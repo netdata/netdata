@@ -48,7 +48,7 @@
     "/chart": {
       "get": {
         "summary": "Get info about a specific chart",
-        "description": "The Chart endpoint returns detailed information about a chart.",
+        "description": "The chart endpoint returns detailed information about a chart.",
         "parameters": [
           {
             "name": "chart",
@@ -78,6 +78,219 @@
           },
           "404": {
             "description": "No chart with the given id is found."
+          }
+        }
+      }
+    },
+    "/contexts": {
+      "get": {
+        "summary": "Get a list of all contexts available at the server",
+        "description": "The contexts endpoint returns a summary about all contexts stored in the netdata server.",
+        "parameters": [
+          {
+            "name": "options",
+            "in": "query",
+            "description": "Options that affect data generation.",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "all",
+                  "charts",
+                  "dimensions",
+                  "labels",
+                  "uuids",
+                  "queue",
+                  "flags",
+                  "deleted",
+                  "deepscan"
+                ]
+              },
+              "default": [
+                "full"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "limit the results on context having data after this timestamp.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "limit the results on context having data before this timestamp.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
+          },
+          {
+            "name": "chart_label_key",
+            "in": "query",
+            "description": "a simple pattern matching charts label keys (use comma or pipe as separator)",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chart_labels_filter",
+            "in": "query",
+            "description": "a simple pattern matching charts label key and values (use colon for equality, comma or pipe as separator)",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dimensions",
+            "in": "query",
+            "description": "a simple pattern matching dimensions (use comma or pipe as separator)",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of contexts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/context_summary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context": {
+      "get": {
+        "summary": "Get info about a specific context",
+        "description": "The context endpoint returns detailed information about a given context.",
+        "parameters": [
+          {
+            "name": "context",
+            "in": "query",
+            "description": "The id of the context as returned by the /contexts call.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "as returned by /contexts",
+              "default": "system.cpu"
+            }
+          },
+          {
+            "name": "options",
+            "in": "query",
+            "description": "Options that affect data generation.",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "all",
+                  "charts",
+                  "dimensions",
+                  "labels",
+                  "uuids",
+                  "queue",
+                  "flags",
+                  "deleted",
+                  "deepscan"
+                ]
+              },
+              "default": [
+                "full"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "limit the results on context having data after this timestamp.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "limit the results on context having data before this timestamp.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
+          },
+          {
+            "name": "chart_label_key",
+            "in": "query",
+            "description": "a simple pattern matching charts label keys (use comma or pipe as separator)",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chart_labels_filter",
+            "in": "query",
+            "description": "a simple pattern matching charts label key and values (use colon for equality, comma or pipe as separator)",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dimensions",
+            "in": "query",
+            "description": "a simple pattern matching dimensions (use comma or pipe as separator)",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A javascript object with detailed information about the context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/context"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No context id was supplied in the request."
+          },
+          "404": {
+            "description": "No context with the given id is found."
           }
         }
       }
@@ -924,7 +1137,7 @@
     "/alarms_values": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time, and alarm `status`.",
+        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing '?all', all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time, and alarm `status`.",
         "parameters": [
           {
             "name": "all",
@@ -1131,7 +1344,7 @@
     "/aclk": {
       "get": {
         "summary": "Get information about current ACLK state",
-        "description": "aclk endpoint returns detailed information about current state of ACLK (Agent to Cloud communication).",
+        "description": "ACLK endpoint returns detailed information about current state of ACLK (Agent to Cloud communication).",
         "responses": {
           "200": {
             "description": "JSON object with ACLK information.",
@@ -1675,6 +1888,89 @@
             "type": "number",
             "nullable": true,
             "description": "Chart health red threshold."
+          }
+        }
+      },
+      "context_summary": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "description": "The hostname of the netdata server."
+          },
+          "machine_guid": {
+            "type": "string",
+            "description": "The unique installation id of this netdata server."
+          },
+          "node_id": {
+            "type": "string",
+            "description": "The unique node id of this netdata server at the hub.",
+            "example": "nightly"
+          },
+          "claim_id": {
+            "type": "string",
+            "description": "The unique handshake id of this netdata server and the hub."
+          },
+          "host_labels": {
+            "type": "object",
+            "description": "The host labels associated with this netdata server."
+          },
+          "context": {
+            "type": "object",
+            "description": "An object containing all the context objects available at the netdata server. This is used as an indexed array. The key of each context object is the id of the context.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/context"
+            }
+          }
+        }
+      },
+      "context": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "The version of this context. The number are not sequential, but bigger numbers depict a newer object."
+          },
+          "hub_version": {
+            "type": "string",
+            "description": "The version of this context, as known by hub."
+          },
+          "family": {
+            "type": "string",
+            "description": "The family of the context. When multiple charts of a context have different families, the netdata server replaces the different parts with [x], so that the context can have only one family."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the context. When multiple charts of a context have different titles, the netdata server replaces the different parts with [x], so that the context can have only one title."
+          },
+          "priority": {
+            "type": "number",
+            "description": "The relative priority of the context. When multiple contexts have different priorities, the minimum among them is selected as the priority of the context."
+          },
+          "units": {
+            "type": "string",
+            "description": "The unit of measurement for the values of all dimensions of the context. If multiple charts of context have different units, the latest collected is selected."
+          },
+          "chart_type": {
+            "type": "string",
+            "description": "The chart type.",
+            "enum": [
+              "line",
+              "area",
+              "stacked"
+            ]
+          },
+          "first_time_t": {
+            "type": "number",
+            "description": "The UNIX timestamp of the first entry (the oldest) in the database."
+          },
+          "last_time_t": {
+            "type": "number",
+            "description": "The UNIX timestamp of the latest entry in the database."
+          },
+          "charts": {
+            "type": "object",
+            "description": "An object containing all the charts available for the chart. This is used as an indexed array. For each pair in the dictionary, the key is the id of the chart and the value provides all details about the chart."
           }
         }
       },

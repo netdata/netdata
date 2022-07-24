@@ -225,6 +225,10 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
+
+                char core[50+1];
+                snprintfz(core, 50, "cpu%d", c);
+                rrdlabels_add(core_st[c]->state->chart_labels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
             else rrdset_next(core_st[c]);
 

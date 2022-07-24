@@ -64,6 +64,7 @@ void netdata_cleanup_and_exit(int ret) {
             rrdeng_exit(multidb_ctx[tier]);
 #endif
     }
+    sql_close_context_database();
     sql_close_database();
 
     // unlink the pid
@@ -733,6 +734,12 @@ static void get_netdata_configured_variables() {
     }
 
     // --------------------------------------------------------------------
+    // rrdcontext
+
+    rrdcontext_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "rrdcontexts", rrdcontext_enabled);
+
+
+    // --------------------------------------------------------------------
     // get various system parameters
 
     get_system_HZ();
@@ -978,6 +985,7 @@ int main(int argc, char **argv) {
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
+                            rrdcontext_enabled = CONFIG_BOOLEAN_NO;
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
@@ -1009,6 +1017,9 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             return mc_unittest();
+                        }
+                        else if(strcmp(optarg, "ctxtest") == 0) {
+                            return ctx_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             return dictionary_unittest(10000);

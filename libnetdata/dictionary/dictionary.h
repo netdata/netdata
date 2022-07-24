@@ -35,26 +35,34 @@
  *
  */
 
-#ifndef DICTIONARY_INTERNALS
-typedef void DICTIONARY;
-#endif
+typedef struct dictionary DICTIONARY;
+typedef struct dictionary_item DICTIONARY_ITEM;
 
 typedef enum dictionary_flags {
-    DICTIONARY_FLAG_NONE                   = 0,        // the default is the opposite of all below
-    DICTIONARY_FLAG_SINGLE_THREADED        = (1 << 0), // don't use any locks (default: use locks)
-    DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE  = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_NAME_LINK_DONT_CLONE   = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE   = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
-    DICTIONARY_FLAG_ADD_IN_FRONT           = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICTIONARY_FLAG_NONE                    = 0,        // the default is the opposite of all below
+    DICTIONARY_FLAG_SINGLE_THREADED         = (1 << 0), // don't use any locks (default: use locks)
+    DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
+    DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
+    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
+    DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1              = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2              = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
-    DICTIONARY_FLAG_RESERVED3              = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
+    DICTIONARY_FLAG_RESERVED1               = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2               = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3               = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
-extern DICTIONARY *dictionary_create(DICTIONARY_FLAGS flags);
+#ifdef NETDATA_INTERNAL_CHECKS
+#define dictionary_create(flags) dictionary_create_advanced_with_trace(flags, 0, __FUNCTION__, __LINE__, __FILE__);
+#define dictionary_create_advanced(flags) dictionary_create_advanced_with_trace(flags, 0, __FUNCTION__, __LINE__, __FILE__);
+extern DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, size_t scratchpad_size, const char *function, size_t line, const char *file);
+#else
+#define dictionary_create(flags) dictionary_create_advanced(flags, 0);
+extern DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size);
+#endif
+
+extern void *dictionary_scratchpad(DICTIONARY *dict);
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
@@ -68,6 +76,11 @@ extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_cal
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
 extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
+
+// a reaction callback to be called after every item insertion or conflict
+// after the constructors have finished and the items are fully available for use
+// and the dictionary is not write locked anymore
+extern void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const char *name, void *value, void *data), void *data);
 
 // Destroy a dictionary
 // returns the number of bytes freed
@@ -99,11 +112,18 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern void *dictionary_acquire_item_unsafe(DICTIONARY *dict, const char *name);
-extern void *dictionary_acquire_item(DICTIONARY *dict, const char *name);
-extern void *dictionary_acquired_item_value(DICTIONARY *dict, void *item);
-extern void dictionary_acquired_item_release(DICTIONARY *dict, void *item);
-extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, void *item);
+extern DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name);
+extern DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name);
+
+extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+extern DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+
+extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
+extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
+
+extern DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM *item);
+extern const char *dictionary_acquired_item_name(DICTIONARY_ITEM *item);
+extern void *dictionary_acquired_item_value(DICTIONARY_ITEM *item);
 
 // UNSAFE functions, without locks
 // to be used when the user is traversing with the right lock type
@@ -159,6 +179,10 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTFE_CONST const
 #endif
 
+#define DICTIONARY_LOCK_READ  'r'
+#define DICTIONARY_LOCK_WRITE 'w'
+#define DICTIONARY_LOCK_NONE  'u'
+
 typedef DICTFE_CONST struct dictionary_foreach {
     DICTFE_CONST char *name;    // the dictionary name of the last item used
     void *value;                // the dictionary value of the last item used
@@ -171,8 +195,8 @@ typedef DICTFE_CONST struct dictionary_foreach {
     void *last_item;            // the item we work on, to remember the position we are at
 } DICTFE;
 
-#define dfe_start_read(dict, value) dfe_start_rw(dict, value, 'r')
-#define dfe_start_write(dict, value) dfe_start_rw(dict, value, 'w')
+#define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
+#define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_rw(dict, value, mode) \
         do { \
             DICTFE value ## _dfe = {};  \
@@ -194,12 +218,35 @@ extern usec_t dictionary_foreach_done(DICTFE *dfe);
 // Get statistics about the dictionary
 extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
 extern long int dictionary_stats_entries(DICTIONARY *dict);
+extern size_t dictionary_stats_version(DICTIONARY *dict);
 extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
 extern size_t dictionary_stats_resets(DICTIONARY *dict);
 extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
+extern size_t dictionary_stats_referenced_items(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
+
+// ----------------------------------------------------------------------------
+// STRING implementation
+
+typedef struct netdata_string STRING;
+extern STRING *string_strdupz(const char *str);
+extern STRING *string_dup(STRING *string);
+extern void string_freez(STRING *string);
+extern size_t string_length(STRING *string);
+extern const char *string2str(STRING *string) NEVERNULL;
+
+// keep common prefix/suffix and replace everything else with [x]
+extern STRING *string_2way_merge(STRING *a, STRING *b);
+
+static inline int string_cmp(STRING *s1, STRING *s2) {
+    // STRINGs are deduplicated, so the same strings have the same pointer
+    if(unlikely(s1 == s2)) return 0;
+
+    // they differ, do the typical comparison
+    return strcmp(string2str(s1), string2str(s2));
+}
 
 #endif /* NETDATA_DICTIONARY_H */

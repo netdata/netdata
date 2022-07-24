@@ -489,6 +489,9 @@ struct rrdpush_destinations *destinations_init(const char *dests) {
 // The sender mutex guards thread creation, any spurious data is wiped on reconnection.
 void rrdpush_sender_thread_stop(RRDHOST *host) {
 
+    if (!host->sender)
+        return;
+
     netdata_mutex_lock(&host->sender->mutex);
     netdata_thread_t thr = 0;
 

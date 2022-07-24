@@ -1173,8 +1173,8 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
         all_points_read += points;
         tmp->query_ops.finalize(&handle);
 
-        internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
-                       rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
+        //internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
+        //               rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
     }
 
     rrdr_query_completed(all_points_read, all_points_read);

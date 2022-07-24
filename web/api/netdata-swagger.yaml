@@ -43,7 +43,7 @@ paths:
   /chart:
     get:
       summary: Get info about a specific chart
-      description: The Chart endpoint returns detailed information about a chart.
+      description: The chart endpoint returns detailed information about a chart.
       parameters:
         - name: chart
           in: query
@@ -64,6 +64,159 @@ paths:
           description: No chart id was supplied in the request.
         "404":
           description: No chart with the given id is found.
+  /contexts:
+    get:
+      summary: Get a list of all contexts available at the server
+      description: The contexts endpoint returns a summary about all contexts stored in the
+        netdata server.
+      parameters:
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - full
+                - all
+                - charts
+                - dimensions
+                - labels
+                - uuids
+                - queue
+                - flags
+                - deleted
+                - deepscan
+            default:
+              - full
+        - name: after
+          in: query
+          description: limit the results on context having data after this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: before
+          in: query
+          description: limit the results on context having data before this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: chart_label_key
+          in: query
+          description: a simple pattern matching charts label keys (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: chart_labels_filter
+          in: query
+          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
+           as separator)"
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: dimensions
+          in: query
+          description: a simple pattern matching dimensions (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An array of contexts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/context_summary"
+  /context:
+    get:
+      summary: Get info about a specific context
+      description: The context endpoint returns detailed information about a given context.
+      parameters:
+        - name: context
+          in: query
+          description: The id of the context as returned by the /contexts call.
+          required: true
+          schema:
+            type: string
+            format: as returned by /contexts
+            default: system.cpu
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - full
+                - all
+                - charts
+                - dimensions
+                - labels
+                - uuids
+                - queue
+                - flags
+                - deleted
+                - deepscan
+            default:
+              - full
+        - name: after
+          in: query
+          description: limit the results on context having data after this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: before
+          in: query
+          description: limit the results on context having data before this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: chart_label_key
+          in: query
+          description: a simple pattern matching charts label keys (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: chart_labels_filter
+          in: query
+          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
+            as separator)"
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: dimensions
+          in: query
+          description: a simple pattern matching dimensions (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A javascript object with detailed information about the context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/context"
+        "400":
+          description: No context id was supplied in the request.
+        "404":
+          description: No context with the given id is found.
   /alarm_variables:
     get:
       summary: List variables available to configure alarms for a chart
@@ -461,7 +614,9 @@ paths:
             format: any text
         - name: label_color
           in: query
-          description: A color to be used for the background of the label side(left side) of the badge. One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character). If value wrong or not given default color will be used.
+          description: "A color to be used for the background of the label side(left side) of the badge.
+            One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character).
+            If value wrong or not given default color will be used."
           required: false
           allowEmptyValue: true
           schema:
@@ -486,7 +641,8 @@ paths:
           description: "A color to be used for the background of the value *(right)* part of badge. You can set
             multiple using a pipe with a condition each, like this:
             `color<value|color:null` The following operators are
-            supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter.
+            supported: >, <, >=, <=, =, :null (to check if no value exists).
+            Each color can be specified in same manner as for `label_color` parameter.
             Currently only integers are supported as values."
           required: false
           allowEmptyValue: true
@@ -495,7 +651,9 @@ paths:
             format: any text
         - name: text_color_lbl
           in: query
-          description: Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          description: "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal
+            color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default
+            color will be used."
           required: false
           allowEmptyValue: true
           schema:
@@ -517,7 +675,9 @@ paths:
                 format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: text_color_val
           in: query
-          description: Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          description: "Font color for value *(right)* part of the badge. One of predefined colors or as HTML
+            hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value
+            given default color will be used."
           required: false
           allowEmptyValue: true
           schema:
@@ -565,7 +725,12 @@ paths:
             format: integer
         - name: fixed_width_lbl
           in: query
-          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's left side *(label/name)*. You must set this parameter together with `fixed_width_val` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          description: "This parameter overrides auto-sizing of badge and creates it with fixed width.
+            This parameter determines the size of the label's left side *(label/name)*.
+            You must set this parameter together with `fixed_width_val` otherwise it will be ignored.
+            You should set the label/value widths wide enough to provide space for all the possible values/contents of
+            the badge you're requesting. In case the text cannot fit the space given it will be clipped.
+            The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`."
           required: false
           allowEmptyValue: false
           schema:
@@ -573,7 +738,12 @@ paths:
             format: integer
         - name: fixed_width_val
           in: query
-          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's right side *(value)*. You must set this parameter together with `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          description: "This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter
+            determines the size of the label's right side *(value)*. You must set this parameter together with
+            `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to
+            provide space for all the possible values/contents of the badge you're requesting. In case the text cannot
+            fit the space given it will be clipped. The `scale` parameter still applies on the values you give to
+            `fixed_width_lbl` and `fixed_width_val`."
           required: false
           allowEmptyValue: false
           schema:
@@ -754,12 +924,12 @@ paths:
   /alarms_values:
     get:
       summary: Get a list of active or raised alarms on the server
-      description: The alarms_values endpoint returns the list of all raised or enabled alarms on
+      description: "The alarms_values endpoint returns the list of all raised or enabled alarms on
         the netdata server. Called without any parameters, the raised alarms in
-        state WARNING or CRITICAL are returned. By passing "?all", all the
+        state WARNING or CRITICAL are returned. By passing '?all', all the
         enabled alarms are returned.
         This option output differs from `/alarms` in the number of variables delivered. This endpoint gives
-        to user `id`, `value`, `last_updated` time, and alarm `status`.
+        to user `id`, `value`, `last_updated` time, and alarm `status`."
       parameters:
         - name: all
           in: query
@@ -855,16 +1025,16 @@ paths:
             memory.
   /manage/health:
     get:
-      summary: Accesses the health management API to control health checks and
-        notifications at runtime.
-      description: Available from Netdata v1.12 and above, protected via bearer
+      summary: "Accesses the health management API to control health checks and
+        notifications at runtime."
+      description: "Available from Netdata v1.12 and above, protected via bearer
         authorization. Especially useful for maintenance periods, the API allows
         you to disable health checks completely, silence alarm notifications, or
         Disable/Silence specific alarms that match selectors on alarm/template
         name, chart, context, host and family. For the simple disable/silence
         all scenarios, only the cmd parameter is required. The other parameters
         are used to define alarm selectors. For more information and examples,
-        refer to the netdata documentation.
+        refer to the netdata documentation."
       parameters:
         - name: cmd
           in: query
@@ -918,8 +1088,8 @@ paths:
   /aclk:
     get:
       summary: Get information about current ACLK state
-      description: aclk endpoint returns detailed information
-        about current state of ACLK (Agent to Cloud communication).
+      description: "ACLK endpoint returns detailed information
+        about current state of ACLK (Agent to Cloud communication)."
       responses:
         "200":
           description: JSON object with ACLK information.
@@ -929,15 +1099,15 @@ paths:
                 $ref: "#/components/schemas/aclk_state"
   /metric_correlations:
     get:
-      summary: Analyze all the metrics to find their correlations
-      description: Given two time-windows (baseline, highlight), it goes
+      summary: "Analyze all the metrics to find their correlations"
+      description: "Given two time-windows (baseline, highlight), it goes
         through all the available metrics, querying both windows and tries to find
         how these two windows relate to each other. It supports
         multiple algorithms to do so. The result is a list of all
         metrics evaluated, weighted for 0.0 (the two windows are
         more different) to 1.0 (the two windows are similar).
         The algorithm adjusts automatically the baseline window to be
-        a power of two multiple of the highlighted (1, 2, 4, 8, etc).
+        a power of two multiple of the highlighted (1, 2, 4, 8, etc)."
       parameters:
         - name: baseline_after
           in: query
@@ -1377,6 +1547,75 @@ components:
           type: number
           nullable: true
           description: Chart health red threshold.
+    context_summary:
+      type: object
+      properties:
+        hostname:
+          type: string
+          description: The hostname of the netdata server.
+        machine_guid:
+          type: string
+          description: The unique installation id of this netdata server.
+        node_id:
+          type: string
+          description: The unique node id of this netdata server at the hub.
+          example: nightly
+        claim_id:
+          type: string
+          description: The unique handshake id of this netdata server and the hub.
+        host_labels:
+          type: object
+          description: The host labels associated with this netdata server.
+        context:
+          type: object
+          description: "An object containing all the context objects available at the netdata server.
+            This is used as an indexed array. The key of each context object is the id of the context."
+          additionalProperties:
+            $ref: "#/components/schemas/context"
+    context:
+      type: object
+      properties:
+        version:
+          type: string
+          description: "The version of this context.
+            The number are not sequential, but bigger numbers depict a newer object."
+        hub_version:
+          type: string
+          description: The version of this context, as known by hub.
+        family:
+          type: string
+          description: "The family of the context. When multiple charts of a context have different families,
+            the netdata server replaces the different parts with [x], so that the context can have only one family."
+        title:
+          type: string
+          description: "The title of the context. When multiple charts of a context have different titles,
+            the netdata server replaces the different parts with [x], so that the context can have only one title."
+        priority:
+          type: number
+          description: "The relative priority of the context. When multiple contexts have different priorities,
+            the minimum among them is selected as the priority of the context."
+        units:
+          type: string
+          description: "The unit of measurement for the values of all dimensions of the context. If multiple charts
+            of context have different units, the latest collected is selected."
+        chart_type:
+          type: string
+          description: The chart type.
+          enum:
+            - line
+            - area
+            - stacked
+        first_time_t:
+          type: number
+          description: The UNIX timestamp of the first entry (the oldest) in the database.
+        last_time_t:
+          type: number
+          description: The UNIX timestamp of the latest entry in the database.
+        charts:
+          type: object
+          description: "An object containing all the charts available for the chart. This is used as an indexed array.
+            For each pair in the dictionary, the key is the id of the chart and the value provides all details about
+            the chart."
     alarm_variables:
       type: object
       properties:
@@ -1848,8 +2087,9 @@ components:
       properties:
         aclk-available:
           type: string
-          description: Describes whether this agent is capable of connection to the Cloud.
-            False means agent has been built without ACLK component either on purpose (user choice) or due to missing dependency.
+          description: "Describes whether this agent is capable of connection to the Cloud.
+            False means agent has been built without ACLK component either on purpose (user choice)
+            or due to missing dependency."
         aclk-version:
           type: integer
           description: Describes which ACLK version is currently used.

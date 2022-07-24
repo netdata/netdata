@@ -143,7 +143,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
     int rc = 0;
     CHECK_SQLITE_CONNECTION(db_meta);
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
 
     RRDSET *st = cmd.data;
 
@@ -222,7 +222,7 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
     if (uuid_parse(wc->host_guid, host_id))
         return;
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (!claim_id)
         return;
 
@@ -281,7 +281,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
 
     struct aclk_chart_dimension_data *aclk_cd_data = cmd.data;
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (!claim_id)
         goto cleanup;
 
@@ -308,7 +308,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
@@ -736,7 +736,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         wc->chart_reset_count);
 
                     chart_reset_t chart_reset;
-                    chart_reset.claim_id = is_agent_claimed();
+                    chart_reset.claim_id = get_agent_claimid();
                     if (chart_reset.claim_id) {
                         chart_reset.node_id = node_id;
                         chart_reset.reason = SEQ_ID_NOT_EXISTS;
@@ -825,7 +825,12 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
     if (!aclk_connected)
         return;
 
-    char *claim_id = is_agent_claimed();
+    if (wc->host && rrdhost_flag_check(wc->host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        internal_error(true, "Skipping aclk_update_retention for host %s because context streaming is enabled", wc->host->hostname);
+        return;
+    }
+
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
@@ -1060,6 +1065,10 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc)
 
 void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 {
+    RRDHOST *host = rd->rrdset->rrdhost;
+    if (likely(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)))
+        return;
+
     int live = !last_updated;
 
     if (likely(rd->aclk_live_status == live))
@@ -1076,7 +1085,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     if (unlikely(!wc))
         return;
 
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
@@ -1120,7 +1129,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
 
 void aclk_send_dimension_update(RRDDIM *rd)
 {
-    char *claim_id = is_agent_claimed();
+    char *claim_id = get_agent_claimid();
     if (unlikely(!claim_id))
         return;
 
@@ -1290,6 +1299,11 @@ void sql_check_chart_liveness(RRDSET *st) {
 // ST is read locked
 int queue_chart_to_aclk(RRDSET *st)
 {
+    RRDHOST *host = st->rrdhost;
+
+    if (likely(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)))
+        return 0;
+
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                        st, ACLK_DATABASE_ADD_CHART);
 }

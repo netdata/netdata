@@ -1772,6 +1772,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
             , NULL
+            , 0
     );
 }
 
@@ -2279,7 +2280,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
     rrd_wrlock();
-    rrdhost_free(host);
+    rrdhost_free(host, 1);
     rrd_unlock();
 }
 

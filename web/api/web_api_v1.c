@@ -374,6 +374,155 @@ inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_c
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
+static RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    char *tok;
+
+    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+        if(!*tok) continue;
+
+        if(!strcmp(tok, "full") || !strcmp(tok, "all"))
+            options |= RRDCONTEXT_OPTIONS_ALL;
+        else if(!strcmp(tok, "charts") || !strcmp(tok, "instances"))
+            options |= RRDCONTEXT_OPTION_SHOW_INSTANCES;
+        else if(!strcmp(tok, "dimensions") || !strcmp(tok, "metrics"))
+            options |= RRDCONTEXT_OPTION_SHOW_METRICS;
+        else if(!strcmp(tok, "queue"))
+            options |= RRDCONTEXT_OPTION_SHOW_QUEUED;
+        else if(!strcmp(tok, "flags"))
+            options |= RRDCONTEXT_OPTION_SHOW_FLAGS;
+        else if(!strcmp(tok, "uuids"))
+            options |= RRDCONTEXT_OPTION_SHOW_UUIDS;
+        else if(!strcmp(tok, "deleted"))
+            options |= RRDCONTEXT_OPTION_SHOW_DELETED;
+        else if(!strcmp(tok, "labels"))
+            options |= RRDCONTEXT_OPTION_SHOW_LABELS;
+        else if(!strcmp(tok, "deepscan"))
+            options |= RRDCONTEXT_OPTION_DEEPSCAN;
+    }
+
+    return options;
+}
+
+static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w, char *url) {
+    char *context = NULL;
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    time_t after = 0, before = 0;
+    const char *chart_label_key = NULL, *chart_labels_filter = NULL;
+    BUFFER *dimensions = NULL;
+
+    buffer_flush(w->response.data);
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "context") || !strcmp(name, "ctx")) context = value;
+        else if(!strcmp(name, "after")) after = str2l(value);
+        else if(!strcmp(name, "before")) before = str2l(value);
+        else if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
+        else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+            if(!dimensions) dimensions = buffer_create(100);
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
+    }
+
+    if(!context || !*context) {
+        buffer_sprintf(w->response.data, "No context is given at the request.");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    SIMPLE_PATTERN *chart_label_key_pattern = NULL;
+    SIMPLE_PATTERN *chart_labels_filter_pattern = NULL;
+    SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
+
+    if(chart_label_key)
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(chart_labels_filter)
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(dimensions) {
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        buffer_free(dimensions);
+    }
+
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    int ret = rrdcontext_to_json(host, w->response.data, after, before, options, context, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
+
+    simple_pattern_free(chart_label_key_pattern);
+    simple_pattern_free(chart_labels_filter_pattern);
+    simple_pattern_free(chart_dimensions_pattern);
+
+    return ret;
+}
+
+static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
+    RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
+    time_t after = 0, before = 0;
+    const char *chart_label_key = NULL, *chart_labels_filter = NULL;
+    BUFFER *dimensions = NULL;
+
+    buffer_flush(w->response.data);
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "after")) after = str2l(value);
+        else if(!strcmp(name, "before")) before = str2l(value);
+        else if(!strcmp(name, "options")) options = rrdcontext_to_json_parse_options(value);
+        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
+        else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+            if(!dimensions) dimensions = buffer_create(100);
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
+    }
+
+    SIMPLE_PATTERN *chart_label_key_pattern = NULL;
+    SIMPLE_PATTERN *chart_labels_filter_pattern = NULL;
+    SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
+
+    if(chart_label_key)
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(chart_labels_filter)
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if(dimensions) {
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+        buffer_free(dimensions);
+    }
+
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    int ret = rrdcontexts_to_json(host, w->response.data, after, before, options, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
+
+    simple_pattern_free(chart_label_key_pattern);
+    simple_pattern_free(chart_labels_filter_pattern);
+    simple_pattern_free(chart_dimensions_pattern);
+
+    return ret;
+}
+
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
 
@@ -932,8 +1081,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
-            continue;
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
@@ -945,8 +1092,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     count = 0;
     rrdhost_foreach_read(host)
     {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
-            continue;
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
@@ -1077,7 +1222,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
 #endif
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     if (agent_id == NULL)
         buffer_strcat(wb, "\t\"agent-claimed\": false,\n");
     else {
@@ -1398,6 +1543,8 @@ static struct api_command {
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_context         },
+        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_contexts        },
         { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_archivedcharts  },
 
         // registry checks the ACL by itself, so we allow everything

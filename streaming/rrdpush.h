@@ -160,7 +160,7 @@ extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
-extern void sender_init(struct sender_state *s, RRDHOST *parent);
+extern void sender_init(RRDHOST *parent);
 extern struct rrdpush_destinations *destinations_init(const char *destinations);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);

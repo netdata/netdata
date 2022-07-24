@@ -141,12 +141,12 @@ static int wait_till_cloud_enabled()
 static int wait_till_agent_claimed(void)
 {
     //TODO prevent malloc and freez
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     while (likely(!agent_id)) {
         sleep_usec(USEC_PER_SEC * 1);
         if (netdata_exit)
             return 1;
-        agent_id = is_agent_claimed();
+        agent_id = get_agent_claimid();
     }
     freez(agent_id);
     return 0;
@@ -769,6 +769,16 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     };
     node_state_update.node_id = mallocz(UUID_STR_LEN);
     uuid_unparse_lower(node_id, (char*)node_state_update.node_id);
+
+    struct capability caps[] = {
+        { .name = "proto", .version = 1,                     .enabled = 1 },
+        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(host) },
+        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
+        { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
+        { .name = NULL,    .version = 0,                     .enabled = 0 }
+    };
+    node_state_update.capabilities = caps;
+
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
@@ -801,6 +811,20 @@ void aclk_send_node_instances()
             };
             node_state_update.node_id = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->node_id, (char*)node_state_update.node_id);
+
+            char host_id[UUID_STR_LEN];
+            uuid_unparse_lower(list->host_id, host_id);
+
+            RRDHOST *host = rrdhost_find_by_guid(host_id, 0);
+            struct capability caps[] = {
+                { .name = "proto", .version = 1,                     .enabled = 1 },
+                { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
+                { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
+                { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
+                { .name = NULL,    .version = 0,                     .enabled = 0 }
+            };
+            node_state_update.capabilities = caps;
+
             rrdhost_aclk_state_lock(localhost);
             node_state_update.claim_id = localhost->aclk_state.claimed_id;
             query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
@@ -913,7 +937,7 @@ char *ng_aclk_state(void)
     );
     buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", use_mqtt_5 ? 5 : 3);
 
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     if (agent_id == NULL)
         buffer_strcat(wb, "No\n");
     else {
@@ -1079,7 +1103,7 @@ char *ng_aclk_state_json(void)
     json_object_array_add(grp, tmp);
     json_object_object_add(msg, "protocols-supported", grp);
 
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     tmp = json_object_new_boolean(agent_id != NULL);
     json_object_object_add(msg, "agent-claimed", tmp);
 

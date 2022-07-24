@@ -724,17 +724,21 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     netdata_mutex_unlock(&host->sender->mutex);
 }
 
-void sender_init(struct sender_state *s, RRDHOST *parent) {
-    memset(s, 0, sizeof(*s));
-    s->host = parent;
-    s->buffer = cbuffer_new(1024, 1024*1024);
-    s->build = buffer_create(1);
+void sender_init(RRDHOST *parent)
+{
+    if (parent->sender)
+        return;
+
+    parent->sender = callocz(1, sizeof(*parent->sender));
+    parent->sender->host = parent;
+    parent->sender->buffer = cbuffer_new(1024, 1024*1024);
+    parent->sender->build = buffer_create(1);
 #ifdef ENABLE_COMPRESSION
-    s->rrdpush_compression = default_compression_enabled;
+    parent->sender->rrdpush_compression = default_compression_enabled;
     if (default_compression_enabled)
-        s->compressor = create_compressor();
+        parent->sender->compressor = create_compressor();
 #endif
-    netdata_mutex_init(&s->mutex);
+    netdata_mutex_init(&parent->sender->mutex);
 }
 
 void *rrdpush_sender_thread(void *ptr) {

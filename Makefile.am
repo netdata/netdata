@@ -434,6 +434,8 @@ RRD_PLUGIN_FILES = \
     database/rrdcalc.h \
     database/rrdcalctemplate.c \
     database/rrdcalctemplate.h \
+    database/rrdcontext.c \
+    database/rrdcontext.h \
     database/rrddim.c \
     database/rrddimvar.c \
     database/rrddimvar.h \
@@ -453,6 +455,8 @@ RRD_PLUGIN_FILES = \
     database/ram/rrddim_mem.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
+    database/sqlite/sqlite_context.c \
+    database/sqlite/sqlite_context.h \
     database/sqlite/sqlite_db_migration.c \
     database/sqlite/sqlite_db_migration.h \
     database/sqlite/sqlite_aclk.c \
@@ -706,6 +710,8 @@ ACLK_FILES = \
     aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
     aclk/aclk_alarm_api.h \
+    aclk/aclk_contexts_api.c \
+    aclk/aclk_contexts_api.h \
     aclk/schema-wrappers/connection.cc \
     aclk/schema-wrappers/connection.h \
     aclk/schema-wrappers/node_connection.cc \
@@ -729,6 +735,10 @@ ACLK_FILES = \
     aclk/schema-wrappers/schema_wrappers.h \
     aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
+    aclk/schema-wrappers/context_stream.cc \
+    aclk/schema-wrappers/context_stream.h \
+    aclk/schema-wrappers/context.cc \
+    aclk/schema-wrappers/context.h \
     $(NULL)
 
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
@@ -746,6 +756,8 @@ ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
+    aclk/aclk-schemas/proto/context/v1/context.proto \
+    aclk/aclk-schemas/proto/context/v1/stream.proto \
     $(NULL)
 
 dist_noinst_DATA += $(ACLK_PROTO_DEFINITIONS)
@@ -774,6 +786,10 @@ ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/alarm/v1/stream.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h \
+    aclk/aclk-schemas/proto/context/v1/context.pb.cc \
+    aclk/aclk-schemas/proto/context/v1/context.pb.h \
+    aclk/aclk-schemas/proto/context/v1/stream.pb.cc \
+    aclk/aclk-schemas/proto/context/v1/stream.pb.h \
     $(NULL)
 
 BUILT_SOURCES += $(ACLK_PROTO_BUILT_FILES)
@@ -826,6 +842,14 @@ aclk/aclk-schemas/proto/alarm/v1/stream.pb.h: aclk/aclk-schemas/proto/alarm/v1/s
 
 aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h: aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/context/v1/context.pb.cc \
+aclk/aclk-schemas/proto/context/v1/context.pb.h: aclk/aclk-schemas/proto/context/v1/context.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/context/v1/stream.pb.cc \
+aclk/aclk-schemas/proto/context/v1/stream.pb.h: aclk/aclk-schemas/proto/context/v1/stream.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 endif #ENABLE_ACLK

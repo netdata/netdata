@@ -3,11 +3,18 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 2
+#define DB_METADATA_VERSION 3
 
 const char *database_config[] = {
-    "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
-    "registry_hostname text, update_every int, os text, timezone text, tags text, hops INT);",
+    "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
+    "registry_hostname TEXT NOT NULL default 'unknown', update_every INT NOT NULL default 1, "
+    "os TEXT NOT NULL default 'unknown', timezone TEXT NOT NULL default 'unknown', tags TEXT NOT NULL default '',"
+    "hops INT NOT NULL DEFAULT 0,"
+    "memory_mode INT DEFAULT 0, abbrev_timezone TEXT DEFAULT '', utc_offset INT NOT NULL DEFAULT 0,"
+    "program_name TEXT NOT NULL DEFAULT 'unknown', program_version TEXT NOT NULL DEFAULT 'unknown', "
+    "entries INT NOT NULL DEFAULT 0,"
+    "health_enabled INT NOT NULL DEFAULT 0);",
+
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
     "chart_type int, memory_mode int, history_entries);",
@@ -349,13 +356,13 @@ static int attempt_database_fix()
     return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
 
-int init_database_batch(int rebuild, int init_type, const char *batch[])
+int init_database_batch(sqlite3 *database, int rebuild, int init_type, const char *batch[])
 {
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
         debug(D_METADATALOG, "Executing %s", batch[i]);
-        rc = sqlite3_exec(db_meta, batch[i], 0, 0, &err_msg);
+        rc = sqlite3_exec(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
@@ -449,41 +456,41 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_database_batch(rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
     snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_database_batch(rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
     snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_database_batch(rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
     snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_database_batch(rebuild, 0, list)) return 1;
-    
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_database_batch(rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_database_batch(rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
 
     snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_database_batch(rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
 
-    if (init_database_batch(rebuild, 0, &database_config[0]))
+    if (init_database_batch(db_meta, rebuild, 0, &database_config[0]))
         return 1;
 
-    if (init_database_batch(rebuild, 0, &database_cleanup[0]))
+    if (init_database_batch(db_meta, rebuild, 0, &database_cleanup[0]))
         return 1;
 
     fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
@@ -850,6 +857,113 @@ bind_fail:
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement to store host %s, rc = %d", hostname, rc);
+    return 1;
+}
+
+//
+// Store host and host system info information in the database
+#define SQL_STORE_HOST_INFO "INSERT OR REPLACE INTO host " \
+        "(host_id, hostname, registry_hostname, update_every, os, timezone," \
+        "tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, program_version," \
+        "entries, health_enabled) " \
+        "values (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, " \
+        "@abbrev_timezone, @utc_offset, @program_name, @program_version, " \
+        "@entries, @health_enabled);"
+
+int sql_store_host_info(RRDHOST *host)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely((!res))) {
+        rc = prepare_statement(db_meta, SQL_STORE_HOST_INFO, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store host, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 2, host->hostname, 0);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 3, host->registry_hostname, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 4, host->rrd_update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 5, host->os, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 6, host->timezone, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 7, host->tags, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 8, host->system_info ? host->system_info->hops : 0);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 9, host->rrd_memory_mode);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 10, host->abbrev_timezone, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 11, host->utc_offset);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 12, host->program_name, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, 13, host->program_version, 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int64(res, 14, host->rrd_history_entries);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 15, host->health_enabled);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    int store_rc = sqlite3_step(res);
+    if (unlikely(store_rc != SQLITE_DONE))
+        error_report("Failed to store host %s, rc = %d", host->hostname, rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store host %s, rc = %d", host->hostname, rc);
+
+    return !(store_rc == SQLITE_DONE);
+bind_fail:
+    error_report("Failed to bind parameter to store host %s, rc = %d", host->hostname, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store host %s, rc = %d", host->hostname, rc);
     return 1;
 }
 
@@ -1884,6 +1998,11 @@ void compute_chart_hash(RRDSET *st)
     unsigned int hash_len;
     char  priority_str[32];
 
+    if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        internal_error(true, "Skipping compute_chart_hash for host %s because context streaming is enabled", st->rrdhost->hostname);
+        return;
+    }
+
     sprintf(priority_str, "%ld", st->priority);
 
     evpctx = EVP_MD_CTX_create();
@@ -2318,6 +2437,7 @@ failed:
     return;
 };
 
+
 #define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id;"
 
 void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
@@ -2481,3 +2601,12 @@ void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_inf
     return;
 }
 
+// Utils
+int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null)
+{
+    if (likely(text))
+        return sqlite3_bind_text(res, position, text, -1, SQLITE_STATIC);
+    if (!can_be_null)
+        return 1;
+    return sqlite3_bind_null(res, position);
+}

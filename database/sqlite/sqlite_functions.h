@@ -60,9 +60,12 @@ typedef enum db_check_action_type {
 
 extern int sql_init_database(db_check_action_type_t rebuild, int memory);
 extern void sql_close_database(void);
-
+extern int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
 extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
                           const char *timezone, const char *tags, int hops);
+
+extern int sql_store_host_info(RRDHOST *host);
+
 extern int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
@@ -104,7 +107,8 @@ extern void compute_chart_hash(RRDSET *st);
 extern int sql_set_dimension_option(uuid_t *dim_uuid, char *option);
 char *get_hostname_by_node_id(char *node_id);
 void free_temporary_host(RRDHOST *host);
-int init_database_batch(int rebuild, int init_type, const char *batch[]);
+int init_database_batch(sqlite3 *database, int rebuild, int init_type, const char *batch[]);
 void migrate_localhost(uuid_t *host_uuid);
 extern void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info);
+extern void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

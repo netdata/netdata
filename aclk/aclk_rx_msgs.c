@@ -289,6 +289,15 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         }
     }
 
+    struct capability caps[] = {
+        { .name = "proto", .version = 1,                     .enabled = 1 },
+        { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
+        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
+        { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
+        { .name = NULL,    .version = 0,                     .enabled = 0 }
+    };
+    node_state_update.capabilities = caps;
+
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
@@ -313,6 +322,7 @@ int send_node_instances(const char *msg, size_t msg_len)
 
 int stream_charts_and_dimensions(const char *msg, size_t msg_len)
 {
+    aclk_ctx_based = 0;
     stream_charts_and_dims_t res = parse_stream_charts_and_dims(msg, msg_len);
     if (!res.claim_id || !res.node_id) {
         error("Error parsing StreamChartsAndDimensions msg");
@@ -426,6 +436,41 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
     return 0;
 }
 
+int contexts_checkpoint(const char *msg, size_t msg_len)
+{
+    aclk_ctx_based = 1;
+
+    struct ctxs_checkpoint *cmd = parse_ctxs_checkpoint(msg, msg_len);
+    if (!cmd)
+        return 1;
+
+    rrdcontext_hub_checkpoint_command(cmd);
+
+    freez(cmd->claim_id);
+    freez(cmd->node_id);
+    freez(cmd);
+    return 0;
+}
+
+int stop_streaming_contexts(const char *msg, size_t msg_len)
+{
+    if (!aclk_ctx_based) {
+        error_report("Received StopStreamingContexts message but context based communication was not enabled  (Cloud violated the protocol). Ignoring message");
+        return 1;
+    }
+
+    struct stop_streaming_ctxs *cmd = parse_stop_streaming_ctxs(msg, msg_len);
+    if (!cmd)
+        return 1;
+
+    rrdcontext_hub_stop_streaming_command(cmd);
+
+    freez(cmd->claim_id);
+    freez(cmd->node_id);
+    freez(cmd);
+    return 0;
+}
+
 typedef struct {
     const char *name;
     simple_hash_t name_hash;
@@ -444,6 +489,8 @@ new_cloud_rx_msg_t rx_msgs[] = {
     { .name = "SendAlarmConfiguration",    .name_hash = 0, .fnc = send_alarm_configuration     },
     { .name = "SendAlarmSnapshot",         .name_hash = 0, .fnc = send_alarm_snapshot          },
     { .name = "DisconnectReq",             .name_hash = 0, .fnc = handle_disconnect_req        },
+    { .name = "ContextsCheckpoint",        .name_hash = 0, .fnc = contexts_checkpoint          },
+    { .name = "StopStreamingContexts",     .name_hash = 0, .fnc = stop_streaming_contexts      },
     { .name = NULL,                        .name_hash = 0, .fnc = NULL                         },
 };
 

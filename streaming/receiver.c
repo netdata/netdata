@@ -517,6 +517,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
                 , rpt->system_info
+                , 0
         );
 
         if(!rpt->host) {
@@ -706,12 +707,16 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
+    rrdcontext_host_child_connected(rpt->host);
+
     size_t count = streaming_parser(rpt, &cd, fp);
 
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
                           "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
+
+    rrdcontext_host_child_disconnected(rpt->host);
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud

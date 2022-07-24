@@ -258,6 +258,68 @@ void aclk_sync_exit_all()
     uv_mutex_unlock(&aclk_async_lock);
 }
 
+#ifdef ENABLE_ACLK
+enum {
+    IDX_HOST_ID,
+    IDX_HOSTNAME,
+    IDX_REGISTRY,
+    IDX_UPDATE_EVERY,
+    IDX_OS,
+    IDX_TIMEZONE,
+    IDX_TAGS,
+    IDX_HOPS,
+    IDX_MEMORY_MODE,
+    IDX_ABBREV_TIMEZONE,
+    IDX_UTC_OFFSET,
+    IDX_PROGRAM_NAME,
+    IDX_PROGRAM_VERSION,
+    IDX_ENTRIES,
+    IDX_HEALTH_ENABLED,
+};
+
+static int create_host_callback(void *data, int argc, char **argv, char **column)
+{
+    UNUSED(data);
+    UNUSED(argc);
+    UNUSED(column);
+
+    char guid[UUID_STR_LEN];
+    uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
+
+    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+    system_info->hops = str2i((const char *) argv[IDX_HOPS]);
+
+    sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
+
+    RRDHOST *host = rrdhost_find_or_create(
+          (const char *) argv[IDX_HOSTNAME]
+        , (const char *) argv[IDX_REGISTRY]
+        , guid
+        , (const char *) argv[IDX_OS]
+        , (const char *) argv[IDX_TIMEZONE]
+        , (const char *) argv[IDX_ABBREV_TIMEZONE]
+        , argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET]) : 0
+        , (const char *) argv[IDX_TAGS]
+        , (const char *) (argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown")
+        , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
+        , argv[3] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
+        , argv[13] ? str2i(argv[IDX_ENTRIES]) : 0
+        , RRD_MEMORY_MODE_DBENGINE
+        , 0 // health
+        , 0 // rrdpush enabled
+        , NULL  //destination
+        , NULL  // api key
+        , NULL  // send charts matching
+        , system_info
+        , 1
+    );
+    char node_str[UUID_STR_LEN] = "<none>";
+    uuid_unparse_lower(*host->node_id, node_str);
+    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", host->hostname, host->machine_guid, node_str);
+    return 0;
+}
+#endif
+
 int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 {
     char uuid_str[GUID_LEN + 1];
@@ -267,10 +329,11 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
-    if (rrdhost_find_by_guid(uuid_str, 0) == localhost)
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str, 0);
+    if (host == localhost)
         return 0;
 
-    sql_create_aclk_table(NULL, (uuid_t *) argv[0], (uuid_t *) argv[1]);
+    sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
     return 0;
 }
 
@@ -303,8 +366,23 @@ void sql_aclk_sync_init(void)
     info("SQLite aclk sync initialization completed");
     fatal_assert(0 == uv_mutex_init(&aclk_async_lock));
 
+    if (likely(rrdcontext_enabled == CONFIG_BOOLEAN_YES)) {
+        rc = sqlite3_exec(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
+           "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "
+           "program_version, entries, health_enabled FROM host WHERE hops >0;",
+              create_host_callback, NULL, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
+            sqlite3_free(err_msg);
+        }
+    }
+
     rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
-        "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, NULL);
+        "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("SQLite error when starting ACLK sync threads, rc = %d (%s)", rc, err_msg);
+        sqlite3_free(err_msg);
+    }
 #endif
     return;
 }
@@ -802,6 +880,17 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
 
     buffer_sprintf(sql,"DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
         "date_cloud_ack < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
+
+    buffer_sprintf(sql,"UPDATE aclk_chart_%s SET status = NULL, date_submitted=unixepoch() WHERE "
+            "date_submitted IS NULL AND date_created < unixepoch()-%d;", wc->uuid_str, ACLK_AUTO_MARK_SUBMIT_INTERVAL);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
+
+    buffer_sprintf(sql,"UPDATE aclk_chart_%s SET date_updated = unixepoch() WHERE date_updated IS NULL"
+                " AND date_submitted IS NOT NULL AND date_submitted < unixepoch()-%d;",
+                wc->uuid_str, ACLK_AUTO_MARK_UPDATED_INTERVAL);
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);

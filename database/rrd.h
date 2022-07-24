@@ -49,6 +49,7 @@ struct pg_cache_page_index;
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
+#include "rrdcontext.h"
 
 extern int storage_tiers;
 extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
@@ -196,15 +197,16 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 typedef enum rrdlabel_source {
-    RRDLABEL_SRC_AUTO   = (1 << 0), // set when Netdata found the label by some automation
-    RRDLABEL_SRC_CONFIG = (1 << 1), // set when the user configured the label
-    RRDLABEL_SRC_K8S    = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
-    RRDLABEL_SRC_ACLK   = (1 << 3), // set when this label is found from ACLK (RRDLABEL_SRC_AUTO should also be set)
+    RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
+    RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
+    RRDLABEL_SRC_K8S        = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
+    RRDLABEL_SRC_ACLK       = (1 << 3), // set when this label is found from ACLK (RRDLABEL_SRC_AUTO should also be set)
 
     // more sources can be added here
 
-    RRDLABEL_FLAG_OLD   = (1 << 30), // marks set for rrdlabels internal use - they are not exposed outside rrdlabels
-    RRDLABEL_FLAG_NEW   = (1 << 31)  //
+    RRDLABEL_FLAG_PERMANENT = (1 << 29), // set when this label should never be removed (can be overwritten though)
+    RRDLABEL_FLAG_OLD       = (1 << 30), // marks for rrdlabels internal use - they are not exposed outside rrdlabels
+    RRDLABEL_FLAG_NEW       = (1 << 31)  // marks for rrdlabels internal use - they are not exposed outside rrdlabels
 } RRDLABEL_SRC;
 
 extern DICTIONARY *rrdlabels_create(void);
@@ -222,7 +224,7 @@ extern int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)
 extern void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
 extern bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
 extern bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
-extern void rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+extern int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
 
 extern void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
 extern void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
@@ -284,7 +286,7 @@ struct rrddim {
 
     struct rrddim_tier *tiers[RRD_STORAGE_TIERS];   // our tiers of databases
 
-    size_t collections_counter;                     // the number of times we added values to this rrdim
+    size_t collections_counter;                     // the number of times we added values to this rrddim
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
     NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
@@ -296,11 +298,12 @@ struct rrddim {
 
     // the *_volume members are used to calculate the accuracy of the rounding done by the
     // storage number - they are printed to debug.log when debug is enabled for a set.
-    NETDATA_DOUBLE collected_volume;             // the sum of all collected values so far
-    NETDATA_DOUBLE stored_volume;                // the sum of all stored values so far
+    NETDATA_DOUBLE collected_volume;                // the sum of all collected values so far
+    NETDATA_DOUBLE stored_volume;                   // the sum of all stored values so far
 
     struct rrddim *next;                            // linking of dimensions within the same data set
     struct rrdset *rrdset;
+    RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk
@@ -531,6 +534,9 @@ struct rrdset {
     char *context;                                  // the template of this data set
     uint32_t hash_context;                          // the hash of the chart's context
 
+    RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
+    RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
+
     RRDSET_TYPE chart_type;                         // line, area, stacked
 
     int update_every;                               // every how many seconds is this updated?
@@ -644,17 +650,17 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND         = 1 << 3, // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND    = 1 << 4, // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED               = 1 << 5, // The host is archived, no collected charts yet
-    RRDHOST_FLAG_MULTIHOST              = 1 << 6, // Host belongs to localhost/megadb
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS = 1 << 7, // contains dims with uninitialized foreach alarms
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE   = 1 << 8,
-    RRDHOST_FLAG_STREAM_LABELS_STOP     = 1 << 9,
-
+    RRDHOST_FLAG_ORPHAN                 = (1 << 0), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = (1 << 1), // delete files of obsolete charts
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = (1 << 2), // delete the entire host when orphan
+    RRDHOST_FLAG_EXPORTING_SEND         = (1 << 3), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND    = (1 << 4), // don't send it to external databases
+    RRDHOST_FLAG_ARCHIVED               = (1 << 5), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_MULTIHOST              = (1 << 6), // Host belongs to localhost/megadb
+    RRDHOST_FLAG_PENDING_FOREACH_ALARMS = (1 << 7), // contains dims with uninitialized foreach alarms
+    RRDHOST_FLAG_STREAM_LABELS_UPDATE   = (1 << 8),
+    RRDHOST_FLAG_STREAM_LABELS_STOP     = (1 << 9),
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS   = (1 << 10), // when set, we should send ACLK stream context updates
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -925,6 +931,9 @@ struct rrdhost {
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
+    RRDCONTEXTS *rrdctx_queue;
+    RRDCONTEXTS *rrdctx;
+
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
 
@@ -1000,6 +1009,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
         , struct rrdhost_system_info *system_info
+        , bool is_archived
 );
 
 extern void rrdhost_update(RRDHOST *host
@@ -1083,7 +1093,7 @@ extern void rrdhost_cleanup_all(void);
 
 extern void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host);
 extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
-extern void rrdhost_free(RRDHOST *host);
+extern void rrdhost_free(RRDHOST *host, bool force);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
 extern void rrd_cleanup_obsolete_charts();
@@ -1291,7 +1301,7 @@ extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
-extern void rrdset_delete(RRDSET *st);
+extern void rrdset_delete_files(RRDSET *st);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern RRDHOST *rrdhost_create(
@@ -1299,7 +1309,7 @@ extern RRDHOST *rrdhost_create(
     const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
     int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
     char *rrdpush_destination, char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
-    int is_localhost); //TODO: Remove , int is_archived);
+    int is_localhost, bool is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
@@ -1317,6 +1327,7 @@ extern int get_tier_grouping(int tier);
 #include "database/engine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
+#include "sqlite/sqlite_context.h"
 #include "sqlite/sqlite_aclk.h"
 #include "sqlite/sqlite_aclk_chart.h"
 #include "sqlite/sqlite_aclk_alert.h"

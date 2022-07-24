@@ -31,7 +31,7 @@ static char *claiming_errors[] = {
 /* Retrieve the claim id for the agent.
  * Caller owns the string.
 */
-char *is_agent_claimed()
+char *get_agent_claimid()
 {
     char *result;
     rrdhost_aclk_state_lock(localhost);

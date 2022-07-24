@@ -996,6 +996,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
     { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
+    { .name = "RRDCONTEXT",  .family = "workers aclk contexts",           .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }

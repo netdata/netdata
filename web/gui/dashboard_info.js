@@ -1284,6 +1284,41 @@ const ebpfUDPrecv = 'Number of calls to <a href="https://learn.netdata.cloud/doc
     'Netdata gives a summary for this chart in <a href="#ebpf_global_udp_bandwidth_call">Network Stack</a>. ' +
     'When the integration is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata shows UDP calls per <a href="#ebpf_apps_udp_recv">application</a>.' + ebpfChartProvides
 
+const cgroupCPULimit = 'Total CPU utilization within the configured or system-wide (if not set) limits. When the CPU utilization of a cgroup exceeds the limit for the configured period, the tasks belonging to its hierarchy will be throttled and are not allowed to run again until the next period.'
+const cgroupCPU = 'Total CPU utilization within the system-wide CPU resources (all cores). The amount of time spent by tasks of the cgroup in <a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
+const cgroupThrottled = 'The percentage of runnable periods when tasks in a cgroup have been throttled. The tasks have not been allowed to run because they have exhausted all of the available time as specified by their CPU quota.'
+const cgroupThrottledDuration = 'The total time duration for which tasks in a cgroup have been throttled. When an application has used its allotted CPU quota for a given period, it gets throttled until the next period.'
+const cgroupCPUShared = '<p>The weight of each group living in the same hierarchy, that translates into the amount of CPU it is expected to get. The percentage of CPU assigned to the cgroup is the value of shares divided by the sum of all shares in all cgroups in the same level.</p> <p>For example, tasks in two cgroups that have <b>cpu.shares</b> set to 100 will receive equal CPU time, but tasks in a cgroup that has <b>cpu.shares</b> set to 200 receive twice the CPU time of tasks in a cgroup where <b>cpu.shares</b> is set to 100.</p>'
+const cgroupCPUPerCore = 'Total CPU utilization per core within the system-wide CPU resources.'
+const cgroupCPUSomePressure = 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. <b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on CPU. The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+const cgroupCPUSomePressureStallTime = 'The amount of time some processes have been waiting for CPU time.'
+const cgroupCPUFullPressure = 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. <b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on CPU resource simultaneously. The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+const cgroupCPUFullPressureStallTime = 'The amount of time all non-idle processes have been stalled due to CPU congestion.'
+
+const cgroupMemUtilization = 'RAM utilization within the configured or system-wide (if not set) limits. When the RAM utilization of a cgroup exceeds the limit, OOM killer will start killing the tasks belonging to the cgroup.'
+const cgroupMemUsageLimit = 'RAM usage within the configured or system-wide (if not set) limits. When the RAM usage of a cgroup exceeds the limit, OOM killer will start killing the tasks belonging to the cgroup.'
+const cgroupMemUsage = 'The amount of used RAM and swap memory.'
+const cgroupMem = 'Memory usage statistics. The individual metrics are described in the memory.stat section for <a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html#per-memory-cgroup-local-status" target="_blank">cgroup-v1</a> and <a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#memory-interface-files" target="_blank">cgroup-v2</a>.'
+const cgroupMemFailCnt = 'The number of memory usage hits limits.'
+const cgroupWriteback = '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+const cgroupMemActivity = '<p>Memory accounting statistics.</p><p><b>In</b> - a page is accounted as either mapped anon page (RSS) or cache page (Page Cache) to the cgroup. <b>Out</b> - a page is unaccounted from the cgroup.</p>'
+const cgroupPgFaults = '<p>Memory <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> statistics.</p><p><b>Pgfault</b> - all page faults. <b>Swap</b> - major page faults.</p>'
+const cgroupMemorySomePressure = 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. <b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on memory. In this state the CPU is still doing productive work. The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+const cgroupMemorySomePressureStallTime = 'The amount of time some processes have been waiting due to memory congestion.'
+const cgroupMemoryFullPressure = 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. <b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on memory resource simultaneously. In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. This has severe impact on performance. The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+const cgroupMemoryFullPressureStallTime = 'The amount of time all non-idle processes have been stalled due to memory congestion.'
+
+const cgroupIO = 'The amount of data transferred to and from specific devices as seen by the CFQ scheduler. It is not updated when the CFQ scheduler is operating on a request queue.'
+const cgroupServicedOps = 'The number of I/O operations performed on specific devices as seen by the CFQ scheduler.'
+const cgroupQueuedOps = 'The number of requests queued for I/O operations.'
+const cgroupMergedOps = 'The number of BIOS requests merged into requests for I/O operations.'
+const cgroupThrottleIO = 'The amount of data transferred to and from specific devices as seen by the throttling policy.'
+const cgroupThrottleIOServicesOps = 'The number of I/O operations performed on specific devices as seen by the throttling policy.'
+const cgroupIOSomePressure = 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. <b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on I/O. In this state the CPU is still doing productive work. The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+const cgroupIOSomePRessureStallTime = 'The amount of time some processes have been waiting due to I/O congestion.'
+const cgroupIOFullPressure = 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. <b>Full</b> line indicates the share of time in which <b>all non-idle tasks</b> are stalled on I/O resource simultaneously. In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. This has severe impact on performance. The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+const cgroupIOFullPressureStallTime = 'The amount of time all non-idle processes have been stalled due to I/O congestion.'
+
 netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
@@ -3140,6 +3175,64 @@ netdataDashboard.context = {
         info: netMTUInfo
     },
 
+    'k8s.cgroup.net_net': {
+        mainheads: [
+            function (_, id) {
+                var iface;
+                try {
+                    iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
+                } catch (e) {
+                    iface = '';
+                }
+                return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
+
+            },
+            function (_, id) {
+                var iface;
+                try {
+                    iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
+                } catch (e) {
+                    iface = '';
+                }
+                return netdataDashboard.gaugeChart('Sent' + iface, '12%', 'sent');
+            }
+        ],
+        info: netBytesInfo
+    },
+    'k8s.cgroup.net_packets': {
+        info: netPacketsInfo
+    },
+    'k8s.cgroup.net_errors': {
+        info: netErrorsInfo
+    },
+    'k8s.cgroup.net_fifo': {
+        info: netFIFOInfo
+    },
+    'k8s.cgroup.net_drops': {
+        info: netDropsInfo
+    },
+    'k8s.cgroup.net_compressed': {
+        info: netCompressedInfo
+    },
+    'k8s.cgroup.net_events': {
+        info: netEventsInfo
+    },
+    'k8s.cgroup.net_operstate': {
+        info: netOperstateInfo
+    },
+    'k8s.cgroup.net_duplex': {
+        info: netDuplexInfo
+    },
+    'k8s.cgroup.net_carrier': {
+        info: netCarrierInfo
+    },
+    'k8s.cgroup.net_speed': {
+        info: netSpeedInfo
+    },
+    'k8s.cgroup.net_mtu': {
+        info: netMTUInfo
+    },
+
     // ------------------------------------------------------------------------
     // WIRELESS NETWORK INTERFACES
 
@@ -4008,8 +4101,7 @@ netdataDashboard.context = {
     'cgroup.cpu_limit': {
         valueRange: "[0, null]",
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -4026,15 +4118,11 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ],
-        info: 'Total CPU utilization within the configured or system-wide (if not set) limits. '+
-        'When the CPU utilization of a cgroup exceeds the limit for the configured period, '+
-        'the tasks belonging to its hierarchy will be throttled and are not allowed to run again until the next period.'
+        info: cgroupCPULimit
     },
-
     'cgroup.cpu': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 if (cgroupCPULimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -4051,60 +4139,107 @@ netdataDashboard.context = {
                     return '';
             }
         ],
-        info: 'Total CPU utilization within the system-wide CPU resources (all cores). '+
-        'The amount of time spent by tasks of the cgroup in '+
-        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
+        info: cgroupCPU
     },
-
     'cgroup.throttled': {
-        info: 'The percentage of runnable periods when tasks in a cgroup have been throttled. '+ 
-        'The tasks have not been allowed to run because they have exhausted all of the available time as specified by their CPU quota.'
+        info: cgroupThrottled
     },
-
     'cgroup.throttled_duration': {
-        info: 'The total time duration for which tasks in a cgroup have been throttled. '+
-        'When an application has used its allotted CPU quota for a given period, it gets throttled until the next period.'
+        info: cgroupThrottledDuration
     },
-
     'cgroup.cpu_shares': {
-        info: '<p>The weight of each group living in the same hierarchy, that translates into the amount of CPU it is expected to get. '+
-        'The percentage of CPU assigned to the cgroup is the value of shares divided by the sum of all shares in all cgroups in the same level.</p>'+
-        '<p>For example, tasks in two cgroups that have <b>cpu.shares</b> set to 100 will receive equal CPU time, '+
-        'but tasks in a cgroup that has <b>cpu.shares</b> set to 200 receive twice the CPU time of tasks in a cgroup where <b>cpu.shares</b> is set to 100.</p>'
+        info: cgroupCPUShared
     },
-
     'cgroup.cpu_per_core': {
-        info: 'Total CPU utilization per core within the system-wide CPU resources.'
+        info: cgroupCPUPerCore
     },
-
     'cgroup.cpu_some_pressure': {
-        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on CPU. ' +
-            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: cgroupCPUSomePressure
     },
     'cgroup.cpu_some_pressure_stall_time': {
-        info: 'The amount of time some processes have been waiting for CPU time.'
+        info: cgroupCPUSomePressureStallTime
     },
-
     'cgroup.cpu_full_pressure': {
-        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
-            '<b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on CPU resource simultaneously. ' +
-            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: cgroupCPUFullPressure
     },
     'cgroup.cpu_full_pressure_stall_time': {
-        info: 'The amount of time all non-idle processes have been stalled due to CPU congestion.'
+        info: cgroupCPUFullPressureStallTime
+    },
+
+    'k8s.cgroup.cpu_limit': {
+        valueRange: "[0, null]",
+        mainheads: [
+            function (_, id) {
+                cgroupCPULimitIsSet = 1;
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="CPU"'
+                    + ' data-units="%"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' role="application"></div>';
+            }
+        ],
+        info: cgroupCPULimit
+    },
+    'k8s.cgroup.cpu': {
+        mainheads: [
+            function (_, id) {
+                if (cgroupCPULimitIsSet === 0) {
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="CPU"'
+                        + ' data-units="%"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[4] + '"'
+                        + ' role="application"></div>';
+                } else
+                    return '';
+            }
+        ],
+        info: cgroupCPU
+    },
+    'k8s.cgroup.throttled': {
+        info: cgroupThrottled
+    },
+    'k8s.cgroup.throttled_duration': {
+        info: cgroupThrottledDuration
+    },
+    'k8s.cgroup.cpu_shares': {
+        info: cgroupCPUShared
+    },
+    'k8s.cgroup.cpu_per_core': {
+        info: cgroupCPUPerCore
+    },
+    'k8s.cgroup.cpu_some_pressure': {
+        info: cgroupCPUSomePressure
+    },
+    'k8s.cgroup.cpu_some_pressure_stall_time': {
+        info: cgroupCPUSomePressureStallTime
+    },
+    'k8s.cgroup.cpu_full_pressure': {
+        info: cgroupCPUFullPressure
+    },
+    'k8s.cgroup.cpu_full_pressure_stall_time': {
+        info: cgroupCPUFullPressureStallTime
     },
 
     'cgroup.mem_utilization': {
-        info: 'RAM utilization within the configured or system-wide (if not set) limits. '+
-        'When the RAM utilization of a cgroup exceeds the limit, '+
-        'OOM killer will start killing the tasks belonging to the cgroup.'
+        info: cgroupMemUtilization
     },
-
     'cgroup.mem_usage_limit': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -4122,15 +4257,11 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ],
-        info: 'RAM usage within the configured or system-wide (if not set) limits. '+
-        'When the RAM usage of a cgroup exceeds the limit, '+
-        'OOM killer will start killing the tasks belonging to the cgroup.'
+        info: cgroupMemUsageLimit
     },
-
     'cgroup.mem_usage': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 if (cgroupMemLimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -4147,79 +4278,125 @@ netdataDashboard.context = {
                     return '';
             }
         ],
-        info: 'The amount of used RAM and swap memory.'
+        info: cgroupMemUsage
     },
-
     'cgroup.mem': {
-        info: 'Memory usage statistics. '+
-        'The individual metrics are described in the memory.stat section for '+
-        '<a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html#per-memory-cgroup-local-status" target="_blank">cgroup-v1 </a>'+
-        'and '+
-        '<a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#memory-interface-files" target="_blank">cgroup-v2</a>.'
+        info: cgroupMem
     },
-
     'cgroup.mem_failcnt': {
-        info: 'The number of memory usage hits limits.'
+        info: cgroupMemFailCnt
     },
-
     'cgroup.writeback': {
-        info: '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+        info: cgroupWriteback
     },
-
     'cgroup.mem_activity': {
-        info: '<p>Memory accounting statistics.</p>'+
-        '<p><b>In</b> - a page is accounted as either mapped anon page (RSS) or cache page (Page Cache) to the cgroup. '+
-        '<b>Out</b> - a page is unaccounted from the cgroup.</p>'
+        info: cgroupMemActivity
     },
-
     'cgroup.pgfaults': {
-        info: '<p>Memory <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> statistics.</p>'+
-        '<p><b>Pgfault</b> - all page faults. '+
-        '<b>Swap</b> - major page faults.</p>'
+        info: cgroupPgFaults
     },
-
     'cgroup.memory_some_pressure': {
-        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on memory. ' +
-            'In this state the CPU is still doing productive work. '+
-            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: cgroupMemorySomePressure
     },
     'cgroup.memory_some_pressure_stall_time': {
-        info: 'The amount of time some processes have been waiting due to memory congestion.'
+        info: cgroupMemorySomePressureStallTime
     },
-
     'cgroup.memory_full_pressure': {
-        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
-            '<b>Full</b> indicates the share of time in which <b>all non-idle tasks</b> are stalled on memory resource simultaneously. ' +
-            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. '+
-            'This has severe impact on performance. '+
-            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: cgroupMemoryFullPressure
     },
     'cgroup.memory_full_pressure_stall_time': {
-        info: 'The amount of time all non-idle processes have been stalled due to memory congestion.'
+        info: cgroupMemoryFullPressureStallTime
+    },
+
+    'k8s.cgroup.mem_utilization': {
+        info: cgroupMemUtilization
+    },
+    'k8s.cgroup.mem_usage_limit': {
+        mainheads: [
+            function (_, id) {
+                cgroupMemLimitIsSet = 1;
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-append-options="percentage"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Memory"'
+                    + ' data-units="%"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' role="application"></div>';
+            }
+        ],
+        info: cgroupMemUsageLimit
+    },
+    'k8s.cgroup.mem_usage': {
+        mainheads: [
+            function (_, id) {
+                if (cgroupMemLimitIsSet === 0) {
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="Memory"'
+                        + ' data-units="MB"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[1] + '"'
+                        + ' role="application"></div>';
+                } else
+                    return '';
+            }
+        ],
+        info: cgroupMemUsage
+    },
+    'k8s.cgroup.mem': {
+        info: cgroupMem
+    },
+    'k8s.cgroup.mem_failcnt': {
+        info: cgroupMemFailCnt
+    },
+    'k8s.cgroup.writeback': {
+        info: cgroupWriteback
+    },
+    'k8s.cgroup.mem_activity': {
+        info: cgroupMemActivity
+    },
+    'k8s.cgroup.pgfaults': {
+        info: cgroupPgFaults
+    },
+    'k8s.cgroup.memory_some_pressure': {
+        info: cgroupMemorySomePressure
+    },
+    'k8s.cgroup.memory_some_pressure_stall_time': {
+        info: cgroupMemorySomePressureStallTime
+    },
+    'k8s.cgroup.memory_full_pressure': {
+        info: cgroupMemoryFullPressure
+    },
+    'k8s.cgroup.memory_full_pressure_stall_time': {
+        info: cgroupMemoryFullPressureStallTime
     },
 
     'cgroup.io': {
-        info: 'The amount of data transferred to and from specific devices as seen by the CFQ scheduler. '+
-        'It is not updated when the CFQ scheduler is operating on a request queue.'
+        info: cgroupIO
     },
-
     'cgroup.serviced_ops': {
-        info: 'The number of I/O operations performed on specific devices as seen by the CFQ scheduler.'
+        info: cgroupServicedOps
     },
-
     'cgroup.queued_ops': {
-        info: 'The number of requests queued for I/O operations.'
+        info: cgroupQueuedOps
     },
-
     'cgroup.merged_ops': {
-        info: 'The number of BIOS requests merged into requests for I/O operations.'
+        info: cgroupMergedOps
     },
-
     'cgroup.throttle_io': {
         mainheads: [
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="read"'
                     + ' data-chart-library="gauge"'
@@ -4233,8 +4410,7 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[2] + '"'
                     + ' role="application"></div>';
             },
-            function (os, id) {
-                void (os);
+            function (_, id) {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="write"'
                     + ' data-chart-library="gauge"'
@@ -4249,214 +4425,220 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ],
-        info: 'The amount of data transferred to and from specific devices as seen by the throttling policy.'
+        info: cgroupThrottleIO
     },
-
     'cgroup.throttle_serviced_ops': {
-        info: 'The number of I/O operations performed on specific devices as seen by the throttling policy.'
+        info: cgroupThrottleIOServicesOps
     },
-
     'cgroup.io_some_pressure': {
-        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
-            '<b>Some</b> indicates the share of time in which at least <b>some tasks</b> are stalled on I/O. ' +
-            'In this state the CPU is still doing productive work. '+
-            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: cgroupIOSomePressure
     },
     'cgroup.io_some_pressure_stall_time': {
-        info: 'The amount of time some processes have been waiting due to I/O congestion.'
+        info: cgroupIOSomePRessureStallTime
     },
-
     'cgroup.io_full_pressure': {
-        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. ' +
-            '<b>Full</b> line indicates the share of time in which <b>all non-idle tasks</b> are stalled on I/O resource simultaneously. ' +
-            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. '+
-            'This has severe impact on performance. '+
-            'The ratios are tracked as recent trends over 10-, 60-, and 300-second windows.'
+        info: cgroupIOFullPressure
     },
     'cgroup.io_full_pressure_stall_time': {
-        info: 'The amount of time all non-idle processes have been stalled due to I/O congestion.'
+        info: cgroupIOFullPressureStallTime
+    },
+
+    'k8s.cgroup.io': {
+        info: cgroupIO
+    },
+    'k8s.cgroup.serviced_ops': {
+        info: cgroupServicedOps
+    },
+    'k8s.cgroup.queued_ops': {
+        info: cgroupQueuedOps
+    },
+    'k8s.cgroup.merged_ops': {
+        info: cgroupMergedOps
+    },
+    'k8s.cgroup.throttle_io': {
+        mainheads: [
+            function (_, id) {
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="read"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Read Disk I/O"'
+                    + ' data-units="KB/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' role="application"></div>';
+            },
+            function (_, id) {
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="write"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Write Disk I/O"'
+                    + ' data-units="KB/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' role="application"></div>';
+            }
+        ],
+        info: cgroupThrottleIO
+    },
+    'k8s.cgroup.throttle_serviced_ops': {
+        info: cgroupThrottleIOServicesOps
+    },
+    'k8s.cgroup.io_some_pressure': {
+        info: cgroupIOSomePressure
+    },
+    'k8s.cgroup.io_some_pressure_stall_time': {
+        info: cgroupIOSomePRessureStallTime
+    },
+    'k8s.cgroup.io_full_pressure': {
+        info: cgroupIOFullPressure
+    },
+    'k8s.cgroup.io_full_pressure_stall_time': {
+        info: cgroupIOFullPressureStallTime
     },
 
     'cgroup.swap_read': {
         info: ebpfSwapRead
     },
-
     'cgroup.swap_write': {
         info: ebpfSwapWrite
     },
-
     'cgroup.fd_open': {
         info: ebpfFileOpen
     },
-
     'cgroup.fd_open_error': {
         info: ebpfFileOpenError
     },
-
     'cgroup.fd_close': {
         info: ebpfFileClosed
     },
-
     'cgroup.fd_close_error': {
         info: ebpfFileCloseError
     },
-
     'cgroup.vfs_unlink': {
         info: ebpfVFSUnlink
     },
-
     'cgroup.vfs_write': {
         info: ebpfVFSWrite
     },
-
     'cgroup.vfs_write_error': {
         info: ebpfVFSWriteError
     },
-
     'cgroup.vfs_read': {
         info: ebpfVFSRead
     },
-
     'cgroup.vfs_read_error': {
         info: ebpfVFSReadError
     },
-
     'cgroup.vfs_write_bytes': {
         info: ebpfVFSWriteBytes
     },
-
     'cgroup.vfs_read_bytes': {
         info: ebpfVFSReadBytes
     },
-
     'cgroup.vfs_fsync': {
         info: ebpfVFSSync
     },
-
     'cgroup.vfs_fsync_error': {
         info: ebpfVFSSyncError
     },
-
     'cgroup.vfs_open': {
         info: ebpfVFSOpen
     },
-
     'cgroup.vfs_open_error': {
         info: ebpfVFSOpenError
     },
-
     'cgroup.vfs_create': {
         info: ebpfVFSCreate
     },
-
     'cgroup.vfs_create_error': {
         info: ebpfVFSCreateError
     },
-
     'cgroup.process_create': {
         info: ebpfProcessCreate
     },
-
     'cgroup.thread_create': {
         info: ebpfThreadCreate
     },
-
     'cgroup.task_exit': {
         info: ebpfTaskExit
     },
-
     'cgroup.task_close': {
         info: ebpfTaskClose
     },
-
     'cgroup.task_error': {
         info: ebpfTaskError
     },
-
     'cgroup.dc_ratio': {
         info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>. Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Filesystem submenu</a>.'
     },
-
     'cgroup.shmget': {
         info: ebpfSHMget
     },
-
     'cgroup.shmat': {
         info: ebpfSHMat
     },
-
     'cgroup.shmdt': {
         info: ebpfSHMdt
     },
-
     'cgroup.shmctl': {
         info: ebpfSHMctl
     },
-
     'cgroup.outbound_conn_v4': {
         info: ebpfIPV4conn
     },
-
     'cgroup.outbound_conn_v6': {
         info: ebpfIPV6conn
     },
-
     'cgroup.net_bytes_send': {
         info: ebpfBandwidthSent
     },
-
     'cgroup.net_bytes_recv': {
         info: ebpfBandwidthRecv
     },
-
     'cgroup.net_tcp_send': {
         info: ebpfTCPSendCall
     },
-
     'cgroup.net_tcp_recv': {
         info: ebpfTCPRecvCall
     },
-
     'cgroup.net_retransmit': {
         info: ebpfTCPRetransmit
     },
-
     'cgroup.net_udp_send': {
         info: ebpfUDPsend
     },
-
     'cgroup.net_udp_recv': {
         info: ebpfUDPrecv
     },
-
     'cgroup.dc_hit_ratio': {
         info: ebpfDCHit
     },
-
     'cgroup.dc_reference': {
         info: ebpfDCReference
     },
-
     'cgroup.dc_not_cache': {
         info: ebpfDCNotCache
     },
-
     'cgroup.dc_not_found': {
         info: ebpfDCNotFound
     },
-
     'cgroup.cachestat_ratio': {
         info: ebpfCachestatRatio
     },
-
     'cgroup.cachestat_dirties': {
         info: ebpfCachestatDirties
     },
-
     'cgroup.cachestat_hits': {
         info: ebpfCachestatHits
     },
-
     'cgroup.cachestat_misses': {
         info: ebpfCachestatMisses
     },

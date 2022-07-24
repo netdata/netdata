@@ -710,6 +710,8 @@ set(RRD_PLUGIN_FILES
         database/rrdcalc.h
         database/rrdcalctemplate.c
         database/rrdcalctemplate.h
+        database/rrdcontext.c
+        database/rrdcontext.h
         database/rrddim.c
         database/rrddimvar.c
         database/rrddimvar.h
@@ -729,6 +731,8 @@ set(RRD_PLUGIN_FILES
         database/ram/rrddim_mem.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
+		database/sqlite/sqlite_context.c
+        database/sqlite/sqlite_context.h
         database/sqlite/sqlite_db_migration.c
         database/sqlite/sqlite_db_migration.h
         database/sqlite/sqlite_aclk.c
@@ -881,6 +885,8 @@ set(ACLK_FILES
         aclk/aclk_charts_api.h
         aclk/aclk_alarm_api.c
         aclk/aclk_alarm_api.h
+        aclk/aclk_contexts_api.c
+        aclk/aclk_contexts_api.h
         mqtt_websockets/src/mqtt_wss_client.c
         mqtt_websockets/src/include/mqtt_wss_client.h
         mqtt_websockets/src/mqtt_wss_log.c
@@ -917,6 +923,10 @@ set(ACLK_FILES
         aclk/schema-wrappers/capability.h
         aclk/schema-wrappers/proto_2_json.cc
         aclk/schema-wrappers/proto_2_json.h
+        aclk/schema-wrappers/context_stream.cc
+        aclk/schema-wrappers/context_stream.h
+        aclk/schema-wrappers/context.cc
+        aclk/schema-wrappers/context.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
@@ -1231,6 +1241,8 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        aclk/aclk-schemas/proto/context/v1/context.proto
+        aclk/aclk-schemas/proto/context/v1/stream.proto
         )
 PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 

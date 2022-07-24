@@ -887,6 +887,7 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
 
     wc->cleanup_thread_deleting_files = 0;
     aclk_data_rotated();
+    rrdcontext_db_rotation();
 
     /* interrupt event loop */
     uv_stop(wc->loop);

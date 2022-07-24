@@ -97,7 +97,7 @@ This call is used to get the value of an item, given its name. It utilizes the `
 
 For **multi-threaded** operation, the `dictionary_get()` call gets a shared read lock on the dictionary.
 
-In clone mode, the value returned is not guaranteed to be valid, as any other thread may delete the item from the dictionary at any time. To ensure the value will be available, use `dictionary_acquire_item()`, which uses a reference counter to defer deletes until the item is released.
+In clone mode, the value returned is not guaranteed to be valid, as any other thread may delete the item from the dictionary at any time. To ensure the value will be available, use `dictionary_get_and_acquire_item()`, which uses a reference counter to defer deletes until the item is released.
 
 The format is:
 
@@ -133,7 +133,7 @@ Where:
 
 > **IMPORTANT**<br/>There is also an **unsafe** version (without locks) of this call. This is to be used when traversing the dictionary, to delete the current item. It should never be called without an active lock on the dictionary, which can only be acquired while traversing.
 
-### dictionary_acquire_item()
+### dictionary_get_and_acquire_item()
 
 This call can be used the search and get a dictionary item, while ensuring that it will be available for use, until `dictionary_acquired_item_release()` is called.
 
@@ -149,7 +149,7 @@ DICTIONARY *dict = dictionary_create(DICTIONARY_FLAGS_NONE);
 dictionary_set(dict, "name", "value", 6);
 
 // find the item we added and acquire it
-void *item = dictionary_acquire_item(dict, "name");
+void *item = dictionary_get_and_acquire_item(dict, "name");
 
 // extract its value
 char *value = (char *)dictionary_acquired_item_value(dict, item);

@@ -73,6 +73,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdcontext_updated_rrddim_algorithm(rd);
     return 1;
 }
 
@@ -85,6 +86,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdcontext_updated_rrddim_multiplier(rd);
     return 1;
 }
 
@@ -97,6 +99,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdcontext_updated_rrddim_divisor(rd);
     return 1;
 }
 
@@ -199,6 +202,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
         rrdset_unlock(st);
+        rrdcontext_updated_rrddim(rd);
         return rd;
     }
 
@@ -344,6 +348,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     ml_new_dimension(rd);
 
     rrdset_unlock(st);
+    rrdcontext_updated_rrddim(rd);
     return(rd);
 }
 
@@ -352,6 +357,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
 void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
+    rrdcontext_removed_rrddim(rd);
     ml_delete_dimension(rd);
     
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
@@ -446,6 +452,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
+    rrdcontext_updated_rrddim_flags(rd);
     return 0;
 }
 
@@ -463,6 +470,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
+    rrdcontext_updated_rrddim_flags(rd);
     return 0;
 }
 
@@ -475,12 +483,14 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+    rrdcontext_updated_rrddim_flags(rd);
 }
 
 inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", st->name, rd->name);
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
+    rrdcontext_updated_rrddim_flags(rd);
 }
 
 // ----------------------------------------------------------------------------
@@ -488,6 +498,8 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
 
 inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
+
+    rrdcontext_collected_rrddim(rd);
 
     now_realtime_timeval(&rd->last_collected_time);
     rd->collected_value = value;
