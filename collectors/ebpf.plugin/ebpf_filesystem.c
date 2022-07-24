@@ -336,17 +336,23 @@ void ebpf_filesystem_cleanup_ebpf_data()
  *
  * @param ptr thread data.
  */
-static void ebpf_filesystem_cleanup(void *ptr)
+static void ebpf_filesystem_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
         return;
 
-    int ret = netdata_thread_cancel(*filesystem_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
+    (void)netdata_thread_cancel(*filesystem_threads.thread);
+}
 
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_filesystem_cleanup(void *ptr)
+{
+    (void)ptr;
     freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
 
@@ -457,6 +463,7 @@ static void read_filesystem_tables()
  */
 void *ebpf_filesystem_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     heartbeat_t hb;
@@ -478,6 +485,7 @@ void *ebpf_filesystem_read_hash(void *ptr)
         read_filesystem_tables();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -572,7 +580,7 @@ static void ebpf_update_filesystem()
  */
 void *ebpf_filesystem_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_filesystem_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = fs_maps;
