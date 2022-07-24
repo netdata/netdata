@@ -59,25 +59,35 @@ static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
                                                     NULL, NULL };
 
 /**
- * Clean up the main thread.
+ * Exit
+ *
+ * Cancel thread.
  *
  * @param ptr thread data.
  */
-static void softirq_cleanup(void *ptr)
+static void softirq_exit(void *ptr)
 {
-    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
-    }
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
         return;
     }
 
-    int ret = netdata_thread_cancel(*softirq_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
+    (void)netdata_thread_cancel(*softirq_threads.thread);
+}
+
+/**
+ * Cleanup
+ *
+ * Clean up allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void softirq_cleanup(void *ptr)
+{
+    (void)ptr;
+    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
+    }
 
     freez(softirq_ebpf_vals);
     freez(softirq_threads.thread);
@@ -113,6 +123,7 @@ static void softirq_read_latency_map()
  */
 static void *softirq_reader(void *ptr)
 {
+    netdata_thread_cleanup_push(softirq_exit, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -127,6 +138,7 @@ static void *softirq_reader(void *ptr)
         softirq_read_latency_map();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
