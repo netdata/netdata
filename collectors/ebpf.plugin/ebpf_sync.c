@@ -178,6 +178,68 @@ static inline int ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t 
 
 /*****************************************************************
  *
+ *  CLEANUP THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Cleanup Objects
+ *
+ * Cleanup loaded objects when thread was initialized.
+ */
+void ebpf_sync_cleanup_objects()
+{
+    int i;
+    for (i = 0; local_syscalls[i].syscall; i++) {
+        ebpf_sync_syscalls_t *w = &local_syscalls[i];
+        if (w->probe_links) {
+            struct bpf_program *prog;
+            size_t j = 0 ;
+            bpf_object__for_each_program(prog, w->objects) {
+                bpf_link__destroy(w->probe_links[j]);
+                j++;
+            }
+            freez(w->probe_links);
+            if (w->objects)
+                bpf_object__close(w->objects);
+        }
+#ifdef LIBBPF_MAJOR_VERSION
+        else if (w->sync_obj)
+            sync_bpf__destroy(w->sync_obj);
+#endif
+    }
+}
+
+/**
+ * Exit
+ *
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_sync_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    (void)netdata_thread_cancel(*sync_threads.thread);
+}
+
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_sync_cleanup(void *ptr)
+{
+    (void)ptr;
+    ebpf_sync_cleanup_objects();
+    freez(sync_threads.thread);
+}
+
+/*****************************************************************
+ *
  *  INITIALIZE THREAD
  *
  *****************************************************************/
@@ -294,6 +356,7 @@ static void read_global_table()
  */
 void *ebpf_sync_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_sync_cleanup, ptr);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     heartbeat_t hb;
@@ -308,6 +371,7 @@ void *ebpf_sync_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -391,60 +455,6 @@ static void sync_collector(ebpf_module_t *em)
     }
 }
 
-
-/*****************************************************************
- *
- *  CLEANUP THREAD
- *
- *****************************************************************/
-
-/**
- * Cleanup Objects
- *
- * Cleanup loaded objects when thread was initialized.
- */
-void ebpf_sync_cleanup_objects()
-{
-    int i;
-    for (i = 0; local_syscalls[i].syscall; i++) {
-        ebpf_sync_syscalls_t *w = &local_syscalls[i];
-        if (w->probe_links) {
-            struct bpf_program *prog;
-            size_t j = 0 ;
-            bpf_object__for_each_program(prog, w->objects) {
-                bpf_link__destroy(w->probe_links[j]);
-                j++;
-            }
-            freez(w->probe_links);
-            if (w->objects)
-                bpf_object__close(w->objects);
-        }
-#ifdef LIBBPF_MAJOR_VERSION
-        else if (w->sync_obj)
-            sync_bpf__destroy(w->sync_obj);
-#endif
-    }
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_sync_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
-        return;
-
-    int ret = netdata_thread_cancel(*sync_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
-
-    ebpf_sync_cleanup_objects();
-    freez(sync_threads.thread);
-}
 
 /*****************************************************************
  *
@@ -542,7 +552,7 @@ static void ebpf_sync_parse_syscalls()
  */
 void *ebpf_sync_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_sync_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_sync_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = sync_maps;
