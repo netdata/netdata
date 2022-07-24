@@ -1005,15 +1005,16 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
             for(int p = 0; p < ei->number_of_pages ;p++) {
                 struct rrdeng_page_descr *descr = ei->pages[p];
 
-                // TODO how to find update_every of a page?
-                usec_t update_every_usec = storage_tiers_grouping_iterations[ctx->tier] * USEC_PER_SEC;
+                usec_t update_every_usec;
 
                 size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
 
                 if(likely(points > 1))
                     update_every_usec = (descr->end_time - descr->start_time) / (points - 1);
-                else
+                else {
+                    update_every_usec = default_rrd_update_every * get_tier_grouping(ctx->tier) * USEC_PER_SEC;
                     stats.single_point_pages++;
+                }
 
                 time_t duration_secs = (time_t)((descr->end_time - descr->start_time + update_every_usec)/USEC_PER_SEC);
 
