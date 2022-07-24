@@ -332,7 +332,9 @@ void ebpf_filesystem_cleanup_ebpf_data()
 }
 
 /**
- * Clean up the main thread.
+ * Filesystem exit
+ *
+ * Cancel child thread.
  *
  * @param ptr thread data.
  */
@@ -346,7 +348,9 @@ static void ebpf_filesystem_exit(void *ptr)
 }
 
 /**
- * Clean up the main thread.
+ * File system cleanup
+ *
+ * Clean up allocated thread.
  *
  * @param ptr thread data.
  */

@@ -140,22 +140,31 @@ static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL };
 
 /**
- * Clean up the main thread.
+ * Hardirq Exit
+ *
+ * Cancel child and exit.
+ *
+ * @param ptr thread data.
+ */
+static void hardirq_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    (void)netdata_thread_cancel(*hardirq_threads.thread);
+}
+
+/**
+ * Hardirq clean up
+ *
+ * Clean up allocated memory.
  *
  * @param ptr thread data.
  */
 static void hardirq_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        return;
-    }
-
-    int ret = netdata_thread_cancel(*hardirq_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
-
+    (void)ptr;
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
@@ -298,6 +307,7 @@ static void hardirq_read_latency_static_map(int mapfd)
  */
 static void *hardirq_reader(void *ptr)
 {
+    netdata_thread_cleanup_push(hardirq_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -313,6 +323,7 @@ static void *hardirq_reader(void *ptr)
         hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -443,7 +454,7 @@ static void hardirq_collector(ebpf_module_t *em)
  */
 void *ebpf_hardirq_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(hardirq_cleanup, ptr);
+    netdata_thread_cleanup_push(hardirq_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = hardirq_maps;
