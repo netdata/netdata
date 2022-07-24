@@ -621,6 +621,67 @@ static void ebpf_create_apps_charts(struct target *root)
 
 /*****************************************************************
  *
+ *  FUNCTIONS TO CLOSE THE THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Process disable tracepoints
+ *
+ * Disable tracepoints when the plugin was responsible to enable it.
+ */
+static void ebpf_process_disable_tracepoints()
+{
+    char *default_message = { "Cannot disable the tracepoint" };
+    if (!was_sched_process_exit_enabled) {
+        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
+            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
+    }
+
+    if (!was_sched_process_exec_enabled) {
+        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
+            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
+    }
+
+    if (!was_sched_process_fork_enabled) {
+        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
+            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
+    }
+}
+
+/**
+ * Process Exit
+ *
+ * Cancel child thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_process_exit(void *ptr)
+{
+    (void)ptr;
+    (void)netdata_thread_cancel(*cgroup_thread.thread);
+}
+
+/**
+ * Process cleanup
+ *
+ * Cleanup allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_process_cleanup(void *ptr)
+{
+    UNUSED(ptr);
+
+    ebpf_cleanup_publish_syscall(process_publish_aggregated);
+    freez(process_hash_values);
+    freez(cgroup_thread.thread);
+
+    ebpf_process_disable_tracepoints();
+}
+
+/*****************************************************************
+ *
  *  FUNCTIONS WITH THE MAIN LOOP
  *
  *****************************************************************/
@@ -637,7 +698,7 @@ static void ebpf_create_apps_charts(struct target *root)
  */
 void *ebpf_cgroup_update_shm(void *ptr)
 {
-    UNUSED(ptr);
+    netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -659,6 +720,7 @@ void *ebpf_cgroup_update_shm(void *ptr)
         }
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1094,57 +1156,6 @@ static void process_collector(ebpf_module_t *em)
 
 /*****************************************************************
  *
- *  FUNCTIONS TO CLOSE THE THREAD
- *
- *****************************************************************/
-
-/**
- * Process disable tracepoints
- *
- * Disable tracepoints when the plugin was responsible to enable it.
- */
-static void ebpf_process_disable_tracepoints()
-{
-    char *default_message = { "Cannot disable the tracepoint" };
-    if (!was_sched_process_exit_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
-            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
-    }
-
-    if (!was_sched_process_exec_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
-            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
-    }
-
-    if (!was_sched_process_fork_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
-    }
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_process_cleanup(void *ptr)
-{
-    UNUSED(ptr);
-
-    int ret = netdata_thread_cancel(*cgroup_thread.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
-
-    ebpf_cleanup_publish_syscall(process_publish_aggregated);
-    freez(process_hash_values);
-    freez(cgroup_thread.thread);
-
-    ebpf_process_disable_tracepoints();
-}
-
-/*****************************************************************
- *
  *  FUNCTIONS TO START THREAD
  *
  *****************************************************************/
@@ -1266,7 +1277,7 @@ static int ebpf_process_enable_tracepoints()
  */
 void *ebpf_process_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_process_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
