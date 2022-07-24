@@ -239,22 +239,32 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
- * Clean up the main thread.
+ * SHM Exit
+ *
+ * Cancel child thread.
  *
  * @param ptr thread data.
  */
-static void ebpf_shm_cleanup(void *ptr)
+static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
         return;
     }
 
-    int ret = netdata_thread_cancel(*shm_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
+    (void)netdata_thread_cancel(*shm_threads.thread);
+}
 
+/**
+ * SHM Cleanup
+ *
+ * Clean up allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_shm_cleanup(void *ptr)
+{
+    (void)ptr;
     ebpf_cleanup_publish_syscall(shm_publish_aggregated);
 
     freez(shm_vector);
@@ -439,6 +449,7 @@ static void read_global_table()
  */
 void *ebpf_shm_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_shm_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -452,6 +463,7 @@ void *ebpf_shm_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1016,7 +1028,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_shm_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_shm_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_shm_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = shm_maps;
