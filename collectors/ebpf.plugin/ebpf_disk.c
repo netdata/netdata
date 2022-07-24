@@ -423,14 +423,14 @@ static void ebpf_cleanup_disk_list()
 }
 
 /**
- * Clean up the main thread.
+ * Disk exit.
+ *
+ * Cancel child and exit.
  *
  * @param ptr thread data.
  */
-static void ebpf_disk_cleanup(void *ptr)
+static void ebpf_disk_exit(void *ptr)
 {
-    ebpf_disk_disable_tracepoints();
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
         return;
@@ -439,6 +439,19 @@ static void ebpf_disk_cleanup(void *ptr)
     // When it fails to cancel the child thread, it is dangerous to clean any data
     if (ret != 0)
         pthread_exit(NULL);
+}
+
+/**
+ * Disk Cleanup
+ *
+ * Clean up allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_disk_cleanup(void *ptr)
+{
+    (void)ptr;
+    ebpf_disk_disable_tracepoints();
 
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
@@ -564,6 +577,7 @@ static void read_hard_disk_tables(int table)
  */
 void *ebpf_disk_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_disk_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -578,6 +592,7 @@ void *ebpf_disk_read_hash(void *ptr)
         read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -775,7 +790,7 @@ static int ebpf_disk_enable_tracepoints()
  */
 void *ebpf_disk_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_disk_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_disk_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = disk_maps;
