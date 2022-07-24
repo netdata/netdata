@@ -44,21 +44,29 @@ netdata_fd_stat_t **fd_pid = NULL;
  *****************************************************************/
 
 /**
+ * FD Exit
+ *
+ * Cancel child thread and exit.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_fd_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    (void)netdata_thread_cancel(*fd_thread.thread);
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
  */
 static void ebpf_fd_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
-        return;
-
-    int ret = netdata_thread_cancel(*fd_thread.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
-
+    (void)ptr;
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_thread.thread);
     freez(fd_values);
@@ -130,6 +138,7 @@ static void read_global_table()
  */
 void *ebpf_fd_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_fd_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -143,6 +152,7 @@ void *ebpf_fd_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -798,7 +808,7 @@ static void ebpf_fd_allocate_global_vectors(int apps)
  */
 void *ebpf_fd_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_fd_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_fd_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = fd_maps;

@@ -301,12 +301,7 @@ static void ebpf_cachestat_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    int ret = netdata_thread_cancel(*cachestat_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
-
-    return;
+    (void)netdata_thread_cancel(*cachestat_threads.thread);
 }
 
 /**
