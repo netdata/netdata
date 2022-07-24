@@ -45,21 +45,29 @@ struct netdata_static_thread vfs_threads = {"VFS KERNEL",
  *****************************************************************/
 
 /**
+ * Exit
+ *
+ * Cancel thread and exit.
+ *
+ * @param ptr thread data.
+**/
+static void ebpf_vfs_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    (void)netdata_thread_cancel(*vfs_threads.thread);
+}
+
+/**
 * Clean up the main thread.
 *
 * @param ptr thread data.
 **/
 static void ebpf_vfs_cleanup(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
-        return;
-
-    int ret = netdata_thread_cancel(*vfs_threads.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
-
+    (void)ptr;
     freez(vfs_hash_values);
     freez(vfs_vector);
     freez(vfs_threads.thread);
@@ -495,6 +503,7 @@ static void read_update_vfs_cgroup()
  */
 void *ebpf_vfs_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -509,6 +518,7 @@ void *ebpf_vfs_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1531,7 +1541,7 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
  */
 void *ebpf_vfs_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_vfs_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = vfs_maps;
