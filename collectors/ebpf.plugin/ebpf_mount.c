@@ -223,21 +223,31 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  *****************************************************************/
 
 /**
- * Clean up the main thread.
+ * Mount Exit
+ *
+ * Cancel child thread.
  *
  * @param ptr thread data.
  */
-static void ebpf_mount_cleanup(void *ptr)
+static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
         return;
 
-    int ret = netdata_thread_cancel(*mount_thread.thread);
-    // When it fails to cancel the child thread, it is dangerous to clean any data
-    if (ret != 0)
-        pthread_exit(NULL);
+    (void)netdata_thread_cancel(*mount_thread.thread);
+}
 
+/**
+ * Mount cleanup
+ *
+ * Clean up allocated memory.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_mount_cleanup(void *ptr)
+{
+    (void)ptr;
     freez(mount_thread.thread);
     freez(mount_values);
 
@@ -245,7 +255,6 @@ static void ebpf_mount_cleanup(void *ptr)
     if (bpf_obj)
         mount_bpf__destroy(bpf_obj);
 #endif
-
 }
 
 /*****************************************************************
@@ -291,6 +300,7 @@ static void read_global_table()
  */
 void *ebpf_mount_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_mount_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -305,6 +315,7 @@ void *ebpf_mount_read_hash(void *ptr)
         read_global_table();
     }
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -444,7 +455,7 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_mount_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_mount_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_mount_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mount_maps;
