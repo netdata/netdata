@@ -389,16 +389,26 @@ static void ebpf_stop_threads(int sig)
         }
     }
 
-    //Unload common threads
+    //Unload threads(except sync and filesystem)
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         freez(ebpf_threads[i].thread);
-        if (ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+        if (ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED && i != EBPF_MODULE_FILESYSTEM_IDX &&
+            i != EBPF_MODULE_SYNC_IDX)
             ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
     }
 
     //Unload filesystem
-    for (i = 0; localfs[i].filesystem != NULL; i++) {
-        ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+    if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_MAIN_THREAD_EXITED) {
+        for (i = 0; localfs[i].filesystem != NULL; i++) {
+            ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+        }
+    }
+
+    //Unload Sync
+    if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_MAIN_THREAD_EXITED) {
+        for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+            ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
+        }
     }
 
     ebpf_exit(sig);
