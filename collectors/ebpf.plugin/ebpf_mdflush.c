@@ -53,7 +53,8 @@ static void mdflush_exit(void *ptr)
         return;
     }
 
-    (void)netdata_thread_cancel(*mdflush_threads.thread);
+    if (mdflush_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*mdflush_threads.thread);
 }
 
 /**

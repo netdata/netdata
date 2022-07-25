@@ -659,7 +659,8 @@ static void ebpf_process_disable_tracepoints()
 static void ebpf_process_exit(void *ptr)
 {
     (void)ptr;
-    (void)netdata_thread_cancel(*cgroup_thread.thread);
+    if (cgroup_thread.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*cgroup_thread.thread);
 }
 
 /**

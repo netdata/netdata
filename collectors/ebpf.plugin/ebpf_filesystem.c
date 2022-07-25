@@ -344,7 +344,8 @@ static void ebpf_filesystem_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*filesystem_threads.thread);
+    if (filesystem_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*filesystem_threads.thread);
 }
 
 /**

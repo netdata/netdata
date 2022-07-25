@@ -56,7 +56,8 @@ static void ebpf_fd_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*fd_thread.thread);
+    if (fd_thread.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*fd_thread.thread);
 }
 
 /**

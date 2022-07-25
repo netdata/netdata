@@ -273,7 +273,8 @@ static void ebpf_dcstat_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*dcstat_threads.thread);
+    if (dcstat_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*dcstat_threads.thread);
 }
 
 /**

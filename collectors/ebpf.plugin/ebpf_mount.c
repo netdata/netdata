@@ -235,7 +235,8 @@ static void ebpf_mount_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*mount_thread.thread);
+    if (mount_thread.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*mount_thread.thread);
 }
 
 /**

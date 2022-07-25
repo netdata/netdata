@@ -301,7 +301,8 @@ static void ebpf_cachestat_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*cachestat_threads.thread);
+    if (cachestat_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*cachestat_threads.thread);
 }
 
 /**

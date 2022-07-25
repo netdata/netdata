@@ -152,7 +152,8 @@ static void hardirq_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*hardirq_threads.thread);
+    if (hardirq_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*hardirq_threads.thread);
 }
 
 /**

@@ -204,7 +204,8 @@ static void ebpf_swap_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*swap_threads.thread);
+    if (swap_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*swap_threads.thread);
 }
 
 /**

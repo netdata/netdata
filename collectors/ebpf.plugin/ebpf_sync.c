@@ -223,7 +223,8 @@ static void ebpf_sync_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*sync_threads.thread);
+    if (sync_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*sync_threads.thread);
 }
 
 /**

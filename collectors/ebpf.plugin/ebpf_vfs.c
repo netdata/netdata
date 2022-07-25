@@ -57,7 +57,8 @@ static void ebpf_vfs_exit(void *ptr)
     if (!em->enabled)
         return;
 
-    (void)netdata_thread_cancel(*vfs_threads.thread);
+    if (vfs_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*vfs_threads.thread);
 }
 
 /**

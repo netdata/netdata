@@ -252,7 +252,8 @@ static void ebpf_shm_exit(void *ptr)
         return;
     }
 
-    (void)netdata_thread_cancel(*shm_threads.thread);
+    if (shm_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*shm_threads.thread);
 }
 
 /**

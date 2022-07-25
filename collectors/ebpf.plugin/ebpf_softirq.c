@@ -72,7 +72,8 @@ static void softirq_exit(void *ptr)
         return;
     }
 
-    (void)netdata_thread_cancel(*softirq_threads.thread);
+    if (softirq_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
+        (void)netdata_thread_cancel(*softirq_threads.thread);
 }
 
 /**
