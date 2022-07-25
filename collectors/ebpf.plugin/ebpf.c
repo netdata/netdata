@@ -377,7 +377,7 @@ static void ebpf_stop_threads(int sig)
         (void)netdata_thread_cancel(*ebpf_threads[i].thread);
     }
 
-    usec_t max = 5 * USEC_PER_SEC, step = 100000;
+    usec_t max = 2 * USEC_PER_SEC, step = 100000;
     while (i && max) {
         max -= step;
         sleep_usec(step);
