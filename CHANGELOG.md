@@ -38,6 +38,7 @@
 - fix\(packaging\): respect CFLAGS arg when building Docker image [\#13340](https://github.com/netdata/netdata/pull/13340) ([ilyam8](https://github.com/ilyam8))
 - add github stars badge to readme [\#13338](https://github.com/netdata/netdata/pull/13338) ([andrewm4894](https://github.com/andrewm4894))
 - Fix coverity 379241 [\#13336](https://github.com/netdata/netdata/pull/13336) ([MrZammler](https://github.com/MrZammler))
+- Rrdcontext [\#13335](https://github.com/netdata/netdata/pull/13335) ([ktsaou](https://github.com/ktsaou))
 - Detect stored metric size by page type  [\#13334](https://github.com/netdata/netdata/pull/13334) ([stelfrag](https://github.com/stelfrag))
 - Silence compile warnings on external source [\#13332](https://github.com/netdata/netdata/pull/13332) ([MrZammler](https://github.com/MrZammler))
 - UpdateNodeCollectors message [\#13330](https://github.com/netdata/netdata/pull/13330) ([MrZammler](https://github.com/MrZammler))
@@ -341,7 +342,6 @@
 - Configurable storage engine for Netdata agents: step 1 [\#12776](https://github.com/netdata/netdata/pull/12776) ([aberaud](https://github.com/aberaud))
 - Fix coverity on receiver setsockopt [\#12772](https://github.com/netdata/netdata/pull/12772) ([MrZammler](https://github.com/MrZammler))
 - some config updates for ml [\#12771](https://github.com/netdata/netdata/pull/12771) ([andrewm4894](https://github.com/andrewm4894))
-- Remove node.d.plugin and relevant files [\#12769](https://github.com/netdata/netdata/pull/12769) ([surajnpn](https://github.com/surajnpn))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
