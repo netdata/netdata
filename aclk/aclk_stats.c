@@ -118,28 +118,6 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample)
-{
-    static RRDSET *st = NULL;
-    static RRDDIM *dims[ACLK_QUERY_TYPE_COUNT];
-
-    if (unlikely(!st)) {
-        st = rrdset_create_localhost(
-            "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
-            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
-
-        for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
-            dims[i] = rrddim_add(st, aclk_query_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-
-    } else
-        rrdset_next(st);
-
-    for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
-        rrddim_set_by_pointer(st, dims[i], per_sample->queries_per_type[i]);
-
-    rrdset_done(st);
-}
-
 static char *cloud_req_http_type_names[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT] = {
     "other",
     "info",
@@ -351,7 +329,6 @@ void *aclk_stats_main_thread(void *ptr)
 #endif
 
         aclk_stats_cloud_req(&per_sample);
-        aclk_stats_cloud_req_type(&per_sample);
         aclk_stats_cloud_req_http_type(&per_sample);
 
         aclk_stats_query_threads(aclk_queries_per_thread_sample);

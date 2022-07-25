@@ -5,6 +5,7 @@
 #include "aclk_stats.h"
 #include "aclk_query_queue.h"
 #include "aclk.h"
+#include "aclk_tx_msgs.h"
 
 #include "schema-wrappers/proto_2_json.h"
 
@@ -131,14 +132,14 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
         return 1;
     }
 
-    query = aclk_query_new(HTTP_API_V2);
+    query = aclk_query_new();
 
-    if (unlikely(aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload))) {
+    if (unlikely(aclk_extract_v2_data(raw_payload, &query->http_api_v2.payload))) {
         error("Error extracting payload expected after the JSON dictionary.");
         goto error;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
+    if (unlikely(aclk_v2_payload_get_query(query->http_api_v2.payload, &query->dedup_id))) {
         error("Could not extract payload from query");
         goto error;
     }
@@ -158,7 +159,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     query->timeout = cloud_to_agent->timeout;
     // for clarity and code readability as when we process the request
     // it would be strange to get URL from `dedup_id`
-    query->data.http_api_v2.query = query->dedup_id;
+    query->http_api_v2.query = query->dedup_id;
     query->msg_id = cloud_to_agent->msg_id;
     aclk_queue_query(query);
     return 0;
@@ -265,7 +266,6 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     }
     update_node_id(&host_id, &node_id);
 
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
     node_instance_connection_t node_state_update = {
         .hops = 1,
         .live = 0,
@@ -298,15 +298,14 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     };
     node_state_update.capabilities = caps;
 
+    size_t payload_len;
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+    char *payload = generate_node_instance_connection(&payload_len, &node_state_update);
     rrdhost_aclk_state_unlock(localhost);
 
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+    aclk_send_bin_msg(payload, payload_len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
 
-    aclk_queue_query(query);
     freez(res.node_id);
     freez(res.machine_guid);
     return 0;

@@ -34,6 +34,17 @@ void aclk_send_node_instances(void);
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 
+#define GENERATE_AND_SEND_PAYLOAD(topic, msg_name, generator_fnc, generator_data...)                                   \
+    size_t payload_len;                                                                                                \
+    char *payload = generator_fnc(&payload_len, generator_data);                                                       \
+    if (unlikely(payload == NULL)) {                                                                                   \
+        error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
+        return;                                                                                                        \
+    }                                                                                                                  \
+    aclk_send_bin_msg(payload, payload_len, topic, msg_name);                                                          \
+    if (!use_mqtt_5)                                                                                                   \
+        freez(payload);
+
 char *ng_aclk_state(void);
 char *ng_aclk_state_json(void);
 

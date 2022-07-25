@@ -57,7 +57,7 @@ void contexts_snapshot_add_ctx_update(contexts_snapshot_t ctxs_snapshot, struct 
     fill_ctx_updated(ctx, ctx_update);
 }
 
-char *contexts_snapshot_2bin(contexts_snapshot_t ctxs_snapshot, size_t *len)
+char *contexts_snapshot_2bin(size_t *len, contexts_snapshot_t ctxs_snapshot)
 {
     ContextsSnapshot *ctxs_snap = (ContextsSnapshot *)ctxs_snapshot;
     *len = PROTO_COMPAT_MSG_SIZE_PTR(ctxs_snap);
@@ -109,7 +109,7 @@ void contexts_updated_add_ctx_update(contexts_updated_t ctxs_updated, struct con
     fill_ctx_updated(ctx, ctx_update);
 }
 
-char *contexts_updated_2bin(contexts_updated_t ctxs_updated, size_t *len)
+char *contexts_updated_2bin(size_t *len, contexts_updated_t ctxs_updated)
 {
     ContextsUpdated *ctxs_update = (ContextsUpdated *)ctxs_updated;
     *len = PROTO_COMPAT_MSG_SIZE_PTR(ctxs_update);

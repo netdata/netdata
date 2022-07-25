@@ -742,8 +742,8 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     }
     if (ret < 0) {
         // node_id not found
-        aclk_query_t create_query;
-        create_query = aclk_query_new(REGISTER_NODE);
+        size_t payload_len;
+
         rrdhost_aclk_state_lock(localhost);
         node_instance_creation_t node_instance_creation = {
             .claim_id = localhost->aclk_state.claimed_id,
@@ -751,16 +751,14 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
             .hostname = host->hostname,
             .machine_guid = host->machine_guid
         };
-        create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
+        char *payload = generate_node_instance_creation(&payload_len, &node_instance_creation);
         rrdhost_aclk_state_unlock(localhost);
-        create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-        create_query->data.bin_payload.msg_name = "CreateNodeInstance";
+
         info("Registering host=%s, hops=%u",host->machine_guid, host->system_info->hops);
-        aclk_queue_query(create_query);
+        aclk_send_bin_message_subtopic_pid(mqttwss_client, payload, payload_len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance");
         return;
     }
 
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
     node_instance_connection_t node_state_update = {
         .hops = host->system_info->hops,
         .live = cmd,
@@ -781,15 +779,14 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
 
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+    size_t payload_len;
+    char *payload = generate_node_instance_connection(&payload_len, &node_state_update);
     rrdhost_aclk_state_unlock(localhost);
 
     info("Queuing status update for node=%s, live=%d, hops=%u",(char*)node_state_update.node_id, cmd,
          host->system_info->hops);
     freez((void*)node_state_update.node_id);
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-    aclk_queue_query(query);
+    aclk_send_bin_message_subtopic_pid(mqttwss_client, payload, payload_len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
 }
 
 void aclk_send_node_instances()
@@ -802,7 +799,6 @@ void aclk_send_node_instances()
     }
     while (!uuid_is_null(list->host_id)) {
         if (!uuid_is_null(list->node_id)) {
-            aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
             node_instance_connection_t node_state_update = {
                 .live = list->live,
                 .hops = list->hops,
@@ -827,34 +823,30 @@ void aclk_send_node_instances()
 
             rrdhost_aclk_state_lock(localhost);
             node_state_update.claim_id = localhost->aclk_state.claimed_id;
-            query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+            size_t payload_len;
+            char *payload = generate_node_instance_connection(&payload_len, &node_state_update);
             rrdhost_aclk_state_unlock(localhost);
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)node_state_update.node_id,
                  list->live,
                  list->hops);
             freez((void*)node_state_update.node_id);
-            query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-            query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-            aclk_queue_query(query);
+            aclk_send_bin_message_subtopic_pid(mqttwss_client, payload, payload_len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
         } else {
-            aclk_query_t create_query;
-            create_query = aclk_query_new(REGISTER_NODE);
             node_instance_creation_t node_instance_creation = {
                 .hops = list->hops,
                 .hostname = list->hostname,
             };
             node_instance_creation.machine_guid = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
-            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             rrdhost_aclk_state_lock(localhost);
-            node_instance_creation.claim_id = localhost->aclk_state.claimed_id,
-            create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
+            node_instance_creation.claim_id = localhost->aclk_state.claimed_id;
+            size_t payload_len;
+            char *payload = generate_node_instance_creation(&payload_len, &node_instance_creation);
             rrdhost_aclk_state_unlock(localhost);
             info("Queuing registration for host=%s, hops=%d",(char*)node_instance_creation.machine_guid,
                  list->hops);
             freez(node_instance_creation.machine_guid);
-            aclk_queue_query(create_query);
+            aclk_send_bin_message_subtopic_pid(mqttwss_client, payload, payload_len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance");
         }
         freez(list->hostname);
 

@@ -36,14 +36,14 @@ contexts_snapshot_t contexts_snapshot_new(const char *claim_id, const char *node
 void contexts_snapshot_delete(contexts_snapshot_t ctxs_snapshot);
 void contexts_snapshot_set_version(contexts_snapshot_t ctxs_snapshot, uint64_t version);
 void contexts_snapshot_add_ctx_update(contexts_snapshot_t ctxs_snapshot, struct context_updated *ctx_update);
-char *contexts_snapshot_2bin(contexts_snapshot_t ctxs_snapshot, size_t *len);
+char *contexts_snapshot_2bin(size_t *len, contexts_snapshot_t ctxs_snapshot);
 
 // ContextS Updated related
 contexts_updated_t contexts_updated_new(const char *claim_id, const char *node_id, uint64_t version_hash, uint64_t created_at);
 void contexts_updated_delete(contexts_updated_t ctxs_updated);
 void contexts_updated_update_version_hash(contexts_updated_t ctxs_updated, uint64_t version_hash);
 void contexts_updated_add_ctx_update(contexts_updated_t ctxs_updated, struct context_updated *ctx_update);
-char *contexts_updated_2bin(contexts_updated_t ctxs_updated, size_t *len);
+char *contexts_updated_2bin(size_t *len, contexts_updated_t ctxs_updated);
 
 
 #ifdef __cplusplus
