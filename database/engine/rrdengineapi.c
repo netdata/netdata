@@ -1079,7 +1079,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_metric_in_index = 40;
     stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = default_rrd_update_every * get_tier_grouping(ctx->tier);
+    stats.default_granularity_secs = (size_t)default_rrd_update_every * get_tier_grouping(ctx->tier);
 
     return stats;
 }
