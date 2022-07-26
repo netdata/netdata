@@ -84,7 +84,7 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
     return 0;
 }
 
-static int do_migration_v2_v3(sqlite3 *database, const char *name)
+static int do_migration_v3_v4(sqlite3 *database, const char *name)
 {
     UNUSED(name);
     info("Running database migration %s", name);
@@ -162,6 +162,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v0 to v1",  .func = do_migration_noop},
     {.name = "v1 to v2",  .func = do_migration_v1_v2},
     {.name = "v2 to v3",  .func = do_migration_v2_v3},
+    {.name = "v3 to v4",  .func = do_migration_v3_v4},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
