@@ -2898,7 +2898,7 @@ if [ -n "$total_crit_alarms" ]; then
    done <<<"$total_crit_alarms,"
 fi
 
-if (( $total_warnings + $total_critical > 15 )); then
+if (( total_warnings + total_critical > 15 )); then
     EXTRA_ALARMS_LIST_TEXT="(Showing latest 15 alerts)"
 fi
 
