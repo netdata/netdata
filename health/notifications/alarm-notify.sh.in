@@ -2899,7 +2899,7 @@ if [ -n "$total_crit_alarms" ]; then
 fi
 
 if (( $total_warnings + $total_critical > 15 )); then
-    EXTRA_ALARMS_LIST_TEXT="(Showing latest 15 alarms)"
+    EXTRA_ALARMS_LIST_TEXT="(Showing latest 15 alerts)"
 fi
 
 if [ -n "$edit_command_line" ]; then
