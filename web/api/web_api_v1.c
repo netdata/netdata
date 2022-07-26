@@ -1533,6 +1533,100 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
     return metric_correlations(host, wb, method, group, group_options, baseline_after, baseline_before, after, before, points, options, timeout);
 }
 
+#ifndef ENABLE_DBENGINE
+int web_client_api_request_v1_dbengine_stats(RRDHOST *host, struct web_client *w, char *url) {
+    return HTTP_RESP_NOT_FOUND;
+}
+#else
+static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
+    RRDENG_SIZE_STATS stats = rrdeng_size_statistics(multidb_ctx[tier]);
+
+    buffer_sprintf(wb,
+                   "\n\t\t\"default_granularity_secs\":%zu"
+                   ",\n\t\t\"sizeof_metric\":%zu"
+                   ",\n\t\t\"sizeof_metric_in_index\":%zu"
+                   ",\n\t\t\"sizeof_page\":%zu"
+                   ",\n\t\t\"sizeof_page_in_index\":%zu"
+                   ",\n\t\t\"sizeof_extent\":%zu"
+                   ",\n\t\t\"sizeof_page_in_extent\":%zu"
+                   ",\n\t\t\"sizeof_datafile\":%zu"
+                   ",\n\t\t\"sizeof_page_in_cache\":%zu"
+                   ",\n\t\t\"sizeof_point_data\":%zu"
+                   ",\n\t\t\"sizeof_page_data\":%zu"
+                   ",\n\t\t\"pages_per_extent\":%zu"
+                   ",\n\t\t\"datafiles\":%zu"
+                   ",\n\t\t\"extents\":%zu"
+                   ",\n\t\t\"extents_pages\":%zu"
+                   ",\n\t\t\"points\":%zu"
+                   ",\n\t\t\"metrics\":%zu"
+                   ",\n\t\t\"metrics_pages\":%zu"
+                   ",\n\t\t\"extents_compressed_bytes\":%zu"
+                   ",\n\t\t\"pages_uncompressed_bytes\":%zu"
+                   ",\n\t\t\"pages_duration_secs\":%ld"
+                   ",\n\t\t\"single_point_pages\":%zu"
+                   ",\n\t\t\"first_t\":%llu"
+                   ",\n\t\t\"last_t\":%llu"
+                   ",\n\t\t\"database_retention_secs\":%ld"
+                   ",\n\t\t\"average_compression_savings\":%0.2f"
+                   ",\n\t\t\"average_point_duration_secs\":%0.2f"
+                   ",\n\t\t\"average_metric_retention_secs\":%0.2f"
+                   ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
+                   ",\n\t\t\"average_page_size_bytes\":%0.2f"
+                   ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
+                   , stats.default_granularity_secs
+                   , stats.sizeof_metric
+                   , stats.sizeof_metric_in_index
+                   , stats.sizeof_page
+                   , stats.sizeof_page_in_index
+                   , stats.sizeof_extent
+                   , stats.sizeof_page_in_extent
+                   , stats.sizeof_datafile
+                   , stats.sizeof_page_in_cache
+                   , stats.sizeof_point_data
+                   , stats.sizeof_page_data
+                   , stats.pages_per_extent
+                   , stats.datafiles
+                   , stats.extents
+                   , stats.extents_pages
+                   , stats.points
+                   , stats.metrics
+                   , stats.metrics_pages
+                   , stats.extents_compressed_bytes
+                   , stats.pages_uncompressed_bytes
+                   , stats.pages_duration_secs
+                   , stats.single_point_pages
+                   , stats.first_t
+                   , stats.last_t
+                   , stats.database_retention_secs
+                   , stats.average_compression_savings
+                   , stats.average_point_duration_secs
+                   , stats.average_metric_retention_secs
+                   , stats.ephemeral_metrics_per_day_percent
+                   , stats.average_page_size_bytes
+                   , stats.estimated_concurrently_collected_metrics
+                   );
+}
+int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
+
+    buffer_strcat(wb, "{");
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        buffer_sprintf(wb, "%s\n\t\"tier%d\": {", tier?",":"", tier);
+        web_client_api_v1_dbengine_stats_for_tier(wb, tier);
+        buffer_strcat(wb, "\n\t}");
+    }
+    buffer_strcat(wb, "\n}");
+
+    return HTTP_RESP_OK;
+}
+#endif
+
 static struct api_command {
     const char *command;
     uint32_t hash;
@@ -1569,6 +1663,9 @@ static struct api_command {
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health         },
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state          },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_metric_correlations },
+
+        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_dbengine_stats },
+
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
