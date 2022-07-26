@@ -2898,6 +2898,10 @@ if [ -n "$total_crit_alarms" ]; then
    done <<<"$total_crit_alarms,"
 fi
 
+if (( $total_warnings + $total_critical > 15 )); then
+    EXTRA_ALARMS_LIST_TEXT="(Showing latest 15 alarms)"
+fi
+
 if [ -n "$edit_command_line" ]; then
     IFS='=' read -r edit_command line s_host <<<"$edit_command_line"
 fi
@@ -3422,6 +3426,10 @@ Content-Transfer-Encoding: 8bit
                             and
                             <span style="font-weight:600">${total_critical} critical</span>
                             additional active alert(s)</div>
+                        </td>
+                        </tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                          <div style="font-family:Open Sans, sans-serif;font-size:12px;line-height:1;text-align:center;color:#35414A;">${EXTRA_ALARMS_LIST_TEXT}</div>
                         </td>
                       </tr>
                       </tbody>

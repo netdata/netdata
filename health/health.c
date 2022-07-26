@@ -11,6 +11,12 @@ static struct {
     ALARM_ENTRY *tail; // latest
 } alarm_notifications_in_progress = {NULL, NULL};
 
+typedef struct active_alerts {
+    char *name;
+    time_t last_status_change;
+    RRDCALC_STATUS status;
+} active_alerts_t;
+
 static inline void enqueue_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
     ae->prev_in_progress = NULL;
@@ -245,6 +251,15 @@ static inline RRDCALC_STATUS rrdcalc_value2status(NETDATA_DOUBLE n) {
 }
 
 #define ALARM_EXEC_COMMAND_LENGTH 8192
+#define ACTIVE_ALARMS_LIST_EXAMINE 500
+#define ACTIVE_ALARMS_LIST 15
+
+static inline int compare_active_alerts(const void * a, const void * b) {
+    active_alerts_t *active_alerts_a = (active_alerts_t *)a;
+    active_alerts_t *active_alerts_b = (active_alerts_t *)b;
+
+    return ( active_alerts_b->last_status_change - active_alerts_a->last_status_change );
+}
 
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
@@ -310,37 +325,57 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
     BUFFER *warn_alarms, *crit_alarms;
+    active_alerts_t *active_alerts = callocz(ACTIVE_ALARMS_LIST_EXAMINE, sizeof(active_alerts_t));
 
     warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    for(rc = host->alarms; rc && (n_warn + n_crit) < ACTIVE_ALARMS_LIST_EXAMINE ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
         if (unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
             if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
-                if (n_warn)
-                    buffer_strcat(warn_alarms, ",");
-                buffer_strcat(warn_alarms, rc->name);
-                buffer_strcat(warn_alarms, "=");
-                buffer_snprintf(warn_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
+                active_alerts[n_warn+n_crit].name = rc->name;
+                active_alerts[n_warn+n_crit].last_status_change = rc->last_status_change;
+                active_alerts[n_warn+n_crit].status = rc->status;
                 n_warn++;
             } else if (ae->alarm_id == rc->id)
                 expr = rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
             if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
-                if (n_crit)
-                    buffer_strcat(crit_alarms, ",");
-                buffer_strcat(crit_alarms, rc->name);
-                buffer_strcat(crit_alarms, "=");
-                buffer_snprintf(crit_alarms, 11, "%"PRId64"", (int64_t)rc->last_status_change);
+                active_alerts[n_warn+n_crit].name = rc->name;
+                active_alerts[n_warn+n_crit].last_status_change = rc->last_status_change;
+                active_alerts[n_warn+n_crit].status = rc->status;
                 n_crit++;
             } else if (ae->alarm_id == rc->id)
                 expr = rc->critical;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
             if (ae->alarm_id == rc->id)
                 expr = rc->warning;
+        }
+    }
+
+    if (n_warn+n_crit>1)
+        qsort (active_alerts, n_warn+n_crit, sizeof(active_alerts_t), compare_active_alerts);
+
+    int count_w = 0, count_c = 0;
+    while (count_w + count_c < n_warn + n_crit && count_w + count_c < ACTIVE_ALARMS_LIST) {
+        if (active_alerts[count_w+count_c].status == RRDCALC_STATUS_WARNING) {
+            if (count_w)
+                buffer_strcat(warn_alarms, ",");
+            buffer_strcat(warn_alarms, active_alerts[count_w+count_c].name);
+            buffer_strcat(warn_alarms, "=");
+            buffer_snprintf(warn_alarms, 11, "%"PRId64"", (int64_t)active_alerts[count_w+count_c].last_status_change);
+            count_w++;
+        }
+        else if (active_alerts[count_w+count_c].status == RRDCALC_STATUS_CRITICAL) {
+            if (count_c)
+                buffer_strcat(crit_alarms, ",");
+            buffer_strcat(crit_alarms, active_alerts[count_w+count_c].name);
+            buffer_strcat(crit_alarms, "=");
+            buffer_snprintf(crit_alarms, 11, "%"PRId64"", (int64_t)active_alerts[count_w+count_c].last_status_change);
+            count_c++;
         }
     }
 
@@ -392,6 +427,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     freez(edit_command);
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
+    freez(active_alerts);
 
     return; //health_alarm_wait_for_execution
 done:
