@@ -378,7 +378,7 @@ typedef struct storage_point {
     (x).min = (x).max = (x).sum = NAN;                  \
     (x).count = 0;                                      \
     (x).anomaly_count = 0;                              \
-    (x).flags = SN_EMPTY_SLOT;                          \
+    (x).flags = SN_FLAG_NONE;                           \
     (x).start_time = 0;                                 \
     (x).end_time = 0;                                   \
     } while(0)
@@ -387,7 +387,7 @@ typedef struct storage_point {
     (x).min = (x).max = (x).sum = NAN;                  \
     (x).count = 1;                                      \
     (x).anomaly_count = 0;                              \
-    (x).flags = SN_EMPTY_SLOT;                          \
+    (x).flags = SN_FLAG_NONE;                           \
     (x).start_time = start_t;                           \
     (x).end_time = end_t;                               \
     } while(0)

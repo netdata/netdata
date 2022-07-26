@@ -177,18 +177,38 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
 /* The page must be populated and referenced */
 static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
 {
-    unsigned i;
-    uint8_t has_only_empty_metrics = 1;
-    storage_number *page;
+    switch(descr->type) {
+        case PAGE_METRICS: {
+            size_t slots = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+            storage_number *array = (storage_number *)descr->pg_cache_descr->page;
+            for (size_t i = 0 ; i < slots; ++i) {
+                if(does_storage_number_exist(array[i]))
+                    return 0;
+            }
+        }
+        break;
 
-    page = descr->pg_cache_descr->page;
-    for (i = 0 ; i < descr->page_length / PAGE_POINT_SIZE_BYTES(descr); ++i) {
-        if (SN_EMPTY_SLOT != page[i]) {
-            has_only_empty_metrics = 0;
-            break;
+        case PAGE_TIER: {
+            size_t slots = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+            storage_number_tier1_t *array = (storage_number_tier1_t *)descr->pg_cache_descr->page;
+            for (size_t i = 0 ; i < slots; ++i) {
+                if(fpclassify(array[i].sum_value) != FP_NAN)
+                    return 0;
+            }
+        }
+        break;
+
+        default: {
+            static bool logged = false;
+            if(!logged) {
+                error("DBENGINE: cannot check page for nulls on unknown page type id %d", descr->type);
+                logged = true;
+            }
+            return 0;
         }
     }
-    return has_only_empty_metrics;
+
+    return 1;
 }
 
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
@@ -222,7 +242,9 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->descr = NULL;
 }
 
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
+void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
+                              usec_t point_in_time,
+                              NETDATA_DOUBLE n,
                               NETDATA_DOUBLE min_value,
                               NETDATA_DOUBLE max_value,
                               uint16_t count,
@@ -516,15 +538,15 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
         case PAGE_METRICS: {
             storage_number n = handle->page[position];
             sp.min = sp.max = sp.sum = unpack_storage_number(n);
-            sp.flags = n & SN_ALL_FLAGS;
+            sp.flags = n & SN_USER_FLAGS;
             sp.count = 1;
-            sp.anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
+            sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
         }
         break;
 
         case PAGE_TIER: {
             tier1_value = ((storage_number_tier1_t *)handle->page)[position];
-            sp.flags = tier1_value.anomaly_count ? 0 : SN_ANOMALY_BIT;
+            sp.flags = tier1_value.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
             sp.count = tier1_value.count;
             sp.anomaly_count = tier1_value.anomaly_count;
             sp.min = tier1_value.min_value;

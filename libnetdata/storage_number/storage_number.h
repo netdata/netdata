@@ -75,37 +75,42 @@ typedef struct storage_number_tier1 {
 #define STORAGE_NUMBER_FORMAT "%u"
 
 typedef enum {
-    SN_ANOMALY_BIT   = (1 << 24), // the anomaly bit of the value
-    SN_EXISTS_RESET  = (1 << 25), // the value has been overflown
-    SN_EXISTS_100    = (1 << 26)  // very large value (multiplier is 100 instead of 10)
+    SN_FLAG_NONE              = 0,
+    SN_FLAG_NOT_ANOMALOUS     = (1 << 24), // the anomaly bit of the value (0:anomalous, 1:not anomalous)
+    SN_FLAG_RESET             = (1 << 25), // the value has been overflown
+    SN_FLAG_NOT_EXISTS_MUL100 = (1 << 26), // very large value (multiplier is 100 instead of 10)
+    SN_FLAG_MULTIPLY          = (1 << 30), // multiply, else divide
+    SN_FLAG_NEGATIVE          = (1 << 31), // negative, else positive
 } SN_FLAGS;
 
-#define SN_ALL_FLAGS (SN_ANOMALY_BIT|SN_EXISTS_RESET|SN_EXISTS_100)
+#define SN_USER_FLAGS (SN_FLAG_NOT_ANOMALOUS | SN_FLAG_RESET)
 
-#define SN_EMPTY_SLOT 0x00000000
-#define SN_DEFAULT_FLAGS SN_ANOMALY_BIT
+// default flags for all storage numbers
+// anomaly bit is reversed, so we set it by default
+#define SN_DEFAULT_FLAGS SN_FLAG_NOT_ANOMALOUS
 
 // When the calculated number is zero and the value is anomalous (ie. it's bit
 // is zero) we want to return a storage_number representation that is
 // different from the empty slot. We achieve this by mapping zero to
 // SN_EXISTS_100. Unpacking the SN_EXISTS_100 value will return zero because
 // its fraction field (as well as its exponent factor field) will be zero.
-#define SN_ANOMALOUS_ZERO SN_EXISTS_100
+#define SN_EMPTY_SLOT SN_FLAG_NOT_EXISTS_MUL100
 
 // checks
-#define does_storage_number_exist(value) (((storage_number) (value)) != SN_EMPTY_SLOT)
-#define did_storage_number_reset(value)  ((((storage_number) (value)) & SN_EXISTS_RESET) != 0)
+#define does_storage_number_exist(value) (((storage_number)(value)) != SN_EMPTY_SLOT)
+#define did_storage_number_reset(value)  ((((storage_number)(value)) & SN_FLAG_RESET))
+#define is_storage_number_anomalous(value)  (does_storage_number_exist(value) && !(((storage_number)(value)) & SN_FLAG_NOT_ANOMALOUS))
 
-storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags);
+storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) __attribute__((const));
 static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attribute__((const));
 
 int print_netdata_double(char *str, NETDATA_DOUBLE value);
 
-//                                          sign       div/mul    <--- multiplier / divider --->     10/100       RESET      EXISTS     VALUE
-#define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
-#define STORAGE_NUMBER_POSITIVE_MIN_RAW (storage_number)( (0 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
-#define STORAGE_NUMBER_NEGATIVE_MAX_RAW (storage_number)( (1 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
-#define STORAGE_NUMBER_NEGATIVE_MIN_RAW (storage_number)( (1 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
+//                                                          sign       div/mul      <--- multiplier / divider --->     10/100       RESET      EXISTS     VALUE
+#define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
+#define STORAGE_NUMBER_POSITIVE_MIN_RAW (storage_number)( (0 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
+#define STORAGE_NUMBER_NEGATIVE_MAX_RAW (storage_number)( (1 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
+#define STORAGE_NUMBER_NEGATIVE_MIN_RAW (storage_number)( (1 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
 
 // accepted accuracy loss
 #define ACCURACY_LOSS_ACCEPTED_PERCENT 0.0001
@@ -126,19 +131,19 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     int factor = 0;
 
     // bit 32 = 0:positive, 1:negative
-    if(unlikely(value & (1 << 31)))
+    if(unlikely(value & SN_FLAG_NEGATIVE))
         sign = -1;
 
     // bit 31 = 0:divide, 1:multiply
-    if(unlikely(value & (1 << 30)))
+    if(unlikely(value & SN_FLAG_MULTIPLY))
         exp = 1;
 
-    // bit 27 SN_EXISTS_100
-    if(unlikely(value & (1 << 26)))
+    // bit 27 SN_FLAG_NOT_EXISTS_MUL100
+    if(unlikely(value & SN_FLAG_NOT_EXISTS_MUL100))
         factor = 1;
 
-    // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_ANOMALY_BIT
+    // bit 26 SN_FLAG_RESET
+    // bit 25 SN_FLAG_NOT_ANOMALOUS
 
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     int mul = (int)((value & ((1<<29)|(1<<28)|(1<<27))) >> 27);

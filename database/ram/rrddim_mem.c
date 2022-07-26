@@ -15,7 +15,7 @@ void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) 
 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
-    rd->db[rd->rrdset->current_entry] = SN_EMPTY_SLOT;
+    rd->db[rd->rrdset->current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
     struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
     ch->rd = rd;
     return (STORAGE_COLLECT_HANDLE *)ch;
@@ -191,8 +191,8 @@ STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
     h->slot = slot;
     h->slot_timestamp += h->dt;
 
-    sp.anomaly_count = (n & SN_ANOMALY_BIT) ? 0 : 1;
-    sp.flags = (n & SN_ALL_FLAGS);
+    sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
+    sp.flags = (n & SN_USER_FLAGS);
     sp.min = sp.max = sp.sum = unpack_storage_number(n);
 
     return sp;

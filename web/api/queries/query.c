@@ -579,7 +579,7 @@ QUERY_POINT QUERY_POINT_EMPTY = {
     .start_time = 0,
     .value = NAN,
     .anomaly = 0,
-    .flags = SN_EMPTY_SLOT,
+    .flags = SN_FLAG_NONE,
 #ifdef NETDATA_INTERNAL_CHECKS
     .id = 0,
 #endif
@@ -823,10 +823,10 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
 #define query_add_point_to_group(r, point, ops)                   do {  \
     if(likely(netdata_double_isnumber((point).value))) {                \
-        if(likely((point).value != 0.0))                                \
+        if(likely(fpclassify((point).value) != FP_ZERO))                \
             (ops).group_points_non_zero++;                              \
                                                                         \
-        if(unlikely((point).flags & SN_EXISTS_RESET))                   \
+        if(unlikely((point).flags & SN_FLAG_RESET))                     \
             (ops).group_value_flags |= RRDR_VALUE_RESET;                \
                                                                         \
         (ops).grouping_add(r, (point).value);                           \
@@ -942,7 +942,7 @@ static inline void rrd2rrdr_do_dimension(
                 }
                 else {
                     new_point.value      = NAN;
-                    new_point.flags      = SN_EMPTY_SLOT;
+                    new_point.flags      = SN_FLAG_NONE;
                 }
             }
 
