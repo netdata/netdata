@@ -21,8 +21,10 @@ extern int default_multidb_disk_quota_mb;
 extern uint8_t rrdeng_drop_metrics_under_page_cache_pressure;
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
+extern size_t page_block_size[];
 
 #define PAGE_POINT_SIZE_BYTES(x) page_type_size[(x)->type]
+#define PAGE_TIER_BLOCK_SIZE(x) page_block_size[(x)->tier]
 
 struct rrdeng_region_info {
     time_t start_time;

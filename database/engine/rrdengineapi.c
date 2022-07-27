@@ -17,6 +17,7 @@ uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER,
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
 size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
+size_t page_block_size[256] = {RRDENG_BLOCK_SIZE, RRDENG_BLOCK_SIZE, RRDENG_BLOCK_SIZE};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
