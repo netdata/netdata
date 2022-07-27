@@ -284,7 +284,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         }
     }
     if (unlikely(NULL == descr ||
-                 descr->page_length + PAGE_POINT_SIZE_BYTES(descr) > RRDENG_BLOCK_SIZE ||
+                 descr->page_length + PAGE_POINT_SIZE_BYTES(descr) > PAGE_TIER_BLOCK_SIZE(ctx) ||
                  must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(collection_handle);
 
@@ -686,7 +686,7 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
     descr = pg_cache_create_descr();
     descr->id = id; /* TODO: add page type: metric, log, something? */
     descr->type = ctx->page_type;
-    page = dbengine_page_alloc(); /*TODO: add page size */
+    page = dbengine_page_alloc(ctx, PAGE_TIER_BLOCK_SIZE(ctx)); /*TODO: add page size */
     rrdeng_page_descr_mutex_lock(ctx, descr);
     pg_cache_descr = descr->pg_cache_descr;
     pg_cache_descr->page = page;
