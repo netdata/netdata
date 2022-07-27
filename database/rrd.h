@@ -209,6 +209,8 @@ typedef enum rrdlabel_source {
     RRDLABEL_FLAG_NEW       = (1 << 31)  // marks for rrdlabels internal use - they are not exposed outside rrdlabels
 } RRDLABEL_SRC;
 
+#define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT)
+
 extern DICTIONARY *rrdlabels_create(void);
 extern void rrdlabels_destroy(DICTIONARY *labels_dict);
 extern void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
