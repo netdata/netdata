@@ -87,7 +87,11 @@ int sql_init_context_database(int memory)
     snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
     if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
 
-    snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta;", netdata_configured_cache_dir);
+    if (likely(!memory))
+        snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta;", netdata_configured_cache_dir);
+    else
+        snprintfz(buf, 1024, "ATTACH DATABASE ':memory:' as meta;");
+
     if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
 
     if (init_database_batch(db_context_meta, DB_CHECK_NONE, 0, &database_context_config[0]))
@@ -436,37 +440,6 @@ skip_delete:
 //
 // TESTING FUNCTIONS
 //
-static void dict_ctx_get_label_list_cb(SQL_CLABEL_DATA *label_data_ptr, void *data)
-{
-    (void)data;
-    SQL_CLABEL_DATA *label_data = label_data_ptr;
-
-    info(" LABEL %d %s = %s", label_data->label_source, label_data->label_key, label_data->label_value);
-}
-
-static void dict_ctx_get_dimension_list_cb(SQL_DIMENSION_DATA *dimension_data_ptr, void *data)
-{
-    (void)data;
-
-    SQL_DIMENSION_DATA *dimension_data = dimension_data_ptr;
-
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(dimension_data->dim_id, uuid_str);
-
-    info(" Dimension %s = %s", uuid_str, dimension_data->id);
-}
-
-
-static void dict_ctx_get_chart_list_cb(SQL_CHART_DATA *chart_data, void *data)
-{
-    (void)data;
-
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(chart_data->chart_id, uuid_str);
-    info("OK GOT %s ID = %s NAME = %s CONTEXT = %s", uuid_str, chart_data->id, chart_data->name, chart_data->context);
-    ctx_get_label_list(&chart_data->chart_id, dict_ctx_get_label_list_cb, NULL);
-    ctx_get_dimension_list(&chart_data->chart_id, dict_ctx_get_dimension_list_cb, NULL);
-}
 
 static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, void *data)
 {
@@ -479,7 +452,7 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
          "priority = %lu "
          "first time = %lu "
          "last time = %lu "
-         "deleted = %d"
+         "deleted = %d "
          "family = %s",
          context_data->id,
          context_data->version,
@@ -493,35 +466,15 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
          context_data->family);
 }
 
-static int localhost_uuid_cb(void *data, int argc, char **argv, char **column)
-{
-    uuid_t *uuid = data;
-    UNUSED(argc);
-    UNUSED(column);
-    uuid_copy(*uuid, * (uuid_t *) argv[0]);
-    return 0;
-}
-
-
-#define SQL_FIND_LOCALHOST "SELECT host_id FROM meta.host WHERE hops = 0;"
 int ctx_unittest(void)
 {
     uuid_t host_uuid;
-    uuid_t host_uuid1;
+    uuid_generate(host_uuid);
 
-    uuid_generate(host_uuid1);
+    int rc = sql_init_context_database(1);
 
-    char *err_msg;
-
-    sql_init_context_database(1);
-
-    int rc = sqlite3_exec(db_context_meta, SQL_FIND_LOCALHOST, localhost_uuid_cb, (void *) &host_uuid, &err_msg);
-    if (rc != SQLITE_OK) {
-        info("Failed to discover localhost UUID rc = %d -- %s", rc, err_msg);
-        sqlite3_free(err_msg);
-    }
-
-   ctx_get_chart_list(&host_uuid, dict_ctx_get_chart_list_cb, NULL);
+    if (rc != SQLITE_OK)
+        return 1;
 
     // Store a context
     VERSIONED_CONTEXT_DATA context_data;
@@ -542,7 +495,7 @@ int ctx_unittest(void)
     else
         info("Entry %s not inserted", context_data.id);
 
-    if (likely(!ctx_store_context(&host_uuid1, &context_data)))
+    if (likely(!ctx_store_context(&host_uuid, &context_data)))
         info("Entry %s inserted", context_data.id);
     else
         info("Entry %s not inserted", context_data.id);
@@ -572,7 +525,7 @@ int ctx_unittest(void)
     info("List context end after insert");
 
     info("List context start after insert");
-    ctx_get_context_list(&host_uuid1, dict_ctx_get_context_list_cb, NULL);
+    ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     info("List context end after insert");
 
     // This will delete the entry
