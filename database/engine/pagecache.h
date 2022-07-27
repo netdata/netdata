@@ -150,6 +150,7 @@ struct page_cache { /* TODO: add statistics */
 
     unsigned page_descriptors;
     unsigned populated_pages;
+    unsigned memory_used;
 };
 
 void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr);
