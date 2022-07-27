@@ -313,9 +313,12 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , system_info
         , 1
     );
+#ifdef NETDATA_INTERNAL_CHECKS
     char node_str[UUID_STR_LEN] = "<none>";
-    uuid_unparse_lower(*host->node_id, node_str);
+    if (likely(host->node_id))
+        uuid_unparse_lower(*host->node_id, node_str);
     internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", host->hostname, host->machine_guid, node_str);
+#endif
     return 0;
 }
 #endif
