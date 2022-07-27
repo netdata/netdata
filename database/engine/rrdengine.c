@@ -15,10 +15,15 @@ unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
 
-void *dbengine_page_alloc() {
+void *dbengine_page_alloc(struct rrdengine_instance *ctx, size_t page_length) {
     void *page = NULL;
-    if (unlikely(db_engine_use_malloc))
-        page = mallocz(RRDENG_BLOCK_SIZE);
+    size_t real_page_length = ALIGN_BYTES_CEILING_TO(page_length,32);
+    if (likely(db_engine_use_malloc)) {
+        page = mallocz(real_page_length);
+        uv_rwlock_wrlock(&ctx->pg_cache.pg_cache_rwlock);
+        ctx->pg_cache.memory_used += real_page_length;
+        uv_rwlock_wrunlock(&ctx->pg_cache.pg_cache_rwlock);
+    }
     else {
         page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
         if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
@@ -26,11 +31,25 @@ void *dbengine_page_alloc() {
     return page;
 }
 
-void dbengine_page_free(void *page) {
-    if (unlikely(db_engine_use_malloc))
-        freez(page);
-    else
-        netdata_munmap(page, RRDENG_BLOCK_SIZE);
+void dbengine_page_free_unsafe(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    if (likely(db_engine_use_malloc)) {
+        size_t real_page_length = ALIGN_BYTES_CEILING_TO(descr->page_length, 32);
+        freez(descr->pg_cache_descr->page);
+        ctx->pg_cache.memory_used -= real_page_length;
+    } else
+        netdata_munmap(descr->pg_cache_descr->page, RRDENG_BLOCK_SIZE);
+}
+
+void dbengine_page_free(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr) {
+    if (likely(db_engine_use_malloc)) {
+        size_t real_page_length = ALIGN_BYTES_CEILING_TO(descr->page_length, 32);
+        freez(descr->pg_cache_descr->page);
+        uv_rwlock_wrlock(&ctx->pg_cache.pg_cache_rwlock);
+        ctx->pg_cache.memory_used -= real_page_length;
+        uv_rwlock_wrunlock(&ctx->pg_cache.pg_cache_rwlock);
+    } else
+        netdata_munmap(descr->pg_cache_descr->page, RRDENG_BLOCK_SIZE);
 }
 
 static void sanity_check(void)
