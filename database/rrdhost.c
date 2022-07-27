@@ -1362,6 +1362,7 @@ void reload_host_labels(void) {
     rrdhost_load_auto_labels();
 
     rrdlabels_remove_all_unmarked(localhost->host_labels);
+    sql_store_host_labels(localhost);
 
     health_label_log_save(localhost);
 

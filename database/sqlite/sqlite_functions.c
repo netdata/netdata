@@ -77,6 +77,7 @@ const char *database_cleanup[] = {
     "DELETE FROM chart_hash WHERE hash_id NOT IN (SELECT hash_id FROM chart_hash_map);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
+    "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
     NULL
 };
 
