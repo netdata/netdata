@@ -334,7 +334,7 @@ netdataDashboard.menu = {
     },
 
     'postgres': {
-        title: 'Postgres',
+        title: 'PostgreSQL',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>PostgreSQL</b>, the open source object-relational database management system (ORDBMS).'
     },
