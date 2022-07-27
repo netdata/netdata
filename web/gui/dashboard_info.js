@@ -334,9 +334,9 @@ netdataDashboard.menu = {
     },
 
     'postgres': {
-        title: 'Postgres',
+        title: 'PostgreSQL',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Performance metrics for <b>PostgresSQL</b>, the object-relational database (ORDBMS).'
+        info: 'Performance metrics for <b>PostgreSQL</b>, the open source object-relational database management system (ORDBMS).'
     },
 
     'redis': {
@@ -3790,7 +3790,6 @@ netdataDashboard.context = {
 
     // ------------------------------------------------------------------------
     // POSTGRESQL
-
 
     'postgres.db_stat_blks': {
         info: 'Blocks reads from disk or cache.<ul>' +
