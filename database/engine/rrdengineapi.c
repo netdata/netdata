@@ -235,7 +235,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
         } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
     } else {
-        dbengine_page_free(descr->pg_cache_descr->page);
+        dbengine_page_free(ctx, descr);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
         rrdeng_page_descr_freez(descr);
     }
@@ -881,9 +881,11 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-    ctx->max_cache_pages = page_cache_mb * (1048576LU / RRDENG_BLOCK_SIZE);
+    ctx->max_cache_pages = page_cache_mb * (1048576LU / PAGE_TIER_BLOCK_SIZE(ctx));
+    ctx->max_cache_memory = page_cache_mb * 1048576LU;
     /* try to keep 5% of the page cache free */
     ctx->cache_pages_low_watermark = (ctx->max_cache_pages * 95LLU) / 100;
+    ctx->cache_memory_low_watermark = (ctx->max_cache_memory * 95LLU) / 100;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->max_disk_space = disk_space_mb * 1048576LLU;
@@ -1077,7 +1079,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = page_type_size[ctx->page_type];
-    stats.sizeof_page_data = RRDENG_BLOCK_SIZE;
+    stats.sizeof_page_data = PAGE_TIER_BLOCK_SIZE(ctx);
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
     stats.sizeof_extent = sizeof(struct extent_info);

@@ -219,8 +219,8 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
     struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
 
     for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        page = dbengine_page_alloc();
         descr = xt_io_descr->descr_array[i];
+        page = dbengine_page_alloc(ctx, descr->page_length);
         for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
             /* care, we don't hold the descriptor mutex */
             if (!uuid_compare(*extent->pages[j]->id, *descr->id) &&
@@ -411,7 +411,7 @@ after_crc_check:
                 continue; /* Failed to reserve a suitable page */
             is_prefetched_page = 1;
         }
-        page = dbengine_page_alloc();
+        page = dbengine_page_alloc(ctx, descr->page_length);
 
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {
@@ -502,13 +502,14 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         }
     }
 
-    ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
+    ret = posix_memalign((void *)&xt_io_descr->buf, PAGE_TIER_BLOCK_SIZE(ctx),
+        ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx)));
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);
     return;*/
     }
-    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+    real_io_size = ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx));
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_read(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, pos, read_extent_cb);
     fatal_assert(-1 != ret);
@@ -737,7 +738,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     int compressed_size, max_compressed_size = 0;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, payload_offset;
-    struct rrdeng_page_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
+    struct rrdeng_page_descr *descr, *eligible_pages[PAGE_TIER_BLOCK_SIZE(ctx)];
     struct page_cache_descr *pg_cache_descr;
     struct extent_io_descriptor *xt_io_descr;
     void *compressed_buf = NULL;
@@ -746,6 +747,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     Word_t Index;
     uint8_t compression_algorithm = ctx->global_compress_alg;
     struct extent_info *extent;
+
     struct rrdengine_datafile *datafile;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
@@ -809,12 +811,13 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
         break;
     }
-    ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
+    ret = posix_memalign((void *)&xt_io_descr->buf, PAGE_TIER_BLOCK_SIZE(ctx),
+        ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx)));
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
-    memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
+    memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx)));
     (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_descr *) * count);
     xt_io_descr->descr_count = count;
 
@@ -881,7 +884,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     crc = crc32(crc, xt_io_descr->buf, size_bytes - sizeof(*trailer));
     crc32set(trailer->checksum, crc);
 
-    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+    real_io_size = ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx));
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, flush_pages_cb);
     fatal_assert(-1 != ret);
@@ -890,11 +893,11 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     ctx->stats.io_write_extent_bytes += real_io_size;
     ++ctx->stats.io_write_extents;
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
-    datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
-    ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
+    datafile->pos += ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx));
+    ctx->disk_space += ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx));
     rrdeng_test_quota(wc);
 
-    return ALIGN_BYTES_CEILING(size_bytes);
+    return ALIGN_BYTES_CEILING_TO(size_bytes, PAGE_TIER_BLOCK_SIZE(ctx));
 }
 
 static void after_delete_old_data(struct rrdengine_worker_config* wc)
@@ -1183,7 +1186,7 @@ void timer_cb(uv_timer_t* handle)
                 /* committed to be written pages are more than the produced number */
                 nr_committed_pages - producers > high_watermark) {
                 /* Flushing speed must increase to stop page cache from filling with dirty pages */
-                bytes_to_write = (nr_committed_pages - producers - low_watermark) * RRDENG_BLOCK_SIZE;
+                bytes_to_write = (nr_committed_pages - producers - low_watermark) * PAGE_TIER_BLOCK_SIZE(ctx);
             }
             bytes_to_write = MAX(DATAFILE_IDEAL_IO_SIZE, bytes_to_write);
 
@@ -1270,6 +1273,8 @@ void rrdeng_worker(void* arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
     int set_name = 0;
+    info("Initializing DBENGINE TIER %d PAGE SIZE = %zu bytes. PAGE CACHE SIZE = %zu bytes, threadhold = %zu bytes, MAX PAGES IN CACHE %zu", ctx->tier, PAGE_TIER_BLOCK_SIZE(ctx),
+         ctx->max_cache_memory, ctx->cache_memory_low_watermark, ctx->max_cache_pages);
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);

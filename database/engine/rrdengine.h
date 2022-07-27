@@ -247,7 +247,9 @@ struct rrdengine_instance {
     int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
+    unsigned long max_cache_memory;
     unsigned long cache_pages_low_watermark;
+    unsigned long cache_memory_low_watermark;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
@@ -256,8 +258,9 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-void *dbengine_page_alloc(void);
-void dbengine_page_free(void *page);
+extern void *dbengine_page_alloc(struct rrdengine_instance *ctx, size_t page_length);
+extern void dbengine_page_free(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
+extern void dbengine_page_free_unsafe(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);

@@ -285,13 +285,14 @@ unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
     return ctx->max_cache_pages + (unsigned long)ctx->metric_API_max_producers;
 }
 
-/*
- * This function returns the low watermark number of pages in the page cache. The page cache should strive to keep the
- * number of pages below that number.
- */
-unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
+unsigned long pg_cache_hard_limit_memory(struct rrdengine_instance *ctx)
 {
-    return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
+    return (ctx->max_cache_memory + (unsigned long)ctx->metric_API_max_producers) * PAGE_TIER_BLOCK_SIZE(ctx);
+}
+
+unsigned long pg_cache_soft_limit_memory(struct rrdengine_instance *ctx)
+{
+    return (ctx->cache_memory_low_watermark + (unsigned long)ctx->metric_API_max_producers) * PAGE_TIER_BLOCK_SIZE(ctx);
 }
 
 /*
@@ -318,10 +319,9 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1)
-        debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
-                number);
-    while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
+    while (pg_cache->memory_used + number * PAGE_TIER_BLOCK_SIZE(ctx) >= pg_cache_hard_limit_memory(ctx)) {
+        internal_error(true, "PAGE_CACHE: Memory used %u, limit is %zu (trying to reserve up to %zu)",
+            pg_cache->memory_used, pg_cache_hard_limit_memory(ctx), pg_cache->memory_used + number * PAGE_TIER_BLOCK_SIZE(ctx));
 
         if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
             /* failed to evict */
@@ -360,7 +360,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
 /*
  * This function will attempt to reserve #number populated pages.
- * It may trigger evictions if the pg_cache_soft_limit() limit is hit.
+ * It may trigger evictions if the pg_cache_soft_limit_memory() limit is hit.
  * Returns 0 on failure and 1 on success.
  */
 static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
@@ -372,7 +372,7 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
+    if (pg_cache->memory_used + (number * PAGE_TIER_BLOCK_SIZE(ctx)) >= pg_cache_soft_limit_memory(ctx)) {
         debug(D_RRDENGINE,
               "==Page cache full. Trying to reserve %u pages.==",
               number);
@@ -380,14 +380,13 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
             if (!pg_cache_try_evict_one_page_unsafe(ctx))
                 break;
             ++count;
-        } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
+        } while (pg_cache->memory_used + (number * PAGE_TIER_BLOCK_SIZE(ctx)) >= pg_cache_soft_limit_memory(ctx));
         debug(D_RRDENGINE, "Evicted %u pages.", count);
     }
 
-    if (pg_cache->populated_pages + number < pg_cache_hard_limit(ctx) + 1) {
-        pg_cache->populated_pages += number;
-        ret = 1; /* success */
-    }
+    pg_cache->populated_pages += number;
+    ret = 1; /* success */
+
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
     return ret;
@@ -398,7 +397,7 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
-    dbengine_page_free(pg_cache_descr->page);
+    dbengine_page_free_unsafe(ctx, descr);
     pg_cache_descr->page = NULL;
     pg_cache_descr->flags &= ~RRD_PAGE_POPULATED;
     pg_cache_release_pages_unsafe(ctx, 1);
@@ -1231,6 +1230,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     pg_cache->page_descriptors = 0;
     pg_cache->populated_pages = 0;
+    pg_cache->memory_used = 0;
     fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
     init_metrics_index(ctx);
