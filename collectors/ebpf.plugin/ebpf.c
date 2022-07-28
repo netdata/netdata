@@ -374,7 +374,8 @@ static void ebpf_stop_threads(int sig)
 {
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        (void)netdata_thread_cancel(*ebpf_threads[i].thread);
+        if (ebpf_threads[i].thread && ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+            (void)netdata_thread_cancel(*ebpf_threads[i].thread);
     }
 
     usec_t max = 2 * USEC_PER_SEC, step = 100000;
@@ -391,7 +392,6 @@ static void ebpf_stop_threads(int sig)
 
     //Unload threads(except sync and filesystem)
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        freez(ebpf_threads[i].thread);
         if (ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED && i != EBPF_MODULE_FILESYSTEM_IDX &&
             i != EBPF_MODULE_SYNC_IDX)
             ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
