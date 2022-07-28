@@ -34,6 +34,18 @@ SVC_TYPE="detect"
 # =====================================================================
 # Utility functions
 
+info() {
+  printf >&2 "%s\n" "${@}"
+}
+
+warning() {
+  printf >&2 "WARNING: %s\n" "${@}"
+}
+
+error() {
+  printf >&2 "ERROR: %s\n" "${@}"
+}
+
 get_os_key() {
   if [ -f /etc/os-release ]; then
     # shellcheck disable=SC1091
@@ -71,24 +83,24 @@ install_generic_service() {
   svc_enable_hook="${4}"
   svc_disable_hook="${5}"
 
-  echo >&2 "Installing ${svc_type_name} service file."
+  info "Installing ${svc_type_name} service file."
   if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
     ENABLE="enable"
   fi
 
   if ! install -C -S -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" /etc/init.d/netdata; then
-    echo >&2 "ERROR: Failed to install service file."
+    error "Failed to install service file."
     exit 4
   fi
 
   case "${ENABLE}" in
     auto) true ;;
     disable)
-      echo >&2 "Disabling Netdata service."
+      info "Disabling Netdata service."
       ${svc_disable_hook}
       ;;
     enable)
-      echo >&2 "Enabling Netdata service."
+      info "Enabling Netdata service."
       ${svc_enable_hook}
       ;;
   esac
@@ -177,7 +189,7 @@ get_systemd_service_dir() {
   elif [ -w "/etc/systemd/system" ]; then
     echo "/etc/systemd/system"
   else
-    echo >&2 "ERROR: Unable to detect systemd service directory."
+    error "Unable to detect systemd service directory."
     exit 4
   fi
 }
@@ -199,18 +211,18 @@ install_systemd_service() {
     fi
   fi
 
-  echo >&2 "Installing systemd service..."
+  info "Installing systemd service..."
   if ! install -C -S -p -m 0644 -o 0 -g 0 "${SRCFILE}" "$(get_systemd_service_dir)/netdata.service"; then
-    echo >&2 "ERROR: Failed to install systemd service file."
+    error "Failed to install systemd service file."
     exit 4
   fi
 
   if ! systemctl daemon-reload; then
-    echo >&2 "WARNING: Failed to reload systemd unit files."
+    warning "Failed to reload systemd unit files."
   fi
 
   if ! systemctl ${ENABLE} netdata; then
-    echo >&2 "WARNING: Failed to ${ENABLE} Netdata service."
+    warning "Failed to ${ENABLE} Netdata service."
   fi
 }
 
@@ -255,7 +267,7 @@ enable_openrc() {
   runlevel="$(rc-status -r)"
   runlevel="${runlevel:-default}"
   if ! rc-update add netdata "${runlevel}"; then
-    echo >&2 "WARNING: Failed to enable Netdata service in runlevel ${runlevel}."
+    warning "Failed to enable Netdata service in runlevel ${runlevel}."
   fi
 }
 
@@ -264,7 +276,7 @@ disable_openrc() {
     if [ -e "${runlevel}/netdata" ]; then
       runlevel="$(basename "${runlevel}")"
       if ! rc-update del netdata "${runlevel}"; then
-        echo >&2 "WARNING: Failed to disable Netdata service in runlevel ${runlevel}."
+        warning "Failed to disable Netdata service in runlevel ${runlevel}."
       fi
     fi
   done
@@ -306,15 +318,15 @@ check_lsb() {
 
 enable_lsb() {
   if ! update-rc.d netdata defaults; then
-    echo >&2 "WARNING: Failed to enable Netdata service."
+    warning "Failed to enable Netdata service."
   elif ! update-rc.d netdata defaults-disable; then
-    echo >&2 "WARNING: Failed to fully enable Netdata service."
+    warning "Failed to fully enable Netdata service."
   fi
 }
 
 disable_lsb() {
   if ! update-rc.d netdata remove; then
-    echo >&2 "WARNING: Failed to disable Netdata service."
+    warning "Failed to disable Netdata service."
   fi
 }
 
@@ -359,13 +371,13 @@ check_initd() {
 
 enable_initd() {
   if ! chkconfig netdata on; then
-    echo >&2 "WARNING: Failed to enable Netdata service."
+    warning "Failed to enable Netdata service."
   fi
 }
 
 disable_initd() {
   if ! chkconfig netdata off; then
-    echo >&2 "WARNING: Failed to disable Netdata service."
+    warning "Failed to disable Netdata service."
   fi
 }
 
@@ -414,12 +426,12 @@ check_runit() {
 }
 
 install_runit_service() {
-  echo "ERROR: Detected runit, which we do not currently support."
+  error "Detected runit, which we do not currently support."
   exit 3
 }
 
 runit_cmds() {
-  echo "ERROR: Detected runit, which we do not currently support."
+  error "Detected runit, which we do not currently support."
   exit 3
 }
 
@@ -450,12 +462,12 @@ check_wsl() {
 }
 
 install_wsl_service() {
-  echo "ERROR: We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
+  error "We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
   exit 3
 }
 
 wsl_cmds() {
-  echo "ERROR: We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
+  error "We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
   exit 3
 }
 
@@ -464,13 +476,13 @@ wsl_cmds() {
 
 enable_freebsd() {
   if ! sysrc netdata_enable=YES; then
-    echo >&2 "WARNING: Failed to enable netdata service."
+    warning "Failed to enable netdata service."
   fi
 }
 
 disable_freebsd() {
   if ! sysrc netdata_enable=NO; then
-    echo >&2 "WARNING: Failed to disable netdata service."
+    warning "Failed to disable netdata service."
   fi
 }
 
@@ -488,14 +500,14 @@ freebsd_cmds() {
 # macOS support functions
 
 install_darwin_service() {
-  echo >&2 "Installing macOS plist file for launchd."
+  info "Installing macOS plist file for launchd."
   if ! install -C -S -p -m 0644 -o 0 -g 0 system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
-    echo >&2 "ERROR: Failed to copy plist file."
+    error "Failed to copy plist file."
     exit 4
   fi
 
   if ! launchctl load /Library/LaunchDaemons/com.github.netdata.plist; then
-    echo >&2 "ERROR: Failed to load plist file."
+    error "Failed to load plist file."
     exit 4
   fi
 }
@@ -518,7 +530,7 @@ detect_linux_svc_type() {
     done
 
     if [ "${SVC_TYPE}" = "detect" ]; then
-      echo >&2 "ERROR: Failed to detect what type of service manager is in use."
+      error "Failed to detect what type of service manager is in use."
       exit 2
     else
       echo "${SVC_TYPE}"
@@ -567,25 +579,25 @@ parse_args() {
         exit 0
         ;;
       *)
-        echo >&2 "Unrecognized option '${1}'."
+        info "Unrecognized option '${1}'."
         exit 1
         ;;
     esac
     shift 1
   done
 
-  if [ "${SVC_SOURCE%@}" = "libsysdir_POST@" ]; then
-    SVC_SOURCE="${SCRIPT_SOURCE}/../../lib/netdata/system"
-    echo "WARNING: SVC_SOURCE not templated, using ${SVC_SOURCE} as source directory."
+  if [ "${SVC_SOURCE#@}" = "libsysdir_POST@" ]; then
+    SVC_SOURCE="$(dirname "${SCRIPT_SOURCE}")/../../lib/netdata/system"
+    warning "SVC_SOURCE not templated, using ${SVC_SOURCE} as source directory."
   fi
 
-  if [ ! -d "${SVC_SOURCE}" ]; then
-    echo >&2 "ERROR: ${SVC_SOURCE} does not appear to be a directory. Please specify a valid source for service files with the --source option."
+  if [ ! -d "${SVC_SOURCE}" ] && [ "${INSTALL}" -eq 1 ]; then
+    error "${SVC_SOURCE} does not appear to be a directory. Please specify a valid source for service files with the --source option."
     exit 1
   fi
 
   if valid_types | grep -vw "${SVC_TYPE}"; then
-    echo >&2 "ERROR: ${SVC_TYPE} is not supported on this platform."
+    error "${SVC_TYPE} is not supported on this platform."
     help_types
     exit 1
   fi
@@ -623,7 +635,7 @@ main() {
       fi
       ;;
     *)
-      echo >&2 "ERROR: ${PLATFORM} is not supported by this script."
+      error "${PLATFORM} is not supported by this script."
       exit 5
   esac
 }
