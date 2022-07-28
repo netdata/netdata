@@ -1573,6 +1573,10 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
                    ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
                    ",\n\t\t\"average_page_size_bytes\":%0.2f"
                    ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
+                   ",\n\t\t\"currently_collected_metrics\":%zu"
+                   ",\n\t\t\"max_concurrently_collected_metrics\":%zu"
+                   ",\n\t\t\"disk_space\":%zu"
+                   ",\n\t\t\"max_disk_space\":%zu"
                    , stats.default_granularity_secs
                    , stats.sizeof_metric
                    , stats.sizeof_metric_in_index
@@ -1604,6 +1608,10 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
                    , stats.ephemeral_metrics_per_day_percent
                    , stats.average_page_size_bytes
                    , stats.estimated_concurrently_collected_metrics
+                   , stats.currently_collected_metrics
+                   , stats.max_concurrently_collected_metrics
+                   , stats.disk_space
+                   , stats.max_disk_space
                    );
 }
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {

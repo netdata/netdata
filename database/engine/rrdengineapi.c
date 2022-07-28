@@ -1037,9 +1037,16 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         }
     }
 
-    internal_error(stats.metrics_pages != stats.extents_pages,
-                   "DBENGINE: metrics pages is %zu, but extents pages is %zu",
-                   stats.metrics_pages, stats.extents_pages);
+
+    stats.currently_collected_metrics = ctx->stats.metric_API_producers;
+    stats.max_concurrently_collected_metrics = ctx->metric_API_max_producers;
+
+    internal_error(stats.metrics_pages != stats.extents_pages + stats.currently_collected_metrics,
+                   "DBENGINE: metrics pages is %zu, but extents pages is %zu and API consumers is %zu",
+                   stats.metrics_pages, stats.extents_pages, stats.currently_collected_metrics);
+
+    stats.disk_space = ctx->disk_space;
+    stats.max_disk_space = ctx->max_disk_space;
 
     stats.database_retention_secs = (time_t)(stats.last_t - stats.first_t);
 
