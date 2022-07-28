@@ -1474,15 +1474,15 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     return HTTP_RESP_OK;
 }
 
-int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
+static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format) {
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    WEIGHTS_METHOD method = default_metric_correlations_method;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
+    int tier = 0;
     const char *group_options = NULL;
 
     while (url) {
@@ -1523,73 +1523,26 @@ int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_clie
         else if(!strcmp(name, "method"))
             method = weights_string_to_method(value);
 
+        else if(!strcmp(name, "tier")) {
+            tier = str2i(value);
+            if(tier >= 0 && tier < storage_tiers)
+                options |= RRDR_OPTION_SELECTED_TIER;
+        }
     }
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;
-    buffer_no_cacheable(wb);
 
-    return metric_correlations(host, wb, method, group, group_options, baseline_after, baseline_before, after, before, points, options, timeout);
+    return web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, tier, timeout);
+}
+
+int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
+    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_MC_KS2, WEIGHTS_FORMAT_CHARTS);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    WEIGHTS_METHOD method = WEIGHTS_METHOD_ANOMALY_RATE;
-    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
-    int timeout = 0;
-    const char *group_options = NULL;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "baseline_after"))
-            baseline_after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "baseline_before"))
-            baseline_before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "timeout"))
-            timeout = (int) strtoul(value, NULL, 0);
-
-        else if(!strcmp(name, "group"))
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
-
-        else if(!strcmp(name, "options"))
-            options |= web_client_api_request_v1_data_options(value);
-
-        else if(!strcmp(name, "method"))
-            method = weights_string_to_method(value);
-
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
-    buffer_no_cacheable(wb);
-
-    return web_api_v1_weights(host, wb, method, WEIGHTS_FORMAT_CONTEXTS, group, group_options, baseline_after, baseline_before, after, before, points, options, timeout);
+    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
 }
 
 #ifndef ENABLE_DBENGINE
