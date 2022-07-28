@@ -42,6 +42,9 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
 
+    "CREATE TABLE IF NOT EXISTS host_label(host_id blob, source_type int, label_key text NOT NULL, "
+    "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key));",
+
     "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
 
     "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
@@ -74,6 +77,7 @@ const char *database_cleanup[] = {
     "DELETE FROM chart_hash WHERE hash_id NOT IN (SELECT hash_id FROM chart_hash_map);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
+    "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
     NULL
 };
 
@@ -764,7 +768,7 @@ static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
 
     rc = execute_insert(res);
     if (likely(rc == SQLITE_DONE))
-        result = 0;
+        result = SQLITE_OK;
     else
         error_report("Failed to execute %s, rc = %d", sql, rc);
 
@@ -1599,6 +1603,45 @@ void add_migrated_file(char *path, uint64_t file_size)
     return;
 }
 
+static int sql_store_label(sqlite3_stmt *res, uuid_t *uuid, int source_type, const char *label, const char *value)
+{
+    int rc;
+
+    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind UUID parameter to store label information");
+        goto skip_store;
+    }
+
+    rc = sqlite3_bind_int(res, 2, source_type);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind type parameter to store label information");
+        goto skip_store;
+    }
+
+    rc = sqlite3_bind_text(res, 3, label, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind label parameter to store label information");
+        goto skip_store;
+    }
+
+    rc = sqlite3_bind_text(res, 4, value, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind value parameter to store label information");
+        goto skip_store;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store label entry, rc = %d", rc);
+
+skip_store:
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("Failed to reset the prepared statement when storing label information");
+
+    return rc != SQLITE_DONE;
+}
+
 #define SQL_INS_CHART_LABEL "insert or replace into chart_label " \
     "(chart_id, source_type, label_key, label_value, date_created) " \
     "values (@chart, @source, @label, @value, unixepoch());"
@@ -1622,39 +1665,35 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind chart_id parameter to store label information");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int(res, 2, source_type);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind type parameter to store label information");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_text(res, 3, label, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind label parameter to store label information");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_text(res, 4, value, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind value parameter to store label information");
-        goto failed;
-    }
-
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store chart label entry, rc = %d", rc);
-
-failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when storing chart label information");
+    sql_store_label(res, chart_uuid, source_type, label, value);
 
     return;
+}
+
+#define SQL_INS_HOST_LABEL "INSERT OR REPLACE INTO host_label " \
+    "(host_id, source_type, label_key, label_value, date_created) " \
+    "values (@chart, @source, @label, @value, unixepoch());"
+
+static void sql_store_host_label(uuid_t *host_uuid, int source_type, const char *label, const char *value)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_INS_HOST_LABEL, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement store chart labels");
+            return;
+        }
+    }
+
+    (void) sql_store_label(res, host_uuid, source_type, label, value);
 }
 
 int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id,
@@ -2599,6 +2638,23 @@ void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_inf
         sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node);
 
     return;
+}
+
+static int save_host_label_callback(const char *name, const char *value, RRDLABEL_SRC label_source, void *data)
+{
+    RRDHOST *host = (RRDHOST *)data;
+    sql_store_host_label(&host->host_uuid, (int)label_source & ~(RRDLABEL_FLAG_INTERNAL), name, value);
+    return 0;
+}
+
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
+void sql_store_host_labels(RRDHOST *host)
+{
+    int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
+    if (rc != SQLITE_OK)
+        error_report("Failed to remove old host labels for host %s", host->hostname);
+
+    rrdlabels_walkthrough_read(host->host_labels, save_host_label_callback, host);
 }
 
 // Utils

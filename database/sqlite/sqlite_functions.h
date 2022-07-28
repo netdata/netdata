@@ -111,4 +111,5 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
 void migrate_localhost(uuid_t *host_uuid);
 extern void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info);
 extern void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
+void sql_store_host_labels(RRDHOST *host);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

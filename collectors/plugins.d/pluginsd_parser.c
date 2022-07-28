@@ -201,6 +201,7 @@ PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_h
         host->host_labels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->host_labels, new_host_labels);
+    sql_store_host_labels(host);
 
     return PARSER_RC_OK;
 }
