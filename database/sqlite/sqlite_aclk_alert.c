@@ -396,10 +396,11 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
+    buffer_sprintf(sql,"delete from aclk_alert_%s; " \
+                       "insert into aclk_alert_%s (alert_unique_id, date_created) " \
                        "select unique_id alert_unique_id, unixepoch() from health_log_%s " \
                        "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
-                       "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str);
+                       "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str, uuid_str);
 
     db_execute(buffer_tostring(sql));
 
