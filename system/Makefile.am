@@ -32,6 +32,11 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(configdir)
 	$(INSTALL) -d $(DESTDIR)$(libsysdir)
 
+libexecnetdatadir=$(libexecdir)/netdata
+nodist_libexecnetdata_SCRIPTS = \
+    install-service.sh \
+    $(NULL)
+
 nodist_libsys_DATA = \
     netdata-openrc \
     netdata.logrotate \
@@ -51,6 +56,7 @@ dist_libsys_DATA = \
 
 dist_noinst_DATA = \
     edit-config.in \
+    install-service.sh.in \
     netdata-openrc.in \
     netdata.logrotate.in \
     netdata.service.in \
