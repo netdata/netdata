@@ -835,7 +835,9 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
     array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
     array[36] = (uint64_t)global_flushing_pressure_page_deletions;
-    fatal_assert(RRDENG_NR_STATS == 37);
+    array[37] = (uint64_t)pg_cache->memory_used;
+    array[38] = (uint64_t)ctx->stats.metric_API_producers * PAGE_TIER_BLOCK_SIZE(ctx);
+    fatal_assert(RRDENG_NR_STATS == 39);
 }
 
 /* Releases reference to page */
