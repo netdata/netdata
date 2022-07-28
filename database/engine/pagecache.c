@@ -287,12 +287,12 @@ unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 
 unsigned long pg_cache_hard_limit_memory(struct rrdengine_instance *ctx)
 {
-    return (ctx->max_cache_memory + (unsigned long)ctx->metric_API_max_producers) * PAGE_TIER_BLOCK_SIZE(ctx);
+    return MAX(ctx->max_cache_memory, ((unsigned long)ctx->metric_API_max_producers * PAGE_TIER_BLOCK_SIZE(ctx)));
 }
 
 unsigned long pg_cache_soft_limit_memory(struct rrdengine_instance *ctx)
 {
-    return (ctx->cache_memory_low_watermark + (unsigned long)ctx->metric_API_max_producers) * PAGE_TIER_BLOCK_SIZE(ctx);
+    return MAX(ctx->cache_memory_low_watermark, ((unsigned long)ctx->metric_API_max_producers * PAGE_TIER_BLOCK_SIZE(ctx)));
 }
 
 /*
