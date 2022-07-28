@@ -12,6 +12,8 @@
 # 4 - Detected system service type, but could not install due to other issues.
 # 5 - Platform not supported.
 
+set -e
+
 SCRIPT_SOURCE="$(
     self=${0}
     while [ -L "${self}" ]
@@ -35,16 +37,36 @@ SVC_TYPE="detect"
 # =====================================================================
 # Utility functions
 
+cleanup() {
+  ec="${?}"
+
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+    fi
+  fi
+
+  trap - EXIT
+
+  exit "${ec}"
+}
+
 info() {
-  printf >&2 "%s\n" "${@}"
+  printf >&2 "%s\n" "${*}"
 }
 
 warning() {
-  printf >&2 "WARNING: %s\n" "${@}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${*}"
+  fi
+  printf >&2 "WARNING: %s\n" "${*}"
 }
 
 error() {
-  printf >&2 "ERROR: %s\n" "${@}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${*}"
+  fi
+  printf >&2 "ERROR: %s\n" "${*}"
 }
 
 get_os_key() {
@@ -619,6 +641,8 @@ parse_args() {
 # Core logic
 
 main() {
+  trap "cleanup" EXIT
+
   parse_args "${@}"
 
   case "${PLATFORM}" in
