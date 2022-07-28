@@ -84,7 +84,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
     w->acl = 0x1f;
 
-    buffer_strcat(log_buffer, query->data.http_api_v2.query);
+    buffer_strcat(log_buffer, query->http_api_v2.query);
     size_t size = 0;
     size_t sent = 0;
     w->tv_in = query->created_tv;
@@ -102,8 +102,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     }
 
     RRDHOST *temp_host = NULL;
-    if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
-        char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
+    if (!strncmp(query->http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
+        char *node_uuid = query->http_api_v2.query + strlen(NODE_ID_QUERY);
         char nodeid[UUID_STR_LEN];
         if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
             error_report(CLOUD_EMSG_MALFORMED_NODE_ID);
@@ -127,14 +127,14 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         }
     }
 
-    char *mysep = strchr(query->data.http_api_v2.query, '?');
+    char *mysep = strchr(query->http_api_v2.query, '?');
     if (mysep) {
         url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
         *mysep = '\0';
     } else
-        url_decode_r(w->decoded_query_string, query->data.http_api_v2.query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        url_decode_r(w->decoded_query_string, query->http_api_v2.query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
-    mysep = strrchr(query->data.http_api_v2.query, '/');
+    mysep = strrchr(query->http_api_v2.query, '/');
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
@@ -151,7 +151,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
-    if ((start = strstr((char *)query->data.http_api_v2.payload, WEB_HDR_ACCEPT_ENC))) {
+    if ((start = strstr((char *)query->http_api_v2.payload, WEB_HDR_ACCEPT_ENC))) {
         start += strlen(WEB_HDR_ACCEPT_ENC);
         end = strstr(start, "\x0D\x0A");
         start = strstr(start, "gzip");
@@ -256,57 +256,16 @@ cleanup:
     return retval;
 }
 
-static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
-{
-    // this will be simplified when legacy support is removed
-    aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
-    return 0;
-}
-
-const char *aclk_query_get_name(aclk_query_type_t qt)
-{
-    switch (qt) {
-        case HTTP_API_V2:          return "http_api_request_v2";
-        case REGISTER_NODE:        return "register_node";
-        case NODE_STATE_UPDATE:    return "node_state_update";
-        case CHART_DIMS_UPDATE:    return "chart_and_dim_update";
-        case CHART_CONFIG_UPDATED: return "chart_config_updated";
-        case CHART_RESET:          return "reset_chart_messages";
-        case RETENTION_UPDATED:    return "update_retention_info";
-        case UPDATE_NODE_INFO:     return "update_node_info";
-        case ALARM_LOG_HEALTH:     return "alarm_log_health";
-        case ALARM_PROVIDE_CFG:    return "provide_alarm_config";
-        case ALARM_SNAPSHOT:       return "alarm_snapshot";
-        case UPDATE_NODE_COLLECTORS: return "update_node_collectors";
-        case PROTO_BIN_MESSAGE:    return "generic_binary_proto_message";
-        default:
-            error_report("Unknown query type used %d", (int) qt);
-            return "unknown";
-    }
-}
-
 static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {   
-    if (query->type == UNKNOWN || query->type >= ACLK_QUERY_TYPE_COUNT) {
-        error_report("Unknown query in query queue. %u", query->type);
-        aclk_query_free(query);
-        return;
-    }
-
-    worker_is_busy(query->type);
-    if (query->type == HTTP_API_V2) {
-        debug(D_ACLK, "Processing Queued Message of type: \"http_api_request_v2\"");
-        http_api_v2(query_thr, query);
-    } else {
-        debug(D_ACLK, "Processing Queued Message of type: \"%s\"", query->data.bin_payload.msg_name);
-        send_bin_msg(query_thr, query);
-    }
+    worker_is_busy(0);
+    debug(D_ACLK, "Processing Queued Message of type: \"http_api_request_v2\"");
+    http_api_v2(query_thr, query);
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.queries_dispatched++;
         aclk_queries_per_thread[query_thr->idx]++;
-        aclk_metrics_per_sample.queries_per_type[query->type]++;
         ACLK_STATS_UNLOCK;
     }
 
@@ -326,11 +285,10 @@ int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
     return 0;
 }
 
-static void worker_aclk_register(void) {
+static void worker_aclk_register(void)
+{
     worker_register("ACLKQUERY");
-    for (int i = 1; i < ACLK_QUERY_TYPE_COUNT; i++) {
-        worker_register_job_name(i, aclk_query_get_name(i));
-    }
+    worker_register_job_name(0, "http query");
 }
 
 /**

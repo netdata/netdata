@@ -95,41 +95,16 @@ void aclk_queue_flush(void)
     };
 }
 
-aclk_query_t aclk_query_new(aclk_query_type_t type)
+aclk_query_t aclk_query_new()
 {
-    aclk_query_t query = callocz(1, sizeof(struct aclk_query));
-    query->type = type;
-    return query;
+    return callocz(1, sizeof(struct aclk_query));
 }
 
 void aclk_query_free(aclk_query_t query)
 {
-    switch (query->type) {
-    case HTTP_API_V2:
-        freez(query->data.http_api_v2.payload);
-        if (query->data.http_api_v2.query != query->dedup_id)
-            freez(query->data.http_api_v2.query);
-        break;
-
-    case NODE_STATE_UPDATE:
-    case REGISTER_NODE:
-    case CHART_DIMS_UPDATE:
-    case CHART_CONFIG_UPDATED:
-    case CHART_RESET:
-    case RETENTION_UPDATED:
-    case UPDATE_NODE_INFO:
-    case ALARM_LOG_HEALTH:
-    case ALARM_PROVIDE_CFG:
-    case ALARM_SNAPSHOT:
-    case UPDATE_NODE_COLLECTORS:
-    case PROTO_BIN_MESSAGE:
-        if (!use_mqtt_5)
-            freez(query->data.bin_payload.payload);
-        break;
-
-    default:
-        break;
-    }
+    freez(query->http_api_v2.payload);
+    if (query->http_api_v2.query != query->dedup_id)
+        freez(query->http_api_v2.query);
 
     freez(query->dedup_id);
     freez(query->callback_topic);
