@@ -60,6 +60,8 @@ struct register_result {
     const char *context;
     const char *dim_name;
     NETDATA_DOUBLE value;
+
+    struct register_result *next; // used to link contexts together
 };
 
 static void register_result_insert_callback(const char *name, void *value, void *data) {
@@ -237,35 +239,78 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before, points, method, group, options, shifts, correlated_dimensions, duration, stats);
 
-    buffer_strcat(wb, "\",\n\t\"correlated_charts\": {\n");
+    DICTIONARY *context_results = dictionary_create(
+         DICTIONARY_FLAG_SINGLE_THREADED
+        |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+        |DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+        |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+        );
 
-    size_t charts = 0, chart_dims = 0, total_dimensions = 0;
     struct register_result *t;
-    RRDSET *last_st = NULL; // never access this - we use it only for comparison
     dfe_start_read(results, t) {
-        if(!last_st || t->st != last_st) {
-            last_st = t->st;
-
-            if(charts) buffer_strcat(wb, "\n\t\t\t}\n\t\t},\n");
-            buffer_strcat(wb, "\t\t\"");
-            buffer_strcat(wb, t->chart_id);
-            buffer_strcat(wb, "\": {\n");
-            buffer_strcat(wb, "\t\t\t\"context\": \"");
-            buffer_strcat(wb, t->context);
-            buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
-            charts++;
-            chart_dims = 0;
+        struct register_result *tc = dictionary_set(context_results, t->context, t, sizeof(*t));
+        if(tc == t)
+            t->next = NULL;
+        else {
+            t->next = tc->next;
+            tc->next = t;
         }
-        if (chart_dims) buffer_sprintf(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, t->dim_name, t->value);
-        chart_dims++;
-        total_dimensions++;
     }
     dfe_done(t);
 
+    buffer_strcat(wb, "\",\n\t\"contexts\": {\n");
+
+    size_t contexts = 0, total_dimensions = 0, charts = 0, context_dims = 0, chart_dims = 0;
+    NETDATA_DOUBLE contexts_total_weight = 0.0, charts_total_weight = 0.0;
+    RRDSET *last_st = NULL; // never access this - we use it only for comparison
+    dfe_start_read(context_results, t) {
+
+        if(contexts)
+            buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t},\n", charts_total_weight / chart_dims, contexts_total_weight / context_dims);
+
+        contexts++;
+        context_dims = 0;
+        contexts_total_weight = 0.0;
+
+        buffer_strcat(wb, "\t\t\"");
+        buffer_strcat(wb, t->context);
+        buffer_strcat(wb, "\": {\n\t\t\t\"charts\":{\n");
+
+        charts = 0;
+        chart_dims = 0;
+        struct register_result *tt;
+        for(tt = t; tt ; tt = tt->next) {
+            if(!last_st || tt->st != last_st) {
+                last_st = tt->st;
+
+                if(charts)
+                    buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t},\n", charts_total_weight / chart_dims);
+
+                buffer_strcat(wb, "\t\t\t\t\"");
+                buffer_strcat(wb, tt->chart_id);
+                buffer_strcat(wb, "\": {\n");
+                buffer_strcat(wb, "\t\t\t\t\t\"dimensions\": {\n");
+                charts++;
+                chart_dims = 0;
+                charts_total_weight = 0.0;
+            }
+
+            if (chart_dims) buffer_sprintf(wb, ",\n");
+            buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, tt->dim_name, tt->value);
+            charts_total_weight += tt->value;
+            contexts_total_weight += tt->value;
+            chart_dims++;
+            context_dims++;
+            total_dimensions++;
+        }
+    }
+    dfe_done(t);
+
+    dictionary_destroy(context_results);
+
     // close dimensions and chart
     if (total_dimensions)
-        buffer_strcat(wb, "\n\t\t\t}\n\t\t}\n");
+        buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t}\n", charts_total_weight / chart_dims, contexts_total_weight / context_dims);
 
     // close correlated_charts
     buffer_sprintf(wb, "\t},\n"
@@ -957,7 +1002,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
 
         switch(method) {
             case WEIGHTS_METHOD_ANOMALY_RATE:
-                options |= RRDR_OPTION_ANOMALY_BIT|RRDR_OPTION_RETURN_RAW;
+                options |= RRDR_OPTION_ANOMALY_BIT;
                 points = 1;
                 correlated_dimensions += rrdset_weights_anomaly_rate(st, results,
                                                                      after, before,
