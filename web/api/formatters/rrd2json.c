@@ -62,10 +62,22 @@ void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_
     RRDDIM *temp_rd = context_param_list->rd;
     RRDDIM *new_rd_list = NULL, *t;
     int is_archived = (context_param_list->flags & CONTEXT_FLAGS_ARCHIVE);
+
+    RRDSET *st = temp_rd->rrdset;
+    RRDSET *last_st = st;
+    time_t last_entry_t = is_archived ? st->last_entry_t : rrdset_last_entry_t(st);
+    time_t last_last_entry_t = last_entry_t;
     while (temp_rd) {
         t = temp_rd->next;
-        RRDSET *st = temp_rd->rrdset;
-        time_t last_entry_t = is_archived ? st->last_entry_t : rrdset_last_entry_t(st);
+
+        st = temp_rd->rrdset;
+        if (st == last_st) {
+            last_entry_t = last_last_entry_t;
+        }else {
+            last_entry_t = is_archived ? st->last_entry_t : rrdset_last_entry_t(st);
+            last_last_entry_t = last_entry_t;
+            last_st = st;
+        }
 
         if (last_entry_t >= after_requested) {
             temp_rd->next = new_rd_list;
