@@ -2647,17 +2647,14 @@ static int save_host_label_callback(const char *name, const char *value, RRDLABE
     return 0;
 }
 
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 void sql_store_host_labels(RRDHOST *host)
 {
-    char sql_cleanup[128];
-
-    time_t now = now_realtime_sec();
-    rrdlabels_walkthrough_read(host->host_labels, save_host_label_callback, host);
-    snprintfz(sql_cleanup, 127, "DELETE FROM host_label WHERE date_created < %ld AND host_id = @uuid;", now);
-
-    int rc = exec_statement_with_uuid(sql_cleanup, &host->host_uuid);
+    int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
     if (rc != SQLITE_OK)
         error_report("Failed to remove old host labels for host %s", host->hostname);
+
+    rrdlabels_walkthrough_read(host->host_labels, save_host_label_callback, host);
 }
 
 // Utils
