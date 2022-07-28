@@ -182,7 +182,6 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
         error("Failed to send cancelation message for http reply");
     }
-    json_object_put(msg);
 }
 
 void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
@@ -201,7 +200,6 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     json_object_object_add(msg, "http-code", tmp);
 
     int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
-    json_object_put(msg);
 
     switch (rc) {
     case HTTP_RESP_FORBIDDEN:
