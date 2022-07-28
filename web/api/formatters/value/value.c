@@ -3,19 +3,19 @@
 #include "value.h"
 
 
-inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, uint8_t *anomaly_rate, RRDDIM *temp_rd) {
+inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate, RRDDIM *temp_rd) {
     long c;
     RRDDIM *d;
 
     NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
-    uint8_t *ar = &r->ar[ i * r->d ];
+    NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
 
     NETDATA_DOUBLE sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
 
     NETDATA_DOUBLE total = 1;
-    size_t total_anomaly_rate = 0;
+    NETDATA_DOUBLE total_anomaly_rate = 0;
 
     int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {

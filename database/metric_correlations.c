@@ -613,7 +613,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
         stats->db_queries++;
         NETDATA_DOUBLE baseline_average = NAN;
-        uint8_t base_anomaly_rate = 0;
+        NETDATA_DOUBLE base_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
                                   baseline_after, baseline_before,
@@ -629,7 +629,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
         stats->db_queries++;
         NETDATA_DOUBLE highlight_average = NAN;
-        uint8_t high_anomaly_rate = 0;
+        NETDATA_DOUBLE high_anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
                                   after, before,
@@ -697,7 +697,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
                                        long long after, long long before,
                                        RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
                                        int timeout, MC_STATS *stats) {
-    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_ANOMALY_BIT;
+    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT;
     long group_time = 0;
 
     int correlated_dimensions = 0;
@@ -719,7 +719,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
 
         stats->db_queries++;
         NETDATA_DOUBLE average = NAN;
-        uint8_t anomaly_rate = 0;
+        NETDATA_DOUBLE anomaly_rate = 0;
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &average, d->id, 1,
                                   after, before,
@@ -957,6 +957,8 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
 
         switch(method) {
             case WEIGHTS_METHOD_ANOMALY_RATE:
+                options |= RRDR_OPTION_ANOMALY_BIT|RRDR_OPTION_RETURN_RAW;
+                points = 1;
                 correlated_dimensions += rrdset_weights_anomaly_rate(st, results,
                                                                      after, before,
                                                                      options, group, group_options,
@@ -965,6 +967,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                 break;
 
             case WEIGHTS_METHOD_MC_VOLUME:
+                points = 1;
                 correlated_dimensions += rrdset_metric_correlations_volume(st, results,
                                                                 baseline_after, baseline_before,
                                                                 after, before,

@@ -82,7 +82,7 @@ RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points
     r->t = onewayalloc_callocz(owa, points, sizeof(time_t));
     r->v = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
     r->o = onewayalloc_mallocz(owa, points * dimensions * sizeof(RRDR_VALUE_FLAGS));
-    r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(uint8_t));
+    r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
     r->od = onewayalloc_mallocz(owa, dimensions * sizeof(RRDR_DIMENSION_FLAGS));
 
     r->group = 1;

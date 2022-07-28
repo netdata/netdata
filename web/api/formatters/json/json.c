@@ -162,7 +162,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     for(i = start; i != end ;i += step) {
         NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
-        uint8_t *ar = &r->ar[ i * r->d ];
+        NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
 
         time_t now = r->t[i];
 
@@ -225,7 +225,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
                 NETDATA_DOUBLE n;
                 if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
-                    n = (NETDATA_DOUBLE)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
+                    n = ar[c];
                 else
                     n = cn[c];
 
@@ -246,7 +246,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
 
             NETDATA_DOUBLE n;
             if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
-                n = (NETDATA_DOUBLE)ar[c] / 2.0; // rrdr stores anomaly rates 0 - 200
+                n = ar[c];
             else
                 n = cn[c];
 
