@@ -483,84 +483,87 @@ NETDATA_START_CMD="netdata"
 NETDATA_INSTALLER_START_CMD=""
 
 install_netdata_service() {
-  uname="$(uname 2> /dev/null)"
-
   if [ "${UID}" -eq 0 ]; then
-    if [ "${uname}" = "Darwin" ]; then
+    if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+      run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds && return 0
+    else
+      uname="$(uname 2> /dev/null)"
 
-      if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]; then
-        echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
-        return 0
-      else
-        echo >&2 "Installing MacOS X plist file..."
+      if [ "${uname}" = "Darwin" ]; then
+        if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]; then
+          echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
+          return 0
+        else
+          echo >&2 "Installing MacOS X plist file..."
+          # This is used by netdata-installer.sh
+          # shellcheck disable=SC2034
+          run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
+            run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
+            NETDATA_START_CMD="launchctl start com.github.netdata" &&
+            NETDATA_STOP_CMD="launchctl stop com.github.netdata"
+          return 0
+        fi
+
+      elif [ "${uname}" = "FreeBSD" ]; then
         # This is used by netdata-installer.sh
         # shellcheck disable=SC2034
-        run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
-          run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
-          NETDATA_START_CMD="launchctl start com.github.netdata" &&
-          NETDATA_STOP_CMD="launchctl stop com.github.netdata"
-        return 0
-      fi
+        run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+          NETDATA_STOP_CMD="service netdata stop" &&
+          NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
+          myret=$?
 
-    elif [ "${uname}" = "FreeBSD" ]; then
-      # This is used by netdata-installer.sh
-      # shellcheck disable=SC2034
-      run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
-        NETDATA_STOP_CMD="service netdata stop" &&
-        NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
-        myret=$?
+        echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
+        echo >&2 ""
 
-      echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
-      echo >&2 ""
+        return ${myret}
 
-      return ${myret}
-
-    elif issystemd; then
-      # systemd is running on this system
-      NETDATA_START_CMD="systemctl start netdata"
-      # This is used by netdata-installer.sh
-      # shellcheck disable=SC2034
-      NETDATA_STOP_CMD="systemctl stop netdata"
-      NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
-
-      SYSTEMD_DIRECTORY="$(get_systemd_service_dir)"
-
-      if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
-        ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
-        IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
-        if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
-          echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
-          ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
-        fi
-
-        echo >&2 "Installing systemd service..."
-        run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
-          run systemctl daemon-reload &&
-          ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
-          return 0
-      else
-        warning "Could not find a systemd service directory, unable to install Netdata systemd service."
-      fi
-    else
-      install_non_systemd_init
-      ret=$?
-
-      if [ ${ret} -eq 0 ]; then
-        if [ -n "${service_cmd}" ]; then
-          NETDATA_START_CMD="service netdata start"
-          # This is used by netdata-installer.sh
-          # shellcheck disable=SC2034
-          NETDATA_STOP_CMD="service netdata stop"
-        elif [ -n "${rcservice_cmd}" ]; then
-          NETDATA_START_CMD="rc-service netdata start"
-          # This is used by netdata-installer.sh
-          # shellcheck disable=SC2034
-          NETDATA_STOP_CMD="rc-service netdata stop"
-        fi
+      elif issystemd; then
+        # systemd is running on this system
+        NETDATA_START_CMD="systemctl start netdata"
+        # This is used by netdata-installer.sh
+        # shellcheck disable=SC2034
+        NETDATA_STOP_CMD="systemctl stop netdata"
         NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
-      fi
 
-      return ${ret}
+        SYSTEMD_DIRECTORY="$(get_systemd_service_dir)"
+
+        if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
+          ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
+          IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+          if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
+            echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
+            ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
+          fi
+
+          echo >&2 "Installing systemd service..."
+          run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
+            run systemctl daemon-reload &&
+            ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
+            return 0
+        else
+          warning "Could not find a systemd service directory, unable to install Netdata systemd service."
+        fi
+      else
+        install_non_systemd_init
+        ret=$?
+
+        if [ ${ret} -eq 0 ]; then
+          if [ -n "${service_cmd}" ]; then
+            NETDATA_START_CMD="service netdata start"
+            # This is used by netdata-installer.sh
+            # shellcheck disable=SC2034
+            NETDATA_STOP_CMD="service netdata stop"
+          elif [ -n "${rcservice_cmd}" ]; then
+            NETDATA_START_CMD="rc-service netdata start"
+            # This is used by netdata-installer.sh
+            # shellcheck disable=SC2034
+            NETDATA_STOP_CMD="rc-service netdata stop"
+          fi
+          NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+        fi
+
+        return ${ret}
+      fi
     fi
   fi
 
@@ -642,11 +645,21 @@ netdata_pids() {
 stop_all_netdata() {
   stop_success=0
 
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+    "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds --cmds-only
+  fi
+
   if [ "${UID}" -eq 0 ]; then
+
     uname="$(uname 2>/dev/null)"
 
     # Any of these may fail, but we need to not bail if they do.
-    if issystemd; then
+    if [ -n "${NETDATA_STOP_CMD}" ]; then
+      if ${NETDATA_STOP_CMD}; then
+        stop_success=1
+        sleep 5
+      fi
+    elif issystemd; then
       if systemctl stop netdata; then
         stop_success=1
         sleep 5
@@ -693,8 +706,16 @@ restart_netdata() {
 
   progress "Restarting netdata instance"
 
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+    "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds --cmds-only
+  fi
+
   if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
-    NETDATA_INSTALLER_START_CMD="${netdata}"
+    if [ -n "${NETDATA_START_CMD}" ]; then
+      NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+    else
+      NETDATA_INSTALLER_START_CMD="${netdata}"
+    fi
   fi
 
   if [ "${UID}" -eq 0 ]; then

@@ -25,6 +25,7 @@ SCRIPT_SOURCE="$(
 
 DUMP_CMDS=0
 ENABLE="auto"
+EXPORT_CMDS=0
 INSTALL=1
 LINUX_INIT_TYPES="wsl systemd openrc lsb initd runit"
 PLATFORM="$(uname -s)"
@@ -106,6 +107,18 @@ install_generic_service() {
   esac
 }
 
+dump_cmds() {
+  [ -n "${NETDATA_START_CMD}" ] && echo "NETDATA_START_CMD='${NETDATA_START_CMD}'"
+  [ -n "${NETDATA_STOP_CMD}" ] && echo "NETDATA_STOP_CMD='${NETDATA_STOP_CMD}'"
+  [ -n "${NETDATA_INSTALLER_START_CMD}" ] && echo "NETDATA_INSTALLER_START_CMD='${NETDATA_INSTALLER_START_CMD}'"
+}
+
+export_cmds() {
+  [ -n "${NETDATA_START_CMD}" ] && export NETDATA_START_CMD
+  [ -n "${NETDATA_STOP_CMD}" ] && export NETDATA_STOP_CMD
+  [ -n "${NETDATA_INSTALLER_START_CMD}" ] && export NETDATA_INSTALLER_START_CMD
+}
+
 # =====================================================================
 # Help functions
 
@@ -117,7 +130,8 @@ USAGE: install-service.sh [options]
   --source      Specify where to find the service files to install (default ${SVC_SOURCE}).
   --type        Specify the type of service file to install. Specify a type of 'help' to get a list of valid types for your platform.
   --cmds        Additionally print a list of commands for starting and stopping the agent with the detected service type.
-  --cmds-only   Don't install, just produce the output for the --cmds option.
+  --export-cmds Export the variables that would be printed by the --cmds option.
+  --cmds-only   Don't install, just handle the --cmds or --export-cmds option.
   --enable      Explicitly enable the service on install (default is to enable if not already installed).
   --disable     Explicitly disable the service on install.
   --help        Print this help information.
@@ -227,8 +241,8 @@ install_systemd_service() {
 }
 
 systemd_cmds() {
-  echo "NETDATA_START_CMD='systemctl start netdata'"
-  echo "NETDATA_STOP_CMD='systemctl stop netdata'"
+  NETDATA_START_CMD='systemctl start netdata'
+  NETDATA_STOP_CMD='systemctl stop netdata'
 }
 
 # =====================================================================
@@ -287,8 +301,8 @@ install_openrc_service() {
 }
 
 openrc_cmds() {
-  echo "NETDATA_START_CMD='rc-service netdata start'"
-  echo "NETDATA_STOP_CMD='rc-service netdata stop'"
+  NETDATA_START_CMD='rc-service netdata start'
+  NETDATA_STOP_CMD='rc-service netdata stop'
 }
 
 # =====================================================================
@@ -336,11 +350,11 @@ install_lsb_service() {
 
 lsb_cmds() {
   if command -v service >/dev/null 2>&1; then
-    echo "NETDATA_START_CMD='service netdata start'"
-    echo "NETDATA_STOP_CMD='service netdata stop'"
+    NETDATA_START_CMD='service netdata start'
+    NETDATA_STOP_CMD='service netdata stop'
   else
-    echo "NETDATA_START_CMD='/etc/init.d/netdata start'"
-    echo "NETDATA_STOP_CMD='/etc/init.d/netdata stop'"
+    NETDATA_START_CMD='/etc/init.d/netdata start'
+    NETDATA_STOP_CMD='/etc/init.d/netdata stop'
   fi
 }
 
@@ -387,11 +401,11 @@ install_initd_service() {
 
 initd_cmds() {
   if command -v service >/dev/null 2>&1; then
-    echo "NETDATA_START_CMD='service netdata start'"
-    echo "NETDATA_STOP_CMD='service netdata stop'"
+    NETDATA_START_CMD='service netdata start'
+    NETDATA_STOP_CMD='service netdata stop'
   else
-    echo "NETDATA_START_CMD='/etc/init.d/netdata start'"
-    echo "NETDATA_STOP_CMD='/etc/init.d/netdata stop'"
+    NETDATA_START_CMD='/etc/init.d/netdata start'
+    NETDATA_STOP_CMD='/etc/init.d/netdata stop'
   fi
 }
 
@@ -491,9 +505,9 @@ install_freebsd_service() {
 }
 
 freebsd_cmds() {
-  echo "NETDATA_START_CMD='service netdata start'"
-  echo "NETDATA_STOP_CMD='service netdata stop'"
-  echo "NETDATA_INSTALLER_START_CMD='service netdata onestart'"
+  NETDATA_START_CMD='service netdata start'
+  NETDATA_STOP_CMD='service netdata stop'
+  NETDATA_INSTALLER_START_CMD='service netdata onestart'
 }
 
 # =====================================================================
@@ -513,8 +527,8 @@ install_darwin_service() {
 }
 
 darwin_cmds() {
-  echo "NETDATA_START_CMD='launchctl start com.github.netdata'"
-  echo "NETDATA_STOP_CMD='launchctl stop com.github.netdata'"
+  NETDATA_START_CMD='launchctl start com.github.netdata'
+  NETDATA_STOP_CMD='launchctl stop com.github.netdata'
 }
 
 # =====================================================================
@@ -568,10 +582,8 @@ parse_args() {
         fi
         ;;
       "--cmds" | "-c") DUMP_CMDS=1 ;;
-      "--cmds-only")
-        DUMP_CMDS=1
-        INSTALL=0
-        ;;
+      "--cmds-only") INSTALL=0 ;;
+      "--export-cmds") EXPORT_CMDS=1 ;;
       "--enable" | "-e") ENABLE="enable" ;;
       "--disable" | "-d") ENABLE="disable" ;;
       "--help" | "-h")
@@ -611,33 +623,25 @@ main() {
 
   case "${PLATFORM}" in
     FreeBSD)
-      if [ "${INSTALL}" -eq 1 ]; then
-        install_freebsd_service
-      fi
-      if [ "${DUMP_CMDS}" -eq 1 ]; then
-        freebsd_cmds
-      fi
+      [ "${INSTALL}" -eq 1 ] && install_freebsd_service
+      freebsd_cmds
       ;;
     Darwin)
-      if [ "${INSTALL}" -eq 1 ]; then
-        install_darwin_service
-      fi
-      if [ "${DUMP_CMDS}" -eq 1 ]; then
-        darwin_cmds
-      fi
+      [ "${INSTALL}" -eq 1 ] && install_darwin_service
+      darwin_cmds
       ;;
     Linux)
-      if [ "${INSTALL}" -eq 1 ]; then
-        install_linux_service
-      fi
-      if [ "${DUMP_CMDS}" -eq 1 ]; then
-        linux_cmds
-      fi
+      [ "${INSTALL}" -eq 1 ] && install_linux_service
+      linux_cmds
       ;;
     *)
       error "${PLATFORM} is not supported by this script."
       exit 5
+      ;;
   esac
+
+  [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
+  [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
 }
 
 main "${@}"
