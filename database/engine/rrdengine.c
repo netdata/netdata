@@ -15,41 +15,51 @@ unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
 
-void *dbengine_page_alloc(struct rrdengine_instance *ctx, size_t page_length) {
+void *dbengine_page_alloc(struct rrdengine_instance *ctx, size_t page_length)
+{
     void *page = NULL;
-    size_t real_page_length = ALIGN_BYTES_CEILING_TO(page_length,32);
+    size_t real_page_length;
     if (likely(db_engine_use_malloc)) {
+        real_page_length = ALIGN_BYTES_CEILING_TO(page_length, 32);
         page = mallocz(real_page_length);
-        uv_rwlock_wrlock(&ctx->pg_cache.pg_cache_rwlock);
-        ctx->pg_cache.memory_used += real_page_length;
-        uv_rwlock_wrunlock(&ctx->pg_cache.pg_cache_rwlock);
+    } else {
+        real_page_length = PAGE_TIER_BLOCK_SIZE(ctx);
+        page = netdata_mmap(NULL, real_page_length, MAP_PRIVATE, enable_ksm);
+        if (!page)
+            fatal("Cannot allocate dbengine page cache page, with mmap()");
     }
-    else {
-        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
-        if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
-    }
+    uv_rwlock_wrlock(&ctx->pg_cache.pg_cache_rwlock);
+    ctx->pg_cache.memory_used += real_page_length;
+    uv_rwlock_wrunlock(&ctx->pg_cache.pg_cache_rwlock);
     return page;
 }
 
 void dbengine_page_free_unsafe(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
 {
+    size_t real_page_length;
     if (likely(db_engine_use_malloc)) {
-        size_t real_page_length = ALIGN_BYTES_CEILING_TO(descr->page_length, 32);
+        real_page_length = ALIGN_BYTES_CEILING_TO(descr->page_length, 32);
         freez(descr->pg_cache_descr->page);
-        ctx->pg_cache.memory_used -= real_page_length;
-    } else
-        netdata_munmap(descr->pg_cache_descr->page, RRDENG_BLOCK_SIZE);
+    } else {
+        real_page_length = PAGE_TIER_BLOCK_SIZE(ctx);
+        netdata_munmap(descr->pg_cache_descr->page, real_page_length);
+    }
+    ctx->pg_cache.memory_used -= real_page_length;
 }
 
-void dbengine_page_free(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr) {
+void dbengine_page_free(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    size_t real_page_length;
     if (likely(db_engine_use_malloc)) {
-        size_t real_page_length = ALIGN_BYTES_CEILING_TO(descr->page_length, 32);
+        real_page_length = ALIGN_BYTES_CEILING_TO(descr->page_length, 32);
         freez(descr->pg_cache_descr->page);
-        uv_rwlock_wrlock(&ctx->pg_cache.pg_cache_rwlock);
-        ctx->pg_cache.memory_used -= real_page_length;
-        uv_rwlock_wrunlock(&ctx->pg_cache.pg_cache_rwlock);
-    } else
-        netdata_munmap(descr->pg_cache_descr->page, RRDENG_BLOCK_SIZE);
+    } else {
+        real_page_length =  PAGE_TIER_BLOCK_SIZE(ctx);
+        netdata_munmap(descr->pg_cache_descr->page, real_page_length);
+    }
+    uv_rwlock_wrlock(&ctx->pg_cache.pg_cache_rwlock);
+    ctx->pg_cache.memory_used -= real_page_length;
+    uv_rwlock_wrunlock(&ctx->pg_cache.pg_cache_rwlock);
 }
 
 static void sanity_check(void)
