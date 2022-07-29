@@ -2657,6 +2657,44 @@ void sql_store_host_labels(RRDHOST *host)
     rrdlabels_walkthrough_read(host->host_labels, save_host_label_callback, host);
 }
 
+#define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
+    "AND label_key IS NOT NULL AND label_value IS NOT NULL;"
+
+DICTIONARY *sql_load_host_labels(uuid_t *host_id)
+{
+    int rc;
+
+    DICTIONARY *labels = NULL;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_LABELS, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to read host information");
+        return NULL;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter host information");
+        goto skip_loading;
+    }
+
+    labels = rrdlabels_create();
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        rrdlabels_add(
+            labels,
+            (const char *)sqlite3_column_text(res, 0),
+            (const char *)sqlite3_column_text(res, 1),
+            sqlite3_column_int(res, 2));
+    }
+
+skip_loading:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading host information");
+    return labels;
+}
+
 // Utils
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null)
 {
