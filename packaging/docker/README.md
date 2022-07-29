@@ -11,7 +11,7 @@ you get set up quickly, and doesn't install anything permanent on the system, wh
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. Read
+Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog instance within the Netdata infrastructure. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
@@ -133,12 +133,12 @@ You can control how the health checks run by using the environment variable `NET
 
 In most cases, the default behavior of checking the `/api/v1/info`
 endpoint will be sufficient. If you are using a configuration which
-disables the web server or restricts access to certain API's, you will
+disables the web server or restricts access to certain APIs, you will
 need to use a non-default configuration for health checks to work.
 
 ## Configure Agent containers
 
-If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container) and you
+If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container), and you
 want to edit Netdata's configuration, you must first use `docker exec` to attach to the container. Replace `netdata`
 with the name of your container.
 
@@ -222,7 +222,7 @@ volumes:
 
 You can change the hostname of a Docker container, and thus the name that appears in the local dashboard and in Netdata
 Cloud, when creating a new container. If you want to change the hostname of a Netdata container _after_ you started it,
-you can safely stop and remove it. You configuration and metrics data reside in persistent volumes and are reattached to
+you can safely stop and remove it. Your configuration and metrics data reside in persistent volumes and are reattached to
 the recreated container.
 
 If you use `docker-run`, use the `--hostname` option with `docker run`.
@@ -251,7 +251,7 @@ how you created the container.
 
 ### Add or remove other volumes
 
-Some of the volumes are optional depending on how you use Netdata:
+Some volumes are optional depending on how you use Netdata:
 
 -   If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
     (they are used to get proper user and group names for the monitored host) to get slightly better security.
@@ -367,6 +367,42 @@ services:
       - DOCKER_USR=root
 ```
 
+### Docker container network interfaces monitoring
+
+Netdata can map a virtual interface in the system namespace to an interface inside a Docker container
+when using network [bridge](https://docs.docker.com/network/bridge/) driver. To do this, the Netdata container needs
+additional privileges:
+
+- the host PID mode. This turns on sharing between container and the host operating system the PID
+  address space (needed to get list of PIDs from `cgroup.procs` file).
+
+- `SYS_ADMIN` capability (needed to execute `setns()`).
+
+**docker run**:
+
+```bash
+docker run -d --name=netdata \
+  ...
+  --pid=host \
+  --cap-add SYS_ADMIN \
+  ...
+  netdata/netdata
+```
+
+**docker compose**:
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    pid: host
+    cap_add:
+      - SYS_ADMIN
+    ...
+```
+
 ### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
@@ -384,7 +420,7 @@ email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
 
 ### Caddyfile
 
-This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain and you need to provide
+This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain, and you need to provide
 your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be
 executed internally by the caddy server.
 
@@ -450,10 +486,10 @@ You may either use the command line tools available or take advantage of our Tra
 
 ### Inside Netdata organization, using Travis CI
 
-To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata
+To enable Travis CI integration on your own repositories (Docker and GitHub), you need to be part of the Netdata
 organization.
 
-Once you have contacted the Netdata owners to setup you up on Github and Travis, execute the following steps
+Once you have contacted the Netdata owners to setup you up on GitHub and Travis, execute the following steps
 
 -   Preparation
     -   Have Netdata forked on your personal GitHub account
@@ -478,7 +514,7 @@ Once you have contacted the Netdata owners to setup you up on Github and Travis,
 
 -   While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add
     the following:
-    -   `DOCKER_USERNAME` and `DOCKER_PWD` variables so that Travis can login to your Docker Hub account and publish
+    -   `DOCKER_USERNAME` and `DOCKER_PWD` variables so that Travis can log in to your Docker Hub account and publish
         Docker images there. 
     -   `REPOSITORY` variable to `NETDATA_DEVELOPER/netdata`, where `NETDATA_DEVELOPER` is your GitHub handle again.
     -   `GITHUB_TOKEN` variable with the token generated on the preparation step, for Travis workflows to function
