@@ -774,8 +774,6 @@ set(RRD_PLUGIN_FILES
         database/engine/metadata_log/compaction.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
-        database/metric_correlations.c
-        database/metric_correlations.h
         )
 
 set(WEB_PLUGIN_FILES
@@ -822,6 +820,8 @@ set(API_PLUGIN_FILES
         web/api/queries/ses/ses.h
         web/api/queries/des/des.c
         web/api/queries/des/des.h
+        web/api/queries/weights.c
+        web/api/queries/weights.h
         web/api/formatters/rrd2json.c
         web/api/formatters/rrd2json.h
         web/api/formatters/csv/csv.c

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_METRIC_CORRELATIONS_H
-#define NETDATA_METRIC_CORRELATIONS_H 1
+#ifndef NETDATA_API_WEIGHTS_H
+#define NETDATA_API_WEIGHTS_H 1
 
-#include "web/api/queries/query.h"
+#include "query.h"
 
 typedef enum {
     WEIGHTS_METHOD_MC_KS2       = 1,
@@ -30,4 +30,4 @@ extern WEIGHTS_METHOD weights_string_to_method(const char *method);
 extern const char *weights_method_to_string(WEIGHTS_METHOD method);
 extern int mc_unittest(void);
 
-#endif //NETDATA_METRIC_CORRELATIONS_H
+#endif //NETDATA_API_WEIGHTS_H

@@ -1681,6 +1681,8 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     database/engine/metadata_log/Makefile
+    database/ram/Makefile
+    database/sqlite/Makefile
     diagrams/Makefile
     exporting/Makefile
     exporting/graphite/Makefile

@@ -7,6 +7,7 @@
 #include "web/api/badges/web_buffer_svg.h"
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/health/health_cmdapi.h"
+#include "web/api/queries/weights.h"
 
 #define MAX_CHART_LABELS_FILTER (32)
 extern RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);

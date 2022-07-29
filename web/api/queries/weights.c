@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
-#include "KolmogorovSmirnovDist.h"
+#include "database/KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
 int enable_metric_correlations = CONFIG_BOOLEAN_YES;

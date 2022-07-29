@@ -473,8 +473,6 @@ RRD_PLUGIN_FILES = \
     database/sqlite/sqlite3.h \
     database/KolmogorovSmirnovDist.c \
     database/KolmogorovSmirnovDist.h \
-    database/metric_correlations.c \
-    database/metric_correlations.h \
     $(NULL)
 
 database/sqlite/sqlite3.$(OBJEXT) : CFLAGS += -Wno-cast-function-type
@@ -599,6 +597,8 @@ API_PLUGIN_FILES = \
     web/api/queries/stddev/stddev.h \
     web/api/queries/sum/sum.c \
     web/api/queries/sum/sum.h \
+    web/api/queries/weights.c \
+    web/api/queries/weights.h \
     web/api/formatters/rrd2json.c \
     web/api/formatters/rrd2json.h \
     web/api/formatters/csv/csv.c \
