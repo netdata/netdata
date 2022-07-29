@@ -1710,91 +1710,103 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     rrdcontext_unlock(rc);
 }
 
+// This will go away when we stop creating/maintaining the corresponding chart
+static int is_ar_chart(RRDSET *st)
+{
+    if (st->state && st->state->is_ar_chart)
+        return 1;
+    return 0;
+}
+
 // ----------------------------------------------------------------------------
 // public API
 
 void rrdcontext_updated_rrddim(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdmetric_from_rrddim(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_from_rrddim(rd);
 }
 
 void rrdcontext_removed_rrddim(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
 
-    rrdmetric_rrddim_is_freed(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_rrddim_is_freed(rd);
 }
 
 void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
 
-    rrdmetric_updated_rrddim_flags(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
 
-    rrdmetric_updated_rrddim_flags(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_divisor(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdmetric_updated_rrddim_flags(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_flags(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdmetric_updated_rrddim_flags(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_collected_rrddim(RRDDIM *rd) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdmetric_collected_rrddim(rd);
+    if (likely(!is_ar_chart(rd->rrdset)))
+        rrdmetric_collected_rrddim(rd);
 }
 
 void rrdcontext_updated_rrdset(RRDSET *st) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdinstance_from_rrdset(st);
+    if (likely(!is_ar_chart(st)))
+        rrdinstance_from_rrdset(st);
 }
 
 void rrdcontext_removed_rrdset(RRDSET *st) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdinstance_rrdset_is_freed(st);
+    if (likely(!is_ar_chart(st)))
+        rrdinstance_rrdset_is_freed(st);
 }
 
 void rrdcontext_updated_rrdset_name(RRDSET *st) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdinstance_updated_rrdset_name(st);
+    if (likely(!is_ar_chart(st)))
+        rrdinstance_updated_rrdset_name(st);
 }
 
 void rrdcontext_updated_rrdset_flags(RRDSET *st) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
 
-    rrdinstance_updated_rrdset_flags(st);
+    if (likely(!is_ar_chart(st)))
+        rrdinstance_updated_rrdset_flags(st);
 }
 
 void rrdcontext_collected_rrdset(RRDSET *st) {
     if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
         return;
-
-    rrdinstance_collected_rrdset(st);
+    if (likely(!is_ar_chart(st)))
+        rrdinstance_collected_rrdset(st);
 }
 
 void rrdcontext_host_child_connected(RRDHOST *host) {
