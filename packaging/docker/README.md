@@ -367,6 +367,42 @@ services:
       - DOCKER_USR=root
 ```
 
+### Docker container network interfaces monitoring
+
+Netdata can map a virtual interface in the system namespace to an interface inside a Docker container
+when using network [bridge](https://docs.docker.com/network/bridge/) driver. To do this, the Netdata container needs
+additional privileges:
+
+- the host PID mode. This turns on sharing between container and the host operating system the PID
+  address space (needed to get list of PIDs from `cgroup.procs` file).
+
+- `SYS_ADMIN` capability (needed to execute `setns()`).
+
+**docker run**:
+
+```bash
+docker run -d --name=netdata \
+  ...
+  --pid=host \
+  --cap-add SYS_ADMIN \
+  ...
+  netdata/netdata
+```
+
+**docker compose**:
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    pid: host
+    cap_add:
+      - SYS_ADMIN
+    ...
+```
+
 ### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
