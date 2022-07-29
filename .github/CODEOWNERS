@@ -5,11 +5,11 @@
 * @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @iigorkarpov @maneamarius
-.github/ @Ferroin @iigorkarpov @maneamarius
+.travis/ @Ferroin
+.github/ @Ferroin
 aclk/ @stelfrag @underhood
-build/ @Ferroin @iigorkarpov @maneamarius
-contrib/debian @Ferroin @iigorkarpov @maneamarius
+build/ @Ferroin
+contrib/debian @Ferroin
 collectors/ @vlvkobal
 collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
@@ -26,32 +26,32 @@ health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 ml/ @andrewm4894 @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
-packaging/ @Ferroin @iigorkarpov @maneamarius
+packaging/ @Ferroin
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @iigorkarpov @maneamarius
-tests/ @Ferroin @iigorkarpov @maneamarius @vkalintiris
+system/ @Ferroin
+tests/ @Ferroin @vkalintiris
 web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin @iigorkarpov @maneamarius
+*.am @Ferroin
 *.md @DShreve2
-Dockerfile* @Ferroin @iigorkarpov @maneamarius
+Dockerfile* @Ferroin
 
 # Ownership of specific files
-.gitignore @Ferroin @iigorkarpov @maneamarius @vkalintiris
-.travis.yml @Ferroin @iigorkarpov @maneamarius
-.lgtm.yml @Ferroin @iigorkarpov @maneamarius
-.eslintrc @Ferroin @iigorkarpov @maneamarius
-.eslintignore @Ferroin @iigorkarpov @maneamarius
-.csslintrc @Ferroin @iigorkarpov @maneamarius
-.codeclimate.yml @Ferroin @iigorkarpov @maneamarius
-.codacy.yml @Ferroin @iigorkarpov @maneamarius
-.yamllint.yml @Ferroin @iigorkarpov @maneamarius
-netdata.spec.in @Ferroin @iigorkarpov @maneamarius
-netdata-installer.sh @Ferroin @iigorkarpov @maneamarius
-packaging/version @netdatabot @Ferroin @iigorkarpov @maneamarius
+.gitignore @Ferroin @vkalintiris
+.travis.yml @Ferroin
+.lgtm.yml @Ferroin
+.eslintrc @Ferroin
+.eslintignore @Ferroin
+.csslintrc @Ferroin
+.codeclimate.yml @Ferroin
+.codacy.yml @Ferroin
+.yamllint.yml @Ferroin
+netdata.spec.in @Ferroin
+netdata-installer.sh @Ferroin
+packaging/version @netdatabot @Ferroin
 
 LICENSE.md @DShreve2 @Ferroin @vkalintiris
-CHANGELOG.md @netdatabot @Ferroin @iigorkarpov @maneamarius
+CHANGELOG.md @netdatabot @Ferroin
