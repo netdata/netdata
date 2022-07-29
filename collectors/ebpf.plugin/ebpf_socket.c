@@ -2024,15 +2024,6 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
         key = next_key;
     }
-
-    test = bpf_map_lookup_elem(fd, &next_key, values);
-    if (test < 0) {
-        return;
-    }
-
-    if (network_connection) {
-        hash_accumulator(values, &next_key, family, end);
-    }
 }
 
 /**
