@@ -3,20 +3,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-SUBDIRS = \
-    average \
-    countif \
-    des \
-    incremental_sum \
-    max \
-    min \
-    sum \
-    median \
-    percentile \
-    ses \
-    stddev \
-    $(NULL)
-
 dist_noinst_DATA = \
     README.md \
     $(NULL)

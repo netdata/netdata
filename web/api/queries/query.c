@@ -14,6 +14,7 @@
 #include "stddev/stddev.h"
 #include "ses/ses.h"
 #include "des/des.h"
+#include "percentile/percentile.h"
 
 // ----------------------------------------------------------------------------
 
@@ -105,6 +106,17 @@ static struct {
                 .free  = grouping_free_median,
                 .add   = grouping_add_median,
                 .flush = grouping_flush_median,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+        },
+        {.name = "percentile",
+                .hash  = 0,
+                .value = RRDR_GROUPING_PERCENTILE,
+                .init  = NULL,
+                .create= grouping_create_percentile,
+                .reset = grouping_reset_percentile,
+                .free  = grouping_free_percentile,
+                .add   = grouping_add_percentile,
+                .flush = grouping_flush_percentile,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
         {.name = "min",

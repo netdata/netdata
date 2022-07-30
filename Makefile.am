@@ -587,6 +587,8 @@ API_PLUGIN_FILES = \
     web/api/queries/median/median.h \
     web/api/queries/min/min.c \
     web/api/queries/min/min.h \
+    web/api/queries/percentile/percentile.c \
+    web/api/queries/percentile/percentile.h \
     web/api/queries/query.c \
     web/api/queries/query.h \
     web/api/queries/rrdr.c \
