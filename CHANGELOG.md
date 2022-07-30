@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- fix\(python.d/smartd\_log\): handle log rotation [\#13460](https://github.com/netdata/netdata/pull/13460) ([ilyam8](https://github.com/ilyam8))
+- docs: add a note about network interface monitoring when running in a Docker container [\#13458](https://github.com/netdata/netdata/pull/13458) ([ilyam8](https://github.com/ilyam8))
+- fix a guide so we can reference it's subsections [\#13455](https://github.com/netdata/netdata/pull/13455) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "Query queue only for queries" [\#13452](https://github.com/netdata/netdata/pull/13452) ([stelfrag](https://github.com/stelfrag))
 - Get last\_entry\_t only when st changes [\#13448](https://github.com/netdata/netdata/pull/13448) ([MrZammler](https://github.com/MrZammler))
 - additional stats [\#13445](https://github.com/netdata/netdata/pull/13445) ([ktsaou](https://github.com/ktsaou))
@@ -337,10 +340,6 @@
 - Fill missing removed events after a crash [\#12803](https://github.com/netdata/netdata/pull/12803) ([MrZammler](https://github.com/MrZammler))
 - Switch to Alma Linux for RHEL compatible support. [\#12799](https://github.com/netdata/netdata/pull/12799) ([Ferroin](https://github.com/Ferroin))
 - Rename --install option for kickstart.sh [\#12798](https://github.com/netdata/netdata/pull/12798) ([maneamarius](https://github.com/maneamarius))
-- chore\(python.d\): remove python.d/\* announced in v1.34.0 deprecation notice [\#12796](https://github.com/netdata/netdata/pull/12796) ([ilyam8](https://github.com/ilyam8))
-- Don't use MADV\_DONTDUMP on non-linux builds [\#12795](https://github.com/netdata/netdata/pull/12795) ([vkalintiris](https://github.com/vkalintiris))
-- Speed up BUFFER increases \(minimize reallocs\) [\#12792](https://github.com/netdata/netdata/pull/12792) ([ktsaou](https://github.com/ktsaou))
-- procfile: more comfortable initial settings and faster/fewer reallocs [\#12791](https://github.com/netdata/netdata/pull/12791) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
