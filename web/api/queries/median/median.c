@@ -2,24 +2,32 @@
 
 #include "median.h"
 
-
 // ----------------------------------------------------------------------------
 // median
 
 struct grouping_median {
     size_t series_size;
     size_t next_pos;
+    NETDATA_DOUBLE percent;
 
     NETDATA_DOUBLE *series;
 };
 
 void grouping_create_median(RRDR *r, const char *options __maybe_unused) {
     long entries = r->group;
-    if(entries < 0) entries = 0;
+    if(entries < 10) entries = 10;
 
     struct grouping_median *g = (struct grouping_median *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_median));
     g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
     g->series_size = (size_t)entries;
+
+    g->percent = 0.0;
+    if(options && *options) {
+        g->percent = str2ndd(options, NULL);
+        if(!netdata_double_isnumber(g->percent)) g->percent = 0.0;
+        if(g->percent < 0.0) g->percent = 0.0;
+        if(g->percent > 50.0) g->percent = 50.0;
+    }
 
     r->internal.grouping_data = g;
 }
@@ -46,8 +54,8 @@ void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
         g->series_size *= 2;
     }
-    else
-        g->series[g->next_pos++] = (NETDATA_DOUBLE)value;
+
+    g->series[g->next_pos++] = (NETDATA_DOUBLE)value;
 }
 
 NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
@@ -60,9 +68,32 @@ NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_optio
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        if(g->next_pos > 1) {
-            sort_series(g->series, g->next_pos);
-            value = (NETDATA_DOUBLE)median_on_sorted_series(g->series, g->next_pos);
+        size_t available_slots = g->next_pos;
+
+        if(available_slots > 1) {
+            sort_series(g->series, available_slots);
+
+            size_t start_slot = 0;
+            size_t end_slot = available_slots - 1;
+
+            if(g->percent > 0.0) {
+                NETDATA_DOUBLE min = g->series[0];
+                NETDATA_DOUBLE max = g->series[available_slots - 1];
+
+                NETDATA_DOUBLE wanted_min = min + (max - min) * g->percent / 100.0;
+                NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent / 100.0;
+
+                for (start_slot = 0; start_slot < available_slots; start_slot++)
+                    if (g->series[start_slot] >= wanted_min) break;
+
+                for (end_slot = available_slots - 1; end_slot > start_slot; end_slot--)
+                    if (g->series[end_slot] <= wanted_max) break;
+            }
+
+            if(start_slot == end_slot)
+                value = g->series[start_slot];
+            else
+                value = (NETDATA_DOUBLE)median_on_sorted_series(&g->series[start_slot], end_slot - start_slot + 1);
         }
         else
             value = (NETDATA_DOUBLE)g->series[0];
@@ -79,4 +110,3 @@ NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_optio
 
     return value;
 }
-
