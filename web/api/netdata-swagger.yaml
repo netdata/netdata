@@ -1318,6 +1318,13 @@ paths:
             type: number
             format: integer
             default: 0
+        - name: context
+          in: query
+          description: A simple pattern matching the contexts to evaluate.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
         - name: points
           in: query
           description: The number of points to be evaluated for the highlighted window.

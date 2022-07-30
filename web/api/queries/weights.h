@@ -24,7 +24,7 @@ extern int web_api_v1_weights (RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method,
                                RRDR_GROUPING group, const char *group_options,
                                long long baseline_after, long long baseline_before,
                                long long after, long long before,
-                               long long points, RRDR_OPTIONS options, int tier, int timeout);
+                               long long points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, int tier, int timeout);
 
 extern WEIGHTS_METHOD weights_string_to_method(const char *method);
 extern const char *weights_method_to_string(WEIGHTS_METHOD method);

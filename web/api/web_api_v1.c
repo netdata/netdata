@@ -1483,7 +1483,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
     int tier = 0;
-    const char *group_options = NULL;
+    const char *group_options = NULL, *contexts_str = NULL;
 
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -1523,6 +1523,9 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
         else if(!strcmp(name, "method"))
             method = weights_string_to_method(value);
 
+        else if(!strcmp(name, "context") || !strcmp(name, "contexts"))
+            contexts_str = value;
+
         else if(!strcmp(name, "tier")) {
             tier = str2i(value);
             if(tier >= 0 && tier < storage_tiers)
@@ -1534,7 +1537,12 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;
 
-    return web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, tier, timeout);
+    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+
+    int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
+
+    simple_pattern_free(contexts);
+    return ret;
 }
 
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
