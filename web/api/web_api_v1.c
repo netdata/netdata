@@ -1480,6 +1480,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
 
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
+    int options_count = 0;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
     int tier = 0;
@@ -1517,8 +1518,11 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
         else if(!strcmp(name, "group"))
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
 
-        else if(!strcmp(name, "options"))
+        else if(!strcmp(name, "options")) {
+            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
             options |= web_client_api_request_v1_data_options(value);
+            options_count++;
+        }
 
         else if(!strcmp(name, "method"))
             method = weights_string_to_method(value);
@@ -1546,7 +1550,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
 }
 
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_MC_KS2, WEIGHTS_FORMAT_CHARTS);
+    return web_client_api_request_v1_weights_internal(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {

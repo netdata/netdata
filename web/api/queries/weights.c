@@ -8,14 +8,14 @@ int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
 WEIGHTS_METHOD default_metric_correlations_method = WEIGHTS_METHOD_MC_KS2;
 
-typedef struct mc_stats {
+typedef struct weights_stats {
     NETDATA_DOUBLE max_base_high_ratio;
     size_t db_points;
     size_t result_points;
     size_t db_queries;
     size_t db_points_per_tier[RRD_STORAGE_TIERS];
     size_t binary_searches;
-} MC_STATS;
+} WEIGHTS_STATS;
 
 // ----------------------------------------------------------------------------
 // parse and render metric correlations methods
@@ -23,7 +23,7 @@ typedef struct mc_stats {
 static struct {
     const char *name;
     WEIGHTS_METHOD value;
-} metric_correlations_methods[] = {
+} weights_methods[] = {
       { "ks2"          , WEIGHTS_METHOD_MC_KS2}
     , { "volume"       , WEIGHTS_METHOD_MC_VOLUME}
     , { "anomaly-rate" , WEIGHTS_METHOD_ANOMALY_RATE}
@@ -31,17 +31,17 @@ static struct {
 };
 
 WEIGHTS_METHOD weights_string_to_method(const char *method) {
-    for(int i = 0; metric_correlations_methods[i].name ;i++)
-        if(strcmp(method, metric_correlations_methods[i].name) == 0)
-            return metric_correlations_methods[i].value;
+    for(int i = 0; weights_methods[i].name ;i++)
+        if(strcmp(method, weights_methods[i].name) == 0)
+            return weights_methods[i].value;
 
     return default_metric_correlations_method;
 }
 
 const char *weights_method_to_string(WEIGHTS_METHOD method) {
-    for(int i = 0; metric_correlations_methods[i].name ;i++)
-        if(metric_correlations_methods[i].value == method)
-            return metric_correlations_methods[i].name;
+    for(int i = 0; weights_methods[i].name ;i++)
+        if(weights_methods[i].value == method)
+            return weights_methods[i].name;
 
     return "unknown";
 }
@@ -97,14 +97,22 @@ static void register_result_destroy(DICTIONARY *results) {
     dictionary_destroy(results);
 }
 
-static void register_result(DICTIONARY *results, RRDSET *st, RRDDIM *d, NETDATA_DOUBLE value, RESULT_FLAGS flags, MC_STATS *stats) {
+static void register_result(DICTIONARY *results,
+                            RRDSET *st,
+                            RRDDIM *d,
+                            NETDATA_DOUBLE value,
+                            RESULT_FLAGS flags,
+                            WEIGHTS_STATS *stats,
+                            bool register_zero) {
+
     if(!netdata_double_isnumber(value)) return;
 
     // make it positive
     NETDATA_DOUBLE v = fabsndd(value);
 
     // no need to store zero scored values
-    if(v == 0.0) return;
+    if(unlikely(fpclassify(v) == FP_ZERO && !register_zero))
+        return;
 
     // keep track of the max of the baseline / highlight ratio
     if(flags & RESULT_IS_BASE_HIGH_RATIO && v > stats->max_base_high_ratio)
@@ -132,7 +140,8 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    long long baseline_after, long long baseline_before,
                                    long points, WEIGHTS_METHOD method,
                                    RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
-                                   size_t examined_dimensions __maybe_unused, usec_t duration, MC_STATS *stats) {
+                                   size_t examined_dimensions __maybe_unused, usec_t duration,
+                                   WEIGHTS_STATS *stats) {
 
     buffer_sprintf(wb, "{\n"
                        "\t\"after\": %lld,\n"
@@ -188,11 +197,12 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
 }
 
 static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
-                                         long long after, long long before,
-                                         long long baseline_after, long long baseline_before,
-                                         long points, WEIGHTS_METHOD method,
-                                         RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
-                                         size_t examined_dimensions, usec_t duration, MC_STATS *stats) {
+                                                long long after, long long before,
+                                                long long baseline_after, long long baseline_before,
+                                                long points, WEIGHTS_METHOD method,
+                                                RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                size_t examined_dimensions, usec_t duration,
+                                                WEIGHTS_STATS *stats) {
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -240,11 +250,12 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 }
 
 static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *wb,
-                                                long long after, long long before,
-                                                long long baseline_after, long long baseline_before,
-                                                long points, WEIGHTS_METHOD method,
-                                                RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
-                                                size_t examined_dimensions, usec_t duration, MC_STATS *stats) {
+                                                  long long after, long long before,
+                                                  long long baseline_after, long long baseline_before,
+                                                  long points, WEIGHTS_METHOD method,
+                                                  RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                  size_t examined_dimensions, usec_t duration,
+                                                  WEIGHTS_STATS *stats) {
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -509,7 +520,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           long long after, long long before,
                                           long long points, RRDR_OPTIONS options,
                                           RRDR_GROUPING group, const char *group_options, int tier,
-                                          uint32_t shifts, int timeout, MC_STATS *stats) {
+                                          uint32_t shifts, int timeout,
+                                          WEIGHTS_STATS *stats, bool register_zero) {
     options |= RRDR_OPTION_NATURAL_POINTS;
 
     long group_time = 0;
@@ -635,7 +647,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
             // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
             // so we flip the result of kstwo()
-            register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats);
+            register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
         }
     }
 
@@ -653,7 +665,9 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              long long baseline_after, long long baseline_before,
                                              long long after, long long before,
                                              RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
-                                             int tier, int timeout, MC_STATS *stats) {
+                                             int tier, int timeout,
+                                             WEIGHTS_STATS *stats, bool register_zero) {
+
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
     long group_time = 0;
 
@@ -750,7 +764,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
             pcent = highlight_countif;
         }
 
-        register_result(results, st, d, pcent, flags, stats);
+        register_result(results, st, d, pcent, flags, stats, register_zero);
     }
 
     return examined_dimensions;
@@ -762,8 +776,10 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
                                        long long after, long long before,
                                        RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
-                                       int tier, int timeout, MC_STATS *stats) {
-    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT;
+                                       int tier, int timeout,
+                                       WEIGHTS_STATS *stats, bool register_zero) {
+
+    options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT | RRDR_OPTION_NATURAL_POINTS;
     long group_time = 0;
 
     int examined_dimensions = 0;
@@ -796,7 +812,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
                                   &value_is_null, &anomaly_rate, 0, tier);
 
         if(ret == HTTP_RESP_OK || !value_is_null || netdata_double_isnumber(average))
-            register_result(results, st, d, average, 0, stats);
+            register_result(results, st, d, average, 0, stats, register_zero);
     }
 
     return examined_dimensions;
@@ -833,7 +849,7 @@ static inline int binary_search_bigger_than_netdata_double(const NETDATA_DOUBLE 
 // ----------------------------------------------------------------------------
 // spread the results evenly according to their value
 
-static size_t spread_results_evenly(DICTIONARY *results, MC_STATS *stats) {
+static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     struct register_result *t;
 
     // count the dimensions
@@ -892,8 +908,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                         long long baseline_after, long long baseline_before,
                         long long after, long long before,
                         long long points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, int tier, int timeout) {
-
-    MC_STATS stats = {};
+    WEIGHTS_STATS stats = {};
 
     DICTIONARY *results = register_result_init();
     DICTIONARY *charts = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);;
@@ -1000,6 +1015,12 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     size_t examined_dimensions = 0;
     void *ptr;
 
+    bool register_zero = true;
+    if(options & RRDR_OPTION_NONZERO) {
+        register_zero = false;
+        options &= ~RRDR_OPTION_NONZERO;
+    }
+
     // for every chart in the dictionary
     dfe_start_read(charts, ptr) {
         usec_t now_usec = now_realtime_usec();
@@ -1022,7 +1043,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                                                                    after, before,
                                                                    options, group, group_options, tier,
                                                                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-                                                                   &stats);
+                                                                   &stats, register_zero);
                 break;
 
             case WEIGHTS_METHOD_MC_VOLUME:
@@ -1032,7 +1053,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                                                                 after, before,
                                                                 options, group, group_options, tier,
                                                                 (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-                                                                &stats);
+                                                                &stats, register_zero);
                 break;
 
             default:
@@ -1042,13 +1063,16 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                                                              after, before,
                                                              points, options, group, group_options, tier, shifts,
                                                              (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-                                                             &stats);
+                                                             &stats, register_zero);
                 break;
         }
 
         rrdset_unlock(st);
     }
     dfe_done(ptr);
+
+    if(!register_zero)
+        options |= RRDR_OPTION_NONZERO;
 
     if(!(options & RRDR_OPTION_RETURN_RAW))
         spread_results_evenly(results, &stats);
@@ -1081,7 +1105,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     }
 
     if(!added_dimensions) {
-        error = "no results produced from correlations";
+        error = "no results produced.";
         resp = HTTP_RESP_NOT_FOUND;
     }
 
