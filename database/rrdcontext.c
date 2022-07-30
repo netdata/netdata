@@ -48,6 +48,7 @@ typedef enum {
     RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 27), // this context belongs to a host that just disconnected
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 28), // this context changed because of a db rotation
     RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 29), // this context is not used anymore
+    RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS           = (1 << 30), // this context is not used anymore
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
@@ -71,7 +72,8 @@ typedef enum {
     |RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD          \
     |RRD_FLAG_UPDATE_REASON_DB_ROTATION                 \
     |RRD_FLAG_UPDATE_REASON_UNUSED                      \
-)
+    |RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS               \
+ )
 
 #define RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS   ( \
      RRD_FLAG_ARCHIVED                                  \
@@ -153,6 +155,7 @@ static struct rrdcontext_reason {
     { RRD_FLAG_UPDATE_REASON_CHANGED_NAME,            "changed name",         60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD,      "child disconnected",   30 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_DB_ROTATION,             "db rotation",          60 * USEC_PER_SEC },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS,           "changed flags",        60 * USEC_PER_SEC },
 
     // terminator
     { 0, NULL, 0 },
@@ -1266,14 +1269,24 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     rrdinstance_trigger_updates(ri, false, true);
 }
 
-static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
-    RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-
+static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st) {
     if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
         rrd_flag_set_archived(ri);
 
-    if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN)))
-        rrd_flag_set_updated(ri, RRD_FLAG_HIDDEN);
+    if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN))) {
+        ri->flags |= RRD_FLAG_HIDDEN;
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
+    }
+    else if(unlikely(!(st->flags & RRDSET_FLAG_HIDDEN) && (ri->flags & RRD_FLAG_HIDDEN))) {
+        ri->flags &= ~RRD_FLAG_HIDDEN;
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
+    }
+}
+
+static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
+    RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+
+    rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
     ri->flags &= ~RRD_FLAG_DONT_PROCESS;
     rrdinstance_trigger_updates(ri, false, true);
@@ -1283,13 +1296,11 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 static inline void rrdinstance_collected_rrdset(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
 
+    rrdinstance_updated_rrdset_flags_no_action(ri, st);
+
     if(unlikely(!rrd_flag_is_collected(ri)))
         rrd_flag_set_collected(ri);
 
-    if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN)))
-        rrd_flag_set_updated(ri, RRD_FLAG_HIDDEN);
-
-    // the chart is collected, let's process it now
     if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
         ri->flags &= ~RRD_FLAG_DONT_PROCESS;
 
