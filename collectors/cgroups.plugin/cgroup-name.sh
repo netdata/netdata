@@ -518,6 +518,11 @@ if [ -z "${NAME}" ]; then
     #shellcheck disable=SC1117
     DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
     docker_validate_id "${DOCKERID}"
+  elif [[ ${CGROUP} =~ system.slice_containerd.service_cpuset_[a-fA-F0-9]+[-_\.]?.*$ ]]; then
+    # docker containers under containerd
+    #shellcheck disable=SC1117
+    DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ystem.slice_containerd.service_cpuset_\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
+    docker_validate_id "${DOCKERID}"
   elif [[ ${CGROUP} =~ ^.*libpod-[a-fA-F0-9]+.*$ ]]; then
     # Podman
     PODMANID="$(echo "${CGROUP}" | sed "s|^.*libpod-\([a-fA-F0-9]\+\).*$|\1|")"
