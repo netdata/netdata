@@ -6,7 +6,7 @@
 #include "aclk/aclk_contexts_api.h"
 #include "aclk/aclk_api.h"
 
-int rrdcontext_enabled = CONFIG_BOOLEAN_NO;
+int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
