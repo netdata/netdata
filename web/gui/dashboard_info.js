@@ -3791,6 +3791,7 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // POSTGRESQL
 
+    // python version start
     'postgres.db_stat_blks': {
         info: 'Blocks reads from disk or cache.<ul>' +
             '<li><strong>blks_read:</strong> number of disk blocks read in this database.</li>' +
@@ -3871,6 +3872,41 @@ netdataDashboard.context = {
             '<li><strong>percent_towards_wraparound:</strong> transaction wraparound may occur when this value reaches 100.</li>' +
             '</ul>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
+    // python version end
+    
+    'postgres.db_buffer_cache': {
+        info: '<p>Buffer cache efficiency.</p><p><b>Hit</b> - number of disk blocks read. <b>Miss</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache)</p>'
+    },
+    'postgres.db_read_operations': {
+        info: '<p>Read queries throughput.</p><p><b>Returned</b> - number of rows returned by queries. The value keeps track of the number of rows read/scanned, not the rows actually returned to the client. <b>Fetched</b> - number of rows fetched that contained data necessary to execute the query successfully.</p>'
+    },
+    'postgres.db_write_operations': {
+        info: '<p>Write queries throughput.</p><p><b>Inserted</b> - number of rows inserted by queries. <b>Deleted</b> - number of rows deleted by queries. <b>Updated</b> - number of rows updated by queries.</p>'
+    },
+    'postgres.db_conflicts': {
+        info: 'Number of queries canceled due to conflicts with recovery.'
+    },
+    'postgres.db_conflicts_stat': {
+        info: '<p>Number of queries canceled due to conflicts with recovery.</p><p><b>Tablespace</b> - queries that have been canceled due to dropped tablespaces. <b>Lock</b> - queries that have been canceled due to lock timeouts. <b>Snapshot</b> - queries that have been canceled due to old snapshots. <b>Bufferpin</b> - queries that have been canceled due to pinned buffers. <b>Deadlock</b> - queries that have been canceled due to deadlocks.</p>'
+    },
+    'postgres.db_deadlocks': {
+        info: 'Number of detected deadlocks. When a transaction cannot acquire the requested lock within a certain amount of time (configured by <b>deadlock_timeout</b>), it begins deadlock detection.'
+    },
+    'postgres.db_locks_held': {
+        info: 'Number of held locks. Some of these lock modes are acquired by PostgreSQL automatically before statement execution, while others are provided to be used by applications. All lock modes acquired in a transaction are held for the duration of the transaction. For lock modes details, see <a href="https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-TABLES" target="_blank">table-level locks</a>.'
+    },
+    'postgres.db_locks_awaited': {
+        info: 'Number of awaited locks. It indicates that some transaction is currently waiting to acquire a lock, which implies that some other transaction is holding a conflicting lock mode on the same lockable object. For lock modes details, see <a href="https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-TABLES" target="_blank">table-level locks</a>.'
+    },
+    'postgres.db_temp_files': {
+        info: 'Number of temporary files created by queries. Complex queries may require more memory than is available (specified by <b>work_mem</b>). When this happens, Postgres reverts to using temporary files - they are actually stored on disk, but only exist for the duration of the request. After the request returns, the temporary files are deleted.'
+    },
+    'postgres.db_temp_files_data': {
+        info: 'Amount of data written temporarily to disk to execute queries.'
+    },
+    'postgres.db_size': {
+        info: 'Actual on-disk usage of the database\'s data directory and any associated tablespaces.'
     },
 
 
