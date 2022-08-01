@@ -87,14 +87,15 @@ static void softirq_exit(void *ptr)
 static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    /* Cannot be finished here, because it calls a cancelation point (pthreads (7)).
-    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
-    }
-     */
 
     freez(softirq_ebpf_vals);
     freez(softirq_threads.thread);
+
+    if (ebpf_softirq_exited > 1) {
+        for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
+            ebpf_disable_tracepoint(&softirq_tracepoints[i]);
+        }
+    }
 
     softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -145,6 +146,7 @@ static void *softirq_reader(void *ptr)
 
         softirq_read_latency_map();
     }
+    ebpf_softirq_exited++;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -219,7 +221,7 @@ static void softirq_collector(ebpf_module_t *em)
     //This will be cancelled by its parent
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
-        if (ebpf_softirq_exited)
+        if (ebpf_exit_plugin)
             break;
 
         pthread_mutex_lock(&lock);

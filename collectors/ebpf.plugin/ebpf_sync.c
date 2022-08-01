@@ -369,10 +369,11 @@ void *ebpf_sync_read_hash(void *ptr)
     heartbeat_init(&hb);
     usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_every;
 
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_sync_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_sync_exited)
+            break;
 
         read_global_table();
     }

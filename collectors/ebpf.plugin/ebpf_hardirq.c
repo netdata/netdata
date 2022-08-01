@@ -168,15 +168,16 @@ static void hardirq_exit(void *ptr)
 static void hardirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    /* Cannot be finished here, because it calls a cancelation point (pthreads (7)).
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-    }
-     */
 
     freez(hardirq_ebpf_vals);
     freez(hardirq_ebpf_static_vals);
     freez(hardirq_threads.thread);
+
+    if (ebpf_hardirq_exited > 1) {
+        for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+            ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+        }
+    }
 
     hardirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -332,6 +333,7 @@ static void *hardirq_reader(void *ptr)
         hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
         hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
     }
+    ebpf_hardirq_exited++;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

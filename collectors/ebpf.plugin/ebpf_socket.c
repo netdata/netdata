@@ -2143,10 +2143,11 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_socket_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_socket_exited)
+            break;
 
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
