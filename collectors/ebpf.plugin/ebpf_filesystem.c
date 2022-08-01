@@ -33,6 +33,7 @@ static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NET
 struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL, 1, NULL,
                                                    NULL, NULL };
+static int ebpf_fs_exited = 0;
 
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
@@ -341,11 +342,12 @@ void ebpf_filesystem_cleanup_ebpf_data()
 static void ebpf_filesystem_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (filesystem_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*filesystem_threads.thread);
+    ebpf_fs_exited = 1;
 }
 
 /**
@@ -357,7 +359,7 @@ static void ebpf_filesystem_exit(void *ptr)
  */
 static void ebpf_filesystem_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
 
@@ -365,6 +367,9 @@ static void ebpf_filesystem_cleanup(void *ptr)
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
     freez(filesystem_hash_values);
+
+    filesystem_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -475,10 +480,11 @@ void *ebpf_filesystem_read_hash(void *ptr)
     heartbeat_init(&hb);
     usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_every;
     int update_every = em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_fs_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_fs_exited)
+            break;
 
         (void) ebpf_update_partitions(em);
         ebpf_obsolete_fs_charts(update_every);
@@ -538,9 +544,10 @@ static void filesystem_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
 

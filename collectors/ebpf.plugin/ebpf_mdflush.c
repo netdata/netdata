@@ -38,6 +38,7 @@ static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static int ebpf_mdflush_exited = 0;
 
 /**
  * MDflush exit
@@ -50,11 +51,11 @@ static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
     }
 
-    if (mdflush_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*mdflush_threads.thread);
+    ebpf_mdflush_exited = 1;
 }
 
 /**
@@ -66,9 +67,12 @@ static void mdflush_exit(void *ptr)
  */
 static void mdflush_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);
+
+    mdflush_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /**
@@ -175,10 +179,11 @@ static void *mdflush_reader(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_MDFLUSH_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_mdflush_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
+        if (ebpf_mdflush_exited)
+            break;
 
         mdflush_read_count_map();
     }
@@ -256,9 +261,10 @@ static void mdflush_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         // write dims now for all hitherto discovered devices.
         write_begin_chart("mdstat", "mdstat_flush");

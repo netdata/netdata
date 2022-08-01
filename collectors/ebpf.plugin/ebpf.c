@@ -365,6 +365,7 @@ static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link 
         bpf_object__close(objects);
 }
 
+int ebpf_exit_plugin = 0;
 /**
  * Close the collector gracefully
  *
@@ -372,11 +373,9 @@ static void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link 
  */
 static void ebpf_stop_threads(int sig)
 {
+    ebpf_exit_plugin = 1;
     int i;
-    for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        if (ebpf_threads[i].thread && ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
-            (void)netdata_thread_cancel(*ebpf_threads[i].thread);
-    }
+    for (i = 0; ebpf_threads[i].name != NULL; i++);
 
     usec_t max = 2 * USEC_PER_SEC, step = 100000;
     while (i && max) {

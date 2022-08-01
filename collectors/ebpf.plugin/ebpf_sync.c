@@ -48,6 +48,7 @@ netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode 
                                           {.name = NETDATA_SYSCALLS_FDATASYNC, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+static int ebpf_sync_exited = 0;
 
 
 #ifdef LIBBPF_MAJOR_VERSION
@@ -220,11 +221,12 @@ void ebpf_sync_cleanup_objects()
 static void ebpf_sync_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (sync_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*sync_threads.thread);
+    ebpf_sync_exited = 1;
 }
 
 /**
@@ -234,9 +236,12 @@ static void ebpf_sync_exit(void *ptr)
  */
 static void ebpf_sync_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_sync_cleanup_objects();
     freez(sync_threads.thread);
+
+    sync_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -444,9 +449,10 @@ static void sync_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
 

@@ -55,6 +55,7 @@ struct config process_config = { .first_section = NULL,
 
 static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
                                                     1, NULL, NULL,  NULL};
+static int ebpf_process_exited = 0;
 
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
@@ -659,8 +660,7 @@ static void ebpf_process_disable_tracepoints()
 static void ebpf_process_exit(void *ptr)
 {
     (void)ptr;
-    if (cgroup_thread.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*cgroup_thread.thread);
+    ebpf_process_exited = 1;
 }
 
 /**
@@ -672,13 +672,16 @@ static void ebpf_process_exit(void *ptr)
  */
 static void ebpf_process_cleanup(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
     freez(cgroup_thread.thread);
 
     ebpf_process_disable_tracepoints();
+
+    cgroup_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -706,9 +709,11 @@ void *ebpf_cgroup_update_shm(void *ptr)
     usec_t step = 3 * USEC_PER_SEC;
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_process_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_process_exited)
+            break;
 
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data
@@ -1099,10 +1104,11 @@ static void process_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     int update_apps_list = update_apps_every - 1;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&collect_data_mutex);
         if (++update_apps_list == update_apps_every) {

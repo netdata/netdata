@@ -90,6 +90,7 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
 struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
                                                NULL, NULL, 1, NULL,
                                                NULL, NULL };
+static int ebpf_socket_exited = 0;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/socket.skel.h" // BTF code
@@ -589,11 +590,12 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
 static void ebpf_socket_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (socket_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*socket_threads.thread);
+    ebpf_socket_exited = 1;
 }
 
 /**
@@ -605,7 +607,7 @@ static void ebpf_socket_exit(void *ptr)
  */
 void ebpf_socket_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
@@ -634,6 +636,8 @@ void ebpf_socket_cleanup(void *ptr)
     if (bpf_obj)
         socket_bpf__destroy(bpf_obj);
 #endif
+    socket_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -2869,9 +2873,10 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     int socket_global_enabled = em->global_charts;
     int network_connection = em->optional;
     int update_every = em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

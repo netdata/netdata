@@ -39,6 +39,7 @@ struct config cachestat_config = { .first_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
+static int ebpf_cachestat_exited = 0;
 
 netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -298,11 +299,12 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (cachestat_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*cachestat_threads.thread);
+    ebpf_cachestat_exited = 1;
 }
 
 /**
@@ -314,7 +316,7 @@ static void ebpf_cachestat_exit(void *ptr)
  */
 static void ebpf_cachestat_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
@@ -325,6 +327,8 @@ static void ebpf_cachestat_cleanup(void *ptr)
     if (bpf_obj)
         cachestat_bpf__destroy(bpf_obj);
 #endif
+    cachestat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -642,10 +646,11 @@ void *ebpf_cachestat_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_cachestat_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_cachestat_exited)
+            break;
 
         read_global_table();
     }
@@ -1078,8 +1083,10 @@ static void cachestat_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

@@ -36,6 +36,7 @@ static netdata_idx_t *disk_hash_values = NULL;
 static struct netdata_static_thread disk_threads = {"DISK KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static int ebpf_disk_exited = 0;
 
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
@@ -432,11 +433,12 @@ static void ebpf_cleanup_disk_list()
 static void ebpf_disk_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (disk_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*disk_threads.thread);
+    ebpf_disk_exited = 1;
 }
 
 /**
@@ -448,7 +450,7 @@ static void ebpf_disk_exit(void *ptr)
  */
 static void ebpf_disk_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_disk_disable_tracepoints();
 
     if (dimensions)
@@ -460,6 +462,9 @@ static void ebpf_disk_cleanup(void *ptr)
 
     ebpf_cleanup_plot_disks();
     ebpf_cleanup_disk_list();
+
+    disk_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -582,10 +587,11 @@ void *ebpf_disk_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_disk_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_disk_exited)
+            break;
 
         read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
     }
@@ -727,9 +733,10 @@ static void disk_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);

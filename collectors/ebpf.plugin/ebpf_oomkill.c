@@ -45,7 +45,9 @@ static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill"
  */
 static void oomkill_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 static void oomkill_write_data(int32_t *keys, uint32_t total)
@@ -303,9 +305,10 @@ static void oomkill_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&collect_data_mutex);
         pthread_mutex_lock(&lock);

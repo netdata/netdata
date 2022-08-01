@@ -29,6 +29,7 @@ struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+static int ebpf_mount_exited = 0;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/mount.skel.h" // BTF code
@@ -232,11 +233,12 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (mount_thread.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*mount_thread.thread);
+    ebpf_mount_exited = 1;
 }
 
 /**
@@ -248,7 +250,7 @@ static void ebpf_mount_exit(void *ptr)
  */
 static void ebpf_mount_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     freez(mount_thread.thread);
     freez(mount_values);
 
@@ -256,6 +258,9 @@ static void ebpf_mount_cleanup(void *ptr)
     if (bpf_obj)
         mount_bpf__destroy(bpf_obj);
 #endif
+
+    mount_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -309,9 +314,11 @@ void *ebpf_mount_read_hash(void *ptr)
 
     usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_mount_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_mount_exited)
+            break;
 
         read_global_table();
     }
@@ -356,9 +363,10 @@ static void mount_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
 

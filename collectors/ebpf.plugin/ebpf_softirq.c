@@ -57,6 +57,7 @@ static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static int ebpf_softirq_exited = 0;
 
 /**
  * Exit
@@ -69,11 +70,11 @@ static void softirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
     }
 
-    if (softirq_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*softirq_threads.thread);
+    ebpf_softirq_exited = 1;
 }
 
 /**
@@ -85,13 +86,18 @@ static void softirq_exit(void *ptr)
  */
 static void softirq_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    /* Cannot be finished here, because it calls a cancelation point (pthreads (7)).
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&softirq_tracepoints[i]);
     }
+     */
 
     freez(softirq_ebpf_vals);
     freez(softirq_threads.thread);
+
+    softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -131,10 +137,11 @@ static void *softirq_reader(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_softirq_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
+        if (ebpf_softirq_exited)
+            break;
 
         softirq_read_latency_map();
     }
@@ -210,8 +217,10 @@ static void softirq_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_softirq_exited)
+            break;
 
         pthread_mutex_lock(&lock);
 

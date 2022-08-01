@@ -37,13 +37,13 @@ struct config vfs_config = { .first_section = NULL,
 struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL, NULL, 1, NULL,
                                             NULL,  NULL};
+static int ebpf_vfs_exited = 0;
 
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
-
 /**
  * Exit
  *
@@ -54,11 +54,12 @@ struct netdata_static_thread vfs_threads = {"VFS KERNEL",
 static void ebpf_vfs_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (vfs_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*vfs_threads.thread);
+    ebpf_vfs_exited = 1;
 }
 
 /**
@@ -68,10 +69,13 @@ static void ebpf_vfs_exit(void *ptr)
 **/
 static void ebpf_vfs_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     freez(vfs_hash_values);
     freez(vfs_vector);
     freez(vfs_threads.thread);
+
+    vfs_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -512,9 +516,11 @@ void *ebpf_vfs_read_hash(void *ptr)
 
     usec_t step = NETDATA_LATENCY_VFS_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_vfs_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_vfs_exited)
+            break;
 
         read_global_table();
     }
@@ -1165,9 +1171,10 @@ static void vfs_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

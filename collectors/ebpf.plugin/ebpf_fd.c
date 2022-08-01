@@ -31,6 +31,7 @@ struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex 
 
 struct netdata_static_thread fd_thread = {"FD KERNEL", NULL, NULL, 1, NULL,
                                           NULL,  NULL};
+static int ebpf_fd_exited = 0;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -53,11 +54,12 @@ netdata_fd_stat_t **fd_pid = NULL;
 static void ebpf_fd_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (fd_thread.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*fd_thread.thread);
+    ebpf_fd_exited = 1;
 }
 
 /**
@@ -67,11 +69,14 @@ static void ebpf_fd_exit(void *ptr)
  */
 static void ebpf_fd_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_thread.thread);
     freez(fd_values);
     freez(fd_vector);
+
+    fd_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -146,9 +151,11 @@ void *ebpf_fd_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_FD_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_fd_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_fd_exited)
+            break;
 
         read_global_table();
     }
@@ -650,9 +657,10 @@ static void fd_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

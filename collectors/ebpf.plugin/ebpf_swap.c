@@ -36,6 +36,7 @@ static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input
 
 struct netdata_static_thread swap_threads = {"SWAP KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
+static int ebpf_swap_exited = 0;
 
 netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -201,11 +202,12 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (swap_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*swap_threads.thread);
+    ebpf_swap_exited = 1;
 }
 
 /**
@@ -217,7 +219,7 @@ static void ebpf_swap_exit(void *ptr)
  */
 static void ebpf_swap_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_cleanup_publish_syscall(swap_publish_aggregated);
 
     freez(swap_vector);
@@ -228,6 +230,8 @@ static void ebpf_swap_cleanup(void *ptr)
     if (bpf_obj)
         swap_bpf__destroy(bpf_obj);
 #endif
+    swap_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -394,10 +398,11 @@ void *ebpf_swap_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_swap_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_swap_exited)
+            break;
 
         read_global_table();
     }
@@ -682,9 +687,10 @@ static void swap_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

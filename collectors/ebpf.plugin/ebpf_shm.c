@@ -36,6 +36,7 @@ static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input =
 
 struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
+static int ebpf_shm_exited = 0;
 
 netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "shmat", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -249,11 +250,11 @@ static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
     }
 
-    if (shm_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*shm_threads.thread);
+    ebpf_shm_exited = 1;
 }
 
 /**
@@ -265,7 +266,7 @@ static void ebpf_shm_exit(void *ptr)
  */
 static void ebpf_shm_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_cleanup_publish_syscall(shm_publish_aggregated);
 
     freez(shm_vector);
@@ -275,6 +276,9 @@ static void ebpf_shm_cleanup(void *ptr)
     if (bpf_obj)
         shm_bpf__destroy(bpf_obj);
 #endif
+
+    shm_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -456,10 +460,11 @@ void *ebpf_shm_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SHM_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_shm_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_shm_exited)
+            break;
 
         read_global_table();
     }
@@ -852,9 +857,10 @@ static void shm_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

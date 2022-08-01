@@ -22,6 +22,7 @@ struct config dcstat_config = { .first_section = NULL,
 struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL, NULL, 1, NULL,
                                                NULL,  NULL};
+static int ebpf_dcstat_exited = 0;
 
 static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
@@ -270,11 +271,12 @@ void ebpf_dcstat_clean_names()
 static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (dcstat_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*dcstat_threads.thread);
+    ebpf_dcstat_exited = 1;
 }
 
 /**
@@ -284,7 +286,7 @@ static void ebpf_dcstat_exit(void *ptr)
  */
 static void ebpf_dcstat_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     freez(dcstat_vector);
     freez(dcstat_values);
     freez(dcstat_threads.thread);
@@ -297,6 +299,9 @@ static void ebpf_dcstat_cleanup(void *ptr)
     if (bpf_obj)
         dc_bpf__destroy(bpf_obj);
 #endif
+
+    dcstat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -523,10 +528,11 @@ void *ebpf_dcstat_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_DCSTAT_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_dcstat_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_dcstat_exited)
+            break;
 
         read_global_table();
     }
@@ -1004,9 +1010,10 @@ static void dcstat_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);

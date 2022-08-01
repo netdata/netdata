@@ -138,6 +138,7 @@ static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
 static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static int ebpf_hardirq_exited = 0;
 
 /**
  * Hardirq Exit
@@ -149,11 +150,12 @@ static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
 static void hardirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;
+    }
 
-    if (hardirq_threads.enabled != NETDATA_MAIN_THREAD_EXITED)
-        (void)netdata_thread_cancel(*hardirq_threads.thread);
+    ebpf_hardirq_exited = 1;
 }
 
 /**
@@ -165,14 +167,19 @@ static void hardirq_exit(void *ptr)
  */
 static void hardirq_cleanup(void *ptr)
 {
-    (void)ptr;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    /* Cannot be finished here, because it calls a cancelation point (pthreads (7)).
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
+     */
 
     freez(hardirq_ebpf_vals);
     freez(hardirq_ebpf_static_vals);
     freez(hardirq_threads.thread);
+
+    hardirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -316,9 +323,11 @@ static void *hardirq_reader(void *ptr)
 
     usec_t step = NETDATA_HARDIRQ_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_hardirq_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
+        if (ebpf_hardirq_exited)
+            break;
 
         hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
         hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
@@ -428,8 +437,10 @@ static void hardirq_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
     //This will be cancelled by its parent
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
 
