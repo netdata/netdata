@@ -26,6 +26,7 @@ typedef enum {
     RRD_FLAG_LIVE_RETENTION = (1 << 5), // we have got live retention from the database
     RRD_FLAG_QUEUED         = (1 << 6), // this context is currently queued to be dispatched to hub
     RRD_FLAG_DONT_PROCESS   = (1 << 7), // don't process updates for this object
+    RRD_FLAG_HIDDEN         = (1 << 8), // don't expose this to the hub or the API
 
     RRD_FLAG_UPDATE_REASON_LOAD_SQL                = (1 << 10), // this object has just been loaded from SQL
     RRD_FLAG_UPDATE_REASON_NEW_OBJECT              = (1 << 11), // this object has just been created
@@ -47,6 +48,7 @@ typedef enum {
     RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 27), // this context belongs to a host that just disconnected
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 28), // this context changed because of a db rotation
     RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 29), // this context is not used anymore
+    RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS           = (1 << 30), // this context is not used anymore
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
@@ -70,11 +72,13 @@ typedef enum {
     |RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD          \
     |RRD_FLAG_UPDATE_REASON_DB_ROTATION                 \
     |RRD_FLAG_UPDATE_REASON_UNUSED                      \
-)
+    |RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS               \
+ )
 
 #define RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS   ( \
      RRD_FLAG_ARCHIVED                                  \
     |RRD_FLAG_DONT_PROCESS                              \
+    |RRD_FLAG_HIDDEN                                    \
     |RRD_FLAG_ALL_UPDATE_REASONS                        \
  )
 
@@ -151,6 +155,7 @@ static struct rrdcontext_reason {
     { RRD_FLAG_UPDATE_REASON_CHANGED_NAME,            "changed name",         60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD,      "child disconnected",   30 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_DB_ROTATION,             "db rotation",          60 * USEC_PER_SEC },
+    { RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS,           "changed flags",        60 * USEC_PER_SEC },
 
     // terminator
     { 0, NULL, 0 },
@@ -329,6 +334,9 @@ static void rrd_flags_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
 
     if(flags & RRD_FLAG_DONT_PROCESS)
         buffer_strcat(wb, "DONT_PROCESS ");
+
+    if(flags & RRD_FLAG_HIDDEN)
+        buffer_strcat(wb, "HIDDEN ");
 }
 
 static void rrd_reasons_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
@@ -768,6 +776,11 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
 }
 
 static void rrdinstance_insert_callback(const char *id __maybe_unused, void *value, void *data) {
+    static STRING *ml_anomaly_rates_id = NULL;
+
+    if(unlikely(!ml_anomaly_rates_id))
+        ml_anomaly_rates_id = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
+
     RRDINSTANCE *ri = value;
 
     // link it to its parent
@@ -787,6 +800,17 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
         ri->rrdlabels = rrdlabels_create();
         ri->flags |= RRD_FLAG_OWN_LABELS;
     }
+
+    if(ri->rrdset) {
+        if(unlikely((ri->rrdset->flags & RRDSET_FLAG_HIDDEN) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
+            ri->flags |= RRD_FLAG_HIDDEN;
+        else
+            ri->flags &= ~RRD_FLAG_HIDDEN;
+    }
+
+    // we need this when loading from SQL
+    if(unlikely(ri->id == ml_anomaly_rates_id))
+        ri->flags |= RRD_FLAG_HIDDEN;
 
     rrdmetrics_create(ri);
     rrdinstance_log(ri, "INSERT");
@@ -878,12 +902,23 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     if(ri->rrdset != ri_new->rrdset) {
         ri->rrdset = ri_new->rrdset;
 
-        if(ri->flags & RRD_FLAG_OWN_LABELS) {
+        if(ri->rrdset && (ri->flags & RRD_FLAG_OWN_LABELS)) {
             DICTIONARY *old = ri->rrdlabels;
             ri->rrdlabels = ri->rrdset->state->chart_labels;
             ri->flags &= ~RRD_FLAG_OWN_LABELS;
             rrdlabels_destroy(old);
         }
+        else if(!ri->rrdset && !(ri->flags & RRD_FLAG_OWN_LABELS)) {
+            ri->rrdlabels = rrdlabels_create();
+            ri->flags |= RRD_FLAG_OWN_LABELS;
+        }
+    }
+
+    if(ri->rrdset) {
+        if(unlikely((ri->rrdset->flags & RRDSET_FLAG_HIDDEN) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
+            ri->flags |= RRD_FLAG_HIDDEN;
+        else
+            ri->flags &= ~RRD_FLAG_HIDDEN;
     }
 
     ri->flags |= (ri_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS);
@@ -1234,11 +1269,24 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     rrdinstance_trigger_updates(ri, false, true);
 }
 
+static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st) {
+    if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
+        rrd_flag_set_archived(ri);
+
+    if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN))) {
+        ri->flags |= RRD_FLAG_HIDDEN;
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
+    }
+    else if(unlikely(!(st->flags & RRDSET_FLAG_HIDDEN) && (ri->flags & RRD_FLAG_HIDDEN))) {
+        ri->flags &= ~RRD_FLAG_HIDDEN;
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
+    }
+}
+
 static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
 
-    if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
-        rrd_flag_set_archived(ri);
+    rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
     ri->flags &= ~RRD_FLAG_DONT_PROCESS;
     rrdinstance_trigger_updates(ri, false, true);
@@ -1248,10 +1296,11 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 static inline void rrdinstance_collected_rrdset(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
 
+    rrdinstance_updated_rrdset_flags_no_action(ri, st);
+
     if(unlikely(!rrd_flag_is_collected(ri)))
         rrd_flag_set_collected(ri);
 
-    // the chart is collected, let's process it now
     if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
         ri->flags &= ~RRD_FLAG_DONT_PROCESS;
 
@@ -1304,12 +1353,14 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
         .deleted = rc->hub.deleted,
     };
 
-    if(snapshot) {
-        if(!rc->hub.deleted)
-            contexts_snapshot_add_ctx_update(bundle, &message);
+    if(likely(!(rc->flags & RRD_FLAG_HIDDEN))) {
+        if (snapshot) {
+            if (!rc->hub.deleted)
+                contexts_snapshot_add_ctx_update(bundle, &message);
+        }
+        else
+            contexts_updated_add_ctx_update(bundle, &message);
     }
-    else
-        contexts_updated_add_ctx_update(bundle, &message);
 #endif
 
     // store it to SQL
@@ -1584,10 +1635,13 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
-    bool live_retention = true, currently_collected = false;
+    bool live_retention = true, currently_collected = false, hidden = true;
     {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
+            if(likely(!(ri->flags & RRD_FLAG_HIDDEN)))
+                hidden = false;
+
             if(!(ri->flags & RRD_FLAG_LIVE_RETENTION))
                 live_retention = false;
 
@@ -1620,6 +1674,11 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
         }
         dfe_done(ri);
     }
+
+    if(hidden && !(rc->flags & RRD_FLAG_HIDDEN))
+        rc->flags |= RRD_FLAG_HIDDEN;
+    else if(!hidden && (rc->flags & RRD_FLAG_HIDDEN))
+        rc->flags &= ~RRD_FLAG_HIDDEN;
 
     if(live_retention && !(rc->flags & RRD_FLAG_LIVE_RETENTION))
         rc->flags |= RRD_FLAG_LIVE_RETENTION;
@@ -2166,6 +2225,9 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
     time_t before = t_parent->before;
     bool has_filter = t_parent->chart_label_key || t_parent->chart_labels_filter || t_parent->chart_dimensions;
 
+    if(unlikely((rc->flags & RRD_FLAG_HIDDEN) && !(options & RRDCONTEXT_OPTION_SHOW_HIDDEN)))
+        return 0;
+
     if((rc->flags & RRD_FLAG_DELETED) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
         return 0;
 
@@ -2538,6 +2600,11 @@ static uint64_t rrdcontext_version_hash_with_callback(
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
 
         rrdcontext_lock(rc);
+
+        if(unlikely(rc->flags & RRD_FLAG_HIDDEN)) {
+            rrdcontext_unlock(rc);
+            continue;
+        }
 
         if(unlikely(callback))
             callback(rc, snapshot, bundle);
