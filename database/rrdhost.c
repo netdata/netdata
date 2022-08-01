@@ -804,8 +804,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     else
         rrdeng_page_descr_use_malloc();
 
-    rrdeng_page_descr_aral_go_singlethreaded();
-
     int created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
@@ -881,7 +879,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
-    rrdeng_page_descr_aral_go_multithreaded();
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {
