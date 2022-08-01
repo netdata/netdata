@@ -96,9 +96,10 @@ extern int rrdset2value_api_v1(
         , time_t *db_after
         , time_t *db_before
         , size_t *db_points_read
+        , size_t *db_points_per_tier
         , size_t *result_points_generated
         , int *value_is_null
-        , uint8_t *anomaly_rate
+        , NETDATA_DOUBLE *anomaly_rate
         , int timeout
         , int tier
 );

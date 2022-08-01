@@ -894,7 +894,7 @@ void *health_main(void *ptr) {
                                                   rc->after, rc->before, rc->group, NULL,
                                                   0, rc->options,
                                                   &rc->db_after,&rc->db_before,
-                                                  NULL, NULL,
+                                                  NULL, NULL, NULL,
                                                   &value_is_null, NULL, 0, 0);
 
                     if (unlikely(ret != 200)) {

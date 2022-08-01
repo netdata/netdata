@@ -567,7 +567,7 @@ typedef struct query_point {
     time_t end_time;
     time_t start_time;
     NETDATA_DOUBLE value;
-    size_t anomaly;
+    NETDATA_DOUBLE anomaly;
     SN_FLAGS flags;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
@@ -628,7 +628,7 @@ typedef struct query_engine_ops {
     NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
     size_t group_points_non_zero;
     size_t group_points_added;
-    size_t group_anomaly_rate;
+    NETDATA_DOUBLE group_anomaly_rate;
     RRDR_VALUE_FLAGS group_value_flags;
 
     // statistics
@@ -910,14 +910,14 @@ static inline void rrd2rrdr_do_dimension(
 
                 new_point.start_time = sp.start_time;
                 new_point.end_time   = sp.end_time;
-                new_point.anomaly    = sp.count ? sp.anomaly_count * 100 / sp.count : 0;
+                new_point.anomaly    = sp.count ? (NETDATA_DOUBLE)sp.anomaly_count * 100.0 / (NETDATA_DOUBLE)sp.count : 0.0;
                 query_point_set_id(new_point, ops.db_total_points_read);
 
                 // set the right value to the point we got
                 if(likely(!storage_point_is_unset(sp) && !storage_point_is_empty(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
-                        new_point.value = (NETDATA_DOUBLE)new_point.anomaly;
+                        new_point.value =  new_point.anomaly;
 
                     else {
                         switch (ops.tier_query_fetch) {
@@ -1073,8 +1073,7 @@ static inline void rrd2rrdr_do_dimension(
             // we only store uint8_t anomaly rates,
             // so let's get double precision by storing
             // anomaly rates in the range 0 - 200
-            ops.group_anomaly_rate = (ops.group_anomaly_rate << 1) / ops.group_points_added;
-            r->ar[rrdr_o_v_index] = (uint8_t)ops.group_anomaly_rate;
+            r->ar[rrdr_o_v_index] = ops.group_anomaly_rate / (NETDATA_DOUBLE)ops.group_points_added;
 
             if(likely(points_added || dim_id_in_rrdr)) {
                 // find the min/max across all dimensions

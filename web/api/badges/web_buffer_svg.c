@@ -1110,7 +1110,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                                       (dimensions) ? buffer_tostring(dimensions) : NULL,
                                       points, after, before, group, group_options, 0, options,
                                       NULL, &latest_timestamp,
-                                      NULL, NULL,
+                                      NULL, NULL, NULL,
                                       &value_is_null, NULL, 0, 0);
 
         // if the value cannot be calculated, show empty badge
