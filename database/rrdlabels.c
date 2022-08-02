@@ -638,10 +638,10 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
 // rrdlabels_get_value_to_char_or_null()
 
 void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key) {
-    void *acquired_item = dictionary_acquire_item(labels, key);
-    RRDLABEL *lb = dictionary_acquired_item_value(labels, acquired_item);
+    DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
 
-    *value = (lb && lb->value) ? strdupz(lb->value) : NULL;
+    *value = (lb && lb->label_value) ? strdupz(string2str(lb->label_value)) : NULL;
 
     dictionary_acquired_item_release(labels, acquired_item);
 }
