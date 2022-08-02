@@ -48,8 +48,22 @@ fatal() {
 function docker_like_get_name_command() {
   local command="${1}"
   local id="${2}"
-  info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
-  NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
+  
+  # Check if the container is scheduled by Nomad
+  # The following grabs the components of a Nomad container and makes environment variables out of them before attempting to generate a name.
+  # It does this to not assume anything about the order in which the variables appear in the environment. 
+  info "Nomad check: Running command: ${command} inspect --format '{{ .Config.Env }}' ${id} | tr ' ' '\n' | grep -e NOMAD_NAMESPACE -e NOMAD_JOB_ID -e NOMAD_SHORT_ALLOC_ID -e NOMAD_TASK_NAME | ..."
+  NAME="$(${command} inspect --format '{{ .Config.Env }}' ${id} | tr ' ' '\n' | grep -e NOMAD_NAMESPACE -e NOMAD_JOB_ID -e NOMAD_SHORT_ALLOC_ID -e NOMAD_TASK_NAME | tr '\n' ' ' | awk '{print $1 " && " $>
+
+  # Need to do this, in case the NAME is a bunch of spaces
+  NAME_TEST="$(echo "${NAME}" | tr -d ' ')"
+  if [ -z "${NAME_TEST}" ] ; then NAME = ""; fi
+
+  if [ -z "${NAME}" ] ; then
+    info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
+    NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
+  fi
+  
   return 0
 }
 
@@ -72,7 +86,21 @@ function docker_like_get_name_api() {
     info "Running API command: curl \"${host}${path}\""
     JSON=$(curl -sS "${host}${path}")
   fi
-  NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+
+  # Check if the container is scheduled by Nomad
+  # Exactly the same logic as in docker_like_get_name_command
+  info "Nomad check via API results"
+  NAME="$(echo "${JSON}" | jq -r '.Config.Env[] | select(contains("NOMAD_NAMESPACE", "NOMAD_JOB_ID", "NOMAD_SHORT_ALLOC_ID", "NOMAD_TASK_NAME"))' | tr '\n' ' ' | awk '{print $1 " && " $2 " && " $3 " && >
+
+  # Need to do this, in case the NAME is a bunch of spaces
+  NAME_TEST="$(echo "${NAME}" | tr -d ' ')"
+  if [ -z "${NAME_TEST}" ] ; then NAME = ""; fi
+
+  if [ -z "${NAME}" ]; then
+    echo "Not a Nomad container. Setting container name via API"
+    NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+  fi
+
   return 0
 }
 
