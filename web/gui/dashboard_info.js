@@ -3874,6 +3874,12 @@ netdataDashboard.context = {
             'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
     // python version end
+    'postgres.connections_utilization': {
+        info: 'Connections utilization. The maximum number of concurrent connections to the database server is <i>max_connections</i> minus <i>superuser_reserved_connections</i>. If the utilization is 100% new connections will be accepted only for superusers, and no new replication connections will be accepted.'
+    },
+    'postgres.connections_usage': {
+        info: '<p>Connections usage. The maximum number of concurrent connections to the database server is <i>max_connections</i> minus <i>superuser_reserved_connections</i>.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
+    },
 
     'postgres.checkpoints': {
         info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it’s been caching in memory has been synchronized with the disk. It’s desirable when checkpoints are scheduled rather than requested, as the latter can indicate that your databases are under heavy load.</p><p><b>Scheduled</b> - checkpoints triggered due that the time elapsed from the previous checkpoint is more than pg setting <i>checkpoint_timeout</i>. <b>Requested</b> - checkpoints ran due to uncheckpointed WAL size grew to more than <i>max_wal_size</i> setting.</p>'
