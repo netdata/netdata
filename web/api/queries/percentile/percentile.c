@@ -84,71 +84,74 @@ void grouping_add_percentile(RRDR *r, NETDATA_DOUBLE value) {
         g->series_size *= 2;
     }
 
-    g->series[g->next_pos++] = (NETDATA_DOUBLE)value;
+    g->series[g->next_pos++] = value;
 }
 
 NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
 
     NETDATA_DOUBLE value;
+    size_t available_slots = g->next_pos;
 
-    if(unlikely(!g->next_pos)) {
+    if(unlikely(!available_slots)) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
+    else if(available_slots == 1) {
+        value = g->series[0];
+    }
     else {
-        size_t available_slots = g->next_pos;
+        sort_series(g->series, available_slots);
 
-        if(available_slots > 1) {
-            sort_series(g->series, available_slots);
+        NETDATA_DOUBLE min = g->series[0];
+        NETDATA_DOUBLE max = g->series[available_slots - 1];
 
-            NETDATA_DOUBLE min = g->series[0];
-            NETDATA_DOUBLE max = g->series[available_slots - 1];
+        if (min != max) {
+            size_t counted = 1;
 
-            size_t slot = 1;
-            value = g->series[0];
+            if (min <= 0.0 && max <= 0.0) {
+                NETDATA_DOUBLE wanted_min = min - (min - max) * g->percent;
 
-            if(min != max) {
-                if (min <= 0.0 && max <= 0.0) {
-                    NETDATA_DOUBLE wanted_min = min - (min - max) * g->percent;
+                // fprintf(stderr, "min = %f, max = %f, wanted_min = %f, percent = %f\n", min, max, wanted_min, g->percent);
 
-                    // fprintf(stderr, "min = %f, max = %f, wanted_min = %f, percent = %f\n", min, max, wanted_min, g->percent);
-
-                    for (slot = 1; slot < available_slots; slot++) {
-                        NETDATA_DOUBLE v = g->series[slot];
-                        if (v >= wanted_min)
-                            value += v;
-                        else
-                            break;
-                    }
+                value = g->series[available_slots - 1];
+                for (int slot = (int)available_slots - 2; slot >= 0; slot--) {
+                    NETDATA_DOUBLE v = g->series[slot];
+                    if (likely(v >= wanted_min)) {
+                        value += v;
+                        counted++;
+                    } else
+                        break;
                 }
-                else {
-                    NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent;
+            }
+            else {
+                NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent;
 
-                    // fprintf(stderr, "min = %f, max = %f, wanted_max = %f, percent = %f\n", min, max, wanted_max, g->percent);
+                // fprintf(stderr, "min = %f, max = %f, wanted_max = %f, percent = %f\n", min, max, wanted_max, g->percent);
 
-                    for (slot = 1; slot < available_slots; slot++) {
-                        NETDATA_DOUBLE v = g->series[slot];
-                        if (v <= wanted_max)
-                            value += v;
-                        else
-                            break;
-                    }
+                value = g->series[0];
+                for (int slot = 1; slot < (int)available_slots; slot++) {
+                    NETDATA_DOUBLE v = g->series[slot];
+                    if (likely(v <= wanted_max)) {
+                        value += v;
+                        counted++;
+                    } else
+                        break;
                 }
             }
 
-            value = value / (NETDATA_DOUBLE)slot;
+            value = value / (NETDATA_DOUBLE)counted;
         }
         else
-            value = (NETDATA_DOUBLE)g->series[0];
-
-        if(!netdata_double_isnumber(value)) {
-            value = 0.0;
-            *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
-        }
-
-        //log_series_to_stderr(g->series, g->next_pos, value, "percentile");
+            value = g->series[0];
     }
+
+    if(unlikely(!netdata_double_isnumber(value))) {
+        value = 0.0;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
+    }
+
+    //log_series_to_stderr(g->series, g->next_pos, value, "percentile");
 
     g->next_pos = 0;
 

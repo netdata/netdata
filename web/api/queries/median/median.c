@@ -84,57 +84,55 @@ void grouping_add_median(RRDR *r, NETDATA_DOUBLE value) {
         g->series_size *= 2;
     }
 
-    g->series[g->next_pos++] = (NETDATA_DOUBLE)value;
+    g->series[g->next_pos++] = value;
 }
 
 NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_median *g = (struct grouping_median *)r->internal.grouping_data;
 
+    size_t available_slots = g->next_pos;
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->next_pos)) {
+    if(unlikely(!available_slots)) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
-    else {
-        size_t available_slots = g->next_pos;
-
-        if(available_slots > 1) {
-            sort_series(g->series, available_slots);
-
-            size_t start_slot = 0;
-            size_t end_slot = available_slots - 1;
-
-            if(g->percent > 0.0) {
-                NETDATA_DOUBLE min = g->series[0];
-                NETDATA_DOUBLE max = g->series[available_slots - 1];
-                NETDATA_DOUBLE delta = (max - min) * g->percent;
-
-                NETDATA_DOUBLE wanted_min = min + delta;
-                NETDATA_DOUBLE wanted_max = max - delta;
-
-                for (start_slot = 0; start_slot < available_slots; start_slot++)
-                    if (g->series[start_slot] >= wanted_min) break;
-
-                for (end_slot = available_slots - 1; end_slot > start_slot; end_slot--)
-                    if (g->series[end_slot] <= wanted_max) break;
-            }
-
-            if(start_slot == end_slot)
-                value = g->series[start_slot];
-            else
-                value = (NETDATA_DOUBLE)median_on_sorted_series(&g->series[start_slot], end_slot - start_slot + 1);
-        }
-        else
-            value = (NETDATA_DOUBLE)g->series[0];
-
-        if(!netdata_double_isnumber(value)) {
-            value = 0.0;
-            *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
-        }
-
-        //log_series_to_stderr(g->series, g->next_pos, value, "median");
+    else if(available_slots == 1) {
+        value = g->series[0];
     }
+    else {
+        sort_series(g->series, available_slots);
+
+        size_t start_slot = 0;
+        size_t end_slot = available_slots - 1;
+
+        if(g->percent > 0.0) {
+            NETDATA_DOUBLE min = g->series[0];
+            NETDATA_DOUBLE max = g->series[available_slots - 1];
+            NETDATA_DOUBLE delta = (max - min) * g->percent;
+
+            NETDATA_DOUBLE wanted_min = min + delta;
+            NETDATA_DOUBLE wanted_max = max - delta;
+
+            for (start_slot = 0; start_slot < available_slots; start_slot++)
+                if (g->series[start_slot] >= wanted_min) break;
+
+            for (end_slot = available_slots - 1; end_slot > start_slot; end_slot--)
+                if (g->series[end_slot] <= wanted_max) break;
+        }
+
+        if(start_slot == end_slot)
+            value = g->series[start_slot];
+        else
+            value = (NETDATA_DOUBLE)median_on_sorted_series(&g->series[start_slot], end_slot - start_slot + 1);
+    }
+
+    if(unlikely(!netdata_double_isnumber(value))) {
+        value = 0.0;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
+    }
+
+    //log_series_to_stderr(g->series, g->next_pos, value, "median");
 
     g->next_pos = 0;
 
