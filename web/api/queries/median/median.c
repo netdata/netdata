@@ -124,7 +124,7 @@ NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_optio
         if(start_slot == end_slot)
             value = g->series[start_slot];
         else
-            value = (NETDATA_DOUBLE)median_on_sorted_series(&g->series[start_slot], end_slot - start_slot + 1);
+            value = median_on_sorted_series(&g->series[start_slot], end_slot - start_slot + 1);
     }
 
     if(unlikely(!netdata_double_isnumber(value))) {

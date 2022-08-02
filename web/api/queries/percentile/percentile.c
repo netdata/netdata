@@ -29,7 +29,7 @@ static void grouping_create_percentile_internal(RRDR *r, const char *options, NE
         if(g->percent > 100.0) g->percent = 100.0;
     }
 
-    g->percent = 1.0 - g->percent / 100.0;
+    g->percent = g->percent / 100.0;
     r->internal.grouping_data = g;
 }
 
@@ -107,43 +107,56 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
         NETDATA_DOUBLE max = g->series[available_slots - 1];
 
         if (min != max) {
-            size_t counted = 1;
+            size_t slots_to_use = (size_t)((NETDATA_DOUBLE)available_slots * g->percent);
+            if(!slots_to_use) slots_to_use = 1;
 
-            if (min <= 0.0 && max <= 0.0) {
-                NETDATA_DOUBLE wanted_min = min - (min - max) * g->percent;
+            NETDATA_DOUBLE percent_to_use = (NETDATA_DOUBLE)slots_to_use / (NETDATA_DOUBLE)available_slots;
+            NETDATA_DOUBLE percent_delta = g->percent - percent_to_use;
 
-                // fprintf(stderr, "min = %f, max = %f, wanted_min = %f, percent = %f\n", min, max, wanted_min, g->percent);
+            NETDATA_DOUBLE percent_interpolation_slot = 0.0;
+            NETDATA_DOUBLE percent_last_slot = 0.0;
+            if(percent_delta > 0.0) {
+                NETDATA_DOUBLE percent_to_use_plus_1_slot = (NETDATA_DOUBLE)(slots_to_use + 1) / (NETDATA_DOUBLE)available_slots;
+                NETDATA_DOUBLE percent_1slot = percent_to_use_plus_1_slot - percent_to_use;
 
-                value = g->series[available_slots - 1];
-                for (int slot = (int)available_slots - 2; slot >= 0; slot--) {
-                    NETDATA_DOUBLE v = g->series[slot];
-                    if (likely(v >= wanted_min)) {
-                        value += v;
-                        counted++;
-                    } else
-                        break;
-                }
+                percent_interpolation_slot = percent_delta / percent_1slot;
+                percent_last_slot = 1 - percent_interpolation_slot;
+            }
+
+            int start_slot, stop_slot, step, last_slot, interpolation_slot;
+            if(min >= 0.0 && max >= 0.0) {
+                start_slot = 0;
+                stop_slot = start_slot + (int)slots_to_use;
+                last_slot = stop_slot - 1;
+                interpolation_slot = stop_slot;
+                step = 1;
             }
             else {
-                NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent;
+                start_slot = (int)available_slots - 1;
+                stop_slot = start_slot - (int)slots_to_use;
+                last_slot = stop_slot + 1;
+                interpolation_slot = stop_slot;
+                step = -1;
+            }
 
-                // fprintf(stderr, "min = %f, max = %f, wanted_max = %f, percent = %f\n", min, max, wanted_max, g->percent);
+            value = 0.0;
+            for(int slot = start_slot; slot != stop_slot ; slot += step)
+                value += g->series[slot];
 
-                value = g->series[0];
-                for (int slot = 1; slot < (int)available_slots; slot++) {
-                    NETDATA_DOUBLE v = g->series[slot];
-                    if (likely(v <= wanted_max)) {
-                        value += v;
-                        counted++;
-                    } else
-                        break;
-                }
+            size_t counted = slots_to_use;
+            if(percent_interpolation_slot > 0.0 && interpolation_slot >= 0 && interpolation_slot < (int)available_slots) {
+                value += g->series[interpolation_slot] * percent_interpolation_slot;
+                value += g->series[last_slot] * percent_last_slot;
+                counted++;
             }
 
             value = value / (NETDATA_DOUBLE)counted;
+
+            fprintf(stderr, "available_slot %zu, percent %f, slots_to_use %zu, start_slot %d, stop_slot %d, step %d, last_slot %d, interpolation_slot %d, percent_interpolation_slot %f, percent_last_slot %f, counted %zu\n",
+                    available_slots, g->percent, slots_to_use, start_slot, stop_slot, step, last_slot, interpolation_slot, percent_interpolation_slot, percent_last_slot, counted);
         }
         else
-            value = g->series[0];
+            value = min;
     }
 
     if(unlikely(!netdata_double_isnumber(value))) {
