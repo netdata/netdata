@@ -3875,12 +3875,11 @@ netdataDashboard.context = {
     },
     // python version end
     'postgres.connections_utilization': {
-        info: 'Connections utilization. The maximum number of concurrent connections to the database server is <i>max_connections</i> minus <i>superuser_reserved_connections</i>. If the utilization is 100% new connections will be accepted only for superusers, and no new replication connections will be accepted.'
+        info: 'Connections in use as percentage of <i>max_connections</i>. Connection "slots" that are reserved for superusers (<i>superuser_reserved_connections</i>) are subtracted from the limit. If the utilization is 100% new connections will be accepted only for superusers, and no new replication connections will be accepted.'
     },
     'postgres.connections_usage': {
         info: '<p>Connections usage. The maximum number of concurrent connections to the database server is <i>max_connections</i> minus <i>superuser_reserved_connections</i>.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
     },
-
     'postgres.checkpoints': {
         info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it’s been caching in memory has been synchronized with the disk. It’s desirable when checkpoints are scheduled rather than requested, as the latter can indicate that your databases are under heavy load.</p><p><b>Scheduled</b> - checkpoints triggered due that the time elapsed from the previous checkpoint is more than pg setting <i>checkpoint_timeout</i>. <b>Requested</b> - checkpoints ran due to uncheckpointed WAL size grew to more than <i>max_wal_size</i> setting.</p>'
     },
@@ -3899,7 +3898,44 @@ netdataDashboard.context = {
     'postgres.bgwriter_buffers_backend_fsync': {
         info: 'Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write). Any values above zero can indicate problems with storage when fsync queue is completely filled. '
     },
-    
+    'postgres.wal_archive_files': {
+        info: '<p>WAL archiving.</p><p><b>Ready</b> - WAL files waiting to be archived. A non-zero Ready value can indicate <i>archive_command</i> is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a> <b>Done</b> - WAL files successfully archived.'
+    },
+    'postgres.autovacuum_workers': {
+        info: 'PostgreSQL databases require periodic maintenance known as vacuuming. For many installations, it is sufficient to let vacuuming be performed by the autovacuum daemon. For more information see <a href="https://www.postgresql.org/docs/current/static/routine-vacuuming.html#AUTOVACUUM" target="_blank">The Autovacuum Daemon</a>.'
+    },
+    'postgres.percent_towards_emergency_autovacuum': {
+        info: 'Percentage towards emergency autovacuum for one or more tables. A forced autovacuum will run once this value reaches 100%. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
+    'postgres.percent_towards_txid_wraparound': {
+        info: 'Percentage towards transaction wraparound. A transaction wraparound may occur when this value reaches 100%. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
+    'postgres.oldest_transaction_xid': {
+        info: 'The oldest current transaction ID (XID). If for some reason autovacuum fails to clear old XIDs from a table, the system will begin to emit warning messages when the database\'s oldest XIDs reach eleven million transactions from the wraparound point. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
+    'postgres.uptime': {
+        info: 'The time elapsed since the Postgres process was started.'
+    },
+
+    'postgres.replication_standby_app_wal_delta': {
+        info: '<p>Replication WAL delta.</p><p><b>SentDelta</b> - sent over the network. <b>WriteDelta</b> - written to disk. <b>FlushDelta</b> - flushed to disk. <b>ReplayDelta</b> - replayed into the database.</p>'
+    },
+    'postgres.replication_standby_app_wal_lag': {
+        info: '<p>Replication WAL lag.</p><p><b>WriteLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written it, but not yet flushed it or applied it. <b>FlushLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written and flushed it, but not yet applied it. <b>ReplayLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written, flushed and applied it.</p>'
+    },
+    'postgres.replication_slot_files': {
+        info: '<p>Replication slot files. For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.</p><p><b>WalKeep</b> - WAL files retained by the replication slot. <b>PgReplslotFiles</b> - files present in pg_replslot.</p>'
+    },
+
+    'postgres.db_transactions': {
+        info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded.</p>'
+    },
+    'postgres.db_connections_utilization': {
+        info: 'Connections in use as percentage of the database\'s <i>CONNECTION LIMIT</i> (if set) or <i>max_connections</i>.'
+    },
+    'postgres.db_connections': {
+        info: 'Number of backends currently connected to this database.'
+    },    
     'postgres.db_buffer_cache': {
         info: '<p>Buffer cache efficiency.</p><p><b>Hit</b> - number of disk blocks read. <b>Miss</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache)</p>'
     },
