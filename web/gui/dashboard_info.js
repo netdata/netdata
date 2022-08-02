@@ -3881,6 +3881,18 @@ netdataDashboard.context = {
     'postgres.checkpoint_time': {
         info: '<p>Checkpoint timing information.</p><p><b>Write</b> - amount of time that has been spent in the portion of checkpoint processing where files are written to disk. <b>Sync</b> - amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk.</p>'
     },
+    'postgres.bgwriter_buffers_alloc': {
+        info: 'Allocated and re-allocated buffers. If a backend process requests data it is either found in a block in shared buffer cache or the block has to be allocated (read from disk). The latter is counted as <b>Allocated</b>.'
+    },
+    'postgres.bgwriter_buffers_written': {
+        info: '<p>Amount of data flushed from memory to disk.</p><p><b>Checkpoint</b> - buffers written during checkpoints. <b>Backend</b> -  buffers written directly by a backend. It may happen that a dirty page is requested by a backend process. In this case the page is synched to disk before the page is returned to the client. <b>Clean</b> - buffers written by the background writer. PostgreSQL may clear pages with a low usage count in advance. The process scans for dirty pages with a low usage count so that they could be cleared if necessay. Buffers written by this process increment the counter.</p>'
+    },
+    'postgres.bgwriter_maxwritten_clean': {
+        info: 'Number of times the background writer stopped a cleaning scan because it had written too many buffers (exceeding the value of <i>bgwriter_lru_maxpages</i>).'
+    },
+    'postgres.bgwriter_buffers_backend_fsync': {
+        info: 'Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write). Any values above zero can indicate problems with storage when fsync queue is completely filled. '
+    },
     
     'postgres.db_buffer_cache': {
         info: '<p>Buffer cache efficiency.</p><p><b>Hit</b> - number of disk blocks read. <b>Miss</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache)</p>'
