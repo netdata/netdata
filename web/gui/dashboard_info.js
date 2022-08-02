@@ -687,6 +687,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Netdata keeps track of the current jail status by reading the Fail2ban log file.'
     },
+
+    'slurm': {
+        title: 'slurm',
+        icon: '<i class="fas fa-list"></i>',
+        info: 'Charts showing the status of the Slurm queue (extracted via squeue).'
+    },
 };
 
 
