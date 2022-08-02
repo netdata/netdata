@@ -6,7 +6,15 @@
 #include "../query.h"
 #include "../rrdr.h"
 
-extern void grouping_create_median(RRDR *r, const char *options __maybe_unused);
+extern void grouping_create_median(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median1(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median2(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median3(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median5(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median10(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median15(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median20(RRDR *r, const char *options);
+extern void grouping_create_trimmed_median25(RRDR *r, const char *options);
 extern void grouping_reset_median(RRDR *r);
 extern void grouping_free_median(RRDR *r);
 extern void grouping_add_median(RRDR *r, NETDATA_DOUBLE value);

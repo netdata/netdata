@@ -13,7 +13,7 @@ struct grouping_median {
     NETDATA_DOUBLE *series;
 };
 
-void grouping_create_median(RRDR *r, const char *options __maybe_unused) {
+void grouping_create_median_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
     long entries = r->group;
     if(entries < 10) entries = 10;
 
@@ -21,7 +21,7 @@ void grouping_create_median(RRDR *r, const char *options __maybe_unused) {
     g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
     g->series_size = (size_t)entries;
 
-    g->percent = 0.0;
+    g->percent = def;
     if(options && *options) {
         g->percent = str2ndd(options, NULL);
         if(!netdata_double_isnumber(g->percent)) g->percent = 0.0;
@@ -29,7 +29,36 @@ void grouping_create_median(RRDR *r, const char *options __maybe_unused) {
         if(g->percent > 50.0) g->percent = 50.0;
     }
 
+    g->percent = g->percent / 100.0;
     r->internal.grouping_data = g;
+}
+
+void grouping_create_median(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 0.0);
+}
+void grouping_create_trimmed_median1(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 1.0);
+}
+void grouping_create_trimmed_median2(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 2.0);
+}
+void grouping_create_trimmed_median3(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 3.0);
+}
+void grouping_create_trimmed_median5(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 5.0);
+}
+void grouping_create_trimmed_median10(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 10.0);
+}
+void grouping_create_trimmed_median15(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 15.0);
+}
+void grouping_create_trimmed_median20(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 20.0);
+}
+void grouping_create_trimmed_median25(RRDR *r, const char *options) {
+    grouping_create_median_internal(r, options, 25.0);
 }
 
 // resets when switches dimensions
@@ -79,9 +108,10 @@ NETDATA_DOUBLE grouping_flush_median(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_optio
             if(g->percent > 0.0) {
                 NETDATA_DOUBLE min = g->series[0];
                 NETDATA_DOUBLE max = g->series[available_slots - 1];
+                NETDATA_DOUBLE delta = (max - min) * g->percent;
 
-                NETDATA_DOUBLE wanted_min = min + (max - min) * g->percent / 100.0;
-                NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent / 100.0;
+                NETDATA_DOUBLE wanted_min = min + delta;
+                NETDATA_DOUBLE wanted_max = max - delta;
 
                 for (start_slot = 0; start_slot < available_slots; start_slot++)
                     if (g->series[start_slot] >= wanted_min) break;

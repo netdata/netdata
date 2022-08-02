@@ -29,7 +29,7 @@ static void grouping_create_percentile_internal(RRDR *r, const char *options, NE
         if(g->percent > 100.0) g->percent = 100.0;
     }
 
-    g->percent = g->percent / 100.0;
+    g->percent = 1.0 - g->percent / 100.0;
     r->internal.grouping_data = g;
 }
 
@@ -110,7 +110,7 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
 
             if(min != max) {
                 if (min <= 0.0 && max <= 0.0) {
-                    NETDATA_DOUBLE wanted_min = min - (min - max) * (1.0 - g->percent);
+                    NETDATA_DOUBLE wanted_min = min - (min - max) * g->percent;
 
                     // fprintf(stderr, "min = %f, max = %f, wanted_min = %f, percent = %f\n", min, max, wanted_min, g->percent);
 
@@ -123,7 +123,7 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
                     }
                 }
                 else {
-                    NETDATA_DOUBLE wanted_max = max - (max - min) * (1.0 - g->percent);
+                    NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent;
 
                     // fprintf(stderr, "min = %f, max = %f, wanted_max = %f, percent = %f\n", min, max, wanted_max, g->percent);
 
