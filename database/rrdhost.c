@@ -768,9 +768,12 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 
-    if (unlikely(sql_init_context_database(0))) {
+    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
         error_report("Failed to initialize context metadata database");
     }
+
+    if (unlikely(!system_info))
+        goto unittest;
 
 #ifdef ENABLE_DBENGINE
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
@@ -891,6 +894,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     health_init();
     rrdpush_init();
 
+unittest:
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     rrd_wrlock();
     localhost = rrdhost_create(
@@ -921,12 +925,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         return 1;
     }
 
-    if (likely(system_info))
-       migrate_localhost(&localhost->host_uuid);
     rrd_unlock();
-    sql_aclk_sync_init();
 
-    web_client_api_v1_management_init();
+    if (likely(system_info)) {
+        migrate_localhost(&localhost->host_uuid);
+        sql_aclk_sync_init();
+        web_client_api_v1_management_init();
+    }
     return localhost==NULL;
 }
 
