@@ -13,7 +13,7 @@ struct grouping_percentile {
     NETDATA_DOUBLE *series;
 };
 
-void grouping_create_percentile(RRDR *r, const char *options __maybe_unused) {
+static void grouping_create_percentile_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
     long entries = r->group;
     if(entries < 10) entries = 10;
 
@@ -21,7 +21,7 @@ void grouping_create_percentile(RRDR *r, const char *options __maybe_unused) {
     g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
     g->series_size = (size_t)entries;
 
-    g->percent = 95.0;
+    g->percent = def;
     if(options && *options) {
         g->percent = str2ndd(options, NULL);
         if(!netdata_double_isnumber(g->percent)) g->percent = 0.0;
@@ -29,7 +29,36 @@ void grouping_create_percentile(RRDR *r, const char *options __maybe_unused) {
         if(g->percent > 100.0) g->percent = 100.0;
     }
 
+    g->percent = g->percent / 100.0;
     r->internal.grouping_data = g;
+}
+
+void grouping_create_percentile25(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 25.0);
+}
+void grouping_create_percentile50(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 50.0);
+}
+void grouping_create_percentile75(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 75.0);
+}
+void grouping_create_percentile80(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 80.0);
+}
+void grouping_create_percentile90(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 90.0);
+}
+void grouping_create_percentile95(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 95.0);
+}
+void grouping_create_percentile97(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 97.0);
+}
+void grouping_create_percentile98(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 98.0);
+}
+void grouping_create_percentile99(RRDR *r, const char *options) {
+    grouping_create_percentile_internal(r, options, 99.0);
 }
 
 // resets when switches dimensions
@@ -76,16 +105,36 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
             NETDATA_DOUBLE min = g->series[0];
             NETDATA_DOUBLE max = g->series[available_slots - 1];
 
-            NETDATA_DOUBLE wanted_max = max - (max - min) * g->percent / 100.0;
-
+            size_t slot = 1;
             value = g->series[0];
-            size_t slot;
-            for(slot = 1; slot < available_slots ;slot++) {
-                NETDATA_DOUBLE v = g->series[slot];
-                if(v <= wanted_max)
-                    value += v;
-                else
-                    break;
+
+            if(min != max) {
+                if (min <= 0.0 && max <= 0.0) {
+                    NETDATA_DOUBLE wanted_min = min - (min - max) * (1.0 - g->percent);
+
+                    // fprintf(stderr, "min = %f, max = %f, wanted_min = %f, percent = %f\n", min, max, wanted_min, g->percent);
+
+                    for (slot = 1; slot < available_slots; slot++) {
+                        NETDATA_DOUBLE v = g->series[slot];
+                        if (v >= wanted_min)
+                            value += v;
+                        else
+                            break;
+                    }
+                }
+                else {
+                    NETDATA_DOUBLE wanted_max = max - (max - min) * (1.0 - g->percent);
+
+                    // fprintf(stderr, "min = %f, max = %f, wanted_max = %f, percent = %f\n", min, max, wanted_max, g->percent);
+
+                    for (slot = 1; slot < available_slots; slot++) {
+                        NETDATA_DOUBLE v = g->series[slot];
+                        if (v <= wanted_max)
+                            value += v;
+                        else
+                            break;
+                    }
+                }
             }
 
             value = value / (NETDATA_DOUBLE)slot;
