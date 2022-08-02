@@ -13,14 +13,14 @@ round number of points.
 
 The following percentile aliases are defined:
 
-  - `trimmed-mean1`
-  - `trimmed-mean2`
-  - `trimmed-mean3`
-  - `trimmed-mean5`
-  - `trimmed-mean10`
-  - `trimmed-mean15`
-  - `trimmed-mean20`
-  - `trimmed-mean25`
+- `trimmed-mean1`
+- `trimmed-mean2`
+- `trimmed-mean3`
+- `trimmed-mean5`
+- `trimmed-mean10`
+- `trimmed-mean15`
+- `trimmed-mean20`
+- `trimmed-mean25`
 
 The default `trimmed-mean` is an alias for `trimmed-mean5`.
 Any percentage may be requested using the `group_options` query parameter.

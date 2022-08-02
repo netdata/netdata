@@ -14,15 +14,15 @@ points.
 
 The following percentile aliases are defined:
 
-  - `percentile25`
-  - `percentile50`
-  - `percentile75`
-  - `percentile80`
-  - `percentile90`
-  - `percentile95`
-  - `percentile97`
-  - `percentile98`
-  - `percentile99`
+- `percentile25`
+- `percentile50`
+- `percentile75`
+- `percentile80`
+- `percentile90`
+- `percentile95`
+- `percentile97`
+- `percentile98`
+- `percentile99`
 
 The default `percentile` is an alias for `percentile95`.
 Any percentile may be requested using the `group_options` query parameter.

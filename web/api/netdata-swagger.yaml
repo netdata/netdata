@@ -365,6 +365,34 @@ paths:
               - des
               - cv
               - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
             default: average
         - name: group_options
           in: query
@@ -575,6 +603,38 @@ paths:
               - stddev
               - sum
               - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
             default: average
         - name: options
           in: query
@@ -1238,6 +1298,34 @@ paths:
               - des
               - cv
               - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
             default: average
         - name: group_options
           in: query
@@ -1413,6 +1501,34 @@ paths:
               - des
               - cv
               - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
             default: average
         - name: group_options
           in: query
