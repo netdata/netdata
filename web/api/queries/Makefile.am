@@ -15,6 +15,7 @@ SUBDIRS = \
     percentile \
     ses \
     stddev \
+    trimmed_mean \
     $(NULL)
 
 dist_noinst_DATA = \

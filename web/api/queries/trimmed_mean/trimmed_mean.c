@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "percentile.h"
+#include "trimmed_mean.h"
 
 // ----------------------------------------------------------------------------
 // median
 
-struct grouping_percentile {
+struct grouping_trimmed_mean {
     size_t series_size;
     size_t next_pos;
     NETDATA_DOUBLE percent;
@@ -13,11 +13,11 @@ struct grouping_percentile {
     NETDATA_DOUBLE *series;
 };
 
-static void grouping_create_percentile_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
+static void grouping_create_trimmed_mean_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
     long entries = r->group;
     if(entries < 10) entries = 10;
 
-    struct grouping_percentile *g = (struct grouping_percentile *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_percentile));
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_trimmed_mean));
     g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
     g->series_size = (size_t)entries;
 
@@ -26,58 +26,55 @@ static void grouping_create_percentile_internal(RRDR *r, const char *options, NE
         g->percent = str2ndd(options, NULL);
         if(!netdata_double_isnumber(g->percent)) g->percent = 0.0;
         if(g->percent < 0.0) g->percent = 0.0;
-        if(g->percent > 100.0) g->percent = 100.0;
+        if(g->percent > 50.0) g->percent = 50.0;
     }
 
-    g->percent = g->percent / 100.0;
+    g->percent = 1.0 - ((g->percent / 100.0) * 2.0);
     r->internal.grouping_data = g;
 }
 
-void grouping_create_percentile25(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 25.0);
+void grouping_create_trimmed_mean1(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 1.0);
 }
-void grouping_create_percentile50(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 50.0);
+void grouping_create_trimmed_mean2(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 2.0);
 }
-void grouping_create_percentile75(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 75.0);
+void grouping_create_trimmed_mean3(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 3.0);
 }
-void grouping_create_percentile80(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 80.0);
+void grouping_create_trimmed_mean5(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 5.0);
 }
-void grouping_create_percentile90(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 90.0);
+void grouping_create_trimmed_mean10(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 10.0);
 }
-void grouping_create_percentile95(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 95.0);
+void grouping_create_trimmed_mean15(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 15.0);
 }
-void grouping_create_percentile97(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 97.0);
+void grouping_create_trimmed_mean20(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 20.0);
 }
-void grouping_create_percentile98(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 98.0);
-}
-void grouping_create_percentile99(RRDR *r, const char *options) {
-    grouping_create_percentile_internal(r, options, 99.0);
+void grouping_create_trimmed_mean25(RRDR *r, const char *options) {
+    grouping_create_trimmed_mean_internal(r, options, 25.0);
 }
 
 // resets when switches dimensions
 // so, clear everything to restart
-void grouping_reset_percentile(RRDR *r) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+void grouping_reset_trimmed_mean(RRDR *r) {
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->internal.grouping_data;
     g->next_pos = 0;
 }
 
-void grouping_free_percentile(RRDR *r) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+void grouping_free_trimmed_mean(RRDR *r) {
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->internal.grouping_data;
     if(g) onewayalloc_freez(r->internal.owa, g->series);
 
     onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
     r->internal.grouping_data = NULL;
 }
 
-void grouping_add_percentile(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+void grouping_add_trimmed_mean(RRDR *r, NETDATA_DOUBLE value) {
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->internal.grouping_data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
@@ -87,8 +84,8 @@ void grouping_add_percentile(RRDR *r, NETDATA_DOUBLE value) {
     g->series[g->next_pos++] = value;
 }
 
-NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_percentile *g = (struct grouping_percentile *)r->internal.grouping_data;
+NETDATA_DOUBLE grouping_flush_trimmed_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+    struct grouping_trimmed_mean *g = (struct grouping_trimmed_mean *)r->internal.grouping_data;
 
     NETDATA_DOUBLE value;
     size_t available_slots = g->next_pos;
@@ -125,14 +122,14 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
 
             int start_slot, stop_slot, step, last_slot, interpolation_slot;
             if(min >= 0.0 && max >= 0.0) {
-                start_slot = 0;
+                start_slot = (int)((available_slots - slots_to_use) / 2);
                 stop_slot = start_slot + (int)slots_to_use;
                 last_slot = stop_slot - 1;
                 interpolation_slot = stop_slot;
                 step = 1;
             }
             else {
-                start_slot = (int)available_slots - 1;
+                start_slot = (int)available_slots - 1 - (int)((available_slots - slots_to_use) / 2);
                 stop_slot = start_slot - (int)slots_to_use;
                 last_slot = stop_slot + 1;
                 interpolation_slot = stop_slot;
@@ -152,8 +149,8 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
 
             value = value / (NETDATA_DOUBLE)counted;
 
-            //fprintf(stderr, "available_slot %zu, percent %f, slots_to_use %zu, start_slot %d, stop_slot %d, step %d, last_slot %d, interpolation_slot %d, percent_interpolation_slot %f, percent_last_slot %f, counted %zu\n",
-            //        available_slots, g->percent, slots_to_use, start_slot, stop_slot, step, last_slot, interpolation_slot, percent_interpolation_slot, percent_last_slot, counted);
+            fprintf(stderr, "available_slot %zu, percent %f, slots_to_use %zu, start_slot %d, stop_slot %d, step %d, last_slot %d, interpolation_slot %d, percent_interpolation_slot %f, percent_last_slot %f, counted %zu\n",
+                    available_slots, g->percent, slots_to_use, start_slot, stop_slot, step, last_slot, interpolation_slot, percent_interpolation_slot, percent_last_slot, counted);
         }
         else
             value = min;
@@ -164,7 +161,7 @@ NETDATA_DOUBLE grouping_flush_percentile(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_o
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
 
-    //log_series_to_stderr(g->series, g->next_pos, value, "percentile");
+    //log_series_to_stderr(g->series, g->next_pos, value, "trimmed_mean");
 
     g->next_pos = 0;
 

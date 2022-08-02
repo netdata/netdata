@@ -822,6 +822,8 @@ set(API_PLUGIN_FILES
         web/api/queries/ses/ses.h
         web/api/queries/des/des.c
         web/api/queries/des/des.h
+        web/api/queries/trimmed_mean/trimmed_mean.c
+        web/api/queries/trimmed_mean/trimmed_mean.h
         web/api/queries/weights.c
         web/api/queries/weights.h
         web/api/formatters/rrd2json.c
