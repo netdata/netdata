@@ -724,8 +724,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #ifdef ENABLE_ACLK
     // Child disconnection
     if (netdata_cloud_setting) {
-        struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *)rpt->host->dbsync_worker;
-        if (!wc || wc->update_node_after == -1)
+        struct aclk_database_worker_config *wc = rpt->host->dbsync_worker;
+        if (wc && wc->update_node_after == -1)
             wc->update_node_after = now_realtime_sec() + ACLK_NODE_UPDATE_DELAY * 3;
     }
 #endif
