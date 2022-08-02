@@ -90,7 +90,6 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
     info("Running database migration %s", name);
 
     char sql[256];
-    char *table;
 
     int rc;
     sqlite3_stmt *res = NULL;
@@ -102,11 +101,12 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
     }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-         table = strdupz((char *) sqlite3_column_text(res, 0));
+         char *table = strdupz((char *) sqlite3_column_text(res, 0));
          if (!column_exists_in_table(table, "chart_context")) {
              snprintfz(sql, 255, "ALTER TABLE %s ADD chart_context text", table);
              sqlite3_exec(database, sql, 0, 0, NULL);
          }
+         freez(table);
     }
 
     rc = sqlite3_finalize(res);
