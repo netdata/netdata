@@ -8,18 +8,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/
 
 The trimmed mean is the average value of a series excluding the smallest and biggest points.
 
-Netdata applies linear interpolation on the last point, if the percentage requested to be excluded does not give a round number of points.
+Netdata applies linear interpolation on the last point, if the percentage requested to be excluded does not give a
+round number of points.
 
 The following percentile aliases are defined:
 
-- `trimmed-mean1`
-- `trimmed-mean2`
-- `trimmed-mean3`
-- `trimmed-mean5`
-- `trimmed-mean10`
-- `trimmed-mean15`
-- `trimmed-mean20`
-- `trimmed-mean25`
+  - `trimmed-mean1`
+  - `trimmed-mean2`
+  - `trimmed-mean3`
+  - `trimmed-mean5`
+  - `trimmed-mean10`
+  - `trimmed-mean15`
+  - `trimmed-mean20`
+  - `trimmed-mean25`
 
 The default `trimmed-mean` is an alias for `trimmed-mean5`.
 Any percentage may be requested using the `group_options` query parameter.
@@ -38,7 +39,8 @@ lookup: trimmed-mean5 -1m unaligned of my_dimension
 `trimmed-mean` does not change the units. For example, if the chart units is `requests/sec`, the result
 will be again expressed in the same units. 
 
-It can also be used in APIs and badges as `&group=trimmed-mean` in the URL and the additional parameter `group_options` may be used to request any percentage (e.g. `&group=trimmed-mean&group_options=29`).
+It can also be used in APIs and badges as `&group=trimmed-mean` in the URL and the additional parameter `group_options`
+may be used to request any percentage (e.g. `&group=trimmed-mean&group_options=29`).
 
 ## Examples
 
