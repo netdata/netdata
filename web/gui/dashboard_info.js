@@ -3874,6 +3874,13 @@ netdataDashboard.context = {
             'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
     // python version end
+
+    'postgres.checkpoints': {
+        info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it’s been caching in memory has been synchronized with the disk. It’s desirable when checkpoints are scheduled rather than requested, as the latter can indicate that your databases are under heavy load.</p><p><b>Scheduled</b> - checkpoints triggered due that the time elapsed from the previous checkpoint is more than pg setting <i>checkpoint_timeout</i>. <b>Requested</b> - checkpoints ran due to uncheckpointed WAL size grew to more than <i>max_wal_size</i> setting.</p>'
+    },
+    'postgres.checkpoint_time': {
+        info: '<p>Checkpoint timing information.</p><p><b>Write</b> - amount of time that has been spent in the portion of checkpoint processing where files are written to disk. <b>Sync</b> - amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk.</p>'
+    },
     
     'postgres.db_buffer_cache': {
         info: '<p>Buffer cache efficiency.</p><p><b>Hit</b> - number of disk blocks read. <b>Miss</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache)</p>'
