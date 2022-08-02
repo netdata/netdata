@@ -43,11 +43,10 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
     size_t pos = 0;
     char *temp = strdupz(line);
     char var[RRDCALC_VAR_MAX];
-    int i=0;
     char *m, *e, *lbl_value = NULL;
 
     while ((m = strchr(temp + pos, '$'))) {
-        i=0;
+        int i=0;
         e = m;
         while (*e) {
             if (*e == ' ' || i == RRDCALC_VAR_MAX - 1) {
