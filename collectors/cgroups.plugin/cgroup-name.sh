@@ -57,7 +57,7 @@ function docker_like_get_name_command() {
 
   # Need to do this, in case the NAME is a bunch of spaces
   NAME_TEST="$(echo "${NAME}" | tr -d ' ')"
-  if [ -z "${NAME_TEST}" ] ; then NAME = ""; fi
+  if [ -z "${NAME_TEST}" ] ; then NAME=""; fi
 
   if [ -z "${NAME}" ] ; then
     info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
@@ -94,7 +94,7 @@ function docker_like_get_name_api() {
 
   # Need to do this, in case the NAME is a bunch of spaces
   NAME_TEST="$(echo "${NAME}" | tr -d ' ')"
-  if [ -z "${NAME_TEST}" ] ; then NAME = ""; fi
+  if [ -z "${NAME_TEST}" ] ; then NAME=""; fi
 
   if [ -z "${NAME}" ]; then
     echo "Not a Nomad container. Setting container name via API"
