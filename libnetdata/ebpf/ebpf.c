@@ -279,7 +279,8 @@ static char *ebpf_select_kernel_name(uint32_t selector)
 {
     static char *kernel_names[] = { NETDATA_IDX_STR_V3_10, NETDATA_IDX_STR_V4_14, NETDATA_IDX_STR_V4_16,
                                     NETDATA_IDX_STR_V4_18, NETDATA_IDX_STR_V5_4,  NETDATA_IDX_STR_V5_10,
-                                    NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_15, NETDATA_IDX_STR_V5_16
+                                    NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_14, NETDATA_IDX_STR_V5_15,
+                                    NETDATA_IDX_STR_V5_16
                                   };
 
     return kernel_names[selector];
@@ -298,7 +299,9 @@ static char *ebpf_select_kernel_name(uint32_t selector)
 static int ebpf_select_max_index(int is_rhf, uint32_t kver)
 {
     if (is_rhf > 0) { // Is Red Hat family
-        if (kver >= NETDATA_EBPF_KERNEL_4_11)
+        if (kver >= NETDATA_EBPF_KERNEL_5_14)
+            return NETDATA_IDX_V5_14;
+        else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
         if (kver >= NETDATA_EBPF_KERNEL_5_16)
@@ -333,6 +336,9 @@ static uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
 {
     uint32_t start = ebpf_select_max_index(is_rhf, kver);
     uint32_t idx;
+
+    if (is_rhf == -1)
+        kernels &= ~NETDATA_V5_14;
 
     for (idx = start; idx; idx--) {
         if (kernels & 1 << idx)
