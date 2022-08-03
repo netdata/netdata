@@ -148,9 +148,6 @@ NETDATA_DOUBLE grouping_flush_trimmed_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value
             }
 
             value = value / (NETDATA_DOUBLE)counted;
-
-            fprintf(stderr, "available_slot %zu, percent %f, slots_to_use %zu, start_slot %d, stop_slot %d, step %d, last_slot %d, interpolation_slot %d, percent_interpolation_slot %f, percent_last_slot %f, counted %zu\n",
-                    available_slots, g->percent, slots_to_use, start_slot, stop_slot, step, last_slot, interpolation_slot, percent_interpolation_slot, percent_last_slot, counted);
         }
         else
             value = min;
