@@ -118,6 +118,7 @@ void destroy_alarm_log_entry(struct alarm_log_entry *entry)
     freez(entry->old_value_string);
 
     freez(entry->rendered_info);
+    freez(entry->chart_context);
 }
 
 static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *proto)
