@@ -48,8 +48,17 @@ fatal() {
 function docker_like_get_name_command() {
   local command="${1}"
   local id="${2}"
-  info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
-  NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
+  info "Running command: ${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' \"${id}\""
+  if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' "${id}")" &&
+    [ -n "$OUTPUT" ]; then
+    nomad_ns="$(echo "$OUTPUT" | grep NOMAD_NAMESPACE | cut -d= -f 2)"
+    nomad_job_name="$(echo "$OUTPUT" | grep NOMAD_JOB_NAME | cut -d= -f 2)"
+    nomad_task_name="$(echo "$OUTPUT" | grep NOMAD_TASK_NAME | cut -d= -f 2)"
+    nomad_alloc_id="$(echo "$OUTPUT" | grep NOMAD_SHORT_ALLOC_ID | cut -d= -f 2)"
+    NAME="$(echo "$OUTPUT" | grep CONT_NAME | cut -d= -f 2 | sed 's|^/||')"
+    [ -n "$nomad_ns" ] && [ -n "$nomad_job_name" ] && [ -n "$nomad_task_name" ] && [ -n "$nomad_alloc_id" ] &&
+      NAME="${nomad_ns}-${nomad_job_name}-${nomad_task_name}-${nomad_alloc_id}"
+  fi
   return 0
 }
 
@@ -61,7 +70,7 @@ function docker_like_get_name_api() {
     warning "No ${host_var} is set"
     return 1
   fi
-  if ! command -v jq > /dev/null 2>&1; then
+  if ! command -v jq >/dev/null 2>&1; then
     warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
     return 1
   fi
@@ -72,7 +81,15 @@ function docker_like_get_name_api() {
     info "Running API command: curl \"${host}${path}\""
     JSON=$(curl -sS "${host}${path}")
   fi
-  NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+  if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[],"CONT_NAME=\(.Name)"') && [ -n "$OUTPUT" ]; then
+    nomad_ns="$(echo "$OUTPUT" | grep NOMAD_NAMESPACE | cut -d= -f 2)"
+    nomad_job_name="$(echo "$OUTPUT" | grep NOMAD_JOB_NAME | cut -d= -f 2)"
+    nomad_task_name="$(echo "$OUTPUT" | grep NOMAD_TASK_NAME | cut -d= -f 2)"
+    nomad_alloc_id="$(echo "$OUTPUT" | grep NOMAD_SHORT_ALLOC_ID | cut -d= -f 2)"
+    NAME="$(echo "$OUTPUT" | grep CONT_NAME | cut -d= -f 2 | sed 's|^/||')"
+    [ -n "$nomad_ns" ] && [ -n "$nomad_jobname" ] && [ -n "$nomad_taskname" ] && [ -n "$nomad_allocid" ] &&
+      NAME="${nomad_ns}-${nomad_job_name}-${nomad_task_name}-${nomad_alloc_id}"
+  fi
   return 0
 }
 
