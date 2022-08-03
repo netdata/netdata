@@ -3927,8 +3927,11 @@ netdataDashboard.context = {
         info: '<p>Replication slot files. For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.</p><p><b>WalKeep</b> - WAL files retained by the replication slot. <b>PgReplslotFiles</b> - files present in pg_replslot.</p>'
     },
 
+    'postgres.db_transactions_ratio': {
+        info: 'Percentage of commited/rollback transactions.'
+    },
     'postgres.db_transactions': {
-        info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded.</p>'
+        info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded. Single queries that have failed outside the transactions are also accounted as rollbacks.</p>'
     },
     'postgres.db_connections_utilization': {
         info: 'Connections in use as percentage of the database\'s <i>CONNECTION LIMIT</i> (if set) or <i>max_connections</i>.'
@@ -3936,17 +3939,23 @@ netdataDashboard.context = {
     'postgres.db_connections': {
         info: 'Number of backends currently connected to this database.'
     },    
-    'postgres.db_buffer_cache': {
-        info: '<p>Buffer cache efficiency.</p><p><b>Hit</b> - number of disk blocks read. <b>Miss</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache)</p>'
+    'postgres.db_buffer_cache_hit_ratio': {
+        info: 'Buffer cache hit ratio. When clients request data, postgres checks shared memory and if there are no relevant data there it has to read it from disk, thus queries become slower.'
     },
-    'postgres.db_read_operations': {
+    'postgres.db_blocks_read': {
+        info: '<p>Number of blocks read from shared buffer cache or from disk.</p><p><b>disk</b> - number of disk blocks read. <b>memory</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
+    },
+    'postgres.db_rows_read_ratio': {
+        info: 'Percentage of returned/fetched rows.'
+    },
+    'postgres.db_rows_read': {
         info: '<p>Read queries throughput.</p><p><b>Returned</b> - number of rows returned by queries. The value keeps track of the number of rows read/scanned, not the rows actually returned to the client. <b>Fetched</b> - number of rows fetched that contained data necessary to execute the query successfully.</p>'
     },
-    'postgres.db_write_operations': {
+    'postgres.db_rows_written': {
         info: '<p>Write queries throughput.</p><p><b>Inserted</b> - number of rows inserted by queries. <b>Deleted</b> - number of rows deleted by queries. <b>Updated</b> - number of rows updated by queries.</p>'
     },
     'postgres.db_conflicts': {
-        info: 'Number of queries canceled due to conflicts with recovery.'
+        info: 'Number of queries canceled due to conflicts with recovery. Conflicts occur only on standby servers.'
     },
     'postgres.db_conflicts_stat': {
         info: '<p>Number of queries canceled due to conflicts with recovery.</p><p><b>Tablespace</b> - queries that have been canceled due to dropped tablespaces. <b>Lock</b> - queries that have been canceled due to lock timeouts. <b>Snapshot</b> - queries that have been canceled due to old snapshots. <b>Bufferpin</b> - queries that have been canceled due to pinned buffers. <b>Deadlock</b> - queries that have been canceled due to deadlocks.</p>'
