@@ -47,14 +47,11 @@ fatal() {
 
 function parse_docker_like_inspect_output() {
   local output="${1}"
-  nomad_ns="$(echo "$output" | grep NOMAD_NAMESPACE | cut -d= -f 2)"
-  nomad_job_name="$(echo "$output" | grep NOMAD_JOB_NAME | cut -d= -f 2)"
-  nomad_task_name="$(echo "$output" | grep NOMAD_TASK_NAME | cut -d= -f 2)"
-  nomad_alloc_id="$(echo "$output" | grep NOMAD_SHORT_ALLOC_ID | cut -d= -f 2)"
-  if [ -n "$nomad_ns" ] && [ -n "$nomad_job_name" ] && [ -n "$nomad_task_name" ] && [ -n "$nomad_alloc_id" ]; then
-    echo "${nomad_ns}-${nomad_job_name}-${nomad_task_name}-${nomad_alloc_id}"
+  eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME)=" <<<"$output")"
+  if [ -n "$NOMAD_NAMESPACE" ] && [ -n "$NOMAD_JOB_NAME" ] && [ -n "$NOMAD_TASK_NAME" ] && [ -n "$NOMAD_SHORT_ALLOC_ID" ]; then
+    echo "${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
   else
-    echo "$output" | grep -m 1 CONT_NAME | cut -d= -f 2 | sed 's|^/||'
+    echo "${CONT_NAME}" | sed 's|^/||'
   fi
 }
 
