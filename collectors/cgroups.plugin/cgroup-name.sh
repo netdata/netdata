@@ -45,19 +45,26 @@ fatal() {
   exit 1
 }
 
+function parse_docker_like_inspect_output() {
+  local output="${1}"
+  nomad_ns="$(echo "$output" | grep NOMAD_NAMESPACE | cut -d= -f 2)"
+  nomad_job_name="$(echo "$output" | grep NOMAD_JOB_NAME | cut -d= -f 2)"
+  nomad_task_name="$(echo "$output" | grep NOMAD_TASK_NAME | cut -d= -f 2)"
+  nomad_alloc_id="$(echo "$output" | grep NOMAD_SHORT_ALLOC_ID | cut -d= -f 2)"
+  if [ -n "$nomad_ns" ] && [ -n "$nomad_job_name" ] && [ -n "$nomad_task_name" ] && [ -n "$nomad_alloc_id" ]; then
+    echo "${nomad_ns}-${nomad_job_name}-${nomad_task_name}-${nomad_alloc_id}"
+  else
+    echo "$output" | grep -m 1 CONT_NAME | cut -d= -f 2 | sed 's|^/||'
+  fi
+}
+
 function docker_like_get_name_command() {
   local command="${1}"
   local id="${2}"
   info "Running command: ${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' \"${id}\""
   if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' "${id}")" &&
     [ -n "$OUTPUT" ]; then
-    nomad_ns="$(echo "$OUTPUT" | grep NOMAD_NAMESPACE | cut -d= -f 2)"
-    nomad_job_name="$(echo "$OUTPUT" | grep NOMAD_JOB_NAME | cut -d= -f 2)"
-    nomad_task_name="$(echo "$OUTPUT" | grep NOMAD_TASK_NAME | cut -d= -f 2)"
-    nomad_alloc_id="$(echo "$OUTPUT" | grep NOMAD_SHORT_ALLOC_ID | cut -d= -f 2)"
-    NAME="$(echo "$OUTPUT" | grep CONT_NAME | cut -d= -f 2 | sed 's|^/||')"
-    [ -n "$nomad_ns" ] && [ -n "$nomad_job_name" ] && [ -n "$nomad_task_name" ] && [ -n "$nomad_alloc_id" ] &&
-      NAME="${nomad_ns}-${nomad_job_name}-${nomad_task_name}-${nomad_alloc_id}"
+      NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
   fi
   return 0
 }
@@ -82,13 +89,7 @@ function docker_like_get_name_api() {
     JSON=$(curl -sS "${host}${path}")
   fi
   if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[],"CONT_NAME=\(.Name)"') && [ -n "$OUTPUT" ]; then
-    nomad_ns="$(echo "$OUTPUT" | grep NOMAD_NAMESPACE | cut -d= -f 2)"
-    nomad_job_name="$(echo "$OUTPUT" | grep NOMAD_JOB_NAME | cut -d= -f 2)"
-    nomad_task_name="$(echo "$OUTPUT" | grep NOMAD_TASK_NAME | cut -d= -f 2)"
-    nomad_alloc_id="$(echo "$OUTPUT" | grep NOMAD_SHORT_ALLOC_ID | cut -d= -f 2)"
-    NAME="$(echo "$OUTPUT" | grep CONT_NAME | cut -d= -f 2 | sed 's|^/||')"
-    [ -n "$nomad_ns" ] && [ -n "$nomad_jobname" ] && [ -n "$nomad_taskname" ] && [ -n "$nomad_allocid" ] &&
-      NAME="${nomad_ns}-${nomad_job_name}-${nomad_task_name}-${nomad_alloc_id}"
+    NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
   fi
   return 0
 }
@@ -395,7 +396,7 @@ function k8s_get_kubepod_name() {
       name+="_$(get_lbl_val "$labels" pod_name)"
       labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
-    else 
+    else
       return 2
     fi
   fi
@@ -417,7 +418,7 @@ function k8s_get_name() {
   local id="${2}"
 
   NAME=$(k8s_get_kubepod_name "$cgroup_path" "$id")
- 
+
   case "$?" in
   0)
     NAME="k8s_${NAME}"
