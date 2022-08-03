@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- Remove the single threaded arrayallocator optiomization during agent startup [\#13473](https://github.com/netdata/netdata/pull/13473) ([stelfrag](https://github.com/stelfrag))
+- Handle cases where entries where stored as text \(with strftime\("%s"\)\) [\#13472](https://github.com/netdata/netdata/pull/13472) ([stelfrag](https://github.com/stelfrag))
 - Fix cgroup name detection for docker containers in containerd cgroup [\#13470](https://github.com/netdata/netdata/pull/13470) ([xkisu](https://github.com/xkisu))
 - rrdcontext support for hidden charts [\#13466](https://github.com/netdata/netdata/pull/13466) ([ktsaou](https://github.com/ktsaou))
+- Load host labels for archived hosts [\#13464](https://github.com/netdata/netdata/pull/13464) ([stelfrag](https://github.com/stelfrag))
 - fix\(python.d/smartd\_log\): handle log rotation [\#13460](https://github.com/netdata/netdata/pull/13460) ([ilyam8](https://github.com/ilyam8))
 - docs: add a note about network interface monitoring when running in a Docker container [\#13458](https://github.com/netdata/netdata/pull/13458) ([ilyam8](https://github.com/ilyam8))
 - fix a guide so we can reference it's subsections [\#13455](https://github.com/netdata/netdata/pull/13455) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -17,6 +20,7 @@
 - additional stats [\#13445](https://github.com/netdata/netdata/pull/13445) ([ktsaou](https://github.com/ktsaou))
 - Store host label information in the metadata database [\#13441](https://github.com/netdata/netdata/pull/13441) ([stelfrag](https://github.com/stelfrag))
 - Fix typo in PostgreSQL section header [\#13440](https://github.com/netdata/netdata/pull/13440) ([shyamvalsan](https://github.com/shyamvalsan))
+- Fix tests so that the actual metadata database is not accessed [\#13439](https://github.com/netdata/netdata/pull/13439) ([stelfrag](https://github.com/stelfrag))
 - Delete aclk\_alert table on start streaming from seq 1 batch 1 [\#13438](https://github.com/netdata/netdata/pull/13438) ([MrZammler](https://github.com/MrZammler))
 - Fix agent crash when archived host has not been registered to the cloud [\#13437](https://github.com/netdata/netdata/pull/13437) ([stelfrag](https://github.com/stelfrag))
 - Dont duplicate buffered bytes [\#13435](https://github.com/netdata/netdata/pull/13435) ([vlvkobal](https://github.com/vlvkobal))
@@ -336,10 +340,6 @@
 - fix!: do not replace a hyphen in the chart name with an underscore [\#12812](https://github.com/netdata/netdata/pull/12812) ([ilyam8](https://github.com/ilyam8))
 - speedup queries by providing optimization in the main loop [\#12811](https://github.com/netdata/netdata/pull/12811) ([ktsaou](https://github.com/ktsaou))
 - onewayallocator to use mallocz\(\) instead of mmap\(\) [\#12810](https://github.com/netdata/netdata/pull/12810) ([ktsaou](https://github.com/ktsaou))
-- Add support for installing static builds on systems without usable internet connections. [\#12809](https://github.com/netdata/netdata/pull/12809) ([Ferroin](https://github.com/Ferroin))
-- Configurable storage engine for Netdata agents: step 2 [\#12808](https://github.com/netdata/netdata/pull/12808) ([aberaud](https://github.com/aberaud))
-- Workers utilization charts [\#12807](https://github.com/netdata/netdata/pull/12807) ([ktsaou](https://github.com/ktsaou))
-- add --repositories-only option [\#12806](https://github.com/netdata/netdata/pull/12806) ([maneamarius](https://github.com/maneamarius))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
