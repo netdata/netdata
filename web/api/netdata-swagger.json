@@ -453,7 +453,35 @@
                 "ses",
                 "des",
                 "cv",
-                "countif"
+                "countif",
+                "percentile",
+                "percentile25",
+                "percentile50",
+                "percentile75",
+                "percentile80",
+                "percentile90",
+                "percentile95",
+                "percentile97",
+                "percentile98",
+                "percentile99",
+                "trimmed-mean",
+                "trimmed-mean1",
+                "trimmed-mean2",
+                "trimmed-mean3",
+                "trimmed-mean5",
+                "trimmed-mean10",
+                "trimmed-mean15",
+                "trimmed-mean20",
+                "trimmed-mean25",
+                "trimmed-median",
+                "trimmed-median1",
+                "trimmed-median2",
+                "trimmed-median3",
+                "trimmed-median5",
+                "trimmed-median10",
+                "trimmed-median15",
+                "trimmed-median20",
+                "trimmed-median25"
               ],
               "default": "average"
             }
@@ -690,7 +718,39 @@
                 "median",
                 "stddev",
                 "sum",
-                "incremental-sum"
+                "incremental-sum",
+                "ses",
+                "des",
+                "cv",
+                "countif",
+                "percentile",
+                "percentile25",
+                "percentile50",
+                "percentile75",
+                "percentile80",
+                "percentile90",
+                "percentile95",
+                "percentile97",
+                "percentile98",
+                "percentile99",
+                "trimmed-mean",
+                "trimmed-mean1",
+                "trimmed-mean2",
+                "trimmed-mean3",
+                "trimmed-mean5",
+                "trimmed-mean10",
+                "trimmed-mean15",
+                "trimmed-mean20",
+                "trimmed-mean25",
+                "trimmed-median",
+                "trimmed-median1",
+                "trimmed-median2",
+                "trimmed-median3",
+                "trimmed-median5",
+                "trimmed-median10",
+                "trimmed-median15",
+                "trimmed-median20",
+                "trimmed-median25"
               ],
               "default": "average"
             }
@@ -1362,7 +1422,7 @@
     "/metric_correlations": {
       "get": {
         "summary": "Analyze all the metrics to find their correlations",
-        "description": "Given two time-windows (baseline, highlight), it goes through all the available metrics, querying both windows and tries to find how these two windows relate to each other. It supports multiple algorithms to do so. The result is a list of all metrics evaluated, weighted for 0.0 (the two windows are more different) to 1.0 (the two windows are similar). The algorithm adjusts automatically the baseline window to be a power of two multiple of the highlighted (1, 2, 4, 8, etc).",
+        "description": "THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint. Given two time-windows (baseline, highlight), it goes through all the available metrics, querying both windows and tries to find how these two windows relate to each other. It supports multiple algorithms to do so. The result is a list of all metrics evaluated, weighted for 0.0 (the two windows are more different) to 1.0 (the two windows are similar). The algorithm adjusts automatically the baseline window to be a power of two multiple of the highlighted (1, 2, 4, 8, etc).",
         "parameters": [
           {
             "name": "baseline_after",
@@ -1499,7 +1559,35 @@
                 "ses",
                 "des",
                 "cv",
-                "countif"
+                "countif",
+                "percentile",
+                "percentile25",
+                "percentile50",
+                "percentile75",
+                "percentile80",
+                "percentile90",
+                "percentile95",
+                "percentile97",
+                "percentile98",
+                "percentile99",
+                "trimmed-mean",
+                "trimmed-mean1",
+                "trimmed-mean2",
+                "trimmed-mean3",
+                "trimmed-mean5",
+                "trimmed-mean10",
+                "trimmed-mean15",
+                "trimmed-mean20",
+                "trimmed-mean25",
+                "trimmed-median",
+                "trimmed-median1",
+                "trimmed-median2",
+                "trimmed-median3",
+                "trimmed-median5",
+                "trimmed-median10",
+                "trimmed-median15",
+                "trimmed-median20",
+                "trimmed-median25"
               ],
               "default": "average"
             }
@@ -1522,6 +1610,236 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/metric_correlations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The given parameters are invalid."
+          },
+          "403": {
+            "description": "metrics correlations are not enabled on this Netdata Agent."
+          },
+          "404": {
+            "description": "No charts could be found, or the method that correlated the metrics did not produce any result."
+          },
+          "504": {
+            "description": "Timeout - the query took too long and has been cancelled."
+          }
+        }
+      }
+    },
+    "/weights": {
+      "get": {
+        "summary": "Analyze all the metrics using an algorithm and score them accordingly",
+        "description": "This endpoint goes through all metrics and scores them according to an algorithm.",
+        "parameters": [
+          {
+            "name": "baseline_after",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of baseline window, or a relative number of seconds (negative, relative to parameter baseline_before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). This parameter is used in KS2 and VOLUME algorithms.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -300
+            }
+          },
+          {
+            "name": "baseline_before",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the ending point of the baseline window, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds). This parameter is used in KS2 and VOLUME algorithms.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -60
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of highlighted window, or a relative number of seconds (negative, relative to parameter highlight_before). Netdata will assume it is a relative number if it is less that 3 years (in seconds).",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -60
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the ending point of the highlighted window, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds).",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "A simple pattern matching the contexts to evaluate.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "points",
+            "in": "query",
+            "description": "The number of points to be evaluated for the highlighted window. The baseline window will be adjusted automatically to receive a proportional amount of points. This parameter is only used by the KS2 algorithm.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 500
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "description": "the algorithm to run",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ks2",
+                "volume",
+                "anomaly-rate"
+              ],
+              "default": "anomaly-rate"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "description": "Use the specified database tier",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "Cancel the query if to takes more that this amount of milliseconds.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 60000
+            }
+          },
+          {
+            "name": "options",
+            "in": "query",
+            "description": "Options that affect data generation.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "min2max",
+                  "abs",
+                  "absolute",
+                  "absolute-sum",
+                  "null2zero",
+                  "percentage",
+                  "unaligned",
+                  "nonzero",
+                  "anomaly-bit",
+                  "raw"
+                ]
+              },
+              "default": [
+                "null2zero",
+                "nonzero",
+                "unaligned"
+              ]
+            }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
+            "required": true,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "min",
+                "max",
+                "average",
+                "median",
+                "stddev",
+                "sum",
+                "incremental-sum",
+                "ses",
+                "des",
+                "cv",
+                "countif",
+                "percentile",
+                "percentile25",
+                "percentile50",
+                "percentile75",
+                "percentile80",
+                "percentile90",
+                "percentile95",
+                "percentile97",
+                "percentile98",
+                "percentile99",
+                "trimmed-mean",
+                "trimmed-mean1",
+                "trimmed-mean2",
+                "trimmed-mean3",
+                "trimmed-mean5",
+                "trimmed-mean10",
+                "trimmed-mean15",
+                "trimmed-mean20",
+                "trimmed-mean25",
+                "trimmed-median",
+                "trimmed-median1",
+                "trimmed-median2",
+                "trimmed-median3",
+                "trimmed-median5",
+                "trimmed-median10",
+                "trimmed-median15",
+                "trimmed-median20",
+                "trimmed-median25"
+              ],
+              "default": "average"
+            }
+          },
+          {
+            "name": "group_options",
+            "in": "query",
+            "description": "When the group function supports additional parameters, this field can be used to pass them to it. Currently only \"countif\" supports this.",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON object with weights for each context, chart and dimension.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/weights"
                 }
               }
             }
@@ -2785,6 +3103,124 @@
             }
           }
         }
+      },
+      "weights": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "description": "the start time of the highlighted window",
+            "type": "integer"
+          },
+          "before": {
+            "description": "the end time of the highlighted window",
+            "type": "integer"
+          },
+          "duration": {
+            "description": "the duration of the highlighted window",
+            "type": "integer"
+          },
+          "points": {
+            "description": "the points of the highlighted window",
+            "type": "integer"
+          },
+          "baseline_after": {
+            "description": "the start time of the baseline window",
+            "type": "integer"
+          },
+          "baseline_before": {
+            "description": "the end time of the baseline window",
+            "type": "integer"
+          },
+          "baseline_duration": {
+            "description": "the duration of the baseline window",
+            "type": "integer"
+          },
+          "baseline_points": {
+            "description": "the points of the baseline window",
+            "type": "integer"
+          },
+          "group": {
+            "description": "the grouping method across time",
+            "type": "string"
+          },
+          "method": {
+            "description": "the correlation method used",
+            "type": "string"
+          },
+          "options": {
+            "description": "a comma separated list of the query options set",
+            "type": "string"
+          },
+          "correlated_dimensions": {
+            "description": "the number of dimensions returned in the result"
+          },
+          "total_dimensions_count": {
+            "description": "the total number of dimensions evaluated",
+            "type": "integer"
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {
+              "query_time_ms": {
+                "type": "number"
+              },
+              "db_queries": {
+                "type": "integer"
+              },
+              "db_points_read": {
+                "type": "integer"
+              },
+              "query_result_points": {
+                "type": "integer"
+              },
+              "binary_searches": {
+                "type": "integer"
+              }
+            }
+          },
+          "contexts": {
+            "description": "A dictionary of weighted context objects.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/weighted_context"
+            }
+          }
+        }
+      },
+      "weighted_context": {
+        "type": "object",
+        "properties": {
+          "weight": {
+            "description": "The average weight of the context.",
+            "type": "number"
+          },
+          "charts": {
+            "description": "A dictionary of weighted chart objects.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/weighted_chart"
+            }
+          }
+        }
+      },
+      "weighted_chart": {
+        "type": "object",
+        "properties": {
+          "weight": {
+            "description": "The average weight of the context.",
+            "type": "number"
+          },
+          "dimensions": {
+            "description": "A dictionary of weighted dimensions.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/weighted_dimension"
+            }
+          }
+        }
+      },
+      "weighted_dimension": {
+        "type": "number"
       }
     }
   }

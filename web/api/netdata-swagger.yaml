@@ -1544,7 +1544,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/weight"
+                $ref: "#/components/schemas/weights"
         "400":
           description: The given parameters are invalid.
         "403":
@@ -2489,7 +2489,7 @@ components:
                       type: number
                     dimension2-name:
                       type: number
-    weight:
+    weights:
       type: object
       properties:
         after:
@@ -2544,26 +2544,31 @@ components:
             binary_searches:
               type: integer
         contexts:
+          description: A dictionary of weighted context objects.
           type: object
-          description: An object containing context objects.
-          properties:
-            contextX:
-              type: object
-              properties:
-                charts:
-                  type: object
-                  properties:
-                    chartX:
-                      type: object
-                      properties:
-                        dimensions:
-                          type: object
-                          properties:
-                            dimensionX:
-                              type: number
-                        weight:
-                          description: The average chart weight
-                          type: number
-                      weight:
-                        description: The average context weight
-                        type: number
+          additionalProperties:
+            $ref: '#/components/schemas/weighted_context'
+    weighted_context:
+      type: object
+      properties:
+        weight:
+          description: The average weight of the context.
+          type: number
+        charts:
+          description: A dictionary of weighted chart objects.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/weighted_chart'
+    weighted_chart:
+      type: object
+      properties:
+        weight:
+          description: The average weight of the context.
+          type: number
+        dimensions:
+          description: A dictionary of weighted dimensions.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/weighted_dimension'
+    weighted_dimension:
+      type: number
