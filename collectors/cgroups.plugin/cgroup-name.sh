@@ -45,11 +45,24 @@ fatal() {
   exit 1
 }
 
+function parse_docker_like_inspect_output() {
+  local output="${1}"
+  eval "$(grep -E "^(NOMAD_NAMESPACE|NOMAD_JOB_NAME|NOMAD_TASK_NAME|NOMAD_SHORT_ALLOC_ID|CONT_NAME)=" <<<"$output")"
+  if [ -n "$NOMAD_NAMESPACE" ] && [ -n "$NOMAD_JOB_NAME" ] && [ -n "$NOMAD_TASK_NAME" ] && [ -n "$NOMAD_SHORT_ALLOC_ID" ]; then
+    echo "${NOMAD_NAMESPACE}-${NOMAD_JOB_NAME}-${NOMAD_TASK_NAME}-${NOMAD_SHORT_ALLOC_ID}"
+  else
+    echo "${CONT_NAME}" | sed 's|^/||'
+  fi
+}
+
 function docker_like_get_name_command() {
   local command="${1}"
   local id="${2}"
-  info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
-  NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
+  info "Running command: ${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' \"${id}\""
+  if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' "${id}")" &&
+    [ -n "$OUTPUT" ]; then
+      NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
+  fi
   return 0
 }
 
@@ -61,7 +74,7 @@ function docker_like_get_name_api() {
     warning "No ${host_var} is set"
     return 1
   fi
-  if ! command -v jq > /dev/null 2>&1; then
+  if ! command -v jq >/dev/null 2>&1; then
     warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
     return 1
   fi
@@ -72,7 +85,9 @@ function docker_like_get_name_api() {
     info "Running API command: curl \"${host}${path}\""
     JSON=$(curl -sS "${host}${path}")
   fi
-  NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+  if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[],"CONT_NAME=\(.Name)"') && [ -n "$OUTPUT" ]; then
+    NAME="$(parse_docker_like_inspect_output "$OUTPUT")"
+  fi
   return 0
 }
 
@@ -378,7 +393,7 @@ function k8s_get_kubepod_name() {
       name+="_$(get_lbl_val "$labels" pod_name)"
       labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
-    else 
+    else
       return 2
     fi
   fi
@@ -400,7 +415,7 @@ function k8s_get_name() {
   local id="${2}"
 
   NAME=$(k8s_get_kubepod_name "$cgroup_path" "$id")
- 
+
   case "$?" in
   0)
     NAME="k8s_${NAME}"
