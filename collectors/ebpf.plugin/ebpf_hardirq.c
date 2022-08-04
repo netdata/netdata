@@ -169,14 +169,14 @@ static void hardirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    freez(hardirq_ebpf_vals);
-    freez(hardirq_ebpf_static_vals);
     freez(hardirq_threads.thread);
 
     if (ebpf_hardirq_exited > 1) {
         for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
             ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
         }
+        freez(hardirq_ebpf_vals);
+        freez(hardirq_ebpf_static_vals);
     }
 
     hardirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
