@@ -61,12 +61,14 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
         pos = m - temp + 1;
         if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
             char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
+            freez(temp);
             temp = buf;
         } else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
             if(likely(rc->rrdset->state && rc->rrdset->state->chart_labels)) {
                 rrdlabels_get_value_to_char_or_null(rc->rrdset->state->chart_labels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
+                    freez(temp);
                     temp = buf;
                     freez(lbl_value);
                 }
@@ -84,7 +86,7 @@ void rrdcalc_update_rrdlabels(RRDSET *st) {
             if (rc->info)
                 freez(rc->info);
 
-            rc->info = strdupz(rrdcalc_replace_variables(rc->original_info, rc));
+            rc->info = rrdcalc_replace_variables(rc->original_info, rc);
         }
     }
 }
