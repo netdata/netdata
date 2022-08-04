@@ -37,7 +37,7 @@ struct config vfs_config = { .first_section = NULL,
 struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL, NULL, 1, NULL,
                                             NULL,  NULL};
-static int ebpf_vfs_exited = 0;
+static int ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /*****************************************************************
  *
@@ -59,7 +59,7 @@ static void ebpf_vfs_exit(void *ptr)
         return;
     }
 
-    ebpf_vfs_exited = 1;
+    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -70,6 +70,9 @@ static void ebpf_vfs_exit(void *ptr)
 static void ebpf_vfs_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_vfs_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     freez(vfs_hash_values);
     freez(vfs_vector);
     freez(vfs_threads.thread);
@@ -524,6 +527,8 @@ void *ebpf_vfs_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

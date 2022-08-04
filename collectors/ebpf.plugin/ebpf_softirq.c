@@ -57,7 +57,7 @@ static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_softirq_exited = 0;
+static int ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
  * Exit
@@ -74,7 +74,7 @@ static void softirq_exit(void *ptr)
         return;
     }
 
-    ebpf_softirq_exited = 1;
+    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -87,15 +87,15 @@ static void softirq_exit(void *ptr)
 static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_softirq_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
 
     freez(softirq_threads.thread);
 
-    if (ebpf_softirq_exited > 1) {
-        for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
-            ebpf_disable_tracepoint(&softirq_tracepoints[i]);
-        }
-        freez(softirq_ebpf_vals);
+    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
     }
+    freez(softirq_ebpf_vals);
 
     softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -146,7 +146,7 @@ static void *softirq_reader(void *ptr)
 
         softirq_read_latency_map();
     }
-    ebpf_softirq_exited++;
+    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

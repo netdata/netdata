@@ -22,7 +22,7 @@ struct config dcstat_config = { .first_section = NULL,
 struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL, NULL, 1, NULL,
                                                NULL,  NULL};
-static int ebpf_dcstat_exited = 0;
+static int ebpf_dcstat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
@@ -276,7 +276,7 @@ static void ebpf_dcstat_exit(void *ptr)
         return;
     }
 
-    ebpf_dcstat_exited = 1;
+    ebpf_dcstat_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -287,6 +287,9 @@ static void ebpf_dcstat_exit(void *ptr)
 static void ebpf_dcstat_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_dcstat_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     freez(dcstat_vector);
     freez(dcstat_values);
     freez(dcstat_threads.thread);
@@ -536,6 +539,8 @@ void *ebpf_dcstat_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_dcstat_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

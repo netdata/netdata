@@ -31,7 +31,7 @@ struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex 
 
 struct netdata_static_thread fd_thread = {"FD KERNEL", NULL, NULL, 1, NULL,
                                           NULL,  NULL};
-static int ebpf_fd_exited = 0;
+static int ebpf_fd_exited = NETDATA_THREAD_EBPF_RUNNING;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -59,7 +59,7 @@ static void ebpf_fd_exit(void *ptr)
         return;
     }
 
-    ebpf_fd_exited = 1;
+    ebpf_fd_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -70,6 +70,9 @@ static void ebpf_fd_exit(void *ptr)
 static void ebpf_fd_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_fd_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_thread.thread);
     freez(fd_values);
@@ -150,7 +153,6 @@ void *ebpf_fd_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_FD_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
     while (!ebpf_fd_exited) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -159,6 +161,8 @@ void *ebpf_fd_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_fd_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

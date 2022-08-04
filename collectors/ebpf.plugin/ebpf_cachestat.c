@@ -39,7 +39,7 @@ struct config cachestat_config = { .first_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
-static int ebpf_cachestat_exited = 0;
+static int ebpf_cachestat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -304,7 +304,7 @@ static void ebpf_cachestat_exit(void *ptr)
         return;
     }
 
-    ebpf_cachestat_exited = 1;
+    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -317,6 +317,9 @@ static void ebpf_cachestat_exit(void *ptr)
 static void ebpf_cachestat_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_cachestat_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
@@ -654,6 +657,8 @@ void *ebpf_cachestat_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

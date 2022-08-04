@@ -90,7 +90,7 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
 struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
                                                NULL, NULL, 1, NULL,
                                                NULL, NULL };
-static int ebpf_socket_exited = 0;
+static int ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/socket.skel.h" // BTF code
@@ -595,7 +595,7 @@ static void ebpf_socket_exit(void *ptr)
         return;
     }
 
-    ebpf_socket_exited = 1;
+    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -608,6 +608,9 @@ static void ebpf_socket_exit(void *ptr)
 void ebpf_socket_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_socket_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
@@ -2156,6 +2159,8 @@ void *ebpf_socket_read_hash(void *ptr)
         wait_to_plot = 1;
         pthread_mutex_unlock(&nv_mutex);
     }
+
+    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

@@ -48,7 +48,7 @@ netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode 
                                           {.name = NETDATA_SYSCALLS_FDATASYNC, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-static int ebpf_sync_exited = 0;
+static int ebpf_sync_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 
 #ifdef LIBBPF_MAJOR_VERSION
@@ -226,7 +226,7 @@ static void ebpf_sync_exit(void *ptr)
         return;
     }
 
-    ebpf_sync_exited = 1;
+    ebpf_sync_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -237,6 +237,9 @@ static void ebpf_sync_exit(void *ptr)
 static void ebpf_sync_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_sync_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_sync_cleanup_objects();
     freez(sync_threads.thread);
 
@@ -377,6 +380,8 @@ void *ebpf_sync_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_sync_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

@@ -55,7 +55,7 @@ struct config process_config = { .first_section = NULL,
 
 static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
                                                     1, NULL, NULL,  NULL};
-static int ebpf_process_exited = 0;
+static int ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
@@ -660,7 +660,7 @@ static void ebpf_process_disable_tracepoints()
 static void ebpf_process_exit(void *ptr)
 {
     (void)ptr;
-    ebpf_process_exited = 1;
+    ebpf_process_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -673,6 +673,8 @@ static void ebpf_process_exit(void *ptr)
 static void ebpf_process_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_process_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
 
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
@@ -725,6 +727,8 @@ void *ebpf_cgroup_update_shm(void *ptr)
             ebpf_parse_cgroup_shm_data();
         }
     }
+
+    ebpf_process_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

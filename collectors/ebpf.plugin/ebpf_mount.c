@@ -29,7 +29,7 @@ struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-static int ebpf_mount_exited = 0;
+static int ebpf_mount_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/mount.skel.h" // BTF code
@@ -238,7 +238,7 @@ static void ebpf_mount_exit(void *ptr)
         return;
     }
 
-    ebpf_mount_exited = 1;
+    ebpf_mount_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -251,6 +251,9 @@ static void ebpf_mount_exit(void *ptr)
 static void ebpf_mount_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_mount_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     freez(mount_thread.thread);
     freez(mount_values);
 
@@ -322,6 +325,8 @@ void *ebpf_mount_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_mount_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

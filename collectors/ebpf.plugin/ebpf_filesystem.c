@@ -33,7 +33,7 @@ static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NET
 struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL, 1, NULL,
                                                    NULL, NULL };
-static int ebpf_fs_exited = 0;
+static int ebpf_fs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
@@ -347,7 +347,7 @@ static void ebpf_filesystem_exit(void *ptr)
         return;
     }
 
-    ebpf_fs_exited = 1;
+    ebpf_fs_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -360,6 +360,9 @@ static void ebpf_filesystem_exit(void *ptr)
 static void ebpf_filesystem_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_fs_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
 
@@ -495,6 +498,8 @@ void *ebpf_filesystem_read_hash(void *ptr)
 
         read_filesystem_tables();
     }
+
+    ebpf_fs_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

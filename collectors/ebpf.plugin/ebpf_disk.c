@@ -36,7 +36,7 @@ static netdata_idx_t *disk_hash_values = NULL;
 static struct netdata_static_thread disk_threads = {"DISK KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_disk_exited = 0;
+static int ebpf_disk_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
@@ -438,7 +438,7 @@ static void ebpf_disk_exit(void *ptr)
         return;
     }
 
-    ebpf_disk_exited = 1;
+    ebpf_disk_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -451,6 +451,9 @@ static void ebpf_disk_exit(void *ptr)
 static void ebpf_disk_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_disk_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_disk_disable_tracepoints();
 
     if (dimensions)
@@ -595,6 +598,8 @@ void *ebpf_disk_read_hash(void *ptr)
 
         read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
     }
+
+    ebpf_disk_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

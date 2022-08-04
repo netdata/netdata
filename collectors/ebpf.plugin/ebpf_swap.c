@@ -36,7 +36,7 @@ static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input
 
 struct netdata_static_thread swap_threads = {"SWAP KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
-static int ebpf_swap_exited = 0;
+static int ebpf_swap_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -207,7 +207,7 @@ static void ebpf_swap_exit(void *ptr)
         return;
     }
 
-    ebpf_swap_exited = 1;
+    ebpf_swap_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -220,6 +220,9 @@ static void ebpf_swap_exit(void *ptr)
 static void ebpf_swap_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_swap_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_cleanup_publish_syscall(swap_publish_aggregated);
 
     freez(swap_vector);
@@ -406,6 +409,8 @@ void *ebpf_swap_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_swap_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

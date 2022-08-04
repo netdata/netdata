@@ -138,7 +138,7 @@ static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
 static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_hardirq_exited = 0;
+static int ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
  * Hardirq Exit
@@ -155,7 +155,7 @@ static void hardirq_exit(void *ptr)
         return;
     }
 
-    ebpf_hardirq_exited = 1;
+    ebpf_hardirq_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -169,15 +169,15 @@ static void hardirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    freez(hardirq_threads.thread);
+    if (ebpf_hardirq_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
 
-    if (ebpf_hardirq_exited > 1) {
-        for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-            ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-        }
-        freez(hardirq_ebpf_vals);
-        freez(hardirq_ebpf_static_vals);
+    freez(hardirq_threads.thread);
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
     }
+    freez(hardirq_ebpf_vals);
+    freez(hardirq_ebpf_static_vals);
 
     hardirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -333,7 +333,7 @@ static void *hardirq_reader(void *ptr)
         hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
         hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
     }
-    ebpf_hardirq_exited++;
+    ebpf_hardirq_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

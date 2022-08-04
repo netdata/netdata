@@ -36,7 +36,7 @@ static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input =
 
 struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
-static int ebpf_shm_exited = 0;
+static int ebpf_shm_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "shmat", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -254,7 +254,7 @@ static void ebpf_shm_exit(void *ptr)
         return;
     }
 
-    ebpf_shm_exited = 1;
+    ebpf_shm_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -267,6 +267,9 @@ static void ebpf_shm_exit(void *ptr)
 static void ebpf_shm_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_shm_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     ebpf_cleanup_publish_syscall(shm_publish_aggregated);
 
     freez(shm_vector);
@@ -468,6 +471,8 @@ void *ebpf_shm_read_hash(void *ptr)
 
         read_global_table();
     }
+
+    ebpf_shm_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;

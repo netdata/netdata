@@ -38,7 +38,7 @@ static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_mdflush_exited = 0;
+static int ebpf_mdflush_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
  * MDflush exit
@@ -55,7 +55,7 @@ static void mdflush_exit(void *ptr)
         return;
     }
 
-    ebpf_mdflush_exited = 1;
+    ebpf_mdflush_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -68,6 +68,9 @@ static void mdflush_exit(void *ptr)
 static void mdflush_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_mdflush_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);
 
@@ -187,6 +190,8 @@ static void *mdflush_reader(void *ptr)
 
         mdflush_read_count_map();
     }
+
+    ebpf_mdflush_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
