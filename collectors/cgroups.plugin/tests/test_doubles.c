@@ -153,3 +153,7 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
     UNUSED(label);
     UNUSED(value);
 }
+
+void rrdcalc_update_rrdlabels(RRDSET *st) {
+    (void)st;
+}

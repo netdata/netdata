@@ -1495,7 +1495,6 @@ if(BUILD_TESTING)
         exporting/tests/exporting_doubles.c
         exporting/tests/netdata_doubles.c
         exporting/tests/system_doubles.c
-        database/rrdcalc.c
         database/rrdlabels.c
         )
     set(TEST_NAME exporting_engine)
