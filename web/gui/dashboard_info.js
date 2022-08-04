@@ -687,6 +687,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Netdata keeps track of the current jail status by reading the Fail2ban log file.'
     },
+
+    'wireguard': {
+        title: 'WireGuard',
+        icon: '<i class="fas fa-dragon"></i>',
+        info: 'VPN network interfaces and peers traffic.'
+    },
 };
 
 
