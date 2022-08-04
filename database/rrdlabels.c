@@ -950,6 +950,8 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->state->chart_labels, new_rrdlabels);
 
+    rrdcalc_update_rrdlabels(st);
+
     // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
     rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, st);
 }

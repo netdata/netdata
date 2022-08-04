@@ -189,7 +189,6 @@ PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, DICTIONARY *n
     }
 
     rrdset_update_rrdlabels(st, new_chart_labels);
-    rrdcalc_update_rrdlabels(st);
 
     return PARSER_RC_OK;
 }

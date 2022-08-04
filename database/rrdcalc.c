@@ -58,7 +58,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
             i++;
         }
         var[i]='\0';
-        pos = e - temp;
+        pos = m - temp + 1;
         if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
             char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
             temp = buf;
@@ -79,7 +79,6 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
 
 void rrdcalc_update_rrdlabels(RRDSET *st) {
     RRDCALC *rc;
-
     for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
         if (rc->original_info) {
             if (rc->info)
