@@ -665,6 +665,7 @@ void *diskspace_main(void *ptr) {
                 continue;
 
             // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
+            // https://github.com/netdata/netdata/issues/11498#issuecomment-950982878
             if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST && !strcmp(mi->root, mi->mount_point))
                 continue;
 
