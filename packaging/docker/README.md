@@ -153,7 +153,7 @@ to restart the container: `docker restart netdata`.
 
 ### Host-editable configuration
 
-> **Warning**: [edit-config](/docs/configure/nodes.md#the-netdata-config-directory) script not working when executed on
+> **Warning**: [edit-config](/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
 > the host system.
 
 If you want to make your container's configuration directory accessible from the host system, you need to use a
