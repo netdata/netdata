@@ -88,13 +88,13 @@ static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    freez(softirq_ebpf_vals);
     freez(softirq_threads.thread);
 
     if (ebpf_softirq_exited > 1) {
         for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
             ebpf_disable_tracepoint(&softirq_tracepoints[i]);
         }
+        freez(softirq_ebpf_vals);
     }
 
     softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
