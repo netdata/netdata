@@ -450,6 +450,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         time_t when,
         const char *name,
         const char *chart,
+        const char *chart_context,
         const char *family,
         const char *class,
         const char *component,
@@ -457,8 +458,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         const char *exec,
         const char *recipient,
         time_t duration,
-    NETDATA_DOUBLE old_value,
-    NETDATA_DOUBLE new_value,
+        NETDATA_DOUBLE old_value,
+        NETDATA_DOUBLE new_value,
         RRDCALC_STATUS old_status,
         RRDCALC_STATUS new_status,
         const char *source,
@@ -477,6 +478,9 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         ae->chart = strdupz(chart);
         ae->hash_chart = simple_hash(ae->chart);
     }
+
+    if(chart_context)
+        ae->chart_context = strdupz(chart_context);
 
     uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
 
@@ -583,6 +587,7 @@ inline void health_alarm_log(
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->name);
     freez(ae->chart);
+    freez(ae->chart_context);
     freez(ae->family);
     freez(ae->classification);
     freez(ae->component);

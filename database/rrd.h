@@ -694,6 +694,7 @@ struct alarm_entry {
 
     char *chart;
     uint32_t hash_chart;
+    char *chart_context;
 
     char *family;
 

@@ -84,6 +84,37 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
     return 0;
 }
 
+static int do_migration_v3_v4(sqlite3 *database, const char *name)
+{
+    UNUSED(name);
+    info("Running database migration %s", name);
+
+    char sql[256];
+
+    int rc;
+    sqlite3_stmt *res = NULL;
+    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%';");
+    rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to alter health_log tables");
+        return 1;
+    }
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+         char *table = strdupz((char *) sqlite3_column_text(res, 0));
+         if (!column_exists_in_table(table, "chart_context")) {
+             snprintfz(sql, 255, "ALTER TABLE %s ADD chart_context text", table);
+             sqlite3_exec(database, sql, 0, 0, NULL);
+         }
+         freez(table);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when altering health_log tables, rc = %d", rc);
+
+    return 0;
+}
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
@@ -131,13 +162,13 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v0 to v1",  .func = do_migration_noop},
     {.name = "v1 to v2",  .func = do_migration_v1_v2},
     {.name = "v2 to v3",  .func = do_migration_v2_v3},
+    {.name = "v3 to v4",  .func = do_migration_v3_v4},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
 
 DATABASE_FUNC_MIGRATION_LIST context_migration_action[] = {
     {.name = "v0 to v1",  .func = do_migration_noop},
-
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
