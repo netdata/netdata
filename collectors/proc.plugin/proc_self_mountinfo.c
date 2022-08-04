@@ -275,7 +275,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             mi->flags |= MOUNTINFO_READONLY;
 
         if(unlikely(mount_point_is_protected(mi->mount_point)))
-           mi->flags |= MOUNTINFO_IS_PROTECTED;
+           mi->flags |= MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST;
 
         // count the optional fields
 /*

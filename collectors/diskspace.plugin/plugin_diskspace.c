@@ -430,7 +430,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     if (unlikely(
             mi->flags & MOUNTINFO_READONLY &&
-            !(mi->flags & MOUNTINFO_IS_PROTECTED) &&
+            !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
             !m->collected &&
             m->do_space != CONFIG_BOOLEAN_YES &&
             m->do_inodes != CONFIG_BOOLEAN_YES))
@@ -665,7 +665,7 @@ void *diskspace_main(void *ptr) {
                 continue;
 
             // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
-            if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_PROTECTED && !strcmp(mi->root, mi->mount_point))
+            if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST && !strcmp(mi->root, mi->mount_point))
                 continue;
 
             worker_is_busy(WORKER_JOB_MOUNTPOINT);
