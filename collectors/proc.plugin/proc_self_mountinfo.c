@@ -182,6 +182,33 @@ static inline int is_read_only(const char *s) {
     return 0;
 }
 
+// for the full list of protected mount points look at
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L142-L149
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L180-L194
+static const char *systemd_protected_mount_points[] = {
+    "/home",
+    "/root",
+    "/usr",
+    "/boot",
+    "/efi",
+    "/etc",
+    "/run/user",
+    "/lib",
+    "/lib64",
+    "/bin",
+    "/sbin",
+    NULL
+};
+
+static inline int mount_point_is_protected(char *mount_point)
+{
+    for (size_t i = 0; systemd_protected_mount_points[i] != NULL; i++)
+        if (!strcmp(mount_point, systemd_protected_mount_points[i]))
+            return 1;
+
+    return 0;
+}
+
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
@@ -251,6 +278,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
         if(unlikely(is_read_only(mi->mount_options)))
             mi->flags |= MOUNTINFO_READONLY;
+
+        if(unlikely(mount_point_is_protected(mi->mount_point)))
+           mi->flags |= MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST;
 
         // count the optional fields
 /*

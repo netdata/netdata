@@ -10,6 +10,7 @@
 #define MOUNTINFO_NO_STAT       0x00000010
 #define MOUNTINFO_NO_SIZE       0x00000020
 #define MOUNTINFO_READONLY      0x00000040
+#define MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST 0x00000080
 
 struct mountinfo {
     long id;                // mount ID: unique identifier of the mount (may be reused after umount(2)).
