@@ -192,6 +192,11 @@ static const char *systemd_protected_mount_points[] = {
     "/boot",
     "/efi",
     "/etc",
+    "/run/user",
+    "/lib",
+    "/lib64",
+    "/bin",
+    "/sbin",
     NULL
 };
 
