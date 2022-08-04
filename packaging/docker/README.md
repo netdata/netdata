@@ -153,6 +153,9 @@ to restart the container: `docker restart netdata`.
 
 ### Host-editable configuration
 
+> **Warning**: [edit-config](/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
+> the host system.
+
 If you want to make your container's configuration directory accessible from the host system, you need to use a
 [volume](https://docs.docker.com/storage/bind-mounts/) rather than a bind mount. The following commands create a
 temporary `netdata_tmp` container, which is used to populate a `netdataconfig` directory, which is then mounted inside
