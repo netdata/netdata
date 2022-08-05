@@ -1748,9 +1748,11 @@ AC_CONFIG_FILES([
     web/api/queries/max/Makefile
     web/api/queries/median/Makefile
     web/api/queries/min/Makefile
+    web/api/queries/percentile/Makefile
     web/api/queries/ses/Makefile
     web/api/queries/stddev/Makefile
     web/api/queries/sum/Makefile
+    web/api/queries/trimmed_mean/Makefile
     web/api/health/Makefile
     web/gui/Makefile
     web/gui/dashboard/Makefile
