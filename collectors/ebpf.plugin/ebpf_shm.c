@@ -36,7 +36,7 @@ static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input =
 
 struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
-static int ebpf_shm_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_shm_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "shmat", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -463,10 +463,10 @@ void *ebpf_shm_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SHM_SLEEP_MS * em->update_every;
-    while (!ebpf_shm_exited) {
+    while (ebpf_shm_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_shm_exited)
+        if (ebpf_shm_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_global_table();

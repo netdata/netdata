@@ -37,7 +37,7 @@ struct config vfs_config = { .first_section = NULL,
 struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL, NULL, 1, NULL,
                                             NULL,  NULL};
-static int ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /*****************************************************************
  *
@@ -519,10 +519,10 @@ void *ebpf_vfs_read_hash(void *ptr)
 
     usec_t step = NETDATA_LATENCY_VFS_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    while (!ebpf_vfs_exited) {
+    while (ebpf_vfs_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_vfs_exited)
+        if (ebpf_vfs_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_global_table();

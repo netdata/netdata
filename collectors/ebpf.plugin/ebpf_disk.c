@@ -36,7 +36,7 @@ static netdata_idx_t *disk_hash_values = NULL;
 static struct netdata_static_thread disk_threads = {"DISK KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_disk_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_disk_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
@@ -590,10 +590,10 @@ void *ebpf_disk_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_every;
-    while (!ebpf_disk_exited) {
+    while (ebpf_disk_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_disk_exited)
+        if (ebpf_disk_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);

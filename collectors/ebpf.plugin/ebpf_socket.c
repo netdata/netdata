@@ -90,7 +90,7 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
 struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
                                                NULL, NULL, 1, NULL,
                                                NULL, NULL };
-static int ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/socket.skel.h" // BTF code
@@ -2146,10 +2146,10 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
-    while (!ebpf_socket_exited) {
+    while (ebpf_socket_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_socket_exited)
+        if (ebpf_socket_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         pthread_mutex_lock(&nv_mutex);

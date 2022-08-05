@@ -55,7 +55,7 @@ struct config process_config = { .first_section = NULL,
 
 static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
                                                     1, NULL, NULL,  NULL};
-static int ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
@@ -711,10 +711,10 @@ void *ebpf_cgroup_update_shm(void *ptr)
     usec_t step = 3 * USEC_PER_SEC;
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     //This will be cancelled by its parent
-    while (!ebpf_process_exited) {
+    while (ebpf_process_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_process_exited)
+        if (ebpf_process_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         // We are using a small heartbeat time to wake up thread,

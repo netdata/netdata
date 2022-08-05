@@ -48,7 +48,7 @@ netdata_ebpf_targets_t sync_targets[] = { {.name = NETDATA_SYSCALLS_SYNC, .mode 
                                           {.name = NETDATA_SYSCALLS_FDATASYNC, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NETDATA_SYSCALLS_SYNC_FILE_RANGE, .mode = EBPF_LOAD_TRAMPOLINE},
                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-static int ebpf_sync_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_sync_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 
 #ifdef LIBBPF_MAJOR_VERSION
@@ -372,10 +372,10 @@ void *ebpf_sync_read_hash(void *ptr)
     heartbeat_init(&hb);
     usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_every;
 
-    while (!ebpf_sync_exited) {
+    while (ebpf_sync_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_sync_exited)
+        if (ebpf_sync_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_global_table();

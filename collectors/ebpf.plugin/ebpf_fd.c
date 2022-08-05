@@ -31,7 +31,7 @@ struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex 
 
 struct netdata_static_thread fd_thread = {"FD KERNEL", NULL, NULL, 1, NULL,
                                           NULL,  NULL};
-static int ebpf_fd_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_fd_exited = NETDATA_THREAD_EBPF_RUNNING;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -153,10 +153,10 @@ void *ebpf_fd_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_FD_SLEEP_MS * em->update_every;
-    while (!ebpf_fd_exited) {
+    while (ebpf_fd_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_fd_exited)
+        if (ebpf_fd_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_global_table();

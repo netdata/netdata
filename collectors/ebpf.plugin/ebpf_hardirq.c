@@ -138,7 +138,7 @@ static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
 static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
  * Hardirq Exit
@@ -323,11 +323,10 @@ static void *hardirq_reader(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_HARDIRQ_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    while (!ebpf_hardirq_exited) {
+    while (ebpf_hardirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
-        if (ebpf_hardirq_exited)
+        if (ebpf_hardirq_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);

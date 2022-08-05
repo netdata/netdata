@@ -36,7 +36,7 @@ static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input
 
 struct netdata_static_thread swap_threads = {"SWAP KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
-static int ebpf_swap_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_swap_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -401,10 +401,10 @@ void *ebpf_swap_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_every;
-    while (!ebpf_swap_exited) {
+    while (ebpf_swap_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_swap_exited)
+        if (ebpf_swap_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_global_table();

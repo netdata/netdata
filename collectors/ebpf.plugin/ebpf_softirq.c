@@ -57,7 +57,7 @@ static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-static int ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
  * Exit
@@ -138,10 +138,10 @@ static void *softirq_reader(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
-    while (!ebpf_softirq_exited) {
+    while (ebpf_softirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
-        if (ebpf_softirq_exited)
+        if (ebpf_softirq_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         softirq_read_latency_map();

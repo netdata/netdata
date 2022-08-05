@@ -29,7 +29,7 @@ struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-static int ebpf_mount_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_mount_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/mount.skel.h" // BTF code
@@ -317,10 +317,10 @@ void *ebpf_mount_read_hash(void *ptr)
 
     usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    while (!ebpf_mount_exited) {
+    while (ebpf_mount_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_mount_exited)
+        if (ebpf_mount_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         read_global_table();

@@ -33,7 +33,7 @@ static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NET
 struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL, 1, NULL,
                                                    NULL, NULL };
-static int ebpf_fs_exited = NETDATA_THREAD_EBPF_RUNNING;
+static enum ebpf_threads_status ebpf_fs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
@@ -483,10 +483,10 @@ void *ebpf_filesystem_read_hash(void *ptr)
     heartbeat_init(&hb);
     usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_every;
     int update_every = em->update_every;
-    while (!ebpf_fs_exited) {
+    while (ebpf_fs_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        if (ebpf_fs_exited)
+        if (ebpf_fs_exited == NETDATA_THREAD_EBPF_STOPPING)
             break;
 
         (void) ebpf_update_partitions(em);
