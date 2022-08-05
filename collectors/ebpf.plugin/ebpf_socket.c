@@ -61,19 +61,14 @@ static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VE
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
-static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
-int read_thread_closed = 1;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
 
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
-
-static struct bpf_object *objects = NULL;
-static struct bpf_link **probe_links = NULL;
 
 struct config socket_config = { .first_section = NULL,
     .last_section = NULL,
@@ -91,6 +86,11 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
                                             {.name = "tcp_v4_connect", .mode = EBPF_LOAD_TRAMPOLINE},
                                             {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
+                                               NULL, NULL, 1, NULL,
+                                               NULL, NULL };
+static enum ebpf_threads_status ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/socket.skel.h" // BTF code
@@ -424,6 +424,225 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
     return ret;
 }
 #endif
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CLOSE THE THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Clean internal socket plot
+ *
+ * Clean all structures allocated with strdupz.
+ *
+ * @param ptr the pointer with addresses to clean.
+ */
+static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
+{
+    freez(ptr->dimension_recv);
+    freez(ptr->dimension_sent);
+    freez(ptr->resolved_name);
+    freez(ptr->dimension_retransmit);
+}
+
+/**
+ * Clean socket plot
+ *
+ * Clean the allocated data for inbound and outbound vectors.
+ */
+static void clean_allocated_socket_plot()
+{
+    uint32_t i;
+    uint32_t end = inbound_vectors.last;
+    netdata_socket_plot_t *plot = inbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+
+    clean_internal_socket_plot(&plot[inbound_vectors.last]);
+
+    end = outbound_vectors.last;
+    plot = outbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+    clean_internal_socket_plot(&plot[outbound_vectors.last]);
+}
+
+/**
+ * Clean network ports allocated during initialization.
+ *
+ * @param ptr a pointer to the link list.
+ */
+static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
+{
+    if (unlikely(!ptr))
+        return;
+
+    while (ptr) {
+        ebpf_network_viewer_port_list_t *next = ptr->next;
+        freez(ptr->value);
+        freez(ptr);
+        ptr = next;
+    }
+}
+
+/**
+ * Clean service names
+ *
+ * Clean the allocated link list that stores names.
+ *
+ * @param names the link list.
+ */
+static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
+{
+    if (unlikely(!names))
+        return;
+
+    while (names) {
+        ebpf_network_viewer_dim_name_t *next = names->next;
+        freez(names->name);
+        freez(names);
+        names = next;
+    }
+}
+
+/**
+ * Clean hostnames
+ *
+ * @param hostnames the hostnames to clean
+ */
+static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
+{
+    if (unlikely(!hostnames))
+        return;
+
+    while (hostnames) {
+        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
+        freez(hostnames->value);
+        simple_pattern_free(hostnames->value_pattern);
+        freez(hostnames);
+        hostnames = next;
+    }
+}
+
+/**
+ * Cleanup publish syscall
+ *
+ * @param nps list of structures to clean
+ */
+void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
+{
+    while (nps) {
+        freez(nps->algorithm);
+        nps = nps->next;
+    }
+}
+
+/**
+ * Clean port Structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+{
+    ebpf_network_viewer_port_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Clean IP structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
+{
+    ebpf_network_viewer_ip_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_ip_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Socket exit
+ *
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_socket_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * Socket cleanup
+ *
+ * Clean up allocated addresses.
+ *
+ * @param ptr thread data.
+ */
+void ebpf_socket_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_socket_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
+    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
+    freez(socket_hash_values);
+
+    freez(bandwidth_vector);
+
+    freez(socket_values);
+    clean_allocated_socket_plot();
+    freez(inbound_vectors.plot);
+    freez(outbound_vectors.plot);
+
+    clean_port_structure(&listen_ports);
+
+    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
+
+    clean_network_ports(network_viewer_opt.included_port);
+    clean_network_ports(network_viewer_opt.excluded_port);
+    clean_service_names(network_viewer_opt.names);
+    clean_hostnames(network_viewer_opt.included_hostnames);
+    clean_hostnames(network_viewer_opt.excluded_hostnames);
+
+    pthread_mutex_destroy(&nv_mutex);
+
+    freez(socket_threads.thread);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        socket_bpf__destroy(bpf_obj);
+#endif
+    socket_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -737,8 +956,6 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
 void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 {
     UNUSED(em);
-    if (!socket_apps_created)
-        return;
 
     struct target *w;
     collected_number value;
@@ -1052,7 +1269,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    socket_apps_created = 1;
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
@@ -1814,15 +2031,6 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
         key = next_key;
     }
-
-    test = bpf_map_lookup_elem(fd, &next_key, values);
-    if (test < 0) {
-        return;
-    }
-
-    if (network_connection) {
-        hash_accumulator(values, &next_key, family, end);
-    }
 }
 
 /**
@@ -1929,18 +2137,20 @@ static void read_listen_table()
  */
 void *ebpf_socket_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_every;
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
-    while (!close_ebpf_plugin) {
+    while (ebpf_socket_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_socket_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
@@ -1950,7 +2160,9 @@ void *ebpf_socket_read_hash(void *ptr)
         pthread_mutex_unlock(&nv_mutex);
     }
 
-    read_thread_closed = 1;
+    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -2643,10 +2855,6 @@ static void ebpf_socket_send_cgroup_data(int update_every)
  *
  *****************************************************************/
 
-struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
-                                               NULL, NULL, 1, NULL,
-                                               NULL, ebpf_socket_read_hash };
-
 /**
  * Main loop for this collector.
  *
@@ -2659,21 +2867,24 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_init(&hb);
 
     socket_threads.thread = mallocz(sizeof(netdata_thread_t));
+    socket_threads.start_routine = ebpf_socket_read_hash;
 
     netdata_thread_create(socket_threads.thread, socket_threads.name,
-                          NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_read_hash, em);
 
     int cgroups = em->cgroup_charts;
     if (cgroups)
         ebpf_socket_update_cgroup_algorithm();
 
-    int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
-    int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
+    int socket_global_enabled = em->global_charts;
     int network_connection = em->optional;
     int update_every = em->update_every;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
+        netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (socket_global_enabled)
             read_hash_global_tables();
@@ -2690,7 +2901,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
 
-        if (socket_apps_enabled)
+        if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
@@ -2716,218 +2927,6 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
-}
-
-/*****************************************************************
- *
- *  FUNCTIONS TO CLOSE THE THREAD
- *
- *****************************************************************/
-
-
-/**
- * Clean internal socket plot
- *
- * Clean all structures allocated with strdupz.
- *
- * @param ptr the pointer with addresses to clean.
- */
-static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
-{
-    freez(ptr->dimension_recv);
-    freez(ptr->dimension_sent);
-    freez(ptr->resolved_name);
-    freez(ptr->dimension_retransmit);
-}
-
-/**
- * Clean socket plot
- *
- * Clean the allocated data for inbound and outbound vectors.
- */
-static void clean_allocated_socket_plot()
-{
-    uint32_t i;
-    uint32_t end = inbound_vectors.last;
-    netdata_socket_plot_t *plot = inbound_vectors.plot;
-    for (i = 0; i < end; i++) {
-        clean_internal_socket_plot(&plot[i]);
-    }
-
-    clean_internal_socket_plot(&plot[inbound_vectors.last]);
-
-    end = outbound_vectors.last;
-    plot = outbound_vectors.plot;
-    for (i = 0; i < end; i++) {
-        clean_internal_socket_plot(&plot[i]);
-    }
-    clean_internal_socket_plot(&plot[outbound_vectors.last]);
-}
-
-/**
- * Clean network ports allocated during initialization.
- *
- * @param ptr a pointer to the link list.
- */
-static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
-{
-    if (unlikely(!ptr))
-        return;
-
-    while (ptr) {
-        ebpf_network_viewer_port_list_t *next = ptr->next;
-        freez(ptr->value);
-        freez(ptr);
-        ptr = next;
-    }
-}
-
-/**
- * Clean service names
- *
- * Clean the allocated link list that stores names.
- *
- * @param names the link list.
- */
-static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
-{
-    if (unlikely(!names))
-        return;
-
-    while (names) {
-        ebpf_network_viewer_dim_name_t *next = names->next;
-        freez(names->name);
-        freez(names);
-        names = next;
-    }
-}
-
-/**
- * Clean hostnames
- *
- * @param hostnames the hostnames to clean
- */
-static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
-{
-    if (unlikely(!hostnames))
-        return;
-
-    while (hostnames) {
-        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
-        freez(hostnames->value);
-        simple_pattern_free(hostnames->value_pattern);
-        freez(hostnames);
-        hostnames = next;
-    }
-}
-
-/**
- * Cleanup publish syscall
- *
- * @param nps list of structures to clean
- */
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
-{
-    while (nps) {
-        freez(nps->algorithm);
-        nps = nps->next;
-    }
-}
-
-/**
- * Clean port Structure
- *
- * Clean the allocated list.
- *
- * @param clean the list that will be cleaned
- */
-void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
-{
-    ebpf_network_viewer_port_list_t *move = *clean;
-    while (move) {
-        ebpf_network_viewer_port_list_t *next = move->next;
-        freez(move->value);
-        freez(move);
-
-        move = next;
-    }
-    *clean = NULL;
-}
-
-/**
- * Clean IP structure
- *
- * Clean the allocated list.
- *
- * @param clean the list that will be cleaned
- */
-static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
-{
-    ebpf_network_viewer_ip_list_t *move = *clean;
-    while (move) {
-        ebpf_network_viewer_ip_list_t *next = move->next;
-        freez(move->value);
-        freez(move);
-
-        move = next;
-    }
-    *clean = NULL;
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_socket_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
-        return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
-
-    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
-    freez(socket_hash_values);
-
-    freez(bandwidth_vector);
-
-    freez(socket_values);
-    clean_allocated_socket_plot();
-    freez(inbound_vectors.plot);
-    freez(outbound_vectors.plot);
-
-    clean_port_structure(&listen_ports);
-
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-
-    clean_network_ports(network_viewer_opt.included_port);
-    clean_network_ports(network_viewer_opt.excluded_port);
-    clean_service_names(network_viewer_opt.names);
-    clean_hostnames(network_viewer_opt.included_hostnames);
-    clean_hostnames(network_viewer_opt.excluded_hostnames);
-
-    pthread_mutex_destroy(&nv_mutex);
-
-    freez(socket_threads.thread);
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
-    finalized_threads = 1;
 }
 
 /*****************************************************************
@@ -3877,8 +3876,8 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
     int ret = 0;
 
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             ret = -1;
         }
     }
@@ -3910,7 +3909,7 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_socket_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_socket_exit, ptr);
 
     memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
     memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
@@ -3932,7 +3931,6 @@ void *ebpf_socket_thread(void *ptr)
         error("Cannot initialize local mutex");
         goto endsocket;
     }
-    pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
     initialize_inbound_outbound();
@@ -3959,11 +3957,11 @@ void *ebpf_socket_thread(void *ptr)
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
         algorithms, NETDATA_MAX_SOCKET_VECTOR);
 
+    pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
 
-    finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);

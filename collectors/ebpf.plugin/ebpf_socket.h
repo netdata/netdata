@@ -279,7 +279,7 @@ typedef struct netdata_socket {
     uint32_t retransmit; // It is never used with UDP
     uint16_t protocol;
     uint16_t reserved;
-} netdata_socket_t __attribute__((__aligned__(8)));
+} netdata_socket_t;
 
 typedef struct netdata_plot_values {
     // Values used in the previous iteration
@@ -307,7 +307,7 @@ typedef struct netdata_socket_idx {
     uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
-} netdata_socket_idx_t __attribute__((__aligned__(8)));
+} netdata_socket_idx_t;
 
 // Next values were defined according getnameinfo(3)
 #define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018

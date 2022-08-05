@@ -5,9 +5,6 @@
 
 netdata_publish_cachestat_t **cachestat_pid;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
 static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];
@@ -17,8 +14,6 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
-
-static int read_thread_closed = 1;
 
 struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
@@ -44,6 +39,7 @@ struct config cachestat_config = { .first_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
+static enum ebpf_threads_status ebpf_cachestat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -294,43 +290,48 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
- * Clean up the main thread.
+ * Cachestat exit.
+ *
+ * Cancel child and exit.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_cachestat_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * Cachestat cleanup
+ *
+ * Clean up allocated addresses.
  *
  * @param ptr thread data.
  */
 static void ebpf_cachestat_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_cachestat_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
     freez(cachestat_values);
+    freez(cachestat_threads.thread);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (bpf_obj)
+    if (bpf_obj)
         cachestat_bpf__destroy(bpf_obj);
 #endif
+    cachestat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -594,6 +595,8 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20093,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
@@ -639,22 +642,25 @@ static void read_global_table()
  */
 void *ebpf_cachestat_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
+    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1068,23 +1074,26 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 */
 static void cachestat_collector(ebpf_module_t *em)
 {
-    cachestat_threads.thread = mallocz(sizeof(netdata_thread_t));
+    cachestat_threads.thread = callocz(1, sizeof(netdata_thread_t));
     cachestat_threads.start_routine = ebpf_cachestat_read_hash;
 
-    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_cachestat_read_hash, em);
 
     netdata_publish_cachestat_t publish;
     memset(&publish, 0, sizeof(publish));
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
@@ -1096,7 +1105,7 @@ static void cachestat_collector(ebpf_module_t *em)
 
         cachestat_send_global(&publish);
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
         if (cgroups)
@@ -1219,8 +1228,8 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             ret = -1;
         }
     }
@@ -1251,7 +1260,7 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_cachestat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_cachestat_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = cachestat_maps;

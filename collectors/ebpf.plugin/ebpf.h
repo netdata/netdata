@@ -108,6 +108,12 @@ typedef struct ebpf_tracepoint {
     char *event;
 } ebpf_tracepoint_t;
 
+enum ebpf_threads_status {
+    NETDATA_THREAD_EBPF_RUNNING,
+    NETDATA_THREAD_EBPF_STOPPING,
+    NETDATA_THREAD_EBPF_STOPPED
+};
+
 // Copied from musl header
 #ifndef offsetof
 #if __GNUC__ > 3
@@ -162,7 +168,6 @@ extern void *ebpf_socket_thread(void *ptr);
 
 // Common variables
 extern pthread_mutex_t lock;
-extern int close_ebpf_plugin;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;
@@ -265,7 +270,6 @@ extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
-extern uint32_t finalized_threads;
 extern ebpf_plugin_stats_t plugin_statistics;
 extern struct btf *default_btf;
 
@@ -281,6 +285,9 @@ extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *u
                                       char *charttype, char *context, int order, int update_every);
 extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
+extern ebpf_filesystem_partitions_t localfs[];
+extern ebpf_sync_syscalls_t local_syscalls[];
+extern int ebpf_exit_plugin;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 

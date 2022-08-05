@@ -10,13 +10,8 @@ static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTA
 netdata_dcstat_pid_t *dcstat_vector = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
 static netdata_idx_t *dcstat_values = NULL;
-
-static int read_thread_closed = 1;
 
 struct config dcstat_config = { .first_section = NULL,
     .last_section = NULL,
@@ -27,6 +22,7 @@ struct config dcstat_config = { .first_section = NULL,
 struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL, NULL, 1, NULL,
                                                NULL,  NULL};
+static enum ebpf_threads_status ebpf_dcstat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
@@ -266,6 +262,24 @@ void ebpf_dcstat_clean_names()
 }
 
 /**
+ * DCstat exit
+ *
+ * Cancel child and exit.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_dcstat_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_dcstat_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -273,38 +287,24 @@ void ebpf_dcstat_clean_names()
 static void ebpf_dcstat_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_dcstat_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     freez(dcstat_vector);
     freez(dcstat_values);
+    freez(dcstat_threads.thread);
 
     ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
 
     ebpf_dcstat_clean_names();
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (bpf_obj)
+    if (bpf_obj)
         dc_bpf__destroy(bpf_obj);
 #endif
+
+    dcstat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -358,6 +358,8 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20103,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
@@ -522,22 +524,25 @@ static void read_global_table()
  */
 void *ebpf_dcstat_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(ebpf_dcstat_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_DCSTAT_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_dcstat_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_dcstat_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
+    ebpf_dcstat_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1000,20 +1005,22 @@ static void dcstat_collector(ebpf_module_t *em)
     dcstat_threads.thread = mallocz(sizeof(netdata_thread_t));
     dcstat_threads.start_routine = ebpf_dcstat_read_hash;
 
-    netdata_thread_create(dcstat_threads.thread, dcstat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(dcstat_threads.thread, dcstat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_dcstat_read_hash, em);
 
     netdata_publish_dcstat_t publish;
     memset(&publish, 0, sizeof(publish));
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
@@ -1025,7 +1032,7 @@ static void dcstat_collector(ebpf_module_t *em)
 
         dcstat_send_global(&publish);
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
         if (cgroups)
@@ -1110,8 +1117,8 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             ret = -1;
         }
     }
@@ -1142,7 +1149,7 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_dcstat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_dcstat_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_dcstat_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = dcstat_maps;

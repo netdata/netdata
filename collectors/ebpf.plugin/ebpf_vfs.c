@@ -34,20 +34,33 @@ struct config vfs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
     .rwlock = AVL_LOCK_INITIALIZER } };
 
-static struct bpf_object *objects = NULL;
-static struct bpf_link **probe_links = NULL;
-
 struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL, NULL, 1, NULL,
                                             NULL,  NULL};
-
-static int read_thread_closed = 1;
+static enum ebpf_threads_status ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
+/**
+ * Exit
+ *
+ * Cancel thread and exit.
+ *
+ * @param ptr thread data.
+**/
+static void ebpf_vfs_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
 
 /**
 * Clean up the main thread.
@@ -57,30 +70,15 @@ static int read_thread_closed = 1;
 static void ebpf_vfs_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_vfs_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 50 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     freez(vfs_hash_values);
     freez(vfs_vector);
+    freez(vfs_threads.thread);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
+    vfs_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -513,23 +511,26 @@ static void read_update_vfs_cgroup()
  */
 void *ebpf_vfs_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_VFS_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    while (ebpf_vfs_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_vfs_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_global_table();
     }
 
-    read_thread_closed = 1;
+    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPED;
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1168,17 +1169,19 @@ static void vfs_collector(ebpf_module_t *em)
     vfs_threads.thread = mallocz(sizeof(netdata_thread_t));
     vfs_threads.start_routine = ebpf_vfs_read_hash;
 
-    netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_vfs_read_hash, em);
 
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             ebpf_vfs_read_apps();
@@ -1191,7 +1194,7 @@ static void vfs_collector(ebpf_module_t *em)
         ebpf_vfs_send_data(em);
         fflush(stdout);
 
-        if (apps)
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_vfs_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
@@ -1505,6 +1508,8 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
@@ -1549,7 +1554,7 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
  */
 void *ebpf_vfs_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_vfs_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = vfs_maps;
@@ -1561,8 +1566,8 @@ void *ebpf_vfs_thread(void *ptr)
     if (!em->enabled)
         goto endvfs;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endvfs;
     }

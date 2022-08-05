@@ -54,52 +54,51 @@ static softirq_val_t softirq_vals[] = {
 // tmp store for soft IRQ values we get from a per-CPU eBPF map.
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
-static int read_thread_closed = 1;
-
 static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static enum ebpf_threads_status ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
- * Clean up the main thread.
+ * Exit
+ *
+ * Cancel thread.
+ *
+ * @param ptr thread data.
+ */
+static void softirq_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * Cleanup
+ *
+ * Clean up allocated memory.
  *
  * @param ptr thread data.
  */
 static void softirq_cleanup(void *ptr)
 {
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_softirq_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
+    freez(softirq_threads.thread);
+
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&softirq_tracepoints[i]);
     }
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        return;
-    }
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 1 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
-
     freez(softirq_ebpf_vals);
-    freez(softirq_threads.thread);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
+    softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -132,22 +131,24 @@ static void softirq_read_latency_map()
  */
 static void *softirq_reader(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(softirq_exit, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_softirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
+        if (ebpf_softirq_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         softirq_read_latency_map();
     }
+    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPED;
 
-    read_thread_closed = 1;
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -201,7 +202,7 @@ static void softirq_collector(ebpf_module_t *em)
     netdata_thread_create(
         softirq_threads.thread,
         softirq_threads.name,
-        NETDATA_THREAD_OPTION_JOINABLE,
+        NETDATA_THREAD_OPTION_DEFAULT,
         softirq_reader,
         em
     );
@@ -217,8 +218,11 @@ static void softirq_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
 
@@ -257,8 +261,8 @@ void *ebpf_softirq_thread(void *ptr)
         goto endsoftirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endsoftirq;
     }

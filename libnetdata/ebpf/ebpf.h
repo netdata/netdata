@@ -213,6 +213,12 @@ typedef struct ebpf_plugin_stats {
     uint32_t trampolines; // Number of trampolines used
 } ebpf_plugin_stats_t;
 
+typedef enum netdata_apps_integration_flags {
+    NETDATA_EBPF_APPS_FLAG_NO,
+    NETDATA_EBPF_APPS_FLAG_YES,
+    NETDATA_EBPF_APPS_FLAG_CHART_CREATED
+} netdata_apps_integration_flags_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -220,7 +226,7 @@ typedef struct ebpf_module {
     void *(*start_routine)(void *);
     int update_every;
     int global_charts;
-    int apps_charts;
+    netdata_apps_integration_flags_t apps_charts;
     int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;
@@ -234,6 +240,8 @@ typedef struct ebpf_module {
     uint64_t kernels;
     netdata_ebpf_load_mode_t load;
     netdata_ebpf_targets_t *targets;
+    struct bpf_link **probe_links;
+    struct bpf_object *objects;
 } ebpf_module_t;
 
 extern int ebpf_get_kernel_version();
@@ -266,6 +274,43 @@ typedef struct netdata_ebpf_histogram {
     int order;
     uint64_t histogram[NETDATA_EBPF_HIST_MAX_BINS];
 } netdata_ebpf_histogram_t;
+
+typedef struct ebpf_filesystem_partitions {
+    char *filesystem;
+    char *optional_filesystem;
+    char *family;
+    char *family_name;
+    struct bpf_object *objects;
+    struct bpf_link **probe_links;
+
+    netdata_ebpf_histogram_t hread;
+    netdata_ebpf_histogram_t hwrite;
+    netdata_ebpf_histogram_t hopen;
+    netdata_ebpf_histogram_t hadditional;
+
+    uint32_t flags;
+    uint32_t enabled;
+
+    ebpf_addresses_t addresses;
+    uint64_t kernels;
+} ebpf_filesystem_partitions_t;
+
+typedef struct ebpf_sync_syscalls {
+    char *syscall;
+    int enabled;
+    uint32_t flags;
+
+    // BTF structure
+    struct bpf_object *objects;
+    struct bpf_link **probe_links;
+
+    // BPF structure
+#ifdef LIBBPF_MAJOR_VERSION
+    struct sync_bpf *sync_obj;
+#else
+    void *sync_obj;
+#endif
+} ebpf_sync_syscalls_t;
 
 extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 

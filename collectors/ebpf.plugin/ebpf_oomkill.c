@@ -34,9 +34,6 @@ static ebpf_tracepoint_t oomkill_tracepoints[] = {
     {.enabled = false, .class = NULL, .event = NULL}
 };
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill", .dimension = "oomkill",
                                                                .algorithm = "absolute",
                                                                .next = NULL};
@@ -49,20 +46,8 @@ static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill"
 static void oomkill_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        return;
-    }
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 static void oomkill_write_data(int32_t *keys, uint32_t total)
@@ -320,8 +305,10 @@ static void oomkill_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&collect_data_mutex);
         pthread_mutex_lock(&lock);
@@ -334,9 +321,11 @@ static void oomkill_collector(ebpf_module_t *em)
         if (cgroups)
             ebpf_oomkill_send_cgroup_data(update_every);
 
-        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
-        oomkill_write_data(keys, count);
-        write_end_chart();
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
+            oomkill_write_data(keys, count);
+            write_end_chart();
+        }
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -361,6 +350,8 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20020,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_OOMKILL);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
@@ -394,8 +385,8 @@ void *ebpf_oomkill_thread(void *ptr)
         goto endoomkill;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endoomkill;
     }

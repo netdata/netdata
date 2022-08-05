@@ -7,7 +7,6 @@ static char *shm_dimension_name[NETDATA_SHM_END] = { "get", "at", "dt", "ctl" };
 static netdata_syscall_stat_t shm_aggregated_data[NETDATA_SHM_END];
 static netdata_publish_syscall_t shm_publish_aggregated[NETDATA_SHM_END];
 
-static int read_thread_closed = 1;
 netdata_publish_shm_t *shm_vector = NULL;
 
 static netdata_idx_t shm_hash_values[NETDATA_SHM_END];
@@ -35,11 +34,9 @@ static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input =
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                         {.name = NULL, .internal_input = 0, .user_input = 0}};
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
                                              NULL, NULL,  NULL};
+static enum ebpf_threads_status ebpf_shm_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "shmat", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -243,44 +240,48 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
- * Clean up the main thread.
+ * SHM Exit
+ *
+ * Cancel child thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_shm_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_shm_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * SHM Cleanup
+ *
+ * Clean up allocated memory.
  *
  * @param ptr thread data.
  */
 static void ebpf_shm_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
+    if (ebpf_shm_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-    }
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     ebpf_cleanup_publish_syscall(shm_publish_aggregated);
 
     freez(shm_vector);
     freez(shm_values);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (bpf_obj)
+    if (bpf_obj)
         shm_bpf__destroy(bpf_obj);
 #endif
+
+    shm_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -456,21 +457,24 @@ static void read_global_table()
  */
 void *ebpf_shm_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(ebpf_shm_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SHM_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_shm_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_shm_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_global_table();
     }
 
-    read_thread_closed = 1;
+    ebpf_shm_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -848,20 +852,22 @@ static void shm_collector(ebpf_module_t *em)
     netdata_thread_create(
         shm_threads.thread,
         shm_threads.name,
-        NETDATA_THREAD_OPTION_JOINABLE,
+        NETDATA_THREAD_OPTION_DEFAULT,
         ebpf_shm_read_hash,
         em
     );
 
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
         if (apps) {
             read_apps_table();
@@ -875,7 +881,7 @@ static void shm_collector(ebpf_module_t *em)
 
         shm_send_global();
 
-        if (apps) {
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
             ebpf_shm_send_apps_data(apps_groups_root_target);
         }
 
@@ -937,6 +943,8 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20194,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SHM);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
@@ -1001,8 +1009,8 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load == EBPF_LOAD_LEGACY) {
-        probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-        if (!probe_links) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
             em->enabled = CONFIG_BOOLEAN_NO;
             ret = -1;
         }
@@ -1032,7 +1040,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_shm_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_shm_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_shm_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = shm_maps;

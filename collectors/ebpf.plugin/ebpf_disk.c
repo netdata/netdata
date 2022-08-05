@@ -25,9 +25,6 @@ char *tracepoint_block_type = { "block"} ;
 char *tracepoint_block_issue = { "block_rq_issue" };
 char *tracepoint_block_rq_complete = { "block_rq_complete" };
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static int was_block_issue_enabled = 0;
 static int was_block_rq_complete_enabled = 0;
 
@@ -35,12 +32,11 @@ static char **dimensions = NULL;
 static netdata_syscall_stat_t disk_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
-static int read_thread_closed = 1;
-
 static netdata_idx_t *disk_hash_values = NULL;
 static struct netdata_static_thread disk_threads = {"DISK KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static enum ebpf_threads_status ebpf_disk_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
@@ -428,25 +424,37 @@ static void ebpf_cleanup_disk_list()
 }
 
 /**
- * Clean up the main thread.
+ * Disk exit.
+ *
+ * Cancel child and exit.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_disk_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_disk_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * Disk Cleanup
+ *
+ * Clean up allocated memory.
  *
  * @param ptr thread data.
  */
 static void ebpf_disk_cleanup(void *ptr)
 {
-    ebpf_disk_disable_tracepoints();
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_disk_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
+    ebpf_disk_disable_tracepoints();
 
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
@@ -458,16 +466,8 @@ static void ebpf_disk_cleanup(void *ptr)
     ebpf_cleanup_plot_disks();
     ebpf_cleanup_disk_list();
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        if (objects)
-            bpf_object__close(objects);
-    }
+    disk_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -583,19 +583,25 @@ static void read_hard_disk_tables(int table)
  */
 void *ebpf_disk_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_disk_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_disk_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_disk_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
     }
 
+    ebpf_disk_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -725,16 +731,17 @@ static void disk_collector(ebpf_module_t *em)
     disk_threads.thread = mallocz(sizeof(netdata_thread_t));
     disk_threads.start_routine = ebpf_disk_read_hash;
 
-    netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_disk_read_hash, em);
 
     int update_every = em->update_every;
-    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
@@ -744,7 +751,6 @@ static void disk_collector(ebpf_module_t *em)
 
         ebpf_update_disks(em);
     }
-    read_thread_closed = 1;
 }
 
 /*****************************************************************
@@ -794,7 +800,7 @@ static int ebpf_disk_enable_tracepoints()
  */
 void *ebpf_disk_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_disk_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_disk_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = disk_maps;
@@ -819,8 +825,8 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
         em->enabled = 0;
         goto enddisk;
     }

@@ -30,67 +30,11 @@ static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NET
                                        .type = NETDATA_EBPF_MAP_CONTROLLER,
                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-ebpf_filesystem_partitions_t localfs[] =
-    {{.filesystem = "ext4",
-      .optional_filesystem = NULL,
-      .family = "ext4",
-      .objects = NULL,
-      .probe_links = NULL,
-      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
-      .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
-     {.filesystem = "xfs",
-      .optional_filesystem = NULL,
-      .family = "xfs",
-      .objects = NULL,
-      .probe_links = NULL,
-      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
-      .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
-     {.filesystem = "nfs",
-      .optional_filesystem = "nfs4",
-      .family = "nfs",
-      .objects = NULL,
-      .probe_links = NULL,
-      .flags = NETDATA_FILESYSTEM_ATTR_CHARTS,
-      .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
-     {.filesystem = "zfs",
-      .optional_filesystem = NULL,
-      .family = "zfs",
-      .objects = NULL,
-      .probe_links = NULL,
-      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
-      .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4},
-     {.filesystem = "btrfs",
-      .optional_filesystem = NULL,
-      .family = "btrfs",
-      .objects = NULL,
-      .probe_links = NULL,
-      .flags = NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE,
-      .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = "btrfs_file_operations", .addr = 0},
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10},
-     {.filesystem = NULL,
-      .optional_filesystem = NULL,
-      .family = NULL,
-      .objects = NULL,
-      .probe_links = NULL,
-      .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
-      .enabled = CONFIG_BOOLEAN_YES,
-      .addresses = {.function = NULL, .addr = 0},
-      .kernels = 0}};
-
 struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL, 1, NULL,
                                                    NULL, NULL };
+static enum ebpf_threads_status ebpf_fs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
-static int read_thread_closed = 1;
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
@@ -381,6 +325,7 @@ void ebpf_filesystem_cleanup_ebpf_data()
                 bpf_link__destroy(probe_links[j]);
                 j++;
             }
+            freez(probe_links);
             if (efp->objects)
                 bpf_object__close(efp->objects);
         }
@@ -388,23 +333,35 @@ void ebpf_filesystem_cleanup_ebpf_data()
 }
 
 /**
- * Clean up the main thread.
+ * Filesystem exit
+ *
+ * Cancel child thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_filesystem_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_fs_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * File system cleanup
+ *
+ * Clean up allocated thread.
  *
  * @param ptr thread data.
  */
 static void ebpf_filesystem_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_fs_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
@@ -413,6 +370,9 @@ static void ebpf_filesystem_cleanup(void *ptr)
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
     freez(filesystem_hash_values);
+
+    filesystem_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -516,16 +476,18 @@ static void read_filesystem_tables()
  */
 void *ebpf_filesystem_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    read_thread_closed = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_every;
     int update_every = em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_fs_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_fs_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         (void) ebpf_update_partitions(em);
         ebpf_obsolete_fs_charts(update_every);
@@ -537,7 +499,9 @@ void *ebpf_filesystem_read_hash(void *ptr)
         read_filesystem_tables();
     }
 
-    read_thread_closed = 1;
+    ebpf_fs_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -579,14 +543,16 @@ static void filesystem_collector(ebpf_module_t *em)
     filesystem_threads.start_routine = ebpf_filesystem_read_hash;
 
     netdata_thread_create(filesystem_threads.thread, filesystem_threads.name,
-                          NETDATA_THREAD_OPTION_JOINABLE, ebpf_filesystem_read_hash, em);
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_filesystem_read_hash, em);
 
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = update_every * USEC_PER_SEC;
-    while (!close_ebpf_plugin || em->optional) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
         pthread_mutex_lock(&lock);
 
@@ -631,7 +597,7 @@ static void ebpf_update_filesystem()
  */
 void *ebpf_filesystem_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_filesystem_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = fs_maps;

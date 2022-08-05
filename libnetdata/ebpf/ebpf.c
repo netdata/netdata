@@ -608,7 +608,7 @@ static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
 void ebpf_update_controller(int fd, ebpf_module_t *em)
 {
     uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
-    uint32_t value = em->apps_charts | em->cgroup_charts;
+    uint32_t value = (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts;
     int ret = bpf_map_update_elem(fd, &key, &value, 0);
     if (ret)
         error("Add key(%u) for controller table failed.", key);
@@ -969,7 +969,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
                                                      EBPF_CFG_UPDATE_EVERY, modules->update_every);
 
     modules->apps_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
-                                                 modules->apps_charts);
+                                                 (int) (modules->apps_charts & NETDATA_EBPF_APPS_FLAG_YES));
 
     modules->cgroup_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP,
                                                    modules->cgroup_charts);
