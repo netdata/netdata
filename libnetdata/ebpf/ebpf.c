@@ -1289,3 +1289,4 @@ void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kve
         snprintfz(output, length, "%s_sys_%s", prefix, syscall);
     }
 }
+
