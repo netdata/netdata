@@ -4,9 +4,6 @@ contact_links:
   - name: "Netdata Agent: Question"
     url: https://github.com/netdata/netdata/discussions/new?category=q-a
     about: Ask a question about Netdata Agent
-  - name: "Netdata Agent Dashboard"
-    url: https://github.com/netdata/dashboard/issues/new/choose
-    about: Create a report to help us improve our dashboard
   - name: "Netdata Cloud"
     url: https://github.com/netdata/netdata-cloud/issues/new/choose
     about: Create a report to help us improve our web application
