@@ -51,7 +51,7 @@ and you must do it manually, using the following steps:
 :::note
 
 In some cases a simple restart of the Agent can fix the issue.  
-Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/start-stop-restart).
+Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/start-stop-restart.md).
 
 :::
 
