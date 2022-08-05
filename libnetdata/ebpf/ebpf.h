@@ -165,8 +165,16 @@ enum netdata_ebpf_map_type {
 
 enum netdata_controller {
     NETDATA_CONTROLLER_APPS_ENABLED,
+    NETDATA_CONTROLLER_APPS_LEVEL,
 
     NETDATA_CONTROLLER_END
+};
+
+// Control how Netdata will monitor PIDs (apps and cgroups)
+enum netdata_apps_level {
+    NETDATA_APPS_LEVEL_REAL_PARENT,
+    NETDATA_APPS_LEVEL_PARENT,
+    NETDATA_APPS_LEVEL_ALL,
 };
 
 typedef struct ebpf_local_maps {
