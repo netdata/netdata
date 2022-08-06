@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Remove prompt to add dashboard issues [\#13490](https://github.com/netdata/netdata/pull/13490) ([cakrit](https://github.com/cakrit))
+- docs: fix unresolved file references [\#13488](https://github.com/netdata/netdata/pull/13488) ([ilyam8](https://github.com/ilyam8))
 - docs: add a note about edit-config for docker installs [\#13487](https://github.com/netdata/netdata/pull/13487) ([ilyam8](https://github.com/ilyam8))
 - health: disable go python last collected alarms [\#13485](https://github.com/netdata/netdata/pull/13485) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin version to v0.34.0 [\#13484](https://github.com/netdata/netdata/pull/13484) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +19,7 @@
 - Handle cases where entries where stored as text \(with strftime\("%s"\)\) [\#13472](https://github.com/netdata/netdata/pull/13472) ([stelfrag](https://github.com/stelfrag))
 - Enable rrdcontexts by default [\#13471](https://github.com/netdata/netdata/pull/13471) ([stelfrag](https://github.com/stelfrag))
 - Fix cgroup name detection for docker containers in containerd cgroup [\#13470](https://github.com/netdata/netdata/pull/13470) ([xkisu](https://github.com/xkisu))
+- Trimmed-median, trimmed-mean and percentile [\#13469](https://github.com/netdata/netdata/pull/13469) ([ktsaou](https://github.com/ktsaou))
 - rrdcontext support for hidden charts [\#13466](https://github.com/netdata/netdata/pull/13466) ([ktsaou](https://github.com/ktsaou))
 - Load host labels for archived hosts [\#13464](https://github.com/netdata/netdata/pull/13464) ([stelfrag](https://github.com/stelfrag))
 - fix\(python.d/smartd\_log\): handle log rotation [\#13460](https://github.com/netdata/netdata/pull/13460) ([ilyam8](https://github.com/ilyam8))
@@ -42,6 +45,7 @@
 - Add missing comma \(handle coverity warning CID 379360\) [\#13413](https://github.com/netdata/netdata/pull/13413) ([stelfrag](https://github.com/stelfrag))
 - codacy/lgtm ignore judy sources [\#13411](https://github.com/netdata/netdata/pull/13411) ([underhood](https://github.com/underhood))
 - Send chart context with alert events to the cloud [\#13409](https://github.com/netdata/netdata/pull/13409) ([MrZammler](https://github.com/MrZammler))
+- Remove SIGSEGV and SIGABRT \(ebpf.plugin\) [\#13407](https://github.com/netdata/netdata/pull/13407) ([thiagoftsm](https://github.com/thiagoftsm))
 - minor fixes on metadata fields  [\#13406](https://github.com/netdata/netdata/pull/13406) ([tkatsoulas](https://github.com/tkatsoulas))
 - chore\(health\): remove py web\_log alarms [\#13404](https://github.com/netdata/netdata/pull/13404) ([ilyam8](https://github.com/ilyam8))
 - Store host system information in the database [\#13402](https://github.com/netdata/netdata/pull/13402) ([stelfrag](https://github.com/stelfrag))
@@ -334,11 +338,6 @@
 - Set a page wait timeout and retry count [\#12836](https://github.com/netdata/netdata/pull/12836) ([stelfrag](https://github.com/stelfrag))
 - Expose anomaly-bit option to health. [\#12835](https://github.com/netdata/netdata/pull/12835) ([vkalintiris](https://github.com/vkalintiris))
 - feat\(plugins.d\): allow external plugins to create chart labels [\#12834](https://github.com/netdata/netdata/pull/12834) ([ilyam8](https://github.com/ilyam8))
-- Ignore obsolete charts/dims in prediction thread. [\#12833](https://github.com/netdata/netdata/pull/12833) ([vkalintiris](https://github.com/vkalintiris))
-- fix\(exporting\)" make 'send charts matching' behave the same as 'filter' for prometheus format [\#12832](https://github.com/netdata/netdata/pull/12832) ([ilyam8](https://github.com/ilyam8))
-- Remove sync warning [\#12831](https://github.com/netdata/netdata/pull/12831) ([thiagoftsm](https://github.com/thiagoftsm))
-- Reduce the number of messages written in the error log due to out of bound timestamps [\#12829](https://github.com/netdata/netdata/pull/12829) ([stelfrag](https://github.com/stelfrag))
-- Bug fix in netdata-uninstaller.sh [\#12828](https://github.com/netdata/netdata/pull/12828) ([maneamarius](https://github.com/maneamarius))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
