@@ -873,6 +873,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
     alarm_log->rendered_info = ae->info ? strdupz(ae->info) : strdupz((char *)"");
+    alarm_log->chart_context = ae->chart_context ? strdupz(ae->chart_context) : strdupz((char *)"");
 
     freez(edit_command);
 }
