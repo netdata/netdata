@@ -339,6 +339,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>PostgreSQL</b>, the open source object-relational database management system (ORDBMS).'
     },
 
+    'pgbouncer': {
+        title: 'PgBouncer',
+        icon: '<i class="fas fa-exchange-alt"></i>',
+        info: 'Performance metrics for PgBouncer, an open source connection pooler for PostgreSQL.'
+    },
+
     'redis': {
         title: 'Redis',
         icon: '<i class="fas fa-database"></i>',
@@ -3985,6 +3991,47 @@ netdataDashboard.context = {
         info: 'Actual on-disk usage of the database\'s data directory and any associated tablespaces.'
     },
 
+    // ------------------------------------------------------------------------
+    // PgBouncer
+    'pgbouncer.client_connections_utilization': {
+        info: 'Client connections in use as percentage of <i>max_client_conn</i> (default 100).'
+    },
+    'pgbouncer.db_client_connections': {
+        info: '<p>Client connections in different states.</p><p><b>Active</b> - linked to server connection and can process queries. <b>Waiting</b> - have sent queries but have not yet got a server connection. <b>CancelReq</b> - have not forwarded query cancellations to the server yet.</p>'
+    },
+    'pgbouncer.db_server_connections': {
+        info: '<p>Server connections in different states.</p><p><b>Active</b> - linked to a client. <b>Idle</b> - unused and immediately usable for client queries. <b>Used</b> - have been idle for more than <i>server_check_delay</i>, so they need <i>server_check_query</i> to run on them before they can be used again. <b>Tested</b> - currently running either <i>server_reset_query</i> or <i>server_check_query</i>. <b>Login</b> - currently in the process of logging in.</p>'
+    },
+    'pgbouncer.db_server_connections_utilization': {
+        info: 'Server connections in use as percentage of <i>max_db_connections</i> (default 0 - unlimited). This considers the PgBouncer database that the client has connected to, not the PostgreSQL database of the outgoing connection.'
+    },
+    'pgbouncer.db_clients_wait_time': {
+        info: 'Time spent by clients waiting for a server connection. This shows if the decrease in database performance from the client\'s point of view was due to exhaustion of the corresponding PgBouncer pool.'
+    },
+    'pgbouncer.db_client_max_wait_time': {
+        info: 'Waiting time for the first (oldest) client in the queue. If this starts increasing, then the current pool of servers does not handle requests quickly enough.'
+    },
+    'pgbouncer.db_transactions': {
+        info: 'SQL transactions pooled (proxied) by pgbouncer.'
+    },
+    'pgbouncer.db_transactions_time': {
+        info: 'Time spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries.'
+    },
+    'pgbouncer.db_transaction_avg_time': {
+        info: 'Average transaction duration.'
+    },
+    'pgbouncer.db_queries': {
+        info: 'SQL queries pooled (proxied) by pgbouncer.'
+    },
+    'pgbouncer.db_queries_time': {
+        info: 'Time spent by pgbouncer when actively connected to PostgreSQL, executing queries.'
+    },
+    'pgbouncer.db_query_avg_time': {
+        info: 'Average query duration.'
+    },
+    'pgbouncer.db_network_io': {
+        info: '<p>Network traffic received and sent by pgbouncer.</p><p><b>Received</b> - received from clients. <b>Sent</b> - sent to servers.</p>'
+    },
 
     // ------------------------------------------------------------------------
     // APACHE
