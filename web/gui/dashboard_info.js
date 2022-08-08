@@ -342,7 +342,7 @@ netdataDashboard.menu = {
     'pgbouncer': {
         title: 'PgBouncer',
         icon: '<i class="fas fa-exchange-alt"></i>',
-        info: 'Performance metrics for PgBouncer, the open source connection pooler for PostgreSQL.'
+        info: 'Performance metrics for PgBouncer, an open source connection pooler for PostgreSQL.'
     },
 
     'redis': {
