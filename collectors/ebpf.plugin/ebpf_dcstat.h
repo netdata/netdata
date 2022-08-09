@@ -79,5 +79,6 @@ extern void *ebpf_dcstat_thread(void *ptr);
 extern void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern struct config dcstat_config;
 extern netdata_ebpf_targets_t dc_targets[];
+extern ebpf_local_maps_t dcstat_maps[];
 
 #endif // NETDATA_EBPF_DCSTAT_H

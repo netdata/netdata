@@ -24,7 +24,7 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL,  NULL};
 static enum ebpf_threads_status ebpf_dcstat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
-static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
+ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                           {.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
