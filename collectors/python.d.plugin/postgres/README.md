@@ -6,6 +6,9 @@ sidebar_label: "PostgreSQL"
 
 # PostgreSQL monitoring with Netdata
 
+> **Warning**: This module is deprecated and will be deleted in v1.37.0.
+> Use [go.d/postgres](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/postgres).
+
 Collects database health and performance metrics.
 
 ## Requirements
