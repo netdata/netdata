@@ -474,6 +474,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
     uint32_t define_size = 0;
     uint32_t apps_type = NETDATA_EBPF_MAP_PID | NETDATA_EBPF_MAP_RESIZABLE;
     if (lmap->user_input && lmap->user_input != lmap->internal_input) {
+        define_size = lmap->internal_input;
 #ifdef NETDATA_INTERNAL_CHECKS
         info("Changing map %s from size %u to %u ", map_name, lmap->internal_input, lmap->user_input);
 #endif
@@ -628,11 +629,18 @@ static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
  */
 void ebpf_update_controller(int fd, ebpf_module_t *em)
 {
-    uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
-    uint32_t value = (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts;
-    int ret = bpf_map_update_elem(fd, &key, &value, 0);
-    if (ret)
-        error("Add key(%u) for controller table failed.", key);
+    uint32_t values[NETDATA_CONTROLLER_END] = {
+        (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts,
+        em->apps_level
+    };
+    uint32_t key;
+    uint32_t end = (em->apps_level != NETDATA_APPS_NOT_SET) ? NETDATA_CONTROLLER_END : NETDATA_CONTROLLER_APPS_LEVEL;
+
+    for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
+        int ret = bpf_map_update_elem(fd, &key, &values[key], 0);
+        if (ret)
+            error("Add key(%u) for controller table failed.", key);
+    }
 }
 
 /**
