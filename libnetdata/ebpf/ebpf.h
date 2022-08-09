@@ -171,11 +171,14 @@ enum netdata_controller {
 };
 
 // Control how Netdata will monitor PIDs (apps and cgroups)
-enum netdata_apps_level {
+typedef enum netdata_apps_level {
     NETDATA_APPS_LEVEL_REAL_PARENT,
     NETDATA_APPS_LEVEL_PARENT,
     NETDATA_APPS_LEVEL_ALL,
-};
+
+    // Present only in user ring
+    NETDATA_APPS_NOT_SET
+} netdata_apps_level_t;
 
 typedef struct ebpf_local_maps {
     char *name;
@@ -239,6 +242,7 @@ typedef struct ebpf_module {
     int update_every;
     int global_charts;
     netdata_apps_integration_flags_t apps_charts;
+    netdata_apps_level_t apps_level;
     int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;
