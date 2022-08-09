@@ -131,7 +131,8 @@ configure any of these collectors according to your setup and infrastructure.
 - [OracleDB](/collectors/python.d.plugin/oracledb/README.md): Monitor database performance and health metrics.
 - [Pika](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pika/): Gather metric, such as clients,
   memory usage, queries, and more from the Redis interface-compatible database.
-- [Postgres](/collectors/python.d.plugin/postgres/README.md): Collect database health and performance metrics.
+- [Postgres](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/postgres): Collect database health
+  and performance metrics.
 - [ProxySQL](/collectors/python.d.plugin/proxysql/README.md): Monitor database backend and frontend performance
   metrics.
 - [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any

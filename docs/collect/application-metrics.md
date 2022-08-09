@@ -21,25 +21,26 @@ charts under **Users**, and per-user group charts under **User Groups**.
 
 Our most popular application collectors:
 
--   [Prometheus endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus): Gathers
-    metrics from one or more Prometheus endpoints that use the OpenMetrics exposition format. Autodetects more than 600
-    endpoints.
--   [Web server logs (Apache, NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/):
-    Tail access logs and provide very detailed web server performance statistics. This module is able to parse 200k+
-    rows in less than half a second.
--   [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
-    replication, and per-user statistics.
--   [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis): Monitor database status by reading the server's response to the `INFO`
-    command.
--   [Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web
-    server performance metrics via the `server-status?auto` endpoint.
--   [Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): Monitor web server
-    status information by gathering metrics via `ngx_http_stub_status_module`.
--   [Postgres](/collectors/python.d.plugin/postgres/README.md): Collect database health and performance metrics. 
--   [ElasticSearch](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch): Collect search engine performance and health
-    statistics. Optionally collects per-index metrics.
--   [PHP-FPM](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
-    summary and processes health metrics by scraping the status page (`/status?full`).
+- [Prometheus endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus): Gathers
+  metrics from one or more Prometheus endpoints that use the OpenMetrics exposition format. Auto-detects more than 600
+  endpoints.
+- [Web server logs (Apache, NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/):
+  Tail access logs and provide very detailed web server performance statistics. This module is able to parse 200k+
+  rows in less than half a second.
+- [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
+  replication, and per-user statistics.
+- [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis): Monitor database status by
+  reading the server's response to the `INFO` command.
+- [Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web server
+  performance metrics via the `server-status?auto` endpoint.
+- [Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): Monitor web server status
+  information by gathering metrics via `ngx_http_stub_status_module`.
+- [Postgres](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/postgres): Collect database health
+  and performance metrics.
+- [ElasticSearch](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch): Collect search
+  engine performance and health statistics. Optionally collects per-index metrics.
+- [PHP-FPM](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application summary
+  and processes health metrics by scraping the status page (`/status?full`).
 
 Our [supported collectors list](/collectors/COLLECTORS.md#service-and-application-collectors) shows all Netdata's
 application metrics collectors, including those for containers/k8s clusters.
