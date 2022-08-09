@@ -283,13 +283,32 @@ module.
 You need to have `CONFIG_CPU_FREQ` and (optionally) `CONFIG_CPU_FREQ_STAT`
 enabled in your kernel.
 
-`cpufreq` interface provides two different ways of getting the information through `/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` and `/sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state` files. The latter is more accurate so it is preferred in the module. `scaling_cur_freq` represents only the current CPU frequency, and doesn't account for any state changes which happen between updates. The module switches back and forth between these two methods if governor is changed.
+`cpufreq` interface provides two different ways of getting the information through
+`/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` and `/sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state`
+files. The latter is more accurate so it is preferred in the module. `scaling_cur_freq` represents only the current
+CPU frequency seen by the kernel, and doesn't account for any state changes which happen between updates. The module
+switches back and forth between these two methods if governor is changed.
 
 It produces one chart with multiple lines (one line per core).
 
+In addition, the module can read `/sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_cur_freq` and show the current
+CPU frequency reported by the hardware. The chart is disabled by default due to performance reasons
+(usually, CPU performance scaling drivers read MSR registers to get the information). To enable it set
+`hardware cpu frequency = yes` in the `[plugin:proc:/proc/stat]` section.
+
 #### configuration
 
-`scaling_cur_freq filename to monitor` and `time_in_state filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
+```conf
+[plugin:proc:/proc/stat]
+	# cpu frequency = yes
+	# hardware cpu frequency = no
+	# scaling_cur_freq filename to monitor = /sys/devices/system/cpu/%s/cpufreq/scaling_cur_freq
+	# cpuinfo_cur_freq filename to monitor = /sys/devices/system/cpu/%s/cpufreq/cpuinfo_cur_freq
+	# time_in_state filename to monitor = /sys/devices/system/cpu/%s/cpufreq/stats/time_in_state
+```
+
+`scaling_cur_freq filename to monitor`, `cpuinfo_cur_freq filename to monitor`, and `time_in_state filename to monitor`
+in the `[plugin:proc:/proc/stat]` configuration section
 
 ### CPU idle states
 

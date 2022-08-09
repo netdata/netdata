@@ -1661,7 +1661,11 @@ netdataDashboard.context = {
     },
 
     'cpufreq.cpufreq': {
-        info: 'The frequency measures the number of cycles your CPU executes per second.'
+        info: 'The frequency measures the number of cycles your CPU executes per second as seen by the kernel.'
+    },
+
+    'cpufreq.hw_cpufreq': {
+        info: 'The frequency measures the number of cycles your CPU executes per second as reported by the hardware.'
     },
 
     'cpuidle.cpuidle': {
