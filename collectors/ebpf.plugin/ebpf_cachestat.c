@@ -19,7 +19,7 @@ struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
 
-static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
+ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
                                               .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                               .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                              {.name = "cstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,

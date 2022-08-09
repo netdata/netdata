@@ -53,7 +53,7 @@ ebpf_module_t ebpf_modules[] = {
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
-      .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
+      .apps_routine = ebpf_cachestat_create_apps_charts, .maps = cachestat_maps,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &cachestat_config,
       .config_file = NETDATA_CACHESTAT_CONFIG_FILE,
       .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18|
