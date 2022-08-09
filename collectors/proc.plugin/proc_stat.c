@@ -1006,7 +1006,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                             "cpu"
                             , "hw_cpufreq"
                             , NULL
-                            , "hw_cpufreq"
+                            , "cpufreq"
                             , "cpufreq.hw_cpufreq"
                             , "Current Hardware CPU Frequency"
                             , "MHz"
