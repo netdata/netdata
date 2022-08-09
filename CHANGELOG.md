@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- bump go.d version to v0.35.0 [\#13494](https://github.com/netdata/netdata/pull/13494) ([ilyam8](https://github.com/ilyam8))
+- add PgBouncer charts description and icon to dashboard info [\#13493](https://github.com/netdata/netdata/pull/13493) ([ilyam8](https://github.com/ilyam8))
 - Add chart\_context to alert snapshots [\#13492](https://github.com/netdata/netdata/pull/13492) ([MrZammler](https://github.com/MrZammler))
 - Remove prompt to add dashboard issues [\#13490](https://github.com/netdata/netdata/pull/13490) ([cakrit](https://github.com/cakrit))
 - docs: fix unresolved file references [\#13488](https://github.com/netdata/netdata/pull/13488) ([ilyam8](https://github.com/ilyam8))
@@ -335,9 +337,6 @@
 - fix\(proc.plugin\): consider ZFS ARC as cache when collecting memory usage on Linux [\#12847](https://github.com/netdata/netdata/pull/12847) ([ilyam8](https://github.com/ilyam8))
 - Resolve coverity related to memory and structure dereference [\#12846](https://github.com/netdata/netdata/pull/12846) ([stelfrag](https://github.com/stelfrag))
 - fix memory leaks and mismatches of the use of the z functions for allocations [\#12841](https://github.com/netdata/netdata/pull/12841) ([ktsaou](https://github.com/ktsaou))
-- Allow usage of new MQTT 5 implementation [\#12838](https://github.com/netdata/netdata/pull/12838) ([underhood](https://github.com/underhood))
-- Set a page wait timeout and retry count [\#12836](https://github.com/netdata/netdata/pull/12836) ([stelfrag](https://github.com/stelfrag))
-- Expose anomaly-bit option to health. [\#12835](https://github.com/netdata/netdata/pull/12835) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
