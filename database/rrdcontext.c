@@ -706,8 +706,10 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
 
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
 static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
-    if(unlikely(!rd->rrdmetric))
-        fatal("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rd->id, function);
+    if(unlikely(!rd->rrdmetric)) {
+        error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rd->id, function);
+        return NULL;
+    }
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
 
@@ -719,6 +721,7 @@ static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char 
 
 static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
+    if(unlikely(!rm)) return;
 
     if(unlikely(rrd_flag_is_collected(rm)))
         rrd_flag_set_archived(rm);
@@ -731,6 +734,7 @@ static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
 
 static inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
+    if(unlikely(!rm)) return;
 
     if(unlikely(rd->flags & (RRDDIM_FLAG_ARCHIVED | RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
@@ -742,6 +746,7 @@ static inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
 
 static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
+    if(unlikely(!rm)) return;
 
     if(unlikely(!rrd_flag_is_collected(rm)))
         rrd_flag_set_collected(rm);
@@ -1217,8 +1222,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
-    if(unlikely(!st->rrdinstance))
-        fatal("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", st->id, function);
+    if(unlikely(!st->rrdinstance)) {
+        error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", st->id, function);
+        return NULL;
+    }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
 
@@ -1230,6 +1237,7 @@ static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const c
 
 static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+    if(unlikely(!ri)) return;
 
     rrd_flag_set_archived(ri);
 
@@ -1257,6 +1265,7 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     if(unlikely(!st->rrdinstance)) return;
 
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+    if(unlikely(!ri)) return;
 
     STRING *old = ri->name;
     ri->name = string_strdupz(st->name);
@@ -1285,6 +1294,7 @@ static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, R
 
 static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+    if(unlikely(!ri)) return;
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
@@ -1295,6 +1305,7 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 
 static inline void rrdinstance_collected_rrdset(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+    if(unlikely(!ri)) return;
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
