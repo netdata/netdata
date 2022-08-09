@@ -233,7 +233,7 @@ get_systemd_service_dir() {
 install_systemd_service() {
   SRCFILE="${SVC_SOURCE}/netdata.service"
 
-  if [ "$(systemctl version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
+  if [ "$(systemctl --version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
     SRCFILE="${SVC_SOURCE}/netdata.service.v235"
   fi
 
