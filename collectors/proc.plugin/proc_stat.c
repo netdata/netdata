@@ -17,8 +17,8 @@ struct last_ticks {
     collected_number ticks;
 };
 
-// This is an extension of struct per_core_single_number_file at CPU_FREQ_INDEX.
-// Either scaling_cur_freq or time_in_state file is used at one time.
+// This is an extension of struct per_core_single_number_file for cpu frequency stats.
+// Either scaling_cur_freq or time_in_state file is used at one time for the frequency seen by the kernel.
 struct per_core_time_in_state_file {
     const char *filename;
     procfile *ff;
@@ -29,7 +29,8 @@ struct per_core_time_in_state_file {
 #define CORE_THROTTLE_COUNT_INDEX    0
 #define PACKAGE_THROTTLE_COUNT_INDEX 1
 #define CPU_FREQ_INDEX               2
-#define PER_CORE_FILES               3
+#define HW_CPU_FREQ_INDEX            3
+#define PER_CORE_FILES               4
 
 struct cpu_chart {
     const char *id;
@@ -477,10 +478,11 @@ int do_proc_stat(int update_every, usec_t dt) {
     static size_t all_cpu_charts_size = 0;
     static procfile *ff = NULL;
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
-           do_core_throttle_count = -1, do_package_throttle_count = -1, do_cpu_freq = -1, do_cpuidle = -1;
+           do_core_throttle_count = -1, do_package_throttle_count = -1, do_cpu_freq = -1, do_hw_cpu_freq = -1, do_cpuidle = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
-    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL,
-           *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
+    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL,
+           *scaling_cur_freq_filename = NULL, *cpuinfo_cur_freq_filename = NULL, *time_in_state_filename = NULL,
+           *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
     static RRDVAR *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)processors;
@@ -500,6 +502,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
             do_cpu_freq = CONFIG_BOOLEAN_NO;
+            do_hw_cpu_freq = CONFIG_BOOLEAN_NO;
             do_cpuidle = CONFIG_BOOLEAN_NO;
         }
         else {
@@ -508,6 +511,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_core_throttle_count = CONFIG_BOOLEAN_AUTO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
             do_cpu_freq = CONFIG_BOOLEAN_YES;
+            do_hw_cpu_freq = CONFIG_BOOLEAN_NO;
             do_cpuidle = CONFIG_BOOLEAN_YES;
         }
         if(unlikely(processors > 24)) {
@@ -524,6 +528,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
         do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
         do_cpu_freq               = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu frequency", do_cpu_freq);
+        do_hw_cpu_freq            = config_get_boolean_ondemand("plugin:proc:/proc/stat", "hardware cpu frequency", do_hw_cpu_freq);
         do_cpuidle                = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu idle states", do_cpuidle);
 
         hash_intr = simple_hash("intr");
@@ -541,6 +546,9 @@ int do_proc_stat(int update_every, usec_t dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/scaling_cur_freq");
         scaling_cur_freq_filename = config_get("plugin:proc:/proc/stat", "scaling_cur_freq filename to monitor", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/cpuinfo_cur_freq");
+        cpuinfo_cur_freq_filename = config_get("plugin:proc:/proc/stat", "cpuinfo_cur_freq filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/stats/time_in_state");
         time_in_state_filename = config_get("plugin:proc:/proc/stat", "time_in_state filename to monitor", filename);
@@ -678,6 +686,15 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 cpu_chart->time_in_state_files.ff = NULL;
                                 do_cpu_freq = CONFIG_BOOLEAN_YES;
                                 accurate_freq_avail = 1;
+                            }
+                        }
+
+                        if(do_hw_cpu_freq != CONFIG_BOOLEAN_NO) {
+                            snprintfz(filename, FILENAME_MAX, cpuinfo_cur_freq_filename, id);
+                            if (stat(filename, &stbuf) == 0) {
+                                cpu_chart->files[HW_CPU_FREQ_INDEX].filename = strdupz(filename);
+                                cpu_chart->files[HW_CPU_FREQ_INDEX].fd = -1;
+                                do_hw_cpu_freq = CONFIG_BOOLEAN_YES;
                             }
                         }
                     }
@@ -974,6 +991,36 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                 chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX, st_scaling_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rrdset_done(st_scaling_cur_freq);
+            }
+        }
+
+        if(likely(do_hw_cpu_freq != CONFIG_BOOLEAN_NO)) {
+            int r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, HW_CPU_FREQ_INDEX);
+            if(likely(r != -1 && (do_hw_cpu_freq == CONFIG_BOOLEAN_YES || r > 0))) {
+                do_hw_cpu_freq = CONFIG_BOOLEAN_YES;
+
+                static RRDSET *st_cpuinfo_cur_freq = NULL;
+
+                if(unlikely(!st_cpuinfo_cur_freq))
+                    st_cpuinfo_cur_freq = rrdset_create_localhost(
+                            "cpu"
+                            , "hw_cpufreq"
+                            , NULL
+                            , "hw_cpufreq"
+                            , "cpufreq.hw_cpufreq"
+                            , "Current Hardware CPU Frequency"
+                            , "MHz"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
+                            , NETDATA_CHART_PRIO_CPUFREQ_CPUINFO_CUR_FREQ
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+                else
+                    rrdset_next(st_cpuinfo_cur_freq);
+
+                chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, HW_CPU_FREQ_INDEX, st_cpuinfo_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rrdset_done(st_cpuinfo_cur_freq);
             }
         }
     }
