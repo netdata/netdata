@@ -1052,11 +1052,9 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
 
-    error("KILLME_1 %s: %d", modules->thread_name, modules->apps_level);
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
     modules->apps_level =  ebpf_convert_string_to_apps_level(value);
-    error("KILLME_2 %s: %d", modules->thread_name, modules->apps_level);
 }
 
 /**
