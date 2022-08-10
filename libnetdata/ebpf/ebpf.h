@@ -26,6 +26,11 @@
 #define EBPF_CFG_CORE_PROGRAM "CO-RE"
 #define EBPF_CFG_LEGACY_PROGRAM "legacy"
 
+#define EBPF_CFG_COLLECT_PID "collect pid"
+#define EBPF_CFG_PID_REAL_PARENT "real parent"
+#define EBPF_CFG_PID_PARENT "parent"
+#define EBPF_CFG_PID_ALL "all"
+
 #define EBPF_CFG_CORE_ATTACH "ebpf co-re tracing"
 #define EBPF_CFG_ATTACH_TRAMPOLINE "trampoline"
 #define EBPF_CFG_ATTACH_TRACEPOINT "tracepoint"

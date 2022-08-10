@@ -835,6 +835,44 @@ static char *ebpf_convert_load_mode_to_string(netdata_ebpf_load_mode_t mode)
 }
 
 /**
+ * Convert collect pid to string
+ *
+ * @param level value that will select the string
+ *
+ * @return It returns the string associated to level.
+ */
+static char *ebpf_convert_collect_pid_to_string(netdata_apps_level_t level)
+{
+    if (level == NETDATA_APPS_LEVEL_REAL_PARENT)
+        return EBPF_CFG_PID_REAL_PARENT;
+    else if (level == NETDATA_APPS_LEVEL_PARENT)
+        return EBPF_CFG_PID_PARENT;
+    else if (level == NETDATA_APPS_LEVEL_ALL)
+        return EBPF_CFG_PID_ALL;
+
+    return EBPF_CFG_PID_ALL;
+}
+
+/**
+ * Convert string to apps level
+ *
+ * @param str the argument read from config files
+ *
+ * @return it returns the level associated to the string or default when it is a wrong value
+ */
+netdata_apps_level_t ebpf_convert_string_to_apps_level(char *str)
+{
+    if (!strcasecmp(str, EBPF_CFG_PID_REAL_PARENT))
+        return NETDATA_APPS_LEVEL_REAL_PARENT;
+    else if (!strcasecmp(str, EBPF_CFG_PID_PARENT))
+        return NETDATA_APPS_LEVEL_PARENT;
+    else if (!strcasecmp(str, EBPF_CFG_PID_ALL))
+        return NETDATA_APPS_LEVEL_ALL;
+
+    return NETDATA_APPS_NOT_SET;
+}
+
+/**
  *  CO-RE type
  *
  *  Select the preferential type of CO-RE
@@ -1013,6 +1051,12 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
+
+    error("KILLME_1 %s: %d", modules->thread_name, modules->apps_level);
+    value = ebpf_convert_collect_pid_to_string(modules->apps_level);
+    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
+    modules->apps_level =  ebpf_convert_string_to_apps_level(value);
+    error("KILLME_2 %s: %d", modules->thread_name, modules->apps_level);
 }
 
 /**
