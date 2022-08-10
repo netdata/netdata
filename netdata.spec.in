@@ -515,6 +515,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 # freeipmi files
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
+# go.d.plugin (the capability required for wireguard module)
+%caps(cap_net_admin=epi) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
 %defattr(0644,root,root,0755)
