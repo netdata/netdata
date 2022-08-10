@@ -266,12 +266,12 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
         ebpf_cachestat_disable_specific_probe(obj);
     }
 
+    ebpf_cachestat_adjust_map_size(obj, em);
+
     int ret = cachestat_bpf__load(obj);
     if (ret) {
         return ret;
     }
-
-    ebpf_cachestat_adjust_map_size(obj, em);
 
     ret = (test == EBPF_LOAD_TRAMPOLINE) ? cachestat_bpf__attach(obj) : ebpf_cachestat_attach_probe(obj);
     if (!ret) {

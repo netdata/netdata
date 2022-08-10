@@ -200,12 +200,12 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
         ebpf_dc_disable_trampoline(obj);
     }
 
+    ebpf_dc_adjust_map_size(obj, em);
+
     int ret = dc_bpf__load(obj);
     if (ret) {
         return ret;
     }
-
-    ebpf_dc_adjust_map_size(obj, em);
 
     ret = (test == EBPF_LOAD_TRAMPOLINE) ? dc_bpf__attach(obj) : ebpf_dc_attach_probes(obj);
     if (!ret) {
