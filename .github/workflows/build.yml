@@ -32,6 +32,10 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - name: Fix tags
+        id: fix-tags
+        run: |
+          git fetch -f origin ${{ github.ref }}:${{ github.ref }}
       - name: Mark Stable
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
@@ -72,6 +76,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create source tarball for distribution.
               Checkout: ${{ steps.checkout.outcome }}
+              Fix Tags: ${{ steps.fix-tags.outcome }}
               Mark stable: ${{ steps.channel.outcome }}
               Build: ${{ steps.build.outcome }}
               Store: ${{ steps.store.outcome }}
@@ -101,6 +106,10 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - name: Fix tags
+        id: fix-tags
+        run: |
+          git fetch -f origin ${{ github.ref }}:${{ github.ref }}
       - name: Mark Stable
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
@@ -144,6 +153,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create static installer archive for ${{ matrix.arch }}.
               Checkout: ${{ steps.checkout.outcome }}
+              Fix Tags: ${{ steps.fix-tags.outcome }}
               Mark stable: ${{ steps.channel.outcome }}
               Build: ${{ steps.build.outcome }}
               Store: ${{ steps.store.outcome }}
