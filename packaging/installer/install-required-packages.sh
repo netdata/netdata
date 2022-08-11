@@ -20,7 +20,6 @@ fi
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
-PACKAGES_NETDATA_PYTHON_POSTGRES=${PACKAGES_NETDATA_PYTHON_POSTGRES-0}
 PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
 PACKAGES_DEBUG=${PACKAGES_DEBUG-0}
 PACKAGES_IPRANGE=${PACKAGES_IPRANGE-0}
@@ -97,8 +96,7 @@ Supported installers (IN):
 Supported packages (you can append many of them):
 
     - netdata-all    all packages required to install netdata
-                     including postgres client,
-                     node.js, python, sensors, etc
+                     including python, sensors, etc
 
     - netdata        minimum packages required to install netdata
                      (includes python)
@@ -106,10 +104,6 @@ Supported packages (you can append many of them):
     - python         install python
 
     - python3        install python3
-
-    - python-postgres install psycopg2
-                     (for monitoring postgres, will install python3 version
-                     if python3 is enabled or detected)
 
     - python-pymongo install python-pymongo (or python3-pymongo for python3)
 
@@ -941,42 +935,6 @@ declare -A pkg_python=(
   ['centos-8']="python2"
 )
 
-declare -A pkg_python_psycopg2=(
-  ['alpine']="py-psycopg2"
-  ['arch']="python2-psycopg2"
-  ['centos']="python-psycopg2"
-  ['debian']="python-psycopg2"
-  ['gentoo']="dev-python/psycopg"
-  ['sabayon']="dev-python/psycopg:2"
-  ['rhel']="python-psycopg2"
-  ['ol']="python-psycopg2"
-  ['suse']="python-psycopg2"
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="python-psycopg2"
-)
-
-declare -A pkg_python3_psycopg2=(
-  ['alpine']="py3-psycopg2"
-  ['arch']="python-psycopg2"
-  ['centos']="WARNING|"
-  ['debian']="WARNING|"
-  ['gentoo']="dev-python/psycopg"
-  ['sabayon']="dev-python/psycopg:2"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['suse']="WARNING|"
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="WARNING|"
-
-  ['centos-7']="python3-psycopg2"
-  ['centos-8']="python38-psycopg2"
-  ['rhel-7']="python3-psycopg2"
-  ['rhel-8']="python38-psycopg2"
-  ['ol-8']="python3-psycopg2"
-)
-
 declare -A pkg_python_pip=(
   ['alpine']="py-pip"
   ['gentoo']="dev-python/pip"
@@ -1359,8 +1317,6 @@ packages() {
     [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python-pymongo
     # suitable_package python-requests
     # suitable_package python-pip
-
-    [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python-psycopg2
   fi
 
   # -------------------------------------------------------------------------
@@ -1372,8 +1328,6 @@ packages() {
     [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python3-pymongo
     # suitable_package python3-requests
     # suitable_package python3-pip
-
-    [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python3-psycopg2
   fi
 
   # -------------------------------------------------------------------------
@@ -1913,7 +1867,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -1976,11 +1930,9 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_NETDATA_SENSORS=1
@@ -2001,16 +1953,6 @@ while [ -n "${1}" ]; do
 
     python3 | netdata-python3)
       PACKAGES_NETDATA_PYTHON3=1
-      ;;
-
-    python-postgres | postgres-python | psycopg2 | netdata-postgres)
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
-      fi
       ;;
 
     python-pymongo)
@@ -2042,11 +1984,9 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_DEBUG=1

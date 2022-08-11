@@ -424,8 +424,8 @@ configuration in [YAML](https://www.tutorialspoint.com/yaml/yaml_basics.htm) for
   run. This enables you to define different "ways" to fetch data from a particular data source so that the collector has
   more chances to work out-of-the-box. For example, if the data source supports both `HTTP` and `linux socket`, you can
   define 2 jobs named `local`, with each using a different method. 
-- Check the `postgresql` collector configuration file on
-  [GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postgres/postgres.conf) to get a
+- Check the `example` collector configuration file on
+  [GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/example.conf) to get a
   sense of the structure.
 
 ```yaml
@@ -455,8 +455,8 @@ function takes 2 arguments, one with the name of the configuration field and one
 find the configuration field. This allows you to define sane defaults for your collector.
 
 Moreover, when creating the configuration file, create a large comment section that describes the configuration
-variables and inform the user about the defaults. For example, take a look at the `postgresql` collector on
-[GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postgres/postgres.conf).
+variables and inform the user about the defaults. For example, take a look at the `example` collector on
+[GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/example.conf).
 
 You can read more about the configuration file on the [`python.d.plugin`
 documentation](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin). 
@@ -465,7 +465,7 @@ documentation](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin
 
 Find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
 
-Now we you ready to start developing our Netdata python Collector and share it with the rest of the Netdata community.
+Now you are ready to start developing our Netdata python Collector and share it with the rest of the Netdata community.
 
 - If you need help while developing your collector, join our [Netdata
   Community](https://community.netdata.cloud/c/agent-development/9) to chat about it.

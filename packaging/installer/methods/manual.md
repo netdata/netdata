@@ -41,7 +41,7 @@ and other operating systems and is regularly tested. You can find this tool [her
 -   **SLE12** Must have your system registered with SUSE Customer Center or have the DVD. See
     [#1162](https://github.com/netdata/netdata/issues/1162)
 
-Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
+Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `named`, hardware sensors and `SNMP`):
 
 ```sh
 curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
@@ -99,7 +99,6 @@ Netdata plugins and various aspects of Netdata can be enabled or benefit when th
 | `python-dnspython`|used for monitoring DNS query time|
 | `python-ipaddress`|used for monitoring **DHCPd**<br/>this package is required only if the system has python v2. python v3 has this functionality embedded|
 | `python-mysqldb`<br/>or<br/>`python-pymysql`|used for monitoring **mysql** or **mariadb** databases<br/>`python-mysqldb` is a lot faster and thus preferred|
-| `python-psycopg2`|used for monitoring **postgresql** databases|
 | `python-pymongo`|used for monitoring **mongodb** databases|
 | `nodejs`|used for `node.js` plugins for monitoring **named** and **SNMP** devices|
 | `lm-sensors`|for monitoring **hardware sensors**|
