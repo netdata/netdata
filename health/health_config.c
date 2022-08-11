@@ -686,7 +686,6 @@ static int health_readfile(const char *filename, void *data) {
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
             rc->name = strdupz(value);
-            rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, filename);
             rc->green = NAN;
             rc->red = NAN;
@@ -703,6 +702,7 @@ static int health_readfile(const char *filename, void *data) {
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
 
+            rc->hash = simple_hash(rc->name);
             alert_cfg->alarm = strdupz(rc->name);
             ignore_this = 0;
         }
@@ -724,7 +724,6 @@ static int health_readfile(const char *filename, void *data) {
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
-            rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, filename);
             rt->green = NAN;
             rt->red = NAN;
@@ -738,6 +737,7 @@ static int health_readfile(const char *filename, void *data) {
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
 
+            rt->hash_name = simple_hash(rt->name);
             alert_cfg->template_key = strdupz(rt->name);
             ignore_this = 0;
         }
