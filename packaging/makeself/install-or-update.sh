@@ -214,6 +214,10 @@ for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plug
   fi
 done
 
+if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ] && command -v setcap 1>/dev/null 2>&1; then
+  run setcap cap_net_admin+epi "usr/libexec/netdata/plugins.d/go.d.plugin"
+fi
+
 # fix the fping binary
 if [ -f bin/fping ]; then
   run chown root:${NETDATA_GROUP} bin/fping
