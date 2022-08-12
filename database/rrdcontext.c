@@ -1381,7 +1381,7 @@ static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe
     }
     else {
         if (ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-            error("RRDCONTEXT: failed to save context '%s' version %lu to SQL.", rc->hub.id, rc->hub.version);
+            error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
     }
 }
 
@@ -1425,7 +1425,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
 
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
-        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %zu, title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
                        sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rc->version,
@@ -1458,7 +1458,7 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
         // we are loading data from the SQL database
 
         if(rc->version)
-            error("RRDCONTEXT: context '%s' is already initialized with version %lu, but it is loaded again from SQL with version %lu", string2str(rc->id), rc->version, rc->hub.version);
+            error("RRDCONTEXT: context '%s' is already initialized with version %"PRIu64", but it is loaded again from SQL with version %"PRIu64"", string2str(rc->id), rc->version, rc->hub.version);
 
         // IMPORTANT
         // replace all string pointers in rc->hub with our own versions
@@ -1942,7 +1942,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     uint64_t our_version_hash = rrdcontext_version_hash(host);
 
     if(cmd->version_hash != our_version_hash) {
-        error("RRDCONTEXT: received version hash %lu for host '%s', does not match our version hash %lu. Sending snapshot of all contexts.",
+        error("RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". Sending snapshot of all contexts.",
               cmd->version_hash, host->hostname, our_version_hash);
 
 #ifdef ENABLE_ACLK
@@ -2339,8 +2339,8 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
                        ",\n\t\t\t\"last_queued\":%llu"
                        ",\n\t\t\t\"scheduled_dispatch\":%llu"
                        ",\n\t\t\t\"last_dequeued\":%llu"
-                       ",\n\t\t\t\"hub_version\":%lu"
-                       ",\n\t\t\t\"version\":%lu"
+                       ",\n\t\t\t\"hub_version\":%"PRIu64""
+                       ",\n\t\t\t\"version\":%"PRIu64""
                        , rc->queue.queued_ut / USEC_PER_SEC
                        , rc->queue.scheduled_dispatch_ut / USEC_PER_SEC
                        , rc->queue.dequeued_ut / USEC_PER_SEC
@@ -2702,7 +2702,7 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
 
     // delete it from SQL
     if(ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-        error("RRDCONTEXT: failed to delete context '%s' version %lu from SQL.", rc->hub.id, rc->hub.version);
+        error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.", rc->hub.id, rc->hub.version);
 }
 
 static void rrdcontext_garbage_collect(void) {
