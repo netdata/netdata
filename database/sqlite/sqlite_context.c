@@ -445,13 +445,13 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
 {
     (void)data;
     info("   Context id = %s "
-         "version = %lu "
+         "version = %"PRIu64" "
          "title = %s "
          "chart_type = %s "
          "units = %s "
-         "priority = %lu "
-         "first time = %lu "
-         "last time = %lu "
+         "priority = %"PRIu64" "
+         "first time = %"PRIu64" "
+         "last time = %"PRIu64" "
          "deleted = %d "
          "family = %s",
          context_data->id,
