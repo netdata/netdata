@@ -1,5 +1,15 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.36.0...HEAD)
+
+**Merged pull requests:**
+
+- Calculate name hash after rrdvar\_fix\_name [\#13509](https://github.com/netdata/netdata/pull/13509) ([MrZammler](https://github.com/MrZammler))
+- fix\(packaging\): add CAP\_NET\_ADMIN for go.d.plugin [\#13507](https://github.com/netdata/netdata/pull/13507) ([ilyam8](https://github.com/ilyam8))
+- chore\(python.d\): remove python.d/\* announced in v1.36.0 deprecation notice [\#13503](https://github.com/netdata/netdata/pull/13503) ([ilyam8](https://github.com/ilyam8))
+
 ## [v1.36.0](https://github.com/netdata/netdata/tree/v1.36.0) (2022-08-10)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.35.1...v1.36.0)
@@ -336,7 +346,6 @@
 - Add a SQLite database checkpoint command [\#12859](https://github.com/netdata/netdata/pull/12859) ([stelfrag](https://github.com/stelfrag))
 - feat\(cgroups.plugin\): add k8s cluster name label \(GKE only\) [\#12858](https://github.com/netdata/netdata/pull/12858) ([ilyam8](https://github.com/ilyam8))
 - Autodetect channel for specific version [\#12856](https://github.com/netdata/netdata/pull/12856) ([maneamarius](https://github.com/maneamarius))
-- Pause alert pushes to the cloud [\#12852](https://github.com/netdata/netdata/pull/12852) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
