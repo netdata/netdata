@@ -85,5 +85,6 @@ extern void *ebpf_cachestat_thread(void *ptr);
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];
+extern ebpf_local_maps_t cachestat_maps[];
 
 #endif // NETDATA_EBPF_CACHESTAT_H

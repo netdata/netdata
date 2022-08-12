@@ -26,6 +26,11 @@
 #define EBPF_CFG_CORE_PROGRAM "CO-RE"
 #define EBPF_CFG_LEGACY_PROGRAM "legacy"
 
+#define EBPF_CFG_COLLECT_PID "collect pid"
+#define EBPF_CFG_PID_REAL_PARENT "real parent"
+#define EBPF_CFG_PID_PARENT "parent"
+#define EBPF_CFG_PID_ALL "all"
+
 #define EBPF_CFG_CORE_ATTACH "ebpf co-re tracing"
 #define EBPF_CFG_ATTACH_TRAMPOLINE "trampoline"
 #define EBPF_CFG_ATTACH_TRACEPOINT "tracepoint"
@@ -76,6 +81,7 @@ enum netdata_ebpf_kernel_versions {
     NETDATA_EBPF_KERNEL_5_0  = 327680,  //  327680 = 5 * 65536 +  0 * 256
     NETDATA_EBPF_KERNEL_5_10 = 330240,  //  330240 = 5 * 65536 + 10 * 256
     NETDATA_EBPF_KERNEL_5_11 = 330496,  //  330240 = 5 * 65536 + 11 * 256
+    NETDATA_EBPF_KERNEL_5_14 = 331264,  //  331264 = 5 * 65536 + 14 * 256
     NETDATA_EBPF_KERNEL_5_15 = 331520,  //  331520 = 5 * 65536 + 15 * 256
     NETDATA_EBPF_KERNEL_5_16 = 331776   //  331776 = 5 * 65536 + 16 * 256
 };
@@ -88,8 +94,9 @@ enum netdata_kernel_flag {
     NETDATA_V5_4  = 1 << 4,
     NETDATA_V5_10 = 1 << 5,
     NETDATA_V5_11 = 1 << 6,
-    NETDATA_V5_15 = 1 << 7,
-    NETDATA_V5_16 = 1 << 8
+    NETDATA_V5_14 = 1 << 7,
+    NETDATA_V5_15 = 1 << 8,
+    NETDATA_V5_16 = 1 << 9
 };
 
 enum netdata_kernel_idx {
@@ -100,6 +107,7 @@ enum netdata_kernel_idx {
     NETDATA_IDX_V5_4 ,
     NETDATA_IDX_V5_10,
     NETDATA_IDX_V5_11,
+    NETDATA_IDX_V5_14,
     NETDATA_IDX_V5_15,
     NETDATA_IDX_V5_16
 };
@@ -111,6 +119,7 @@ enum netdata_kernel_idx {
 #define NETDATA_IDX_STR_V5_4  "5.4"
 #define NETDATA_IDX_STR_V5_10 "5.10"
 #define NETDATA_IDX_STR_V5_11 "5.11"
+#define NETDATA_IDX_STR_V5_14 "5.14"
 #define NETDATA_IDX_STR_V5_15 "5.15"
 #define NETDATA_IDX_STR_V5_16 "5.16"
 
@@ -161,9 +170,20 @@ enum netdata_ebpf_map_type {
 
 enum netdata_controller {
     NETDATA_CONTROLLER_APPS_ENABLED,
+    NETDATA_CONTROLLER_APPS_LEVEL,
 
     NETDATA_CONTROLLER_END
 };
+
+// Control how Netdata will monitor PIDs (apps and cgroups)
+typedef enum netdata_apps_level {
+    NETDATA_APPS_LEVEL_REAL_PARENT,
+    NETDATA_APPS_LEVEL_PARENT,
+    NETDATA_APPS_LEVEL_ALL,
+
+    // Present only in user ring
+    NETDATA_APPS_NOT_SET
+} netdata_apps_level_t;
 
 typedef struct ebpf_local_maps {
     char *name;
@@ -227,6 +247,7 @@ typedef struct ebpf_module {
     int update_every;
     int global_charts;
     netdata_apps_integration_flags_t apps_charts;
+    netdata_apps_level_t apps_level;
     int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;

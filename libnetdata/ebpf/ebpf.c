@@ -279,7 +279,8 @@ static char *ebpf_select_kernel_name(uint32_t selector)
 {
     static char *kernel_names[] = { NETDATA_IDX_STR_V3_10, NETDATA_IDX_STR_V4_14, NETDATA_IDX_STR_V4_16,
                                     NETDATA_IDX_STR_V4_18, NETDATA_IDX_STR_V5_4,  NETDATA_IDX_STR_V5_10,
-                                    NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_15, NETDATA_IDX_STR_V5_16
+                                    NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_14, NETDATA_IDX_STR_V5_15,
+                                    NETDATA_IDX_STR_V5_16
                                   };
 
     return kernel_names[selector];
@@ -298,7 +299,9 @@ static char *ebpf_select_kernel_name(uint32_t selector)
 static int ebpf_select_max_index(int is_rhf, uint32_t kver)
 {
     if (is_rhf > 0) { // Is Red Hat family
-        if (kver >= NETDATA_EBPF_KERNEL_4_11)
+        if (kver >= NETDATA_EBPF_KERNEL_5_14)
+            return NETDATA_IDX_V5_14;
+        else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
         if (kver >= NETDATA_EBPF_KERNEL_5_16)
@@ -333,6 +336,9 @@ static uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
 {
     uint32_t start = ebpf_select_max_index(is_rhf, kver);
     uint32_t idx;
+
+    if (is_rhf == -1)
+        kernels &= ~NETDATA_V5_14;
 
     for (idx = start; idx; idx--) {
         if (kernels & 1 << idx)
@@ -465,24 +471,40 @@ void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
  */
 void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name)
 {
+    uint32_t define_size = 0;
     uint32_t apps_type = NETDATA_EBPF_MAP_PID | NETDATA_EBPF_MAP_RESIZABLE;
     if (lmap->user_input && lmap->user_input != lmap->internal_input) {
+        define_size = lmap->internal_input;
 #ifdef NETDATA_INTERNAL_CHECKS
         info("Changing map %s from size %u to %u ", map_name, lmap->internal_input, lmap->user_input);
 #endif
-#ifdef LIBBPF_MAJOR_VERSION
-        bpf_map__set_max_entries(map, lmap->user_input);
-#else
-        bpf_map__resize(map, lmap->user_input);
-#endif
     } else if (((lmap->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts)) {
         lmap->user_input = ND_EBPF_DEFAULT_MIN_PID;
-#ifdef LIBBPF_MAJOR_VERSION
-        bpf_map__set_max_entries(map, lmap->user_input);
-#else
-        bpf_map__resize(map, lmap->user_input);
-#endif
+    } else if (((em->apps_charts) || (em->cgroup_charts)) && (em->apps_level != NETDATA_APPS_NOT_SET)) {
+        switch (em->apps_level) {
+            case NETDATA_APPS_LEVEL_ALL: {
+                define_size = lmap->user_input;
+                break;
+            }
+            case NETDATA_APPS_LEVEL_PARENT: {
+                define_size = ND_EBPF_DEFAULT_PID_SIZE / 2;
+                break;
+            }
+            case NETDATA_APPS_LEVEL_REAL_PARENT:
+            default: {
+                define_size = ND_EBPF_DEFAULT_PID_SIZE / 3;
+            }
+        }
     }
+
+    if (!define_size)
+        return;
+
+#ifdef LIBBPF_MAJOR_VERSION
+    bpf_map__set_max_entries(map, define_size);
+#else
+    bpf_map__resize(map, define_size);
+#endif
 }
 
 /**
@@ -607,11 +629,18 @@ static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
  */
 void ebpf_update_controller(int fd, ebpf_module_t *em)
 {
-    uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
-    uint32_t value = (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts;
-    int ret = bpf_map_update_elem(fd, &key, &value, 0);
-    if (ret)
-        error("Add key(%u) for controller table failed.", key);
+    uint32_t values[NETDATA_CONTROLLER_END] = {
+        (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts,
+        em->apps_level
+    };
+    uint32_t key;
+    uint32_t end = (em->apps_level != NETDATA_APPS_NOT_SET) ? NETDATA_CONTROLLER_END : NETDATA_CONTROLLER_APPS_LEVEL;
+
+    for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
+        int ret = bpf_map_update_elem(fd, &key, &values[key], 0);
+        if (ret)
+            error("Add key(%u) for controller table failed.", key);
+    }
 }
 
 /**
@@ -806,6 +835,44 @@ static char *ebpf_convert_load_mode_to_string(netdata_ebpf_load_mode_t mode)
 }
 
 /**
+ * Convert collect pid to string
+ *
+ * @param level value that will select the string
+ *
+ * @return It returns the string associated to level.
+ */
+static char *ebpf_convert_collect_pid_to_string(netdata_apps_level_t level)
+{
+    if (level == NETDATA_APPS_LEVEL_REAL_PARENT)
+        return EBPF_CFG_PID_REAL_PARENT;
+    else if (level == NETDATA_APPS_LEVEL_PARENT)
+        return EBPF_CFG_PID_PARENT;
+    else if (level == NETDATA_APPS_LEVEL_ALL)
+        return EBPF_CFG_PID_ALL;
+
+    return EBPF_CFG_PID_ALL;
+}
+
+/**
+ * Convert string to apps level
+ *
+ * @param str the argument read from config files
+ *
+ * @return it returns the level associated to the string or default when it is a wrong value
+ */
+netdata_apps_level_t ebpf_convert_string_to_apps_level(char *str)
+{
+    if (!strcasecmp(str, EBPF_CFG_PID_REAL_PARENT))
+        return NETDATA_APPS_LEVEL_REAL_PARENT;
+    else if (!strcasecmp(str, EBPF_CFG_PID_PARENT))
+        return NETDATA_APPS_LEVEL_PARENT;
+    else if (!strcasecmp(str, EBPF_CFG_PID_ALL))
+        return NETDATA_APPS_LEVEL_ALL;
+
+    return NETDATA_APPS_NOT_SET;
+}
+
+/**
  *  CO-RE type
  *
  *  Select the preferential type of CO-RE
@@ -984,6 +1051,10 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
+
+    value = ebpf_convert_collect_pid_to_string(modules->apps_level);
+    value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
+    modules->apps_level =  ebpf_convert_string_to_apps_level(value);
 }
 
 /**
@@ -1283,3 +1354,4 @@ void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kve
         snprintfz(output, length, "%s_sys_%s", prefix, syscall);
     }
 }
+

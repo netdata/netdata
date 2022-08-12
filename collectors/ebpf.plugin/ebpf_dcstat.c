@@ -24,7 +24,7 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL,  NULL};
 static enum ebpf_threads_status ebpf_dcstat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
-static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
+ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                           {.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -200,12 +200,12 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
         ebpf_dc_disable_trampoline(obj);
     }
 
+    ebpf_dc_adjust_map_size(obj, em);
+
     int ret = dc_bpf__load(obj);
     if (ret) {
         return ret;
     }
-
-    ebpf_dc_adjust_map_size(obj, em);
 
     ret = (test == EBPF_LOAD_TRAMPOLINE) ? dc_bpf__attach(obj) : ebpf_dc_attach_probes(obj);
     if (!ret) {
