@@ -115,7 +115,8 @@ socket:
 
 ### Per-Queue Chart configuration
 
-RabbitMQ users with the "monitoring" tag cannot see all queue data, you'll need a user with read permissions here. To create a dedicated user for netdata:
+RabbitMQ users with the "monitoring" tag cannot see all queue data. You'll need a user with read permissions. 
+To create a dedicated user for netdata:
 
 ```bash
 rabbitmqctl add_user netdata ChangeThisSuperSecretPassword
