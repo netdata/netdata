@@ -113,4 +113,26 @@ socket:
 
 ---
 
+### Per-Queue Chart configuration
 
+RabbitMQ users with the "monitoring" tag cannot see all queue data. You'll need a user with read permissions. 
+To create a dedicated user for netdata:
+
+```bash
+rabbitmqctl add_user netdata ChangeThisSuperSecretPassword
+rabbitmqctl set_permissions netdata "^$" "^$" ".*"
+```
+
+See [set_permissions](https://www.rabbitmq.com/rabbitmqctl.8.html#set_permissions) for details.
+
+Once the user is set up, add `collect_queues_metrics: yes` to your `rabbitmq.conf`:
+
+```yaml
+local:
+  name                   : 'local'
+  host                   : '127.0.0.1'
+  port                   :  15672
+  user                   : 'netdata'
+  pass                   : 'ChangeThisSuperSecretPassword'
+  collect_queues_metrics : 'yes'
+```
