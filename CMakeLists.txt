@@ -1670,3 +1670,66 @@ endif()
 
 endif()
 endif()
+
+
+# generate config.h so that CMake becomes independent of automake
+
+## netdata version
+set(GIT_EXECUTABLE "git")
+execute_process(COMMAND ${GIT_EXECUTABLE} describe OUTPUT_VARIABLE NETDATA_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF("${NETDATA_VERSION}" STREQUAL "")
+    file(STRINGS "packaging/version" NETDATA_VERSION LIMIT_COUNT 1)
+ENDIF()
+
+set(NETDATA_USER "netdata" CACHE STRING "use this user to drop privileges")
+
+check_include_file(time.h HAVE_TIME_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+if (HAVE_TIME_H)
+    include(CheckStructHasMember)
+    check_struct_has_member("struct timespec" tv_sec "time.h" HAVE_STRUCT_TIMESPEC)
+endif (HAVE_TIME_H)
+
+check_include_file(sys/statfs.h HAVE_SYS_STATFS_H)
+check_include_file(sys/statvfs.h HAVE_SYS_STATVFS_H)
+check_include_file(inttypes.h HAVE_INTTYPES_H)
+check_include_file(stdint.h HAVE_STDINT_H)
+
+include(CheckSymbolExists)
+check_symbol_exists(major "sys/mkdev.h" MAJOR_IN_MKDEV)
+check_symbol_exists(major "sys/sysmacros.h" MAJOR_IN_SYSMACROS)
+
+include(CheckCSourceCompiles)
+check_c_source_compiles("
+  #define _GNU_SOURCE
+  #include <string.h>
+  int main() { char x = *strerror_r(0, &x, sizeof(x)); return 0; }
+  " STRERROR_R_CHAR_P)
+
+# TODO create option for bundled protobuf
+#set(BUNDLED_PROTOBUF AUTO CACHE STRING "Use bundled (statically linked) protobuf built by installer (or manually)")
+#set_property(CACHE BUNDLED_PROTOBUF PROPERTY STRINGS AUTO ON OFF)
+#
+#if(BUNDLED_PROTOBUF STREQUAL "AUTO")
+#elseif(BUNDLED_PROTOBUF)
+#else()
+#endif()
+
+IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    SET(LIKELY_MACRO "__builtin_expect(!!(x), 1)")
+    SET(UNLIKELY_MACRO "__builtin_expect(!!(x), 0)")
+ELSE()
+    SET(LIKELY_MACRO "(x)")
+    SET(UNLIKELY_MACRO "(x)")
+ENDIF()
+
+IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    SET(ALWAYS_UNUSED_MACRO "__attribute__((unused))")
+    SET(MAYBE_UNUSED_MACRO "__attribute__((unused))")
+ELSE()
+    SET(ALWAYS_UNUSED_MACRO "")
+    SET(MAYBE_UNUSED_MACRO "")
+ENDIF()
+
+configure_file(config.cmake.h.in config.h)
