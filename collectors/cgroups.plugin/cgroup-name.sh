@@ -450,6 +450,7 @@ function k8s_get_name() {
 
 function docker_get_name() {
   local id="${1}"
+  # See https://github.com/netdata/netdata/pull/13523 for details
   if command -v snap >/dev/null 2>&1 && snap list docker >/dev/null 2>&1; then
     docker_like_get_name_api DOCKER_HOST "${id}"
   elif hash docker 2> /dev/null; then
