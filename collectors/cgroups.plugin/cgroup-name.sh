@@ -450,7 +450,9 @@ function k8s_get_name() {
 
 function docker_get_name() {
   local id="${1}"
-  if hash docker 2> /dev/null; then
+  if command -v snap >/dev/null 2>&1 && snap list docker >/dev/null 2>&1; then
+    docker_like_get_name_api DOCKER_HOST "${id}"
+  elif hash docker 2> /dev/null; then
     docker_like_get_name_command docker "${id}"
   else
     docker_like_get_name_api DOCKER_HOST "${id}" || docker_like_get_name_command podman "${id}"
