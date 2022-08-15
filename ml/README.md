@@ -248,8 +248,6 @@ In terms of anomaly detection, the most interesting charts would be the `anomaly
 - `anomaly_detection.dimensions`: Percentage of anomalous dimensions.
 - `anomaly_detection.detector_window`: The length of the active window used by the detector.
 - `anomaly_detection.detector_events`: Flags (0 or 1) to show when an anomaly event has been triggered by the detector.
-- `anomaly_detection.prediction_stats`: Diagnostic metrics relating to prediction time of anomaly detection.
-- `anomaly_detection.training_stats`: Diagnostic metrics relating to training time of anomaly detection.
 
 Below is an example of how these charts may look in the presence of an anomaly event.
 
