@@ -9,20 +9,30 @@ Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 > FreeIPMI provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
-## Compile `freeipmi.plugin`
+## Installing the FreeIPMI plugin
 
-1.  install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
+When using our official DEB/RPM packages, the FreeIPMI plugin is included in a separate package named
+`netdata-plugin-freeipmi` which needs to be manually installed using your system package manager. It is not
+installed automatically due to the large number of dependencies it requires.
 
-2.  re-install Netdata from source. The installer will detect that the required libraries are now available and will also build `freeipmi.plugin`.
+When using a static build of Netdata, the FreeIPMI plugin will be included and installed automatically, though
+you will still need to have FreeIPMI installed on your system to be able to use the plugin.
 
-> ❗ In some distributions `libipmimonitoring.pc` is located in an unregistered directory.
-> In that case you should find the file and link it to the standard pkg-config directory. Usually, running
-> `sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc`
-> resolves the issue.
+When using a local build of Netdata, you need to ensure that the FreeIPMI development packages (typically called `libipmimonitoring-dev`, `libipmimonitoring-devel`, or `freeipmi-devel`) are installed when building Netdata.
 
-Keep in mind IPMI requires root access, so the plugin is setuid to root.
+### Special Considerations
 
-If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the Netdata plugin will be able to work.
+Accessing IPMI requires root access, so the FreeIPMI plugin is automatically installed setuid root.
+
+FreeIPMI does not work correctly on IBM POWER systems, thus Netdata’s FreeIPMI plugin is not usable on such systems.
+
+If you have not previously used IPMI on your system, you will probably need to run the `ipmimonitoring` command as root to initiailze IPMI settings so that the Netdata plugin works correctly. It should return information about available seensors on the system.
+
+In some distributions `libipmimonitoring.pc` is located in a non-standard directory, which
+can cause building the plugin to fail when building Netdata from source. In that case you
+should find the file and link it to the standard pkg-config directory. Usually, running `sudo ln -s
+/usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc`
+resolves this issue.
 
 ## Netdata use
 
@@ -190,5 +200,3 @@ If you need to disable IPMI for Netdata, edit `/etc/netdata/netdata.conf` and se
 [plugins]
     freeipmi = no
 ```
-
-
