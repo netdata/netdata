@@ -25,6 +25,8 @@ static struct disk {
 
     char *mount_point;
 
+    char *chart_id;
+
     // disk options caching
     int do_io;
     int do_ops;
@@ -283,7 +285,7 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
         if(unlikely(!d->st_bcache_cache_allocations)) {
             d->st_bcache_cache_allocations = rrdset_create_localhost(
                     "disk_bcache_cache_alloc"
-                    , d->device
+                    , d->chart_id
                     , d->disk
                     , family
                     , "disk.bcache_cache_alloc"
@@ -607,6 +609,26 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         struct disk *last;
         for(last = disk_root; last->next ;last = last->next);
         last->next = d;
+    }
+
+    d->chart_id = strdupz(d->device);
+
+    // read device uuid if it is an LVM volume
+    if (!strncmp(d->device, "dm-", 3)) {
+        char uuid_filename[FILENAME_MAX + 1];
+        snprintfz(uuid_filename, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
+        strncat(uuid_filename, "/dm/uuid", FILENAME_MAX);
+
+        char device_uuid[RRD_ID_LENGTH_MAX + 1];
+        if (!read_file(uuid_filename, device_uuid, RRD_ID_LENGTH_MAX) && !strncmp(device_uuid, "LVM-", 4)) {
+            trim(device_uuid);
+
+            char chart_id[RRD_ID_LENGTH_MAX + 1];
+            snprintf(chart_id, RRD_ID_LENGTH_MAX, "%s-%s", d->device, device_uuid + 4);
+
+            freez(d->chart_id);
+            d->chart_id = strdupz(chart_id);
+        }
     }
 
     char buffer[FILENAME_MAX + 1];
@@ -1078,7 +1100,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_io)) {
                 d->st_io = rrdset_create_localhost(
                         RRD_TYPE_DISK
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.io"
@@ -1109,7 +1131,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if (unlikely(!d->st_ext_io)) {
                 d->st_ext_io = rrdset_create_localhost(
                         "disk_ext"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.io"
@@ -1142,7 +1164,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ops)) {
                 d->st_ops = rrdset_create_localhost(
                         "disk_ops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.ops"
@@ -1175,7 +1197,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if (unlikely(!d->st_ext_ops)) {
                 d->st_ext_ops = rrdset_create_localhost(
                         "disk_ext_ops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.ops"
@@ -1214,7 +1236,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_qops)) {
                 d->st_qops = rrdset_create_localhost(
                         "disk_qops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.qops"
@@ -1248,7 +1270,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_backlog)) {
                 d->st_backlog = rrdset_create_localhost(
                         "disk_backlog"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.backlog"
@@ -1282,7 +1304,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_busy)) {
                 d->st_busy = rrdset_create_localhost(
                         "disk_busy"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.busy"
@@ -1311,7 +1333,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_util)) {
                 d->st_util = rrdset_create_localhost(
                         "disk_util"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.util"
@@ -1350,7 +1372,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_mops)) {
                 d->st_mops = rrdset_create_localhost(
                         "disk_mops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.mops"
@@ -1385,7 +1407,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ext_mops)) {
                 d->st_ext_mops = rrdset_create_localhost(
                         "disk_ext_mops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.mops"
@@ -1420,7 +1442,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_iotime)) {
                 d->st_iotime = rrdset_create_localhost(
                         "disk_iotime"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.iotime"
@@ -1453,7 +1475,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ext_iotime)) {
                 d->st_ext_iotime = rrdset_create_localhost(
                         "disk_ext_iotime"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.iotime"
@@ -1498,7 +1520,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_await)) {
                     d->st_await = rrdset_create_localhost(
                             "disk_await"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.await"
@@ -1529,7 +1551,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_ext_await)) {
                     d->st_ext_await = rrdset_create_localhost(
                             "disk_ext_await"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk_ext.await"
@@ -1573,7 +1595,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_avgsz)) {
                     d->st_avgsz = rrdset_create_localhost(
                             "disk_avgsz"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.avgsz"
@@ -1604,7 +1626,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_ext_avgsz)) {
                     d->st_ext_avgsz = rrdset_create_localhost(
                             "disk_ext_avgsz"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk_ext.avgsz"
@@ -1643,7 +1665,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_svctm)) {
                     d->st_svctm = rrdset_create_localhost(
                             "disk_svctm"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.svctm"
@@ -1751,7 +1773,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_hit_ratio)) {
                     d->st_bcache_hit_ratio = rrdset_create_localhost(
                             "disk_bcache_hit_ratio"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_hit_ratio"
@@ -1786,7 +1808,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_rates)) {
                     d->st_bcache_rates = rrdset_create_localhost(
                             "disk_bcache_rates"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_rates"
@@ -1816,7 +1838,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_size)) {
                     d->st_bcache_size = rrdset_create_localhost(
                             "disk_bcache_size"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_size"
@@ -1844,7 +1866,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_usage)) {
                     d->st_bcache_usage = rrdset_create_localhost(
                             "disk_bcache_usage"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_usage"
@@ -1873,7 +1895,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_cache_read_races)) {
                     d->st_bcache_cache_read_races = rrdset_create_localhost(
                             "disk_bcache_cache_read_races"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_cache_read_races"
@@ -1908,7 +1930,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache)) {
                     d->st_bcache = rrdset_create_localhost(
                             "disk_bcache"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache"
@@ -1948,7 +1970,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_bypass)) {
                     d->st_bcache_bypass = rrdset_create_localhost(
                             "disk_bcache_bypass"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_bypass"
@@ -2023,12 +2045,19 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             struct disk *t = d;
 
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
+            rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_await);
+            rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
+            rrdset_obsolete_and_pointer_null(d->st_busy);
             rrdset_obsolete_and_pointer_null(d->st_io);
+            rrdset_obsolete_and_pointer_null(d->st_ext_io);
             rrdset_obsolete_and_pointer_null(d->st_iotime);
+            rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
             rrdset_obsolete_and_pointer_null(d->st_mops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_mops);
             rrdset_obsolete_and_pointer_null(d->st_ops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_ops);
             rrdset_obsolete_and_pointer_null(d->st_qops);
             rrdset_obsolete_and_pointer_null(d->st_svctm);
             rrdset_obsolete_and_pointer_null(d->st_util);
@@ -2038,6 +2067,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_obsolete_and_pointer_null(d->st_bcache_size);
             rrdset_obsolete_and_pointer_null(d->st_bcache_usage);
             rrdset_obsolete_and_pointer_null(d->st_bcache_hit_ratio);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_allocations);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_read_races);
 
             if(d == disk_root) {
                 disk_root = d = d->next;
@@ -2068,6 +2099,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             freez(t->disk);
             freez(t->device);
             freez(t->mount_point);
+            freez(t->chart_id);
             freez(t);
         }
         else {
