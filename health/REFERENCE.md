@@ -536,11 +536,47 @@ See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more ex
 
 #### Alarm line `info`
 
-The info field can contain a small piece of text describing the alarm or template. This will be rendered in notifications and UI elements whenever the specific alarm is in focus. An example for the `ram_available` alarm is:
+The info field can contain a small piece of text describing the alarm or template. This will be rendered in
+notifications and UI elements whenever the specific alarm is in focus. An example for the `ram_available` alarm is:
 
 ```yaml
 info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
 ```
+
+info fields can contain special variables in their text that will be replaced during run-time to provide more specific
+alert information. Current variables supported are:
+
+| variable | description |
+| ---------| ----------- |
+| $family  | Will be replaced by the family instance for the alert (e.g. eth0) |
+| $label:  | Followed by a chart label name, this will replace the variable with the chart label's value |
+
+For example, an info field like the following:
+
+```yaml
+info: average inbound utilization for the network interface $family over the last minute
+```
+
+Will be rendered on the alert acting on interface `eth0` as:
+
+```yaml
+info: average inbound utilization for the network interface eth0 over the last minute
+```
+
+An alert acting on a chart that has a chart label named e.g. `target`, with a value of `https://netdata.cloud/`,
+can be enriched as follows:
+
+```yaml
+info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site $label:target
+```
+
+Will become:
+
+```yaml
+info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/
+```
+
+> Please note that variable names are case sensitive.
 
 ## Expressions
 

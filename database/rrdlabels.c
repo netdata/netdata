@@ -620,7 +620,7 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 }
 
 // ----------------------------------------------------------------------------
-// rrdlabels_get_to_buffer_or_null()
+// rrdlabels_get_value_to_buffer_or_null()
 
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
     DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
@@ -634,6 +634,17 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
     dictionary_acquired_item_release(labels, acquired_item);
 }
 
+// ----------------------------------------------------------------------------
+// rrdlabels_get_value_to_char_or_null()
+
+void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key) {
+    DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
+
+    *value = (lb && lb->label_value) ? strdupz(string2str(lb->label_value)) : NULL;
+
+    dictionary_acquired_item_release(labels, acquired_item);
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels_unmark_all()
@@ -938,6 +949,8 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
 
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->state->chart_labels, new_rrdlabels);
+
+    rrdcalc_update_rrdlabels(st);
 
     // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
     rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, st);

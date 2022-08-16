@@ -58,6 +58,7 @@ struct rrdcalc {
 
     char *source;                   // the source of this alarm
     char *units;                    // the units of the alarm
+    char *original_info;            // the original info field before any variable replacement
     char *info;                     // a short description of the alarm
 
     int update_every;               // update frequency for the alarm
@@ -210,6 +211,7 @@ extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe_comma(char *str);
 extern char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen);
+extern void rrdcalc_update_rrdlabels(RRDSET *st);
 
 extern void rrdcalc_labels_unlink();
 extern void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host);
@@ -220,5 +222,10 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     }
     return 0;
 }
+
+#define RRDCALC_VAR_MAX 100
+#define RRDCALC_VAR_FAMILY "$family"
+#define RRDCALC_VAR_LABEL "$label:"
+#define RRDCALC_VAR_LABEL_LEN (sizeof(RRDCALC_VAR_LABEL)-1)
 
 #endif //NETDATA_RRDCALC_H

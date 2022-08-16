@@ -512,23 +512,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
     ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
-    char *replaced_info = NULL;
-    if (likely(info)) {
-        char *m;
-        replaced_info = strdupz(info);
-        size_t pos = 0;
-        while ((m = strstr(replaced_info + pos, "$family"))) {
-            char *buf = NULL;
-            pos = m - replaced_info;
-            buf = find_and_replace(replaced_info, "$family", (ae->family) ? ae->family : "", m);
-            freez(replaced_info);
-            replaced_info = strdupz(buf);
-            freez(buf);
-        }
-    }
-
-    if(replaced_info) ae->info = strdupz(replaced_info);
-    freez(replaced_info);
+    if (info)
+        ae->info = strdupz(info);
 
     ae->old_status = old_status;
     ae->new_status = new_status;

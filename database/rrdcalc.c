@@ -35,6 +35,62 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
+char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
+{
+    if (!line)
+        return NULL;
+
+    size_t pos = 0;
+    char *temp = strdupz(line);
+    char var[RRDCALC_VAR_MAX];
+    char *m, *lbl_value = NULL;
+
+    while ((m = strchr(temp + pos, '$'))) {
+        int i=0;
+        char *e = m;
+        while (*e) {
+            if (*e == ' ' || i == RRDCALC_VAR_MAX - 1) {
+                break;
+            }
+            else
+                var[i]=*e;
+            e++;
+            i++;
+        }
+        var[i]='\0';
+        pos = m - temp + 1;
+        if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
+            char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
+            freez(temp);
+            temp = buf;
+        } else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
+            if(likely(rc->rrdset->state && rc->rrdset->state->chart_labels)) {
+                rrdlabels_get_value_to_char_or_null(rc->rrdset->state->chart_labels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
+                if (lbl_value) {
+                    char *buf = find_and_replace(temp, var, lbl_value, m);
+                    freez(temp);
+                    temp = buf;
+                    freez(lbl_value);
+                }
+            }
+        }
+    }
+
+    return temp;
+}
+
+void rrdcalc_update_rrdlabels(RRDSET *st) {
+    RRDCALC *rc;
+    for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
+        if (rc->original_info) {
+            if (rc->info)
+                freez(rc->info);
+
+            rc->info = rrdcalc_replace_variables(rc->original_info, rc);
+        }
+    }
+}
+
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     RRDHOST *host = st->rrdhost;
 
@@ -82,6 +138,12 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         rc->hostid->options |= RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR;
 
     if(!rc->units) rc->units = strdupz(st->units);
+
+    if (rc->original_info) {
+        if (rc->info)
+            freez(rc->info);
+        rc->info = rrdcalc_replace_variables(rc->original_info, rc);
+    }
 
     time_t now = now_realtime_sec();
     ALARM_ENTRY *ae = health_create_alarm_entry(
@@ -427,7 +489,10 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     if(rt->recipient) rc->recipient = strdupz(rt->recipient);
     if(rt->source) rc->source = strdupz(rt->source);
     if(rt->units) rc->units = strdupz(rt->units);
-    if(rt->info) rc->info = strdupz(rt->info);
+    if(rt->info) {
+        rc->info = strdupz(rt->info);
+        rc->original_info = strdupz(rt->info);
+    }
 
     if (rt->classification) rc->classification = strdupz(rt->classification);
     if (rt->component) rc->component = strdupz(rt->component);
@@ -543,6 +608,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     if(rc->source) newrc->source = strdupz(rc->source);
     if(rc->units) newrc->units = strdupz(rc->units);
     if(rc->info) newrc->info = strdupz(rc->info);
+    if(rc->original_info) newrc->original_info = strdupz(rc->original_info);
 
     if (rc->classification) newrc->classification = strdupz(rc->classification);
     if (rc->component) newrc->component = strdupz(rc->component);
@@ -586,6 +652,7 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
+    freez(rc->original_info);
     freez(rc->classification);
     freez(rc->component);
     freez(rc->type);
