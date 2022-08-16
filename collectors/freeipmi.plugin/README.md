@@ -29,7 +29,7 @@ FreeIPMI does not work correctly on IBM POWER systems, thus Netdata’s FreeIPMI
 If you have not previously used IPMI on your system, you will probably need to run the `ipmimonitoring` command as root to initiailze IPMI settings so that the Netdata plugin works correctly. It should return information about available seensors on the system.
 
 In some distributions `libipmimonitoring.pc` is located in a non-standard directory, which
-can cause building the plugin to fail when building Netdata from source..  In that case you
+can cause building the plugin to fail when building Netdata from source. In that case you
 should find the file and link it to the standard pkg-config directory. Usually, running `sudo ln -s
 /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc`
 resolves this issue.
