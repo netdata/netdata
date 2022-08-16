@@ -2,18 +2,25 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.36.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.36.1...HEAD)
 
 **Merged pull requests:**
 
+- remove reference to charts now in netdata monitoring [\#13521](https://github.com/netdata/netdata/pull/13521) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(ci\): fix fetching tags in Build workflow [\#13517](https://github.com/netdata/netdata/pull/13517) ([ilyam8](https://github.com/ilyam8))
 - docs\(postfix\): add a note about `authorized_mailq_users` [\#13515](https://github.com/netdata/netdata/pull/13515) ([ilyam8](https://github.com/ilyam8))
 - Remove extra U from log message [\#13514](https://github.com/netdata/netdata/pull/13514) ([uplime](https://github.com/uplime))
 - Print rrdcontexts versions with PRIu64 [\#13511](https://github.com/netdata/netdata/pull/13511) ([MrZammler](https://github.com/MrZammler))
 - Calculate name hash after rrdvar\_fix\_name [\#13509](https://github.com/netdata/netdata/pull/13509) ([MrZammler](https://github.com/MrZammler))
 - fix\(packaging\): add CAP\_NET\_ADMIN for go.d.plugin [\#13507](https://github.com/netdata/netdata/pull/13507) ([ilyam8](https://github.com/ilyam8))
+- netdata.service: Update PIDFile to avoid systemd legacy path warning [\#13504](https://github.com/netdata/netdata/pull/13504) ([candrews](https://github.com/candrews))
 - chore\(python.d\): remove python.d/\* announced in v1.36.0 deprecation notice [\#13503](https://github.com/netdata/netdata/pull/13503) ([ilyam8](https://github.com/ilyam8))
+- reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.36.0...v1.36.1)
 
 ## [v1.36.0](https://github.com/netdata/netdata/tree/v1.36.0) (2022-08-10)
 
@@ -340,11 +347,6 @@
 - fix\(health\): change duplicate health template message logging level to 'info' [\#12873](https://github.com/netdata/netdata/pull/12873) ([ilyam8](https://github.com/ilyam8))
 - docs: fix unresolved file references [\#12872](https://github.com/netdata/netdata/pull/12872) ([ilyam8](https://github.com/ilyam8))
 - Set trust durations to have data from children properly aligned [\#12870](https://github.com/netdata/netdata/pull/12870) ([stelfrag](https://github.com/stelfrag))
-- feat\(proc/cgroups.plugin\): add PSI stall time charts [\#12869](https://github.com/netdata/netdata/pull/12869) ([ilyam8](https://github.com/ilyam8))
-- Update README.md [\#12868](https://github.com/netdata/netdata/pull/12868) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix for negative per job busy time [\#12867](https://github.com/netdata/netdata/pull/12867) ([ktsaou](https://github.com/ktsaou))
-- Apply some logic to possible streaming destinations [\#12866](https://github.com/netdata/netdata/pull/12866) ([MrZammler](https://github.com/MrZammler))
-- fix\(cgroups.plugin\): do not disable K8s pod/container cgroups if can't rename them [\#12865](https://github.com/netdata/netdata/pull/12865) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
