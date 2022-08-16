@@ -2043,12 +2043,19 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             struct disk *t = d;
 
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
+            rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_await);
+            rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
+            rrdset_obsolete_and_pointer_null(d->st_busy);
             rrdset_obsolete_and_pointer_null(d->st_io);
+            rrdset_obsolete_and_pointer_null(d->st_ext_io);
             rrdset_obsolete_and_pointer_null(d->st_iotime);
+            rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
             rrdset_obsolete_and_pointer_null(d->st_mops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_mops);
             rrdset_obsolete_and_pointer_null(d->st_ops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_ops);
             rrdset_obsolete_and_pointer_null(d->st_qops);
             rrdset_obsolete_and_pointer_null(d->st_svctm);
             rrdset_obsolete_and_pointer_null(d->st_util);
@@ -2058,6 +2065,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_obsolete_and_pointer_null(d->st_bcache_size);
             rrdset_obsolete_and_pointer_null(d->st_bcache_usage);
             rrdset_obsolete_and_pointer_null(d->st_bcache_hit_ratio);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_allocations);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_read_races);
 
             if(d == disk_root) {
                 disk_root = d = d->next;
