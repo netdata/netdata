@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/metrics-sto
 
 # Streaming reference
 
-Each node running Netdata can stream the metrics it collects, in real time, to another node. To learn more, read about
+Each node running Netdata can stream the metrics it collects in real time to another node. To learn more, read about
 [how streaming works](/docs/metrics-storage-management/how-streaming-works.mdx).
 
 For a quickstart guide for enabling a simple `parent-child` streaming relationship, see our [stream metrics between
@@ -351,7 +351,7 @@ curl -X GET http://localhost:19999/api/v1/info | grep 'Stream Compression'
 ```
 "buildinfo": "dbengine|Native HTTPS|Netdata Cloud|ACLK Next Generation|New Cloud Protocol Support|ACLK Legacy|TLS Host Verification|Machine Learning|Stream Compression|protobuf|JSON-C|libcrypto|libm|LWS v3.2.2|mosquitto|zlib|apps|cgroup Network Tracking|EBPF|perf|slabinfo",
 ```
-> Note: If your OS doesn't support Netdata compression the `buildinfo` will not contain the `Stream Compression` statement.
+> Note: If your OS doesn't support Netdata compression, the `buildinfo` will not contain the `Stream Compression` statement.
 
 To check if your Netdata Agent has stream compression enabled, run the following GET request in your browser or terminal:
 
@@ -367,7 +367,7 @@ Note: The `stream-compression` status can be `"enabled" | "disabled" | "N/A"`.
 A compressed data packet is determined and decompressed on the fly.
 
 #### Limitations
-This limitation will be withdrawn asap and is work-in-progress.
+This limitation will be withdrawn ASAP and is a work-in-progress.
 
 The current implementation of streaming data compression can support only a few number of dimensions in a chart with names that cannot exceed the size of 16384 bytes. In case your instance hit this limitation, the agent will deactivate compression during runtime to avoid stream corruption. This limitation can be seen in the error.log file with the sequence of the following messages:
 ```
