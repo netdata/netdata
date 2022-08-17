@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update FreeIPMI and CUPS plugin documentation. [\#13526](https://github.com/netdata/netdata/pull/13526) ([Ferroin](https://github.com/Ferroin))
+- Use LVM UUIDs in chart ids for logical volumes [\#13525](https://github.com/netdata/netdata/pull/13525) ([vlvkobal](https://github.com/vlvkobal))
 - remove reference to charts now in netdata monitoring [\#13521](https://github.com/netdata/netdata/pull/13521) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(ci\): fix fetching tags in Build workflow [\#13517](https://github.com/netdata/netdata/pull/13517) ([ilyam8](https://github.com/ilyam8))
 - docs\(postfix\): add a note about `authorized_mailq_users` [\#13515](https://github.com/netdata/netdata/pull/13515) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +19,7 @@
 - chore\(python.d\): remove python.d/\* announced in v1.36.0 deprecation notice [\#13503](https://github.com/netdata/netdata/pull/13503) ([ilyam8](https://github.com/ilyam8))
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
+- Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -342,11 +345,6 @@
 - Fix compilation warnings [\#12886](https://github.com/netdata/netdata/pull/12886) ([vlvkobal](https://github.com/vlvkobal))
 - Take into account the in queue wait time when executing a data query [\#12885](https://github.com/netdata/netdata/pull/12885) ([stelfrag](https://github.com/stelfrag))
 - Update dashboard to version v2.25.2. [\#12884](https://github.com/netdata/netdata/pull/12884) ([netdatabot](https://github.com/netdatabot))
-- Consider ZFS ARC shrinkable as cache on FreeBSD [\#12879](https://github.com/netdata/netdata/pull/12879) ([vlvkobal](https://github.com/vlvkobal))
-- Remove Fedora 34 from CI and package builds. [\#12875](https://github.com/netdata/netdata/pull/12875) ([Ferroin](https://github.com/Ferroin))
-- fix\(health\): change duplicate health template message logging level to 'info' [\#12873](https://github.com/netdata/netdata/pull/12873) ([ilyam8](https://github.com/ilyam8))
-- docs: fix unresolved file references [\#12872](https://github.com/netdata/netdata/pull/12872) ([ilyam8](https://github.com/ilyam8))
-- Set trust durations to have data from children properly aligned [\#12870](https://github.com/netdata/netdata/pull/12870) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
