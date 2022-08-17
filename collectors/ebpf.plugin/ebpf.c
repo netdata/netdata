@@ -1263,35 +1263,29 @@ static void ebpf_update_table_size()
 /**
  * Set Load mode
  *
- * @param load  default load mode.
+ * @param origin specify the configuration file loaded
  */
-static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load)
+static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebpf_load_mode_t origin)
 {
-#ifdef LIBBPF_MAJOR_VERSION
-    if (load == EBPF_LOAD_CORE || load == EBPF_LOAD_PLAY_DICE) {
-        load = (!default_btf) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
-    }
-#else
-    load = EBPF_LOAD_LEGACY;
-#endif
+    UNUSED(load);
 
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
-        // TO DO: Use `load` variable after we change all threads.
-        ebpf_modules[i].load = EBPF_LOAD_LEGACY; // load ;
+        ebpf_modules[i].load |= origin ;
     }
 }
 
 /**
  *  Update mode
  *
- *  @param str value read from configuration file.
+ *  @param str      value read from configuration file.
+ *  @param origin   specify the configuration file loaded
  */
-static inline void epbf_update_load_mode(char *str)
+static inline void epbf_update_load_mode(char *str, netdata_ebpf_load_mode_t origin)
 {
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(str);
 
-    ebpf_set_load_mode(load);
+    ebpf_set_load_mode(load, origin);
 }
 
 /**
@@ -1299,9 +1293,11 @@ static inline void epbf_update_load_mode(char *str)
  *
  * @param disable_apps    variable to store information related to apps.
  * @param disable_cgroups variable to store information related to cgroups.
- * @param update_every value to overwrite the update frequency set by the server.
+ * @param update_every    value to overwrite the update frequency set by the server.
+ * @param origin          specify the configuration file loaded
  */
-static void read_collector_values(int *disable_apps, int *disable_cgroups, int update_every)
+static void read_collector_values(int *disable_apps, int *disable_cgroups,
+                                  int update_every, netdata_ebpf_load_mode_t origin)
 {
     // Read global section
     char *value;
@@ -1323,7 +1319,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
 
     value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, EBPF_CFG_DEFAULT_PROGRAM);
 
-    epbf_update_load_mode(value);
+    epbf_update_load_mode(value, origin);
 
     ebpf_update_interval(update_every);
 
@@ -1501,6 +1497,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
 static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups, int update_every)
 {
     char lpath[4096];
+    netdata_ebpf_load_mode_t origin;
 
     snprintf(lpath, 4095, "%s/%s", path, NETDATA_EBPF_CONFIG_FILE);
     if (!appconfig_load(&collector_config, lpath, 0, NULL)) {
@@ -1508,9 +1505,11 @@ static int load_collector_config(char *path, int *disable_apps, int *disable_cgr
         if (!appconfig_load(&collector_config, lpath, 0, NULL)) {
             return -1;
         }
-    }
+        origin = EBPF_LOADED_FROM_STOCK;
+    } else
+        origin = EBPF_LOADED_FROM_USER;
 
-    read_collector_values(disable_apps, disable_cgroups, update_every);
+    read_collector_values(disable_apps, disable_cgroups, update_every, origin);
 
     return 0;
 }
@@ -1554,7 +1553,7 @@ static inline void ebpf_load_thread_config()
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_update_module(&ebpf_modules[i]);
+        ebpf_update_module(&ebpf_modules[i], default_btf);
     }
 }
 
@@ -1773,14 +1772,14 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case EBPF_OPTION_LEGACY: {
-                ebpf_set_load_mode(EBPF_LOAD_LEGACY);
+                ebpf_set_load_mode(EBPF_LOAD_LEGACY, EBPF_LOADED_FROM_USER);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with \"LEGACY\" code, because it was started with the option \"[-]-legacy\".");
 #endif
                 break;
             }
             case EBPF_OPTION_CORE: {
-                ebpf_set_load_mode(EBPF_LOAD_CORE);
+                ebpf_set_load_mode(EBPF_LOAD_CORE, EBPF_LOADED_FROM_USER);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with \"CO-RE\" code, because it was started with the option \"[-]-core\".");
 #endif

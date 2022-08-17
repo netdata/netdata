@@ -291,7 +291,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->enabled) {
-            if (em->load == EBPF_LOAD_LEGACY) {
+            if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
                     errors++;
 

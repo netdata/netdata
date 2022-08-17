@@ -1227,7 +1227,7 @@ static void ebpf_cachestat_set_internal_value()
 static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
-    if (em->load == EBPF_LOAD_LEGACY) {
+    if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;

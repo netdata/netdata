@@ -812,7 +812,7 @@ static void ebpf_create_swap_charts(int update_every)
 static int ebpf_swap_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
-    if (em->load == EBPF_LOAD_LEGACY) {
+    if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;
