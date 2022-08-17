@@ -850,7 +850,7 @@ static char *ebpf_convert_collect_pid_to_string(netdata_apps_level_t level)
     else if (level == NETDATA_APPS_LEVEL_ALL)
         return EBPF_CFG_PID_ALL;
 
-    return EBPF_CFG_PID_ALL;
+    return EBPF_CFG_PID_INTERNAL_USAGE;
 }
 
 /**

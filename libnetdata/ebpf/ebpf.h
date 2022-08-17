@@ -30,6 +30,7 @@
 #define EBPF_CFG_PID_REAL_PARENT "real parent"
 #define EBPF_CFG_PID_PARENT "parent"
 #define EBPF_CFG_PID_ALL "all"
+#define EBPF_CFG_PID_INTERNAL_USAGE "not used"
 
 #define EBPF_CFG_CORE_ATTACH "ebpf co-re tracing"
 #define EBPF_CFG_ATTACH_TRAMPOLINE "trampoline"
