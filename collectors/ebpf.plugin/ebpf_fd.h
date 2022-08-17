@@ -79,6 +79,7 @@ extern void *ebpf_fd_thread(void *ptr);
 extern void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern struct config fd_config;
 extern netdata_fd_stat_t **fd_pid;
+extern netdata_ebpf_targets_t fd_targets[];
 
 #endif /* NETDATA_EBPF_FD_H */
 
