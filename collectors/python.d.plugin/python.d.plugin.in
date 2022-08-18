@@ -497,6 +497,8 @@ class FileLockRegistry:
         self.locks = dict()
 
     def register(self, name):
+        if name.startswith("dockerd"):
+            name = "docker" + name[7:]
         if name in self.locks:
             return
         file = os.path.join(self.path, '{0}.collector.lock'.format(name))
@@ -505,6 +507,8 @@ class FileLockRegistry:
         self.locks[name] = lock
 
     def unregister(self, name):
+        if name.startswith("dockerd"):
+            name = "docker" + name[7:]
         if name not in self.locks:
             return
         lock = self.locks[name]
