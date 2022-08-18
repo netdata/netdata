@@ -1107,11 +1107,32 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
             error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
-        origin = EBPF_LOADED_FROM_STOCK;
+        // If user defined data globaly, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
+        // forcing users to configure thread by thread.
+        origin = (!(em->load & NETDATA_EBPF_LOAD_SOURCE)) ? EBPF_LOADED_FROM_STOCK : em->load;
     } else
         origin = EBPF_LOADED_FROM_USER;
 
     ebpf_update_module_using_config(em, origin, btf_file);
+}
+
+/**
+ * Adjust Apps Cgroup
+ *
+ * Apps and cgroup has internal cleanup that needs attaching tracers to release_task, to avoid overload the function
+ * we will enable this integration by default, if and only if, we are running with trampolines.
+ *
+ * @param em   a poiter to the main thread structure.
+ * @param mode is the mode used with different
+ */
+void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode)
+{
+    if ((em->load & EBPF_LOADED_FROM_STOCK) &&
+    (em->apps_charts || em->cgroup_charts) &&
+    mode != EBPF_LOAD_TRAMPOLINE) {
+        em->apps_charts = NETDATA_EBPF_APPS_FLAG_NO;
+        em->cgroup_charts = 0;
+    }
 }
 
 //----------------------------------------------------------------------------------------------------------------------

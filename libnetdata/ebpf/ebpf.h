@@ -209,6 +209,7 @@ typedef enum netdata_ebpf_load_mode {
     EBPF_LOADED_FROM_USER = 1<<4    // Configuration loaded from user
 } netdata_ebpf_load_mode_t;
 #define NETDATA_EBPF_LOAD_METHODS (EBPF_LOAD_LEGACY|EBPF_LOAD_CORE|EBPF_LOAD_PLAY_DICE)
+#define NETDATA_EBPF_LOAD_SOURCE (EBPF_LOADED_FROM_STOCK|EBPF_LOADED_FROM_USER)
 
 typedef enum netdata_ebpf_program_loaded {
     EBPF_LOAD_PROBE,         // Attach probes on targets
@@ -279,6 +280,7 @@ extern void ebpf_mount_config_name(char *filename, size_t length, char *path, co
 extern int ebpf_load_config(struct config *config, char *filename);
 extern void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
+extern void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode);
 extern char *ebpf_find_symbol(char *search);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
