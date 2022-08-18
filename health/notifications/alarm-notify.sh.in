@@ -428,6 +428,10 @@ else
   done
 fi
 
+if [[ ! $curl_options =~ .*\--connect-timeout ]]; then
+  curl_options+=" --connect-timeout 5"
+fi
+
 OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
 
 # If we didn't autodetect the character set for e-mail and it wasn't
