@@ -314,6 +314,8 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
+#else
+void *defaul_btf = NULL;
 #endif
 char *btf_path = NULL;
 
