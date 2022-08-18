@@ -104,9 +104,9 @@ platforms, but may require some extra effort from users.
 | FreeBSD | 13-STABLE | No | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | FreeBSD | 12-STABLE | No | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo | Latest | No | |
-| macOS | 12 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies |
-| macOS | 11 | No | Planned for **Core** tier support. Currently only works for Intel-based hardware. Requires Homebrew for dependencies.  |
-| macOS | 10.15 | No | Planned for **Core** tier support. Requires Homebrew for dependencies.  |
+| macOS | 12 | No | Currently only works for Intel-based hardware. Requires Homebrew for dependencies |
+| macOS | 11 | No | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.  |
+| macOS | 10.15 | No | Requires Homebrew for dependencies.  |
 | openSUSE | Tumbleweed | No | |
 
 ## Third-party supported platforms
