@@ -131,7 +131,7 @@ def dirs():
 
 DIRS = dirs()
 
-IS_ATTY = sys.stdout.isatty()
+IS_ATTY = sys.stdout.isatty() or sys.stderr.isatty()
 
 MODULE_SUFFIX = '.chart.py'
 
@@ -496,7 +496,16 @@ class FileLockRegistry:
         self.path = path
         self.locks = dict()
 
+    @staticmethod
+    def rename(name):
+        # go version name is 'docker'
+        if name.startswith("dockerd"):
+            name = "docker" + name[7:]
+        return name
+
+
     def register(self, name):
+        name = self.rename(name)
         if name in self.locks:
             return
         file = os.path.join(self.path, '{0}.collector.lock'.format(name))
@@ -505,6 +514,7 @@ class FileLockRegistry:
         self.locks[name] = lock
 
     def unregister(self, name):
+        name = self.rename(name)
         if name not in self.locks:
             return
         lock = self.locks[name]
@@ -892,6 +902,11 @@ def main():
         cmd.update_every,
         registry,
     )
+
+    # cheap attempt to reduce chance of python.d job running before go.d
+    # TODO: better implementation needed
+    if not IS_ATTY:
+        time.sleep(1.5)
 
     try:
         if not p.setup():
