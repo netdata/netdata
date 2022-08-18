@@ -131,7 +131,7 @@ def dirs():
 
 DIRS = dirs()
 
-IS_ATTY = sys.stdout.isatty()
+IS_ATTY = sys.stdout.isatty() or sys.stderr.isatty()
 
 MODULE_SUFFIX = '.chart.py'
 
@@ -902,6 +902,9 @@ def main():
         cmd.update_every,
         registry,
     )
+
+    if not IS_ATTY:
+        time.sleep(1.5)
 
     try:
         if not p.setup():
