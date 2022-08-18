@@ -3899,7 +3899,7 @@ netdataDashboard.context = {
         info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded. Single queries that have failed outside the transactions are also accounted as rollbacks.</p>'
     },
     'postgres.db_connections_utilization': {
-        info: 'Connection utilization per database. Utilization is measured as a percentage of CONNECTION LIMIT per database (if set) or max_connections (if CONNECTION LIMIT is not set).'
+        info: 'Connection utilization per database. Utilization is measured as a percentage of <i>CONNECTION LIMIT</i> per database (if set) or <i>max_connections</i> (if <i>CONNECTION LIMIT</i> is not set).'
     },
     'postgres.db_connections': {
         info: 'Number of current connections per database.'
