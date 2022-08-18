@@ -7,7 +7,8 @@
 #define NETDATA_USER "@NETDATA_USER@"
 
 /* Using a bundled copy of protobuf */
-#define BUNDLED_PROTOBUF 1
+// #undef BUNDLED_PROTOBUF
+#define HAVE_PROTOBUF 1
 
 #define likely(x) @LIKELY_MACRO@
 #define unlikely(x) @UNLIKELY_MACRO@
@@ -29,13 +30,24 @@
 #cmakedefine MAJOR_IN_MKDEV
 #cmakedefine MAJOR_IN_SYSMACROS
 
+#cmakedefine HAVE_CRYPTO
+
+#cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
+
 /* they are defined as REQUIRED in CMakeLists.txt */
 #define NETDATA_WITH_ZLIB 1
 #define ENABLE_JSONC 1
+
+#cmakedefine ENABLE_ML
+
+/* NSA spy stuff */
 #define ENABLE_HTTPS 1
+#cmakedefine01 HAVE_X509_VERIFY_PARAM_set1_host
 
 #define ENABLE_ACLK
 #define ENABLE_DBENGINE
+#cmakedefine ENABLE_APPS_PLUGIN
+
 
 #define __always_unused @ALWAYS_UNUSED_MACRO@
 #define __maybe_unused @MAYBE_UNUSED_MACRO@
