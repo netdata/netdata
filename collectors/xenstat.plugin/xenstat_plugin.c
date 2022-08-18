@@ -1006,12 +1006,16 @@ int main(int argc, char **argv) {
 
     if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_init()\n");
     xhandle = xenstat_init();
-    if (xhandle == NULL)
+    if (xhandle == NULL) {
         error("XENSTAT: failed to initialize xenstat library.");
+        return 1;
+    }
 
     if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling libxl_ctx_alloc()\n");
     if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, NULL)) {
         error("XENSTAT: failed to initialize xl context.");
+        xenstat_uninit(xhandle);
+        return 1;
     }
     libxl_dominfo_init(&info);
 
@@ -1062,4 +1066,6 @@ int main(int argc, char **argv) {
     libxl_ctx_free(ctx);
     xenstat_uninit(xhandle);
     info("XENSTAT process exiting");
+    
+    return 0;
 }
