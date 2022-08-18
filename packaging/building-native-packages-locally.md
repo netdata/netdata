@@ -1,18 +1,20 @@
 <!--
 title: How to build native (DEB/RPM) packages locally for testing
-description: 
+description: Instructions for developers who need to build native packages locally for testing.
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/building-native-packages-locally.md
 keywords: [Netdata native package, Netdata RPM, Netdata DEB, Testing native packages Netdata]
 -->
 
 # How to build native (DEB/RPM) packages locally for testing
 
-> Please provide a short summary
 ## Requirements
+
 You will need:
 
-* A working Docker host (it _may_ work with Podman or Singularity, but they are untested).
+* A working Docker or Podman host.
 * A local copy of the source tree you want to build from.
+
+## Building the packages
 
 In the root of the source tree you want to build from, clean up any existing files left over from a previous build and then run:
 
@@ -20,15 +22,22 @@ In the root of the source tree you want to build from, clean up any existing fil
 docker run -it --rm -e VERSION=0.1 -v $PWD:/netdata netdata/package-builders:<tag>
 ```
 
+or
+
+```bash
+podman run -it --rm -e VERSION=0.1 -v $PWD:/netdata netdata/package-builders:<tag>
+```
+
 The `<tag>` should be the lowercase distribution name with no spaces, followed by the release of that distribution. For
-example, `centos7` to build on CentOS 7, or `ubuntu20.04` to build on Ubuntu 20.04 (use `rockylinux8` for RHEL 8 or CentOS 8).
+example, `centos7` to build on CentOS 7, or `ubuntu20.04` to build on Ubuntu 20.04. Note that we use Alma Linux
+for builds on CentOS/RHEL 8 or newer.
 
 Once it finishes, the built packages can be found under `artifacts/` in the source tree.
 
 If an error is encountered and the build is being run interactively, it will drop to a shell to allow you to
 inspect the state of the container and look at build logs.
 
-## Longer explanation
+### Detailed explanation
 
 The environments used for building our packages are fully self-contianed Docker images built from the Dockerfiles
 located at https://github.com/netdata/helper-images/tree/master/package-builders. These are published on Docker
@@ -37,9 +46,9 @@ Hub with the image name `netdata/package-builders`, and tagged using the name an
 
 The build code has two specific requirements when run:
 
-* It expects the source tree it should build from to be located at `/netdata`, and expects that said source tree
+- It expects the source tree it should build from to be located at `/netdata`, and expects that said source tree
   is clean (no artifacts left over from previous builds).
-* It expects an environment variable named `VERSION` to be defined, and uses this to control what version number
+- It expects an environment variable named `VERSION` to be defined, and uses this to control what version number
   will be shown in the package metadata and filenames.
 
 Internally, the source tree gets copied to a temporary location for the build process so that the souce tree can
@@ -72,13 +81,21 @@ The quick and easy way to do this is to run:
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
 
-Which will set up the required QEMU user-mode emulation until you reboot.
+or
+
+```bash
+podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
+
+Which will set up the required QEMU user-mode emulation until you reboot. Note that if using Podman, you will need
+to run this as root and not as a rootless container (the package builds work fine in a rootless container though,
+even if doing cross-architecture builds).
 
 Once you have that set up, the command to build the packages is the same as above, you just need to add a correct
-`--platform` option to the `docker run` command. The current list of architectures we build for, and the correct
-value for the `--platform` option is:
+`--platform` option to the `docker run` or `podman run` command. The current list of architectures we build for,
+and the correct value for the `--platform` option is:
 
-* 32-bit ARMv7: `linux/arm/v7`
-* 64-bit ARMv8: `linux/arm64/v8`
-* 32-bit x86: `linux/i386`
-* 64-bit x86: `linux/amd64`
+- 32-bit ARMv7: `linux/arm/v7`
+- 64-bit ARMv8: `linux/arm64/v8`
+- 32-bit x86: `linux/i386`
+- 64-bit x86: `linux/amd64`
