@@ -3803,10 +3803,30 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // POSTGRESQL
     'postgres.connections_utilization': {
-        info: 'Connections in use as percentage of <i>max_connections</i>. Connection "slots" that are reserved for superusers (<i>superuser_reserved_connections</i>) are subtracted from the limit. If the utilization is 100% new connections will be accepted only for superusers, and no new replication connections will be accepted.'
+        room: { 
+            mainheads: [
+                function (_, id) {
+                    cgroupMemLimitIsSet = 1;
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-append-options="percentage"'
+                        + ' data-gauge-max-value="100"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="Connections Utilization"'
+                        + ' data-units="%"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[1] + '"'
+                        + ' role="application"></div>';
+                }
+            ],
+        },
+        info: '<p>A connection is an established line of communication between a client and the PostgreSQL server. Each connection adds to the load on the PostgreSQL server. To guard against running out of memory or overloading the database the <i>max_connections</i> parameter (default = 100) defines the maximum number of concurrent connections to the database server. A separate parameter, <i>superuser_reserved_connections</i> (default = 3), defines the quota for superuser connections (so that superusers can connect even if all other connection slots are blocked).</p><p><br></p><p><b>Total connection utilization</b> across all databases. Utilization is measured as a percentage of (<i>max_connections</i> - <i>superuser_reserved_connections</i>). If the utilization is 100% no more new connections will be accepted (superuser connections will still be accepted if superuser quota is available).</p>'
     },
     'postgres.connections_usage': {
-        info: '<p>Connections usage. The maximum number of concurrent connections to the database server is <i>max_connections</i> minus <i>superuser_reserved_connections</i>.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
+        info: '<p><b>Connections usage</b> across all databases. The maximum number of concurrent connections to the database server is (<i>max_connections</i> - <i>superuser_reserved_connections</i>). As a general rule, if you need more than 200 connections it is advisable to use connection pooling.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
     },
     'postgres.checkpoints': {
         info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it’s been caching in memory has been synchronized with the disk. It’s desirable when checkpoints are scheduled rather than requested, as the latter can indicate that your databases are under heavy load.</p><p><b>Scheduled</b> - checkpoints triggered due that the time elapsed from the previous checkpoint is more than pg setting <i>checkpoint_timeout</i>. <b>Requested</b> - checkpoints ran due to uncheckpointed WAL size grew to more than <i>max_wal_size</i> setting.</p>'
@@ -3842,6 +3862,23 @@ netdataDashboard.context = {
         info: 'The oldest current transaction ID (XID). If for some reason autovacuum fails to clear old XIDs from a table, the system will begin to emit warning messages when the database\'s oldest XIDs reach eleven million transactions from the wraparound point. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
     'postgres.uptime': {
+        room: { 
+            mainheads: [
+                function (os, id) {
+                    void (os);
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="easypiechart"'
+                        + ' data-title="Uptime"'
+                        + ' data-units="Seconds"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="10%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' role="application"></div>';
+                }
+            ],
+        },
         info: 'The time elapsed since the Postgres process was started.'
     },
 
@@ -3862,18 +3899,62 @@ netdataDashboard.context = {
         info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded. Single queries that have failed outside the transactions are also accounted as rollbacks.</p>'
     },
     'postgres.db_connections_utilization': {
-        info: 'Connections in use as percentage of the database\'s <i>CONNECTION LIMIT</i> (if set) or <i>max_connections</i>.'
+        info: 'Connection utilization per database. Utilization is measured as a percentage of <i>CONNECTION LIMIT</i> per database (if set) or <i>max_connections</i> (if <i>CONNECTION LIMIT</i> is not set).'
     },
     'postgres.db_connections': {
-        info: 'Number of backends currently connected to this database.'
+        info: 'Number of current connections per database.'
     },    
     'postgres.db_buffer_cache_hit_ratio': {
+        /*
+        room: { 
+            mainheads: [
+                function (_, id) {
+                    cgroupMemLimitIsSet = 1;
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-append-options="percentage"'
+                        + ' data-gauge-max-value="100"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="Cache Hit Ratio"'
+                        + ' data-units="%"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[1] + '"'
+                        + ' role="application"></div>';
+                }
+            ],
+        },
+        */        
         info: 'Buffer cache hit ratio. When clients request data, postgres checks shared memory and if there are no relevant data there it has to read it from disk, thus queries become slower.'
     },
     'postgres.db_blocks_read': {
         info: '<p>Number of blocks read from shared buffer cache or from disk.</p><p><b>disk</b> - number of disk blocks read. <b>memory</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
     },
     'postgres.db_rows_read_ratio': {
+        /*
+        room: {
+            mainheads: [
+                function (_, id) {
+                    cgroupMemLimitIsSet = 1;
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-append-options="percentage"'
+                        + ' data-gauge-max-value="100"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="Rows Fetched vs Returned"'
+                        + ' data-units="%"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[1] + '"'
+                        + ' role="application"></div>';
+                }
+            ],
+        },
+        */        
         info: 'Percentage of returned/fetched rows.'
     },
     'postgres.db_rows_read': {
@@ -3904,6 +3985,23 @@ netdataDashboard.context = {
         info: 'Amount of data written temporarily to disk to execute queries.'
     },
     'postgres.db_size': {
+        room: {
+            mainheads: [
+                function (os, id) {
+                    void (os);
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="easypiechart"'
+                        + ' data-title="DB Size"'
+                        + ' data-units="MiB"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="10%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' role="application"></div>';
+                }
+            ],
+        },        
         info: 'Actual on-disk usage of the database\'s data directory and any associated tablespaces.'
     },
 
