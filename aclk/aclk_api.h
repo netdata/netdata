@@ -23,19 +23,8 @@ extern int use_mqtt_5;
 extern int aclk_ctx_based;
 
 #ifdef ENABLE_ACLK
-void *aclk_starter(void *ptr);
 
 void aclk_host_state_update(RRDHOST *host, int connect);
-
-#define NETDATA_ACLK_HOOK                                                                                              \
-    { .name = "ACLK_Main",                                                                                             \
-      .config_section = NULL,                                                                                          \
-      .config_name = NULL,                                                                                             \
-      .enabled = 1,                                                                                                    \
-      .thread = NULL,                                                                                                  \
-      .init_routine = NULL,                                                                                            \
-      .start_routine = aclk_starter },
-
 #endif
 
 void add_aclk_host_labels(void);

@@ -20,21 +20,6 @@ int aclk_ctx_based = 0;
 
 #define ACLK_IMPL_KEY_NAME "aclk implementation"
 
-#ifdef ENABLE_ACLK
-void *aclk_starter(void *ptr) {
-    char *aclk_impl_req = config_get(CONFIG_SECTION_CLOUD, ACLK_IMPL_KEY_NAME, "ng");
-
-    if (!strcasecmp(aclk_impl_req, "ng")) {
-        return aclk_main(ptr);
-    } else if (!strcasecmp(aclk_impl_req, "legacy")) {
-        error("Legacy ACLK is not supported anymore key \"" ACLK_IMPL_KEY_NAME "\" in section \"" CONFIG_SECTION_CLOUD "\" ignored. Using ACLK-NG.");
-    } else {
-        error("Unknown value \"%s\" of key \"" ACLK_IMPL_KEY_NAME "\" in section \"" CONFIG_SECTION_CLOUD "\". Using ACLK-NG. This config key will be deprecated.", aclk_impl_req);
-    }
-    return aclk_main(ptr);
-}
-#endif /* ENABLE_ACLK */
-
 void add_aclk_host_labels(void) {
     DICTIONARY *labels = localhost->host_labels;
 

@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-extern void *aclk_starter(void *ptr);
+extern void *aclk_main(void *ptr);
 extern void *analytics_main(void *ptr);
 extern void *checks_main(void *ptr);
 extern void *cpuidlejitter_main(void *ptr);
@@ -131,7 +131,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = aclk_starter
+        .start_routine = aclk_main
     },
 #endif
 
