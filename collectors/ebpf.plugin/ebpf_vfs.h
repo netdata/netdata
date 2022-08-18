@@ -149,13 +149,28 @@ enum vfs_counters {
 
 enum netdata_vfs_tables {
     NETDATA_VFS_PID,
-    NETDATA_VFS_ALL
+    NETDATA_VFS_ALL,
+    NETDATA_VFS_CTRL
+};
+
+enum netdata_vfs_calls_name {
+    NETDATA_EBPF_VFS_WRITE,
+    NETDATA_EBPF_VFS_WRITEV,
+    NETDATA_EBPF_VFS_READ,
+    NETDATA_EBPF_VFS_READV,
+    NETDATA_EBPF_VFS_UNLINK,
+    NETDATA_EBPF_VFS_FSYNC,
+    NETDATA_EBPF_VFS_OPEN,
+    NETDATA_EBPF_VFS_CREATE,
+
+    NETDATA_VFS_END_LIST
 };
 
 extern netdata_publish_vfs_t **vfs_pid;
 
 extern void *ebpf_vfs_thread(void *ptr);
 extern void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern netdata_ebpf_targets_t vfs_targets[];
 
 extern struct config vfs_config;
 
