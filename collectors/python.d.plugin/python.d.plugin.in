@@ -903,6 +903,8 @@ def main():
         registry,
     )
 
+    # cheap attempt to reduce chance of python.d job running before go.d
+    # TODO: better implementation needed
     if not IS_ATTY:
         time.sleep(1.5)
 
