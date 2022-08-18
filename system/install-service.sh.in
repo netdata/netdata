@@ -666,6 +666,7 @@ main() {
 
   [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
   [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
+  exit 0
 }
 
 main "${@}"
