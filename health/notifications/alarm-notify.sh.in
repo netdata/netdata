@@ -1352,7 +1352,6 @@ send_telegram() {
           "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
         notify_telegram=0
-        attempt_counter=$((attempt_counter + 1))
 
         if [ "${httpcode}" = "200" ]; then
           info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
