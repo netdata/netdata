@@ -353,7 +353,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
     if (!ret) {
         ebpf_vfs_set_hash_tables(obj);
 
-        ebpf_update_controller(cachestat_maps[NETDATA_VFS_CTRL].map_fd, em);
+        ebpf_update_controller(vfs_maps[NETDATA_VFS_CTRL].map_fd, em);
     }
 
     return ret;
@@ -397,6 +397,11 @@ static void ebpf_vfs_cleanup(void *ptr)
     freez(vfs_hash_values);
     freez(vfs_vector);
     freez(vfs_threads.thread);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        vfs_bpf__destroy(bpf_obj);
+#endif
 
     vfs_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;

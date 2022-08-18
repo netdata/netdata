@@ -284,7 +284,7 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
     if (!ret) {
         ebpf_fd_set_hash_tables(obj);
 
-        ebpf_update_controller(cachestat_maps[NETDATA_CACHESTAT_CTRL].map_fd, em);
+        ebpf_update_controller(fd_maps[NETDATA_CACHESTAT_CTRL].map_fd, em);
     }
 
     return ret;
@@ -330,6 +330,11 @@ static void ebpf_fd_cleanup(void *ptr)
     freez(fd_thread.thread);
     freez(fd_values);
     freez(fd_vector);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        fd_bpf__destroy(bpf_obj);
+#endif
 
     fd_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;
