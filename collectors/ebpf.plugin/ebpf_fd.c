@@ -58,6 +58,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_kprobe, false);
     if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
@@ -102,6 +103,7 @@ static inline void ebpf_disable_trampoline(struct fd_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_close_fd_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata___close_fd_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata___close_fd_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_fentry, false);
 }
 
 /*
@@ -132,8 +134,8 @@ static inline void ebpf_disable_specific_trampoline(struct fd_bpf *obj)
 static void ebpf_set_trampoline_target(struct fd_bpf *obj)
 {
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fentry, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
-
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
+    bpf_program__set_attach_target(obj->progs.netdata_release_task_fd_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
 
     if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
         bpf_program__set_attach_target(
@@ -167,6 +169,13 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
     obj->links.netdata_sys_open_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_sys_open_kretprobe, true,
                                                                        fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
     ret = libbpf_get_error(obj->links.netdata_sys_open_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_release_task_fd_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_fd_kprobe,
+                                                                           true,
+                                                                           EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_release_task_fd_kprobe);
     if (ret)
         return -1;
 
@@ -1078,6 +1087,7 @@ static void ebpf_fd_allocate_global_vectors(int apps)
 static int ebpf_fd_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_FD_SYSCALL_OPEN].mode);
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
@@ -1098,7 +1108,7 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
     if (ret)
         error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
-    return 0;
+    return ret;
 }
 
 /**
