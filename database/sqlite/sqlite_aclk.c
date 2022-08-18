@@ -426,7 +426,7 @@ static void timer_cb(uv_timer_t* handle)
         if (wc->rotation_after && wc->rotation_after < now) {
             cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
             if (!aclk_database_enq_cmd_noblock(wc, &cmd))
-                wc->rotation_after += ACLK_DATABASE_ROTATION_INTERVAL;
+                wc->rotation_after = now + ACLK_DATABASE_ROTATION_INTERVAL;
         }
 
         if (wc->chart_updates && !wc->chart_pending && wc->chart_payload_count) {
