@@ -860,8 +860,6 @@ set(CLAIM_PLUGIN_FILES
 
 set(ACLK_ALWAYS_BUILD
         aclk/aclk_rrdhost_state.h
-        aclk/aclk_api.c
-        aclk/aclk_api.h
         aclk/aclk_proxy.c
         aclk/aclk_proxy.h
         )

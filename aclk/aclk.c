@@ -28,6 +28,16 @@ int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
 int disconnect_req = 0;
 
+int aclk_connected = 0;
+int use_mqtt_5 = 0;
+int aclk_ctx_based = 0;
+int aclk_disable_runtime = 0;
+int aclk_stats_enabled;
+int aclk_kill_link = 0;
+
+usec_t aclk_session_us = 0;
+time_t aclk_session_sec = 0;
+
 time_t last_conn_time_mqtt = 0;
 time_t last_conn_time_appl = 0;
 time_t last_disconnect_time = 0;
@@ -924,7 +934,7 @@ static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
     freez(stats);
 }
 
-char *ng_aclk_state(void)
+char *aclk_state(void)
 {
     BUFFER *wb = buffer_create(1024);
     struct tm *tmptr, tmbuf;
@@ -1088,7 +1098,7 @@ static json_object *timestamp_to_json(const time_t *t)
     return NULL;
 }
 
-char *ng_aclk_state_json(void)
+char *aclk_state_json(void)
 {
     json_object *tmp, *grp, *msg = json_object_new_object();
 
@@ -1203,4 +1213,39 @@ char *ng_aclk_state_json(void)
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
     json_object_put(msg);
     return str;
+}
+
+void add_aclk_host_labels(void) {
+    DICTIONARY *labels = localhost->host_labels;
+
+#ifdef ENABLE_ACLK
+    rrdlabels_add(labels, "_aclk_ng_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+#else
+    rrdlabels_add(labels, "_aclk_ng_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+#endif
+    rrdlabels_add(labels, "_aclk_legacy_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+#ifdef ENABLE_ACLK
+    ACLK_PROXY_TYPE aclk_proxy;
+    char *proxy_str;
+    aclk_get_proxy(&aclk_proxy);
+
+    switch(aclk_proxy) {
+        case PROXY_TYPE_SOCKS5:
+            proxy_str = "SOCKS5";
+            break;
+        case PROXY_TYPE_HTTP:
+            proxy_str = "HTTP";
+            break;
+        default:
+            proxy_str = "none";
+            break;
+    }
+
+    int mqtt5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_YES);
+
+    rrdlabels_add(labels, "_mqtt_version", mqtt5 ? "5" : "3", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_impl", "Next Generation", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+#endif
 }
