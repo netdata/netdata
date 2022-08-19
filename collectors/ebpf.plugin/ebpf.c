@@ -145,7 +145,7 @@ ebpf_module_t ebpf_modules[] = {
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL},
     { .thread_name = "shm", .config_name = "shm", .enabled = 0, .start_routine = ebpf_shm_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
-      .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_shm_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &shm_config,
       .config_file = NETDATA_DIRECTORY_SHM_CONFIG_FILE,
