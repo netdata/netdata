@@ -267,7 +267,6 @@ void print_build_info(void) {
     printf("    Native HTTPS:               %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
     printf("    Netdata Cloud:              %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
     printf("    ACLK:                       %s\n", FEAT_YES_NO(FEAT_CLOUD));
-    printf("    ACLK New Cloud Protocol:    %s\n", FEAT_YES_NO(1));
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
     printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
@@ -375,7 +374,7 @@ void analytics_build_info(BUFFER *b) {
     add_to_bi(b, "Native HTTPS");
 #endif
 #ifdef ENABLE_ACLK
-    add_to_bi(b, "Netdata Cloud|ACLK Next Generation|New Cloud Protocol Support");
+    add_to_bi(b, "Netdata Cloud");
 #endif
 #if (FEAT_TLS_HOST_VERIFY!=0)
     add_to_bi(b, "TLS Host Verification");
