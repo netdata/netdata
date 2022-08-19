@@ -16,7 +16,8 @@ You will need:
 
 ## Building the packages
 
-In the root of the source tree you want to build from, clean up any existing files left over from a previous build and then run:
+In the root of the source tree you want to build from, clean up any existing files left over from a previous build
+and then run:
 
 ```bash
 docker run -it --rm -e VERSION=0.1 -v $PWD:/netdata netdata/package-builders:<tag>
@@ -28,9 +29,10 @@ or
 podman run -it --rm -e VERSION=0.1 -v $PWD:/netdata netdata/package-builders:<tag>
 ```
 
-The `<tag>` should be the lowercase distribution name with no spaces, followed by the release of that distribution. For
-example, `centos7` to build on CentOS 7, or `ubuntu20.04` to build on Ubuntu 20.04. Note that we use Alma Linux
-for builds on CentOS/RHEL 8 or newer.
+The `<tag>` should be the lowercase distribution name with no spaces, followed by the
+release of that distribution. For example, `centos7` to build on CentOS 7, or `ubuntu20.04`
+to build on Ubuntu 20.04. Note that we use Alma Linux for builds on CentOS/RHEL 8 or newer. See
+[netdata/package-builders](https://hub.docker.com/r/netdata/package-builders/tags) for all available tags.
 
 Once it finishes, the built packages can be found under `artifacts/` in the source tree.
 
