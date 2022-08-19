@@ -903,9 +903,11 @@ netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode
 void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file)
 {
     if (!file) {
-        mod->load = EBPF_LOAD_LEGACY;
+        mod->load &= ~EBPF_LOAD_CORE;
+        mod->load |= EBPF_LOAD_LEGACY;
     } else if (mod->load == EBPF_LOAD_PLAY_DICE && file) {
-        mod->load = EBPF_LOAD_CORE;
+        mod->load &= ~EBPF_LOAD_LEGACY;
+        mod->load |= EBPF_LOAD_CORE;
     }
 }
 
@@ -1109,7 +1111,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
         }
         // If user defined data globaly, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
         // forcing users to configure thread by thread.
-        origin = (!(em->load & NETDATA_EBPF_LOAD_SOURCE)) ? EBPF_LOADED_FROM_STOCK : em->load;
+        origin = (!(em->load & NETDATA_EBPF_LOAD_SOURCE)) ? EBPF_LOADED_FROM_STOCK : em->load & NETDATA_EBPF_LOAD_SOURCE;
     } else
         origin = EBPF_LOADED_FROM_USER;
 
