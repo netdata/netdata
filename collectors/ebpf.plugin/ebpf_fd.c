@@ -257,6 +257,19 @@ static void ebpf_fd_adjust_map_size(struct fd_bpf *obj, ebpf_module_t *em)
 }
 
 /**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_fd_disable_release_task(struct fd_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_fentry, false);
+}
+
+/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -283,6 +296,9 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
     }
 
     ebpf_fd_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_fd_disable_release_task(obj);
 
     int ret = fd_bpf__load(obj);
     if (ret) {

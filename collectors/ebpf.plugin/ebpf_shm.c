@@ -208,11 +208,13 @@ static void ebpf_shm_set_hash_tables(struct shm_bpf *obj)
  *  Disable Release Task
  *
  *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
  */
 static void ebpf_shm_disable_release_task(struct shm_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_shm_release_task_probe, false);
-    bpf_program__set_autoload(obj->progs.netdata_shm_release_task_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_shm_release_task_fentry, false);
 }
 
 /**
