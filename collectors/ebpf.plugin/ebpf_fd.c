@@ -173,7 +173,7 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
         return -1;
 
     obj->links.netdata_release_task_fd_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_fd_kprobe,
-                                                                           true,
+                                                                           false,
                                                                            EBPF_COMMON_FNCT_CLEAN_UP);
     ret = libbpf_get_error(obj->links.netdata_release_task_fd_kprobe);
     if (ret)
@@ -290,6 +290,8 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
         ebpf_disable_specific_trampoline(obj);
 
         ebpf_set_trampoline_target(obj);
+        // TODO: Remove this in next PR, because this specific trampoline has an error.
+        bpf_program__set_autoload(obj->progs.netdata_release_task_fd_fentry, false);
     } else {
         ebpf_disable_trampoline(obj);
         ebpf_disable_specific_probes(obj);
