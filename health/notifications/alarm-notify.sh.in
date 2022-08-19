@@ -1339,21 +1339,37 @@ send_telegram() {
 
   if [ "${SEND_TELEGRAM}" = "YES" ] && [ -n "${bottoken}" ] && [ -n "${chatids}" ] && [ -n "${message}" ]; then
     for chatid in ${chatids}; do
-      # https://core.telegram.org/bots/api#sendmessage
-      httpcode=$(docurl ${disableNotification} \
-        --data-urlencode "parse_mode=HTML" \
-        --data-urlencode "disable_web_page_preview=true" \
-        --data-urlencode "text=${emoji} ${message}" \
-        "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+      notify_telegram=1
+      notify_retries=${TELEGRAM_RETRIES_ON_LIMIT:-0}
 
-      if [ "${httpcode}" = "200" ]; then
-        info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
-        sent=$((sent + 1))
-      elif [ "${httpcode}" = "401" ]; then
-        error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
-      else
-        error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP response status code ${httpcode}."
-      fi
+      while [ ${notify_telegram} -eq 1 ]; do
+        # https://core.telegram.org/bots/api#sendmessage
+        httpcode=$(docurl ${disableNotification} \
+          --data-urlencode "parse_mode=HTML" \
+          --data-urlencode "disable_web_page_preview=true" \
+          --data-urlencode "text=${emoji} ${message}" \
+          "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+
+        notify_telegram=0
+
+        if [ "${httpcode}" = "200" ]; then
+          info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+          sent=$((sent + 1))
+        elif [ "${httpcode}" = "401" ]; then
+          error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+        elif [ "${httpcode}" = "429" ]; then
+          if [ "$notify_retries" -gt 0 ]; then
+            error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': rate limit exceeded, retrying after 1s."
+            notify_retries=$((notify_retries - 1))
+            notify_telegram=1
+            sleep 1
+          else
+            error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': rate limit exceeded."
+          fi
+        else
+          error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP response status code ${httpcode}."
+        fi
+      done
     done
 
     [ ${sent} -gt 0 ] && return 0
