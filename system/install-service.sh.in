@@ -133,12 +133,14 @@ dump_cmds() {
   [ -n "${NETDATA_START_CMD}" ] && echo "NETDATA_START_CMD='${NETDATA_START_CMD}'"
   [ -n "${NETDATA_STOP_CMD}" ] && echo "NETDATA_STOP_CMD='${NETDATA_STOP_CMD}'"
   [ -n "${NETDATA_INSTALLER_START_CMD}" ] && echo "NETDATA_INSTALLER_START_CMD='${NETDATA_INSTALLER_START_CMD}'"
+  return 0
 }
 
 export_cmds() {
-  [ -n "${NETDATA_START_CMD}" ] && export NETDATA_START_CMD
-  [ -n "${NETDATA_STOP_CMD}" ] && export NETDATA_STOP_CMD
-  [ -n "${NETDATA_INSTALLER_START_CMD}" ] && export NETDATA_INSTALLER_START_CMD
+  [ -n "${NETDATA_START_CMD}" ] && export NETDATA_START_CMD="${NETDATA_START_CMD}"
+  [ -n "${NETDATA_STOP_CMD}" ] && export NETDATA_STOP_CMD="${NETDATA_STOP_CMD}"
+  [ -n "${NETDATA_INSTALLER_START_CMD}" ] && export NETDATA_INSTALLER_START_CMD="${NETDATA_INSTALLER_START_COMMAND}"
+  return 0
 }
 
 # =====================================================================
