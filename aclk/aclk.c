@@ -2,6 +2,7 @@
 
 #include "aclk.h"
 
+#ifdef ENABLE_ACLK
 #include "aclk_stats.h"
 #include "mqtt_wss_client.h"
 #include "aclk_otp.h"
@@ -22,6 +23,8 @@
 #endif
 
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
+
+#endif /* ENABLE_ACLK */
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
@@ -48,6 +51,7 @@ int aclk_alert_reloaded = 0; //1 on health log exchange, and again on health_rel
 
 time_t aclk_block_until = 0;
 
+#ifdef ENABLE_ACLK
 mqtt_wss_client mqttwss_client;
 
 netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -933,9 +937,13 @@ static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
     );
     freez(stats);
 }
+#endif /* ENABLE_ACLK */
 
 char *aclk_state(void)
 {
+#ifndef ENABLE_ACLK
+    return strdupz("ACLK Available: No");
+#else
     BUFFER *wb = buffer_create(1024);
     struct tm *tmptr, tmbuf;
     char *ret;
@@ -1020,8 +1028,10 @@ char *aclk_state(void)
     ret = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return ret;
+#endif /* ENABLE_ACLK */
 }
 
+#ifdef ENABLE_ACLK
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct proto_alert_status status;
@@ -1097,9 +1107,13 @@ static json_object *timestamp_to_json(const time_t *t)
     }
     return NULL;
 }
+#endif /* ENABLE_ACLK */
 
 char *aclk_state_json(void)
 {
+#ifndef ENABLE_ACLK
+    return strdupz("{\"aclk-available\":false}");
+#else
     json_object *tmp, *grp, *msg = json_object_new_object();
 
     tmp = json_object_new_boolean(1);
@@ -1213,6 +1227,7 @@ char *aclk_state_json(void)
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
     json_object_put(msg);
     return str;
+#endif /* ENABLE_ACLK */
 }
 
 void add_aclk_host_labels(void) {

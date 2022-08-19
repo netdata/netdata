@@ -862,11 +862,11 @@ set(ACLK_ALWAYS_BUILD
         aclk/aclk_rrdhost_state.h
         aclk/aclk_proxy.c
         aclk/aclk_proxy.h
+        aclk/aclk.c
+        aclk/aclk.h
         )
 
 set(ACLK_FILES
-        aclk/aclk.c
-        aclk/aclk.h
         aclk/aclk_util.c
         aclk/aclk_util.h
         aclk/aclk_stats.c
