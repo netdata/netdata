@@ -1215,14 +1215,9 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
-    buffer_strcat(wb, "\t\"aclk-ng-available\": true,\n");
-    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
-    buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
-    buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
+    buffer_strcat(wb, "\t\"aclk-new-cloud-protocol\": true,\n");
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
-    buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
-    buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
 #endif
     char *agent_id = get_agent_claimid();
     if (agent_id == NULL)
@@ -1234,11 +1229,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef ENABLE_ACLK
     if (aclk_connected) {
         buffer_strcat(wb, "\t\"aclk-available\": true,\n");
-        buffer_strcat(wb, "\t\"aclk-available-protocol\": \"New\",\n");
     }
     else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false,\n\t\"aclk-available-protocol\": null,\n");     // Intentionally valid with/without #ifdef above
+        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "\t\"memory-mode\": ");
     analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
