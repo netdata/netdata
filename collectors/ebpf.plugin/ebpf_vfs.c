@@ -80,6 +80,7 @@ static void ebpf_vfs_disable_probes(struct vfs_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_vfs_open_kretprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_vfs_create_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_vfs_create_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_kprobe, false);
 }
 
 /*
@@ -105,6 +106,7 @@ static void ebpf_vfs_disable_trampoline(struct vfs_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_vfs_open_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_vfs_open_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata_vfs_create_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_fentry, false);
 }
 
 /**
@@ -143,6 +145,8 @@ static void ebpf_vfs_set_trampoline_target(struct vfs_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_vfs_open_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
 
     bpf_program__set_attach_target(obj->progs.netdata_vfs_create_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_release_task_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
 }
 
 /**
@@ -288,6 +292,13 @@ static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
     if (ret)
         return -1;
 
+    obj->links.netdata_vfs_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_release_task_fentry,
+                                                                            true,
+                                                                            EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_vfs_release_task_kprobe);
+    if (ret)
+        return -1;
+
     return 0;
 }
 
@@ -320,6 +331,19 @@ static void ebpf_vfs_set_hash_tables(struct vfs_bpf *obj)
 }
 
 /**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_disable_release_task(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_kprobe, false);
+}
+
+/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -343,6 +367,9 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
     }
 
     ebpf_vfs_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_vfs_disable_release_task(obj);
 
     int ret = vfs_bpf__load(obj);
     if (ret) {
