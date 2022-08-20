@@ -1906,6 +1906,7 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
 static int ebpf_vfs_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_EBPF_VFS_WRITE].mode);
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
