@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Cleanup of APIs [\#13539](https://github.com/netdata/netdata/pull/13539) ([underhood](https://github.com/underhood))
 - bump go.d version to v0.36.0 [\#13538](https://github.com/netdata/netdata/pull/13538) ([ilyam8](https://github.com/ilyam8))
 - chore\(python.d\): rename dockerd job on lock registration [\#13537](https://github.com/netdata/netdata/pull/13537) ([ilyam8](https://github.com/ilyam8))
 - Update MacOS community support details [\#13536](https://github.com/netdata/netdata/pull/13536) ([DShreve2](https://github.com/DShreve2))
@@ -28,6 +29,7 @@
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
 - Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
+- Fix telegram-bot rate limit [\#13119](https://github.com/netdata/netdata/pull/13119) ([MAH69IK](https://github.com/MAH69IK))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -241,7 +243,6 @@
 - Remove official support for Debian 9. [\#13065](https://github.com/netdata/netdata/pull/13065) ([Ferroin](https://github.com/Ferroin))
 - Fix coverity 378587 [\#13024](https://github.com/netdata/netdata/pull/13024) ([MrZammler](https://github.com/MrZammler))
 - Remove Ubuntu 21.10 from CI and package builds. [\#12918](https://github.com/netdata/netdata/pull/12918) ([Ferroin](https://github.com/Ferroin))
-- Configurable storage engine for Netdata agents: step 3 [\#12892](https://github.com/netdata/netdata/pull/12892) ([aberaud](https://github.com/aberaud))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
@@ -347,8 +348,6 @@
 - fix\(cgroups.plugin\): use correct identifier when registering the main thread "chart" worker job [\#12902](https://github.com/netdata/netdata/pull/12902) ([ilyam8](https://github.com/ilyam8))
 - Remove CPU-specific info from cpuidle dimensions [\#12898](https://github.com/netdata/netdata/pull/12898) ([vlvkobal](https://github.com/vlvkobal))
 - Adjust alarms count [\#12896](https://github.com/netdata/netdata/pull/12896) ([MrZammler](https://github.com/MrZammler))
-- Return stable or nightly based on version if the file check fails [\#12894](https://github.com/netdata/netdata/pull/12894) ([stelfrag](https://github.com/stelfrag))
-- Update reconnect node with kickstart info [\#12891](https://github.com/netdata/netdata/pull/12891) ([cakrit](https://github.com/cakrit))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
