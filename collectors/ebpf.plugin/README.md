@@ -144,15 +144,15 @@ process group that it needs to plot data. There are different ways to collect PI
 collects data with the following values:
 
 -   `real parent`: This is the default mode. Collection will aggregate data for the real parent, the thread that creates
-    child threads.
+     child threads.
 -   `parent`: Parent and real parent are the same when a process starts, but this value can be changed during run time.
--   `all`: This option will store all PIDs that run on host; this method can be expensive for host, because more memory needs
-    to be allocated and parsed.
+-   `all`: This option will store all PIDs that run on host; this method can be expensive for host, because more memory
+    needs to be allocated and parsed.
 
 The threads that have integration with other collectors have an internal clean up. To do this, they attach either a
-`trampolines` or a `kprobe` to `release_task` internal function. To avoid `overload` on this function, `ebpf.plugin` will
-only enable these threads integrated with other collectors when the kernel is compiled with `CONFIG_DEBUG_INFO_BTF`, unless
-you enable them manually.
+`trampolines` or a `kprobe` to `release_task` internal function. To avoid `overload` on this function, `ebpf.plugin`
+will only enable these threads integrated with other collectors when the kernel is compiled with
+`CONFIG_DEBUG_INFO_BTF`, unless you enable them manually.
 
 #### Integration Dashboard Elements
 
