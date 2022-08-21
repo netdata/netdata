@@ -6,7 +6,6 @@
 from collections import defaultdict
 
 from bases.FrameworkServices.SimpleService import SimpleService
-from bases.charts import create_runtime_chart
 from third_party import lm_sensors as sensors
 
 ORDER = [
@@ -178,7 +177,3 @@ class Service(SimpleService):
             if v == feat_type:
                 return self.priority + i
         return self.priority
-
-    @create_runtime_chart
-    def create(self):
-        return True
