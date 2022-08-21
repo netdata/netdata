@@ -73,13 +73,13 @@ LIMITS = {
 }
 
 TYPE_MAP = {
-    0: 'voltage',  #
-    1: 'fan',  #
-    2: 'temperature',  #
-    3: 'power',  #
-    4: 'energy',  #
-    5: 'current',  #
-    6: 'humidity',  #
+    0: 'voltage',
+    1: 'fan',
+    2: 'temperature',
+    3: 'power',
+    4: 'energy',
+    5: 'current',
+    6: 'humidity',
     # 7: 'max_main',
     # 16: 'vid',
     # 17: 'intrusion',
