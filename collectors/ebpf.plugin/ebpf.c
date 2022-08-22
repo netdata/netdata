@@ -1269,11 +1269,10 @@ static void ebpf_update_table_size()
  */
 static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebpf_load_mode_t origin)
 {
-    UNUSED(load);
-
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_modules[i].load |= origin ;
+        ebpf_modules[i].load &= ~NETDATA_EBPF_LOAD_METHODS;
+        ebpf_modules[i].load |= load | origin ;
     }
 }
 
