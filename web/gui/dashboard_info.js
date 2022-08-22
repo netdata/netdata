@@ -291,6 +291,12 @@ netdataDashboard.menu = {
         info: 'QEMU virtual machine resource utilization metrics. QEMU (short for Quick Emulator) is a free and open-source hosted hypervisor that performs hardware virtualization.'
     },
 
+    'docker': {
+        title: 'Docker',
+        icon: '<i class="fas fa-cube"></i>',
+        info: 'Docker containers state and disk usage.'
+    },
+
     'fping': {
         title: 'fping',
         icon: '<i class="fas fa-exchange-alt"></i>',
