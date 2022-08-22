@@ -139,7 +139,7 @@ If you do not need to monitor specific metrics for your `cgroups`, you can enabl
 
 #### Collect PID
 
-When one of the previous integrations is enabled, `ebpf.pluigin` will use Process Identifier (`PID`) to identify the
+When one of the previous integrations is enabled, `ebpf.plugin` will use Process Identifier (`PID`) to identify the
 process group for which it needs to plot data. There are different ways to collect PID, and you can select the way
 `ebpf.plugin` collects data with the following values:
 
