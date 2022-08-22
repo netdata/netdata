@@ -3773,21 +3773,11 @@ netdataDashboard.context = {
     },
 
     'mysql.galera_cluster_status': {
-        info:
-            '<code>-1</code>: unknown, ' +
-            '<code>0</code>: primary (primary group configuration, quorum present), ' +
-            '<code>1</code>: non-primary (non-primary group configuration, quorum lost), ' +
-            '<code>2</code>: disconnected(not connected to group, retrying).'
+        info: "<p>Status of this cluster component.</p><p><b>Primary</b> - primary group configuration, quorum present. <b>Non-Primary</b> - non-primary group configuration, quorum lost. <b>Disconnected</b> - not connected to group, retrying.</p>"
     },
 
     'mysql.galera_cluster_state': {
-        info:
-            '<code>0</code>: Undefined, ' +
-            '<code>1</code>: Joining, ' +
-            '<code>2</code>: Donor/Desynced, ' +
-            '<code>3</code>: Joined, ' +
-            '<code>4</code>: Synced, ' +
-            '<code>5</code>: Inconsistent.'
+        info: "<p>Membership state of this cluster component.</p><p><b>Undefined</b> - undefined state. <b>Joining</b> - the node is attempting to join the cluster. <b>Donor</b> - the node has blocked itself while it sends a State Snapshot Transfer (SST) to bring a new node up to date with the cluster. <b>Joined</b> - the node has successfully joined the cluster. <b>Synced</b> - the node has established a connection with the cluster and synchronized its local databases with those of the cluster. <b>Error</b> - the node is not part of the cluster and does not replicate transactions. This state is provider-specific, check <i>wsrep_local_state_comment</i> variable for a description.</p>"
     },
 
     'mysql.galera_cluster_weight': {
