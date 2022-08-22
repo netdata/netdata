@@ -139,15 +139,15 @@ If you do not need to monitor specific metrics for your `cgroups`, you can enabl
 
 #### Collect PID
 
-When one of the previous integrations are enabled, `ebpf.pluigin` will use Process Identifier (`PID`) to identify the
-process group that it needs to plot data. There are different ways to collect PID, and you can select the way `ebpf.plugin`
-collects data with the following values:
+When one of the previous integrations is enabled, `ebpf.pluigin` will use Process Identifier (`PID`) to identify the
+process group for which it needs to plot data. There are different ways to collect PID, and you can select the way
+`ebpf.plugin` collects data with the following values:
 
 -   `real parent`: This is the default mode. Collection will aggregate data for the real parent, the thread that creates
      child threads.
 -   `parent`: Parent and real parent are the same when a process starts, but this value can be changed during run time.
--   `all`: This option will store all PIDs that run on host; this method can be expensive for host, because more memory
-    needs to be allocated and parsed.
+-   `all`: This option will store all PIDs that run on the host; this method can be expensive for the host, because more
+    memory needs to be allocated and parsed.
 
 The threads that have integration with other collectors have an internal clean up. To do this, they attach either a
 `trampolines` or a `kprobe` to `release_task` internal function. To avoid `overload` on this function, `ebpf.plugin`
