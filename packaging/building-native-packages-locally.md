@@ -41,8 +41,8 @@ inspect the state of the container and look at build logs.
 
 ### Detailed explanation
 
-The environments used for building our packages are fully self-contianed Docker images built from the Dockerfiles
-located at https://github.com/netdata/helper-images/tree/master/package-builders. These are published on Docker
+The environments used for building our packages are fully self-contianed Docker images built from [Dockerfiles](https://github.com/netdata/helper-images/tree/master/package-builders)
+These are published on Docker
 Hub with the image name `netdata/package-builders`, and tagged using the name and version of the distribution
 (with the tag corresponding to the suffix on the associated Dockerfile).
 
@@ -56,7 +56,7 @@ The build code has two specific requirements when run:
 Internally, the source tree gets copied to a temporary location for the build process so that the souce tree can
 be mounted directly from the host without worrying about leaving a dirty tree behind, any templating or file
 movements required for the build to work are done, the pakcage build command is invoked with the correct arguments,
-and then the resultant packages are copied to the `artifacts/` directory in the original sourc etree so they are
+and then the resultant packages are copied to the `artifacts/` directory in the original source tree so they are
 accessible after the container exits.
 
 ## Finding build logs after a failed build
