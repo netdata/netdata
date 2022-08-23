@@ -26,7 +26,7 @@ dist_web_DATA = \
     index.html \
     infographic.html \
     manifest.json \
-    precache-manifest.e95d658eed560f9e0189217cc6919238.js \
+    precache-manifest.2f5064a2051affab62b6ec181c822429.js \
     refresh-badges.js \
     robots.txt \
     service-worker.js \
@@ -135,8 +135,8 @@ dist_weblib_DATA = \
 
 webstaticcssdir=$(webdir)/static/css
 dist_webstaticcss_DATA = \
-    static/css/2.20fd0a40.chunk.css \
-    static/css/2.20fd0a40.chunk.css.map \
+    static/css/2.c454aab8.chunk.css \
+    static/css/2.c454aab8.chunk.css.map \
     static/css/4.a36e3b73.chunk.css \
     static/css/4.a36e3b73.chunk.css.map \
     static/css/main.53ba10f1.chunk.css \
@@ -145,31 +145,31 @@ dist_webstaticcss_DATA = \
 
 webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
-    static/js/10.44d9d40b.chunk.js \
-    static/js/10.44d9d40b.chunk.js.map \
-    static/js/2.3123f37d.chunk.js \
-    static/js/2.3123f37d.chunk.js.LICENSE \
-    static/js/2.3123f37d.chunk.js.map \
-    static/js/3.d49f0857.chunk.js \
-    static/js/3.d49f0857.chunk.js.map \
-    static/js/4.8b70c754.chunk.js \
-    static/js/4.8b70c754.chunk.js.map \
-    static/js/5.29dab1cd.chunk.js \
-    static/js/5.29dab1cd.chunk.js.LICENSE \
-    static/js/5.29dab1cd.chunk.js.map \
-    static/js/6.7b15cdf3.chunk.js \
-    static/js/6.7b15cdf3.chunk.js.map \
-    static/js/7.cf6bc66f.chunk.js \
-    static/js/7.cf6bc66f.chunk.js.map \
-    static/js/8.b1a4b595.chunk.js \
-    static/js/8.b1a4b595.chunk.js.map \
-    static/js/9.50358509.chunk.js \
-    static/js/9.50358509.chunk.js.map \
-    static/js/main.cc0e57d1.chunk.js \
-    static/js/main.cc0e57d1.chunk.js.LICENSE \
-    static/js/main.cc0e57d1.chunk.js.map \
-    static/js/runtime-main.b352aa47.js \
-    static/js/runtime-main.b352aa47.js.map \
+    static/js/10.a5cd7d0e.chunk.js \
+    static/js/10.a5cd7d0e.chunk.js.map \
+    static/js/2.3fdc43e8.chunk.js \
+    static/js/2.3fdc43e8.chunk.js.LICENSE \
+    static/js/2.3fdc43e8.chunk.js.map \
+    static/js/3.f137faca.chunk.js \
+    static/js/3.f137faca.chunk.js.map \
+    static/js/4.2dbcd906.chunk.js \
+    static/js/4.2dbcd906.chunk.js.map \
+    static/js/5.2f783a54.chunk.js \
+    static/js/5.2f783a54.chunk.js.LICENSE \
+    static/js/5.2f783a54.chunk.js.map \
+    static/js/6.e1951239.chunk.js \
+    static/js/6.e1951239.chunk.js.map \
+    static/js/7.c2417fb0.chunk.js \
+    static/js/7.c2417fb0.chunk.js.map \
+    static/js/8.b4161ea2.chunk.js \
+    static/js/8.b4161ea2.chunk.js.map \
+    static/js/9.a4363968.chunk.js \
+    static/js/9.a4363968.chunk.js.map \
+    static/js/main.d5e27ebe.chunk.js \
+    static/js/main.d5e27ebe.chunk.js.LICENSE \
+    static/js/main.d5e27ebe.chunk.js.map \
+    static/js/runtime-main.08abed8f.js \
+    static/js/runtime-main.08abed8f.js.map \
     $(NULL)
 
 webstaticmediadir=$(webdir)/static/media
