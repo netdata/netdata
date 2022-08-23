@@ -3,6 +3,8 @@
 # Author: Pawel Krupa (paulfantom)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from collections import defaultdict
+
 from bases.FrameworkServices.SimpleService import SimpleService
 from third_party import lm_sensors as sensors
 
@@ -77,11 +79,11 @@ TYPE_MAP = {
     4: 'energy',
     5: 'current',
     6: 'humidity',
-    7: 'max_main',
-    16: 'vid',
-    17: 'intrusion',
-    18: 'max_other',
-    24: 'beep_enable'
+    # 7: 'max_main',
+    # 16: 'vid',
+    # 17: 'intrusion',
+    # 18: 'max_other',
+    # 24: 'beep_enable'
 }
 
 
@@ -91,64 +93,73 @@ class Service(SimpleService):
         self.order = list()
         self.definitions = dict()
         self.chips = configuration.get('chips')
+        self.priority = 60000
 
     def get_data(self):
-        data = dict()
+        seen, data = dict(), dict()
         try:
             for chip in sensors.ChipIterator():
-                prefix = sensors.chip_snprintf_name(chip)
-                for feature in sensors.FeatureIterator(chip):
-                    sfi = sensors.SubFeatureIterator(chip, feature)
-                    val = None
-                    for sf in sfi:
-                        try:
-                            val = sensors.get_value(chip, sf.number)
-                            break
-                        except sensors.SensorsError:
-                            continue
-                    if val is None:
+                chip_name = sensors.chip_snprintf_name(chip)
+                seen[chip_name] = defaultdict(list)
+
+                for feat in sensors.FeatureIterator(chip):
+                    if feat.type not in TYPE_MAP:
                         continue
-                    type_name = TYPE_MAP[feature.type]
-                    if type_name in LIMITS:
-                        limit = LIMITS[type_name]
-                        if val < limit[0] or val > limit[1]:
-                            continue
-                    data[prefix + '_' + str(feature.name.decode())] = int(val * 1000)
+
+                    feat_type = TYPE_MAP[feat.type]
+                    feat_name = str(feat.name.decode())
+                    feat_label = sensors.get_label(chip, feat)
+                    feat_limits = LIMITS.get(feat_type)
+                    sub_feat = next(sensors.SubFeatureIterator(chip, feat))  # current value
+
+                    if not sub_feat:
+                        continue
+
+                    try:
+                        v = sensors.get_value(chip, sub_feat.number)
+                    except sensors.SensorsError:
+                        continue
+
+                    if v is None:
+                        continue
+
+                    seen[chip_name][feat_type].append((feat_name, feat_label))
+
+                    if feat_limits and (v < feat_limits[0] or v > feat_limits[1]):
+                        continue
+
+                    data[chip_name + '_' + feat_name] = int(v * 1000)
+
         except sensors.SensorsError as error:
             self.error(error)
             return None
 
+        self.update_sensors_charts(seen)
+
         return data or None
 
-    def create_definitions(self):
-        for sensor in ORDER:
-            for chip in sensors.ChipIterator():
-                chip_name = sensors.chip_snprintf_name(chip)
-                if self.chips and not any([chip_name.startswith(ex) for ex in self.chips]):
+    def update_sensors_charts(self, seen):
+        for chip_name, feat in seen.items():
+            if self.chips and not any([chip_name.startswith(ex) for ex in self.chips]):
+                continue
+
+            for feat_type, sub_feat in feat.items():
+                if feat_type not in ORDER or feat_type not in CHARTS:
                     continue
-                for feature in sensors.FeatureIterator(chip):
-                    sfi = sensors.SubFeatureIterator(chip, feature)
-                    vals = list()
-                    for sf in sfi:
-                        try:
-                            vals.append(sensors.get_value(chip, sf.number))
-                        except sensors.SensorsError as error:
-                            self.error('{0}: {1}'.format(sf.name, error))
-                            continue
-                    if not vals or (vals[0] == 0 and feature.type != 1):
-                        continue
-                    if TYPE_MAP[feature.type] == sensor:
-                        # create chart
-                        name = chip_name + '_' + TYPE_MAP[feature.type]
-                        if name not in self.order:
-                            self.order.append(name)
-                            chart_def = list(CHARTS[sensor]['options'])
-                            self.definitions[name] = {'options': chart_def}
-                            self.definitions[name]['lines'] = []
-                        line = list(CHARTS[sensor]['lines'][0])
-                        line[0] = chip_name + '_' + str(feature.name.decode())
-                        line[1] = sensors.get_label(chip, feature)
-                        self.definitions[name]['lines'].append(line)
+
+                chart_id = '{}_{}'.format(chip_name, feat_type)
+                if chart_id in self.charts:
+                    continue
+
+                params = [chart_id] + list(CHARTS[feat_type]['options'])
+                new_chart = self.charts.add_chart(params)
+                new_chart.params['priority'] = self.get_chart_priority(feat_type)
+
+                for name, label in sub_feat:
+                    lines = list(CHARTS[feat_type]['lines'][0])
+                    lines[0] = chip_name + '_' + name
+                    lines[1] = label
+                    new_chart.add_dimension(lines)
 
     def check(self):
         try:
@@ -157,6 +168,12 @@ class Service(SimpleService):
             self.error(error)
             return False
 
-        self.create_definitions()
+        self.priority = self.charts.priority
 
-        return bool(self.get_data())
+        return bool(self.get_data() and self.charts)
+
+    def get_chart_priority(self, feat_type):
+        for i, v in enumerate(ORDER):
+            if v == feat_type:
+                return self.priority + i
+        return self.priority
