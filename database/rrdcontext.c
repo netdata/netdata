@@ -1531,11 +1531,20 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
     RRDCONTEXT *rc = (RRDCONTEXT *)oldv;
     RRDCONTEXT *rc_new = (RRDCONTEXT *)newv;
 
+    //current rc is not archived, new_rc is archived, dont merge
+    if (!rrd_flag_is_archived(rc) && rrd_flag_is_archived(rc_new)) {
+        rrdcontext_freez(rc_new);
+        return;
+    }
+
     rrdcontext_lock(rc);
 
     if(rc->title != rc_new->title) {
         STRING *old_title = rc->title;
-        rc->title = string_2way_merge(rc->title, rc_new->title);
+        if (rrd_flag_is_archived(rc) && !rrd_flag_is_archived(rc_new))
+            rc->title = string_dup(rc_new->title);
+        else
+            rc->title = string_2way_merge(rc->title, rc_new->title);
         string_freez(old_title);
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_TITLE);
     }
@@ -1549,7 +1558,10 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 
     if(rc->family != rc_new->family) {
         STRING *old_family = rc->family;
-        rc->family = string_2way_merge(rc->family, rc_new->family);
+        if (rrd_flag_is_archived(rc) && !rrd_flag_is_archived(rc_new))
+            rc->family = string_dup(rc_new->family);
+        else
+            rc->family = string_2way_merge(rc->family, rc_new->family);
         string_freez(old_family);
         rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
     }
