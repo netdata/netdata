@@ -271,7 +271,11 @@ extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
+#ifdef LIBBPF_MAJOR_VERSION
 extern struct btf *default_btf;
+#else
+extern void *default_btf;
+#endif
 
 // Socket functions and variables
 // Common functions

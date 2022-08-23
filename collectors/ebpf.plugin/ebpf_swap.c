@@ -71,6 +71,7 @@ static void ebpf_swap_disable_trampoline(struct swap_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_writepage_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
 }
 
 /**
@@ -87,6 +88,9 @@ static void ebpf_swap_set_trampoline_target(struct swap_bpf *obj)
 
     bpf_program__set_attach_target(obj->progs.netdata_swap_writepage_fentry, 0,
                                    swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_release_task_fentry, 0,
+                                   EBPF_COMMON_FNCT_CLEAN_UP);
 }
 
 /**
@@ -110,6 +114,13 @@ static int ebpf_swap_attach_kprobe(struct swap_bpf *obj)
     obj->links.netdata_swap_writepage_probe = bpf_program__attach_kprobe(obj->progs.netdata_swap_writepage_probe,
                                                                          false,
                                                                          swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
+    ret = libbpf_get_error(obj->links.netdata_swap_writepage_probe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_probe,
+                                                                         false,
+                                                                         EBPF_COMMON_FNCT_CLEAN_UP);
     ret = libbpf_get_error(obj->links.netdata_swap_writepage_probe);
     if (ret)
         return -1;
@@ -146,6 +157,19 @@ static void ebpf_swap_adjust_map_size(struct swap_bpf *obj, ebpf_module_t *em)
 }
 
 /**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_swap_disable_release_task(struct swap_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_probe, false);
+}
+
+/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -168,12 +192,15 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
         ebpf_swap_disable_trampoline(obj);
     }
 
+    ebpf_swap_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_swap_disable_release_task(obj);
+
     int ret = swap_bpf__load(obj);
     if (ret) {
         return ret;
     }
-
-    ebpf_swap_adjust_map_size(obj, em);
 
     ret = (test == EBPF_LOAD_TRAMPOLINE) ? swap_bpf__attach(obj) : ebpf_swap_attach_kprobe(obj);
     if (!ret) {
@@ -812,7 +839,8 @@ static void ebpf_create_swap_charts(int update_every)
 static int ebpf_swap_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
-    if (em->load == EBPF_LOAD_LEGACY) {
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_KEY_SWAP_READPAGE_CALL].mode);
+    if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;

@@ -65,6 +65,7 @@ static inline void ebpf_dc_disable_probes(struct dc_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_lookup_fast_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_d_lookup_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_dcstat_release_task_kprobe, false);
 }
 
 /*
@@ -78,6 +79,7 @@ static inline void ebpf_dc_disable_trampoline(struct dc_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_lookup_fast_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_d_lookup_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_dcstat_release_task_fentry, false);
 }
 
 /**
@@ -94,6 +96,9 @@ static void ebpf_dc_set_trampoline_target(struct dc_bpf *obj)
 
     bpf_program__set_attach_target(obj->progs.netdata_d_lookup_fexit, 0,
                                    dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_dcstat_release_task_fentry, 0,
+                                   EBPF_COMMON_FNCT_CLEAN_UP);
 }
 
 /**
@@ -122,6 +127,13 @@ static int ebpf_dc_attach_probes(struct dc_bpf *obj)
                                                                        false,
                                                                        lookup_name);
     ret = libbpf_get_error(obj->links.netdata_lookup_fast_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_dcstat_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_dcstat_release_task_kprobe,
+                                                                       false,
+                                                                       EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_dcstat_release_task_kprobe);
     if (ret)
         return -1;
 
@@ -180,6 +192,19 @@ netdata_ebpf_program_loaded_t ebpf_dc_update_load(ebpf_module_t *em)
 }
 
 /**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_dc_disable_release_task(struct dc_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_dcstat_release_task_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_dcstat_release_task_fentry, false);
+}
+
+/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -201,6 +226,9 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
     }
 
     ebpf_dc_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_dc_disable_release_task(obj);
 
     int ret = dc_bpf__load(obj);
     if (ret) {
@@ -1116,7 +1144,8 @@ static void ebpf_dcstat_allocate_global_vectors(int apps)
 static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
-    if (em->load == EBPF_LOAD_LEGACY) {
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode);
+    if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;

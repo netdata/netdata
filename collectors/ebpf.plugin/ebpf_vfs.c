@@ -39,6 +39,354 @@ struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL,  NULL};
 static enum ebpf_threads_status ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
+netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_writev", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_read", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_readv", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_unlink", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_fsync", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_open", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_create", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/vfs.skel.h" // BTF code
+
+static struct vfs_bpf *bpf_obj = NULL;
+
+/**
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static void ebpf_vfs_disable_probes(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_unlink_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_unlink_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_create_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_create_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_kprobe, false);
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_disable_trampoline(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_unlink_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_create_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_fentry, false);
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_set_trampoline_target(struct vfs_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_write_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_write_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_writev_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_writev_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_read_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_READ].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_read_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_READ].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_readv_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_READV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_readv_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_READV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_unlink_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_fsync_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_fsync_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_open_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_open_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_create_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_release_task_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
+}
+
+/**
+ * Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
+{
+    obj->links.netdata_vfs_write_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_write_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+    int ret = libbpf_get_error(obj->links.netdata_vfs_write_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_write_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_write_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_write_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_writev_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_writev_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_writev_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_writev_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_writev_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_writev_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_read_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_read_kprobe, false,
+                                                                    vfs_targets[NETDATA_EBPF_VFS_READ].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_read_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_read_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_read_kretprobe, true,
+                                                                       vfs_targets[NETDATA_EBPF_VFS_READ].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_read_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_readv_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_readv_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_READV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_readv_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_readv_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_readv_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_READV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_readv_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_unlink_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_unlink_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_unlink_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_unlink_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_unlink_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_unlink_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kprobe, false,
+                                                                    vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kretprobe, true,
+                                                                       vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kprobe, false,
+                                                                    vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kretprobe, true,
+                                                                       vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_release_task_fentry,
+                                                                            true,
+                                                                            EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_vfs_release_task_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_vfs_adjust_map_size(struct vfs_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(obj->maps.tbl_vfs_pid, &vfs_maps[NETDATA_VFS_PID],
+                         em, bpf_map__name(obj->maps.tbl_vfs_pid));
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_set_hash_tables(struct vfs_bpf *obj)
+{
+    vfs_maps[NETDATA_VFS_ALL].map_fd = bpf_map__fd(obj->maps.tbl_vfs_stats);
+    vfs_maps[NETDATA_VFS_PID].map_fd = bpf_map__fd(obj->maps.tbl_vfs_pid);
+    vfs_maps[NETDATA_VFS_CTRL].map_fd = bpf_map__fd(obj->maps.vfs_ctrl);
+}
+
+/**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_disable_release_task(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_kprobe, false);
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_EBPF_VFS_WRITE].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_vfs_disable_probes(obj);
+
+        ebpf_vfs_set_trampoline_target(obj);
+    } else {
+        ebpf_vfs_disable_trampoline(obj);
+    }
+
+    ebpf_vfs_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_vfs_disable_release_task(obj);
+
+    int ret = vfs_bpf__load(obj);
+    if (ret) {
+        return ret;
+    }
+
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? vfs_bpf__attach(obj) : ebpf_vfs_attach_probe(obj);
+    if (!ret) {
+        ebpf_vfs_set_hash_tables(obj);
+
+        ebpf_update_controller(vfs_maps[NETDATA_VFS_CTRL].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -76,6 +424,11 @@ static void ebpf_vfs_cleanup(void *ptr)
     freez(vfs_hash_values);
     freez(vfs_vector);
     freez(vfs_threads.thread);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        vfs_bpf__destroy(bpf_obj);
+#endif
 
     vfs_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
     em->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -1543,6 +1896,36 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
  *
  *****************************************************************/
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_vfs_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_EBPF_VFS_WRITE].mode);
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = vfs_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_vfs_load_and_attach(bpf_obj, em);
+    }
+#endif
+
+    return ret;
+}
+
 /**
  * Process thread
  *
@@ -1566,8 +1949,10 @@ void *ebpf_vfs_thread(void *ptr)
     if (!em->enabled)
         goto endvfs;
 
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_vfs_load_bpf(em)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endvfs;
     }

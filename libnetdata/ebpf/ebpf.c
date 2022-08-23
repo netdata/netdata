@@ -444,9 +444,9 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
 
     // In theory the `else if` is useless, because when this function is called, the module should not stay in
     // EBPF_LOAD_PLAY_DICE. We have this additional condition to detect errors from developers.
-    if (em->load == EBPF_LOAD_LEGACY)
+    if (em->load & EBPF_LOAD_LEGACY)
         report->legacy++;
-    else if (em->load == EBPF_LOAD_CORE)
+    else if (em->load & EBPF_LOAD_CORE)
         report->core++;
 
     ebpf_stats_targets(report, em->targets);
@@ -826,9 +826,9 @@ netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str)
  */
 static char *ebpf_convert_load_mode_to_string(netdata_ebpf_load_mode_t mode)
 {
-    if (mode == EBPF_LOAD_CORE)
+    if (mode & EBPF_LOAD_CORE)
         return EBPF_CFG_CORE_PROGRAM;
-    else if (mode == EBPF_LOAD_LEGACY)
+    else if (mode & EBPF_LOAD_LEGACY)
         return EBPF_CFG_LEGACY_PROGRAM;
 
     return EBPF_CFG_DEFAULT_PROGRAM;
@@ -850,7 +850,7 @@ static char *ebpf_convert_collect_pid_to_string(netdata_apps_level_t level)
     else if (level == NETDATA_APPS_LEVEL_ALL)
         return EBPF_CFG_PID_ALL;
 
-    return EBPF_CFG_PID_ALL;
+    return EBPF_CFG_PID_INTERNAL_USAGE;
 }
 
 /**
@@ -903,9 +903,11 @@ netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode
 void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file)
 {
     if (!file) {
-        mod->load = EBPF_LOAD_LEGACY;
+        mod->load &= ~EBPF_LOAD_CORE;
+        mod->load |= EBPF_LOAD_LEGACY;
     } else if (mod->load == EBPF_LOAD_PLAY_DICE && file) {
-        mod->load = EBPF_LOAD_CORE;
+        mod->load &= ~EBPF_LOAD_LEGACY;
+        mod->load |= EBPF_LOAD_CORE;
     }
 }
 
@@ -1019,13 +1021,38 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
 }
 
 /**
+ * Select Load Mode
+ *
+ * Select the load mode according the given inputs.
+ *
+ * @param btf_file a pointer to the loaded btf file.
+ * @parma load     current value.
+ *
+ * @return it returns the new load mode.
+ */
+static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {
+        load = (!btf_file) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
+    }
+#else
+    load = EBPF_LOAD_LEGACY;
+#endif
+
+    return load;
+}
+
+/**
  * Update Module using config
  *
  * Update configuration for a specific thread.
  *
  * @param modules   structure that will be updated
+ * @oaram origin    specify the configuration file loaded
+ * @param btf_file a pointer to the loaded btf file.
  */
-void ebpf_update_module_using_config(ebpf_module_t *modules)
+void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file)
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
@@ -1044,9 +1071,11 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
 
-    value = ebpf_convert_load_mode_to_string(modules->load);
+    value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
-    modules->load = epbf_convert_string_to_load_mode(value);
+    netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(value);
+    load = ebpf_select_load_mode(btf_file, load);
+    modules->load = origin | load;
 
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(value, modules->mode);
@@ -1066,10 +1095,13 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
  * update the variables.
  *
  * @param em       the module structure
+ * @param btf_file a pointer to the loaded btf file.
  */
-void ebpf_update_module(ebpf_module_t *em)
+void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
 {
     char filename[FILENAME_MAX+1];
+    netdata_ebpf_load_mode_t origin;
+
     ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, em->config_file);
     if (!ebpf_load_config(em->cfg, filename)) {
         ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, em->config_file);
@@ -1077,9 +1109,32 @@ void ebpf_update_module(ebpf_module_t *em)
             error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
-    }
+        // If user defined data globaly, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
+        // forcing users to configure thread by thread.
+        origin = (!(em->load & NETDATA_EBPF_LOAD_SOURCE)) ? EBPF_LOADED_FROM_STOCK : em->load & NETDATA_EBPF_LOAD_SOURCE;
+    } else
+        origin = EBPF_LOADED_FROM_USER;
 
-    ebpf_update_module_using_config(em);
+    ebpf_update_module_using_config(em, origin, btf_file);
+}
+
+/**
+ * Adjust Apps Cgroup
+ *
+ * Apps and cgroup has internal cleanup that needs attaching tracers to release_task, to avoid overload the function
+ * we will enable this integration by default, if and only if, we are running with trampolines.
+ *
+ * @param em   a poiter to the main thread structure.
+ * @param mode is the mode used with different
+ */
+void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode)
+{
+    if ((em->load & EBPF_LOADED_FROM_STOCK) &&
+    (em->apps_charts || em->cgroup_charts) &&
+    mode != EBPF_LOAD_TRAMPOLINE) {
+        em->apps_charts = NETDATA_EBPF_APPS_FLAG_NO;
+        em->cgroup_charts = 0;
+    }
 }
 
 //----------------------------------------------------------------------------------------------------------------------

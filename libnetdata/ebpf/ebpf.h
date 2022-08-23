@@ -30,6 +30,7 @@
 #define EBPF_CFG_PID_REAL_PARENT "real parent"
 #define EBPF_CFG_PID_PARENT "parent"
 #define EBPF_CFG_PID_ALL "all"
+#define EBPF_CFG_PID_INTERNAL_USAGE "not used"
 
 #define EBPF_CFG_CORE_ATTACH "ebpf co-re tracing"
 #define EBPF_CFG_ATTACH_TRAMPOLINE "trampoline"
@@ -201,11 +202,14 @@ typedef struct ebpf_specify_name {
 } ebpf_specify_name_t;
 
 typedef enum netdata_ebpf_load_mode {
-    EBPF_LOAD_LEGACY,        // Select legacy mode, this means we will load binaries
-    EBPF_LOAD_CORE,          // When CO-RE is used, it is necessary to use the souce code
-
-    EBPF_LOAD_PLAY_DICE      // Take a look on environment and choose the best option
+    EBPF_LOAD_LEGACY = 1<<0,        // Select legacy mode, this means we will load binaries
+    EBPF_LOAD_CORE = 1<<1,          // When CO-RE is used, it is necessary to use the souce code
+    EBPF_LOAD_PLAY_DICE = 1<<2,      // Take a look on environment and choose the best option
+    EBPF_LOADED_FROM_STOCK = 1<<3,  // Configuration loaded from Stock file
+    EBPF_LOADED_FROM_USER = 1<<4    // Configuration loaded from user
 } netdata_ebpf_load_mode_t;
+#define NETDATA_EBPF_LOAD_METHODS (EBPF_LOAD_LEGACY|EBPF_LOAD_CORE|EBPF_LOAD_PLAY_DICE)
+#define NETDATA_EBPF_LOAD_SOURCE (EBPF_LOADED_FROM_STOCK|EBPF_LOADED_FROM_USER)
 
 typedef enum netdata_ebpf_program_loaded {
     EBPF_LOAD_PROBE,         // Attach probes on targets
@@ -274,8 +278,9 @@ extern struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em,
 
 extern void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 extern int ebpf_load_config(struct config *config, char *filename);
-extern void ebpf_update_module(ebpf_module_t *em);
+extern void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
+extern void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode);
 extern char *ebpf_find_symbol(char *search);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
