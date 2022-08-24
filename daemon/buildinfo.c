@@ -317,7 +317,6 @@ void print_build_info_json(void) {
     printf("    \"cloud-disabled\": false,\n");
 #endif
     printf("    \"aclk\": %s,\n", FEAT_JSON_BOOL(FEAT_CLOUD));
-    printf("    \"aclk-new-cloud-proto\": %s,\n", FEAT_JSON_BOOL(1));
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));

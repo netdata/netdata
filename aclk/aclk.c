@@ -2,6 +2,7 @@
 
 #include "aclk.h"
 
+#ifdef ENABLE_ACLK
 #include "aclk_stats.h"
 #include "mqtt_wss_client.h"
 #include "aclk_otp.h"
@@ -23,10 +24,22 @@
 
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
+#endif /* ENABLE_ACLK */
+
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
 int disconnect_req = 0;
+
+int aclk_connected = 0;
+int use_mqtt_5 = 0;
+int aclk_ctx_based = 0;
+int aclk_disable_runtime = 0;
+int aclk_stats_enabled;
+int aclk_kill_link = 0;
+
+usec_t aclk_session_us = 0;
+time_t aclk_session_sec = 0;
 
 time_t last_conn_time_mqtt = 0;
 time_t last_conn_time_appl = 0;
@@ -38,6 +51,7 @@ int aclk_alert_reloaded = 0; //1 on health log exchange, and again on health_rel
 
 time_t aclk_block_until = 0;
 
+#ifdef ENABLE_ACLK
 mqtt_wss_client mqttwss_client;
 
 netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -923,9 +937,13 @@ static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
     );
     freez(stats);
 }
+#endif /* ENABLE_ACLK */
 
-char *ng_aclk_state(void)
+char *aclk_state(void)
 {
+#ifndef ENABLE_ACLK
+    return strdupz("ACLK Available: No");
+#else
     BUFFER *wb = buffer_create(1024);
     struct tm *tmptr, tmbuf;
     char *ret;
@@ -1010,8 +1028,10 @@ char *ng_aclk_state(void)
     ret = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return ret;
+#endif /* ENABLE_ACLK */
 }
 
+#ifdef ENABLE_ACLK
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct proto_alert_status status;
@@ -1087,9 +1107,13 @@ static json_object *timestamp_to_json(const time_t *t)
     }
     return NULL;
 }
+#endif /* ENABLE_ACLK */
 
-char *ng_aclk_state_json(void)
+char *aclk_state_json(void)
 {
+#ifndef ENABLE_ACLK
+    return strdupz("{\"aclk-available\":false}");
+#else
     json_object *tmp, *grp, *msg = json_object_new_object();
 
     tmp = json_object_new_boolean(1);
@@ -1203,4 +1227,36 @@ char *ng_aclk_state_json(void)
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
     json_object_put(msg);
     return str;
+#endif /* ENABLE_ACLK */
+}
+
+void add_aclk_host_labels(void) {
+    DICTIONARY *labels = localhost->host_labels;
+
+#ifdef ENABLE_ACLK
+    rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+    ACLK_PROXY_TYPE aclk_proxy;
+    char *proxy_str;
+    aclk_get_proxy(&aclk_proxy);
+
+    switch(aclk_proxy) {
+        case PROXY_TYPE_SOCKS5:
+            proxy_str = "SOCKS5";
+            break;
+        case PROXY_TYPE_HTTP:
+            proxy_str = "HTTP";
+            break;
+        default:
+            proxy_str = "none";
+            break;
+    }
+
+    int mqtt5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_YES);
+
+    rrdlabels_add(labels, "_mqtt_version", mqtt5 ? "5" : "3", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+#else
+    rrdlabels_add(labels, "_aclk_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
+#endif
 }

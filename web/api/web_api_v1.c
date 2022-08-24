@@ -1215,7 +1215,6 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
-    buffer_strcat(wb, "\t\"aclk-new-cloud-protocol\": true,\n");
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
 #endif

@@ -676,8 +676,6 @@ PARSER_FILES = \
 
 if ENABLE_ACLK
 ACLK_FILES = \
-    aclk/aclk.c \
-    aclk/aclk.h \
     aclk/aclk_util.c \
     aclk/aclk_util.h \
     aclk/aclk_stats.c \
@@ -860,10 +858,10 @@ endif #ENABLE_ACLK
 
 ACLK_ALWAYS_BUILD_FILES = \
     aclk/aclk_rrdhost_state.h \
-    aclk/aclk_api.c \
-    aclk/aclk_api.h \
     aclk/aclk_proxy.c \
     aclk/aclk_proxy.h \
+    aclk/aclk.c \
+    aclk/aclk.h \
     $(NULL)
 
 SPAWN_PLUGIN_FILES = \

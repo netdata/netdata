@@ -4,7 +4,7 @@
 #include "sqlite/sqlite_context.h"
 #include "aclk/schema-wrappers/context.h"
 #include "aclk/aclk_contexts_api.h"
-#include "aclk/aclk_api.h"
+#include "aclk/aclk.h"
 
 int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 
