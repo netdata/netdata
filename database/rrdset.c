@@ -140,7 +140,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     char sanitized_name[CONFIG_MAX_VALUE + 1];
     char new_name[CONFIG_MAX_VALUE + 1];
 
-    snprintfz(full_name, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
+    snprintfz(full_name, RRD_ID_LENGTH_MAX, "%s.%s", rrdset_type(st), name);
     rrdset_strncpyz_name(sanitized_name, full_name, CONFIG_MAX_VALUE);
     strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
@@ -397,7 +397,7 @@ void rrdset_free(RRDSET *st) {
 
     // free directly allocated members
     freez((void *)st->name);
-    freez(st->type);
+    string_freez(st->type);
     freez(st->family);
     freez(st->title);
     string_freez(st->units);
@@ -717,8 +717,8 @@ RRDSET *rrdset_create_custom(
     st->plugin_name = rrd_string_strdupz(plugin);
     st->module_name = rrd_string_strdupz(module);
     st->chart_type  = chart_type;
-    st->type        = strdupz(type);
-    st->family      = family ? strdupz(family) : strdupz(st->type);
+    st->type        = rrd_string_strdupz(type);
+    st->family      = family ? strdupz(family) : strdupz(rrdset_type(st));
     json_fix_string(st->family);
 
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;

@@ -745,7 +745,7 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
         return 0;
 
     rc = sql_store_chart(
-        chart_uuid, &st->rrdhost->host_uuid, st->type, id, name, st->family, st->context, st->title,
+        chart_uuid, &st->rrdhost->host_uuid, rrdset_type(st), id, name, st->family, st->context, st->title,
         rrdset_units(st), rrdset_plugin_name(st), rrdset_module_name(st), st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
 
     return rc;
@@ -2095,7 +2095,7 @@ void compute_chart_hash(RRDSET *st)
     (void)sql_store_chart_hash(
         (uuid_t *)&hash_value,
         st->chart_uuid,
-        st->type,
+        rrdset_type(st),
         st->id,
         st->name,
         st->family,
