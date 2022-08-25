@@ -746,7 +746,7 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
 
     rc = sql_store_chart(
         chart_uuid, &st->rrdhost->host_uuid, rrdset_type(st), id, name,
-        rrdset_family(st), st->context, rrdset_title(st), rrdset_units(st),
+        rrdset_family(st), rrdset_context(st), rrdset_title(st), rrdset_units(st),
         rrdset_plugin_name(st), rrdset_module_name(st),
         st->priority, st->update_every, st->chart_type,
         st->rrd_memory_mode, st->entries);
@@ -1872,7 +1872,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
 
         if (!st || uuid_compare(*(uuid_t *)sqlite3_column_blob(res, 7), chart_id)) {
             if (unlikely(st && !st->counter)) {
-                onewayalloc_freez(owa, st->context);
+                string_freez(st->context);
                 onewayalloc_freez(owa, (char *) st->name);
                 onewayalloc_freez(owa, st);
             }
@@ -1886,7 +1886,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
             st->update_every = sqlite3_column_int(res, 6);
             st->counter = 0;
             if (chart) {
-                st->context = onewayalloc_strdupz(owa, (char *)sqlite3_column_text(res, 8));
+                st->context = string_strdupz((char *)sqlite3_column_text(res, 8));
                 strncpyz(st->id, chart, RRD_ID_LENGTH_MAX);
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
@@ -1912,13 +1912,13 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
     }
     if (st) {
         if (!st->counter) {
-            onewayalloc_freez(owa,st->context);
+            string_freez(st->context);
             onewayalloc_freez(owa,(char *)st->name);
             onewayalloc_freez(owa,st);
         }
         else
             if (!st->context && context)
-                st->context = onewayalloc_strdupz(owa,context);
+                st->context = string_strdupz(context);
     }
 
 failed:
@@ -2078,7 +2078,7 @@ void compute_chart_hash(RRDSET *st)
     EVP_DigestUpdate(evpctx, st->id, strlen(st->id));
     EVP_DigestUpdate(evpctx, st->name, strlen(st->name));
     EVP_DigestUpdate(evpctx, rrdset_family(st), string_length(st->family));
-    EVP_DigestUpdate(evpctx, st->context, strlen(st->context));
+    EVP_DigestUpdate(evpctx, rrdset_context(st), string_length(st->context));
     EVP_DigestUpdate(evpctx, rrdset_title(st), string_length(st->title));
     EVP_DigestUpdate(evpctx, rrdset_units(st), string_length(st->units));
     EVP_DigestUpdate(evpctx, rrdset_plugin_name(st), string_length(st->plugin_name));
@@ -2102,7 +2102,7 @@ void compute_chart_hash(RRDSET *st)
         st->id,
         st->name,
         rrdset_family(st),
-        st->context,
+        rrdset_context(st),
         rrdset_title(st),
         rrdset_units(st),
         rrdset_plugin_name(st),

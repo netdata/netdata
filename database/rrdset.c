@@ -401,11 +401,10 @@ void rrdset_free(RRDSET *st) {
     string_freez(st->family);
     string_freez(st->title);
     string_freez(st->units);
-    freez(st->context);
+    string_freez(st->context);
     freez(st->cache_dir);
     string_freez(st->plugin_name);
     string_freez(st->module_name);
-    freez(st->state->old_context);
     rrdlabels_destroy(st->state->chart_labels);
     freez(st->state);
     freez(st->chart_uuid);
@@ -558,10 +557,7 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_ACTIVATED;
         }
 
-        char *old_context = NULL,
-             *old_context_v = NULL;
         int rc;
-
         if(unlikely(name))
             rc = rrdset_set_name(st, name);
         else
@@ -611,26 +607,21 @@ RRDSET *rrdset_create_custom(
             string_freez(old_units);
         }
 
+        if(context && *context) {
+            STRING *old_context = st->context;
+            st->context = rrd_string_strdupz(context);
+            if(old_context != st->context)
+                mark_rebuild |= META_CHART_UPDATED;
+            string_freez(old_context);
+        }
+
         if (st->chart_type != chart_type) {
             st->chart_type = chart_type;
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        if (unlikely(context && st->state->old_context && strcmp(st->state->old_context, context))) {
-            char *new_context = strdupz(context);
-            old_context_v = st->state->old_context;
-            st->state->old_context = strdupz(context);
-            json_fix_string(new_context);
-            old_context = st->context;
-            st->context = new_context;
-            st->hash_context = simple_hash(st->context);
-            mark_rebuild |= META_CHART_UPDATED;
-        }
-
         if (mark_rebuild) {
             rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            freez(old_context);
-            freez(old_context_v);
             if (mark_rebuild != META_CHART_ACTIVATED) {
                 info("Collector updated metadata for chart %s", st->id);
                 sched_yield();
@@ -638,7 +629,7 @@ RRDSET *rrdset_create_custom(
         }
         if (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
             debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
-            int rc = update_chart_metadata(st->chart_uuid, st, id, name);
+            rc = update_chart_metadata(st->chart_uuid, st, id, name);
             if (unlikely(rc))
                 error_report("Failed to update chart metadata in the database");
 
@@ -719,10 +710,8 @@ RRDSET *rrdset_create_custom(
 
     st->units = rrd_string_strdupz(units);
 
-    st->context = context ? strdupz(context) : strdupz(st->id);
-    st->state->old_context = strdupz(st->context);
-    json_fix_string(st->context);
-    st->hash_context = simple_hash(st->context);
+    st->context = context ? rrd_string_strdupz(context) : rrd_string_strdupz(st->id);
+    st->hash_context = simple_hash(rrdset_context(st));
 
     st->priority = priority;
 

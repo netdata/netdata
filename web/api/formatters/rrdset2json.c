@@ -49,7 +49,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         st->name,
         rrdset_type(st),
         rrdset_family(st),
-        st->context,
+        rrdset_context(st),
         rrdset_title(st),
         st->name,
         st->priority,

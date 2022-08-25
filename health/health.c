@@ -617,12 +617,12 @@ static void health_main_cleanup(void *ptr) {
 static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
     SILENCER *s;
     debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",
-            rc->name, (rc->rrdset)?rc->rrdset->context:"", rc->chart, host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
+            rc->name, (rc->rrdset)?rrdset_context(rc->rrdset):"", rc->chart, host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
                 (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches(s->alarms_pattern,rc->name))) &&
-                (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches(s->contexts_pattern,rc->rrdset->context))) &&
+                (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches(s->contexts_pattern, rrdset_context(rc->rrdset)))) &&
                 (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern,host))) &&
                 (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches(s->charts_pattern,rc->chart))) &&
                 (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches(s->families_pattern, rrdset_family(rc->rrdset))))
@@ -634,7 +634,7 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers
                 debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
                         , (silencers->stype == STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rc->name
-                        , (rc->rrdset)?rc->rrdset->context:""
+                        , (rc->rrdset)?rrdset_context(rc->rrdset):""
                         , rc->chart
                         , host
                         , (rc->rrdset)?rrdset_family(rc->rrdset):""
@@ -853,9 +853,11 @@ void *health_main(void *ptr) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
-                            rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                            rc->value, NAN, rc->status, RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0, 0);
+                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now,
+                            rc->name, rc->rrdset->id, rrdset_context(rc->rrdset), rrdset_family(rc->rrdset),
+                            rc->classification, rc->component, rc->type, rc->exec, rc->recipient,
+                            now - rc->last_status_change, rc->value, NAN, rc->status,
+                            RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0, 0);
                         if (ae) {
                             health_alarm_log(host, ae);
                             rc->old_status = rc->status;
@@ -1113,13 +1115,15 @@ void *health_main(void *ptr) {
 
 
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
-                                rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
-                                rc->delay_last,
-                                (
-                                        ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                        ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now,
+                            rc->name, rc->rrdset->id, rrdset_context(rc->rrdset),
+                            rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type,
+                            rc->exec, rc->recipient, now - rc->last_status_change,
+                            rc->old_value, rc->value, rc->status, status, rc->source,
+                            rc->units, rc->info, rc->delay_last,
+                            (
+                                ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
                                 )
                         );
                         health_alarm_log(host, ae);
@@ -1165,13 +1169,15 @@ void *health_main(void *ptr) {
                         rc->last_repeat = now;
                         if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
-                                rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
-                                rc->delay_last,
-                                (
-                                        ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                        ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                            host, rc->id, rc->next_event_id++, rc->config_hash_id, now,
+                            rc->name, rc->rrdset->id, rrdset_context(rc->rrdset),
+                            rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type,
+                            rc->exec, rc->recipient, now - rc->last_status_change,
+                            rc->old_value, rc->value, rc->old_status, rc->status, rc->source,
+                            rc->units, rc->info, rc->delay_last,
+                            (
+                                ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
                                 )
                         );
                         ae->last_repeat = rc->last_repeat;

@@ -100,10 +100,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_name);
     rs->key_fullidname = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->key_id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), rs->key_id);
     rs->key_contextid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->key_name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), rs->key_name);
     rs->key_contextname = strdupz(buffer);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->key_id);

@@ -1111,7 +1111,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
 
 static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT trc = {
-        .id = string_strdupz(st->context),
+        .id = string_dup(st->context),
         .title = string_dup(st->title),
         .units = string_dup(st->units),
         .family = string_dup(st->family),

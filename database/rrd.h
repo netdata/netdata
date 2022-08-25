@@ -455,7 +455,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
-    char *old_context;
     uuid_t hash_id;
     DICTIONARY *chart_labels;
     bool is_ar_chart;
@@ -528,8 +527,8 @@ struct rrdset {
     STRING *title;                                  // title shown to user
     STRING *units;                                  // units of measurement
 
-    char *context;                                  // the template of this data set
-    uint32_t hash_context;                          // the hash of the chart's context
+    STRING *context;                                // the template of this data set
+    uint32_t hash_context;
 
     RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
     RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
@@ -625,6 +624,7 @@ struct rrdset {
 #define rrdset_type(st) string2str((st)->type)
 #define rrdset_family(st) string2str((st)->family)
 #define rrdset_title(st) string2str((st)->title)
+#define rrdset_context(st) string2str((st)->context)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))

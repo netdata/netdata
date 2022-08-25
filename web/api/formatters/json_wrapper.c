@@ -79,8 +79,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sgroup%s: %s%s%s,\n"
                        "   %soptions%s: %s"
                    , kq, kq
-                   , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->id, sq
-                   , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->name, sq
+                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):r->st->id, sq
+                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
                    , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t_nolock(r->st))

@@ -122,7 +122,7 @@ static void register_result(DICTIONARY *results,
         .flags = flags,
         .st = st,
         .chart_id = st->id,
-        .context = st->context,
+        .context = rrdset_context(st),
         .dim_name = rrddim_name(d),
         .value = v
     };
@@ -1006,7 +1006,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
-            if(!contexts || simple_pattern_matches(contexts, st->context))
+            if(!contexts || simple_pattern_matches(contexts, rrdset_context(st)))
                 dictionary_set(charts, st->name, NULL, 0);
         }
     }
