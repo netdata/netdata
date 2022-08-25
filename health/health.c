@@ -617,7 +617,7 @@ static void health_main_cleanup(void *ptr) {
 static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
     SILENCER *s;
     debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",
-            rc->name, (rc->rrdset)?rc->rrdset->context:"", rc->chart, host, (rc->rrdset)?rc->rrdset->family:"");
+            rc->name, (rc->rrdset)?rc->rrdset->context:"", rc->chart, host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
@@ -625,7 +625,7 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers
                 (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches(s->contexts_pattern,rc->rrdset->context))) &&
                 (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern,host))) &&
                 (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches(s->charts_pattern,rc->chart))) &&
-                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches(s->families_pattern,rc->rrdset->family)))
+                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches(s->families_pattern, rrdset_family(rc->rrdset))))
                 ) {
             debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
             if (unlikely(silencers->stype == STYPE_NONE)) {
@@ -637,7 +637,7 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers
                         , (rc->rrdset)?rc->rrdset->context:""
                         , rc->chart
                         , host
-                        , (rc->rrdset)?rc->rrdset->family:""
+                        , (rc->rrdset)?rrdset_family(rc->rrdset):""
                         );
             }
             return silencers->stype;
@@ -854,7 +854,7 @@ void *health_main(void *ptr) {
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                             host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
-                            rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                            rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                             rc->value, NAN, rc->status, RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0, 0);
                         if (ae) {
                             health_alarm_log(host, ae);
@@ -1114,7 +1114,7 @@ void *health_main(void *ptr) {
 
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
-                                rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                                rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
                                 (
@@ -1166,7 +1166,7 @@ void *health_main(void *ptr) {
                         if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id, rc->rrdset->context,
-                                rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                                rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
                                 (

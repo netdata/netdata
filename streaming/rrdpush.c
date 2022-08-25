@@ -234,7 +234,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , name
             , st->title
             , rrdset_units(st)
-            , st->family
+            , rrdset_family(st)
             , st->context
             , rrdset_type_name(st->chart_type)
             , st->priority

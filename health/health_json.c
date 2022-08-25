@@ -208,7 +208,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , hash_id
                    , rc->name
                    , rc->chart
-                   , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
+                   , (rc->rrdset)?rrdset_family(rc->rrdset):""
                    , rc->classification?rc->classification:"Unknown"
                    , rc->component?rc->component:"Unknown"
                    , rc->type?rc->type:"Unknown"

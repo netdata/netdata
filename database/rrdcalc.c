@@ -60,7 +60,7 @@ char *rrdcalc_replace_variables(const char *line, RRDCALC *rc)
         var[i]='\0';
         pos = m - temp + 1;
         if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
-            char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
+            char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rrdset_family(rc->rrdset) : "", m);
             freez(temp);
             temp = buf;
         } else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
@@ -155,7 +155,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         rc->name,
         rc->rrdset->id,
         rc->rrdset->context,
-        rc->rrdset->family,
+        rrdset_family(rc->rrdset),
         rc->classification,
         rc->component,
         rc->type,
@@ -228,7 +228,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
         rc->name,
         rc->rrdset->id,
         rc->rrdset->context,
-        rc->rrdset->family,
+        rrdset_family(rc->rrdset),
         rc->classification,
         rc->component,
         rc->type,

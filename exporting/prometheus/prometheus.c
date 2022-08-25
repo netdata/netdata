@@ -447,7 +447,7 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
         p->suffix,
         (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->st->name) ? p->st->name : p->st->id,
         p->st->context,
-        p->st->family,
+        rrdset_family(p->st),
         (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->rd->name) ? rrddim_name(p->rd) : rrddim_id(p->rd));
 
     if (prometheus_collector)
@@ -577,7 +577,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
             prometheus_label_copy(
                 chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id, PROMETHEUS_ELEMENT_MAX);
-            prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+            prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
             prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
@@ -606,7 +606,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     (homogeneous) ? "homogeneous" : "heterogeneous",
                     (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
                     st->context,
-                    st->family,
+                    rrdset_family(st),
                     rrdset_units(st));
 
             // for each dimension

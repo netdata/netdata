@@ -129,7 +129,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                 chart_counter ? "," : "",
                 st->id,
                 st->name,
-                st->family,
+                rrdset_family(st),
                 st->context,
                 rrdset_units(st),
                 (int64_t)rrdset_last_entry_t_nolock(st));

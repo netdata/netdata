@@ -398,7 +398,7 @@ void rrdset_free(RRDSET *st) {
     // free directly allocated members
     freez((void *)st->name);
     string_freez(st->type);
-    freez(st->family);
+    string_freez(st->family);
     freez(st->title);
     string_freez(st->units);
     freez(st->context);
@@ -491,7 +491,7 @@ static inline void rrdset_update_permanent_labels(RRDSET *st) {
 
     rrdlabels_add(st->state->chart_labels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
     rrdlabels_add(st->state->chart_labels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_instance_family",st->family,             RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_instance_family",rrdset_family(st),      RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
 }
 
 RRDSET *rrdset_create_custom(
@@ -718,8 +718,7 @@ RRDSET *rrdset_create_custom(
     st->module_name = rrd_string_strdupz(module);
     st->chart_type  = chart_type;
     st->type        = rrd_string_strdupz(type);
-    st->family      = family ? strdupz(family) : strdupz(rrdset_type(st));
-    json_fix_string(st->family);
+    st->family      = family ? rrd_string_strdupz(family) : string_dup(st->type);
 
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
 
@@ -757,7 +756,7 @@ RRDSET *rrdset_create_custom(
     st->state->old_title = strdupz(st->title);
     json_fix_string(st->title);
 
-    st->rrdfamily = rrdfamily_create(host, st->family);
+    st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
 
     st->next = host->rrdset_root;
     host->rrdset_root = st;

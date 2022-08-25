@@ -202,7 +202,7 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
         chart,
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
         PROMETHEUS_ELEMENT_MAX);
-    prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
     prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
     as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);

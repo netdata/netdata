@@ -292,7 +292,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     buffer_sprintf(buf, "{\n\t\"chart\": \"%s\",\n\t\"chart_name\": \"%s\",\n\t\"chart_context\": \"%s\",\n\t\"chart_variables\": {", st->id, st->name, st->context);
     avl_traverse_lock(&st->rrdvar_root_index, single_variable2json, (void *)&helper);
 
-    buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", st->family);
+    buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", rrdset_family(st));
     helper.counter = 0;
     avl_traverse_lock(&st->rrdfamily->rrdvar_root_index, single_variable2json, (void *)&helper);
 

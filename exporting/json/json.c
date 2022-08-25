@@ -195,7 +195,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 
         st->id,
         st->name,
-        st->family,
+        rrdset_family(st),
         st->context,
         rrdset_type(st),
         rrdset_units(st),
@@ -279,7 +279,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
 
         st->id,
         st->name,
-        st->family,
+        rrdset_family(st),
         st->context,
         rrdset_type(st),
         rrdset_units(st),
