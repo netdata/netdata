@@ -701,8 +701,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if (context && !chart) {
         RRDSET *st1;
 
-        uint32_t context_hash = simple_hash(context);
-
         SIMPLE_PATTERN *chart_label_key_pattern = NULL;
         if(chart_label_key)
             chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
@@ -711,14 +709,16 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         if(chart_labels_filter)
             chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
+        STRING *context_string = string_strdupz(context);
         rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
-            if (st1->hash_context == context_hash && !strcmp(rrdset_context(st1), context) &&
+            if (st1->context == context_string &&
                 (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_label_key_pattern, ':')) &&
                 (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_labels_filter_pattern, ':')))
                     build_context_param_list(owa, &context_param_list, st1);
         }
         rrdhost_unlock(host);
+        string_freez(context_string);
 
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;

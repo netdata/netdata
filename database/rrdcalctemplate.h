@@ -20,8 +20,7 @@ struct rrdcalctemplate {
     char *component;
     char *type;
 
-    char *context;
-    uint32_t hash_context;
+    STRING *context;
 
     char *family_match;
     SIMPLE_PATTERN *family_pattern;

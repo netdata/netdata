@@ -310,16 +310,20 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
         while(p && *p && (tok = mystrsep(&p, ", |"))) {
             if(!*tok) continue;
 
+            STRING *tok_string = string_strdupz(tok);
+
             for(rc = host->alarms; rc ; rc = rc->next) {
                 if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                     continue;
                 if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
                     continue;
-                if(unlikely(rc->rrdset && rc->rrdset->hash_context == simple_hash(tok)
-                            && !strcmp(rrdset_context(rc->rrdset), tok)
-                            && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
+                if(unlikely(rc->rrdset
+                             && rc->rrdset->context == tok_string
+                             && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
                     numberOfAlarms++;
             }
+
+            string_freez(tok_string);
         }
     }
     else {

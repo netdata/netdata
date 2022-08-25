@@ -526,9 +526,7 @@ struct rrdset {
     STRING *family;                                 // grouping sets under the same family
     STRING *title;                                  // title shown to user
     STRING *units;                                  // units of measurement
-
     STRING *context;                                // the template of this data set
-    uint32_t hash_context;
 
     RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
     RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to

@@ -711,7 +711,6 @@ RRDSET *rrdset_create_custom(
     st->units = rrd_string_strdupz(units);
 
     st->context = context ? rrd_string_strdupz(context) : rrd_string_strdupz(st->id);
-    st->hash_context = simple_hash(rrdset_context(st));
 
     st->priority = priority;
 

@@ -12,7 +12,7 @@
  * @param st is the chart where the alarm will be attached.
  */
 void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
-    if(rt->hash_context != st->hash_context || strcmp(rt->context, rrdset_context(st)) != 0)
+    if(rt->context != st->context)
         return;
 
     if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, st->name))
@@ -75,7 +75,7 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->classification);
     freez(rt->component);
     freez(rt->type);
-    freez(rt->context);
+    string_freez(rt->context);
     freez(rt->source);
     freez(rt->units);
     freez(rt->info);

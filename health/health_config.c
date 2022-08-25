@@ -147,7 +147,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         ", red " NETDATA_DOUBLE_FORMAT_AUTO
         ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
           rt->name,
-          (rt->context)?rt->context:"NONE",
+          (rt->context)?string2str(rt->context):"NONE",
           (rt->exec)?rt->exec:"DEFAULT",
           (rt->recipient)?rt->recipient:"DEFAULT",
           rt->green,
@@ -998,14 +998,13 @@ static int health_readfile(const char *filename, void *data) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 alert_cfg->on = strdupz(value);
                 if(rt->context) {
-                    if(strcmp(rt->context, value) != 0)
+                    if(strcmp(string2str(rt->context), value) != 0)
                         error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->context, value, value);
+                                line, filename, rt->name, key, string2str(rt->context), value, value);
 
-                    freez(rt->context);
+                    string_freez(rt->context);
                 }
-                rt->context = strdupz(value);
-                rt->hash_context = simple_hash(rt->context);
+                rt->context = string_strdupz(value);
             }
             else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
                 alert_cfg->classification = strdupz(value);
