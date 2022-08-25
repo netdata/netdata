@@ -22,7 +22,10 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
     RRDDIM tmp = {
         .id = rrd_string_strdupz(id)
     };
-    return (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl_t *) &tmp);
+    RRDDIM *rd = (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl_t *) &tmp);
+    string_freez(tmp.id);
+
+    return rd;
 }
 
 

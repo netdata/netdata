@@ -9,8 +9,9 @@
 #define WORKER_JOB_WORKERS            2
 #define WORKER_JOB_DBENGINE           3
 #define WORKER_JOB_HEARTBEAT          4
+#define WORKER_JOB_STRINGS            5
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 6
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
 #endif
 
@@ -988,6 +989,89 @@ static void dbengine_statistics_charts(void) {
 #endif
 }
 
+static void update_strings_charts() {
+    static RRDSET *st_ops = NULL, *st_entries = NULL, *st_mem = NULL;
+    static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL, *rd_ops_searches = NULL;
+    static RRDDIM *rd_entries_entries = NULL, *rd_entries_refs = NULL;
+    static RRDDIM *rd_mem = NULL;
+
+    size_t inserts, deletes, searches, entries, references, memory;
+
+    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory);
+
+    if (unlikely(!st_ops)) {
+        st_ops = rrdset_create_localhost(
+            "netdata"
+            , "strings_ops"
+            , NULL
+            , "strings"
+            , NULL
+            , "Strings operations"
+            , "ops/s"
+            , "netdata"
+            , "stats"
+            , 910000
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE);
+
+        rd_ops_inserts  = rrddim_add(st_ops, "inserts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_deletes  = rrddim_add(st_ops, "deletes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_searches = rrddim_add(st_ops, "searches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    } else
+        rrdset_next(st_ops);
+
+    rrddim_set_by_pointer(st_ops, rd_ops_inserts, (collected_number)inserts);
+    rrddim_set_by_pointer(st_ops, rd_ops_deletes, (collected_number)deletes);
+    rrddim_set_by_pointer(st_ops, rd_ops_searches, (collected_number)searches);
+    rrdset_done(st_ops);
+
+    if (unlikely(!st_entries)) {
+        st_entries = rrdset_create_localhost(
+            "netdata"
+            , "strings_entries"
+            , NULL
+            , "strings"
+            , NULL
+            , "Strings entries"
+            , "entries"
+            , "netdata"
+            , "stats"
+            , 910001
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE);
+
+        rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st_entries);
+
+    rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number)entries);
+    rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
+    rrdset_done(st_entries);
+
+    if (unlikely(!st_mem)) {
+        st_mem = rrdset_create_localhost(
+            "netdata"
+            , "strings_memory"
+            , NULL
+            , "strings"
+            , NULL
+            , "Strings memory"
+            , "bytes"
+            , "netdata"
+            , "stats"
+            , 910001
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE);
+
+        rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st_mem);
+
+    rrddim_set_by_pointer(st_mem, rd_mem, (collected_number)memory);
+    rrdset_done(st_mem);
+}
+
 static void update_heartbeat_charts() {
     static RRDSET *st_heartbeat = NULL;
     static RRDDIM *rd_heartbeat_min = NULL;
@@ -1639,6 +1723,7 @@ void *global_statistics_main(void *ptr)
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_WORKERS, "workers");
     worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
+    worker_register_job_name(WORKER_JOB_STRINGS, "strings");
 
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
@@ -1673,6 +1758,9 @@ void *global_statistics_main(void *ptr)
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);
         update_heartbeat_charts();
+        
+        worker_is_busy(WORKER_JOB_STRINGS);
+        update_strings_charts();
     }
 
     netdata_thread_cleanup_pop(1);

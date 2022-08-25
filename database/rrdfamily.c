@@ -19,7 +19,11 @@ static RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id) {
         .family = string_strdupz(id)
     };
 
-    return (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl_t *) &tmp);
+    RRDFAMILY *rc = (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl_t *) &tmp);
+
+    string_freez(tmp.family);
+
+    return rc;
 }
 
 RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {

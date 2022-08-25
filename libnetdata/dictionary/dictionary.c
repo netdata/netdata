@@ -1517,6 +1517,15 @@ DICTIONARY string_dictionary = {
     .rwlock = NETDATA_RWLOCK_INITIALIZER
 };
 
+void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory) {
+    *inserts = string_dictionary.inserts;
+    *deletes = string_dictionary.deletes;
+    *searches = string_dictionary.searches;
+    *entries = string_dictionary.entries;
+    *references = string_dictionary.referenced_items;
+    *memory = string_dictionary.memory;
+}
+
 static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
 
 STRING *string_dup(STRING *string) {
@@ -1525,6 +1534,8 @@ STRING *string_dup(STRING *string) {
     STRING_ENTRY *se = (STRING_ENTRY *)string;
     netdata_mutex_lock(&string_mutex);
     se->refcount++;
+    string_dictionary.referenced_items++;
+    //fprintf(stderr, "STRING_STRDUPZ (DUP): '%s'\n", se->str);
     netdata_mutex_unlock(&string_mutex);
     return string;
 }
@@ -1550,12 +1561,18 @@ STRING *string_strdupz(const char *str) {
         string_dictionary.inserts++;
         string_dictionary.entries++;
         string_dictionary.memory += (long)mem_size;
+        string_dictionary.referenced_items++;
+
+        //fprintf(stderr, "STRING_STRDUPZ (NEW): '%s'\n", str);
     }
     else {
         // the item is already in the index
         se = *ptr;
         se->refcount++;
         string_dictionary.searches++;
+        string_dictionary.referenced_items++;
+
+        //fprintf(stderr, "STRING_STRDUPZ (FOUND): '%s'\n", str);
     }
 
     netdata_mutex_unlock(&string_mutex);
@@ -1570,6 +1587,8 @@ void string_freez(STRING *string) {
 
     if(se->refcount == 0)
         fatal("STRING: tried to free string that has zero references.");
+
+    string_dictionary.referenced_items--;
 
     se->refcount--;
     if(unlikely(se->refcount == 0)) {

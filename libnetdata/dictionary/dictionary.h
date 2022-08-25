@@ -249,4 +249,6 @@ static inline int string_cmp(STRING *s1, STRING *s2) {
     return strcmp(string2str(s1), string2str(s2));
 }
 
+extern void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory);
+
 #endif /* NETDATA_DICTIONARY_H */
