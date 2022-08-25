@@ -253,17 +253,11 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // the dimension definition
 
-    const char *id;                                 // the id of this dimension (for internal identification)
-    const char *name;                               // the name of this dimension (as presented to user)
+    STRING *id;                                     // the id of this dimension (for internal identification)
+    STRING *name;                                   // the name of this dimension (as presented to user)
                                                     // this is a pointer to the config structure
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
-    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
-                                                    // instead of strcmp() every item in the binary index
-                                                    // we first compare the hashes
-    uint32_t hash_name;                             // a simple hash of the name
-
-
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // configuration flags for the dimension
@@ -326,6 +320,9 @@ struct rrddim {
     void *rd_on_file;                               // pointer to the header written on disk
     storage_number *db;                             // the array of values
 };
+
+#define rrddim_id(rd) string2str((rd)->id)
+#define rrddim_name(rd) string2str((rd) ->name)
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 extern const char *rrddim_cache_filename(RRDDIM *rd);

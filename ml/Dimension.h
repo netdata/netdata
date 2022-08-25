@@ -26,7 +26,7 @@ public:
         RRDSET *RS = RD->rrdset;
 
         std::stringstream SS;
-        SS << RS->context << "|" << RS->id << "|" << RD->name;
+        SS << RS->context << "|" << RS->id << "|" << rrddim_name(RD);
         return SS.str();
     }
 

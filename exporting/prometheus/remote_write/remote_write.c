@@ -249,7 +249,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
-                    rd->id, rd->rrdset->id,
+                    rrddim_id(rd), rd->rrdset->id,
                     (host == localhost) ? instance->config.hostname : host->hostname,
                     (unsigned long)rd->last_collected_time.tv_sec,
                     (unsigned long)instance->after,
@@ -263,7 +263,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
 
                 prometheus_label_copy(
                     dimension,
-                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
@@ -278,7 +278,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
 
                 prometheus_name_copy(
                     dimension,
-                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(
                     name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->config.prefix, context, dimension,
@@ -304,7 +304,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
 
                 prometheus_label_copy(
                     dimension,
-                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(
                     name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->config.prefix, context, units, suffix);

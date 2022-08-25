@@ -121,7 +121,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, rd->name);
+        buffer_strcat(wb, rrddim_name(rd));
 //        buffer_strcat(wb, ".");
 //        buffer_strcat(wb, rd->rrdset->name);
         buffer_fast_strcat(wb, post_label, post_label_len);
@@ -253,7 +253,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
-                buffer_sprintf(wb, "%s%s%s: ", kq, rd->name, kq);
+                buffer_sprintf(wb, "%s%s%s: ", kq, rrddim_name(rd), kq);
 
             if(co[c] & RRDR_VALUE_EMPTY && !(options & RRDR_OPTION_INTERNAL_AR)) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))

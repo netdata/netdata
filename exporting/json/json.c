@@ -200,8 +200,8 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         st->type,
         st->units,
 
-        rd->id,
-        rd->name,
+        rrddim_id(rd),
+        rrddim_name(rd),
         rd->last_collected_value,
 
         (unsigned long long)rd->last_collected_time.tv_sec);
@@ -285,8 +285,8 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         st->type,
         st->units,
 
-        rd->id,
-        rd->name,
+        rrddim_id(rd),
+        rrddim_name(rd),
         value,
 
         (unsigned long long)last_t);

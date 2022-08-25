@@ -1093,8 +1093,8 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     memset(&dim_payload, 0, sizeof(dim_payload));
     dim_payload.node_id = wc->node_id;
     dim_payload.claim_id = claim_id;
-    dim_payload.name = rd->name;
-    dim_payload.id = rd->id;
+    dim_payload.name = rrddim_name(rd);
+    dim_payload.id = rrddim_id(rd);
     dim_payload.chart_id = rd->rrdset->id;
     dim_payload.created_at.tv_sec = created_at;
     dim_payload.last_timestamp.tv_sec = last_updated;
@@ -1144,8 +1144,8 @@ void aclk_send_dimension_update(RRDDIM *rd)
             rd->rrdset->rrdhost->dbsync_worker,
             claim_id,
             &rd->metric_uuid,
-            rd->id,
-            rd->name,
+            rrddim_id(rd),
+            rrddim_name(rd),
             rd->rrdset->id,
             first_entry_t,
             live ? 0 : last_entry_t,
@@ -1157,7 +1157,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
                 rd->rrdset->rrdhost->hostname,
                 rd->rrdset->name,
-                rd->name,
+                rrddim_name(rd),
                 live,
                 first_entry_t,
                 last_entry_t);
@@ -1167,7 +1167,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
                 rd->rrdset->rrdhost->hostname,
                 rd->rrdset->name,
-                rd->name,
+                rrddim_name(rd),
                 live,
                 first_entry_t,
                 last_entry_t,

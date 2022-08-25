@@ -448,7 +448,7 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
         (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->st->name) ? p->st->name : p->st->id,
         p->st->context,
         p->st->family,
-        (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->rd->name) ? p->rd->name : p->rd->id);
+        (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->rd->name) ? rrddim_name(p->rd) : rrddim_id(p->rd));
 
     if (prometheus_collector)
         buffer_sprintf(wb, "1 / 1");
@@ -651,7 +651,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             prometheus_label_copy(
                                 dimension,
-                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
@@ -667,7 +667,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             prometheus_name_copy(
                                 dimension,
-                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
@@ -694,7 +694,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             prometheus_label_copy(
                                 dimension,
-                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
@@ -705,7 +705,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     context,
                                     units,
                                     suffix,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                    (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                     st->units,
                                     (unsigned long long)first_time,
                                     (unsigned long long)last_time);

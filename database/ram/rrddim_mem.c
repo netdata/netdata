@@ -91,7 +91,7 @@ static inline size_t rrddim_time2slot(RRDDIM *rd, time_t t) {
     }
 
     if(unlikely(ret >= entries)) {
-        error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rd->name);
+        error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rrddim_name(rd));
         ret = entries - 1;
     }
 
@@ -119,12 +119,12 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
         ret = last_entry_t - (time_t)(update_every * (last_slot - slot));
 
     if(unlikely(ret < first_entry_t)) {
-        error("INTERNAL ERROR: rrddim_slot2time() on %s returns time too far in the past", rd->name);
+        error("INTERNAL ERROR: rrddim_slot2time() on %s returns time too far in the past", rrddim_name(rd));
         ret = first_entry_t;
     }
 
     if(unlikely(ret > last_entry_t)) {
-        error("INTERNAL ERROR: rrddim_slot2time() on %s returns time into the future", rd->name);
+        error("INTERNAL ERROR: rrddim_slot2time() on %s returns time into the future", rrddim_name(rd));
         ret = last_entry_t;
     }
 
@@ -206,7 +206,7 @@ int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
 void rrddim_query_finalize(struct rrddim_query_handle *handle) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(!rrddim_query_is_finished(handle))
-        error("QUERY: query for chart '%s' dimension '%s' has been stopped unfinished", handle->rd->rrdset->id, handle->rd->name);
+        error("QUERY: query for chart '%s' dimension '%s' has been stopped unfinished", handle->rd->rrdset->id, rrddim_name(handle->rd));
 #endif
     freez(handle->handle);
 }

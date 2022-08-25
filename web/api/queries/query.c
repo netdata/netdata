@@ -685,8 +685,8 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
     RRDDIM *d;
     long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
     for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d ;c++, d = d->next) {
-        if(    (match_ids   && simple_pattern_matches(pattern, d->id))
-               || (match_names && simple_pattern_matches(pattern, d->name))
+        if(    (match_ids   && simple_pattern_matches(pattern, rrddim_id(d)))
+               || (match_names && simple_pattern_matches(pattern, rrddim_name(d)))
                 ) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
@@ -768,7 +768,7 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
             internal_error(true, "QUERY: NULL dimension - invalid params to tier calculation");
         else
             internal_error(true, "QUERY: chart '%s' dimension '%s' invalid params to tier calculation",
-                           (rd->rrdset)?rd->rrdset->name:"unknown", rd->name);
+                           (rd->rrdset)?rd->rrdset->name:"unknown", rrddim_name(rd));
 
         return 0;
     }
@@ -782,7 +782,7 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
     for(int tier = 0; tier < storage_tiers ; tier++) {
         if(unlikely(!rd->tiers[tier])) {
             internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized",
-                           tier, rd->rrdset->name, rd->name);
+                           tier, rd->rrdset->name, rrddim_name(rd));
     //        buffer_free(wb);
             return 0;
         }
@@ -799,7 +799,7 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
         int update_every = (int)rd->tiers[tier]->tier_grouping * (int)rd->update_every;
         if(unlikely(update_every == 0)) {
             internal_error(true, "QUERY: update_every of tier %d for chart '%s' dimension '%s' is zero. tg = %d, ue = %d",
-                           tier, rd->rrdset->name, rd->name, rd->tiers[tier]->tier_grouping, rd->update_every);
+                           tier, rd->rrdset->name, rrddim_name(rd), rd->tiers[tier]->tier_grouping, rd->update_every);
     //        buffer_free(wb);
             return 0;
         }
@@ -1259,7 +1259,7 @@ static inline void rrd2rrdr_do_dimension(
             // check if the db is giving us zero duration points
             if(unlikely(new_point.start_time == new_point.end_time)) {
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu start time %ld, end time %ld, that are both equal",
-                               rd->rrdset->name, rd->name, new_point.id, new_point.start_time, new_point.end_time);
+                               rd->rrdset->name, rrddim_name(rd), new_point.id, new_point.start_time, new_point.end_time);
 
                 new_point.start_time = new_point.end_time - ((time_t)ops.tier_ptr->tier_grouping * (time_t)ops.rd->update_every);
             }
@@ -1267,7 +1267,7 @@ static inline void rrd2rrdr_do_dimension(
             // check if the db is advancing the query
             if(unlikely(new_point.end_time <= last1_point.end_time)) {
                 internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld time %ld, before the last point %zu end time %ld, now is %ld to %ld",
-                               rd->rrdset->name, rd->name, new_point.id, new_point.start_time, new_point.end_time,
+                               rd->rrdset->name, rrddim_name(rd), new_point.id, new_point.start_time, new_point.end_time,
                                last1_point.id, last1_point.end_time, now_start_time, now_end_time);
 
                 count_same_end_time++;
@@ -1295,7 +1295,7 @@ static inline void rrd2rrdr_do_dimension(
                     // we only log if this is not point 1
                     internal_error(new_point.end_time < after_wanted && new_point.id > 1,
                                    "QUERY: next_metric(%s, %s) returned point %zu from %ld time %ld, which is entirely before our current timeframe %ld to %ld (and before the entire query, after %ld, before %ld)",
-                                   rd->rrdset->name, rd->name,
+                                   rd->rrdset->name, rrddim_name(rd),
                                    new_point.id, new_point.start_time, new_point.end_time,
                                    now_start_time, now_end_time,
                                    after_wanted, before_wanted);
@@ -1339,7 +1339,7 @@ static inline void rrd2rrdr_do_dimension(
                 internal_error(current_point.id > 0 && last1_point.id == 0 && current_point.end_time > after_wanted && current_point.end_time > now_end_time,
                                "QUERY: on '%s', dim '%s', after %ld, before %ld, view update every %ld, query granularity %ld,"
                                " interpolating point %zu (from %ld to %ld) at %ld, but we could really favor by having last_point1 in this query.",
-                               rd->rrdset->name, rd->name, after_wanted, before_wanted, ops.view_update_every, ops.query_granularity,
+                               rd->rrdset->name, rrddim_name(rd), after_wanted, before_wanted, ops.view_update_every, ops.query_granularity,
                                current_point.id, current_point.start_time, current_point.end_time, now_end_time);
             }
             else if(likely(now_end_time <= last1_point.end_time)) {
@@ -1350,7 +1350,7 @@ static inline void rrd2rrdr_do_dimension(
                 internal_error(current_point.id > 0 && last2_point.id == 0 && current_point.end_time > after_wanted && current_point.end_time > now_end_time,
                                "QUERY: on '%s', dim '%s', after %ld, before %ld, view update every %ld, query granularity %ld,"
                                " interpolating point %zu (from %ld to %ld) at %ld, but we could really favor by having last_point2 in this query.",
-                               rd->rrdset->name, rd->name, after_wanted, before_wanted, ops.view_update_every, ops.query_granularity,
+                               rd->rrdset->name, rrddim_name(rd), after_wanted, before_wanted, ops.view_update_every, ops.query_granularity,
                                current_point.id, current_point.start_time, current_point.end_time, now_end_time);
             }
             else {
@@ -1425,7 +1425,7 @@ static inline void rrd2rrdr_do_dimension(
 
     internal_error((long)points_added != points_wanted,
                    "QUERY: query on %s/%s requested %zu points, but RRDR added %zu (%zu db points read).",
-                   r->st->name, rd->name, (size_t)points_wanted, (size_t)points_added, ops.db_total_points_read);
+                   r->st->name, rrddim_name(rd), (size_t)points_wanted, (size_t)points_added, ops.db_total_points_read);
 }
 
 // ----------------------------------------------------------------------------
@@ -2024,21 +2024,21 @@ RRDR *rrd2rrdr(
         else {
             if(r->after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               st->name, (size_t)max_after, rd->name, (size_t)r->after);
+                               st->name, (size_t)max_after, rrddim_name(rd), (size_t)r->after);
 
                 r->after = (r->after > max_after) ? r->after : max_after;
             }
 
             if(r->before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               st->name, (size_t)min_before, rd->name, (size_t)r->before);
+                               st->name, (size_t)min_before, rrddim_name(rd), (size_t)r->before);
 
                 r->before = (r->before < min_before) ? r->before : min_before;
             }
 
             if(r->rows != max_rows) {
                 internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               st->name, (size_t)max_rows, rd->name, (size_t)r->rows);
+                               st->name, (size_t)max_rows, rrddim_name(rd), (size_t)r->rows);
 
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }

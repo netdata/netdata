@@ -98,9 +98,9 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
             buffer_strcat(wb, "\t\t\t\t\"");
-        buffer_strcat_jsonescape(wb, rd->id);
+        buffer_strcat_jsonescape(wb, rrddim_id(rd));
         buffer_strcat(wb, "\": { \"name\": \"");
-        buffer_strcat_jsonescape(wb, rd->name);
+        buffer_strcat_jsonescape(wb, rrddim_name(rd));
         buffer_strcat(wb, "\" }");
 
         dimensions++;

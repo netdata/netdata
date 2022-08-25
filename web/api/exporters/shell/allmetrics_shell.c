@@ -46,7 +46,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
             rrddim_foreach_read(rd, st) {
                 if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
-                    shell_name_copy(dimension, rd->name?rd->name:rd->id, SHELL_ELEMENT_MAX);
+                    shell_name_copy(dimension, rd->name?rrddim_name(rd):rrddim_id(rd), SHELL_ELEMENT_MAX);
 
                     NETDATA_DOUBLE n = rd->last_stored_value;
 
@@ -148,8 +148,8 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                         "\t\t\t\t\"name\": \"%s\",\n"
                         "\t\t\t\t\"value\": ",
                         dimension_counter ? "," : "",
-                        rd->id,
-                        rd->name);
+                        rrddim_id(rd),
+                        rrddim_name(rd));
 
                     if(isnan(rd->last_stored_value))
                         buffer_strcat(wb, "null");

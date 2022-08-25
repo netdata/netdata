@@ -129,7 +129,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     buffer_sprintf(
@@ -169,7 +169,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;

@@ -103,7 +103,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         if(i) buffer_strcat(wb, ", ");
         buffer_strcat(wb, sq);
-        buffer_strcat(wb, rd->name);
+        buffer_strcat(wb, rrddim_name(rd));
         buffer_strcat(wb, sq);
         i++;
     }
@@ -127,7 +127,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         if(i) buffer_strcat(wb, ", ");
         buffer_strcat(wb, sq);
-        buffer_strcat(wb, rd->id);
+        buffer_strcat(wb, rrddim_id(rd));
         buffer_strcat(wb, sq);
         i++;
     }
@@ -149,8 +149,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rd->id, rd->name);
-            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rd->id, rd->name);
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrddim_id(rd), rrddim_name(rd));
+            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrddim_id(rd), rrddim_name(rd));
             dictionary_set(dict, name, output, len+1);
         }
         dictionary_walkthrough_read(dict, value_list_output, &co);

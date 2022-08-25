@@ -577,7 +577,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);
-        internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rm->rrddim->id, uuid1, uuid2);
+        internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rrddim_id(rm->rrddim), uuid1, uuid2);
     }
 
     if(rm->rrddim != rm_new->rrddim)
@@ -678,7 +678,7 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) 
 
 static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
     if(unlikely(!rd->rrdset))
-        fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rd->id);
+        fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rrddim_id(rd));
 
     if(unlikely(!rd->rrdset->rrdhost))
         fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rd->rrdset->id);
@@ -689,8 +689,8 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
 
     RRDMETRIC trm = {
-        .id = string_strdupz(rd->id),
-        .name = string_strdupz(rd->name),
+        .id = string_dup(rd->id),
+        .name = string_dup(rd->name),
         .flags = RRD_FLAG_NONE,
         .rrddim = rd,
     };
@@ -707,14 +707,14 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
 static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
     if(unlikely(!rd->rrdmetric)) {
-        error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rd->id, function);
+        error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
 
     if(unlikely(rm->rrddim != rd))
-        fatal("RRDMETRIC: '%s' is not linked to RRDDIM '%s' at %s()", string2str(rm->id), rd->id, function);
+        fatal("RRDMETRIC: '%s' is not linked to RRDDIM '%s' at %s()", string2str(rm->id), rrddim_id(rd), function);
 
     return rm;
 }

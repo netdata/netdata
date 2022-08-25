@@ -605,11 +605,11 @@ int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 2, rd->id, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, 2, rrddim_id(rd), -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 3, rd->name, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, 3, rrddim_name(rd), -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -620,7 +620,7 @@ int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
     }
     else {
         uuid_generate(*store_uuid);
-        status = sql_store_dimension(store_uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
+        status = sql_store_dimension(store_uuid, st->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
         if (unlikely(status))
             error_report("Failed to store dimension metadata in the database");
     }
@@ -1778,8 +1778,8 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
     rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
 
     uuid_copy(rd->metric_uuid, *metric_uuid);
-    rd->id = onewayalloc_strdupz(owa, id);
-    rd->name = onewayalloc_strdupz(owa, name);
+    rd->id = string_strdupz(id);
+    rd->name = string_strdupz(name);
 
     for(int tier = 0; tier < storage_tiers ;tier++) {
         rd->tiers[tier] = onewayalloc_callocz(owa, 1, sizeof(*rd->tiers[tier]));

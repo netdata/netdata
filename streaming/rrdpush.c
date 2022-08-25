@@ -184,7 +184,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         if(unlikely(!rd->exposed)) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, st->id, rd->id);
+            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, st->id, rrddim_id(rd));
             #endif
             return 1;
         }
@@ -257,8 +257,8 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         buffer_sprintf(
                 host->sender->build
                 , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
-                , rd->id
-                , rd->name
+                , rrddim_id(rd)
+                , rrddim_name(rd)
                 , rrd_algorithm_name(rd->algorithm)
                 , rd->multiplier
                 , rd->divisor
@@ -301,7 +301,7 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
         if(rd->updated && rd->exposed)
             buffer_sprintf(host->sender->build
                            , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
-                           , rd->id
+                           , rrddim_id(rd)
                            , rd->collected_value
         );
     }

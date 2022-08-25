@@ -98,7 +98,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_insta
 
     pg_cache = &ctx->pg_cache;
 
-    rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
+    rrdeng_generate_legacy_uuid(rrddim_id(rd), rd->rrdset->id, &legacy_uuid);
     if (host != localhost && is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
         is_multihost_child = 1;
 
@@ -138,8 +138,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_insta
         uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
 
         if (unlikely(need_to_store && !ctx->tier))
-            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
-                rd->algorithm);
+            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
     }
 
     struct rrdeng_metric_handle *mh = mallocz(sizeof(struct rrdeng_metric_handle));

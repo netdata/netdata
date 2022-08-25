@@ -123,12 +123,12 @@ static void register_result(DICTIONARY *results,
         .st = st,
         .chart_id = st->id,
         .context = st->context,
-        .dim_name = d->name,
+        .dim_name = rrddim_name(d),
         .value = v
     };
 
     char buf[5000 + 1];
-    snprintfz(buf, 5000, "%s:%s", st->id, d->name);
+    snprintfz(buf, 5000, "%s:%s", st->id, rrddim_name(d));
     dictionary_set(results, buf, &t, sizeof(struct register_result));
 }
 
@@ -692,7 +692,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         NETDATA_DOUBLE baseline_average = NAN;
         NETDATA_DOUBLE base_anomaly_rate = 0;
         value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &baseline_average, rrddim_id(d), 1,
                                   baseline_after, baseline_before,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
@@ -709,7 +709,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         NETDATA_DOUBLE highlight_average = NAN;
         NETDATA_DOUBLE high_anomaly_rate = 0;
         value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &highlight_average, rrddim_id(d), 1,
                                   after, before,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
@@ -734,7 +734,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         char highlighted_countif_options[50 + 1];
         snprintfz(highlighted_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
 
-        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, rrddim_id(d), 1,
                                   after, before,
                                   RRDR_GROUPING_COUNTIF,highlighted_countif_options,
                                   group_time, options,
@@ -803,7 +803,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
         NETDATA_DOUBLE average = NAN;
         NETDATA_DOUBLE anomaly_rate = 0;
         value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &average, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &average, rrddim_id(d), 1,
                                   after, before,
                                   group, group_options, group_time, options,
                                   NULL, NULL,

@@ -7,8 +7,8 @@
 // RRDFAMILY index
 
 int rrdfamily_compare(void *a, void *b) {
-    // a and b are STRING pointers
-    return (int)(a - b);
+    // a and b are RRDFAMILY pointers
+    return (int)((uintptr_t )((RRDFAMILY *)a)->family - (uintptr_t )((RRDFAMILY *)b)->family);
 }
 
 #define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))

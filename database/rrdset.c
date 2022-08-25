@@ -239,7 +239,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
-                        rd->name,
+                        rrddim_name(rd),
                         st->name,
                         host->hostname,
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm),
@@ -1140,7 +1140,7 @@ static inline size_t rrdset_done_interpolate(
                                  NETDATA_DOUBLE_FORMAT
                                 " * (%llu - %llu)"
                                 " / (%llu - %llu)"
-                              , rd->name
+                              , rrddim_name(rd)
                               , new_value
                               , rd->calculated_value
                               , next_store_ut, last_collect_ut
@@ -1157,7 +1157,7 @@ static inline size_t rrdset_done_interpolate(
 
                         #ifdef NETDATA_INTERNAL_CHECKS
                         rrdset_debug(st, "%s: COLLECTION POINT IS SHORT " NETDATA_DOUBLE_FORMAT " - EXTRAPOLATING",
-                                    rd->name
+                                    rrddim_name(rd)
                                   , (NETDATA_DOUBLE)(next_store_ut - last_stored_ut)
                         );
                         #endif
@@ -1193,7 +1193,7 @@ static inline size_t rrdset_done_interpolate(
                         rrdset_debug(st, "%s: CALC2 DEF " NETDATA_DOUBLE_FORMAT " = ((("
                                             "(" NETDATA_DOUBLE_FORMAT " - " NETDATA_DOUBLE_FORMAT ")"
                                             " * %llu"
-                                            " / %llu) + " NETDATA_DOUBLE_FORMAT, rd->name
+                                            " / %llu) + " NETDATA_DOUBLE_FORMAT, rrddim_name(rd)
                                   , new_value
                                   , rd->calculated_value, rd->last_calculated_value
                                   , (next_store_ut - first_ut)
@@ -1225,7 +1225,7 @@ static inline size_t rrdset_done_interpolate(
                 (void) ml_is_anomalous(rd, 0, false);
 
                 #ifdef NETDATA_INTERNAL_CHECKS
-                rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rd->name, current_entry);
+                rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
                 #endif
 
                 store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
@@ -1275,7 +1275,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
             current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
 
             #ifdef NETDATA_INTERNAL_CHECKS
-            rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING (FILLED THE GAP)", rd->name, current_entry);
+            rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING (FILLED THE GAP)", rrddim_name(rd), current_entry);
             #endif
         }
     }
@@ -1506,7 +1506,7 @@ after_first_database_work:
         }
 
         if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rd->name, st->id);
+            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), st->id);
             rrddim_isnot_obsolete(st, rd);
         }
 
@@ -1515,11 +1515,12 @@ after_first_database_work:
                 " last_collected_value = " COLLECTED_NUMBER_FORMAT
                 " collected_value = " COLLECTED_NUMBER_FORMAT
                 " last_calculated_value = " NETDATA_DOUBLE_FORMAT
-                " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
-                                      , rd->last_collected_value
-                                      , rd->collected_value
-                                      , rd->last_calculated_value
-                                      , rd->calculated_value
+                " calculated_value = " NETDATA_DOUBLE_FORMAT
+                     , rrddim_name(rd)
+                     , rd->last_collected_value
+                     , rd->collected_value
+                     , rd->last_calculated_value
+                     , rd->calculated_value
         );
         #endif
 
@@ -1533,7 +1534,7 @@ after_first_database_work:
                 rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN " NETDATA_DOUBLE_FORMAT " = "
                             COLLECTED_NUMBER_FORMAT
                             " * " NETDATA_DOUBLE_FORMAT
-                            " / " NETDATA_DOUBLE_FORMAT, rd->name
+                            " / " NETDATA_DOUBLE_FORMAT, rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value
                           , (NETDATA_DOUBLE)rd->multiplier
@@ -1558,7 +1559,7 @@ after_first_database_work:
                 rrdset_debug(st, "%s: CALC PCENT-ROW " NETDATA_DOUBLE_FORMAT " = 100"
                             " * " COLLECTED_NUMBER_FORMAT
                             " / " COLLECTED_NUMBER_FORMAT
-                          , rd->name
+                          , rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value
                           , st->collected_total
@@ -1579,7 +1580,7 @@ after_first_database_work:
                 // produces wrong results as far as incremental counters are concerned.
                 if(unlikely((uint64_t)rd->last_collected_value > (uint64_t)rd->collected_value)) {
                     debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                          , st->name, rd->name
+                          , st->name, rrddim_name(rd)
                           , rd->last_collected_value
                           , rd->collected_value);
 
@@ -1627,7 +1628,7 @@ after_first_database_work:
                             COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
                             ")"
                                     " * " NETDATA_DOUBLE_FORMAT
-                            " / " NETDATA_DOUBLE_FORMAT, rd->name
+                            " / " NETDATA_DOUBLE_FORMAT, rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value, rd->last_collected_value
                           , (NETDATA_DOUBLE)rd->multiplier
@@ -1647,7 +1648,7 @@ after_first_database_work:
                 // to reset the calculation (it will give zero as the calculation for this second)
                 if(unlikely(rd->last_collected_value > rd->collected_value)) {
                     debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                          , st->name, rd->name
+                          , st->name, rrddim_name(rd)
                           , rd->last_collected_value
                           , rd->collected_value
                     );
@@ -1672,7 +1673,7 @@ after_first_database_work:
                 rrdset_debug(st, "%s: CALC PCENT-DIFF " NETDATA_DOUBLE_FORMAT " = 100"
                             " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
                             " / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
-                          , rd->name
+                          , rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value, rd->last_collected_value
                           , st->collected_total, st->last_collected_total
@@ -1688,7 +1689,7 @@ after_first_database_work:
 
                 #ifdef NETDATA_INTERNAL_CHECKS
                 rrdset_debug(st, "%s: CALC " NETDATA_DOUBLE_FORMAT " = 0"
-                          , rd->name
+                          , rrddim_name(rd)
                           , rd->calculated_value
                 );
                 #endif
@@ -1701,7 +1702,7 @@ after_first_database_work:
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
                     " last_calculated_value = " NETDATA_DOUBLE_FORMAT
-                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
+                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rrddim_name(rd)
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1752,7 +1753,7 @@ after_second_database_work:
             continue;
 
         #ifdef NETDATA_INTERNAL_CHECKS
-        rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rd->name, rd->last_collected_value, rd->collected_value);
+        rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rrddim_name(rd), rd->last_collected_value, rd->collected_value);
         #endif
 
         rd->last_collected_value = rd->collected_value;
@@ -1762,7 +1763,7 @@ after_second_database_work:
                 if(unlikely(!first_entry)) {
                     #ifdef NETDATA_INTERNAL_CHECKS
                     rrdset_debug(st, "%s: setting last_calculated_value (old: " NETDATA_DOUBLE_FORMAT
-                        ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
+                        ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rrddim_name(rd), rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
                     #endif
 
                     rd->last_calculated_value += rd->calculated_value;
@@ -1779,7 +1780,7 @@ after_second_database_work:
             case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                 #ifdef NETDATA_INTERNAL_CHECKS
                 rrdset_debug(st, "%s: setting last_calculated_value (old: " NETDATA_DOUBLE_FORMAT
-                    ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rd->name, rd->last_calculated_value, rd->calculated_value);
+                    ") to last_calculated_value (new: " NETDATA_DOUBLE_FORMAT ")", rrddim_name(rd), rd->last_calculated_value, rd->calculated_value);
                 #endif
 
                 rd->last_calculated_value = rd->calculated_value;
@@ -1795,7 +1796,7 @@ after_second_database_work:
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
                     " last_calculated_value = " NETDATA_DOUBLE_FORMAT
-                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rd->name
+                    " calculated_value = " NETDATA_DOUBLE_FORMAT, rrddim_name(rd)
                                       , rd->last_collected_value
                                       , rd->collected_value
                                       , rd->last_calculated_value
@@ -1835,7 +1836,7 @@ after_second_database_work:
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                 if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&  !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)
                              && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
-                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), st->name, st->id);
 
                     const char *cache_filename = rrddim_cache_filename(rd);
                     if(cache_filename) {
