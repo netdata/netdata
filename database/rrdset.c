@@ -403,8 +403,8 @@ void rrdset_free(RRDSET *st) {
     freez(st->units);
     freez(st->context);
     freez(st->cache_dir);
-    freez(st->plugin_name);
-    freez(st->module_name);
+    string_freez(st->plugin_name);
+    string_freez(st->module_name);
     freez(st->state->old_title);
     freez(st->state->old_units);
     freez(st->state->old_context);
@@ -490,9 +490,9 @@ static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
 static inline void rrdset_update_permanent_labels(RRDSET *st) {
     if(!st->state || !st->state->chart_labels) return;
 
-    rrdlabels_add(st->state->chart_labels, "_collect_plugin", st->plugin_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_collect_module", st->module_name, RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_instance_family",   st->family,   RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->state->chart_labels, "_instance_family",st->family,             RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
 }
 
 RRDSET *rrdset_create_custom(
@@ -559,7 +559,8 @@ RRDSET *rrdset_create_custom(
             changed_from_archived_to_active = 1;
             mark_rebuild |= META_CHART_ACTIVATED;
         }
-        char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_context = NULL,
+
+        char *old_title = NULL, *old_context = NULL,
              *old_title_v = NULL, *old_context_v = NULL, *old_units_v = NULL, *old_units = NULL;
         int rc;
 
@@ -580,34 +581,20 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        if (plugin && st->plugin_name) {
-            if (unlikely(strcmp(plugin, st->plugin_name))) {
-                old_plugin = st->plugin_name;
-                st->plugin_name = strdupz(plugin);
+        {
+            STRING *old_plugin = st->plugin_name;
+            st->plugin_name = string_strdupz(plugin);
+            if (old_plugin != st->plugin_name)
                 mark_rebuild |= META_PLUGIN_UPDATED;
-            }
-        } else {
-            if (plugin != st->plugin_name) { // one is NULL?
-                old_plugin = st->plugin_name;
-                st->plugin_name = plugin ? strdupz(plugin) : NULL;
-                mark_rebuild |= META_PLUGIN_UPDATED;
-            }
+            string_freez(old_plugin);
         }
 
-        if (module && st->module_name) {
-            if (unlikely(strcmp(module, st->module_name))) {
-                old_module = st->module_name;
-                st->module_name = strdupz(module);
+        {
+            STRING *old_module = st->module_name;
+            st->module_name = string_strdupz(module);
+            if (old_module != st->module_name)
                 mark_rebuild |= META_MODULE_UPDATED;
-            }
-        } else {
-            if (module != st->module_name) {
-                if (st->module_name && *st->module_name) {
-                    old_module = st->module_name;
-                    st->module_name = module ? strdupz(module) : NULL;
-                    mark_rebuild |= META_MODULE_UPDATED;
-                }
-            }
+            string_freez(old_module);
         }
 
         if (unlikely(title && st->state->old_title && strcmp(st->state->old_title, title))) {
@@ -649,8 +636,6 @@ RRDSET *rrdset_create_custom(
 
         if (mark_rebuild) {
             rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            freez(old_plugin);
-            freez(old_module);
             freez(old_title);
             freez(old_units);
             freez(old_context);
@@ -735,8 +720,8 @@ RRDSET *rrdset_create_custom(
     }
     st->rrd_memory_mode = memory_mode;
 
-    st->plugin_name = plugin?strdupz(plugin):NULL;
-    st->module_name = module?strdupz(module):NULL;
+    st->plugin_name = string_strdupz(plugin);
+    st->module_name = string_strdupz(module);
     st->chart_type  = chart_type;
     st->type        = strdupz(type);
     st->family      = family ? strdupz(family) : strdupz(st->type);

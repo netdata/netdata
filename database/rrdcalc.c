@@ -179,10 +179,10 @@ static int rrdcalc_is_matching_rrdset(RRDCALC *rc, RRDSET *st) {
         (rc->hash_chart != st->hash_name || strcmp(rc->chart, st->name) != 0))
         return 0;
 
-    if (rc->module_pattern && !simple_pattern_matches(rc->module_pattern, st->module_name))
+    if (rc->module_pattern && !simple_pattern_matches(rc->module_pattern, rrdset_module_name(st)))
         return 0;
 
-    if (rc->plugin_pattern && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
+    if (rc->plugin_pattern && !simple_pattern_matches(rc->plugin_pattern, rrdset_plugin_name(st)))
         return 0;
 
     if (st->rrdhost->host_labels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->host_labels, rc->host_labels_pattern, '='))

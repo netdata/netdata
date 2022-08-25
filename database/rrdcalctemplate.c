@@ -21,10 +21,10 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, st->family))
         return;
 
-    if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, st->module_name))
+    if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, rrdset_module_name(st)))
         return;
 
-    if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, st->plugin_name))
+    if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, rrdset_plugin_name(st)))
         return;
 
     if(host->host_labels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->host_labels, rt->host_labels_pattern, '='))

@@ -141,8 +141,8 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 // generate collectors list for the api/v1/info call
 
 struct collector {
-    char *plugin;
-    char *module;
+    const char *plugin;
+    const char *module;
 };
 
 struct array_printer {
@@ -176,8 +176,8 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
-                    .plugin = st->plugin_name ? st->plugin_name : "",
-                    .module = st->module_name ? st->module_name : ""
+                    .plugin = rrdset_plugin_name(st),
+                    .module = rrdset_module_name(st)
             };
             sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));

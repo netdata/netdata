@@ -16,8 +16,8 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector_info col = {
-                    .plugin = st->plugin_name ? st->plugin_name : "",
-                    .module = st->module_name ? st->module_name : ""
+                    .plugin = rrdset_plugin_name(st),
+                    .module = rrdset_module_name(st)
             };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector_info));

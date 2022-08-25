@@ -243,8 +243,8 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
             , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
             , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
-            , (st->plugin_name)?st->plugin_name:""
-            , (st->module_name)?st->module_name:""
+            , rrdset_plugin_name(st)
+            , rrdset_module_name(st)
     );
 
     // send the chart labels

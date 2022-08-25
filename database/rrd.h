@@ -572,8 +572,8 @@ struct rrdset {
     };
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
-    char *plugin_name;                              // the name of the plugin that generated this
-    char *module_name;                              // the name of the plugin module that generated this
+    STRING *plugin_name;                            // the name of the plugin that generated this
+    STRING *module_name;                            // the name of the plugin module that generated this
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
@@ -620,6 +620,9 @@ struct rrdset {
     avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
 };
+
+#define rrdset_plugin_name(st) string2str((st)->plugin_name)
+#define rrdset_module_name(st) string2str((st)->module_name)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))

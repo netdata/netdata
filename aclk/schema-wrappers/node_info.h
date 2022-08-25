@@ -72,8 +72,8 @@ struct update_node_info {
 };
 
 struct collector_info {
-    char *module;
-    char *plugin;
+    const char *module;
+    const char *plugin;
 };
 
 struct update_node_collectors {

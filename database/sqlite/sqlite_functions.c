@@ -745,8 +745,8 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
         return 0;
 
     rc = sql_store_chart(
-        chart_uuid, &st->rrdhost->host_uuid, st->type, id, name, st->family, st->context, st->title, st->units, st->plugin_name,
-        st->module_name, st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
+        chart_uuid, &st->rrdhost->host_uuid, st->type, id, name, st->family, st->context, st->title, st->units,
+        rrdset_plugin_name(st), rrdset_module_name(st), st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
 
     return rc;
 }
@@ -2078,9 +2078,8 @@ void compute_chart_hash(RRDSET *st)
     EVP_DigestUpdate(evpctx, st->context, strlen(st->context));
     EVP_DigestUpdate(evpctx, st->title, strlen(st->title));
     EVP_DigestUpdate(evpctx, st->units, strlen(st->units));
-    EVP_DigestUpdate(evpctx, st->plugin_name, strlen(st->plugin_name));
-    if (st->module_name)
-        EVP_DigestUpdate(evpctx, st->module_name, strlen(st->module_name));
+    EVP_DigestUpdate(evpctx, rrdset_plugin_name(st), string_length(st->plugin_name));
+    EVP_DigestUpdate(evpctx, rrdset_module_name(st), string_length(st->module_name));
 //    EVP_DigestUpdate(evpctx, priority_str, strlen(priority_str));
     EVP_DigestUpdate(evpctx, &st->priority, sizeof(st->priority));
     EVP_DigestUpdate(evpctx, &st->chart_type, sizeof(st->chart_type));
@@ -2103,8 +2102,8 @@ void compute_chart_hash(RRDSET *st)
         st->context,
         st->title,
         st->units,
-        st->plugin_name,
-        st->module_name,
+        rrdset_plugin_name(st),
+        rrdset_module_name(st),
         st->priority,
         st->chart_type);
 #else

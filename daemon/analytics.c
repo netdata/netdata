@@ -10,8 +10,8 @@ extern void analytics_build_info (BUFFER *b);
 extern int aclk_connected;
 
 struct collector {
-    char *plugin;
-    char *module;
+    const char *plugin;
+    const char *module;
 };
 
 struct array_printer {
@@ -286,8 +286,10 @@ void analytics_collectors(void)
     rrdset_foreach_read(st, localhost)
     {
         if (rrdset_is_available_for_viewers(st)) {
-            struct collector col = { .plugin = st->plugin_name ? st->plugin_name : "",
-                                     .module = st->module_name ? st->module_name : "" };
+            struct collector col = {
+                .plugin = rrdset_plugin_name(st),
+                .module = rrdset_module_name(st)
+            };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
         }
