@@ -1112,7 +1112,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
 static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT trc = {
         .id = string_strdupz(st->context),
-        .title = string_strdupz(st->title),
+        .title = string_dup(st->title),
         .units = string_dup(st->units),
         .family = string_dup(st->family),
         .priority = st->priority,
@@ -1129,7 +1129,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .name = string_strdupz(st->name),
         .units = string_dup(st->units),
         .family = string_dup(st->family),
-        .title = string_strdupz(st->title),
+        .title = string_dup(st->title),
         .chart_type = st->chart_type,
         .priority = st->priority,
         .update_every = st->update_every,

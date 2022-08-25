@@ -50,7 +50,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         rrdset_type(st),
         rrdset_family(st),
         st->context,
-        st->title,
+        rrdset_title(st),
         st->name,
         st->priority,
         rrdset_plugin_name(st),

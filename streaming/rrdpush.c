@@ -232,7 +232,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
             , name
-            , st->title
+            , rrdset_title(st)
             , rrdset_units(st)
             , rrdset_family(st)
             , st->context

@@ -399,7 +399,7 @@ void rrdset_free(RRDSET *st) {
     freez((void *)st->name);
     string_freez(st->type);
     string_freez(st->family);
-    freez(st->title);
+    string_freez(st->title);
     string_freez(st->units);
     freez(st->context);
     freez(st->cache_dir);
@@ -559,8 +559,8 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_ACTIVATED;
         }
 
-        char *old_title = NULL, *old_context = NULL,
-             *old_title_v = NULL, *old_context_v = NULL;
+        char *old_context = NULL,
+             *old_context_v = NULL;
         int rc;
 
         if(unlikely(name))
@@ -596,14 +596,12 @@ RRDSET *rrdset_create_custom(
             string_freez(old_module);
         }
 
-        if (unlikely(title && st->state->old_title && strcmp(st->state->old_title, title))) {
-            char *new_title = strdupz(title);
-            old_title_v = st->state->old_title;
-            st->state->old_title = strdupz(title);
-            json_fix_string(new_title);
-            old_title = st->title;
-            st->title = new_title;
-            mark_rebuild |= META_CHART_UPDATED;
+        if(title && *title) {
+            STRING *old_title = st->title;
+            st->title = rrd_string_strdupz(title);
+            if(old_title != st->title)
+                mark_rebuild |= META_CHART_UPDATED;
+            string_freez(old_title);
         }
 
         if(units && *units) {
@@ -632,9 +630,7 @@ RRDSET *rrdset_create_custom(
 
         if (mark_rebuild) {
             rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            freez(old_title);
             freez(old_context);
-            freez(old_title_v);
             freez(old_context_v);
             if (mark_rebuild != META_CHART_ACTIVATED) {
                 info("Collector updated metadata for chart %s", st->id);
@@ -752,9 +748,7 @@ RRDSET *rrdset_create_custom(
         // could not use the name, use the id
         rrdset_set_name(st, id);
 
-    st->title = strdupz(title);
-    st->state->old_title = strdupz(st->title);
-    json_fix_string(st->title);
+    st->title = rrd_string_strdupz(title);
 
     st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
 

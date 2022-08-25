@@ -526,7 +526,7 @@ struct rrdset {
 
     STRING *type;                                   // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     STRING *family;                                 // grouping sets under the same family
-    char *title;                                    // title shown to user
+    STRING *title;                                  // title shown to user
     STRING *units;                                  // units of measurement
 
     char *context;                                  // the template of this data set
@@ -625,6 +625,7 @@ struct rrdset {
 #define rrdset_units(st) string2str((st)->units)
 #define rrdset_type(st) string2str((st)->type)
 #define rrdset_family(st) string2str((st)->family)
+#define rrdset_title(st) string2str((st)->title)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))

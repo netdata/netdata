@@ -745,8 +745,11 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
         return 0;
 
     rc = sql_store_chart(
-        chart_uuid, &st->rrdhost->host_uuid, rrdset_type(st), id, name, rrdset_family(st), st->context, st->title,
-        rrdset_units(st), rrdset_plugin_name(st), rrdset_module_name(st), st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
+        chart_uuid, &st->rrdhost->host_uuid, rrdset_type(st), id, name,
+        rrdset_family(st), st->context, rrdset_title(st), rrdset_units(st),
+        rrdset_plugin_name(st), rrdset_module_name(st),
+        st->priority, st->update_every, st->chart_type,
+        st->rrd_memory_mode, st->entries);
 
     return rc;
 }
@@ -2076,7 +2079,7 @@ void compute_chart_hash(RRDSET *st)
     EVP_DigestUpdate(evpctx, st->name, strlen(st->name));
     EVP_DigestUpdate(evpctx, rrdset_family(st), string_length(st->family));
     EVP_DigestUpdate(evpctx, st->context, strlen(st->context));
-    EVP_DigestUpdate(evpctx, st->title, strlen(st->title));
+    EVP_DigestUpdate(evpctx, rrdset_title(st), string_length(st->title));
     EVP_DigestUpdate(evpctx, rrdset_units(st), string_length(st->units));
     EVP_DigestUpdate(evpctx, rrdset_plugin_name(st), string_length(st->plugin_name));
     EVP_DigestUpdate(evpctx, rrdset_module_name(st), string_length(st->module_name));
@@ -2100,7 +2103,7 @@ void compute_chart_hash(RRDSET *st)
         st->name,
         rrdset_family(st),
         st->context,
-        st->title,
+        rrdset_title(st),
         rrdset_units(st),
         rrdset_plugin_name(st),
         rrdset_module_name(st),
