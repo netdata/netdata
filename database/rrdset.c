@@ -400,13 +400,12 @@ void rrdset_free(RRDSET *st) {
     freez(st->type);
     freez(st->family);
     freez(st->title);
-    freez(st->units);
+    string_freez(st->units);
     freez(st->context);
     freez(st->cache_dir);
     string_freez(st->plugin_name);
     string_freez(st->module_name);
     freez(st->state->old_title);
-    freez(st->state->old_units);
     freez(st->state->old_context);
     rrdlabels_destroy(st->state->chart_labels);
     freez(st->state);
@@ -561,7 +560,7 @@ RRDSET *rrdset_create_custom(
         }
 
         char *old_title = NULL, *old_context = NULL,
-             *old_title_v = NULL, *old_context_v = NULL, *old_units_v = NULL, *old_units = NULL;
+             *old_title_v = NULL, *old_context_v = NULL;
         int rc;
 
         if(unlikely(name))
@@ -581,17 +580,17 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        {
+        if(plugin && *plugin) {
             STRING *old_plugin = st->plugin_name;
-            st->plugin_name = string_strdupz(plugin);
+            st->plugin_name = rrd_string_strdupz(plugin);
             if (old_plugin != st->plugin_name)
                 mark_rebuild |= META_PLUGIN_UPDATED;
             string_freez(old_plugin);
         }
 
-        {
+        if(module && *module) {
             STRING *old_module = st->module_name;
-            st->module_name = string_strdupz(module);
+            st->module_name = rrd_string_strdupz(module);
             if (old_module != st->module_name)
                 mark_rebuild |= META_MODULE_UPDATED;
             string_freez(old_module);
@@ -607,16 +606,13 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        if (unlikely(units && st->state->old_units && strcmp(st->state->old_units, units))) {
-            char *new_units = strdupz(units);
-            old_units_v = st->state->old_units;
-            st->state->old_units = strdupz(units);
-            json_fix_string(new_units);
-            old_units= st->units;
-            st->units = new_units;
-            mark_rebuild |= META_CHART_UPDATED;
+        if(units && *units) {
+            STRING *old_units = st->units;
+            st->units = rrd_string_strdupz(units);
+            if(old_units != st->units)
+                mark_rebuild |= META_CHART_UPDATED;
+            string_freez(old_units);
         }
-
 
         if (st->chart_type != chart_type) {
             st->chart_type = chart_type;
@@ -637,10 +633,8 @@ RRDSET *rrdset_create_custom(
         if (mark_rebuild) {
             rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             freez(old_title);
-            freez(old_units);
             freez(old_context);
             freez(old_title_v);
-            freez(old_units_v);
             freez(old_context_v);
             if (mark_rebuild != META_CHART_ACTIVATED) {
                 info("Collector updated metadata for chart %s", st->id);
@@ -720,8 +714,8 @@ RRDSET *rrdset_create_custom(
     }
     st->rrd_memory_mode = memory_mode;
 
-    st->plugin_name = string_strdupz(plugin);
-    st->module_name = string_strdupz(module);
+    st->plugin_name = rrd_string_strdupz(plugin);
+    st->module_name = rrd_string_strdupz(module);
     st->chart_type  = chart_type;
     st->type        = strdupz(type);
     st->family      = family ? strdupz(family) : strdupz(st->type);
@@ -729,9 +723,7 @@ RRDSET *rrdset_create_custom(
 
     st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
 
-    st->units = units ? strdupz(units) : strdupz("");
-    st->state->old_units = strdupz(st->units);
-    json_fix_string(st->units);
+    st->units = rrd_string_strdupz(units);
 
     st->context = context ? strdupz(context) : strdupz(st->id);
     st->state->old_context = strdupz(st->context);

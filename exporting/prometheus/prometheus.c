@@ -455,7 +455,7 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
     else
         buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT, p->rd->multiplier, p->rd->divisor);
 
-    buffer_sprintf(wb, " %s %s (%s)\n", p->relation, p->st->units, p->type);
+    buffer_sprintf(wb, " %s %s (%s)\n", p->relation, rrdset_units(p->st), p->type);
 }
 
 /**
@@ -590,13 +590,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                 if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
                     homogeneous = 0;
 
-                if (st->module_name && !strcmp(st->module_name, "prometheus"))
+                if (!strcmp(rrdset_module_name(st), "prometheus"))
                     prometheus_collector = 1;
             } else {
                 if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE &&
                     !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
                     prometheus_units_copy(
-                        units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
+                        units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
@@ -607,7 +607,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
                     st->context,
                     st->family,
-                    st->units);
+                    rrdset_units(st));
 
             // for each dimension
             RRDDIM *rd;
@@ -706,7 +706,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     units,
                                     suffix,
                                     (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                                    st->units,
+                                    rrdset_units(st),
                                     (unsigned long long)first_time,
                                     (unsigned long long)last_time);
 

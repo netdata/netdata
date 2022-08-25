@@ -215,7 +215,7 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
             homogeneous = 0;
     } else {
         if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
-            prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
+            prometheus_units_copy(units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, 0);
     }
 
     return 0;

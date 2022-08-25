@@ -55,7 +55,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         st->priority,
         rrdset_plugin_name(st),
         rrdset_module_name(st),
-        st->units,
+        rrdset_units(st),
         st->name,
         rrdset_type_name(st->chart_type));
 

@@ -1113,7 +1113,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT trc = {
         .id = string_strdupz(st->context),
         .title = string_strdupz(st->title),
-        .units = string_strdupz(st->units),
+        .units = string_dup(st->units),
         .family = string_strdupz(st->family),
         .priority = st->priority,
         .chart_type = st->chart_type,
@@ -1127,7 +1127,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDINSTANCE tri = {
         .id = string_strdupz(st->id),
         .name = string_strdupz(st->name),
-        .units = string_strdupz(st->units),
+        .units = string_dup(st->units),
         .family = string_strdupz(st->family),
         .title = string_strdupz(st->title),
         .chart_type = st->chart_type,

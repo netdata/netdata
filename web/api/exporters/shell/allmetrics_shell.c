@@ -51,18 +51,18 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
                     NETDATA_DOUBLE n = rd->last_stored_value;
 
                     if(isnan(n) || isinf(n))
-                        buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, st->units);
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, rrdset_units(st));
                     else {
                         if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
                         n = roundndd(n);
                         if(!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) total += n;
-                        buffer_sprintf(wb, "NETDATA_%s_%s=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, dimension, n, st->units);
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, dimension, n, rrdset_units(st));
                     }
                 }
             }
 
             total = roundndd(total);
-            buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, total, st->units);
+            buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, total, rrdset_units(st));
             rrdset_unlock(st);
         }
     }
@@ -131,7 +131,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                 st->name,
                 st->family,
                 st->context,
-                st->units,
+                rrdset_units(st),
                 (int64_t)rrdset_last_entry_t_nolock(st));
 
             chart_counter++;

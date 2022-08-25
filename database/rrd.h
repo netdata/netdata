@@ -456,7 +456,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // volatile state per chart
 struct rrdset_volatile {
     char *old_title;
-    char *old_units;
     char *old_context;
     uuid_t hash_id;
     DICTIONARY *chart_labels;
@@ -528,7 +527,7 @@ struct rrdset {
     char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     char *family;                                   // grouping sets under the same family
     char *title;                                    // title shown to user
-    char *units;                                    // units of measurement
+    STRING *units;                                  // units of measurement
 
     char *context;                                  // the template of this data set
     uint32_t hash_context;                          // the hash of the chart's context
@@ -623,11 +622,20 @@ struct rrdset {
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
 #define rrdset_module_name(st) string2str((st)->module_name)
+#define rrdset_units(st) string2str((st)->units)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
 #define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
 
+static inline STRING *rrd_string_strdupz(const char *s) {
+    if(unlikely(!s || !*s)) return string_strdupz(s);
+
+    char buffer[strlen(s) + 1];
+    strcpy(buffer, s);
+    json_fix_string(buffer);
+    return string_strdupz(buffer);
+}
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock

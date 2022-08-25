@@ -20,7 +20,7 @@ int rrddim_compare(void* a, void* b) {
 
 static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
     RRDDIM tmp = {
-        .id = string_strdupz(id)
+        .id = rrd_string_strdupz(id)
     };
     return (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl_t *) &tmp);
 }
@@ -46,7 +46,7 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rrddim_name(rd), st->name, name);
 
     string_freez(rd->name);
-    rd->name = string_strdupz(name);
+    rd->name = rrd_string_strdupz(name);
 
     if (!st->state->is_ar_chart)
         rrddimvar_rename_all(rd);
@@ -205,9 +205,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     rd = callocz(1, sizeof(RRDDIM));
-    rd->id = string_strdupz(id);
+    rd->id = rrd_string_strdupz(id);
 
-    rd->name = (name && *name)?string_strdupz(name):string_dup(rd->id);
+    rd->name = (name && *name)?rrd_string_strdupz(name):string_dup(rd->id);
 
     rd->algorithm = algorithm;
     rd->multiplier = multiplier;

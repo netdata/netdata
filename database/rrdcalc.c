@@ -137,7 +137,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     if(rc->hostid && !rc->hostname)
         rc->hostid->options |= RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR;
 
-    if(!rc->units) rc->units = strdupz(st->units);
+    if(!rc->units) rc->units = strdupz(rrdset_units(st));
 
     if (rc->original_info) {
         if (rc->info)
