@@ -328,7 +328,7 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
             ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a
             ${ELF_LIBRARIES})
         list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${ELF_INCLUDE_DIRS})
-        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include)
+        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include/uapi)
         set(ENABLE_PLUGIN_EBPF True)
     ELSE(ELF_LIBRARIES)
         set(ENABLE_PLUGIN_EBPF False)
