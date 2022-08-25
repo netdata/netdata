@@ -162,8 +162,7 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 struct rrdfamily {
     avl_t avl;
 
-    const char *family;
-    uint32_t hash_family;
+    STRING *family;
 
     size_t use_count;
 
