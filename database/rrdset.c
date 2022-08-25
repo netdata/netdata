@@ -405,7 +405,6 @@ void rrdset_free(RRDSET *st) {
     freez(st->cache_dir);
     string_freez(st->plugin_name);
     string_freez(st->module_name);
-    freez(st->state->old_title);
     freez(st->state->old_context);
     rrdlabels_destroy(st->state->chart_labels);
     freez(st->state);

@@ -455,7 +455,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
-    char *old_title;
     char *old_context;
     uuid_t hash_id;
     DICTIONARY *chart_labels;
