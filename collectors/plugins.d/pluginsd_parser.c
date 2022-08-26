@@ -111,7 +111,7 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
         if (rs)
             rrdsetvar_custom_chart_variable_set(rs, value);
         else
-            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, host->hostname, st->id);
+            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, host->hostname, rrdset_id(st));
     }
     return PARSER_RC_OK;
 }
@@ -215,7 +215,7 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     if (unlikely(!dimension || !*dimension)) {
-        error("requested a SET on chart '%s' of host '%s', without a dimension. Disabling it.", st->id, host->hostname);
+        error("requested a SET on chart '%s' of host '%s', without a dimension. Disabling it.", rrdset_id(st), host->hostname);
         goto disable;
     }
 
@@ -230,14 +230,14 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     }
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "is setting dimension %s/%s to %s", st->id, dimension, value ? value : "<nothing>");
+        debug(D_PLUGINSD, "is setting dimension '%s'/'%s' to '%s'", rrdset_id(st), dimension, value ? value : "<nothing>");
 
     if (value) {
         RRDDIM *rd = rrddim_find(st, dimension);
         if (unlikely(!rd)) {
             error(
                 "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
-                dimension, rrdset_name(st), st->id, st->rrdhost->hostname);
+                dimension, rrdset_name(st), rrdset_id(st), st->rrdhost->hostname);
             goto disable;
         } else {
             if (plugins_action->set_action) {
@@ -300,7 +300,7 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     }
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "requested an END on chart %s", st->id);
+        debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
@@ -425,7 +425,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
     if (unlikely(!id)) {
         error(
             "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname,
-            st ? st->id : "UNSET");
+            st ? rrdset_id(st) : "UNSET");
         goto disable;
     }
 
@@ -455,7 +455,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
         debug(
             D_PLUGINSD,
             "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
-            st->id, id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
+            rrdset_id(st), id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
             options ? options : "");
 
     if (plugins_action->dimension_action) {

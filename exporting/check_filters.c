@@ -69,22 +69,22 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
 
     if(unlikely(!(*flags & RRDSET_FLAG_EXPORTING_SEND))) {
         // we have not checked this chart
-        if(simple_pattern_matches(instance->config.charts_pattern, st->id) || simple_pattern_matches(instance->config.charts_pattern, rrdset_name(st)))
+        if(simple_pattern_matches(instance->config.charts_pattern, rrdset_id(st)) || simple_pattern_matches(instance->config.charts_pattern, rrdset_name(st)))
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
             *flags |= RRDSET_FLAG_EXPORTING_IGNORE;
-            debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", st->id, host->hostname);
+            debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", rrdset_id(st), host->hostname);
             return 0;
         }
     }
 
     if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", st->id, host->hostname);
+        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), host->hostname);
         return 0;
     }
 
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", st->id, host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
+        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
 

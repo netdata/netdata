@@ -200,7 +200,7 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
 {
     prometheus_label_copy(
         chart,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         PROMETHEUS_ELEMENT_MAX);
     prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
     prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
@@ -249,7 +249,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
-                    rrddim_id(rd), rd->rrdset->id,
+                    rrddim_id(rd), rrdset_id(rd->rrdset),
                     (host == localhost) ? instance->config.hostname : host->hostname,
                     (unsigned long)rd->last_collected_time.tv_sec,
                     (unsigned long)instance->after,

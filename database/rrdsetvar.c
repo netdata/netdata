@@ -58,7 +58,7 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
     // KEYS
 
     char buffer[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rs->variable);
+    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rs->variable);
     rs->key_fullid = strdupz(buffer);
 
     snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rs->variable);
@@ -80,7 +80,7 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
 }
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
-    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, rrdset_name(st), variable);
+    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", rrdset_id(st), rrdset_name(st), variable);
     RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
 
     rs->variable = strdupz(variable);
@@ -99,7 +99,7 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, 
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
-    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, rrdset_name(st));
+    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
 
     RRDSETVAR *rs;
     for(rs = st->variables; rs ; rs = rs->next)
@@ -110,7 +110,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
 
 void rrdsetvar_free(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
-    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, rrdset_name(st), rs->variable);
+    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", rrdset_id(st), rrdset_name(st), rs->variable);
 
     if(st->variables == rs) {
         st->variables = rs->next;
@@ -118,7 +118,7 @@ void rrdsetvar_free(RRDSETVAR *rs) {
     else {
         RRDSETVAR *t;
         for (t = st->variables; t && t->next != rs; t = t->next);
-        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->key_fullname, st->id);
+        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->key_fullname, rrdset_id(st));
         else t->next = rs->next;
     }
 
@@ -154,7 +154,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
                 return rs;
             }
             else {
-                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", n, st->id, host->hostname);
+                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", n, rrdset_id(st), host->hostname);
                 freez(n);
                 return NULL;
             }
@@ -176,7 +176,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
 void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one.", rs->variable, rs->rrdset->id, rs->rrdset->rrdhost->hostname, value);
+            " but the variable is not a custom chart one.", rs->variable, rrdset_id(rs->rrdset), rs->rrdset->rrdhost->hostname, value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;

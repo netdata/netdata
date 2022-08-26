@@ -2228,7 +2228,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 statsd_add_dim_to_app_chart(app, chart, dim);
 
             if (unlikely(dim->value_ptr)) {
-                debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, rrddim_id(dim->rd), chart->id, chart->st->id, app->name, *dim->value_ptr);
+                debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, rrddim_id(dim->rd), chart->id, rrdset_id(chart->st), app->name, *dim->value_ptr);
                 rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
             }
         }

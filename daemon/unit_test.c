@@ -1258,7 +1258,7 @@ static int test_variable_renames(void) {
 
     fprintf(stderr, "Creating chart\n");
     RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
-    fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, rrdset_name(st));
+    fprintf(stderr, "Created chart with id '%s', name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Creating dimension DIM1\n");
     RRDDIM *rd1 = rrddim_add(st, "DIM1", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1270,11 +1270,11 @@ static int test_variable_renames(void) {
 
     fprintf(stderr, "Renaming chart to CHARTNAME1\n");
     rrdset_set_name(st, "CHARTNAME1");
-    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, rrdset_name(st));
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming chart to CHARTNAME2\n");
     rrdset_set_name(st, "CHARTNAME2");
-    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, rrdset_name(st));
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");
     rrddim_set_name(st, rd1, "DIM1NAME1");

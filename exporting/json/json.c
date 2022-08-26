@@ -193,7 +193,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         tags_post,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
-        st->id,
+        rrdset_id(st),
         rrdset_name(st),
         rrdset_family(st),
         rrdset_context(st),
@@ -277,7 +277,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         tags_post,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
-        st->id,
+        rrdset_id(st),
         rrdset_name(st),
         rrdset_family(st),
         rrdset_context(st),

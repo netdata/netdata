@@ -1932,13 +1932,13 @@ RRDR *rrd2rrdr(
     RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
     if(unlikely(!r)) {
         internal_error(true, "QUERY: cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld",
-                       st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
+                       rrdset_id(st), (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
         return NULL;
     }
 
     if(unlikely(!r->d || !points_wanted)) {
         internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%zu, points=%ld",
-                       st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
+                       rrdset_id(st), (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
         return r;
     }
 

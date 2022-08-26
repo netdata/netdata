@@ -94,7 +94,7 @@ void rrdcalc_update_rrdlabels(RRDSET *st) {
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     RRDHOST *host = st->rrdhost;
 
-    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rc->name, st->id, host->hostname);
+    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rc->name, rrdset_id(st), host->hostname);
 
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
@@ -108,19 +108,19 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     st->alarms = rc;
 
     if(rc->update_every < rc->rrdset->update_every) {
-        error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rc->rrdset->id, rc->name, rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
+        error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rc->name, rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
         rc->update_every = rc->rrdset->update_every;
     }
 
     if(!isnan(rc->green) && isnan(st->green)) {
         debug(D_HEALTH, "Health alarm '%s.%s' green threshold set from " NETDATA_DOUBLE_FORMAT_AUTO
-            " to " NETDATA_DOUBLE_FORMAT_AUTO ".", rc->rrdset->id, rc->name, rc->rrdset->green, rc->green);
+            " to " NETDATA_DOUBLE_FORMAT_AUTO ".", rrdset_id(rc->rrdset), rc->name, rc->rrdset->green, rc->green);
         st->green = rc->green;
     }
 
     if(!isnan(rc->red) && isnan(st->red)) {
         debug(D_HEALTH, "Health alarm '%s.%s' red threshold set from " NETDATA_DOUBLE_FORMAT_AUTO " to " NETDATA_DOUBLE_FORMAT_AUTO
-            ".", rc->rrdset->id, rc->name, rc->rrdset->red, rc->red);
+            ".", rrdset_id(rc->rrdset), rc->name, rc->rrdset->red, rc->red);
         st->red = rc->red;
     }
 
@@ -128,7 +128,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
+    snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rc->name);
     rc->hostid   = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
 
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rc->name);
@@ -153,7 +153,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         rc->config_hash_id,
         now,
         rc->name,
-        rc->rrdset->id,
+        rrdset_id(rc->rrdset),
         rrdset_context(rc->rrdset),
         rrdset_family(rc->rrdset),
         rc->classification,
@@ -175,8 +175,8 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 }
 
 static int rrdcalc_is_matching_rrdset(RRDCALC *rc, RRDSET *st) {
-    if((rc->hash_chart != st->hash || strcmp(rrdcalc_chart_name(rc), st->id) != 0) &&
-        (rc->chart != st->name))
+    if (   (rc->chart != st->id)
+        && (rc->chart != st->name))
         return 0;
 
     if (rc->module_pattern && !simple_pattern_matches(rc->module_pattern, rrdset_module_name(st)))
@@ -226,7 +226,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
         rc->config_hash_id,
         now,
         rc->name,
-        rc->rrdset->id,
+        rrdset_id(rc->rrdset),
         rrdset_context(rc->rrdset),
         rrdset_family(rc->rrdset),
         rc->classification,
@@ -246,7 +246,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
         0);
     health_alarm_log(host, ae);
 
-    debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rc->name, st->id, host->hostname);
+    debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rc->name, rrdset_id(st), host->hostname);
 
     // unlink it
     if(rc->rrdset_prev)

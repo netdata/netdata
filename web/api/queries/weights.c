@@ -121,14 +121,14 @@ static void register_result(DICTIONARY *results,
     struct register_result t = {
         .flags = flags,
         .st = st,
-        .chart_id = st->id,
+        .chart_id = rrdset_id(st),
         .context = rrdset_context(st),
         .dim_name = rrddim_name(d),
         .value = v
     };
 
     char buf[5000 + 1];
-    snprintfz(buf, 5000, "%s:%s", st->id, rrddim_name(d));
+    snprintfz(buf, 5000, "%s:%s", rrdset_id(st), rrddim_name(d));
     dictionary_set(results, buf, &t, sizeof(struct register_result));
 }
 

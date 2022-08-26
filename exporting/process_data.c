@@ -111,7 +111,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
             host->hostname,
-            st->id,
+            rrdset_id(st),
             rrddim_id(rd),
             (unsigned long)after,
             (unsigned long)before,
@@ -143,7 +143,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
             host->hostname,
-            st->id,
+            rrdset_id(st),
             rrddim_id(rd),
             (unsigned long)after,
             (unsigned long)before);

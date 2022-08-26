@@ -5,19 +5,19 @@
 #include <sched.h>
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
+    debug(D_RRD_CALLS, "Checking read lock on chart '%s'", rrdset_id(st));
 
     int ret = netdata_rwlock_trywrlock(&st->rrdset_rwlock);
     if(ret == 0)
-        fatal("RRDSET '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
+        fatal("RRDSET '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", rrdset_id(st), function, line, file);
 }
 
 void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRD_CALLS, "Checking write lock on chart '%s'", st->id);
+    debug(D_RRD_CALLS, "Checking write lock on chart '%s'", rrdset_id(st));
 
     int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
     if(ret == 0)
-        fatal("RRDSET '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
+        fatal("RRDSET '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", rrdset_id(st), function, line, file);
 }
 
 
@@ -25,17 +25,20 @@ void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, c
 // RRDSET index
 
 int rrdset_compare(void* a, void* b) {
-    if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
-    else if(((RRDSET *)a)->hash > ((RRDSET *)b)->hash) return 1;
-    else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
+    RRDSET *A = a;
+    RRDSET *B = b;
+    return (int)((uintptr_t)A->id - (uintptr_t)B->id);
 }
 
-static RRDSET *rrdset_index_find(RRDHOST *host, const char *id, uint32_t hash) {
-    RRDSET tmp;
-    strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
-    tmp.hash = (hash)?hash:simple_hash(tmp.id);
+static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
+    RRDSET tmp = {
+        .id = rrd_string_strdupz(id)
+    };
 
-    return (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl_t *) &tmp);
+    RRDSET *st = (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl_t *) &tmp);
+
+    string_freez(tmp.id);
+    return st;
 }
 
 // ----------------------------------------------------------------------------
@@ -87,7 +90,7 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
 
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, host->hostname);
-    RRDSET *st = rrdset_index_find(host, id, 0);
+    RRDSET *st = rrdset_index_find(host, id);
     return(st);
 }
 
@@ -145,7 +148,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
     if(rrdset_index_find_name(host, new_name)) {
         debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, host->hostname);
-        if(!strcmp(st->id, full_name) && !st->name) {
+        if(!strcmp(rrdset_id(st), full_name) && !st->name) {
             unsigned i = 1;
 
             do {
@@ -345,7 +348,7 @@ void rrdset_free(RRDSET *st) {
     // remove it from the indexes
 
     if(unlikely(rrdset_index_del(host, st) != st))
-        error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
+        error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", rrdset_id(st));
 
     rrdset_index_del_name(host, st);
 
@@ -364,7 +367,7 @@ void rrdset_free(RRDSET *st) {
 
     rrdfamily_free(host, st->rrdfamily);
 
-    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, st->id);
+    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, rrdset_id(st));
     rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
@@ -380,7 +383,7 @@ void rrdset_free(RRDSET *st) {
 
         // bypass it
         if(s) s->next = st->next;
-        else error("Request to free RRDSET '%s': cannot find it under host '%s'", st->id, host->hostname);
+        else error("Request to free RRDSET '%s': cannot find it under host '%s'", rrdset_id(st), host->hostname);
     }
 
     rrdset_unlock(st);
@@ -393,21 +396,25 @@ void rrdset_free(RRDSET *st) {
 
     netdata_rwlock_destroy(&st->rrdset_rwlock);
 
+    rrdset_memory_file_free(st);
+    rrdlabels_destroy(st->state->chart_labels);
+
     // free directly allocated members
+
+    string_freez(st->id);
     string_freez(st->name);
     string_freez(st->type);
     string_freez(st->family);
     string_freez(st->title);
     string_freez(st->units);
     string_freez(st->context);
-    freez(st->cache_dir);
     string_freez(st->plugin_name);
     string_freez(st->module_name);
-    rrdlabels_destroy(st->state->chart_labels);
+
+    freez(st->cache_dir);
     freez(st->state);
     freez(st->chart_uuid);
 
-    rrdset_memory_file_free(st);
     freez(st);
 }
 
@@ -425,7 +432,7 @@ void rrdset_delete_files(RRDSET *st) {
     RRDDIM *rd;
     rrdset_check_rdlock(st);
 
-    info("Deleting chart '%s' ('%s') from disk...", st->id, rrdset_name(st));
+    info("Deleting chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         const char *cache_filename = rrdset_cache_filename(st);
@@ -435,7 +442,7 @@ void rrdset_delete_files(RRDSET *st) {
                 error("Cannot delete chart header file '%s'", cache_filename);
         }
         else
-            error("Cannot find the cache filename of chart '%s'", st->id);
+            error("Cannot find the cache filename of chart '%s'", rrdset_id(st));
     }
 
     rrddim_foreach_read(rd, st) {
@@ -455,7 +462,7 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
 
     rrdset_check_rdlock(st);
 
-    info("Deleting dimensions of chart '%s' ('%s') from disk...", st->id, rrdset_name(st));
+    info("Deleting dimensions of chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
@@ -544,6 +551,7 @@ RRDSET *rrdset_create_custom(
 
     char fullid[RRD_ID_LENGTH_MAX + 1];
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+    json_fix_string(fullid);
 
     int changed_from_archived_to_active = 0;
     RRDSET *st = rrdset_find_on_create(host, fullid);
@@ -556,7 +564,7 @@ RRDSET *rrdset_create_custom(
         }
 
         int rc;
-        if(unlikely(name))
+        if(unlikely(name && *name))
             rc = rrdset_set_name(st, name);
         else
             rc = rrdset_set_name(st, id);
@@ -621,12 +629,12 @@ RRDSET *rrdset_create_custom(
         if (mark_rebuild) {
             rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             if (mark_rebuild != META_CHART_ACTIVATED) {
-                info("Collector updated metadata for chart %s", st->id);
+                info("Collector updated metadata for chart %s", rrdset_id(st));
                 sched_yield();
             }
         }
         if (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
-            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
+            debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
             rc = update_chart_metadata(st->chart_uuid, st, id, name);
             if (unlikely(rc))
                 error_report("Failed to update chart metadata in the database");
@@ -682,8 +690,7 @@ RRDSET *rrdset_create_custom(
     st = callocz(1, sizeof(RRDSET));
     st->state = callocz(1, sizeof(*st->state));
 
-    strcpy(st->id, fullid);
-    st->hash = simple_hash(st->id);
+    st->id = string_strdupz(fullid); // fullid is already json_fix'ed
 
     st->rrdhost = host;
     st->cache_dir = cache_dir;
@@ -704,11 +711,11 @@ RRDSET *rrdset_create_custom(
     st->type        = rrd_string_strdupz(type);
     st->family      = family ? rrd_string_strdupz(family) : string_dup(st->type);
 
-    st->state->is_ar_chart = strcmp(st->id, ML_ANOMALY_RATES_CHART_ID) == 0;
+    st->state->is_ar_chart = strcmp(rrdset_id(st), ML_ANOMALY_RATES_CHART_ID) == 0;
 
     st->units = rrd_string_strdupz(units);
 
-    st->context = context ? rrd_string_strdupz(context) : rrd_string_strdupz(st->id);
+    st->context = (context && *context) ? rrd_string_strdupz(context) : string_dup(st->id);
 
     st->priority = priority;
 
@@ -749,7 +756,7 @@ RRDSET *rrdset_create_custom(
     }
 
     if(unlikely(rrdset_index_add(host, st) != st))
-        error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
+        error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", rrdset_id(st));
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
@@ -825,7 +832,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             // oops! the database is in the future
             #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
-                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), st->rrdhost->hostname, (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
@@ -845,7 +852,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             // oops! the database is too far behind
             #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
-                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), st->rrdhost->hostname, (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             microseconds = (usec_t)since_last_usec;
@@ -884,7 +891,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
 
     if(discarded && discarded != microseconds)
-        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, st->id, discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
+        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, rrdset_id(st), discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
 
     #endif
 
@@ -1281,7 +1288,7 @@ void rrdset_done(RRDSET *st) {
 #endif
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
-        error("Chart '%s' has the OBSOLETE flag set, but it is collected.", st->id);
+        error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
     }
 
@@ -1461,7 +1468,7 @@ after_first_database_work:
         }
 
         if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), st->id);
+            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
             rrddim_isnot_obsolete(st, rd);
         }
 
@@ -1791,7 +1798,7 @@ after_second_database_work:
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                 if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&  !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)
                              && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
-                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), st->id);
+                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
 
                     const char *cache_filename = rrddim_cache_filename(rd);
                     if(cache_filename) {
@@ -2003,8 +2010,8 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         info("Initializing file '%s'.", fullfilename);
         memset(st_on_file, 0, size);
     }
-    else if(strncmp(st_on_file->id, st->id, RRD_ID_LENGTH_MAX_V019) != 0) {
-        error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, st->id);
+    else if(strncmp(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019) != 0) {
+        error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, rrdset_id(st));
         memset(st_on_file, 0, size);
     }
     else if(st_on_file->memsize != size || st_on_file->entries != st->entries) {
@@ -2050,7 +2057,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     memset(st_on_file, 0, size);
 
     // set the values we need
-    strncpyz(st_on_file->id, st->id, RRD_ID_LENGTH_MAX_V019 + 1);
+    strncpyz(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019 + 1);
     strcpy(st_on_file->cache_filename, fullfilename);
     strcpy(st_on_file->magic, RRDSET_MAGIC_V019);
     st_on_file->memsize = size;

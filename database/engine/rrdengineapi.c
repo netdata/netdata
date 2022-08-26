@@ -98,7 +98,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_insta
 
     pg_cache = &ctx->pg_cache;
 
-    rrdeng_generate_legacy_uuid(rrddim_id(rd), rd->rrdset->id, &legacy_uuid);
+    rrdeng_generate_legacy_uuid(rrddim_id(rd), (char *)rrdset_id(rd->rrdset), &legacy_uuid);
     if (host != localhost && is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
         is_multihost_child = 1;
 

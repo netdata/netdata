@@ -156,7 +156,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.name = (char *)rrdset_name(st);
         chart_payload.node_id = wc->node_id;
         chart_payload.claim_id = claim_id;
-        chart_payload.id = strdupz(st->id);
+        chart_payload.id = strdupz(rrdset_id(st));
 
         chart_payload.chart_labels = rrdlabels_create();
         rrdlabels_copy(chart_payload.chart_labels, st->state->chart_labels);
@@ -1095,7 +1095,7 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     dim_payload.claim_id = claim_id;
     dim_payload.name = rrddim_name(rd);
     dim_payload.id = rrddim_id(rd);
-    dim_payload.chart_id = rd->rrdset->id;
+    dim_payload.chart_id = rrdset_id(rd->rrdset);
     dim_payload.created_at.tv_sec = created_at;
     dim_payload.last_timestamp.tv_sec = last_updated;
 
@@ -1146,7 +1146,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
             &rd->metric_uuid,
             rrddim_id(rd),
             rrddim_name(rd),
-            rd->rrdset->id,
+            rrdset_id(rd->rrdset),
             first_entry_t,
             live ? 0 : last_entry_t,
             NULL);

@@ -854,7 +854,7 @@ void *health_main(void *ptr) {
                         time_t now = now_realtime_sec();
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                             host, rc->id, rc->next_event_id++, rc->config_hash_id, now,
-                            rc->name, rc->rrdset->id, rrdset_context(rc->rrdset), rrdset_family(rc->rrdset),
+                            rc->name, rrdset_id(rc->rrdset), rrdset_context(rc->rrdset), rrdset_family(rc->rrdset),
                             rc->classification, rc->component, rc->type, rc->exec, rc->recipient,
                             now - rc->last_status_change, rc->value, NAN, rc->status,
                             RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0, 0);
@@ -1116,7 +1116,7 @@ void *health_main(void *ptr) {
 
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                             host, rc->id, rc->next_event_id++, rc->config_hash_id, now,
-                            rc->name, rc->rrdset->id, rrdset_context(rc->rrdset),
+                            rc->name, rrdset_id(rc->rrdset), rrdset_context(rc->rrdset),
                             rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type,
                             rc->exec, rc->recipient, now - rc->last_status_change,
                             rc->old_value, rc->value, rc->status, status, rc->source,
@@ -1170,7 +1170,7 @@ void *health_main(void *ptr) {
                         if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                             host, rc->id, rc->next_event_id++, rc->config_hash_id, now,
-                            rc->name, rc->rrdset->id, rrdset_context(rc->rrdset),
+                            rc->name, rrdset_id(rc->rrdset), rrdset_context(rc->rrdset),
                             rrdset_family(rc->rrdset), rc->classification, rc->component, rc->type,
                             rc->exec, rc->recipient, now - rc->last_status_change,
                             rc->old_value, rc->value, rc->old_status, rc->status, rc->source,

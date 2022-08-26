@@ -14,6 +14,7 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
     if (unlikely(archive_mode)) {
         temp_rd->rrdset->counter--;
         if (!temp_rd->rrdset->counter) {
+            string_freez(temp_rd->rrdset->id);
             string_freez(temp_rd->rrdset->name);
             string_freez(temp_rd->rrdset->context);
             onewayalloc_freez(owa, temp_rd->rrdset);

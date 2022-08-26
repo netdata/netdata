@@ -66,7 +66,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     if(unlikely(rd->algorithm == algorithm))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", st->id, rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
+    debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
@@ -79,7 +79,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     if(unlikely(rd->multiplier == multiplier))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rrddim_name(rd), rd->multiplier, multiplier);
+    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
@@ -92,7 +92,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     if(unlikely(rd->divisor == divisor))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rrddim_name(rd), rd->divisor, divisor);
+    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
@@ -109,7 +109,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     
     for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
         if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
-            if (rc->chart == st->name || !strcmp(rrdcalc_chart_name(rc), st->id)) {
+            if (rc->chart == st->name || !strcmp(rrdcalc_chart_name(rc), rrdset_id(st))) {
                 char *name = alarm_name_with_dim(rc->name, strlen(rc->name), rrddim_name(rd), string_length(rd->name));
                 if(rrdcalc_exists(host, rrdset_name(st), name, 0, 0)) {
                     freez(name);
@@ -163,7 +163,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
-        debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
+        debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", rrdset_id(st), name?name:"<NONAME>");
 
         int rc = rrddim_set_name(st, rd, name);
         rc += rrddim_set_algorithm(st, rd, algorithm);
@@ -335,7 +335,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     }
 
     if(unlikely(rrddim_index_add(st, rd) != rd))
-        error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rrddim_id(rd), st->id);
+        error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rrddim_id(rd), rrdset_id(st));
 
     rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
     rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
@@ -387,7 +387,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         if (i && i->next == rd)
             i->next = rd->next;
         else
-            error("Request to free dimension '%s.%s' but it is not linked.", st->id, rrddim_name(rd));
+            error("Request to free dimension '%s.%s' but it is not linked.", rrdset_id(st), rrddim_name(rd));
     }
     rd->next = NULL;
 
@@ -395,7 +395,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         rrddimvar_free(rd->variables);
 
     if(unlikely(rrddim_index_del(st, rd) != rd))
-        error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rrddim_id(rd), st->id);
+        error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rrddim_id(rd), rrdset_id(st));
 
     // free(rd->annotations);
 //#ifdef ENABLE_ACLK
@@ -440,7 +440,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), st->id, host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), host->hostname);
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
@@ -458,7 +458,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), st->id, host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), host->hostname);
         return 1;
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
@@ -515,7 +515,7 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), st->id, host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), host->hostname);
         return 0;
     }
 

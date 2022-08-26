@@ -74,7 +74,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, st->id);
+            buffer_strcat(wb, rrdset_id(st));
             buffer_strcat(wb, "\": ");
             rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 

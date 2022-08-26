@@ -140,7 +140,7 @@ static inline int should_send_chart_matching(RRDSET *st) {
     if(!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE)) {
         RRDHOST *host = st->rrdhost;
 
-        if(simple_pattern_matches(host->rrdpush_send_charts_matching, st->id) ||
+        if(simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_id(st)) ||
             simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st))) {
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
@@ -184,7 +184,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         if(unlikely(!rd->exposed)) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, st->id, rrddim_id(rd));
+            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, rrdset_id(st), rrddim_id(rd));
             #endif
             return 1;
         }
@@ -215,8 +215,8 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     // properly set the name for the remote end to parse it
     char *name = "";
-    if(likely(rrdset_name(st))) {
-        if(unlikely(strcmp(st->id, rrdset_name(st)))) {
+    if(likely(st->name)) {
+        if(unlikely(st->id != st->name)) {
             // they differ
             name = strchr(rrdset_name(st), '.');
             if(name)
@@ -230,7 +230,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     buffer_sprintf(
             host->sender->build
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
-            , st->id
+            , rrdset_id(st)
             , name
             , rrdset_title(st)
             , rrdset_units(st)
@@ -290,7 +290,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", rrdset_id(st), (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
     if (s->version >= VERSION_GAP_FILLING)
         buffer_sprintf(host->sender->build, " %"PRId64"\n", (int64_t)st->last_collected_time.tv_sec);
     else

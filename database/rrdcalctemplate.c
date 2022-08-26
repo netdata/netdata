@@ -30,12 +30,12 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if(host->host_labels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->host_labels, rt->host_labels_pattern, '='))
         return;
 
-    RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
+    RRDCALC *rc = rrdcalc_create_from_template(host, rt, rrdset_id(st));
     if (unlikely(!rc))
-        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
+        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, rrdset_id(st), host->hostname);
 #ifdef NETDATA_INTERNAL_CHECKS
     else if (rc->rrdset != st && !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
-        error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rc->name, st->id);
+        error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rc->name, rrdset_id(st));
 #endif
 }
 

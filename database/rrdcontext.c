@@ -681,10 +681,10 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
         fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rrddim_id(rd));
 
     if(unlikely(!rd->rrdset->rrdhost))
-        fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rd->rrdset->id);
+        fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rrdset_id(rd->rrdset));
 
     if(unlikely(!rd->rrdset->rrdinstance))
-        fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rd->rrdset->id);
+        fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rrdset_id(rd->rrdset));
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
 
@@ -858,7 +858,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
         uuid_unparse(*ri->rrdset->chart_uuid, uuid2);
-        internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), ri->rrdset->id, uuid1, uuid2);
+        internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), rrdset_id(ri->rrdset), uuid1, uuid2);
     }
 
     if(ri->name != ri_new->name) {
@@ -1125,7 +1125,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
-        .id = string_strdupz(st->id),
+        .id = string_dup(st->id),
         .name = string_dup(st->name),
         .units = string_dup(st->units),
         .family = string_dup(st->family),
@@ -1223,14 +1223,14 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
     if(unlikely(!st->rrdinstance)) {
-        error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", st->id, function);
+        error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
 
     if(unlikely(ri->rrdset != st))
-        fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), st->id, function);
+        fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), rrdset_id(st), function);
 
     return ri;
 }

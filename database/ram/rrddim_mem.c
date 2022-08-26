@@ -206,7 +206,7 @@ int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
 void rrddim_query_finalize(struct rrddim_query_handle *handle) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(!rrddim_query_is_finished(handle))
-        error("QUERY: query for chart '%s' dimension '%s' has been stopped unfinished", handle->rd->rrdset->id, rrddim_name(handle->rd));
+        error("QUERY: query for chart '%s' dimension '%s' has been stopped unfinished", rrdset_id(handle->rd->rrdset), rrddim_name(handle->rd));
 #endif
     freez(handle->handle);
 }

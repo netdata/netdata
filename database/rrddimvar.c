@@ -94,10 +94,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rrddim_name(rd), rs->suffix);
     rs->key_name = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), rs->key_id);
     rs->key_fullidid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), rs->key_name);
     rs->key_fullidname = strdupz(buffer);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), rs->key_id);
@@ -155,7 +155,7 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, co
     RRDSET *st = rd->rrdset;
     (void)st;
 
-    debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", st->id, rrdset_name(st), rrddim_id(rd), (prefix)?prefix:"", rrddim_name(rd), (suffix)?suffix:"");
+    debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), (prefix)?prefix:"", rrddim_name(rd), (suffix)?suffix:"");
 
     if(!prefix) prefix = "";
     if(!suffix) suffix = "";
@@ -182,7 +182,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
     (void)st;
 
-    debug(D_VARIABLES, "RRDDIMSET rename for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
+    debug(D_VARIABLES, "RRDDIMSET rename for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
 
     RRDDIMVAR *rs, *next = rd->variables;
     while((rs = next)) {
@@ -194,19 +194,19 @@ void rrddimvar_rename_all(RRDDIM *rd) {
 void rrddimvar_free(RRDDIMVAR *rs) {
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
-    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", st->id, rrdset_name(st), rrddim_id(rd), rrddim_name(rd), rs->prefix, rs->suffix);
+    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd), rs->prefix, rs->suffix);
 
     rrddimvar_free_variables(rs);
 
     if(rd->variables == rs) {
-        debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
+        debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
         rd->variables = rs->next;
     }
     else {
-        debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
+        debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
         RRDDIMVAR *t;
         for (t = rd->variables; t && t->next != rs; t = t->next) ;
-        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->key_name, st->id, rrddim_id(rd));
+        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->key_name, rrdset_id(st), rrddim_id(rd));
         else t->next = rs->next;
     }
 

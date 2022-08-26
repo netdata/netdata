@@ -515,8 +515,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // the set configuration
 
-    char id[RRD_ID_LENGTH_MAX + 1];                 // id of the data set
-
+    STRING *id;                                     // the ID of the data set
     STRING *name;                                   // the name of this dimension (as presented to user)
     STRING *type;                                   // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     STRING *family;                                 // grouping sets under the same family
@@ -538,9 +537,6 @@ struct rrdset {
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
-
-    uint32_t hash;                                  // a simple hash on the id, to speed up searching
-                                                    // we first compare hashes, and only if the hashes are equal we do string comparisons
 
     long entries;                                   // total number of entries in the data set
 
@@ -615,6 +611,7 @@ struct rrdset {
 #define rrdset_title(st) string2str((st)->title)
 #define rrdset_context(st) string2str((st)->context)
 #define rrdset_name(st) string2str((st)->name)
+#define rrdset_id(st) string2str((st)->id)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))

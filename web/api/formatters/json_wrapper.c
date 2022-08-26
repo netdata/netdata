@@ -79,7 +79,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sgroup%s: %s%s%s,\n"
                        "   %soptions%s: %s"
                    , kq, kq
-                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):r->st->id, sq
+                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):rrdset_id(r->st), sq
                    , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):rrdset_name(r->st), sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
@@ -109,7 +109,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     }
     if(!i) {
 #ifdef NETDATA_INTERNAL_CHECKS
-        error("RRDR is empty for %s (RRDR has %d dimensions, options is 0x%08x)", r->st->id, r->d, options);
+        error("RRDR is empty for %s (RRDR has %d dimensions, options is 0x%08x)", rrdset_id(r->st), r->d, options);
 #endif
         rows = 0;
         buffer_strcat(wb, sq);
@@ -160,8 +160,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
         dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rd->rrdset->id, rrdset_name(rd->rrdset));
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rd->rrdset->id, rrdset_name(rd->rrdset));
+            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
             dictionary_set(dict, name, output, len + 1);
         }
 
@@ -198,7 +198,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if (i)
                 buffer_strcat(wb, ", ");
             buffer_strcat(wb, sq);
-            buffer_strcat(wb, rd->rrdset->id);
+            buffer_strcat(wb, rrdset_id(rd->rrdset));
             buffer_strcat(wb, sq);
             i++;
         }

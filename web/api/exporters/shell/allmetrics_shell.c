@@ -35,9 +35,9 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
         NETDATA_DOUBLE total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, st->name?rrdset_name(st):st->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, st->name?rrdset_name(st):rrdset_id(st), SHELL_ELEMENT_MAX);
 
-        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, rrdset_name(st));
+        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", rrdset_id(st), rrdset_name(st));
         if(rrdset_is_available_for_viewers(st)) {
             rrdset_rdlock(st);
 
@@ -74,7 +74,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, rc->rrdset->name?rrdset_name(rc->rrdset):rc->rrdset->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, rc->rrdset->name?rrdset_name(rc->rrdset):rrdset_id(rc->rrdset), SHELL_ELEMENT_MAX);
 
         char alarm[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
@@ -110,7 +110,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, rrdset_name(st))))
+        if (filter && !(simple_pattern_matches(filter, rrdset_id(st)) || simple_pattern_matches(filter, rrdset_name(st))))
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {
@@ -127,7 +127,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                 "\t\t\"last_updated\": %"PRId64",\n"
                 "\t\t\"dimensions\": {",
                 chart_counter ? "," : "",
-                st->id,
+                rrdset_id(st),
                 rrdset_name(st),
                 rrdset_family(st),
                 rrdset_context(st),
