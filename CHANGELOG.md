@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- add `apt` to `apps_groups.conf` [\#13571](https://github.com/netdata/netdata/pull/13571) ([andrewm4894](https://github.com/andrewm4894))
+- eBPF cmake missing include dir [\#13568](https://github.com/netdata/netdata/pull/13568) ([underhood](https://github.com/underhood))
+- chore: removing logging that a chart collection in the same interpolation point [\#13567](https://github.com/netdata/netdata/pull/13567) ([ilyam8](https://github.com/ilyam8))
 - add more monitoring tools to `apps_groups.conf` [\#13566](https://github.com/netdata/netdata/pull/13566) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(health.d/mysql\): adjust `mysql_galera_cluster_size_max_2m` lookup to make time in warn/crit predictable [\#13563](https://github.com/netdata/netdata/pull/13563) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.28.6. [\#13562](https://github.com/netdata/netdata/pull/13562) ([netdatabot](https://github.com/netdatabot))
@@ -343,8 +346,6 @@
 - feat: move dirs, logs, and env vars config options to separate sections [\#12935](https://github.com/netdata/netdata/pull/12935) ([ilyam8](https://github.com/ilyam8))
 - Adjust the dimension liveness status check [\#12933](https://github.com/netdata/netdata/pull/12933) ([stelfrag](https://github.com/stelfrag))
 - chore\(fping.plugin\): bump default fping version to 5.1 [\#12930](https://github.com/netdata/netdata/pull/12930) ([ilyam8](https://github.com/ilyam8))
-- Restore a broken symbolic link [\#12923](https://github.com/netdata/netdata/pull/12923) ([vlvkobal](https://github.com/vlvkobal))
-- collectors: apps.plugin: apps\_groups: update net, aws, ha groups [\#12921](https://github.com/netdata/netdata/pull/12921) ([k0ste](https://github.com/k0ste))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
