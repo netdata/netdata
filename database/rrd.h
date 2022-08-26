@@ -503,11 +503,11 @@ typedef enum rrdset_flags {
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
+#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 struct rrdset {
     // ------------------------------------------------------------------------
-    // binary indexing structures
+    // indexing structures
 
     avl_t avl;                                      // the index, with key the id - this has to be first!
     avl_t avlname;                                  // the index, with key the name
@@ -518,33 +518,36 @@ struct rrdset {
     char id[RRD_ID_LENGTH_MAX + 1];                 // id of the data set
 
     STRING *name;                                   // the name of this dimension (as presented to user)
-                                                    // this is a pointer to the config structure
-                                                    // since the config always has a higher priority
-                                                    // (the user overwrites the name of the charts)
-
     STRING *type;                                   // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     STRING *family;                                 // grouping sets under the same family
     STRING *title;                                  // title shown to user
     STRING *units;                                  // units of measurement
     STRING *context;                                // the template of this data set
+    STRING *plugin_name;                            // the name of the plugin that generated this
+    STRING *module_name;                            // the name of the plugin module that generated this
 
     RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
     RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
 
+    RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
     RRDSET_TYPE chart_type;                         // line, area, stacked
+    RRDSET_FLAGS flags;                             // configuration flags
+    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
 
     int update_every;                               // every how many seconds is this updated?
+
+    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
+                                                    // netdata will interpolate values for gaps lower than this
+
+    uint32_t hash;                                  // a simple hash on the id, to speed up searching
+                                                    // we first compare hashes, and only if the hashes are equal we do string comparisons
+
+    uint32_t hash_name;                             // a simple hash on the name
 
     long entries;                                   // total number of entries in the data set
 
     long current_entry;                             // the entry that is currently being updated
                                                     // it goes around in a round-robin fashion
-
-    RRDSET_FLAGS flags;                             // configuration flags
-    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
-
-    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
-                                                    // netdata will interpolate values for gaps lower than this
 
     long priority;                                  // the sorting priority of this chart
 
@@ -552,11 +555,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
-    RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
-
     char *cache_dir;                                // the directory to store dimensions
-
-    netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
 
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
@@ -567,18 +566,11 @@ struct rrdset {
     };
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
-    STRING *plugin_name;                            // the name of the plugin that generated this
-    STRING *module_name;                            // the name of the plugin module that generated this
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
-
-    uint32_t hash;                                  // a simple hash on the id, to speed up searching
-                                                    // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    uint32_t hash_name;                             // a simple hash on the name
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
@@ -596,8 +588,8 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // local variables
 
-    NETDATA_DOUBLE green;                        // green threshold for this chart
-    NETDATA_DOUBLE red;                          // red threshold for this chart
+    NETDATA_DOUBLE green;                           // green threshold for this chart
+    NETDATA_DOUBLE red;                             // red threshold for this chart
 
     avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
     RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
@@ -612,6 +604,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // the dimensions
 
+    netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
     avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
 };
