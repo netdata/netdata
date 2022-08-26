@@ -3960,7 +3960,7 @@ netdataDashboard.context = {
         info: '<p>Write queries throughput.</p><p><b>Inserted</b> - number of rows inserted by queries. <b>Deleted</b> - number of rows deleted by queries. <b>Updated</b> - number of rows updated by queries.</p>'
     },
     'postgres.db_conflicts': {
-        info: 'Number of queries canceled due to conflict with recovery on standby servers. To minimize query cancels caused by cleanup records consider configuring <a href="https://www.postgresql.org/docs/9.4/runtime-config-replication.html#GUC-HOT-STANDBY-FEEDBACK" target="_blank"><i>hot_standby_feedback</i></a>.'
+        info: 'Number of queries canceled due to conflict with recovery on standby servers. To minimize query cancels caused by cleanup records consider configuring <a href="https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-HOT-STANDBY-FEEDBACK" target="_blank"><i>hot_standby_feedback</i></a>.'
     },
     'postgres.db_conflicts_stat': {
         info: '<p>Statistics about queries canceled due to various types of conflicts on standby servers.</p><p><b>Tablespace</b> - queries that have been canceled due to dropped tablespaces. <b>Lock</b> - queries that have been canceled due to lock timeouts. <b>Snapshot</b> - queries that have been canceled due to old snapshots. <b>Bufferpin</b> - queries that have been canceled due to pinned buffers. <b>Deadlock</b> - queries that have been canceled due to deadlocks.</p>'
