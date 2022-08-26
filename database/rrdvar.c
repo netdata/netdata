@@ -217,40 +217,32 @@ NETDATA_DOUBLE rrdvar2number(RRDVAR *rv) {
     }
 }
 
-int health_variable_lookup(const char *variable, RRDCALC *rc, NETDATA_DOUBLE *result) {
+int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result) {
     RRDSET *st = rc->rrdset;
     if(!st) return 0;
 
     RRDHOST *host = st->rrdhost;
     RRDVAR *rv;
 
-    STRING *variable_string = string_strdupz(variable);
-    int ret = 0;
-
-    rv = rrdvar_index_find(&st->rrdvar_root_index, variable_string);
+    rv = rrdvar_index_find(&st->rrdvar_root_index, variable);
     if(rv) {
         *result = rrdvar2number(rv);
-        ret = 1;
-        goto done;
+        return 1;
     }
 
-    rv = rrdvar_index_find(&st->rrdfamily->rrdvar_root_index, variable_string);
+    rv = rrdvar_index_find(&st->rrdfamily->rrdvar_root_index, variable);
     if(rv) {
         *result = rrdvar2number(rv);
-        ret = 1;
-        goto done;
+        return 1;
     }
 
-    rv = rrdvar_index_find(&host->rrdvar_root_index, variable_string);
+    rv = rrdvar_index_find(&host->rrdvar_root_index, variable);
     if(rv) {
         *result = rrdvar2number(rv);
-        ret = 1;
-        goto done;
+        return 1;
     }
 
-done:
-    string_freez(variable_string);
-    return ret;
+    return 0;
 }
 
 // ----------------------------------------------------------------------------

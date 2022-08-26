@@ -62,24 +62,36 @@ static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n);
 // evaluation of expressions
 
 static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
-    static uint32_t this_hash = 0, now_hash = 0, after_hash = 0, before_hash = 0, status_hash = 0, removed_hash = 0, uninitialized_hash = 0, undefined_hash = 0, clear_hash = 0, warning_hash = 0, critical_hash = 0;
+    static STRING
+        *this_string = NULL,
+        *now_string = NULL,
+        *after_string = NULL,
+        *before_string = NULL,
+        *status_string = NULL,
+        *removed_string = NULL,
+        *uninitialized_string = NULL,
+        *undefined_string = NULL,
+        *clear_string = NULL,
+        *warning_string = NULL,
+        *critical_string = NULL;
+
     NETDATA_DOUBLE n;
 
-    if(unlikely(this_hash == 0)) {
-        this_hash = simple_hash("this");
-        now_hash = simple_hash("now");
-        after_hash = simple_hash("after");
-        before_hash = simple_hash("before");
-        status_hash = simple_hash("status");
-        removed_hash = simple_hash("REMOVED");
-        uninitialized_hash = simple_hash("UNINITIALIZED");
-        undefined_hash = simple_hash("UNDEFINED");
-        clear_hash = simple_hash("CLEAR");
-        warning_hash = simple_hash("WARNING");
-        critical_hash = simple_hash("CRITICAL");
+    if(unlikely(this_string == NULL)) {
+        this_string = string_strdupz("this");
+        now_string = string_strdupz("now");
+        after_string = string_strdupz("after");
+        before_string = string_strdupz("before");
+        status_string = string_strdupz("status");
+        removed_string = string_strdupz("REMOVED");
+        uninitialized_string = string_strdupz("UNINITIALIZED");
+        undefined_string = string_strdupz("UNDEFINED");
+        clear_string = string_strdupz("CLEAR");
+        warning_string = string_strdupz("WARNING");
+        critical_string = string_strdupz("CRITICAL");
     }
 
-    if(unlikely(v->hash == this_hash && !strcmp(v->name, "this"))) {
+    if(unlikely(v->name == this_string)) {
         n = (exp->myself)?*exp->myself:NAN;
         buffer_strcat(exp->error_msg, "[ $this = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -87,7 +99,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == after_hash && !strcmp(v->name, "after"))) {
+    if(unlikely(v->name == after_string)) {
         n = (exp->after && *exp->after)?*exp->after:NAN;
         buffer_strcat(exp->error_msg, "[ $after = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -95,7 +107,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == before_hash && !strcmp(v->name, "before"))) {
+    if(unlikely(v->name == before_string)) {
         n = (exp->before && *exp->before)?*exp->before:NAN;
         buffer_strcat(exp->error_msg, "[ $before = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -103,15 +115,15 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == now_hash && !strcmp(v->name, "now"))) {
-        n = now_realtime_sec();
+    if(unlikely(v->name == now_string)) {
+        n = (NETDATA_DOUBLE)now_realtime_sec();
         buffer_strcat(exp->error_msg, "[ $now = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
         return n;
     }
 
-    if(unlikely(v->hash == status_hash && !strcmp(v->name, "status"))) {
+    if(unlikely(v->name == status_string)) {
         n = (exp->status)?*exp->status:RRDCALC_STATUS_UNINITIALIZED;
         buffer_strcat(exp->error_msg, "[ $status = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -119,7 +131,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == removed_hash && !strcmp(v->name, "REMOVED"))) {
+    if(unlikely(v->name == removed_string)) {
         n = RRDCALC_STATUS_REMOVED;
         buffer_strcat(exp->error_msg, "[ $REMOVED = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -127,7 +139,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == uninitialized_hash && !strcmp(v->name, "UNINITIALIZED"))) {
+    if(unlikely(v->name == uninitialized_string)) {
         n = RRDCALC_STATUS_UNINITIALIZED;
         buffer_strcat(exp->error_msg, "[ $UNINITIALIZED = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -135,7 +147,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == undefined_hash && !strcmp(v->name, "UNDEFINED"))) {
+    if(unlikely(v->name == undefined_string)) {
         n = RRDCALC_STATUS_UNDEFINED;
         buffer_strcat(exp->error_msg, "[ $UNDEFINED = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -143,7 +155,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == clear_hash && !strcmp(v->name, "CLEAR"))) {
+    if(unlikely(v->name == clear_string)) {
         n = RRDCALC_STATUS_CLEAR;
         buffer_strcat(exp->error_msg, "[ $CLEAR = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -151,7 +163,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == warning_hash && !strcmp(v->name, "WARNING"))) {
+    if(unlikely(v->name == warning_string)) {
         n = RRDCALC_STATUS_WARNING;
         buffer_strcat(exp->error_msg, "[ $WARNING = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -159,7 +171,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->hash == critical_hash && !strcmp(v->name, "CRITICAL"))) {
+    if(unlikely(v->name == critical_string)) {
         n = RRDCALC_STATUS_CRITICAL;
         buffer_strcat(exp->error_msg, "[ $CRITICAL = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -168,14 +180,14 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
     }
 
     if(exp->rrdcalc && health_variable_lookup(v->name, exp->rrdcalc, &n)) {
-        buffer_sprintf(exp->error_msg, "[ ${%s} = ", v->name);
+        buffer_sprintf(exp->error_msg, "[ ${%s} = ", string2str(v->name));
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
         return n;
     }
 
     *error = EVAL_ERROR_UNKNOWN_VARIABLE;
-    buffer_sprintf(exp->error_msg, "[ undefined variable '%s' ] ", v->name);
+    buffer_sprintf(exp->error_msg, "[ undefined variable '%s' ] ", string2str(v->name));
     return NAN;
 }
 
@@ -357,7 +369,7 @@ static inline NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int 
 
 static inline void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *error) {
     (void)error;
-    buffer_sprintf(out, "${%s}", v->name);
+    buffer_sprintf(out, "${%s}", string2str(v->name));
 }
 
 static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n) {
@@ -859,12 +871,11 @@ static inline void eval_node_set_value_to_variable(EVAL_NODE *op, int pos, const
 
     op->ops[pos].type = EVAL_VALUE_VARIABLE;
     op->ops[pos].variable = callocz(1, sizeof(EVAL_VARIABLE));
-    op->ops[pos].variable->name = strdupz(variable);
-    op->ops[pos].variable->hash = simple_hash(op->ops[pos].variable->name);
+    op->ops[pos].variable->name = string_strdupz(variable);
 }
 
 static inline void eval_variable_free(EVAL_VARIABLE *v) {
-    freez(v->name);
+    string_freez(v->name);
     freez(v);
 }
 
