@@ -15,7 +15,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if(rt->context != st->context)
         return;
 
-    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, st->name))
+    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, rrdset_name(st)))
         return;
 
     if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, rrdset_family(st)))

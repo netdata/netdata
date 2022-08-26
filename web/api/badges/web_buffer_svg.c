@@ -1020,7 +1020,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             label = dim;
         }
         else
-            label = st->name;
+            label = rrdset_name(st);
     }
     if(!units) {
         if(alarm) {

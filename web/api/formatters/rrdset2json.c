@@ -46,17 +46,17 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
         "\t\t\t\"chart_type\": \"%s\",\n",
         st->id,
-        st->name,
+        rrdset_name(st),
         rrdset_type(st),
         rrdset_family(st),
         rrdset_context(st),
         rrdset_title(st),
-        st->name,
+        rrdset_name(st),
         st->priority,
         rrdset_plugin_name(st),
         rrdset_module_name(st),
         rrdset_units(st),
-        st->name,
+        rrdset_name(st),
         rrdset_type_name(st->chart_type));
 
     if (likely(!skip_volatile))

@@ -141,7 +141,7 @@ static inline int should_send_chart_matching(RRDSET *st) {
         RRDHOST *host = st->rrdhost;
 
         if(simple_pattern_matches(host->rrdpush_send_charts_matching, st->id) ||
-            simple_pattern_matches(host->rrdpush_send_charts_matching, st->name)) {
+            simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st))) {
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         }
@@ -215,10 +215,10 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     // properly set the name for the remote end to parse it
     char *name = "";
-    if(likely(st->name)) {
-        if(unlikely(strcmp(st->id, st->name))) {
+    if(likely(rrdset_name(st))) {
+        if(unlikely(strcmp(st->id, rrdset_name(st)))) {
             // they differ
-            name = strchr(st->name, '.');
+            name = strchr(rrdset_name(st), '.');
             if(name)
                 name++;
             else

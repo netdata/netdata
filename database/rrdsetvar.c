@@ -61,7 +61,7 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
     snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rs->variable);
     rs->key_fullid = strdupz(buffer);
 
-    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rs->variable);
+    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rs->variable);
     rs->key_fullname = strdupz(buffer);
 
     // ------------------------------------------------------------------------
@@ -80,7 +80,7 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
 }
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
-    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
+    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, rrdset_name(st), variable);
     RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
 
     rs->variable = strdupz(variable);
@@ -99,7 +99,7 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, 
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
-    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
+    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, rrdset_name(st));
 
     RRDSETVAR *rs;
     for(rs = st->variables; rs ; rs = rs->next)
@@ -110,7 +110,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
 
 void rrdsetvar_free(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
-    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
+    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, rrdset_name(st), rs->variable);
 
     if(st->variables == rs) {
         st->variables = rs->next;

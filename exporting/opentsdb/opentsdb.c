@@ -177,7 +177,7 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : st->id,
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
@@ -217,7 +217,7 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : st->id,
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
@@ -309,7 +309,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : st->id,
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
@@ -359,7 +359,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : st->id,
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];

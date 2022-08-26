@@ -499,11 +499,11 @@ int do_ipc(int update_every, usec_t dt) {
                 do_msg = CONFIG_BOOLEAN_NO;
             }
             else if(unlikely(!message_queue_root)) {
-                info("Making chart %s (%s) obsolete since it does not have any dimensions", st_msq_messages->name, st_msq_messages->id);
+                info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_messages), st_msq_messages->id);
                 rrdset_is_obsolete(st_msq_messages);
                 st_msq_messages = NULL;
 
-                info("Making chart %s (%s) obsolete since it does not have any dimensions", st_msq_bytes->name, st_msq_bytes->id);
+                info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_bytes), st_msq_bytes->id);
                 rrdset_is_obsolete(st_msq_bytes);
                 st_msq_bytes = NULL;
             }

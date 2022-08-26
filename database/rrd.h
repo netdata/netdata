@@ -517,7 +517,7 @@ struct rrdset {
 
     char id[RRD_ID_LENGTH_MAX + 1];                 // id of the data set
 
-    const char *name;                               // the name of this dimension (as presented to user)
+    STRING *name;                                   // the name of this dimension (as presented to user)
                                                     // this is a pointer to the config structure
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
@@ -623,6 +623,7 @@ struct rrdset {
 #define rrdset_family(st) string2str((st)->family)
 #define rrdset_title(st) string2str((st)->title)
 #define rrdset_context(st) string2str((st)->context)
+#define rrdset_name(st) string2str((st)->name)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
@@ -679,7 +680,7 @@ typedef enum rrdhost_flags {
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, st->name, ##args); } while(0)
+            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif

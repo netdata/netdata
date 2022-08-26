@@ -69,7 +69,7 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
 
     if(unlikely(!(*flags & RRDSET_FLAG_EXPORTING_SEND))) {
         // we have not checked this chart
-        if(simple_pattern_matches(instance->config.charts_pattern, st->id) || simple_pattern_matches(instance->config.charts_pattern, st->name))
+        if(simple_pattern_matches(instance->config.charts_pattern, st->id) || simple_pattern_matches(instance->config.charts_pattern, rrdset_name(st)))
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
             *flags |= RRDSET_FLAG_EXPORTING_IGNORE;

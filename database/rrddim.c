@@ -33,7 +33,7 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 // RRDDIM - find a dimension
 
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", st->name, id);
+    debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
     return rrddim_index_find(st, id);
 }
@@ -46,7 +46,7 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     if(unlikely(!name || !*name || !strcmp(rrddim_name(rd), name)))
         return 0;
 
-    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rrddim_name(rd), st->name, name);
+    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
 
     string_freez(rd->name);
     rd->name = rrd_string_strdupz(name);
@@ -109,9 +109,9 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     
     for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
         if (simple_pattern_matches(rrdc->spdim, rrddim_id(rd)) || simple_pattern_matches(rrdc->spdim, rrddim_name(rd))) {
-            if (rrdc->hash_chart == st->hash_name || !strcmp(rrdc->chart, st->name) || !strcmp(rrdc->chart, st->id)) {
+            if (rrdc->hash_chart == st->hash_name || !strcmp(rrdc->chart, rrdset_name(st)) || !strcmp(rrdc->chart, st->id)) {
                 char *name = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rrddim_name(rd), string_length(rd->name));
-                if(rrdcalc_exists(host, st->name, name, 0, 0)) {
+                if(rrdcalc_exists(host, rrdset_name(st), name, 0, 0)) {
                     freez(name);
                     continue;
                 }
@@ -227,7 +227,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     if(memory_mode == RRD_MEMORY_MODE_MAP || memory_mode == RRD_MEMORY_MODE_SAVE) {
         if(!rrddim_memory_load_or_create_map_save(st, rd, memory_mode)) {
-            info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", st->name, rrddim_name(rd));
+            info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
             memory_mode = RRD_MEMORY_MODE_RAM;
         }
     }
@@ -238,7 +238,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
         rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1);
         if(!rd->db) {
-            info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", st->name, rrddim_name(rd));
+            info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             memory_mode = RRD_MEMORY_MODE_ALLOC;
         }
         else rd->memsize = entries * sizeof(storage_number);
@@ -280,10 +280,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         }
 
         if(!initialized)
-            error("Failed to initialize all db tiers for chart '%s', dimension '%s", st->name, rrddim_name(rd));
+            error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
 
         if(!rd->tiers[0])
-            error("Failed to initialize the first db tier for chart '%s', dimension '%s", st->name, rrddim_name(rd));
+            error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
     store_active_dimension(&rd->metric_uuid);
@@ -299,7 +299,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         }
 
         if(!initialized)
-            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", st->name, rrddim_name(rd));
+            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
     // append this dimension
@@ -313,7 +313,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                         rrddim_name(rd),
-                        st->name,
+                        rrdset_name(st),
                         host->hostname,
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
                         rd->multiplier, td->multiplier,
@@ -356,7 +356,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     rrdcontext_removed_rrddim(rd);
     ml_delete_dimension(rd);
     
-    debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rrddim_name(rd));
+    debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
 
@@ -434,13 +434,13 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 // RRDDIM - set dimension options
 
 int rrddim_hide(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", st->name, id);
+    debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), st->id, host->hostname);
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
@@ -453,12 +453,12 @@ int rrddim_hide(RRDSET *st, const char *id) {
 }
 
 int rrddim_unhide(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", st->name, id);
+    debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), st->id, host->hostname);
         return 1;
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
@@ -471,10 +471,10 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 }
 
 inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
-    debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", st->name, rrddim_name(rd));
+    debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))) {
-        info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), st->name);
+        info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
         return;
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
@@ -483,7 +483,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
 }
 
 inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
-    debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", st->name, rrddim_name(rd));
+    debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
     rrdcontext_updated_rrddim_flags(rd);
@@ -493,7 +493,7 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
 // RRDDIM - collect values for a dimension
 
 inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, collected_number value) {
-    debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rrddim_name(rd), value);
+    debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
     rrdcontext_collected_rrddim(rd);
 
@@ -515,7 +515,7 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), st->id, host->hostname);
         return 0;
     }
 

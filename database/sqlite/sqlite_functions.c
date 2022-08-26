@@ -1873,7 +1873,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
         if (!st || uuid_compare(*(uuid_t *)sqlite3_column_blob(res, 7), chart_id)) {
             if (unlikely(st && !st->counter)) {
                 string_freez(st->context);
-                onewayalloc_freez(owa, (char *) st->name);
+                string_freez(st->name);
                 onewayalloc_freez(owa, st);
             }
             st = onewayalloc_callocz(owa, 1, sizeof(*st));
@@ -1882,7 +1882,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
             snprintfz(
                 n, RRD_ID_LENGTH_MAX, "%s.%s", (char *)sqlite3_column_text(res, 4),
                 (char *)sqlite3_column_text(res, 3));
-            st->name = onewayalloc_strdupz(owa, n);
+            st->name = string_strdupz(n);
             st->update_every = sqlite3_column_int(res, 6);
             st->counter = 0;
             if (chart) {
@@ -1894,7 +1894,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
             st->rrdhost = host;
         }
 
-        if (unlikely(find_dimension_first_last_t(machine_guid, (char *)st->name, (char *)sqlite3_column_text(res, 1),
+        if (unlikely(find_dimension_first_last_t(machine_guid, (char *)rrdset_name(st), (char *)sqlite3_column_text(res, 1),
                 (uuid_t *)sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t,
                 &rrdeng_uuid, 0)))
             continue;
@@ -1913,7 +1913,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
     if (st) {
         if (!st->counter) {
             string_freez(st->context);
-            onewayalloc_freez(owa,(char *)st->name);
+            string_freez(st->name);
             onewayalloc_freez(owa,st);
         }
         else
@@ -2076,7 +2076,7 @@ void compute_chart_hash(RRDSET *st)
     EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
     //EVP_DigestUpdate(evpctx, st->type, strlen(st->type));
     EVP_DigestUpdate(evpctx, st->id, strlen(st->id));
-    EVP_DigestUpdate(evpctx, st->name, strlen(st->name));
+    EVP_DigestUpdate(evpctx, rrdset_name(st), string_length(st->name));
     EVP_DigestUpdate(evpctx, rrdset_family(st), string_length(st->family));
     EVP_DigestUpdate(evpctx, rrdset_context(st), string_length(st->context));
     EVP_DigestUpdate(evpctx, rrdset_title(st), string_length(st->title));
@@ -2100,7 +2100,7 @@ void compute_chart_hash(RRDSET *st)
         st->chart_uuid,
         rrdset_type(st),
         st->id,
-        st->name,
+        rrdset_name(st),
         rrdset_family(st),
         rrdset_context(st),
         rrdset_title(st),

@@ -237,7 +237,7 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
         if (unlikely(!rd)) {
             error(
                 "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
-                dimension, st->name, st->id, st->rrdhost->hostname);
+                dimension, rrdset_name(st), st->id, st->rrdhost->hostname);
             goto disable;
         } else {
             if (plugins_action->set_action) {

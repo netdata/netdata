@@ -541,7 +541,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                          group_time, options, NULL, context_param_list, group_options,
                          timeout, tier);
     if(!high_rrdr) {
-        info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
 
@@ -551,11 +551,11 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_points     += high_rrdr->internal.db_points_read;
     stats->result_points += high_rrdr->internal.result_points_generated;
     if(!high_rrdr->d) {
-        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
     if(high_rrdr->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        info("Metric correlations: rrd2rrdr() on highlighted window timed out '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() on highlighted window timed out '%s'.", rrdset_name(st));
         goto cleanup;
     }
     int high_points = rrdr_rows(high_rrdr);
@@ -571,7 +571,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                     group_time, options, NULL, context_param_list, group_options,
                     (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), tier);
     if(!base_rrdr) {
-        info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
 
@@ -581,15 +581,15 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_points     += base_rrdr->internal.db_points_read;
     stats->result_points += base_rrdr->internal.result_points_generated;
     if(!base_rrdr->d) {
-        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
     if (base_rrdr->d != high_rrdr->d) {
-        info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", st->name);
+        info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", rrdset_name(st));
         goto cleanup;
     }
     if(base_rrdr->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        info("Metric correlations: rrd2rrdr() on baseline window timed out '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() on baseline window timed out '%s'.", rrdset_name(st));
         goto cleanup;
     }
     int base_points = rrdr_rows(base_rrdr);
@@ -1007,7 +1007,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             if(!contexts || simple_pattern_matches(contexts, rrdset_context(st)))
-                dictionary_set(charts, st->name, NULL, 0);
+                dictionary_set(charts, rrdset_name(st), NULL, 0);
         }
     }
     rrdhost_unlock(host);

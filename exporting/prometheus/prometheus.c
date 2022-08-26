@@ -9,7 +9,7 @@
 
 static int is_matches_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter) {
     if (instance->config.options & EXPORTING_OPTION_SEND_NAMES) {
-        return simple_pattern_matches(filter, st->name);
+        return simple_pattern_matches(filter, rrdset_name(st));
     }
     return simple_pattern_matches(filter, st->id);
 }
@@ -445,7 +445,7 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
         wb,
         "%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * ",
         p->suffix,
-        (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->st->name) ? p->st->name : p->st->id,
+        (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->st->name) ? rrdset_name(p->st) : p->st->id,
         rrdset_context(p->st),
         rrdset_family(p->st),
         (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->rd->name) ? rrddim_name(p->rd) : rrddim_id(p->rd));
@@ -575,8 +575,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             char family[PROMETHEUS_ELEMENT_MAX + 1];
             char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
-            prometheus_label_copy(
-                chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id, PROMETHEUS_ELEMENT_MAX);
+            prometheus_label_copy(chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? rrdset_name(st) : st->id, PROMETHEUS_ELEMENT_MAX);
             prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
             prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
 
@@ -604,7 +603,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     wb,
                     "\n# COMMENT %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n",
                     (homogeneous) ? "homogeneous" : "heterogeneous",
-                    (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
+                    (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? rrdset_name(st) : st->id,
                     rrdset_context(st),
                     rrdset_family(st),
                     rrdset_units(st));

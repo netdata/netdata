@@ -48,10 +48,7 @@ int rrdset_compare_name(void* a, void* b) {
     RRDSET *B = rrdset_from_avlname(b);
 
     // fprintf(stderr, "COMPARING: %s with %s\n", A->name, B->name);
-
-    if(A->hash_name < B->hash_name) return -1;
-    else if(A->hash_name > B->hash_name) return 1;
-    else return strcmp(A->name, B->name);
+    return (int)((uintptr_t)A->name - (uintptr_t)B->name);
 }
 
 RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
@@ -76,13 +73,16 @@ RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
 
 static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, uint32_t hash) {
     void *result = NULL;
-    RRDSET tmp;
-    tmp.name = name;
-    tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
+    RRDSET tmp = {
+        .name = string_strdupz(name),
+        .hash_name = (hash)?hash:simple_hash(name)
+    };
 
     result = avl_search_lock(&host->rrdset_root_index_name, (avl_t *) (&(tmp.avlname)));
-    if(result) return rrdset_from_avlname(result);
 
+    string_freez(tmp.name);
+
+    if(result) return rrdset_from_avlname(result);
     return NULL;
 }
 
@@ -129,12 +129,12 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length) {
 }
 
 int rrdset_set_name(RRDSET *st, const char *name) {
-    if(unlikely(st->name && !strcmp(st->name, name)))
+    if(unlikely(!strcmp(rrdset_name(st), name)))
         return 1;
 
     RRDHOST *host = st->rrdhost;
 
-    debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", st->name?st->name:"", name);
+    debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", rrdset_name(st), name);
 
     char full_name[RRD_ID_LENGTH_MAX + 1];
     char sanitized_name[CONFIG_MAX_VALUE + 1];
@@ -162,13 +162,14 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
     if(st->name) {
         rrdset_index_del_name(host, st);
-        st->name = strdupz(new_name);
-        st->hash_name = simple_hash(st->name);
+        string_freez(st->name);
+        st->name = string_strdupz(new_name);
+        st->hash_name = simple_hash(rrdset_name(st));
         rrdsetvar_rename_all(st);
     }
     else {
-        st->name = strdupz(new_name);
-        st->hash_name = simple_hash(st->name);
+        st->name = string_strdupz(new_name);
+        st->hash_name = simple_hash(rrdset_name(st));
     }
 
     rrdset_wrlock(st);
@@ -178,7 +179,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     rrdset_unlock(st);
 
     if(unlikely(rrdset_index_add_name(host, st) != st))
-        error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
+        error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", rrdset_name(st));
 
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
@@ -192,7 +193,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
 inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))) {
-        info("Cannot obsolete already archived chart %s", st->name);
+        info("Cannot obsolete already archived chart %s", rrdset_name(st));
         return;
     }
 
@@ -239,12 +240,12 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
-                        rrddim_name(rd),
-                        st->name,
-                        host->hostname,
-                        rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm),
-                        rd->multiplier, multiplier,
-                        rd->divisor, divisor
+                     rrddim_name(rd),
+                     rrdset_name(st),
+                     host->hostname,
+                     rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm),
+                     rd->multiplier, multiplier,
+                     rd->divisor, divisor
                 );
                 #endif
                 rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
@@ -261,7 +262,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
 // RRDSET - reset a chart
 
 void rrdset_reset(RRDSET *st) {
-    debug(D_RRD_CALLS, "rrdset_reset() %s", st->name);
+    debug(D_RRD_CALLS, "rrdset_reset() %s", rrdset_name(st));
 
     st->last_collected_time.tv_sec = 0;
     st->last_collected_time.tv_usec = 0;
@@ -396,7 +397,7 @@ void rrdset_free(RRDSET *st) {
     netdata_rwlock_destroy(&st->rrdset_rwlock);
 
     // free directly allocated members
-    freez((void *)st->name);
+    string_freez(st->name);
     string_freez(st->type);
     string_freez(st->family);
     string_freez(st->title);
@@ -427,7 +428,7 @@ void rrdset_delete_files(RRDSET *st) {
     RRDDIM *rd;
     rrdset_check_rdlock(st);
 
-    info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);
+    info("Deleting chart '%s' ('%s') from disk...", st->id, rrdset_name(st));
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         const char *cache_filename = rrdset_cache_filename(st);
@@ -457,7 +458,7 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
 
     rrdset_check_rdlock(st);
 
-    info("Deleting dimensions of chart '%s' ('%s') from disk...", st->id, st->name);
+    info("Deleting dimensions of chart '%s' ('%s') from disk...", st->id, rrdset_name(st));
 
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
@@ -694,7 +695,7 @@ RRDSET *rrdset_create_custom(
 
     if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
         if(!rrdset_memory_load_or_create_map_save(st, memory_mode)) {
-            info("Failed to use memory mode %s for chart '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", st->name);
+            info("Failed to use memory mode %s for chart '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st));
             memory_mode = RRD_MEMORY_MODE_RAM;
         }
     }
@@ -882,7 +883,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
+    debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", rrdset_name(st), microseconds);
     rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
 
     if(discarded && discarded != microseconds)
@@ -1071,7 +1072,7 @@ static inline size_t rrdset_done_interpolate(
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
 
         #ifdef NETDATA_INTERNAL_CHECKS
-        if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
+        if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", rrdset_name(st), first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
         rrdset_debug(st, "last_stored_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
         rrdset_debug(st, "next_store_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
         #endif
@@ -1251,7 +1252,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
 void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
-    debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
+    debug(D_RRD_CALLS, "rrdset_done() for chart %s", rrdset_name(st));
     rrdcontext_collected_rrdset(st);
 
     RRDDIM *rd;
@@ -1291,7 +1292,7 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
         info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
-            " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
+            " secs). Resetting it.", st->rrdhost->hostname, rrdset_name(st), st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1339,7 +1340,7 @@ void rrdset_done(RRDSET *st) {
         info(
             "%s: too old data (last updated at %"PRId64".%"PRId64", last collected at %"PRId64".%"PRId64"). "
             "Resetting it. Will not store the next entry.",
-            st->name,
+            rrdset_name(st),
             (int64_t)st->last_updated.tv_sec,
             (int64_t)st->last_updated.tv_usec,
             (int64_t)st->last_collected_time.tv_sec,
@@ -1361,7 +1362,7 @@ void rrdset_done(RRDSET *st) {
         info(
             "%s: too old data (last updated at %" PRId64 ".%" PRId64 ", last collected at %" PRId64 ".%" PRId64 "). "
             "Resetting it. Will not store the next entry.",
-            st->name,
+            rrdset_name(st),
             (int64_t)st->last_updated.tv_sec,
             (int64_t)st->last_updated.tv_usec,
             (int64_t)st->last_collected_time.tv_sec,
@@ -1537,7 +1538,7 @@ after_first_database_work:
                 // produces wrong results as far as incremental counters are concerned.
                 if(unlikely((uint64_t)rd->last_collected_value > (uint64_t)rd->collected_value)) {
                     debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                          , st->name, rrddim_name(rd)
+                          , rrdset_name(st), rrddim_name(rd)
                           , rd->last_collected_value
                           , rd->collected_value);
 
@@ -1605,7 +1606,7 @@ after_first_database_work:
                 // to reset the calculation (it will give zero as the calculation for this second)
                 if(unlikely(rd->last_collected_value > rd->collected_value)) {
                     debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                          , st->name, rrddim_name(rd)
+                          , rrdset_name(st), rrddim_name(rd)
                           , rd->last_collected_value
                           , rd->collected_value
                     );
@@ -1676,7 +1677,7 @@ after_first_database_work:
 //     if(unlikely(now_collect_ut < next_store_ut && st->counter_done > 1)) {
 //         // this is collected in the same interpolation point
 //         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-//         info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, st->counter_done, next_store_ut - now_collect_ut);
+//         info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, rrdset_name(st), st->counter_done, next_store_ut - now_collect_ut);
 //     }
 // #endif
 
@@ -1793,7 +1794,7 @@ after_second_database_work:
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                 if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&  !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)
                              && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
-                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), st->name, st->id);
+                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), st->id);
 
                     const char *cache_filename = rrddim_cache_filename(rd);
                     if(cache_filename) {

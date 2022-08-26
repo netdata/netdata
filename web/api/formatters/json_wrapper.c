@@ -80,7 +80,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %soptions%s: %s"
                    , kq, kq
                    , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):r->st->id, sq
-                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):r->st->name, sq
+                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):rrdset_name(r->st), sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
                    , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t_nolock(r->st))
@@ -160,8 +160,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
         dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rd->rrdset->id, rd->rrdset->name);
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rd->rrdset->id, rd->rrdset->name);
+            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rd->rrdset->id, rrdset_name(rd->rrdset));
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rd->rrdset->id, rrdset_name(rd->rrdset));
             dictionary_set(dict, name, output, len + 1);
         }
 

@@ -153,7 +153,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
-        chart_payload.name = (char *)st->name;
+        chart_payload.name = (char *)rrdset_name(st);
         chart_payload.node_id = wc->node_id;
         chart_payload.claim_id = claim_id;
         chart_payload.id = strdupz(st->id);
@@ -1156,7 +1156,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
                 D_ACLK_SYNC,
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
                 rd->rrdset->rrdhost->hostname,
-                rd->rrdset->name,
+                rrdset_name(rd->rrdset),
                 rrddim_name(rd),
                 live,
                 first_entry_t,
@@ -1166,7 +1166,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
                 D_ACLK_SYNC,
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
                 rd->rrdset->rrdhost->hostname,
-                rd->rrdset->name,
+                rrdset_name(rd->rrdset),
                 rrddim_name(rd),
                 live,
                 first_entry_t,
@@ -1280,15 +1280,15 @@ void sql_check_chart_liveness(RRDSET *st) {
 
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
-            debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", st->name);
+            debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", rrdset_name(st));
             rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
     else
-        debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", st->name);
+        debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", rrdset_name(st));
     time_t mark = now_realtime_sec();
 
-    debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", st->name);
+    debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", rrdset_name(st));
     rrddim_foreach_read(rd, st) {
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN))
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));

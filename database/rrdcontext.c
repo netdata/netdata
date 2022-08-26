@@ -1126,7 +1126,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
     RRDINSTANCE tri = {
         .id = string_strdupz(st->id),
-        .name = string_strdupz(st->name),
+        .name = string_dup(st->name),
         .units = string_dup(st->units),
         .family = string_dup(st->family),
         .title = string_dup(st->title),
@@ -1268,7 +1268,7 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     if(unlikely(!ri)) return;
 
     STRING *old = ri->name;
-    ri->name = string_strdupz(st->name);
+    ri->name = string_dup(st->name);
 
     if(ri->name != old)
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_NAME);

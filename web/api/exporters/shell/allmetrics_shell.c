@@ -30,14 +30,14 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !simple_pattern_matches(filter, st->name))
+        if (filter && !simple_pattern_matches(filter, rrdset_name(st)))
             continue;
 
         NETDATA_DOUBLE total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, st->name?st->name:st->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, st->name?rrdset_name(st):st->id, SHELL_ELEMENT_MAX);
 
-        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
+        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, rrdset_name(st));
         if(rrdset_is_available_for_viewers(st)) {
             rrdset_rdlock(st);
 
@@ -74,7 +74,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, rc->rrdset->name?rc->rrdset->name:rc->rrdset->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, rc->rrdset->name?rrdset_name(rc->rrdset):rc->rrdset->id, SHELL_ELEMENT_MAX);
 
         char alarm[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
@@ -110,7 +110,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
+        if (filter && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, rrdset_name(st))))
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {
@@ -128,7 +128,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                 "\t\t\"dimensions\": {",
                 chart_counter ? "," : "",
                 st->id,
-                st->name,
+                rrdset_name(st),
                 rrdset_family(st),
                 rrdset_context(st),
                 rrdset_units(st),
