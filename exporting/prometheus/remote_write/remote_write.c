@@ -335,7 +335,7 @@ int format_variable_prometheus_remote_write_callback(RRDVAR *rv, void *data) {
         char name[PROMETHEUS_LABELS_MAX + 1];
         char *suffix = "";
 
-        prometheus_name_copy(context, rv->name, PROMETHEUS_ELEMENT_MAX);
+        prometheus_name_copy(context, rrdvar_name(rv), PROMETHEUS_ELEMENT_MAX);
         snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
         NETDATA_DOUBLE value = rrdvar2number(rv);

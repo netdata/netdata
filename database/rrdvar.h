@@ -34,9 +34,7 @@ typedef enum rrdvar_options {
 struct rrdvar {
     avl_t avl;
 
-    char *name;
-    uint32_t hash;
-
+    STRING *name;
     RRDVAR_TYPE type;
     RRDVAR_OPTIONS options;
 
@@ -44,6 +42,8 @@ struct rrdvar {
 
     time_t last_updated;
 };
+
+#define rrdvar_name(rv) string2str((rv)->name)
 
 #define RRDVAR_MAX_LENGTH 1024
 

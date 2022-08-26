@@ -1038,10 +1038,10 @@ static void update_strings_charts() {
             , "stats"
             , 910001
             , localhost->rrd_update_every
-            , RRDSET_TYPE_LINE);
+            , RRDSET_TYPE_AREA);
 
         rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, -1, RRD_ALGORITHM_ABSOLUTE);
     } else
         rrdset_next(st_entries);
 
@@ -1062,7 +1062,7 @@ static void update_strings_charts() {
             , "stats"
             , 910001
             , localhost->rrd_update_every
-            , RRDSET_TYPE_LINE);
+            , RRDSET_TYPE_AREA);
 
         rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     } else

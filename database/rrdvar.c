@@ -21,15 +21,16 @@ inline int rrdvar_fix_name(char *variable) {
 }
 
 int rrdvar_compare(void* a, void* b) {
-    if(((RRDVAR *)a)->hash < ((RRDVAR *)b)->hash) return -1;
-    else if(((RRDVAR *)a)->hash > ((RRDVAR *)b)->hash) return 1;
-    else return strcmp(((RRDVAR *)a)->name, ((RRDVAR *)b)->name);
+    RRDVAR *A = a;
+    RRDVAR *B = b;
+
+    return (int)((uintptr_t)A->name - (uintptr_t)B->name);
 }
 
 static inline RRDVAR *rrdvar_index_add(avl_tree_lock *tree, RRDVAR *rv) {
     RRDVAR *ret = (RRDVAR *)avl_insert_lock(tree, (avl_t *)(rv));
     if(ret != rv)
-        debug(D_VARIABLES, "Request to insert RRDVAR '%s' into index failed. Already exists.", rv->name);
+        debug(D_VARIABLES, "Request to insert RRDVAR '%s' into index failed. Already exists.", rrdvar_name(rv));
 
     return ret;
 }
@@ -37,16 +38,15 @@ static inline RRDVAR *rrdvar_index_add(avl_tree_lock *tree, RRDVAR *rv) {
 static inline RRDVAR *rrdvar_index_del(avl_tree_lock *tree, RRDVAR *rv) {
     RRDVAR *ret = (RRDVAR *)avl_remove_lock(tree, (avl_t *)(rv));
     if(!ret)
-        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rv->name);
+        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
 
     return ret;
 }
 
-static inline RRDVAR *rrdvar_index_find(avl_tree_lock *tree, const char *name, uint32_t hash) {
-    RRDVAR tmp;
-    tmp.name = (char *)name;
-    tmp.hash = (hash)?hash:simple_hash(tmp.name);
-
+static inline RRDVAR *rrdvar_index_find(avl_tree_lock *tree, STRING *name) {
+    RRDVAR tmp = {
+        .name = name
+    };
     return (RRDVAR *)avl_search_lock(tree, (avl_t *)&tmp);
 }
 
@@ -56,31 +56,36 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
     if(!rv) return;
 
     if(tree) {
-        debug(D_VARIABLES, "Deleting variable '%s'", rv->name);
+        debug(D_VARIABLES, "Deleting variable '%s'", rrdvar_name(rv));
         if(unlikely(!rrdvar_index_del(tree, rv)))
-            error("RRDVAR: Attempted to delete variable '%s' from host '%s', but it is not found.", rv->name, host->hostname);
+            error("RRDVAR: Attempted to delete variable '%s' from host '%s', but it is not found.", rrdvar_name(rv), host->hostname);
     }
 
     if(rv->options & RRDVAR_OPTION_ALLOCATED)
         freez(rv->value);
 
-    freez(rv->name);
+    string_freez(rv->name);
     freez(rv);
+}
+
+static inline STRING *rrdvar_name_to_string(const char *name) {
+    char *variable = strdupz(name);
+    rrdvar_fix_name(variable);
+    STRING *name_string = string_strdupz(variable);
+    freez(variable);
+    return name_string;
 }
 
 inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, avl_tree_lock *tree, const char *name,
                                        RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
-    char *variable = strdupz(name);
-    rrdvar_fix_name(variable);
-    uint32_t hash = simple_hash(variable);
+    STRING *variable = rrdvar_name_to_string(name);
 
-    RRDVAR *rv = rrdvar_index_find(tree, variable, hash);
+    RRDVAR *rv = rrdvar_index_find(tree, variable);
     if(unlikely(!rv)) {
-        debug(D_VARIABLES, "Variable '%s' not found in scope '%s'. Creating a new one.", variable, scope);
+        debug(D_VARIABLES, "Variable '%s' not found in scope '%s'. Creating a new one.", string2str(variable), scope);
 
         rv = callocz(1, sizeof(RRDVAR));
         rv->name = variable;
-        rv->hash = hash;
         rv->type = type;
         rv->options = options;
         rv->value = value;
@@ -88,19 +93,19 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, avl_tre
 
         RRDVAR *ret = rrdvar_index_add(tree, rv);
         if(unlikely(ret != rv)) {
-            debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", variable, scope);
+            debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", string2str(variable), scope);
             freez(rv);
-            freez(variable);
+            string_freez(variable);
             rv = NULL;
         }
         else
-            debug(D_VARIABLES, "Variable '%s' created in scope '%s'", variable, scope);
+            debug(D_VARIABLES, "Variable '%s' created in scope '%s'", string2str(variable), scope);
     }
     else {
-        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", variable, scope);
+        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", string2str(variable), scope);
 
         // already exists
-        freez(variable);
+        string_freez(variable);
 
         // this is important
         // it must return NULL - not the existing variable - or double-free will happen
@@ -141,14 +146,12 @@ static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *t
         freez(v);
         debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
 
-        char *variable = strdupz(name);
-        rrdvar_fix_name(variable);
-        uint32_t hash = simple_hash(variable);
+        STRING *variable = rrdvar_name_to_string(name);
 
         // find the existing one to return it
-        rv = rrdvar_index_find(tree_lock, variable, hash);
+        rv = rrdvar_index_find(tree_lock, variable);
 
-        freez(variable);
+        string_freez(variable);
     }
 
     return rv;
@@ -160,7 +163,7 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
 
 void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value) {
     if(rv->type != RRDVAR_TYPE_CALCULATED || !(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR) || !(rv->options & RRDVAR_OPTION_ALLOCATED))
-        error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rv->name, value);
+        error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rv), value);
     else {
         NETDATA_DOUBLE *v = rv->value;
         if(*v != value) {
@@ -214,32 +217,40 @@ NETDATA_DOUBLE rrdvar2number(RRDVAR *rv) {
     }
 }
 
-int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, NETDATA_DOUBLE *result) {
+int health_variable_lookup(const char *variable, RRDCALC *rc, NETDATA_DOUBLE *result) {
     RRDSET *st = rc->rrdset;
     if(!st) return 0;
 
     RRDHOST *host = st->rrdhost;
     RRDVAR *rv;
 
-    rv = rrdvar_index_find(&st->rrdvar_root_index, variable, hash);
+    STRING *variable_string = string_strdupz(variable);
+    int ret = 0;
+
+    rv = rrdvar_index_find(&st->rrdvar_root_index, variable_string);
     if(rv) {
         *result = rrdvar2number(rv);
-        return 1;
+        ret = 1;
+        goto done;
     }
 
-    rv = rrdvar_index_find(&st->rrdfamily->rrdvar_root_index, variable, hash);
+    rv = rrdvar_index_find(&st->rrdfamily->rrdvar_root_index, variable_string);
     if(rv) {
         *result = rrdvar2number(rv);
-        return 1;
+        ret = 1;
+        goto done;
     }
 
-    rv = rrdvar_index_find(&host->rrdvar_root_index, variable, hash);
+    rv = rrdvar_index_find(&host->rrdvar_root_index, variable_string);
     if(rv) {
         *result = rrdvar2number(rv);
-        return 1;
+        ret = 1;
+        goto done;
     }
 
-    return 0;
+done:
+    string_freez(variable_string);
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
@@ -258,9 +269,9 @@ static int single_variable2json(void *entry, void *data) {
 
     if (helper->options == RRDVAR_OPTION_DEFAULT || rv->options & helper->options) {
         if(unlikely(isnan(value) || isinf(value)))
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rrdvar_name(rv));
         else
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (NETDATA_DOUBLE)value);
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rrdvar_name(rv), (NETDATA_DOUBLE)value);
 
         helper->counter++;
     }

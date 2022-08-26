@@ -94,11 +94,11 @@ static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *ho
     buffer_sprintf(
             host->sender->build
             , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
-            , rv->name
+            , rrdvar_name(rv)
             , *value
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rv->name, *value);
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rv), *value);
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {

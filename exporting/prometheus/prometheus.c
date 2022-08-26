@@ -366,7 +366,7 @@ static int print_host_variables(RRDVAR *rv, void *data)
         if (isnan(value) || isinf(value)) {
             if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
                 buffer_sprintf(
-                    opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rv->name, (isnan(value)) ? "NAN" : "INF");
+                    opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rrdvar_name(rv), (isnan(value)) ? "NAN" : "INF");
 
             return 0;
         }
@@ -378,7 +378,7 @@ static int print_host_variables(RRDVAR *rv, void *data)
             label_post = "}";
         }
 
-        prometheus_name_copy(opts->name, rv->name, sizeof(opts->name));
+        prometheus_name_copy(opts->name, rrdvar_name(rv), sizeof(opts->name));
 
         if (opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
             buffer_sprintf(
