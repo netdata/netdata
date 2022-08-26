@@ -40,6 +40,8 @@
 
 #cmakedefine ENABLE_ML
 
+#cmakedefine HAVE_LIBBPF
+
 /* NSA spy stuff */
 #define ENABLE_HTTPS 1
 #cmakedefine01 HAVE_X509_VERIFY_PARAM_set1_host
