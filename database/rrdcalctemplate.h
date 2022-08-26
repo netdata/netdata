@@ -34,7 +34,7 @@ struct rrdcalctemplate {
     char *charts_match;
     SIMPLE_PATTERN *charts_pattern;
 
-    char *source;                   // the source of this alarm
+    STRING *source;                 // the source of this alarm
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm
 
@@ -47,8 +47,8 @@ struct rrdcalctemplate {
     // ------------------------------------------------------------------------
     // database lookup settings
 
-    char *dimensions;               // the chart dimensions
-    char *foreachdim;               // the group of dimensions that the lookup will be applied.
+    STRING *dimensions;             // the chart dimensions
+    STRING *foreachdim;             // the group of dimensions that the lookup will be applied.
     SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
     int foreachcounter;             // the number of alarms created with foreachdim, this also works as an id of the
                                     // children
@@ -73,7 +73,7 @@ struct rrdcalctemplate {
 
     // ------------------------------------------------------------------------
     // Labels settings
-    char *host_labels;                   // the label read from an alarm file
+    STRING *host_labels;                 // the label read from an alarm file
     SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
 
     // ------------------------------------------------------------------------
@@ -85,6 +85,11 @@ struct rrdcalctemplate {
 
     struct rrdcalctemplate *next;
 };
+
+#define rrdcalctemplate_source(rt) string2str((rt)->source)
+#define rrdcalctemplate_dimensions(rt) string2str((rt)->dimensions)
+#define rrdcalctemplate_foreachdim(rt) string2str((rt)->foreachdim)
+#define rrdcalctemplate_host_labels(rt) string2str((rt)->host_labels)
 
 #define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
 

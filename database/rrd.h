@@ -664,7 +664,7 @@ typedef enum rrdhost_flags {
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~flag, __ATOMIC_SEQ_CST)
+#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
@@ -686,34 +686,30 @@ struct alarm_entry {
     time_t duration;
     time_t non_clear_duration;
 
-    char *name;
-    uint32_t hash_name;
+    STRING *name;
+    STRING *chart;
+    STRING *chart_context;
+    STRING *family;
 
-    char *chart;
-    uint32_t hash_chart;
-    char *chart_context;
+    STRING *classification;
+    STRING *component;
+    STRING *type;
 
-    char *family;
-
-    char *classification;
-    char *component;
-    char *type;
-
-    char *exec;
-    char *recipient;
+    STRING *exec;
+    STRING *recipient;
     time_t exec_run_timestamp;
     int exec_code;
     uint64_t exec_spawn_serial;
 
-    char *source;
-    char *units;
-    char *info;
+    STRING *source;
+    STRING *units;
+    STRING *info;
 
     NETDATA_DOUBLE old_value;
     NETDATA_DOUBLE new_value;
 
-    char *old_value_string;
-    char *new_value_string;
+    STRING *old_value_string;
+    STRING *new_value_string;
 
     RRDCALC_STATUS old_status;
     RRDCALC_STATUS new_status;
@@ -733,6 +729,20 @@ struct alarm_entry {
     struct alarm_entry *prev_in_progress;
 };
 
+#define ae_name(ae) string2str((ae)->name)
+#define ae_chart_name(ae) string2str((ae)->chart)
+#define ae_chart_context(ae) string2str((ae)->chart_context)
+#define ae_family(ae) string2str((ae)->family)
+#define ae_classification(ae) string2str((ae)->classification)
+#define ae_component(ae) string2str((ae)->component)
+#define ae_type(ae) string2str((ae)->type)
+#define ae_exec(ae) string2str((ae)->exec)
+#define ae_recipient(ae) string2str((ae)->recipient)
+#define ae_source(ae) string2str((ae)->source)
+#define ae_units(ae) string2str((ae)->units)
+#define ae_info(ae) string2str((ae)->info)
+#define ae_old_value_string(ae) string2str((ae)->old_value_string)
+#define ae_new_value_string(ae) string2str((ae)->new_value_string)
 
 typedef struct alarm_log {
     uint32_t next_log_id;

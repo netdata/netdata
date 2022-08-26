@@ -1792,13 +1792,10 @@ int alarm_compare_id(void *a, void *b) {
  * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
  */
 int alarm_compare_name(void *a, void *b) {
-    RRDCALC *in1 = (RRDCALC *)a;
-    RRDCALC *in2 = (RRDCALC *)b;
+    RRDCALC *A = (RRDCALC *)a;
+    RRDCALC *B = (RRDCALC *)b;
 
-    if(in1->hash < in2->hash) return -1;
-    else if(in1->hash > in2->hash) return 1;
-
-    return strcmp(in1->name,in2->name);
+    return (int)((uintptr_t)A->name - (uintptr_t)B->name);
 }
 
 // Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache

@@ -118,14 +118,14 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , (uint32_t)ae->exec_run_timestamp
                             , (uint32_t)ae->delay_up_to_timestamp
 
-                            , (ae->name)?ae->name:""
-                            , (ae->chart)?ae->chart:""
-                            , (ae->family)?ae->family:""
-                            , (ae->exec)?ae->exec:""
-                            , (ae->recipient)?ae->recipient:""
-                            , (ae->source)?ae->source:""
-                            , (ae->units)?ae->units:""
-                            , (ae->info)?ae->info:""
+                            , ae_name(ae)
+                            , ae_chart_name(ae)
+                            , ae_family(ae)
+                            , ae_exec(ae)
+                            , ae_recipient(ae)
+                            , ae_source(ae)
+                            , ae_units(ae)
+                            , ae_info(ae)
 
                             , ae->exec_code
                             , ae->new_status
@@ -135,9 +135,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->new_value
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
-                            , (ae->classification)?ae->classification:"Unknown"
-                            , (ae->component)?ae->component:"Unknown"
-                            , (ae->type)?ae->type:"Unknown"
+                            , (ae->classification)?ae_classification(ae):"Unknown"
+                            , (ae->component)?ae_component(ae):"Unknown"
+                            , (ae->type)?ae_type(ae):"Unknown"
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -156,18 +156,23 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
 static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
 {
-    uint32_t hash_chart = simple_hash(chart);
-    uint32_t hash_name = simple_hash(name);
+    STRING *chart_string = string_strdupz(chart);
+    STRING *name_string = string_strdupz(name);
+
+    uint32_t ret = 1;
 
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if (unlikely(
-                ae->alarm_id == alarm_id && (!(ae->hash_name == hash_name && ae->hash_chart == hash_chart &&
-                                               !strcmp(name, ae->name) && !strcmp(chart, ae->chart))))) {
-            return 0;
+        if (unlikely(ae->alarm_id == alarm_id && (!(chart_string == ae->chart && name_string == ae->name)))) {
+            ret = 0;
+            break;
         }
     }
-    return 1;
+
+    string_freez(chart_string);
+    string_freez(name_string);
+
+    return ret;
 }
 
 static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
@@ -232,16 +237,16 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                 char* alarm_name = pointers[13];
                 last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
 
-                RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
+                RRDCALC *rc = alarm_max_last_repeat(host, alarm_name);
                 if (!rc) {
                     for(rc = host->alarms; rc ; rc = rc->next) {
                         RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl_t *)rc);
                         if(rdcmp != rc) {
-                            error("Cannot insert the alarm index ID using log %s", rc->name);
+                            error("Cannot insert the alarm index ID using log %s", rrdcalc_name(rc));
                         }
                     }
 
-                    rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
+                    rc = alarm_max_last_repeat(host, alarm_name);
                 }
 
                 if(unlikely(rc)) {
@@ -315,36 +320,29 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
             ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
 
-            freez(ae->name);
-            ae->name = strdupz(pointers[13]);
-            ae->hash_name = simple_hash(ae->name);
+            string_freez(ae->name);
+            ae->name = string_strdupz(pointers[13]);
 
-            freez(ae->chart);
-            ae->chart = strdupz(pointers[14]);
-            ae->hash_chart = simple_hash(ae->chart);
+            string_freez(ae->chart);
+            ae->chart = string_strdupz(pointers[14]);
 
-            freez(ae->family);
-            ae->family = strdupz(pointers[15]);
+            string_freez(ae->family);
+            ae->family = string_strdupz(pointers[15]);
 
-            freez(ae->exec);
-            ae->exec = strdupz(pointers[16]);
-            if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
+            string_freez(ae->exec);
+            ae->exec = string_strdupz(pointers[16]);
 
-            freez(ae->recipient);
-            ae->recipient = strdupz(pointers[17]);
-            if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
+            string_freez(ae->recipient);
+            ae->recipient = string_strdupz(pointers[17]);
 
-            freez(ae->source);
-            ae->source = strdupz(pointers[18]);
-            if(!*ae->source) { freez(ae->source); ae->source = NULL; }
+            string_freez(ae->source);
+            ae->source = string_strdupz(pointers[18]);
 
-            freez(ae->units);
-            ae->units = strdupz(pointers[19]);
-            if(!*ae->units) { freez(ae->units); ae->units = NULL; }
+            string_freez(ae->units);
+            ae->units = string_strdupz(pointers[19]);
 
-            freez(ae->info);
-            ae->info = strdupz(pointers[20]);
-            if(!*ae->info) { freez(ae->info); ae->info = NULL; }
+            string_freez(ae->info);
+            ae->info = string_strdupz(pointers[20]);
 
             ae->exec_code   = str2i(pointers[21]);
             ae->new_status  = str2i(pointers[22]);
@@ -357,24 +355,21 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->last_repeat = last_repeat;
 
             if (likely(entries > 30)) {
-                freez(ae->classification);
-                ae->classification = strdupz(pointers[28]);
-                if(!*ae->classification) { freez(ae->classification); ae->classification = NULL; }
+                string_freez(ae->classification);
+                ae->classification = string_strdupz(pointers[28]);
 
-                freez(ae->component);
-                ae->component = strdupz(pointers[29]);
-                if(!*ae->component) { freez(ae->component); ae->component = NULL; }
+                string_freez(ae->component);
+                ae->component = string_strdupz(pointers[29]);
 
-                freez(ae->type);
-                ae->type = strdupz(pointers[30]);
-                if(!*ae->type) { freez(ae->type); ae->type = NULL; }
+                string_freez(ae->type);
+                ae->type = string_strdupz(pointers[30]);
             }
 
             char value_string[100 + 1];
-            freez(ae->old_value_string);
-            freez(ae->new_value_string);
-            ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
-            ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+            string_freez(ae->old_value_string);
+            string_freez(ae->new_value_string);
+            ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
+            ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
             // add it to host if not already there
             if(unlikely(*pointers[0] == 'A')) {
@@ -443,63 +438,48 @@ inline void health_alarm_log_load(RRDHOST *host) {
 // health alarm log management
 
 inline ALARM_ENTRY* health_create_alarm_entry(
-        RRDHOST *host,
-        uint32_t alarm_id,
-        uint32_t alarm_event_id,
-        uuid_t config_hash_id,
-        time_t when,
-        const char *name,
-        const char *chart,
-        const char *chart_context,
-        const char *family,
-        const char *class,
-        const char *component,
-        const char *type,
-        const char *exec,
-        const char *recipient,
-        time_t duration,
-        NETDATA_DOUBLE old_value,
-        NETDATA_DOUBLE new_value,
-        RRDCALC_STATUS old_status,
-        RRDCALC_STATUS new_status,
-        const char *source,
-        const char *units,
-        const char *info,
-        int delay,
-        uint32_t flags
+    RRDHOST *host,
+    uint32_t alarm_id,
+    uint32_t alarm_event_id,
+    const uuid_t config_hash_id,
+    time_t when,
+    STRING *name,
+    STRING *chart,
+    STRING *chart_context,
+    STRING *family,
+    STRING *class,
+    STRING *component,
+    STRING *type,
+    STRING *exec,
+    STRING *recipient,
+    time_t duration,
+    NETDATA_DOUBLE old_value,
+    NETDATA_DOUBLE new_value,
+    RRDCALC_STATUS old_status,
+    RRDCALC_STATUS new_status,
+    STRING *source,
+    STRING *units,
+    STRING *info,
+    int delay,
+    uint32_t flags
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
-    ae->name = strdupz(name);
-    ae->hash_name = simple_hash(ae->name);
-
-    if(chart) {
-        ae->chart = strdupz(chart);
-        ae->hash_chart = simple_hash(ae->chart);
-    }
-
-    if(chart_context)
-        ae->chart_context = strdupz(chart_context);
+    ae->name = string_dup(name);
+    ae->chart = string_dup(chart);
+    ae->chart_context = string_dup(chart_context);
 
     uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
 
-    if(family)
-        ae->family = strdupz(family);
-
-    if (class)
-        ae->classification = strdupz(class);
-
-    if (component)
-        ae->component = strdupz(component);
-
-    if (type)
-        ae->type = strdupz(type);
-
-    if(exec) ae->exec = strdupz(exec);
-    if(recipient) ae->recipient = strdupz(recipient);
-    if(source) ae->source = strdupz(source);
-    if(units) ae->units = strdupz(units);
+    ae->family = string_dup(family);
+    ae->classification = string_dup(class);
+    ae->component = string_dup(component);
+    ae->type = string_dup(type);
+    ae->exec = string_dup(exec);
+    ae->recipient = string_dup(recipient);
+    ae->source = string_dup(source);
+    ae->units = string_dup(units);
 
     ae->unique_id = host->health_log.next_log_id++;
     ae->alarm_id = alarm_id;
@@ -509,12 +489,10 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->new_value = new_value;
 
     char value_string[100 + 1];
-    ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
-    ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+    ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
+    ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-    if (info)
-        ae->info = strdupz(info);
-
+    ae->info = string_dup(info);
     ae->old_status = old_status;
     ae->new_status = new_status;
     ae->duration = duration;
@@ -570,20 +548,20 @@ inline void health_alarm_log(
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    freez(ae->name);
-    freez(ae->chart);
-    freez(ae->chart_context);
-    freez(ae->family);
-    freez(ae->classification);
-    freez(ae->component);
-    freez(ae->type);
-    freez(ae->exec);
-    freez(ae->recipient);
-    freez(ae->source);
-    freez(ae->units);
-    freez(ae->info);
-    freez(ae->old_value_string);
-    freez(ae->new_value_string);
+    string_freez(ae->name);
+    string_freez(ae->chart);
+    string_freez(ae->chart_context);
+    string_freez(ae->family);
+    string_freez(ae->classification);
+    string_freez(ae->component);
+    string_freez(ae->type);
+    string_freez(ae->exec);
+    string_freez(ae->recipient);
+    string_freez(ae->source);
+    string_freez(ae->units);
+    string_freez(ae->info);
+    string_freez(ae->old_value_string);
+    string_freez(ae->new_value_string);
     freez(ae);
 }
 

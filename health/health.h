@@ -49,30 +49,30 @@ extern void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 extern void health_alarm_log_load(RRDHOST *host);
 
 extern ALARM_ENTRY* health_create_alarm_entry(
-        RRDHOST *host,
-        uint32_t alarm_id,
-        uint32_t alarm_event_id,
-        uuid_t config_hash_id,
-        time_t when,
-        const char *name,
-        const char *chart,
-        const char *chart_context,
-        const char *family,
-        const char *classification,
-        const char *component,
-        const char *type,
-        const char *exec,
-        const char *recipient,
-        time_t duration,
-        NETDATA_DOUBLE old_value,
-        NETDATA_DOUBLE new_value,
-        RRDCALC_STATUS old_status,
-        RRDCALC_STATUS new_status,
-        const char *source,
-        const char *units,
-        const char *info,
-        int delay,
-        uint32_t flags);
+    RRDHOST *host,
+    uint32_t alarm_id,
+    uint32_t alarm_event_id,
+    const uuid_t config_hash_id,
+    time_t when,
+    STRING *name,
+    STRING *chart,
+    STRING *chart_context,
+    STRING *family,
+    STRING *classification,
+    STRING *component,
+    STRING *type,
+    STRING *exec,
+    STRING *recipient,
+    time_t duration,
+    NETDATA_DOUBLE old_value,
+    NETDATA_DOUBLE new_value,
+    RRDCALC_STATUS old_status,
+    RRDCALC_STATUS new_status,
+    STRING *source,
+    STRING *units,
+    STRING *info,
+    int delay,
+    uint32_t flags);
 
 extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
 
@@ -90,6 +90,6 @@ extern void health_label_log_save(RRDHOST *host);
 extern char *health_edit_command_from_source(const char *source);
 extern void sql_refresh_hashes(void);
 
-extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
+extern SIMPLE_PATTERN *health_pattern_from_foreach(const char *s);
 
 #endif //NETDATA_HEALTH_H

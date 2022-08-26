@@ -131,7 +131,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                 "\t\t\t\t\t\"units\": \"%s\",\n"
                 "\t\t\t\t\t\"update_every\": %d\n"
                 "\t\t\t\t}",
-                (alarms) ? ",\n" : "", rc->name, rc->id, rrdcalc_status2string(rc->status), rc->units,
+                (alarms) ? ",\n" : "", rrdcalc_name(rc), rc->id, rrdcalc_status2string(rc->status), rrdcalc_units(rc),
                 rc->update_every);
 
             alarms++;

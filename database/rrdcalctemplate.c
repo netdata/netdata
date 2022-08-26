@@ -35,7 +35,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
         info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, rrdset_id(st), host->hostname);
 #ifdef NETDATA_INTERNAL_CHECKS
     else if (rc->rrdset != st && !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
-        error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rc->name, rrdset_id(st));
+        error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st));
 #endif
 }
 
@@ -76,12 +76,12 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->component);
     freez(rt->type);
     string_freez(rt->context);
-    freez(rt->source);
+    string_freez(rt->source);
     freez(rt->units);
     freez(rt->info);
-    freez(rt->dimensions);
-    freez(rt->foreachdim);
-    freez(rt->host_labels);
+    string_freez(rt->dimensions);
+    string_freez(rt->foreachdim);
+    string_freez(rt->host_labels);
     simple_pattern_free(rt->spdim);
     simple_pattern_free(rt->host_labels_pattern);
     freez(rt);

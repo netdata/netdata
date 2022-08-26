@@ -77,15 +77,15 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
         shell_name_copy(chart, rc->rrdset->name?rrdset_name(rc->rrdset):rrdset_id(rc->rrdset), SHELL_ELEMENT_MAX);
 
         char alarm[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
+        shell_name_copy(alarm, rrdcalc_name(rc), SHELL_ELEMENT_MAX);
 
         NETDATA_DOUBLE n = rc->value;
 
         if(isnan(n) || isinf(n))
-            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rc->units);
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rrdcalc_units(rc));
         else {
             n = roundndd(n);
-            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, alarm, n, rc->units);
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, alarm, n, rrdcalc_units(rc));
         }
 
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));

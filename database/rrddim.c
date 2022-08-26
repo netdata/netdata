@@ -110,8 +110,8 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
         if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
             if (rc->chart == st->name || !strcmp(rrdcalc_chart_name(rc), rrdset_id(st))) {
-                char *name = alarm_name_with_dim(rc->name, strlen(rc->name), rrddim_name(rd), string_length(rd->name));
-                if(rrdcalc_exists(host, rrdset_name(st), name, 0, 0)) {
+                char *name = alarm_name_with_dim(rrdcalc_name(rc), string_length(rc->name), rrddim_name(rd), string_length(rd->name));
+                if(rrdcalc_exists(host, rrdset_name(st), name)) {
                     freez(name);
                     continue;
                 }
@@ -124,7 +124,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
                     rrdcalc_add_to_host(host, child);
                     RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)child);
                     if (rdcmp != child) {
-                        error("Cannot insert the alarm index ID %s",child->name);
+                        error("Cannot insert the alarm index ID %s", rrdcalc_name(child));
                     }
                 }
                 else {

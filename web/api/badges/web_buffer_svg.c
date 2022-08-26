@@ -1025,7 +1025,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(!units) {
         if(alarm) {
             if(rc->units)
-                units = rc->units;
+                units = rrdcalc_units(rc);
             else
                 units = "";
         }

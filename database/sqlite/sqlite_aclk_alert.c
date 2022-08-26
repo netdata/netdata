@@ -831,13 +831,13 @@ void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
 #ifdef ENABLE_ACLK
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
-    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
     char config_hash_id[GUID_LEN + 1];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
 
-    alarm_log->chart = strdupz((char *)ae->chart);
-    alarm_log->name = strdupz((char *)ae->name);
-    alarm_log->family = strdupz((char *)ae->family);
+    alarm_log->chart = strdupz(ae_chart_name(ae));
+    alarm_log->name = strdupz(ae_name(ae));
+    alarm_log->family = strdupz(ae_family(ae));
 
     alarm_log->batch_id = 0;
     alarm_log->sequence_id = 0;
@@ -847,8 +847,8 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     alarm_log->utc_offset = host->utc_offset;
     alarm_log->timezone = strdupz((char *)host->abbrev_timezone);
-    alarm_log->exec_path = ae->exec ? strdupz((char *)ae->exec) : strdupz((char *)host->health_default_exec);
-    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : strdupz((char *)"");
+    alarm_log->exec_path = ae->exec ? strdupz(ae_exec(ae)) : strdupz((char *)host->health_default_exec);
+    alarm_log->conf_source = ae->source ? strdupz(ae_source(ae)) : strdupz((char *)"");
 
     alarm_log->command = strdupz((char *)edit_command);
 
@@ -861,19 +861,19 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->last_repeat = (time_t)ae->last_repeat;
 
     alarm_log->silenced =
-        ((ae->flags & HEALTH_ENTRY_FLAG_SILENCED) || (ae->recipient && !strncmp((char *)ae->recipient, "silent", 6))) ?
+        ((ae->flags & HEALTH_ENTRY_FLAG_SILENCED) || (ae->recipient && !strncmp(ae_recipient(ae), "silent", 6))) ?
             1 :
             0;
 
-    alarm_log->value_string = strdupz(ae->new_value_string);
-    alarm_log->old_value_string = strdupz(ae->old_value_string);
+    alarm_log->value_string = strdupz(ae_new_value_string(ae));
+    alarm_log->old_value_string = strdupz(ae_old_value_string(ae));
 
     alarm_log->value = (!isnan(ae->new_value)) ? (NETDATA_DOUBLE)ae->new_value : 0;
     alarm_log->old_value = (!isnan(ae->old_value)) ? (NETDATA_DOUBLE)ae->old_value : 0;
 
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-    alarm_log->rendered_info = ae->info ? strdupz(ae->info) : strdupz((char *)"");
-    alarm_log->chart_context = ae->chart_context ? strdupz(ae->chart_context) : strdupz((char *)"");
+    alarm_log->rendered_info = strdupz(ae_info(ae));
+    alarm_log->chart_context = strdupz(ae_chart_context(ae));
 
     freez(edit_command);
 }

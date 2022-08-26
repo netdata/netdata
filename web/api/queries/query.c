@@ -665,10 +665,10 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
     int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
 
+    if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
+
     if (should_lock)
         rrdset_check_rdlock(r->st);
-
-    if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
 
     int match_ids = 0, match_names = 0;
 
@@ -685,7 +685,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
     RRDDIM *d;
     long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
     for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d ;c++, d = d->next) {
-        if(    (match_ids   && simple_pattern_matches(pattern, rrddim_id(d)))
+        if(       (match_ids   && simple_pattern_matches(pattern, rrddim_id(d)))
                || (match_names && simple_pattern_matches(pattern, rrddim_name(d)))
                 ) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
@@ -1977,9 +1977,8 @@ RRDR *rrd2rrdr(
     if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
         rrdset_check_rdlock(st);
 
-    if(dimensions)
+    if(dimensions && *dimensions)
         rrdr_disable_not_selected_dimensions(r, options, dimensions, context_param_list);
-
 
     query_debug_log_fin();
 
