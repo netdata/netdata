@@ -32,7 +32,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
 
     RRDCALC *rc = rrdcalc_create_from_template(host, rt, rrdset_id(st));
     if (unlikely(!rc))
-        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, rrdset_id(st), host->hostname);
+        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rrdcalctemplate_name(rt), rrdset_id(st), host->hostname);
 #ifdef NETDATA_INTERNAL_CHECKS
     else if (rc->rrdset != st && !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
         error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st));
@@ -57,28 +57,28 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     expression_free(rt->warning);
     expression_free(rt->critical);
 
-    freez(rt->family_match);
+    string_freez(rt->family_match);
     simple_pattern_free(rt->family_pattern);
 
-    freez(rt->plugin_match);
+    string_freez(rt->plugin_match);
     simple_pattern_free(rt->plugin_pattern);
 
-    freez(rt->module_match);
+    string_freez(rt->module_match);
     simple_pattern_free(rt->module_pattern);
 
-    freez(rt->charts_match);
+    string_freez(rt->charts_match);
     simple_pattern_free(rt->charts_pattern);
 
-    freez(rt->name);
-    freez(rt->exec);
-    freez(rt->recipient);
-    freez(rt->classification);
-    freez(rt->component);
-    freez(rt->type);
+    string_freez(rt->name);
+    string_freez(rt->exec);
+    string_freez(rt->recipient);
+    string_freez(rt->classification);
+    string_freez(rt->component);
+    string_freez(rt->type);
     string_freez(rt->context);
     string_freez(rt->source);
-    freez(rt->units);
-    freez(rt->info);
+    string_freez(rt->units);
+    string_freez(rt->info);
     string_freez(rt->dimensions);
     string_freez(rt->foreachdim);
     string_freez(rt->host_labels);
@@ -90,7 +90,7 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
 inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 
-    debug(D_HEALTH, "Health removing template '%s' of host '%s'", rt->name, host->hostname);
+    debug(D_HEALTH, "Health removing template '%s' of host '%s'", rrdcalctemplate_name(rt), host->hostname);
 
     if(host->templates == rt) {
         host->templates = rt->next;
@@ -103,7 +103,7 @@ inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) 
             rt->next = NULL;
         }
         else
-            error("Cannot find RRDCALCTEMPLATE '%s' linked in host '%s'", rt->name, host->hostname);
+            error("Cannot find RRDCALCTEMPLATE '%s' linked in host '%s'", rrdcalctemplate_name(rt), host->hostname);
     }
 
     rrdcalctemplate_free(rt);

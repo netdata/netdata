@@ -468,14 +468,14 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 }
 
 inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
-    debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rt->name);
+    debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rrdcalctemplate_name(rt));
 
-    if(rrdcalc_exists(host, chart, rt->name))
+    if(rrdcalc_exists(host, chart, rrdcalctemplate_name(rt)))
         return NULL;
 
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
     rc->next_event_id = 1;
-    rc->name = string_strdupz(rt->name);
+    rc->name = string_dup(rt->name);
     rc->chart = string_strdupz(chart);
     uuid_copy(rc->config_hash_id, rt->config_hash_id);
 
@@ -509,33 +509,31 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->update_every = rt->update_every;
     rc->options = rt->options;
 
-    if(rt->exec) rc->exec = string_strdupz(rt->exec);
-    if(rt->recipient) rc->recipient = string_strdupz(rt->recipient);
+    rc->exec = string_dup(rt->exec);
+    rc->recipient = string_dup(rt->recipient);
     rc->source = string_dup(rt->source);
-    if(rt->units) rc->units = string_strdupz(rt->units);
-    if(rt->info) {
-        rc->info = string_strdupz(rt->info);
-        rc->original_info = string_dup(rc->info);
-    }
+    rc->units = string_dup(rt->units);
+    rc->info = string_dup(rt->info);
+    rc->original_info = string_dup(rt->info);
 
-    if (rt->classification) rc->classification = string_strdupz(rt->classification);
-    if (rt->component) rc->component = string_strdupz(rt->component);
-    if (rt->type) rc->type = string_strdupz(rt->type);
+    rc->classification = string_dup(rt->classification);
+    rc->component = string_dup(rt->component);
+    rc->type = string_dup(rt->type);
 
     if(rt->calculation) {
         rc->calculation = expression_parse(rt->calculation->source, NULL, NULL);
         if(!rc->calculation)
-            error("Health alarm '%s.%s': failed to parse calculation expression '%s'", chart, rt->name, rt->calculation->source);
+            error("Health alarm '%s.%s': failed to parse calculation expression '%s'", chart, rrdcalctemplate_name(rt), rt->calculation->source);
     }
     if(rt->warning) {
         rc->warning = expression_parse(rt->warning->source, NULL, NULL);
         if(!rc->warning)
-            error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", chart, rt->name, rt->warning->source);
+            error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", chart, rrdcalctemplate_name(rt), rt->warning->source);
     }
     if(rt->critical) {
         rc->critical = expression_parse(rt->critical->source, NULL, NULL);
         if(!rc->critical)
-            error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
+            error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rrdcalctemplate_name(rt), rt->critical->source);
     }
 
     debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " NETDATA_DOUBLE_FORMAT_AUTO

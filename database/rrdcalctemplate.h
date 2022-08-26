@@ -9,34 +9,34 @@
 // these are to be applied to charts found dynamically
 // based on their context.
 struct rrdcalctemplate {
-    char *name;
-    uint32_t hash_name;
     uuid_t config_hash_id;
 
-    char *exec;
-    char *recipient;
+    STRING *name;
 
-    char *classification;
-    char *component;
-    char *type;
+    STRING *exec;
+    STRING *recipient;
+
+    STRING *classification;
+    STRING *component;
+    STRING *type;
 
     STRING *context;
 
-    char *family_match;
+    STRING *family_match;
     SIMPLE_PATTERN *family_pattern;
 
-    char *plugin_match;
+    STRING *plugin_match;
     SIMPLE_PATTERN *plugin_pattern;
 
-    char *module_match;
+    STRING *module_match;
     SIMPLE_PATTERN *module_pattern;
 
-    char *charts_match;
+    STRING *charts_match;
     SIMPLE_PATTERN *charts_pattern;
 
     STRING *source;                 // the source of this alarm
-    char *units;                    // the units of the alarm
-    char *info;                     // a short description of the alarm
+    STRING *units;                  // the units of the alarm
+    STRING *info;                   // a short description of the alarm
 
     int update_every;               // update frequency for the alarm
 
@@ -86,6 +86,18 @@ struct rrdcalctemplate {
     struct rrdcalctemplate *next;
 };
 
+#define rrdcalctemplate_name(rt) string2str((rt)->name)
+#define rrdcalctemplate_exec(rt) string2str((rt)->exec)
+#define rrdcalctemplate_recipient(rt) string2str((rt)->recipient)
+#define rrdcalctemplate_classification(rt) string2str((rt)->classification)
+#define rrdcalctemplate_component(rt) string2str((rt)->component)
+#define rrdcalctemplate_type(rt) string2str((rt)->type)
+#define rrdcalctemplate_family_match(rt) string2str((rt)->family_match)
+#define rrdcalctemplate_plugin_match(rt) string2str((rt)->plugin_match)
+#define rrdcalctemplate_module_match(rt) string2str((rt)->module_match)
+#define rrdcalctemplate_charts_match(rt) string2str((rt)->charts_match)
+#define rrdcalctemplate_units(rt) string2str((rt)->units)
+#define rrdcalctemplate_info(rt) string2str((rt)->info)
 #define rrdcalctemplate_source(rt) string2str((rt)->source)
 #define rrdcalctemplate_dimensions(rt) string2str((rt)->dimensions)
 #define rrdcalctemplate_foreachdim(rt) string2str((rt)->foreachdim)
