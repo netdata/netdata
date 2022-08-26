@@ -3923,7 +3923,7 @@ netdataDashboard.context = {
             ],
         },
         */        
-        info: 'Buffer cache hit ratio. When clients request data, postgres checks shared memory and if there are no relevant data there it has to read it from disk, thus queries become slower.'
+        info: 'PostgreSQL uses a <b>shared buffer cache</b> to store frequently accessed data in memory, and avoid slower disk reads. If you are seeing performance issues, consider increasing the <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS" target="_blank"><i>shared_buffers</i></a> size or tuning <a href="https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE" target="_blank"><i>effective_cache_size</i></a>.'
     },
     'postgres.db_blocks_read': {
         info: '<p>Number of blocks read from shared buffer cache or from disk.</p><p><b>disk</b> - number of disk blocks read. <b>memory</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
@@ -3951,19 +3951,19 @@ netdataDashboard.context = {
             ],
         },
         */        
-        info: 'Percentage of returned/fetched rows.'
+        info: 'The percentage of rows that contain data needed to execute the query, out of the total number of rows scanned. A high value indicates that the database is executing queries efficiently, while a low value indicates that the database is performing extra work by scanning a large number of rows that aren\'t required to process the query. Low values may be caused by missing indexes or inefficient queries.'
     },
     'postgres.db_rows_read': {
-        info: '<p>Read queries throughput.</p><p><b>Returned</b> - number of rows returned by queries. The value keeps track of the number of rows read/scanned, not the rows actually returned to the client. <b>Fetched</b> - number of rows fetched that contained data necessary to execute the query successfully.</p>'
+        info: '<p>Read queries throughput.</p><p><b>Returned</b> - Total number of rows scanned by queries. This value indicates rows returned by the storage layer to be scanned, not rows returned to the client. <b>Fetched</b> - Subset of scanned rows (<b>Returned</b>) that contained data needed to execute the query.</p>'
     },
     'postgres.db_rows_written': {
         info: '<p>Write queries throughput.</p><p><b>Inserted</b> - number of rows inserted by queries. <b>Deleted</b> - number of rows deleted by queries. <b>Updated</b> - number of rows updated by queries.</p>'
     },
     'postgres.db_conflicts': {
-        info: 'Number of queries canceled due to conflicts with recovery. Conflicts occur only on standby servers.'
+        info: 'Number of queries canceled due to conflict with recovery on standby servers. To minimize query cancels caused by cleanup records consider configuring <a href="https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-HOT-STANDBY-FEEDBACK" target="_blank"><i>hot_standby_feedback</i></a>.'
     },
     'postgres.db_conflicts_stat': {
-        info: '<p>Number of queries canceled due to conflicts with recovery.</p><p><b>Tablespace</b> - queries that have been canceled due to dropped tablespaces. <b>Lock</b> - queries that have been canceled due to lock timeouts. <b>Snapshot</b> - queries that have been canceled due to old snapshots. <b>Bufferpin</b> - queries that have been canceled due to pinned buffers. <b>Deadlock</b> - queries that have been canceled due to deadlocks.</p>'
+        info: '<p>Statistics about queries canceled due to various types of conflicts on standby servers.</p><p><b>Tablespace</b> - queries that have been canceled due to dropped tablespaces. <b>Lock</b> - queries that have been canceled due to lock timeouts. <b>Snapshot</b> - queries that have been canceled due to old snapshots. <b>Bufferpin</b> - queries that have been canceled due to pinned buffers. <b>Deadlock</b> - queries that have been canceled due to deadlocks.</p>'
     },
     'postgres.db_deadlocks': {
         info: 'Number of detected deadlocks. When a transaction cannot acquire the requested lock within a certain amount of time (configured by <b>deadlock_timeout</b>), it begins deadlock detection.'
