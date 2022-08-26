@@ -542,8 +542,6 @@ struct rrdset {
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
 
-    uint32_t hash_name;                             // a simple hash on the name
-
     long entries;                                   // total number of entries in the data set
 
     long current_entry;                             // the entry that is currently being updated

@@ -40,24 +40,24 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     }
 
     if(!rc->update_every) {
-        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rc->chart?rc->chart:"NOCHART", rc->name);
+        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
     if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->calculation && !rc->warning && !rc->critical) {
-        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rc->chart?rc->chart:"NOCHART", rc->name);
+        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
-    if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
+    if (rrdcalc_exists(host, rrdcalc_chart_name(rc), rc->name, rc->hash_chart, rc->hash))
         return 0;
 
-    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
+    rc->id = rrdcalc_get_unique_id(host, rrdcalc_chart_name(rc), rc->name, &rc->next_event_id);
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " NETDATA_DOUBLE_FORMAT_AUTO
         ", red " NETDATA_DOUBLE_FORMAT_AUTO
         ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
-            rc->chart?rc->chart:"NOCHART",
+            rrdcalc_chart_name(rc),
             rc->name,
             rc->id,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -779,14 +779,14 @@ static int health_readfile(const char *filename, void *data) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 alert_cfg->on = strdupz(value);
                 if(rc->chart) {
-                    if(strcmp(rc->chart, value) != 0)
+                    if(strcmp(rrdcalc_chart_name(rc), value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->chart, value, value);
+                                line, filename, rc->name, key, rrdcalc_chart_name(rc), value, value);
 
-                    freez(rc->chart);
+                    string_freez(rc->chart);
                 }
-                rc->chart = strdupz(value);
-                rc->hash_chart = simple_hash(rc->chart);
+                rc->chart = string_strdupz(value);
+                rc->hash_chart = simple_hash(rrdcalc_chart_name(rc));
             }
             else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
                 alert_cfg->classification = strdupz(value);

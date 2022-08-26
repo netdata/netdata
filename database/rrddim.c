@@ -105,19 +105,19 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // RRDDIM create a dimension
 
 void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
-    RRDCALC *rrdc;
+    RRDCALC *rc;
     
-    for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
-        if (simple_pattern_matches(rrdc->spdim, rrddim_id(rd)) || simple_pattern_matches(rrdc->spdim, rrddim_name(rd))) {
-            if (rrdc->hash_chart == st->hash_name || !strcmp(rrdc->chart, rrdset_name(st)) || !strcmp(rrdc->chart, st->id)) {
-                char *name = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rrddim_name(rd), string_length(rd->name));
+    for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
+        if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
+            if (rc->chart == st->name || !strcmp(rrdcalc_chart_name(rc), st->id)) {
+                char *name = alarm_name_with_dim(rc->name, strlen(rc->name), rrddim_name(rd), string_length(rd->name));
                 if(rrdcalc_exists(host, rrdset_name(st), name, 0, 0)) {
                     freez(name);
                     continue;
                 }
 
                 netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-                RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, name, rrddim_name(rd));
+                RRDCALC *child = rrdcalc_create_from_rrdcalc(rc, host, name, rrddim_name(rd));
                 netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
                 if (child) {
@@ -129,7 +129,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
                 }
                 else {
                     error("Cannot allocate a new alarm.");
-                    rrdc->foreachcounter--;
+                    rc->foreachcounter--;
                 }
             }
         }

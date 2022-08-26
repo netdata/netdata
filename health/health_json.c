@@ -144,7 +144,7 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
     buffer_sprintf(wb,
                    "\t\t\"%s.%s\": {\n"
                    "\t\t\t\"id\": %lu,\n"
-                   , rc->chart, rc->name
+                   , rrdcalc_chart_name(rc), rc->name
                    , (unsigned long)rc->id);
 
     buffer_strcat(wb, "\t\t\t\"value\":");
@@ -203,11 +203,11 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"value_string\": \"%s\",\n"
                     "\t\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\t\"times_repeat\": %lu,\n"
-                   , rc->chart, rc->name
+                   , rrdcalc_chart_name(rc), rc->name
                    , (unsigned long)rc->id
                    , hash_id
                    , rc->name
-                   , rc->chart
+                   , rrdcalc_chart_name(rc)
                    , (rc->rrdset)?rrdset_family(rc->rrdset):""
                    , rc->classification?rc->classification:"Unknown"
                    , rc->component?rc->component:"Unknown"

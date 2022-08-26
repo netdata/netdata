@@ -522,7 +522,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
     if(unlikely(!rc->rrdset)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
@@ -533,27 +533,27 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
             *next_run = rc->next_update;
         }
 
-        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
+        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rrdcalc_chart_name(rc), rc->name, (int) (rc->next_update - now));
         return 0;
     }
 
     if(unlikely(!rc->update_every)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
     if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE))) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as obsolete", rc->chart?rc->chart:"NOCHART", rc->name);
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as obsolete", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
     if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ARCHIVED))) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as archived", rc->chart?rc->chart:"NOCHART", rc->name);
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as archived", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
     if(unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rc->chart?rc->chart:"NOCHART", rc->name);
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rrdcalc_chart_name(rc), rc->name);
         return 0;
     }
 
@@ -566,7 +566,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     if(unlikely(now + update_every < first /* || now - update_every > last */)) {
         debug(D_HEALTH
               , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
-              , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) now, (unsigned long) first
+              , rrdcalc_chart_name(rc), rc->name, (unsigned long) now, (unsigned long) first
               , (unsigned long) last);
         return 0;
     }
@@ -577,7 +577,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         if(needed + update_every < first || needed - update_every > last) {
             debug(D_HEALTH
                   , "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu)."
-                  , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) needed, (unsigned long) first
+                  , rrdcalc_chart_name(rc), rc->name, (unsigned long) needed, (unsigned long) first
                   , (unsigned long) last);
             return 0;
         }
@@ -617,14 +617,14 @@ static void health_main_cleanup(void *ptr) {
 static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
     SILENCER *s;
     debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",
-            rc->name, (rc->rrdset)?rrdset_context(rc->rrdset):"", rc->chart, host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
+            rc->name, (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
                 (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches(s->alarms_pattern,rc->name))) &&
                 (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches(s->contexts_pattern, rrdset_context(rc->rrdset)))) &&
                 (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern,host))) &&
-                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches(s->charts_pattern,rc->chart))) &&
+                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches(s->charts_pattern, rrdcalc_chart_name(rc)))) &&
                 (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches(s->families_pattern, rrdset_family(rc->rrdset))))
                 ) {
             debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
@@ -635,7 +635,7 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers
                         , (silencers->stype == STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rc->name
                         , (rc->rrdset)?rrdset_context(rc->rrdset):""
-                        , rc->chart
+                        , rrdcalc_chart_name(rc)
                         , host
                         , (rc->rrdset)?rrdset_family(rc->rrdset):""
                         );
@@ -905,7 +905,7 @@ void *health_main(void *ptr) {
                         rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d",
-                              host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, ret
+                              host->hostname, rrdcalc_chart_name(rc), rc->name, ret
                         );
                     } else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
@@ -932,12 +932,12 @@ void *health_main(void *ptr) {
 
                         debug(D_HEALTH,
                               "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
-                              host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name
+                              host->hostname, rrdcalc_chart_name(rc), rc->name
                         );
                     } else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT, host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT, host->hostname, rrdcalc_chart_name(rc), rc->name,
                           rc->value
                     );
                 }
@@ -954,7 +954,7 @@ void *health_main(void *ptr) {
                         rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
-                              host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                              host->hostname, rrdcalc_chart_name(rc), rc->name,
                               rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
                         );
                     } else {
@@ -962,7 +962,7 @@ void *health_main(void *ptr) {
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
                               NETDATA_DOUBLE_FORMAT
-                              ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                              ": %s (source: %s)", host->hostname, rrdcalc_chart_name(rc), rc->name,
                               rc->calculation->parsed_as, rc->calculation->result,
                               buffer_tostring(rc->calculation->error_msg), rc->source
                         );
@@ -1004,14 +1004,14 @@ void *health_main(void *ptr) {
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
-                                  host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                                  host->hostname, rrdcalc_chart_name(rc), rc->name,
                                   buffer_tostring(rc->warning->error_msg)
                             );
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
                                   NETDATA_DOUBLE_FORMAT
-                                  ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART",
+                                  ": %s (source: %s)", host->hostname, rrdcalc_chart_name(rc),
                                   rc->name, rc->warning->result, buffer_tostring(rc->warning->error_msg), rc->source
                             );
                             warning_status = rrdcalc_value2status(rc->warning->result);
@@ -1030,14 +1030,14 @@ void *health_main(void *ptr) {
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
-                                  host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
+                                  host->hostname, rrdcalc_chart_name(rc), rc->name,
                                   buffer_tostring(rc->critical->error_msg)
                             );
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
                                   NETDATA_DOUBLE_FORMAT
-                                  ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART",
+                                  ": %s (source: %s)", host->hostname, rrdcalc_chart_name(rc),
                                   rc->name, rc->critical->result, buffer_tostring(rc->critical->error_msg),
                                   rc->source
                             );

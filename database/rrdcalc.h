@@ -47,7 +47,7 @@ struct rrdcalc {
     char *component;                // the component that this alarm refers to
     char *type;                     // type of the alarm
 
-    char *chart;                    // the chart id this should be linked to
+    STRING *chart;                  // the chart id this should be linked to
     uint32_t hash_chart;
 
     char *plugin_match;             //the plugin name that should be linked to
@@ -151,6 +151,8 @@ struct rrdcalc {
 
     struct rrdcalc *next;
 };
+
+#define rrdcalc_chart_name(rc) string2str((rc)->chart)
 
 struct alert_config {
     char *alarm;

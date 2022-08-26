@@ -71,11 +71,10 @@ RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - find charts
 
-static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, uint32_t hash) {
+static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
     void *result = NULL;
     RRDSET tmp = {
         .name = string_strdupz(name),
-        .hash_name = (hash)?hash:simple_hash(name)
     };
 
     result = avl_search_lock(&host->rrdset_root_index_name, (avl_t *) (&(tmp.avlname)));
@@ -106,7 +105,7 @@ inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *i
 
 inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
     debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, host->hostname);
-    RRDSET *st = rrdset_index_find_name(host, name, 0);
+    RRDSET *st = rrdset_index_find_name(host, name);
     return(st);
 }
 
@@ -144,7 +143,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     rrdset_strncpyz_name(sanitized_name, full_name, CONFIG_MAX_VALUE);
     strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
-    if(rrdset_index_find_name(host, new_name, 0)) {
+    if(rrdset_index_find_name(host, new_name)) {
         debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, host->hostname);
         if(!strcmp(st->id, full_name) && !st->name) {
             unsigned i = 1;
@@ -152,7 +151,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
             do {
                 snprintfz(new_name, CONFIG_MAX_VALUE, "%s_%u", sanitized_name, i);
                 i++;
-            } while (rrdset_index_find_name(host, new_name, 0));
+            } while (rrdset_index_find_name(host, new_name));
 
             info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, host->hostname);
         } else {
@@ -164,12 +163,10 @@ int rrdset_set_name(RRDSET *st, const char *name) {
         rrdset_index_del_name(host, st);
         string_freez(st->name);
         st->name = string_strdupz(new_name);
-        st->hash_name = simple_hash(rrdset_name(st));
         rrdsetvar_rename_all(st);
     }
     else {
         st->name = string_strdupz(new_name);
-        st->hash_name = simple_hash(rrdset_name(st));
     }
 
     rrdset_wrlock(st);
