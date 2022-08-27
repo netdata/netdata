@@ -801,16 +801,15 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // host information
 
-    char *hostname;                                 // the hostname of this host
-    uint32_t hash_hostname;                         // the hostname hash
+    STRING *hostname;                               // the hostname of this host
 
     char *registry_hostname;                        // the registry hostname for this host
 
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
     uint32_t hash_machine_guid;                     // the hash of the unique ID
 
-    const char *os;                                 // the O/S type of the host
-    const char *tags;                               // tags for this host
+    STRING *os;                                     // the O/S type of the host
+    STRING *tags;                                   // tags for this host
     const char *timezone;                           // the timezone of the host
 
     const char *abbrev_timezone;                    // the abbriviated timezone of the host
@@ -879,14 +878,14 @@ struct rrdhost {
     // health monitoring options
 
     unsigned int health_enabled;                  // 1 when this host has health enabled
-    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
-    char *health_default_exec;                      // the full path of the alarms notifications program
-    char *health_default_recipient;                 // the default recipient for all alarms
-    char *health_log_filename;                      // the alarms event log filename
-    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
+    time_t health_delay_up_to;                    // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                  // the full path of the alarms notifications program
+    STRING *health_default_recipient;             // the default recipient for all alarms
+    char *health_log_filename;                    // the alarms event log filename
+    size_t health_log_entries_written;            // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                          // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;    // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;    // the default value for the interval between repeating critical notifications
 
 
     // all RRDCALCs are primarily allocated and linked here
@@ -959,6 +958,10 @@ struct rrdhost {
 };
 extern RRDHOST *localhost;
 
+#define rrdhost_hostname(host) string2str((host)->hostname)
+#define rrdhost_os(host) string2str((host)->os)
+#define rrdhost_tags(host) string2str((host)->tags)
+
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
 #define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))
 #define rrdhost_unlock(host) netdata_rwlock_unlock(&((host)->rrdhost_rwlock))
@@ -996,7 +999,7 @@ extern time_t rrdhost_free_orphan_time;
 
 extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
-extern RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash);
+extern RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
 
 extern RRDHOST *rrdhost_find_or_create(

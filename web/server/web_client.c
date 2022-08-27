@@ -1307,7 +1307,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
         uint32_t hash = simple_hash(tok);
 
-        host = rrdhost_find_by_hostname(tok, hash);
+        host = rrdhost_find_by_hostname(tok);
         if (!host)
             host = rrdhost_find_by_guid(tok, hash);
         if (!host) {

@@ -66,23 +66,23 @@ RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash) {
     return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl_t *) &tmp);
 }
 
-RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
+RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     if(unlikely(!strcmp(hostname, "localhost")))
         return localhost;
 
-    if(unlikely(!hash)) hash = simple_hash(hostname);
+    STRING *hostname_string = string_strdupz(hostname);
 
     rrd_rdlock();
-    RRDHOST *host;
+    RRDHOST *host = NULL;
     rrdhost_foreach_read(host) {
-        if(unlikely((hash == host->hash_hostname && !strcmp(hostname, host->hostname)))) {
-            rrd_unlock();
-            return host;
-        }
+        if(unlikely(host->hostname == hostname_string))
+            break;
     }
     rrd_unlock();
 
-    return NULL;
+    string_freez(hostname_string);
+
+    return host;
 }
 
 #define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
@@ -93,31 +93,30 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
 // RRDHOST - internal helpers
 
 static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
-    if(host->tags && tags && !strcmp(host->tags, tags))
+    if(host->tags && tags && !strcmp(rrdhost_tags(host), tags))
         return;
 
-    void *old = (void *)host->tags;
-    host->tags = (tags && *tags)?strdupz(tags):NULL;
-    freez(old);
+    STRING *old = host->tags;
+    host->tags = string_strdupz((tags && *tags)?tags:NULL);
+    string_freez(old);
 }
 
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
-    if(host->hostname && hostname && !strcmp(host->hostname, hostname))
+    if(host->hostname && hostname && !strcmp(rrdhost_hostname(host), hostname))
         return;
 
-    void *old = host->hostname;
-    host->hostname = strdupz(hostname?hostname:"localhost");
-    host->hash_hostname = simple_hash(host->hostname);
-    freez(old);
+    STRING *old = host->hostname;
+    host->hostname = string_strdupz(hostname?hostname:"localhost");
+    string_freez(old);
 }
 
 static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
-    if(host->os && os && !strcmp(host->os, os))
+    if(host->os && os && !strcmp(rrdhost_os(host), os))
         return;
 
-    void *old = (void *)host->os;
-    host->os = strdupz(os?os:"unknown");
-    freez(old);
+    STRING *old = host->os;
+    host->os = string_strdupz(os?os:"unknown");
+    string_freez(old);
 }
 
 static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
@@ -162,7 +161,7 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
     host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
     host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
 
-    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : host->hostname);
+    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : rrdhost_hostname(host));
 }
 
 // ----------------------------------------------------------------------------
@@ -264,7 +263,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
-        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", host->hostname, n, host->health_log.max);
+        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
         config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
     }
     else
@@ -293,7 +292,7 @@ RRDHOST *rrdhost_create(const char *hostname,
            host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", host->hostname, host->cache_dir);
+                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->cache_dir);
         }
 
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
@@ -302,7 +301,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         if(host->health_enabled) {
             int r = mkdir(host->varlib_dir, 0775);
             if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
+                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
        }
 
     }
@@ -311,15 +310,15 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
         int r = mkdir(filename, 0775);
         if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", host->hostname, filename);
+            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
     }
 
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
     host->health_log_filename = strdupz(filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = strdupz("root");
+    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+    host->health_default_recipient = string_strdupz("root");
 
 
     // ------------------------------------------------------------------------
@@ -334,7 +333,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     RRDHOST *t = rrdhost_index_add(host);
 
     if(t != host) {
-        error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", host->hostname, host->machine_guid, t->hostname, t->machine_guid);
+        error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
         rrdhost_free(host, 1);
         return NULL;
     }
@@ -376,7 +375,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
         ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
+            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), dbenginepath);
         else ret = 0; // succeed
         if (is_legacy) {
             // initialize legacy dbengine instance as needed
@@ -403,7 +402,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (ret) { // check legacy or multihost initialization success
             error(
                 "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-                host->hostname, host->machine_guid, host->cache_dir);
+                rrdhost_hostname(host), host->machine_guid, host->cache_dir);
             rrdhost_free(host, 1);
             host = NULL;
             //rrd_hosts_available++; //TODO: maybe we want this?
@@ -466,12 +465,12 @@ RRDHOST *rrdhost_create(const char *hostname,
                  ", health_log '%s'"
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
-         , host->hostname
+         , rrdhost_hostname(host)
          , host->registry_hostname
          , host->machine_guid
-         , host->os
+         , rrdhost_os(host)
          , host->timezone
-         , (host->tags)?host->tags:""
+         , rrdhost_tags(host)
          , host->program_name
          , host->program_version
          , host->rrd_update_every
@@ -484,8 +483,8 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->cache_dir
          , host->varlib_dir
          , host->health_log_filename
-         , host->health_default_exec
-         , host->health_default_recipient
+         , string2str(host->health_default_exec)
+         , string2str(host->health_default_recipient)
     );
     sql_store_host_system_info(&host->host_uuid, system_info);
 
@@ -540,36 +539,35 @@ void rrdhost_update(RRDHOST *host
     freez(host->registry_hostname);
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
-    if(strcmp(host->hostname, hostname) != 0) {
-        info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", host->hostname, hostname);
-        char *t = host->hostname;
-        host->hostname = strdupz(hostname);
-        host->hash_hostname = simple_hash(host->hostname);
-        freez(t);
+    if(strcmp(rrdhost_hostname(host), hostname) != 0) {
+        info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", rrdhost_hostname(host), hostname);
+        STRING *t = host->hostname;
+        host->hostname = string_strdupz(hostname);
+        string_freez(t);
     }
 
     if(strcmp(host->program_name, program_name) != 0) {
-        info("Host '%s' switched program name from '%s' to '%s'", host->hostname, host->program_name, program_name);
+        info("Host '%s' switched program name from '%s' to '%s'", rrdhost_hostname(host), host->program_name, program_name);
         char *t = host->program_name;
         host->program_name = strdupz(program_name);
         freez(t);
     }
 
     if(strcmp(host->program_version, program_version) != 0) {
-        info("Host '%s' switched program version from '%s' to '%s'", host->hostname, host->program_version, program_version);
+        info("Host '%s' switched program version from '%s' to '%s'", rrdhost_hostname(host), host->program_version, program_version);
         char *t = host->program_version;
         host->program_version = strdupz(program_version);
         freez(t);
     }
 
     if(host->rrd_update_every != update_every)
-        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every, update_every);
+        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_update_every, update_every);
 
     if(host->rrd_history_entries < history)
-        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
+        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
 
     if(host->rrd_memory_mode != mode)
-        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
     // update host tags
     rrdhost_init_tags(host, tags);
@@ -591,12 +589,12 @@ void rrdhost_update(RRDHOST *host
             if (host != localhost) {
                 r = mkdir(host->varlib_dir, 0775);
                 if (r != 0 && errno != EEXIST)
-                    error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
+                    error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
             }
             snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
             r = mkdir(filename, 0775);
             if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", host->hostname, filename);
+                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
 
             rrdhost_wrlock(host);
             health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
@@ -621,7 +619,7 @@ void rrdhost_update(RRDHOST *host
         rrd_hosts_available++;
         ml_new_host(host);
         rrdhost_load_rrdcontext_data(host);
-        info("Host %s is not in archived mode anymore", host->hostname);
+        info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
 
     return;
@@ -656,7 +654,7 @@ RRDHOST *rrdhost_find_or_create(
     if (unlikely(host && RRD_MEMORY_MODE_DBENGINE != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
-              host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+              rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
         rrdhost_free(host, 1);
         host = NULL;
     }
@@ -739,7 +737,7 @@ void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host) {
 restart_after_removal:
     rrdhost_foreach_write(host) {
         if(rrdhost_should_be_removed(host, protected_host, now)) {
-            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
+            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
             if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
 #ifdef ENABLE_DBENGINE
@@ -940,19 +938,19 @@ unittest:
 // there are only used when NETDATA_INTERNAL_CHECKS is set
 
 void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRDHOST, "Checking read lock on host '%s'", host->hostname);
+    debug(D_RRDHOST, "Checking read lock on host '%s'", rrdhost_hostname(host));
 
     int ret = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
     if(ret == 0)
-        fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
+        fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", rrdhost_hostname(host), function, line, file);
 }
 
 void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRDHOST, "Checking write lock on host '%s'", host->hostname);
+    debug(D_RRDHOST, "Checking write lock on host '%s'", rrdhost_hostname(host));
 
     int ret = netdata_rwlock_tryrdlock(&host->rrdhost_rwlock);
     if(ret == 0)
-        fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
+        fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", rrdhost_hostname(host), function, line, file);
 }
 
 void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line) {
@@ -1051,7 +1049,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     if(!host) return;
 
     if (netdata_exit || force)
-        info("Freeing all memory for host '%s'...", host->hostname);
+        info("Freeing all memory for host '%s'...", rrdhost_hostname(host));
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
@@ -1104,7 +1102,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     }
     host->alarms_template_with_foreach = NULL;
 
-    debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", host->hostname);
+    debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", rrdhost_hostname(host));
     rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);
 
     health_alarm_log_free(host);
@@ -1119,7 +1117,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
 #endif
 
     if (!netdata_exit && !force) {
-        info("Setting archive mode for host '%s'...", host->hostname);
+        info("Setting archive mode for host '%s'...", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
         rrdhost_unlock(host);
         return;
@@ -1144,7 +1142,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // remove it from the indexes
 
     if(rrdhost_index_del(host) != host)
-        error("RRDHOST '%s' removed from index, deleted the wrong entry.", host->hostname);
+        error("RRDHOST '%s' removed from index, deleted the wrong entry.", rrdhost_hostname(host));
 
     // ------------------------------------------------------------------------
     // unlink it from the host
@@ -1159,7 +1157,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
         // bypass it
         if(h) h->next = host->next;
-        else error("Request to free RRDHOST '%s': cannot find it", host->hostname);
+        else error("Request to free RRDHOST '%s': cannot find it", rrdhost_hostname(host));
     }
 
     // ------------------------------------------------------------------------
@@ -1168,9 +1166,9 @@ void rrdhost_free(RRDHOST *host, bool force) {
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
     freez(host->aclk_state.prev_claimed_id);
-    freez((void *)host->tags);
+    string_freez(host->tags);
     rrdlabels_destroy(host->host_labels);
-    freez((void *)host->os);
+    string_freez(host->os);
     freez((void *)host->timezone);
     freez((void *)host->abbrev_timezone);
     freez(host->program_version);
@@ -1186,10 +1184,9 @@ void rrdhost_free(RRDHOST *host, bool force) {
         freez(host->destinations);
         host->destinations = tmp_destination;
     }
-    freez(host->health_default_exec);
-    freez(host->health_default_recipient);
+    string_freez(host->health_default_exec);
+    string_freez(host->health_default_recipient);
     freez(host->health_log_filename);
-    freez(host->hostname);
     freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
@@ -1199,6 +1196,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     rrdhost_destroy_rrdcontexts(host);
 
+    string_freez(host->hostname);
     freez(host);
 #ifdef ENABLE_ACLK
     if (wc)
@@ -1221,7 +1219,7 @@ void rrdhost_free_all(void) {
 void rrdhost_save_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Saving/Closing database of host '%s'...", host->hostname);
+    info("Saving/Closing database of host '%s'...", rrdhost_hostname(host));
 
     RRDSET *st;
 
@@ -1383,7 +1381,7 @@ void reload_host_labels(void) {
 void rrdhost_delete_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Deleting database of host '%s'...", host->hostname);
+    info("Deleting database of host '%s'...", rrdhost_hostname(host));
 
     RRDSET *st;
 
@@ -1408,7 +1406,7 @@ void rrdhost_delete_charts(RRDHOST *host) {
 void rrdhost_cleanup_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Cleaning up database of host '%s'...", host->hostname);
+    info("Cleaning up database of host '%s'...", rrdhost_hostname(host));
 
     RRDSET *st;
     uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -1555,7 +1553,7 @@ restart_after_removal:
                 }
                 rrdset_unlock(st);
 
-                debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, rrdset_id(st));
+                debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
                 rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
                 rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);

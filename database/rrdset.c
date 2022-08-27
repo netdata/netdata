@@ -89,13 +89,13 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
 }
 
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
-    debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, host->hostname);
+    debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
     return(st);
 }
 
 inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id) {
-    debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, host->hostname);
+    debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, rrdhost_hostname(host));
 
     char buf[RRD_ID_LENGTH_MAX + 1];
     strncpyz(buf, type, RRD_ID_LENGTH_MAX - 1);
@@ -107,7 +107,7 @@ inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *i
 }
 
 inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
-    debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, host->hostname);
+    debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find_name(host, name);
     return(st);
 }
@@ -147,7 +147,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
     if(rrdset_index_find_name(host, new_name)) {
-        debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, host->hostname);
+        debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
         if(!strcmp(rrdset_id(st), full_name) && !st->name) {
             unsigned i = 1;
 
@@ -156,7 +156,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
                 i++;
             } while (rrdset_index_find_name(host, new_name));
 
-            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, host->hostname);
+            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
         } else {
             return 0;
         }
@@ -242,7 +242,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                      rrddim_name(rd),
                      rrdset_name(st),
-                     host->hostname,
+                     rrdhost_hostname(host),
                      rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm),
                      rd->multiplier, multiplier,
                      rd->divisor, divisor
@@ -367,7 +367,7 @@ void rrdset_free(RRDSET *st) {
 
     rrdfamily_free(host, st->rrdfamily);
 
-    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, rrdset_id(st));
+    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
     rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
@@ -383,7 +383,7 @@ void rrdset_free(RRDSET *st) {
 
         // bypass it
         if(s) s->next = st->next;
-        else error("Request to free RRDSET '%s': cannot find it under host '%s'", rrdset_id(st), host->hostname);
+        else error("Request to free RRDSET '%s': cannot find it under host '%s'", rrdset_id(st), rrdhost_hostname(host));
     }
 
     rrdset_unlock(st);
@@ -832,7 +832,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             // oops! the database is in the future
             #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
-                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), st->rrdhost->hostname, (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+                " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), rrdhost_hostname(st->rrdhost), (NETDATA_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
@@ -852,7 +852,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             // oops! the database is too far behind
             #ifdef NETDATA_INTERNAL_CHECKS
             info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
-                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), st->rrdhost->hostname, (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+                " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), rrdhost_hostname(st->rrdhost), (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
             microseconds = (usec_t)since_last_usec;
@@ -891,7 +891,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
 
     if(discarded && discarded != microseconds)
-        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, rrdset_id(st), discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
+        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", rrdhost_hostname(st->rrdhost), rrdset_id(st), discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
 
     #endif
 
@@ -1296,7 +1296,7 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
         info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
-            " secs). Resetting it.", st->rrdhost->hostname, rrdset_name(st), st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
+            " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_name(st), st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;

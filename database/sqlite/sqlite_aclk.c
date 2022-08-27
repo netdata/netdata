@@ -320,7 +320,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     char node_str[UUID_STR_LEN] = "<none>";
     if (likely(host->node_id))
         uuid_unparse_lower(*host->node_id, node_str);
-    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", host->hostname, host->machine_guid, node_str);
+    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", rrdhost_hostname(host), host->machine_guid, node_str);
 #endif
     return 0;
 }
@@ -526,7 +526,7 @@ void aclk_database_worker(void *arg)
 
     char threadname[NETDATA_THREAD_NAME_MAX+1];
     if (wc->host)
-        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->host->hostname);
+        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", rrdhost_hostname(wc->host));
     else {
         snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->uuid_str);
         threadname[11] = '\0';
@@ -707,12 +707,12 @@ void aclk_database_worker(void *arg)
                         if (claimed()) {
                             wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
                             if (wc->host) {
-                                info("HOST %s (%s) detected as active", wc->host->hostname, wc->host_guid);
-                                snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->host->hostname);
+                                info("HOST %s (%s) detected as active", rrdhost_hostname(wc->host), wc->host_guid);
+                                snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", rrdhost_hostname(wc->host));
                                 uv_thread_set_name_np(wc->thread, threadname);
                                 wc->host->dbsync_worker = wc;
                                 if (unlikely(!wc->hostname))
-                                    wc->hostname = strdupz(wc->host->hostname);
+                                    wc->hostname = strdupz(rrdhost_hostname(wc->host));
                                 aclk_del_worker_thread(wc);
                                 wc->node_info_send = 1;
                             }
@@ -844,7 +844,7 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
         uuid_unparse_lower(*node_id, wc->node_id);
     if (likely(host)) {
         host->dbsync_worker = (void *)wc;
-        wc->hostname = strdupz(host->hostname);
+        wc->hostname = strdupz(rrdhost_hostname(host));
     }
     else
         wc->hostname = get_hostname_by_node_id(wc->node_id);

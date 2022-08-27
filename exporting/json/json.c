@@ -145,7 +145,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
-    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+    const char *tags_pre = "", *tags_post = "", *tags = rrdhost_tags(host);
     if (!tags)
         tags = "";
 
@@ -187,7 +187,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "\"timestamp\":%llu}",
 
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         tags_pre,
         tags,
         tags_post,
@@ -230,7 +230,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
     if(isnan(value))
         return 0;
 
-    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+    const char *tags_pre = "", *tags_post = "", *tags = rrdhost_tags(host);
     if (!tags)
         tags = "";
 
@@ -271,7 +271,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"timestamp\": %llu}",
 
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         tags_pre,
         tags,
         tags_post,

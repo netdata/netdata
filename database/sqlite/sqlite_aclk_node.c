@@ -47,7 +47,7 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
     dictionary_destroy(dict);
     freez(upd_node_collectors.claim_id);
 
-    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, wc->host->hostname);
+    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(wc->host));
 #else
     UNUSED(wc);
 #endif
@@ -94,8 +94,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
         netdata_mutex_unlock(&host->receiver_lock);
     }
 
-    node_info.data.name = host->hostname;
-    node_info.data.os = (char *) host->os;
+    node_info.data.name = (char *)rrdhost_hostname(host);
+    node_info.data.os = (char *)rrdhost_os(host);
     node_info.data.os_name = host->system_info->host_os_name;
     node_info.data.os_version = host->system_info->host_os_version;
     node_info.data.kernel_name = host->system_info->kernel_name;
@@ -126,7 +126,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.host_labels_ptr = host->host_labels;
 
     aclk_update_node_info(&node_info);
-    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, wc->host->hostname, wc->host_guid, wc->host == localhost ? "parent" : "child");
+    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), wc->host_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);

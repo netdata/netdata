@@ -110,7 +110,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
             if(unlikely(t->name == rt->name
                         && !strcmp(t->family_match?rrdcalctemplate_family_match(t):"*", rt->family_match?rrdcalctemplate_family_match(rt):"*")
             )) {
-                info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), host->hostname);
+                info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
                 return 0;
             }
         }
@@ -127,7 +127,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
             if(unlikely(t->name == rt->name
                         && !strcmp(t->family_match?rrdcalctemplate_family_match(t):"*", rt->family_match?rrdcalctemplate_family_match(rt):"*")
             )) {
-                info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), host->hostname);
+                info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
                 return 0;
             }
         }
@@ -752,12 +752,12 @@ static int health_readfile(const char *filename, void *data) {
             if (alert_cfg) alert_cfg->os = string_strdupz(value);
             SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT);
 
-            if(!simple_pattern_matches(os_pattern, host->os)) {
+            if(!simple_pattern_matches(os_pattern, rrdhost_os(host))) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", host->hostname, rrdcalc_name(rc), line, filename, os_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, os_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", host->hostname, rrdcalctemplate_name(rt), line, filename, os_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, os_match);
 
                 ignore_this = 1;
             }
@@ -769,12 +769,12 @@ static int health_readfile(const char *filename, void *data) {
             if (alert_cfg) alert_cfg->host = string_strdupz(value);
             SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT);
 
-            if(!simple_pattern_matches(host_pattern, host->hostname)) {
+            if(!simple_pattern_matches(host_pattern, rrdhost_hostname(host))) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", host->hostname, rrdcalc_name(rc), line, filename, host_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, host_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", host->hostname, rrdcalctemplate_name(rt), line, filename, host_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, host_match);
 
                 ignore_this = 1;
             }
@@ -1286,7 +1286,7 @@ void sql_refresh_hashes(void)
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
     if(unlikely(!host->health_enabled)) {
-        debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", host->hostname);
+        debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;
     }
 

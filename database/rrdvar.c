@@ -58,7 +58,7 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
     if(tree) {
         debug(D_VARIABLES, "Deleting variable '%s'", rrdvar_name(rv));
         if(unlikely(!rrdvar_index_del(tree, rv)))
-            error("RRDVAR: Attempted to delete variable '%s' from host '%s', but it is not found.", rrdvar_name(rv), host->hostname);
+            error("RRDVAR: Attempted to delete variable '%s' from host '%s', but it is not found.", rrdvar_name(rv), rrdhost_hostname(host));
     }
 
     if(rv->options & RRDVAR_OPTION_ALLOCATED)
@@ -294,7 +294,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     helper.counter = 0;
     avl_traverse_lock(&st->rrdfamily->rrdvar_root_index, single_variable2json, (void *)&helper);
 
-    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", host->hostname);
+    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", rrdhost_hostname(host));
     helper.counter = 0;
     avl_traverse_lock(&host->rrdvar_root_index, single_variable2json, (void *)&helper);
 

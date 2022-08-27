@@ -1086,7 +1086,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        buffer_sprintf(wb, "\t\t\"%s\"", host->hostname);
+        buffer_sprintf(wb, "\t\t\"%s\"", rrdhost_hostname(host));
         count++;
     }
 
@@ -1101,7 +1101,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         buffer_sprintf(
             wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
             , host->machine_guid
-            , host->hostname
+            , rrdhost_hostname(host)
             , (host->receiver || host == localhost) ? "true" : "false"
             , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
             );

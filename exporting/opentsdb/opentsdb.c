@@ -194,9 +194,9 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
+        (host->tags) ? rrdhost_tags(host) : "",
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
@@ -240,9 +240,9 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
         dimension_name,
         (unsigned long long)last_t,
         value,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
+        (host->tags) ? rrdhost_tags(host) : "",
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
@@ -336,9 +336,9 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
+        (host->tags) ? rrdhost_tags(host) : "",
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
@@ -392,9 +392,9 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         dimension_name,
         (unsigned long long)last_t,
         value,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
+        (host->tags) ? rrdhost_tags(host) : "",
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;

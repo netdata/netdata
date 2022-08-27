@@ -57,7 +57,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"old_value_string\": \"%s\",\n"
                     "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
-                   , host->hostname
+                   , rrdhost_hostname(host)
                    , host->utc_offset
                    , host->abbrev_timezone
                    , ae->unique_id
@@ -75,8 +75,8 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false"
                    , (unsigned long)ae->exec_run_timestamp
                    , (ae->flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false"
-                   , ae->exec?ae_exec(ae):host->health_default_exec
-                   , ae->recipient?ae_recipient(ae):host->health_default_recipient
+                   , ae->exec?ae_exec(ae):string2str(host->health_default_exec)
+                   , ae->recipient?ae_recipient(ae):string2str(host->health_default_recipient)
                    , ae->exec_code
                    , ae_source(ae)
                    , edit_command
@@ -218,8 +218,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , (rc->rrdset)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
-                   , rc->exec?rrdcalc_exec(rc):host->health_default_exec
-                   , rc->recipient?rrdcalc_recipient(rc):host->health_default_recipient
+                   , rc->exec?rrdcalc_exec(rc):string2str(host->health_default_exec)
+                   , rc->recipient?rrdcalc_recipient(rc):string2str(host->health_default_recipient)
                    , rrdcalc_source(rc)
                    , rrdcalc_units(rc)
                    , rrdcalc_info(rc)
@@ -370,7 +370,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
                     "\n\t\"status\": %s,"
                     "\n\t\"now\": %lu,"
                     "\n\t\"alarms\": {\n",
-            host->hostname,
+            rrdhost_hostname(host),
             (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
             host->health_enabled?"true":"false",
             (unsigned long)now_realtime_sec());
@@ -390,7 +390,7 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
     rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                        "\n\t\"alarms\": {\n",
-                   host->hostname);
+                   rrdhost_hostname(host));
 
     health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc_values2json_nolock);
 

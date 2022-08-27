@@ -314,7 +314,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                         rrddim_name(rd),
                         rrdset_name(st),
-                        host->hostname,
+                        rrdhost_hostname(host),
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
                         rd->multiplier, td->multiplier,
                         rd->divisor, td->divisor
@@ -440,7 +440,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
@@ -458,7 +458,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
@@ -515,7 +515,7 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), host->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 0;
     }
 

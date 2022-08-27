@@ -318,8 +318,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     static char command_to_run[ALARM_EXEC_COMMAND_LENGTH + 1];
 
-    const char *exec      = (ae->exec)      ? ae_exec(ae)      : host->health_default_exec;
-    const char *recipient = (ae->recipient) ? ae_recipient(ae) : host->health_default_recipient;
+    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health_default_exec);
+    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health_default_recipient);
 
     int n_warn=0, n_crit=0;
     RRDCALC *rc;
@@ -614,7 +614,7 @@ static void health_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-static SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
+static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *silencers) {
     SILENCER *s;
     debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",
           rrdcalc_name(rc), (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
@@ -664,14 +664,14 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         if (silencers->stype == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
         else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
     } else {
-        SILENCE_TYPE st = check_silenced(rc, host->hostname, silencers);
+        SILENCE_TYPE st = check_silenced(rc, rrdhost_hostname(host), silencers);
         if (st == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
         else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
     }
 
     if (rrdcalc_flags_old != rc->rrdcalc_flags) {
         info("Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
-             host->hostname,
+             rrdhost_hostname(host),
              rrdcalc_name(rc),
              (rrdcalc_flags_old & RRDCALC_FLAG_DISABLED)?"true":"false",
              (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false",
@@ -812,7 +812,7 @@ void *health_main(void *ptr) {
                 info(
                     "Postponing health checks for %"PRId64" seconds, on host '%s'.",
                     (int64_t)hibernation_delay,
-                    host->hostname);
+                    rrdhost_hostname(host));
 
                 host->health_delay_up_to = now + hibernation_delay;
             }
@@ -821,7 +821,7 @@ void *health_main(void *ptr) {
                 if (unlikely(now < host->health_delay_up_to))
                     continue;
 
-                info("Resuming health checks on host '%s'.", host->hostname);
+                info("Resuming health checks on host '%s'.", rrdhost_hostname(host));
                 host->health_delay_up_to = 0;
             }
 
@@ -926,7 +926,7 @@ void *health_main(void *ptr) {
                         rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d",
-                              host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc), ret
+                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), ret
                         );
                     } else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
@@ -953,13 +953,13 @@ void *health_main(void *ptr) {
 
                         debug(D_HEALTH,
                               "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
-                              host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc)
+                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc)
                         );
                     } else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
                     debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
-                          host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc), rc->value
+                          rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), rc->value
                     );
                 }
 
@@ -975,7 +975,7 @@ void *health_main(void *ptr) {
                         rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
-                              host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                               rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
                         );
                     } else {
@@ -983,7 +983,7 @@ void *health_main(void *ptr) {
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
                               NETDATA_DOUBLE_FORMAT
-                              ": %s (source: %s)", host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                              ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                               rc->calculation->parsed_as, rc->calculation->result,
                               buffer_tostring(rc->calculation->error_msg), rrdcalc_source(rc)
                         );
@@ -1025,14 +1025,14 @@ void *health_main(void *ptr) {
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
-                                  host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                                  rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                                   buffer_tostring(rc->warning->error_msg)
                             );
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
                                   NETDATA_DOUBLE_FORMAT
-                                  ": %s (source: %s)", host->hostname, rrdcalc_chart_name(rc),
+                                  ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
                                   rrdcalc_name(rc), rc->warning->result, buffer_tostring(rc->warning->error_msg), rrdcalc_source(rc)
                             );
                             warning_status = rrdcalc_value2status(rc->warning->result);
@@ -1051,14 +1051,14 @@ void *health_main(void *ptr) {
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
-                                  host->hostname, rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                                  rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                                   buffer_tostring(rc->critical->error_msg)
                             );
                         } else {
                             rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
                                   NETDATA_DOUBLE_FORMAT
-                                  ": %s (source: %s)", host->hostname, rrdcalc_chart_name(rc),
+                                  ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
                                   rrdcalc_name(rc), rc->critical->result, buffer_tostring(rc->critical->error_msg),
                                   rrdcalc_source(rc)
                             );

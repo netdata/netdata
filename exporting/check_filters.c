@@ -25,7 +25,7 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
     RRDHOST_FLAGS *flags = &host->exporting_flags[instance->index];
 
     if (unlikely((*flags & (RRDHOST_FLAG_EXPORTING_SEND | RRDHOST_FLAG_EXPORTING_DONT_SEND)) == 0)) {
-        char *host_name = (host == localhost) ? "localhost" : host->hostname;
+        const char *host_name = (host == localhost) ? "localhost" : rrdhost_hostname(host);
 
         if (!instance->config.hosts_pattern || simple_pattern_matches(instance->config.hosts_pattern, host_name)) {
             *flags |= RRDHOST_FLAG_EXPORTING_SEND;
@@ -73,18 +73,18 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
             *flags |= RRDSET_FLAG_EXPORTING_IGNORE;
-            debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", rrdset_id(st), host->hostname);
+            debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", rrdset_id(st), rrdhost_hostname(host));
             return 0;
         }
     }
 
     if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), host->hostname);
+        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), rrdhost_hostname(host));
         return 0;
     }
 
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
+        debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
 

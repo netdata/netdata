@@ -15,7 +15,7 @@ int sql_create_health_log_table(RRDHOST *host) {
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
+            error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return 1;
     }
 
@@ -26,7 +26,7 @@ int sql_create_health_log_table(RRDHOST *host) {
 
     rc = sqlite3_exec_monitored(db_meta, command, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
-        error_report("HEALTH [%s]: SQLite error during creation of health log table, rc = %d (%s)", host->hostname, rc, err_msg);
+        error_report("HEALTH [%s]: SQLite error during creation of health log table, rc = %d (%s)", rrdhost_hostname(host), rc, err_msg);
         sqlite3_free(err_msg);
         return 1;
     }
@@ -49,7 +49,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
+            error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return;
     }
 
@@ -60,7 +60,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", host->hostname);
+        error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", rrdhost_hostname(host));
         return;
     }
 
@@ -96,12 +96,12 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
-        error_report("HEALTH [%s]: Failed to update health log, rc = %d", host->hostname, rc);
+        error_report("HEALTH [%s]: Failed to update health log, rc = %d", rrdhost_hostname(host), rc);
     }
 
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to finalize the prepared statement for updating health log.", host->hostname);
+        error_report("HEALTH [%s]: Failed to finalize the prepared statement for updating health log.", rrdhost_hostname(host));
 
     return;
 }
@@ -122,7 +122,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
+            error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return;
     }
 
@@ -133,11 +133,11 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", host->hostname);
+        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
         return;
     }
 
-    rc = sqlite3_bind_text(res, 1, host->hostname, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, 1, rrdhost_hostname(host), -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind hostname parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -331,7 +331,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
-        error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", host->hostname, rc);
+        error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
         goto failed;
     }
 
@@ -340,7 +340,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", host->hostname);
+        error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", rrdhost_hostname(host));
 
     return;
 }
@@ -436,7 +436,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
-    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", host->hostname, uuid_str, host->health_log_entries_written);
+    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, host->health_log_entries_written);
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \
@@ -615,7 +615,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
+            error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
         return;
     }
 
@@ -628,7 +628,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     ret = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(ret != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare sql statement to load health log.", host->hostname);
+        error_report("HEALTH [%s]: Failed to prepare sql statement to load health log.", rrdhost_hostname(host));
         return;
     }
 
@@ -640,33 +640,33 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         // check that we have valid ids
         uint32_t unique_id = (uint32_t) sqlite3_column_int64(res, 1);
         if(!unique_id) {
-            error_report("HEALTH [%s]: Got invalid unique id. Ignoring it.", host->hostname);
+            error_report("HEALTH [%s]: Got invalid unique id. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
         uint32_t alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
         if(!alarm_id) {
-            error_report("HEALTH [%s]: Got invalid alarm id. Ignoring it.", host->hostname);
+            error_report("HEALTH [%s]: Got invalid alarm id. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
         //need name, chart and family
         if (sqlite3_column_type(res, 13) == SQLITE_NULL) {
-            error_report("HEALTH [%s]: Got null name field. Ignoring it.", host->hostname);
+            error_report("HEALTH [%s]: Got null name field. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
         if (sqlite3_column_type(res, 14) == SQLITE_NULL) {
-            error_report("HEALTH [%s]: Got null chart field. Ignoring it.", host->hostname);
+            error_report("HEALTH [%s]: Got null chart field. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
 
         if (sqlite3_column_type(res, 15) == SQLITE_NULL) {
-            error_report("HEALTH [%s]: Got null family field. Ignoring it.", host->hostname);
+            error_report("HEALTH [%s]: Got null family field. Ignoring it.", rrdhost_hostname(host));
             errored++;
             continue;
         }
@@ -805,7 +805,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     if (unlikely(!host->health_log.next_alarm_id || host->health_log.next_alarm_id <= host->health_max_alarm_id))
         host->health_log.next_alarm_id = host->health_max_alarm_id + 1;
 
-    info("HEALTH [%s]: Table health_log_%s, loaded %zd alarm entries, errors in %zd entries.", host->hostname, uuid_str, loaded, errored);
+    info("HEALTH [%s]: Table health_log_%s, loaded %zd alarm entries, errors in %zd entries.", rrdhost_hostname(host), uuid_str, loaded, errored);
 
     ret = sqlite3_finalize(res);
     if (unlikely(ret != SQLITE_OK))

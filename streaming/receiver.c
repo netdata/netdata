@@ -66,7 +66,7 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
     if (cd->version < VERSION_GAP_FILLING ) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", host->hostname, cd->cmd,
+        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd,
                cd->version);
         return PARSER_RC_OK;    // Ignore error and continue stream
     }
@@ -78,7 +78,7 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
             info(
                 "STREAM %s from %s: Initial connection (no gap to check), "
                 "remote=%"PRId64" local=%"PRId64" slew=%"PRId64"",
-                host->hostname,
+                rrdhost_hostname(host),
                 cd->cmd,
                 (int64_t)remote_time,
                 (int64_t)now,
@@ -88,7 +88,7 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
             info(
                 "STREAM %s from %s: Checking for gaps... "
                 "remote=%"PRId64" local=%"PRId64"..%"PRId64" slew=%"PRId64"  %"PRId64"-sec gap",
-                host->hostname,
+                rrdhost_hostname(host),
                 cd->cmd,
                 (int64_t)remote_time,
                 (int64_t)prev,
@@ -486,8 +486,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #else
         if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
-            log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "FAILED - CANNOT REPLY");
-            error("STREAM %s [receive from [%s]:%s]: cannot send command.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+            log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - CANNOT REPLY");
+            error("STREAM %s [receive from [%s]:%s]: cannot send command.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
             close(rpt->fd);
             return 0;
         }
@@ -575,14 +575,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port
-         , rpt->host->hostname
+         , rrdhost_hostname(rpt->host)
          , rpt->host->machine_guid
          , rpt->host->rrd_update_every
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
          , (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
          , ssl ? " SSL," : ""
-         , rpt->host->tags?rpt->host->tags:""
+         , rrdhost_tags(rpt->host)
     );
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -605,7 +605,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-    info("STREAM %s [receive from [%s]:%s]: initializing communication...", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+    info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     char initial_response[HTTP_HEADER_SIZE];
     if (rpt->stream_version > 1) {
         if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
@@ -618,13 +618,13 @@ static int rrdpush_receive(struct receiver_state *rpt)
             }
 #endif
         }
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
         sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->stream_version);
     } else if (rpt->stream_version == 1) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
     } else {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
@@ -635,27 +635,27 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #else
     if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "FAILED - CANNOT REPLY");
-        error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - CANNOT REPLY");
+        error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         close(rpt->fd);
         return 0;
     }
 
     // remove the non-blocking flag from the socket
     if(sock_delnonblock(rpt->fd) < 0)
-        error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
+        error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     struct timeval timeout;
     timeout.tv_sec = 120;
     timeout.tv_usec = 0;
     if (unlikely(setsockopt(rpt->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
-        error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
+        error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     // convert the socket to a FILE *
     FILE *fp = fdopen(rpt->fd, "r");
     if(!fp) {
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "FAILED - SOCKET ERROR");
-        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
+        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
         close(rpt->fd);
         return 0;
     }
@@ -686,7 +686,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
             info(
                 "Postponing health checks for %" PRId64 " seconds, on host '%s', because it was just connected.",
                 (int64_t)alarms_delay,
-                rpt->host->hostname);
+                rrdhost_hostname(rpt->host));
         }
     }
     rpt->host->senders_connect_time = now_realtime_sec();
@@ -695,8 +695,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdhost_unlock(rpt->host);
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rpt->host->hostname, rpt->client_ip, rpt->client_port);
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "CONNECTED");
+    info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
 
     cd.version = rpt->stream_version;
 

@@ -184,7 +184,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         if(unlikely(!rd->exposed)) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, rrdset_id(st), rrddim_id(rd));
+            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             #endif
             return 1;
         }
@@ -336,12 +336,12 @@ void rrdset_done_push(RRDSET *st) {
     // Handle non-connected case
     if(unlikely(!__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
         if(unlikely(!host->rrdpush_sender_error_shown))
-            error("STREAM %s [send]: not ready - discarding collected metrics.", host->hostname);
+            error("STREAM %s [send]: not ready - discarding collected metrics.", rrdhost_hostname(host));
         host->rrdpush_sender_error_shown = 1;
         return;
     }
     else if(unlikely(host->rrdpush_sender_error_shown)) {
-        info("STREAM %s [send]: sending metrics...", host->hostname);
+        info("STREAM %s [send]: sending metrics...", rrdhost_hostname(host));
         host->rrdpush_sender_error_shown = 0;
     }
 
@@ -354,7 +354,7 @@ void rrdset_done_push(RRDSET *st) {
 
     // signal the sender there are more data
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 
     sender_commit(host->sender);
 }
@@ -376,7 +376,7 @@ void rrdpush_send_labels(RRDHOST *host) {
     sender_commit(host->sender);
 
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
 }
@@ -399,7 +399,7 @@ void rrdpush_claimed_id(RRDHOST *host)
 
     // signal the sender there are more data
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 }
 
 int connect_to_one_of_destinations(
@@ -496,7 +496,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     netdata_thread_t thr = 0;
 
     if(host->rrdpush_sender_spawn) {
-        info("STREAM %s [send]: signaling sending thread to stop...", host->hostname);
+        info("STREAM %s [send]: signaling sending thread to stop...", rrdhost_hostname(host));
 
         // signal the thread that we want to join it
         host->rrdpush_sender_join = 1;
@@ -512,10 +512,10 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     netdata_mutex_unlock(&host->sender->mutex);
 
     if(thr != 0) {
-        info("STREAM %s [send]: waiting for the sending thread to stop...", host->hostname);
+        info("STREAM %s [send]: waiting for the sending thread to stop...", rrdhost_hostname(host));
         void *result;
         netdata_thread_join(thr, &result);
-        info("STREAM %s [send]: sending thread has exited.", host->hostname);
+        info("STREAM %s [send]: sending thread has exited.", rrdhost_hostname(host));
     }
 }
 
@@ -533,10 +533,10 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
 
     if(!host->rrdpush_sender_spawn) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", host->hostname);
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", rrdhost_hostname(host));
 
         if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host->sender))
-            error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
+            error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             host->rrdpush_sender_spawn = 1;
     }
@@ -763,7 +763,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 info(
                     "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
                     "existing connection is dead (%"PRId64" sec), accepting new connection.",
-                    host->hostname,
+                    rrdhost_hostname(host),
                     w->client_ip,
                     w->client_port,
                     (int64_t)age);
@@ -772,12 +772,12 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 netdata_mutex_unlock(&host->receiver_lock);
                 rrdhost_unlock(host);
                 rrd_unlock();
-                log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
+                log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, rrdhost_hostname(host),
                                       "REJECTED - ALREADY CONNECTED");
                 info(
                     "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
                     "existing connection is active (within last %"PRId64" sec), rejecting new connection.",
-                    host->hostname,
+                    rrdhost_hostname(host),
                     w->client_ip,
                     w->client_port,
                     (int64_t)age);

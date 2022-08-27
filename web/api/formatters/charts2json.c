@@ -57,10 +57,10 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
-                   , host->hostname
+                   , rrdhost_hostname(host)
                    , host->program_version
                    , get_release_channel()
-                   , host->os
+                   , rrdhost_os(host)
                    , host->timezone
                    , host->rrd_update_every
                    , host->rrd_history_entries
@@ -117,7 +117,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                                  "\n\t\t\t\"hostname\": \"%s\""
                                  "\n\t\t}"
                                , (found > 0) ? "," : ""
-                               , h->hostname
+                               , rrdhost_hostname(h)
                 );
 
                 found++;
@@ -131,7 +131,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        , "\n\t\t{"
                          "\n\t\t\t\"hostname\": \"%s\""
                          "\n\t\t}"
-                       , host->hostname
+                       , rrdhost_hostname(host)
         );
     }
 

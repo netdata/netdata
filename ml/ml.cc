@@ -16,7 +16,7 @@ bool ml_enabled(RRDHOST *RH) {
     if (!Cfg.EnableAnomalyDetection)
         return false;
 
-    if (simple_pattern_matches(Cfg.SP_HostsToSkip, RH->hostname))
+    if (simple_pattern_matches(Cfg.SP_HostsToSkip, rrdhost_hostname(RH)))
         return false;
 
     return true;

@@ -171,7 +171,7 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(
         hostname,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         PROMETHEUS_ELEMENT_MAX);
 
     add_host_info(
@@ -250,7 +250,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
                     rrddim_id(rd), rrdset_id(rd->rrdset),
-                    (host == localhost) ? instance->config.hostname : host->hostname,
+                    (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
                     (unsigned long)rd->last_collected_time.tv_sec,
                     (unsigned long)instance->after,
                     (unsigned long)instance->before);
@@ -270,7 +270,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 add_metric(
                     connector_specific_data->write_request,
                     name, chart, family, dimension,
-                    (host == localhost) ? instance->config.hostname : host->hostname,
+                    (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
                     rd->last_collected_value, timeval_msec(&rd->last_collected_time));
             } else {
                 // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -287,7 +287,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 add_metric(
                     connector_specific_data->write_request,
                     name, chart, family, NULL,
-                    (host == localhost) ? instance->config.hostname : host->hostname,
+                    (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
                     rd->last_collected_value, timeval_msec(&rd->last_collected_time));
             }
         } else {
@@ -312,7 +312,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 add_metric(
                     connector_specific_data->write_request,
                     name, chart, family, dimension,
-                    (host == localhost) ? instance->config.hostname : host->hostname,
+                    (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
                     value, last_t * MSEC_PER_SEC);
             }
         }
@@ -340,7 +340,7 @@ int format_variable_prometheus_remote_write_callback(RRDVAR *rv, void *data) {
 
         NETDATA_DOUBLE value = rrdvar2number(rv);
         add_variable(connector_specific_data->write_request, name,
-            (host == localhost) ? instance->config.hostname : host->hostname, value, opts->now / USEC_PER_MS);
+            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host), value, opts->now / USEC_PER_MS);
     }
 
     return 0;

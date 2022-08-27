@@ -304,7 +304,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         log_access(
             "ACLK STA [%s (%s)]: Ignoring chart push event, updates have been turned off for this node.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A");
+            wc->host ? rrdhost_hostname(wc->host) : "N/A");
         return;
     }
 
@@ -504,7 +504,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         log_access(
             "ACLK REQ [%s (%s)]: Sending chart config for %s.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             hash_id);
         aclk_chart_config_updated(&chart_config, 1);
         destroy_chart_config_updated(&chart_config);
@@ -512,7 +512,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         log_access(
             "ACLK STA [%s (%s)]: Chart config for %s not found.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             hash_id);
 
 bind_fail:
@@ -552,7 +552,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
         log_access(
             "ACLK STA [%s (%s)]: CHARTS ACKNOWLEDGED IN THE DATABASE UP TO %" PRIu64,
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             cmd.param1);
 
 bind_fail:
@@ -637,7 +637,7 @@ void aclk_get_chart_config(char **hash_id)
         log_access(
             "ACLK REQ [%s (%s)]: Request %d for chart config with hash %s received.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             i,
             hash_id[i]);
         cmd.data_param = (void *)strdupz(hash_id[i]);
@@ -826,7 +826,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
         return;
 
     if (wc->host && rrdhost_flag_check(wc->host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        internal_error(true, "Skipping aclk_update_retention for host %s because context streaming is enabled", wc->host->hostname);
+        internal_error(true, "Skipping aclk_update_retention for host %s because context streaming is enabled", rrdhost_hostname(wc->host));
         return;
     }
 
@@ -1155,7 +1155,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
             debug(
                 D_ACLK_SYNC,
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
-                rd->rrdset->rrdhost->hostname,
+                rrdhost_hostname(rd->rrdset->rrdhost),
                 rrdset_name(rd->rrdset),
                 rrddim_name(rd),
                 live,
@@ -1165,7 +1165,7 @@ void aclk_send_dimension_update(RRDDIM *rd)
             debug(
                 D_ACLK_SYNC,
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
-                rd->rrdset->rrdhost->hostname,
+                rrdhost_hostname(rd->rrdset->rrdhost),
                 rrdset_name(rd->rrdset),
                 rrddim_name(rd),
                 live,

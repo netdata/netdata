@@ -765,7 +765,7 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
 #ifdef NETDATA_INTERNAL_CHECKS
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*uuid, uuid_str);
-    debug(D_METADATALOG,"Generating uuid [%s] for chart %s under host %s", uuid_str, rrdset_id(st), st->rrdhost->hostname);
+    debug(D_METADATALOG,"Generating uuid [%s] for chart %s under host %s", uuid_str, rrdset_id(st), rrdhost_hostname(st->rrdhost));
 #endif
 
     rc = update_chart_metadata(uuid, st, id, name);
@@ -925,7 +925,7 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 2, host->hostname, 0);
+    rc = bind_text_null(res, 2, rrdhost_hostname(host), 0);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -937,7 +937,7 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 5, host->os, 1);
+    rc = bind_text_null(res, 5, rrdhost_os(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -945,7 +945,7 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 7, host->tags, 1);
+    rc = bind_text_null(res, 7, rrdhost_tags(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -983,18 +983,18 @@ int sql_store_host_info(RRDHOST *host)
 
     int store_rc = sqlite3_step_monitored(res);
     if (unlikely(store_rc != SQLITE_DONE))
-        error_report("Failed to store host %s, rc = %d", host->hostname, rc);
+        error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), rc);
 
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store host %s, rc = %d", host->hostname, rc);
+        error_report("Failed to reset statement to store host %s, rc = %d", rrdhost_hostname(host), rc);
 
     return !(store_rc == SQLITE_DONE);
 bind_fail:
-    error_report("Failed to bind parameter to store host %s, rc = %d", host->hostname, rc);
+    error_report("Failed to bind parameter to store host %s, rc = %d", rrdhost_hostname(host), rc);
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store host %s, rc = %d", host->hostname, rc);
+        error_report("Failed to reset statement to store host %s, rc = %d", rrdhost_hostname(host), rc);
     return 1;
 }
 
@@ -1318,10 +1318,10 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
-        , host->hostname
+        , rrdhost_hostname(host)
         , host->program_version
         , get_release_channel()
-        , host->os
+        , rrdhost_os(host)
         , host->timezone
         , host->rrd_update_every
         , host->rrd_history_entries
@@ -1413,7 +1413,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
                       "\n\t\t\t\"hostname\": \"%s\""
                       "\n\t\t}"
                     , (found > 0) ? "," : ""
-                    , h->hostname
+                    , rrdhost_hostname(h)
                 );
 
                 found++;
@@ -1427,7 +1427,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
             , "\n\t\t{"
               "\n\t\t\t\"hostname\": \"%s\""
               "\n\t\t}"
-            , host->hostname
+            , rrdhost_hostname(host)
         );
     }
 
@@ -1448,9 +1448,9 @@ failed:
 void free_temporary_host(RRDHOST *host)
 {
     if (host) {
-        freez(host->hostname);
-        freez((char *)host->os);
-        freez((char *)host->tags);
+        string_freez(host->hostname);
+        string_freez(host->os);
+        string_freez(host->tags);
         freez((char *)host->timezone);
         freez(host->program_name);
         freez(host->program_version);
@@ -2071,7 +2071,7 @@ void compute_chart_hash(RRDSET *st)
     char  priority_str[32];
 
     if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        internal_error(true, "Skipping compute_chart_hash for host %s because context streaming is enabled", st->rrdhost->hostname);
+        internal_error(true, "Skipping compute_chart_hash for host %s because context streaming is enabled", rrdhost_hostname(st->rrdhost));
         return;
     }
 
@@ -2684,7 +2684,7 @@ void sql_store_host_labels(RRDHOST *host)
 {
     int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
     if (rc != SQLITE_OK)
-        error_report("Failed to remove old host labels for host %s", host->hostname);
+        error_report("Failed to remove old host labels for host %s", rrdhost_hostname(host));
 
     rrdlabels_walkthrough_read(host->host_labels, save_host_label_callback, host);
 }

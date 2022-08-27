@@ -151,7 +151,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
                 return rs;
             }
             else {
-                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", string2str(n), rrdset_id(st), host->hostname);
+                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", string2str(n), rrdset_id(st), rrdhost_hostname(host));
                 string_freez(n);
                 return NULL;
             }
@@ -173,7 +173,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
 void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one.", string2str(rs->variable), rrdset_id(rs->rrdset), rs->rrdset->rrdhost->hostname, value);
+            " but the variable is not a custom chart one.", string2str(rs->variable), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;

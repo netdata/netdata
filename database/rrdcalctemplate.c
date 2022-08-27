@@ -32,7 +32,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
 
     RRDCALC *rc = rrdcalc_create_from_template(host, rt, rrdset_id(st));
     if (unlikely(!rc))
-        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rrdcalctemplate_name(rt), rrdset_id(st), host->hostname);
+        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rrdcalctemplate_name(rt), rrdset_id(st), rrdhost_hostname(host));
 #ifdef NETDATA_INTERNAL_CHECKS
     else if (rc->rrdset != st && !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
         error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st));
@@ -90,7 +90,7 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
 inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 
-    debug(D_HEALTH, "Health removing template '%s' of host '%s'", rrdcalctemplate_name(rt), host->hostname);
+    debug(D_HEALTH, "Health removing template '%s' of host '%s'", rrdcalctemplate_name(rt), rrdhost_hostname(host));
 
     if(host->templates == rt) {
         host->templates = rt->next;
@@ -103,7 +103,7 @@ inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) 
             rt->next = NULL;
         }
         else
-            error("Cannot find RRDCALCTEMPLATE '%s' linked in host '%s'", rrdcalctemplate_name(rt), host->hostname);
+            error("Cannot find RRDCALCTEMPLATE '%s' linked in host '%s'", rrdcalctemplate_name(rt), rrdhost_hostname(host));
     }
 
     rrdcalctemplate_free(rt);

@@ -49,7 +49,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
                 D_EXPORTING,
                 "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
                 rrdset_id(st),
-                host->hostname);
+                rrdhost_hostname(host));
             return 0;
         }
     }
@@ -59,7 +59,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
             D_EXPORTING,
             "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
             rrdset_id(st),
-            host->hostname);
+            rrdhost_hostname(host));
         return 0;
     }
 
@@ -70,7 +70,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
             D_EXPORTING,
             "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
             rrdset_id(st),
-            host->hostname,
+            rrdhost_hostname(host),
             rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
@@ -521,7 +521,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(hostname, rrdhost_hostname(host), PROMETHEUS_ELEMENT_MAX);
 
     format_host_labels_prometheus(instance, host);
 
@@ -808,7 +808,7 @@ static inline time_t prometheus_preparation(
         buffer_sprintf(
             wb,
             "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s, time range %lu to %lu\n\n",
-            host->hostname,
+            rrdhost_hostname(host),
             (first_seen) ? "FIRST SEEN " : "",
             server,
             mode,

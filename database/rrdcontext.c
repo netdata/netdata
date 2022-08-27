@@ -1945,7 +1945,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         info("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', while node '%s' has an active context streaming.",
-              cmd->claim_id, cmd->node_id, host->hostname);
+              cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         // disable it temporarily, so that our worker will not attempt to send messages in parallel
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
@@ -1955,7 +1955,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     if(cmd->version_hash != our_version_hash) {
         error("RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". Sending snapshot of all contexts.",
-              cmd->version_hash, host->hostname, our_version_hash);
+              cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
 #ifdef ENABLE_ACLK
         // prepare the snapshot
@@ -1977,11 +1977,11 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 #endif
     }
 
-    internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", host->hostname);
+    internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", rrdhost_hostname(host));
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
     uuid_unparse_lower(*host->node_id, node_str);
-    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, host->hostname);
+    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
@@ -2006,12 +2006,12 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but node '%s' does not have active context streaming. Ignoring command.",
-              cmd->claim_id, cmd->node_id, host->hostname);
+              cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         return;
     }
 
-    internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", host->hostname);
+    internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", rrdhost_hostname(host));
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
@@ -2440,7 +2440,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
                        ",\n\t\"machine_guid\": \"%s\""
                        ",\n\t\"node_id\": \"%s\""
                        ",\n\t\"claim_id\": \"%s\""
-                   , host->hostname
+                   , rrdhost_hostname(host)
                    , host->machine_guid
                    , node_uuid
                    , host->aclk_state.claimed_id ? host->aclk_state.claimed_id : ""
@@ -2743,7 +2743,7 @@ static void rrdcontext_garbage_collect(void) {
 
                 if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
                     error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                          string2str(rc->id), host->hostname);
+                          string2str(rc->id), rrdhost_hostname(host));
             }
             else {
                 RRDINSTANCE *ri;
@@ -2895,7 +2895,7 @@ void *rrdcontext_main(void *ptr) {
                         // delete it from the master dictionary
                         if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
                             error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                                  string2str(id), host->hostname);
+                                  string2str(id), rrdhost_hostname(host));
 
                         string_freez(id);
                     }

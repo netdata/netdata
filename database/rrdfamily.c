@@ -52,7 +52,7 @@ void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
         if(ret != rc)
             error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
         else {
-            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", host->hostname, string2str(rc->family));
+            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", rrdhost_hostname(host), string2str(rc->family));
             rrdvar_free_remaining_variables(host, &rc->rrdvar_root_index);
 
             string_freez(rc->family);

@@ -16,7 +16,7 @@ PARSER_RC metalog_pluginsd_host_action(
     if (host) {
         if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
             error("Archived host '%s' has memory mode '%s', but the archived one is '%s'. Ignoring archived state.",
-                  host->hostname, rrd_memory_mode_name(host->rrd_memory_mode),
+                  rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode),
                   rrd_memory_mode_name(RRD_MEMORY_MODE_DBENGINE));
             ((PARSER_USER_OBJECT *) user)->host = NULL; /* Ignore objects if memory mode is not dbengine */
         }

@@ -47,7 +47,7 @@ static inline void deactivate_compression(struct sender_state *s) {
     default_compression_enabled = 0;
     s->rrdpush_compression = 0;
     s->version = STREAM_VERSION_CLABELS;
-    error("STREAM_COMPRESSION %s [send to %s]: Restarting connection without compression", s->host->hostname, s->connected_to);
+    error("STREAM_COMPRESSION %s [send to %s]: Restarting connection without compression", rrdhost_hostname(s->host), s->connected_to);
     rrdpush_sender_thread_close_socket(s->host);
 }
 #endif
@@ -162,7 +162,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 
     size_t len = cbuffer_next_unsafe(host->sender->buffer, NULL);
     if (len)
-        error("STREAM %s [send]: discarding %zu bytes of metrics already in the buffer.", host->hostname, len);
+        error("STREAM %s [send]: discarding %zu bytes of metrics already in the buffer.", rrdhost_hostname(host), len);
 
     cbuffer_remove_unsafe(host->sender->buffer, len);
     netdata_mutex_unlock(&host->sender->mutex);
@@ -259,7 +259,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     rrdpush_sender_thread_close_socket(host);
 
     debug(D_STREAM, "STREAM: Attempting to connect...");
-    info("STREAM %s [send to %s]: connecting...", host->hostname, host->rrdpush_send_destination);
+    info("STREAM %s [send to %s]: connecting...", rrdhost_hostname(host), host->rrdpush_send_destination);
 
     host->rrdpush_sender_socket = connect_to_one_of_destinations(
             host->destinations
@@ -272,11 +272,11 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     );
 
     if(unlikely(host->rrdpush_sender_socket == -1)) {
-        error("STREAM %s [send to %s]: failed to connect", host->hostname, host->rrdpush_send_destination);
+        error("STREAM %s [send to %s]: failed to connect", rrdhost_hostname(host), host->rrdpush_send_destination);
         return 0;
     }
 
-    info("STREAM %s [send to %s]: initializing communication...", host->hostname, s->connected_to);
+    info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
 #ifdef ENABLE_HTTPS
     if( netdata_client_ctx ){
@@ -370,11 +370,11 @@ if(!s->rrdpush_compression)
                  "User-Agent: %s/%s\r\n"
                  "Accept: */*\r\n\r\n"
                  , host->rrdpush_send_api_key
-                 , host->hostname
+                 , rrdhost_hostname(host)
                  , host->registry_hostname
                  , host->machine_guid
                  , default_rrd_update_every
-                 , host->os
+                 , rrdhost_os(host)
                  , host->timezone
                  , host->abbrev_timezone
                  , host->utc_offset
@@ -382,7 +382,7 @@ if(!s->rrdpush_compression)
                  , host->system_info->ml_capable
                  , host->system_info->ml_enabled
                  , host->system_info->mc_version
-                 , (host->tags) ? host->tags : ""
+                 , rrdhost_tags(host)
                  , s->version
                  , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
                  , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""
@@ -456,12 +456,12 @@ if(!s->rrdpush_compression)
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-        error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", host->hostname, s->connected_to);
+        error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", rrdhost_hostname(host), s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
 
-    info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, s->connected_to);
+    info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
     ssize_t received;
 #ifdef ENABLE_HTTPS
@@ -472,7 +472,7 @@ if(!s->rrdpush_compression)
     if(received == -1) {
 #endif
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-        error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, s->connected_to);
+        error("STREAM %s [send to %s]: remote netdata does not respond.", rrdhost_hostname(host), s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
@@ -482,7 +482,7 @@ if(!s->rrdpush_compression)
     int32_t version = (int32_t)parse_stream_version(host, http);
     if(version == -1) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE);
-        error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
+        error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", rrdhost_hostname(host), s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         //catch other reject reasons and force to check other destinations
         if (host->destination->next)
@@ -490,19 +490,19 @@ if(!s->rrdpush_compression)
         return 0;
     }
     else if(version == -2) {
-        error("STREAM %s [send to %s]: remote server is the localhost for [%s].", host->hostname, s->connected_to, host->hostname);
+        error("STREAM %s [send to %s]: remote server is the localhost for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
         rrdpush_sender_thread_close_socket(host);
         host->destination->disabled_because_of_localhost = 1;
         return 0;
     }
     else if(version == -3) {
-        error("STREAM %s [send to %s]: remote server already receives metrics for [%s].", host->hostname, s->connected_to, host->hostname);
+        error("STREAM %s [send to %s]: remote server already receives metrics for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
         rrdpush_sender_thread_close_socket(host);
         host->destination->disabled_already_streaming = now_realtime_sec();
         return 0;
     }
     else if(version == -4) {
-        error("STREAM %s [send to %s]: remote server denied access for [%s].", host->hostname, s->connected_to, host->hostname);
+        error("STREAM %s [send to %s]: remote server denied access for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
         rrdpush_sender_thread_close_socket(host);
         if (host->destination->next)
             host->destination->disabled_because_of_denied_access = 1;
@@ -520,23 +520,23 @@ if(!s->rrdpush_compression)
     }
     else {
         //parent does not support compression or has compression disabled
-        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
-        infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, s->host->hostname);
+        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, rrdhost_hostname(s->host));
+        infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, rrdhost_hostname(s->host));
         s->version = STREAM_VERSION_CLABELS;
     }        
 #endif  //ENABLE_COMPRESSION
 
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
-         , host->hostname
+         , rrdhost_hostname(host)
          , s->connected_to
          , s->version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, s->connected_to);
+        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
 
     if(sock_enlarge_out(host->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", host->hostname, s->connected_to);
+        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
 
     debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_sender_socket);
 
@@ -606,15 +606,15 @@ void attempt_to_send(struct sender_state *s) {
         cbuffer_remove_unsafe(s->buffer, ret);
         s->sent_bytes_on_this_connection += ret;
         s->sent_bytes += ret;
-        debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", s->host->hostname, s->connected_to, ret);
+        debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", rrdhost_hostname(s->host), s->connected_to, ret);
         s->last_sent_t = now_monotonic_sec();
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", s->host->hostname, s->connected_to);
+        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", rrdhost_hostname(s->host), s->connected_to);
     else if (ret == -1) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
         debug(D_STREAM, "STREAM: Send failed - closing socket...");
-        error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  s->host->hostname, s->connected_to, s->sent_bytes_on_this_connection);
+        error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
         rrdpush_sender_thread_close_socket(s->host);
     }
     else {
@@ -645,7 +645,7 @@ int ret;
         char buf[256];
         while ((err = ERR_get_error()) != 0) {
             ERR_error_string_n(err, buf, sizeof(buf));
-            error("STREAM %s [send to %s] ssl error: %s", s->host->hostname, s->connected_to, buf);
+            error("STREAM %s [send to %s] ssl error: %s", rrdhost_hostname(s->host), s->connected_to, buf);
         }
         error("Restarting connection");
         rrdpush_sender_thread_close_socket(s->host);
@@ -665,11 +665,11 @@ int ret;
 
     if (ret==0) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
-        error("STREAM %s [send to %s]: connection closed by far end. Restarting connection", s->host->hostname, s->connected_to);
+        error("STREAM %s [send to %s]: connection closed by far end. Restarting connection", rrdhost_hostname(s->host), s->connected_to);
     }
     else {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
-        error("STREAM %s [send to %s]: error during receive (%d). Restarting connection", s->host->hostname, s->connected_to, ret);
+        error("STREAM %s [send to %s]: error during receive (%d). Restarting connection", rrdhost_hostname(s->host), s->connected_to, ret);
     }
     rrdpush_sender_thread_close_socket(s->host);
 }
@@ -680,7 +680,7 @@ void execute_commands(struct sender_state *s) {
     *end = 0;
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
-        info("STREAM %s [send to %s] received command over connection: %s", s->host->hostname, s->connected_to, start);
+        info("STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
         start = newline+1;
     }
     if (start<end) {
@@ -697,7 +697,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     netdata_mutex_lock(&host->sender->mutex);
 
-    info("STREAM %s [send]: sending thread cleans up...", host->hostname);
+    info("STREAM %s [send]: sending thread cleans up...", rrdhost_hostname(host));
 
     rrdpush_sender_thread_close_socket(host);
 
@@ -713,13 +713,13 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     }
 
     if(!host->rrdpush_sender_join) {
-        info("STREAM %s [send]: sending thread detaches itself.", host->hostname);
+        info("STREAM %s [send]: sending thread detaches itself.", rrdhost_hostname(host));
         netdata_thread_detach(netdata_thread_self());
     }
 
     host->rrdpush_sender_spawn = 0;
 
-    info("STREAM %s [send]: sending thread now exits.", host->hostname);
+    info("STREAM %s [send]: sending thread now exits.", rrdhost_hostname(host));
 
     netdata_mutex_unlock(&host->sender->mutex);
 }
@@ -749,7 +749,7 @@ void *rrdpush_sender_thread(void *ptr) {
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
        !*s->host->rrdpush_send_api_key) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              s->host->hostname, s->task_id);
+              rrdhost_hostname(s->host), s->task_id);
         return NULL;
     }
 
@@ -760,7 +760,7 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 #endif
 
-    info("STREAM %s [send]: thread created (task id %d)", s->host->hostname, s->task_id);
+    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->task_id);
 
     s->timeout = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
     s->default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
@@ -776,7 +776,7 @@ void *rrdpush_sender_thread(void *ptr) {
     // initialize rrdpush globals
     __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
     if(pipe(s->host->rrdpush_sender_pipe) == -1) {
-        error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", s->host->hostname);
+        error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", rrdhost_hostname(s->host));
         return NULL;
     }
     s->version = STREAMING_PROTOCOL_CURRENT_VERSION;
@@ -834,7 +834,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // If the TCP window never opened then something is wrong, restart connection
         if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-            error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", s->host->hostname, s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
+            error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", rrdhost_hostname(s->host), s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
             rrdpush_sender_thread_close_socket(s->host);
             continue;
         }
@@ -874,7 +874,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // Only errors from poll() are internal, but try restarting the connection
         if(unlikely(retval == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
-            error("STREAM %s [send to %s]: failed to poll(). Closing socket.", s->host->hostname, s->connected_to);
+            error("STREAM %s [send to %s]: failed to poll(). Closing socket.", rrdhost_hostname(s->host), s->connected_to);
             rrdpush_sender_thread_close_socket(s->host);
             continue;
         }
@@ -886,7 +886,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
             char buffer[1000 + 1];
             if (read(s->host->rrdpush_sender_pipe[PIPE_READ], buffer, 1000) == -1)
-                error("STREAM %s [send to %s]: cannot read from internal pipe.", s->host->hostname, s->connected_to);
+                error("STREAM %s [send to %s]: cannot read from internal pipe.", rrdhost_hostname(s->host), s->connected_to);
         }
 
         // Read as much as possible to fill the buffer, split into full lines for execution.
@@ -915,7 +915,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 error = "connection is invalid (POLLNVAL)";
             if(unlikely(error)) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR);
-                error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.", s->host->hostname,
+                error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.", rrdhost_hostname(s->host),
                       s->connected_to, error, s->sent_bytes_on_this_connection);
                 rrdpush_sender_thread_close_socket(s->host);
             }
@@ -926,7 +926,7 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
             errno = 0;
             error("STREAM %s [send to %s]: buffer full (%zu-bytes) after %zu bytes. Restarting connection",
-                  s->host->hostname, s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
+                  rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
             rrdpush_sender_thread_close_socket(s->host);
         }
     }

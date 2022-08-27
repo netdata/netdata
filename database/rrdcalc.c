@@ -100,7 +100,7 @@ void rrdcalc_update_rrdlabels(RRDSET *st) {
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     RRDHOST *host = st->rrdhost;
 
-    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), host->hostname);
+    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
@@ -260,7 +260,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     health_alarm_log(host, ae);
 
-    debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), host->hostname);
+    debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
     // unlink it
     if(rc->rrdset_prev)
@@ -323,8 +323,8 @@ inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name) {
     // make sure it does not already exist
     for(rc = host->alarms; rc ; rc = rc->next) {
         if (unlikely(rc->chart == chart_string && rc->name == name_string)) {
-            debug(D_HEALTH, "Health alarm '%s/%s' already exists in host '%s'.", chart, name, host->hostname);
-            info("Health alarm '%s/%s' already exists in host '%s'.", chart, name, host->hostname);
+            debug(D_HEALTH, "Health alarm '%s/%s' already exists in host '%s'.", chart, name, rrdhost_hostname(host));
+            info("Health alarm '%s/%s' already exists in host '%s'.", chart, name, rrdhost_hostname(host));
             ret = 1;
             break;
         }
@@ -694,7 +694,7 @@ void rrdcalc_free(RRDCALC *rc) {
 void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     if(unlikely(!rc)) return;
 
-    debug(D_HEALTH, "Health removing alarm '%s.%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), host->hostname);
+    debug(D_HEALTH, "Health removing alarm '%s.%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdhost_hostname(host));
 
     // unlink it from RRDSET
     if(rc->rrdset) rrdsetcalc_unlink(rc);
@@ -710,7 +710,7 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             rc->next = NULL;
         }
         else
-            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rrdcalc_chart_name(rc), rrdcalc_name(rc), host->hostname);
+            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdhost_hostname(host));
     }
 
     RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl_t *)rc);
@@ -744,7 +744,7 @@ void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             rc->next = NULL;
         }
         else
-            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rrdcalc_chart_name(rc), rrdcalc_name(rc), host->hostname);
+            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdhost_hostname(host));
     }
 
     rrdcalc_free(rc);
@@ -762,7 +762,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
         if(!rrdlabels_match_simple_pattern_parsed(host->host_labels, rc->host_labels_pattern, '=')) {
             info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rrdcalc_name(rc),
-                 host->hostname,
+                 rrdhost_hostname(host),
                  rrdcalc_host_labels(rc));
 
             if(host->alarms == alarms)
