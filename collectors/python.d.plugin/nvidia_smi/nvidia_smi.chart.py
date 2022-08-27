@@ -450,7 +450,7 @@ class Service(SimpleService):
         self.order = list()
         self.definitions = dict()
         self.loop_mode = configuration.get('loop_mode', True)
-        poll = int(configuration.get('poll_seconds', 1))
+        poll = int(configuration.get('poll_seconds', self.get_update_every()))
         self.exclude_zero_memory_users = configuration.get('exclude_zero_memory_users', False)
         self.poller = NvidiaSMIPoller(poll)
 
