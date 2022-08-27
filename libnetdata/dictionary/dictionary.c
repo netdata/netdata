@@ -1532,11 +1532,8 @@ STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
-    netdata_mutex_lock(&string_mutex);
-    se->refcount++;
-    string_dictionary.referenced_items++;
-    //fprintf(stderr, "STRING_STRDUPZ (DUP): '%s'\n", se->str);
-    netdata_mutex_unlock(&string_mutex);
+    __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_SEQ_CST);
     return string;
 }
 
@@ -1561,7 +1558,6 @@ STRING *string_strdupz(const char *str) {
         string_dictionary.inserts++;
         string_dictionary.entries++;
         string_dictionary.memory += (long)mem_size;
-        string_dictionary.referenced_items++;
 
         //fprintf(stderr, "STRING_STRDUPZ (NEW): '%s'\n", str);
     }
@@ -1570,10 +1566,11 @@ STRING *string_strdupz(const char *str) {
         se = *ptr;
         se->refcount++;
         string_dictionary.searches++;
-        string_dictionary.referenced_items++;
 
         //fprintf(stderr, "STRING_STRDUPZ (FOUND): '%s'\n", str);
     }
+
+    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_SEQ_CST);
 
     netdata_mutex_unlock(&string_mutex);
     return (STRING *)se;
@@ -1585,13 +1582,14 @@ void string_freez(STRING *string) {
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
 
-    if(se->refcount == 0)
+    __atomic_fetch_sub(&string_dictionary.referenced_items, 1, __ATOMIC_SEQ_CST);
+
+    uint32_t refcount = __atomic_fetch_sub(&se->refcount, 1, __ATOMIC_SEQ_CST);
+
+    if(refcount == 0)
         fatal("STRING: tried to free string that has zero references.");
 
-    string_dictionary.referenced_items--;
-
-    se->refcount--;
-    if(unlikely(se->refcount == 0)) {
+    if(unlikely(refcount == 1)) {
         if(hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0)
             error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
 
@@ -1659,6 +1657,88 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
     }
 
     return string_strdupz(buf1);
+}
+
+// ----------------------------------------------------------------------------
+// THREAD_CACHE
+
+typedef struct cache_entry {
+#ifdef DICTIONARY_WITH_AVL
+    avl_t avl_node;
+#endif
+    void *ptr;
+    const char str[];   // the string itself
+} CACHE_ENTRY;
+
+#ifdef DICTIONARY_WITH_AVL
+static int cache_entry_compare(void* a, void* b) {
+    return strcmp(((CACHE_ENTRY *)a)->str, ((CACHE_ENTRY *)b)->str);
+}
+
+static void *get_thread_static_cache_entry(const char *name) {
+    static __thread size_t _length = 0;
+    static __thread CACHE_ENTRY *_tmp = NULL;
+
+    size_t size = sizeof(CACHE_ENTRY) + strlen(name) + 1;
+    if(likely(_tmp && _length < size)) {
+        freez(_tmp);
+        _tmp = NULL;
+        _length = 0;
+    }
+
+    if(unlikely(!_tmp)) {
+        _tmp = callocz(1, size);
+        _length = size;
+    }
+
+    strcpy((char *)&_tmp->str[0], name);
+    return _tmp;
+}
+#endif
+
+static __thread DICTIONARY cache_dictionary = {
+#ifdef DICTIONARY_WITH_AVL
+    .values_index = {
+        .root = NULL,
+        .compar = cache_entry_compare
+    },
+    .get_thread_static_name_value = get_thread_static_cache_entry,
+#endif
+
+    .flags = DICTIONARY_FLAG_EXCLUSIVE_ACCESS,
+    .rwlock = NETDATA_RWLOCK_INITIALIZER
+};
+
+void *thread_cache_entry_get(const char *str, void *(*prepare_the_value)(const char *str, void *data), void *data) {
+    if(unlikely(!str || !*str)) return NULL;
+
+    size_t length = strlen(str) + 1;
+    CACHE_ENTRY *ce;
+    CACHE_ENTRY **ptr = (CACHE_ENTRY **)hashtable_insert_unsafe(&cache_dictionary, str, length);
+    if(unlikely(*ptr == 0)) {
+        // a new item added to the index
+        size_t mem_size = sizeof(CACHE_ENTRY) + length;
+        ce = mallocz(mem_size);
+        strcpy((char *)ce->str, str);
+        ce->ptr = prepare_the_value(str, data);
+        *ptr = ce;
+        hashtable_inserted_name_value_unsafe(&cache_dictionary, ce);
+        cache_dictionary.version++;
+        cache_dictionary.inserts++;
+        cache_dictionary.entries++;
+        cache_dictionary.memory += (long)mem_size;
+    }
+    else {
+        // the item is already in the index
+        ce = *ptr;
+        cache_dictionary.searches++;
+    }
+
+    return ce->ptr;
+}
+
+void thread_cache_destroy(void) {
+    hashtable_destroy_unsafe(&cache_dictionary);
 }
 
 // ----------------------------------------------------------------------------

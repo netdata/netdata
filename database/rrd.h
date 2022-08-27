@@ -617,14 +617,7 @@ struct rrdset {
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
 #define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
 
-static inline STRING *rrd_string_strdupz(const char *s) {
-    if(unlikely(!s || !*s)) return string_strdupz(s);
-
-    char buffer[strlen(s) + 1];
-    strcpy(buffer, s);
-    json_fix_string(buffer);
-    return string_strdupz(buffer);
-}
+extern STRING *rrd_string_strdupz(const char *s);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock

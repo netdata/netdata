@@ -106,6 +106,8 @@ static void thread_cleanup(void *ptr) {
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         info("thread with task id %d finished", gettid());
 
+    thread_cache_destroy();
+
     freez((void *)netdata_thread->tag);
     netdata_thread->tag = NULL;
 

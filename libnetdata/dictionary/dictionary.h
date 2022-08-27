@@ -251,4 +251,10 @@ static inline int string_cmp(STRING *s1, STRING *s2) {
 
 extern void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory);
 
+// ----------------------------------------------------------------------------
+// THREAD CACHE
+
+extern void *thread_cache_entry_get(const char *str, void *(*prepare_the_value)(const char *str, void *data), void *data);
+extern void thread_cache_destroy(void);
+
 #endif /* NETDATA_DICTIONARY_H */
