@@ -2378,7 +2378,7 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
 
 int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     if(!host->rrdctx) {
-        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, host->hostname);
+        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -2418,7 +2418,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     if(!host->rrdctx) {
-        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, host->hostname);
+        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
         return HTTP_RESP_NOT_FOUND;
     }
 
