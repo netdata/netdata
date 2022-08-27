@@ -52,28 +52,28 @@ static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
 
     // KEYS
 
-    freez(rs->key_id);
+    string_freez(rs->key_id);
     rs->key_id = NULL;
 
-    freez(rs->key_name);
+    string_freez(rs->key_name);
     rs->key_name = NULL;
 
-    freez(rs->key_fullidid);
+    string_freez(rs->key_fullidid);
     rs->key_fullidid = NULL;
 
-    freez(rs->key_fullidname);
+    string_freez(rs->key_fullidname);
     rs->key_fullidname = NULL;
 
-    freez(rs->key_contextid);
+    string_freez(rs->key_contextid);
     rs->key_contextid = NULL;
 
-    freez(rs->key_contextname);
+    string_freez(rs->key_contextname);
     rs->key_contextname = NULL;
 
-    freez(rs->key_fullnameid);
+    string_freez(rs->key_fullnameid);
     rs->key_fullnameid = NULL;
 
-    freez(rs->key_fullnamename);
+    string_freez(rs->key_fullnamename);
     rs->key_fullnamename = NULL;
 }
 
@@ -88,29 +88,29 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
 
     // KEYS
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rrddim_id(rd), rs->suffix);
-    rs->key_id = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", string2str(rs->prefix), rrddim_id(rd), string2str(rs->suffix));
+    rs->key_id = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rrddim_name(rd), rs->suffix);
-    rs->key_name = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", string2str(rs->prefix), rrddim_name(rd), string2str(rs->suffix));
+    rs->key_name = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), rs->key_id);
-    rs->key_fullidid = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), string2str(rs->key_id));
+    rs->key_fullidid = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), rs->key_name);
-    rs->key_fullidname = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), string2str(rs->key_name));
+    rs->key_fullidname = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), rs->key_id);
-    rs->key_contextid = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), string2str(rs->key_id));
+    rs->key_contextid = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), rs->key_name);
-    rs->key_contextname = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), string2str(rs->key_name));
+    rs->key_contextname = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), rs->key_id);
-    rs->key_fullnameid = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), string2str(rs->key_id));
+    rs->key_fullnameid = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), rs->key_name);
-    rs->key_fullnamename = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), string2str(rs->key_name));
+    rs->key_fullnamename = string_strdupz(buffer);
 
     // CHART VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -162,8 +162,8 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, co
 
     RRDDIMVAR *rs = (RRDDIMVAR *)callocz(1, sizeof(RRDDIMVAR));
 
-    rs->prefix = strdupz(prefix);
-    rs->suffix = strdupz(suffix);
+    rs->prefix = string_strdupz(prefix);
+    rs->suffix = string_strdupz(suffix);
 
     rs->type = type;
     rs->value = value;
@@ -194,7 +194,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
 void rrddimvar_free(RRDDIMVAR *rs) {
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
-    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd), rs->prefix, rs->suffix);
+    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd), string2str(rs->prefix), string2str(rs->suffix));
 
     rrddimvar_free_variables(rs);
 
@@ -206,12 +206,11 @@ void rrddimvar_free(RRDDIMVAR *rs) {
         debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
         RRDDIMVAR *t;
         for (t = rd->variables; t && t->next != rs; t = t->next) ;
-        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->key_name, rrdset_id(st), rrddim_id(rd));
+        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", string2str(rs->key_name), rrdset_id(st), rrddim_id(rd));
         else t->next = rs->next;
     }
 
-    freez(rs->prefix);
-    freez(rs->suffix);
+    string_freez(rs->prefix);
+    string_freez(rs->suffix);
     freez(rs);
 }
-

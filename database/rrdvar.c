@@ -68,7 +68,7 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
     freez(rv);
 }
 
-static inline STRING *rrdvar_name_to_string(const char *name) {
+inline STRING *rrdvar_name_to_string(const char *name) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);
     STRING *name_string = string_strdupz(variable);
@@ -76,16 +76,15 @@ static inline STRING *rrdvar_name_to_string(const char *name) {
     return name_string;
 }
 
-inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, avl_tree_lock *tree, const char *name,
+inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, avl_tree_lock *tree, STRING *name,
                                        RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
-    STRING *variable = rrdvar_name_to_string(name);
 
-    RRDVAR *rv = rrdvar_index_find(tree, variable);
+    RRDVAR *rv = rrdvar_index_find(tree, name);
     if(unlikely(!rv)) {
-        debug(D_VARIABLES, "Variable '%s' not found in scope '%s'. Creating a new one.", string2str(variable), scope);
+        debug(D_VARIABLES, "Variable '%s' not found in scope '%s'. Creating a new one.", string2str(name), scope);
 
         rv = callocz(1, sizeof(RRDVAR));
-        rv->name = variable;
+        rv->name = string_dup(name);
         rv->type = type;
         rv->options = options;
         rv->value = value;
@@ -93,19 +92,15 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, avl_tre
 
         RRDVAR *ret = rrdvar_index_add(tree, rv);
         if(unlikely(ret != rv)) {
-            debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", string2str(variable), scope);
+            debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", string2str(name), scope);
             freez(rv);
-            string_freez(variable);
             rv = NULL;
         }
         else
-            debug(D_VARIABLES, "Variable '%s' created in scope '%s'", string2str(variable), scope);
+            debug(D_VARIABLES, "Variable '%s' created in scope '%s'", string2str(name), scope);
     }
     else {
-        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", string2str(variable), scope);
-
-        // already exists
-        string_freez(variable);
+        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", string2str(name), scope);
 
         // this is important
         // it must return NULL - not the existing variable - or double-free will happen
@@ -141,18 +136,18 @@ static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *t
     NETDATA_DOUBLE *v = callocz(1, sizeof(NETDATA_DOUBLE));
     *v = NAN;
 
-    RRDVAR *rv = rrdvar_create_and_index(scope, tree_lock, name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_ALLOCATED, v);
+    STRING *name_string = rrdvar_name_to_string(name);
+
+    RRDVAR *rv = rrdvar_create_and_index(scope, tree_lock, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_ALLOCATED, v);
     if(unlikely(!rv)) {
         freez(v);
-        debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
-
-        STRING *variable = rrdvar_name_to_string(name);
+        debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", string2str(name_string));
 
         // find the existing one to return it
-        rv = rrdvar_index_find(tree_lock, variable);
-
-        string_freez(variable);
+        rv = rrdvar_index_find(tree_lock, name_string);
     }
+
+    string_freez(name_string);
 
     return rv;
 }

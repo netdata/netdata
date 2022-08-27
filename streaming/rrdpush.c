@@ -278,7 +278,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             buffer_sprintf(
                     host->sender->build
                     , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
-                    , rs->variable
+                    , string2str(rs->variable)
                     , *value
             );
         }

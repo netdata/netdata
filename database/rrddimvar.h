@@ -11,17 +11,17 @@
 // This means, there will be no speed penalty for using
 // these variables
 struct rrddimvar {
-    char *prefix;
-    char *suffix;
+    STRING *prefix;
+    STRING *suffix;
 
-    char *key_id;                   // dimension id
-    char *key_name;                 // dimension name
-    char *key_contextid;            // context + dimension id
-    char *key_contextname;          // context + dimension name
-    char *key_fullidid;             // chart type.chart id + dimension id
-    char *key_fullidname;           // chart type.chart id + dimension name
-    char *key_fullnameid;           // chart type.chart name + dimension id
-    char *key_fullnamename;         // chart type.chart name + dimension name
+    STRING *key_id;                   // dimension id
+    STRING *key_name;                 // dimension name
+    STRING *key_contextid;            // context + dimension id
+    STRING *key_contextname;          // context + dimension name
+    STRING *key_fullidid;             // chart type.chart id + dimension id
+    STRING *key_fullidname;           // chart type.chart id + dimension name
+    STRING *key_fullnameid;           // chart type.chart name + dimension id
+    STRING *key_fullnamename;         // chart type.chart name + dimension name
 
     RRDVAR_TYPE type;
     void *value;

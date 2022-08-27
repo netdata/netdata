@@ -12,11 +12,10 @@
 // these variables
 
 struct rrdsetvar {
-    char *variable;                 // variable name
-    uint32_t hash;                  // variable name hash
+    STRING *variable;               // variable name
 
-    char *key_fullid;               // chart type.chart id.variable
-    char *key_fullname;             // chart type.chart name.variable
+    STRING *key_fullid;             // chart type.chart id.variable
+    STRING *key_fullname;           // chart type.chart name.variable
 
     RRDVAR_TYPE type;
     void *value;
