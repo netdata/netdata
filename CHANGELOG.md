@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.37.2 [\#13574](https://github.com/netdata/netdata/pull/13574) ([ilyam8](https://github.com/ilyam8))
+- Updating info for postgreqsql metrics [\#13573](https://github.com/netdata/netdata/pull/13573) ([shyamvalsan](https://github.com/shyamvalsan))
 - add `apt` to `apps_groups.conf` [\#13571](https://github.com/netdata/netdata/pull/13571) ([andrewm4894](https://github.com/andrewm4894))
 - eBPF cmake missing include dir [\#13568](https://github.com/netdata/netdata/pull/13568) ([underhood](https://github.com/underhood))
 - chore: removing logging that a chart collection in the same interpolation point [\#13567](https://github.com/netdata/netdata/pull/13567) ([ilyam8](https://github.com/ilyam8))
@@ -344,8 +346,6 @@
 - Reduce timeout to 1 second for getting cloud instance info [\#12941](https://github.com/netdata/netdata/pull/12941) ([MrZammler](https://github.com/MrZammler))
 - Stream and advertise metric correlations to the cloud [\#12940](https://github.com/netdata/netdata/pull/12940) ([MrZammler](https://github.com/MrZammler))
 - feat: move dirs, logs, and env vars config options to separate sections [\#12935](https://github.com/netdata/netdata/pull/12935) ([ilyam8](https://github.com/ilyam8))
-- Adjust the dimension liveness status check [\#12933](https://github.com/netdata/netdata/pull/12933) ([stelfrag](https://github.com/stelfrag))
-- chore\(fping.plugin\): bump default fping version to 5.1 [\#12930](https://github.com/netdata/netdata/pull/12930) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
