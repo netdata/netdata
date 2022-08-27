@@ -4,11 +4,10 @@
 # Author: Ilya Mashchenko (ilyam8)
 # User Memory Stat Author: Guido Scatena (scatenag)
 
-import subprocess
-import threading
 import os
 import pwd
-
+import subprocess
+import threading
 import xml.etree.ElementTree as et
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -32,6 +31,7 @@ BAR_USAGE = 'bar1_mem_usage'
 TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
+POWER_STATE = 'power_state'
 PROCESSES_MEM = 'processes_mem'
 USER_MEM = 'user_mem'
 USER_NUM = 'user_num'
@@ -47,10 +47,14 @@ ORDER = [
     TEMPERATURE,
     CLOCKS,
     POWER,
+    POWER_STATE,
     PROCESSES_MEM,
     USER_MEM,
     USER_NUM,
 ]
+
+# https://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpupstate.html
+POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 
 def gpu_charts(gpu):
@@ -124,6 +128,10 @@ def gpu_charts(gpu):
             'lines': [
                 ['power_draw', 'power', 'absolute', 1, 100],
             ]
+        },
+        POWER_STATE: {
+            'options': [None, 'Power State', 'state', fam, 'nvidia_smi.power_state', 'line'],
+            'lines': [['power_state_' + v.lower(), v, 'absolute'] for v in POWER_STATES]
         },
         PROCESSES_MEM: {
             'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
@@ -382,6 +390,10 @@ class GPU:
     def mem_clock(self):
         return self.root.find('clocks').find('mem_clock').text.split()[0]
 
+    @handle_attr_error
+    def power_state(self):
+        return str(self.root.find('power_readings').find('power_state').text.split()[0])
+
     @handle_value_error
     @handle_attr_error
     def power_draw(self):
@@ -426,6 +438,13 @@ class GPU:
             'mem_clock': self.mem_clock(),
             'power_draw': self.power_draw(),
         }
+
+        for v in POWER_STATES:
+            data['power_state_' + v.lower()] = 0
+        p_state = self.power_state()
+        if p_state:
+            data['power_state_' + p_state.lower()] = 1
+
         processes = self.processes() or []
         users = set()
         for p in processes:
