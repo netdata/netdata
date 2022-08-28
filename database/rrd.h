@@ -161,10 +161,9 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 struct rrdfamily {
     STRING *family;
+    DICTIONARY *rrdvar_root_index;
 
     size_t use_count;
-
-    avl_tree_lock rrdvar_root_index;
 };
 typedef struct rrdfamily RRDFAMILY;
 
@@ -569,7 +568,7 @@ struct rrdset {
     NETDATA_DOUBLE green;                           // green threshold for this chart
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
-    avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
+    DICTIONARY *rrdvar_root_index;                  // RRDVAR index for this chart
     RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
 
@@ -916,7 +915,7 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
     DICTIONARY *rrdfamily_root_index;               // the host's chart families index
-    avl_tree_lock rrdvar_root_index;                // the host's chart variables index
+    DICTIONARY *rrdvar_root_index;                  // the host's chart variables index
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 

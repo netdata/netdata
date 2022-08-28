@@ -29,8 +29,11 @@ RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
 
         rc->family = string_strdupz(id);
 
-        // initialize the variables index
-        avl_init_lock(&rc->rrdvar_root_index, rrdvar_compare);
+        rc->rrdvar_root_index = dictionary_create(
+             DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+            |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+            |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+            );
 
         RRDFAMILY *ret = rrdfamily_index_add(host, rc);
         if(ret != rc)
@@ -49,8 +52,9 @@ void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
             error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
         else {
             debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", rrdhost_hostname(host), string2str(rc->family));
-            rrdvar_free_remaining_variables(host, &rc->rrdvar_root_index);
+            rrdvar_free_remaining_variables(host, rc->rrdvar_root_index);
 
+            dictionary_destroy(rc->rrdvar_root_index);
             string_freez(rc->family);
             freez(rc);
         }

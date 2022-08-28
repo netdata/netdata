@@ -315,9 +315,9 @@ static inline size_t dictionary_lock_free(DICTIONARY *dict) {
 }
 
 static void dictionary_lock(DICTIONARY *dict, char rw) {
-    if(rw == 'u' || rw == 'U') return;
+    if(rw == DICTIONARY_LOCK_NONE || rw == 'U') return;
 
-    if(rw == 'r' || rw == 'R') {
+    if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REETRANT || rw == 'R') {
         // read lock
         __atomic_add_fetch(&dict->readers, 1, __ATOMIC_RELAXED);
     }
@@ -329,7 +329,7 @@ static void dictionary_lock(DICTIONARY *dict, char rw) {
     if(likely(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))
         return;
 
-    if(rw == 'r' || rw == 'R') {
+    if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REETRANT || rw == 'R') {
         // read lock
         netdata_rwlock_rdlock(&dict->rwlock);
 
@@ -347,9 +347,9 @@ static void dictionary_lock(DICTIONARY *dict, char rw) {
 }
 
 static void dictionary_unlock(DICTIONARY *dict, char rw) {
-    if(rw == 'u' || rw == 'U') return;
+    if(rw == DICTIONARY_LOCK_NONE || rw == 'U') return;
 
-    if(rw == 'r' || rw == 'R') {
+    if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REETRANT || rw == 'R') {
         // read unlock
         __atomic_sub_fetch(&dict->readers, 1, __ATOMIC_RELAXED);
     }
@@ -1280,6 +1280,9 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
         dfe->value = NULL;
     }
 
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REETRANT))
+        dictionary_unlock(dfe->dict, dfe->rw);
+
     return dfe->value;
 }
 
@@ -1293,6 +1296,9 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->value = NULL;
         return NULL;
     }
+
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REETRANT))
+        dictionary_lock(dfe->dict, dfe->rw);
 
     // the item we just did
     NAME_VALUE *nv = (NAME_VALUE *)dfe->last_item;
@@ -1320,6 +1326,9 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->value = NULL;
     }
 
+    if(unlikely(dfe->rw == DICTIONARY_LOCK_REETRANT))
+        dictionary_unlock(dfe->dict, dfe->rw);
+
     return dfe->value;
 }
 
@@ -1338,7 +1347,9 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
     if(likely(nv))
         reference_counter_release(dfe->dict, nv, false);
 
-    dictionary_unlock(dfe->dict, dfe->rw);
+    if(likely(dfe->rw != DICTIONARY_LOCK_REETRANT))
+        dictionary_unlock(dfe->dict, dfe->rw);
+
     dfe->dict = NULL;
     dfe->last_item = NULL;
     dfe->name = NULL;
@@ -1383,7 +1394,13 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
         // while we are using it
         reference_counter_acquire(dict, nv);
 
+        if(unlikely(rw == DICTIONARY_LOCK_REETRANT))
+            dictionary_unlock(dict, rw);
+
         int r = callback(namevalue_get_name(nv), nv->value, data);
+
+        if(unlikely(rw == DICTIONARY_LOCK_REETRANT))
+            dictionary_lock(dict, rw);
 
         // since we have a reference counter, this item cannot be deleted
         // until we release the reference counter, so the pointers are there
@@ -1449,7 +1466,15 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
         nv = array[i];
         if(likely(!(nv->flags & NAME_VALUE_FLAG_DELETED))) {
             reference_counter_acquire(dict, nv);
+
+            if(unlikely(rw == DICTIONARY_LOCK_REETRANT))
+                dictionary_unlock(dict, rw);
+
             int r = callback(namevalue_get_name(nv), nv->value, data);
+
+            if(unlikely(rw == DICTIONARY_LOCK_REETRANT))
+                dictionary_lock(dict, rw);
+
             reference_counter_release(dict, nv, false);
             if (r < 0) {
                 ret = r;

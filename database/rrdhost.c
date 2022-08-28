@@ -282,8 +282,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdset_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     host->rrdset_root_index_name = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     host->rrdfamily_root_index   = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-
-    avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
+    host->rrdvar_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -1146,7 +1145,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     host->alarms_template_with_foreach = NULL;
 
     debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", rrdhost_hostname(host));
-    rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);
+    rrdvar_free_remaining_variables(host, host->rrdvar_root_index);
 
     health_alarm_log_free(host);
 
@@ -1240,6 +1239,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     dictionary_destroy(host->rrdset_root_index);
     dictionary_destroy(host->rrdset_root_index_name);
     dictionary_destroy(host->rrdfamily_root_index);
+    dictionary_destroy(host->rrdvar_root_index);
 
     rrdhost_destroy_rrdcontexts(host);
 
@@ -1601,7 +1601,7 @@ restart_after_removal:
                 rrdset_unlock(st);
 
                 debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
-                rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
+                rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
 
                 rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
                 

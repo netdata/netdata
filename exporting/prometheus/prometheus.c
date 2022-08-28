@@ -349,8 +349,9 @@ struct host_variables_callback_options {
  * @param data callback options.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
-static int print_host_variables(RRDVAR *rv, void *data)
-{
+static int print_host_variables(const char *name __maybe_unused, void *rv_ptr, void *data) {
+    RRDVAR *rv = rv_ptr;
+
     struct host_variables_callback_options *opts = data;
 
     if (rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR | RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
@@ -551,15 +552,19 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {
-        struct host_variables_callback_options opts = { .host = host,
-                                                        .wb = wb,
-                                                        .labels = (labels[0] == ',') ? &labels[1] : labels,
-                                                        .exporting_options = exporting_options,
-                                                        .output_options = output_options,
-                                                        .prefix = prefix,
-                                                        .now = now_realtime_sec(),
-                                                        .host_header_printed = 0 };
-        foreach_host_variable_callback(host, print_host_variables, &opts);
+
+        struct host_variables_callback_options opts = {
+            .host = host,
+            .wb = wb,
+            .labels = (labels[0] == ',') ? &labels[1] : labels,
+            .exporting_options = exporting_options,
+            .output_options = output_options,
+            .prefix = prefix,
+            .now = now_realtime_sec(),
+            .host_header_printed = 0
+        };
+
+        rrdvar_walkthrough_read(host->rrdvar_root_index, print_host_variables, &opts);
     }
 
     // for each chart

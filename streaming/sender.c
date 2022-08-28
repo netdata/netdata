@@ -110,7 +110,7 @@ void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
 }
 
 
-static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr, void *host_ptr) {
+static int rrdpush_sender_thread_custom_host_variables_callback(const char *name __maybe_unused, void *rrdvar_ptr, void *host_ptr) {
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
@@ -127,7 +127,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
     sender_start(host->sender);
-    int ret = rrdvar_callback_for_all_host_variables(host, rrdpush_sender_thread_custom_host_variables_callback, host);
+    int ret = rrdvar_walkthrough_read(host->rrdvar_root_index, rrdpush_sender_thread_custom_host_variables_callback, host);
     (void)ret;
     sender_commit(host->sender);
 

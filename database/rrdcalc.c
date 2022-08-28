@@ -130,16 +130,16 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         st->red = rc->red;
     }
 
-    rc->local  = rrdvar_create_and_index("local",  &st->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
-    rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
+    rc->local  = rrdvar_create_and_index("local",  st->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+    rc->family = rrdvar_create_and_index("family", st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
     STRING *fullname_string = string_strdupz(fullname);
-    rc->hostid   = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
+    rc->hostid   = rrdvar_create_and_index("host", host->rrdvar_root_index, fullname_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
 
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
-    rc->hostname = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR, &rc->value);
+    rc->hostname = rrdvar_create_and_index("host", host->rrdvar_root_index, fullname_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR, &rc->value);
 
     string_freez(fullname_string);
 
@@ -274,16 +274,16 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
-    rrdvar_free(host, &st->rrdvar_root_index, rc->local);
+    rrdvar_free(host, st->rrdvar_root_index, rc->local);
     rc->local = NULL;
 
-    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rc->family);
+    rrdvar_free(host, st->rrdfamily->rrdvar_root_index, rc->family);
     rc->family = NULL;
 
-    rrdvar_free(host, &host->rrdvar_root_index, rc->hostid);
+    rrdvar_free(host, host->rrdvar_root_index, rc->hostid);
     rc->hostid = NULL;
 
-    rrdvar_free(host, &host->rrdvar_root_index, rc->hostname);
+    rrdvar_free(host, host->rrdvar_root_index, rc->hostname);
     rc->hostname = NULL;
 
     rc->rrdset = NULL;

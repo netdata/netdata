@@ -333,12 +333,10 @@ void rrdset_free(RRDSET *st) {
     while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
-    dictionary_destroy(st->dimensions_index);
-
     rrdfamily_free(host, st->rrdfamily);
 
     debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
-    rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
+    rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
     // unlink it from the host
@@ -370,6 +368,9 @@ void rrdset_free(RRDSET *st) {
     rrdlabels_destroy(st->state->chart_labels);
 
     // free directly allocated members
+
+    dictionary_destroy(st->dimensions_index);
+    dictionary_destroy(st->rrdvar_root_index);
 
     string_freez(st->id);
     string_freez(st->name);
@@ -696,8 +697,17 @@ RRDSET *rrdset_create_custom(
 
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 
-    st->dimensions_index = dictionary_create(DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
+    st->dimensions_index = dictionary_create(
+          DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+        | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+        | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+        );
+
+    st->rrdvar_root_index = dictionary_create(
+          DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+        | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+        | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+        );
 
     netdata_rwlock_init(&st->rrdset_rwlock);
     st->state->chart_labels = rrdlabels_create();

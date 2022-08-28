@@ -179,9 +179,10 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTFE_CONST const
 #endif
 
-#define DICTIONARY_LOCK_READ  'r'
-#define DICTIONARY_LOCK_WRITE 'w'
-#define DICTIONARY_LOCK_NONE  'u'
+#define DICTIONARY_LOCK_READ     'r'
+#define DICTIONARY_LOCK_WRITE    'w'
+#define DICTIONARY_LOCK_REETRANT 'z'
+#define DICTIONARY_LOCK_NONE     'u'
 
 typedef DICTFE_CONST struct dictionary_foreach {
     DICTFE_CONST char *name;    // the dictionary name of the last item used
