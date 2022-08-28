@@ -243,11 +243,6 @@ extern bool exporting_labels_filter_callback(const char *name, const char *value
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    // ------------------------------------------------------------------------
-    // binary indexing structures
-
-    avl_t avl;                                      // the binary index - this has to be first member!
-
     uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
 
     // ------------------------------------------------------------------------
@@ -255,9 +250,6 @@ struct rrddim {
 
     STRING *id;                                     // the id of this dimension (for internal identification)
     STRING *name;                                   // the name of this dimension (as presented to user)
-                                                    // this is a pointer to the config structure
-                                                    // since the config always has a higher priority
-                                                    // (the user overwrites the name of the charts)
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // configuration flags for the dimension
@@ -507,12 +499,6 @@ typedef enum rrdset_flags {
 
 struct rrdset {
     // ------------------------------------------------------------------------
-    // indexing structures
-
-    avl_t avl;                                      // the index, with key the id - this has to be first!
-    avl_t avlname;                                  // the index, with key the name
-
-    // ------------------------------------------------------------------------
     // the set configuration
 
     STRING *id;                                     // the ID of the data set
@@ -598,9 +584,11 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // the dimensions
 
+    DICTIONARY *dimensions_index;                   // the root of the dimensions index
+
     netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
-    avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
+    RRDDIM *dimensions_last;
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
@@ -925,8 +913,8 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // indexes
 
-    avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
-    avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
+    DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
+    DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
@@ -1239,11 +1227,18 @@ time_t rrdhost_last_entry_t(RRDHOST *h);
 // RRD DIMENSION functions
 
 extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
-extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
-                                 collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);//,
-                                 //int is_archived, uuid_t *dim_uuid);
-#define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, \
-                                                                                   algorithm, (st)->rrd_memory_mode)//, 0, NULL)
+
+extern RRDDIM *rrddim_add_custom(RRDSET *st
+                                 , const char *id
+                                 , const char *name
+                                 , collected_number multiplier
+                                 , collected_number divisor
+                                 , RRD_ALGORITHM algorithm
+                                 , RRD_MEMORY_MODE memory_mode
+                                 );
+
+#define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
+    rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
 extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
@@ -1251,15 +1246,7 @@ extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
 extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
 
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
-/* This will not return dimensions that are archived */
-static inline RRDDIM *rrddim_find_active(RRDSET *st, const char *id)
-{
-    RRDDIM *rd = rrddim_find(st, id);
-    if (unlikely(rd && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)))
-        return NULL;
-    return rd;
-}
-
+extern RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 
 extern int rrddim_hide(RRDSET *st, const char *id);
 extern int rrddim_unhide(RRDSET *st, const char *id);
@@ -1299,10 +1286,6 @@ extern int rrdfamily_compare(void *a, void *b);
 
 extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
 extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
-
-#define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl_t *)(st))
-#define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl_t *)(st))
-extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);

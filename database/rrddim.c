@@ -10,24 +10,18 @@
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
-int rrddim_compare(void* a, void* b) {
-    // a and b are RRDDIM pointers
-    return (int)((uintptr_t )((RRDDIM *)a)->id - (uintptr_t )((RRDDIM *)b)->id);
+static inline RRDDIM *rrddim_index_add(RRDSET *st, RRDDIM *rd) {
+    return dictionary_set(st->dimensions_index, string2str(rd->id), rd, sizeof(RRDDIM));
 }
 
-#define rrddim_index_add(st, rd) (RRDDIM *)avl_insert_lock(&((st)->dimensions_index), (avl_t *)(rd))
-#define rrddim_index_del(st,rd ) (RRDDIM *)avl_remove_lock(&((st)->dimensions_index), (avl_t *)(rd))
-
-static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
-    RRDDIM tmp = {
-        .id = rrd_string_strdupz(id)
-    };
-    RRDDIM *rd = (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl_t *) &tmp);
-    string_freez(tmp.id);
-
+static inline RRDDIM *rrddim_index_del(RRDSET *st, RRDDIM *rd) {
+    dictionary_del(st->dimensions_index, string2str(rd->id));
     return rd;
 }
 
+static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
+    return dictionary_get(st->dimensions_index, id);
+}
 
 // ----------------------------------------------------------------------------
 // RRDDIM - find a dimension
@@ -38,6 +32,15 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
     return rrddim_index_find(st, id);
 }
 
+// This will not return dimensions that are archived
+RRDDIM *rrddim_find_active(RRDSET *st, const char *id) {
+    RRDDIM *rd = rrddim_find(st, id);
+
+    if (unlikely(rd && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)))
+        return NULL;
+
+    return rd;
+}
 
 // ----------------------------------------------------------------------------
 // RRDDIM rename a dimension
@@ -155,9 +158,14 @@ time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
 }
 #endif
 
-RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
-                          collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode)
-{
+RRDDIM *rrddim_add_custom(RRDSET *st
+                          , const char *id
+                          , const char *name
+                          , collected_number multiplier
+                          , collected_number divisor
+                          , RRD_ALGORITHM algorithm
+                          , RRD_MEMORY_MODE memory_mode
+                          ) {
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
@@ -208,7 +216,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     rd = callocz(1, sizeof(RRDDIM));
-    rd->id = rrd_string_strdupz(id);
+    rd->id = string_strdupz(id);
 
     rd->name = (name && *name)?rrd_string_strdupz(name):string_dup(rd->id);
 
@@ -257,6 +265,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef ENABLE_ACLK
     rd->aclk_live_status = -1;
 #endif
+
     (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
 
     // initialize the db tiers
@@ -304,9 +313,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     // append this dimension
     if(!st->dimensions)
-        st->dimensions = rd;
+        st->dimensions = st->dimensions_last = rd;
     else {
-        RRDDIM *td = st->dimensions;
+        RRDDIM *td = st->dimensions_last;
 
         if(td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
@@ -324,8 +333,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             }
         }
 
-        for(; td->next; td = td->next) ;
-        td->next = rd;
+        st->dimensions_last->next = rd;
+        st->dimensions_last = rd;
     }
 
     if(host->health_enabled && !st->state->is_ar_chart) {
@@ -384,8 +393,12 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         RRDDIM *i;
         for (i = st->dimensions; i && i->next != rd; i = i->next) ;
 
-        if (i && i->next == rd)
+        if (i && i->next == rd) {
+            if(st->dimensions_last == rd)
+                st->dimensions_last = i;
+
             i->next = rd->next;
+        }
         else
             error("Request to free dimension '%s.%s' but it is not linked.", rrdset_id(st), rrddim_name(rd));
     }

@@ -24,69 +24,37 @@ void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, c
 // ----------------------------------------------------------------------------
 // RRDSET index
 
-int rrdset_compare(void* a, void* b) {
-    RRDSET *A = a;
-    RRDSET *B = b;
-    return (int)((uintptr_t)A->id - (uintptr_t)B->id);
+static inline RRDSET *rrdset_index_add(RRDHOST *host, RRDSET *st) {
+    return dictionary_set(host->rrdset_root_index, string2str(st->id), st, sizeof(RRDSET));
+}
+
+static inline RRDSET *rrdset_index_del(RRDHOST *host, RRDSET *st) {
+    if(dictionary_del(host->rrdset_root_index, string2str(st->id)) != 0) return NULL;
+    return st;
 }
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
-    RRDSET tmp = {
-        .id = rrd_string_strdupz(id)
-    };
-
-    RRDSET *st = (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl_t *) &tmp);
-
-    string_freez(tmp.id);
-    return st;
+    return dictionary_get(host->rrdset_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
 // RRDSET name index
 
-#define rrdset_from_avlname(avlname_ptr) ((RRDSET *)((avlname_ptr) - offsetof(RRDSET, avlname)))
-
-int rrdset_compare_name(void* a, void* b) {
-    RRDSET *A = rrdset_from_avlname(a);
-    RRDSET *B = rrdset_from_avlname(b);
-
-    // fprintf(stderr, "COMPARING: %s with %s\n", A->name, B->name);
-    return (int)((uintptr_t)A->name - (uintptr_t)B->name);
+static inline RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
+    return dictionary_get(host->rrdset_root_index_name, string2str(st->name));
 }
 
-RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
-    void *result;
-    // fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
-    result = avl_insert_lock(&host->rrdset_root_index_name, (avl_t *) (&st->avlname));
-    if(result) return rrdset_from_avlname(result);
-    return NULL;
+static inline RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
+    if(dictionary_del(host->rrdset_root_index_name, string2str(st->name)) != 0) return NULL;
+    return st;
 }
 
-RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    void *result;
-    // fprintf(stderr, "DELETING: %s (name: %s)\n", st->id, st->name);
-    result = (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index_name), (avl_t *)(&st->avlname));
-    if(result) return rrdset_from_avlname(result);
-    return NULL;
+static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
+    return dictionary_get(host->rrdset_root_index_name, name);
 }
-
 
 // ----------------------------------------------------------------------------
 // RRDSET - find charts
-
-static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
-    void *result = NULL;
-    RRDSET tmp = {
-        .name = string_strdupz(name),
-    };
-
-    result = avl_search_lock(&host->rrdset_root_index_name, (avl_t *) (&(tmp.avlname)));
-
-    string_freez(tmp.name);
-
-    if(result) return rrdset_from_avlname(result);
-    return NULL;
-}
 
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
@@ -364,6 +332,8 @@ void rrdset_free(RRDSET *st) {
      * alarms will still be connected to the host, and freed during shutdown. */
     while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
+
+    dictionary_destroy(st->dimensions_index);
 
     rrdfamily_free(host, st->rrdfamily);
 
@@ -726,7 +696,7 @@ RRDSET *rrdset_create_custom(
 
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 
-    avl_init_lock(&st->dimensions_index, rrddim_compare);
+    st->dimensions_index = dictionary_create(DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);

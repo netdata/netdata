@@ -157,18 +157,12 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id) {
 // ----------------------------------------------------------------------------
 // RRD - string management
 
-static void *rrd_string_cache_entry(const char *s, void *data) {
-    (void)data;
+STRING *rrd_string_strdupz(const char *s) {
+    if(unlikely(!s || !*s)) return string_strdupz(s);
 
     char *tmp = strdupz(s);
     json_fix_string(tmp);
     STRING *ret = string_strdupz(tmp);
     freez(tmp);
     return ret;
-}
-
-STRING *rrd_string_strdupz(const char *s) {
-    if(unlikely(!s || !*s)) return string_strdupz(s);
-
-    return string_dup(thread_cache_entry_get(s, rrd_string_cache_entry, NULL));
 }

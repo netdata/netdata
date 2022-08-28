@@ -236,8 +236,9 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->system_info = system_info;
 
-    avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
-    avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
+    host->rrdset_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    host->rrdset_root_index_name = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
     avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
 
@@ -1079,6 +1080,9 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
+
+    dictionary_destroy(host->rrdset_root_index);
+    dictionary_destroy(host->rrdset_root_index_name);
 
     freez(host->exporting_flags);
 
