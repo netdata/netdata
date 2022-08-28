@@ -160,8 +160,6 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 // RRD FAMILY
 
 struct rrdfamily {
-    avl_t avl;
-
     STRING *family;
 
     size_t use_count;
@@ -917,7 +915,7 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
-    avl_tree_lock rrdfamily_root_index;             // the host's chart families index
+    DICTIONARY *rrdfamily_root_index;               // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
@@ -1279,8 +1277,6 @@ extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
-
-extern int rrdfamily_compare(void *a, void *b);
 
 extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
 extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);

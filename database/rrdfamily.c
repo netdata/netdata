@@ -6,25 +6,21 @@
 // ----------------------------------------------------------------------------
 // RRDFAMILY index
 
-int rrdfamily_compare(void *a, void *b) {
-    // a and b are RRDFAMILY pointers
-    return (int)((uintptr_t )((RRDFAMILY *)a)->family - (uintptr_t )((RRDFAMILY *)b)->family);
+static inline RRDFAMILY *rrdfamily_index_add(RRDHOST *host, RRDFAMILY *rc) {
+    return dictionary_set(host->rrdfamily_root_index, string2str(rc->family), rc, sizeof(RRDFAMILY));
 }
 
-#define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))
-#define rrdfamily_index_del(host, rc) (RRDFAMILY *)avl_remove_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))
-
-static RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id) {
-    RRDFAMILY tmp = {
-        .family = string_strdupz(id)
-    };
-
-    RRDFAMILY *rc = (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl_t *) &tmp);
-
-    string_freez(tmp.family);
-
+static inline RRDFAMILY *rrdfamily_index_del(RRDHOST *host, RRDFAMILY *rc) {
+    dictionary_del(host->rrdfamily_root_index, string2str(rc->family));
     return rc;
 }
+
+static inline RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id) {
+    return dictionary_get(host->rrdfamily_root_index, id);
+}
+
+// ----------------------------------------------------------------------------
+// RRDFAMILY management
 
 RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
     RRDFAMILY *rc = rrdfamily_index_find(host, id);

@@ -281,8 +281,8 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->rrdset_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     host->rrdset_root_index_name = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    host->rrdfamily_root_index   = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
-    avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
     avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
@@ -1123,9 +1123,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
 
-    dictionary_destroy(host->rrdset_root_index);
-    dictionary_destroy(host->rrdset_root_index_name);
-
     freez(host->exporting_flags);
 
     while(host->alarms)
@@ -1239,6 +1236,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host->node_id);
+
+    dictionary_destroy(host->rrdset_root_index);
+    dictionary_destroy(host->rrdset_root_index_name);
+    dictionary_destroy(host->rrdfamily_root_index);
 
     rrdhost_destroy_rrdcontexts(host);
 
