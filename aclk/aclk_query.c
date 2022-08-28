@@ -54,7 +54,7 @@ static RRDHOST *node_id_2_rrdhost(const char *node_id)
         return NULL;
     }
     uuid_unparse_lower(host_id_bin, host_id);
-    return rrdhost_find_by_guid(host_id, 0);
+    return rrdhost_find_by_guid(host_id);
 }
 
 #define NODE_ID_QUERY "/node/"

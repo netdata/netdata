@@ -274,7 +274,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         .node_id = res.node_id
     };
 
-    RRDHOST *host = rrdhost_find_by_guid(res.machine_guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
     if (host) {
         // not all host must have RRDHOST struct created for them
         // if they never connected during runtime of agent

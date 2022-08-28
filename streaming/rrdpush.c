@@ -746,7 +746,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
 
     rrd_rdlock();
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
     if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
         host = NULL;
     if (host) {

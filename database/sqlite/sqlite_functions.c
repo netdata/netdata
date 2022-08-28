@@ -2231,7 +2231,7 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     char host_guid[GUID_LEN + 1];
     uuid_unparse_lower(*host_id, host_guid);
     rrd_wrlock();
-    host = rrdhost_find_by_guid(host_guid, 0);
+    host = rrdhost_find_by_guid(host_guid);
     if (likely(host))
             set_host_node_id(host, node_id);
     rrd_unlock();
@@ -2446,7 +2446,7 @@ struct  node_instance_list *get_node_list(void)
             uuid_copy(node_list[row].host_id, *host_id);
             node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
-            RRDHOST *host = rrdhost_find_by_guid(host_guid, 0);
+            RRDHOST *host = rrdhost_find_by_guid(host_guid);
             node_list[row].live = host && (host == localhost || host->receiver) ? 1 : 0;
             node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
                                   uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;

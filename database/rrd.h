@@ -641,6 +641,8 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_STREAM_LABELS_UPDATE   = (1 << 8),
     RRDHOST_FLAG_STREAM_LABELS_STOP     = (1 << 9),
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS   = (1 << 10), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_INDEXED_MACHINE_GUID   = (1 << 11), // when set, we have indexed its machine guid
+    RRDHOST_FLAG_INDEXED_HOSTNAME       = (1 << 12), // when set, we have indexed its hostname
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -787,7 +789,6 @@ struct rrdhost {
     char *registry_hostname;                        // the registry hostname for this host
 
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
-    uint32_t hash_machine_guid;                     // the hash of the unique ID
 
     STRING *os;                                     // the O/S type of the host
     STRING *tags;                                   // tags for this host
@@ -950,6 +951,8 @@ extern RRDHOST *localhost;
 #define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
 #define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
+extern long rrdhost_hosts_available(void);
+
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 
@@ -981,7 +984,7 @@ extern time_t rrdhost_free_orphan_time;
 extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
 extern RRDHOST *rrdhost_find_by_hostname(const char *hostname);
-extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
+extern RRDHOST *rrdhost_find_by_guid(const char *guid);
 
 extern RRDHOST *rrdhost_find_or_create(
         const char *hostname
@@ -1272,16 +1275,11 @@ extern int alarm_compare_name(void *a, void *b);
 
 #ifdef NETDATA_RRD_INTERNALS
 
-extern avl_tree_lock rrdhost_root_index;
-
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
-extern int rrddim_compare(void* a, void* b);
-extern int rrdset_compare(void* a, void* b);
-extern int rrdset_compare_name(void* a, void* b);
 extern int rrdfamily_compare(void *a, void *b);
 
 extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);

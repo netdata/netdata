@@ -829,7 +829,7 @@ void aclk_send_node_instances()
             char host_id[UUID_STR_LEN];
             uuid_unparse_lower(list->host_id, host_id);
 
-            RRDHOST *host = rrdhost_find_by_guid(host_id, 0);
+            RRDHOST *host = rrdhost_find_by_guid(host_id);
             struct capability caps[] = {
                 { .name = "proto", .version = 1,                     .enabled = 1 },
                 { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },

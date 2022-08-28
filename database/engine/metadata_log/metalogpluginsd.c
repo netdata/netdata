@@ -12,7 +12,7 @@ PARSER_RC metalog_pluginsd_host_action(
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
     if (host) {
         if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
             error("Archived host '%s' has memory mode '%s', but the archived one is '%s'. Ignoring archived state.",

@@ -45,49 +45,87 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 // ----------------------------------------------------------------------------
 // RRDHOST index
 
-int rrdhost_compare(void* a, void* b) {
-    if(((RRDHOST *)a)->hash_machine_guid < ((RRDHOST *)b)->hash_machine_guid) return -1;
-    else if(((RRDHOST *)a)->hash_machine_guid > ((RRDHOST *)b)->hash_machine_guid) return 1;
-    else return strcmp(((RRDHOST *)a)->machine_guid, ((RRDHOST *)b)->machine_guid);
+static DICTIONARY *rrdhost_root_index = NULL;
+static DICTIONARY *rrdhost_root_index_hostname = NULL;
+
+static inline void rrdhost_init() {
+    if(unlikely(!rrdhost_root_index)) {
+        rrdhost_root_index = dictionary_create(
+              DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+            | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+            | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+            );
+    }
+
+    if(unlikely(!rrdhost_root_index_hostname)) {
+        rrdhost_root_index_hostname = dictionary_create(
+              DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+            | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+            | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+            );
+    }
 }
 
-avl_tree_lock rrdhost_root_index = {
-        .avl_tree = { NULL, rrdhost_compare },
-        .rwlock = AVL_LOCK_INITIALIZER
-};
-
-RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash) {
-    debug(D_RRDHOST, "Searching in index for host with guid '%s'", guid);
-
-    RRDHOST tmp;
-    strncpyz(tmp.machine_guid, guid, GUID_LEN);
-    tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
-
-    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl_t *) &tmp);
+inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
+    return dictionary_get(rrdhost_root_index, guid);
 }
 
-RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
+inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     if(unlikely(!strcmp(hostname, "localhost")))
         return localhost;
 
-    STRING *hostname_string = string_strdupz(hostname);
+    return dictionary_get(rrdhost_root_index_hostname, hostname);
+}
 
-    rrd_rdlock();
-    RRDHOST *host = NULL;
-    rrdhost_foreach_read(host) {
-        if(unlikely(host->hostname == hostname_string))
-            break;
-    }
-    rrd_unlock();
+inline long rrdhost_hosts_available(void) {
+    return dictionary_stats_entries(rrdhost_root_index);
+}
 
-    string_freez(hostname_string);
+static inline RRDHOST *rrdhost_index_add(RRDHOST *host) {
+    RRDHOST *ret_machine_guid = dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
+    if(ret_machine_guid == host)
+        rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
+    else
+        error("RRDHOST: host with machine guid '%s' is already indexed", host->machine_guid);
 
     return host;
 }
 
-#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
-#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
+static inline RRDHOST *rrdhost_index_del(RRDHOST *host) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID)) {
+        if(dictionary_del(rrdhost_root_index, host->machine_guid) !=  0)
+            error("RRDHOST: failed to delete machine guid '%s' from index", host->machine_guid);
 
+        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
+    }
+
+    return host;
+}
+
+static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
+    if(!host->hostname) return host;
+
+    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
+    if(ret_hostname == host)
+        rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
+    else
+        error("RRDHOST: host with hostname '%s' is already indexed", rrdhost_hostname(host));
+
+    return host;
+}
+
+static inline RRDHOST *rrdhost_index_del_hostname(RRDHOST *host) {
+    if(unlikely(!host->hostname)) return host;
+
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_HOSTNAME)) {
+        if(dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)) !=  0)
+            error("RRDHOST: failed to delete hostname '%s' from index", rrdhost_hostname(host));
+
+        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
+    }
+
+    return host;
+}
 
 // ----------------------------------------------------------------------------
 // RRDHOST - internal helpers
@@ -102,12 +140,18 @@ static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
 }
 
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
+    if(unlikely(hostname && !*hostname)) hostname = NULL;
+
     if(host->hostname && hostname && !strcmp(rrdhost_hostname(host), hostname))
         return;
+
+    rrdhost_index_del_hostname(host);
 
     STRING *old = host->hostname;
     host->hostname = string_strdupz(hostname?hostname:"localhost");
     string_freez(old);
+
+    rrdhost_index_add_hostname(host);
 }
 
 static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
@@ -138,7 +182,6 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
 static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
     strncpy(host->machine_guid, machine_guid, GUID_LEN);
     host->machine_guid[GUID_LEN] = '\0';
-    host->hash_machine_guid = simple_hash(host->machine_guid);
 }
 
 void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname,
@@ -542,9 +585,7 @@ void rrdhost_update(RRDHOST *host
 
     if(strcmp(rrdhost_hostname(host), hostname) != 0) {
         info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", rrdhost_hostname(host), hostname);
-        STRING *t = host->hostname;
-        host->hostname = string_strdupz(hostname);
-        string_freez(t);
+        rrdhost_init_hostname(host, hostname);
     }
 
     if(strcmp(host->program_name, program_name) != 0) {
@@ -651,7 +692,7 @@ RRDHOST *rrdhost_find_or_create(
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     rrd_wrlock();
-    RRDHOST *host = rrdhost_find_by_guid(guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && RRD_MEMORY_MODE_DBENGINE != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
@@ -760,6 +801,7 @@ restart_after_removal:
 // RRDHOST global / startup initialization
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+    rrdhost_init();
 
     if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -1304,7 +1346,7 @@ static void rrdhost_load_auto_labels(void) {
     add_aclk_host_labels();
 
     rrdlabels_add(
-        labels, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", RRDLABEL_SRC_AUTO);
+        labels, "_is_parent", (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     if (localhost->rrdpush_send_destination)
         rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);

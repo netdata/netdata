@@ -335,7 +335,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
-    RRDHOST *host = rrdhost_find_by_guid(uuid_str, 0);
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str);
     if (host == localhost)
         return 0;
 
@@ -705,7 +705,7 @@ void aclk_database_worker(void *arg)
                 case ACLK_DATABASE_TIMER:
                     if (unlikely(localhost && !wc->host && !wc->is_orphan)) {
                         if (claimed()) {
-                            wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
+                            wc->host = rrdhost_find_by_guid(wc->host_guid);
                             if (wc->host) {
                                 info("HOST %s (%s) detected as active", rrdhost_hostname(wc->host), wc->host_guid);
                                 snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", rrdhost_hostname(wc->host));
