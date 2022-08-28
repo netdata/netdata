@@ -35,8 +35,8 @@ struct rrdvar {
     void *value;
     time_t last_updated;
 
-    RRDVAR_TYPE type;
-    RRDVAR_OPTIONS options;
+    RRDVAR_OPTIONS options:16;
+    RRDVAR_TYPE type:8;
 };
 
 #define rrdvar_name(rv) string2str((rv)->name)
