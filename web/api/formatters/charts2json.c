@@ -58,10 +58,10 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
                    , rrdhost_hostname(host)
-                   , host->program_version
+                   , rrdhost_program_version(host)
                    , get_release_channel()
                    , rrdhost_os(host)
-                   , host->timezone
+                   , rrdhost_timezone(host)
                    , host->rrd_update_every
                    , host->rrd_history_entries
                    , rrd_memory_mode_name(host->rrd_memory_mode)

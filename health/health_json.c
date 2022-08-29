@@ -59,7 +59,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"silenced\": \"%s\",\n"
                    , rrdhost_hostname(host)
                    , host->utc_offset
-                   , host->abbrev_timezone
+                   , rrdhost_abbrev_timezone(host)
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id

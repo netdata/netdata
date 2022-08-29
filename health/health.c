@@ -386,7 +386,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
-              host->registry_hostname,
+              rrdhost_registry_hostname(host),
               ae->unique_id,
               ae->alarm_id,
               ae->alarm_event_id,

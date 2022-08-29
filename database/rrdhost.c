@@ -164,16 +164,16 @@ static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
 }
 
 static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
-    if (host->timezone && timezone && !strcmp(host->timezone, timezone) && host->abbrev_timezone && abbrev_timezone &&
-        !strcmp(host->abbrev_timezone, abbrev_timezone) && host->utc_offset == utc_offset)
+    if (host->timezone && timezone && !strcmp(rrdhost_timezone(host), timezone) && host->abbrev_timezone && abbrev_timezone &&
+        !strcmp(rrdhost_abbrev_timezone(host), abbrev_timezone) && host->utc_offset == utc_offset)
         return;
 
-    void *old = (void *)host->timezone;
-    host->timezone = strdupz((timezone && *timezone)?timezone:"unknown");
-    freez(old);
+    STRING *old = host->timezone;
+    host->timezone = string_strdupz((timezone && *timezone)?timezone:"unknown");
+    string_freez(old);
 
     old = (void *)host->abbrev_timezone;
-    host->abbrev_timezone = strdupz((abbrev_timezone && *abbrev_timezone) ? abbrev_timezone : "UTC");
+    host->abbrev_timezone = string_strdupz((abbrev_timezone && *abbrev_timezone) ? abbrev_timezone : "UTC");
     freez(old);
 
     host->utc_offset = utc_offset;
@@ -201,10 +201,9 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
     rrdhost_init_timezone(host, tzone, abbrev_tzone, utc_offset);
     rrdhost_init_tags(host, tags);
 
-    host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
-    host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
-
-    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : rrdhost_hostname(host));
+    host->program_name = string_strdupz((program_name && *program_name) ? program_name : "unknown");
+    host->program_version = string_strdupz((program_version && *program_version) ? program_version : "unknown");
+    host->registry_hostname = string_strdupz((registry_hostname && *registry_hostname) ? registry_hostname : rrdhost_hostname(host));
 }
 
 // ----------------------------------------------------------------------------
@@ -509,13 +508,13 @@ RRDHOST *rrdhost_create(const char *hostname,
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
-         , host->registry_hostname
+         , rrdhost_registry_hostname(host)
          , host->machine_guid
          , rrdhost_os(host)
-         , host->timezone
+         , rrdhost_timezone(host)
          , rrdhost_tags(host)
-         , host->program_name
-         , host->program_version
+         , rrdhost_program_name(host)
+         , rrdhost_program_version(host)
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
@@ -579,26 +578,26 @@ void rrdhost_update(RRDHOST *host
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
 
-    freez(host->registry_hostname);
-    host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
+    string_freez(host->registry_hostname);
+    host->registry_hostname = string_strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
     if(strcmp(rrdhost_hostname(host), hostname) != 0) {
         info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", rrdhost_hostname(host), hostname);
         rrdhost_init_hostname(host, hostname);
     }
 
-    if(strcmp(host->program_name, program_name) != 0) {
-        info("Host '%s' switched program name from '%s' to '%s'", rrdhost_hostname(host), host->program_name, program_name);
-        char *t = host->program_name;
-        host->program_name = strdupz(program_name);
-        freez(t);
+    if(strcmp(rrdhost_program_name(host), program_name) != 0) {
+        info("Host '%s' switched program name from '%s' to '%s'", rrdhost_hostname(host), rrdhost_program_name(host), program_name);
+        STRING *t = host->program_name;
+        host->program_name = string_strdupz(program_name);
+        string_freez(t);
     }
 
-    if(strcmp(host->program_version, program_version) != 0) {
-        info("Host '%s' switched program version from '%s' to '%s'", rrdhost_hostname(host), host->program_version, program_version);
-        char *t = host->program_version;
-        host->program_version = strdupz(program_version);
-        freez(t);
+    if(strcmp(rrdhost_program_version(host), program_version) != 0) {
+        info("Host '%s' switched program version from '%s' to '%s'", rrdhost_hostname(host), rrdhost_program_version(host), program_version);
+        STRING *t = host->program_version;
+        host->program_version = string_strdupz(program_version);
+        string_freez(t);
     }
 
     if(host->rrd_update_every != update_every)
@@ -1211,10 +1210,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
     string_freez(host->tags);
     rrdlabels_destroy(host->host_labels);
     string_freez(host->os);
-    freez((void *)host->timezone);
-    freez((void *)host->abbrev_timezone);
-    freez(host->program_version);
-    freez(host->program_name);
+    string_freez(host->timezone);
+    string_freez(host->abbrev_timezone);
+    string_freez(host->program_name);
+    string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
     freez(host->varlib_dir);
@@ -1229,7 +1228,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     string_freez(host->health_default_exec);
     string_freez(host->health_default_recipient);
     freez(host->health_log_filename);
-    freez(host->registry_hostname);
+    string_freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);

@@ -19,41 +19,27 @@ struct machine_learning_info {
 };
 
 struct aclk_node_info {
-    char *name;
+    const char *name;
 
-    char *os;
-    char *os_name;
-    char *os_version;
-
-    char *kernel_name;
-    char *kernel_version;
-
-    char *architecture;
-
+    const char *os;
+    const char *os_name;
+    const char *os_version;
+    const char *kernel_name;
+    const char *kernel_version;
+    const char *architecture;
     uint32_t cpus;
-
-    char *cpu_frequency;
-
-    char *memory;
-
-    char *disk_space;
-
-    char *version;
-
-    char *release_channel;
-
-    char *timezone;
-
-    char *virtualization_type;
-
-    char *container_type;
-
-    char *custom_info;
-
-    char *machine_guid;
+    const char *cpu_frequency;
+    const char *memory;
+    const char *disk_space;
+    const char *version;
+    const char *release_channel;
+    const char *timezone;
+    const char *virtualization_type;
+    const char *container_type;
+    const char *custom_info;
+    const char *machine_guid;
 
     DICTIONARY *host_labels_ptr;
-
     struct machine_learning_info ml_info;
 };
 

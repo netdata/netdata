@@ -778,20 +778,20 @@ struct rrdhost_system_info {
 struct rrdhost {
     avl_t avl;                                      // the index of hosts
 
+    char machine_guid[GUID_LEN + 1];                // the unique ID of this host
+
     // ------------------------------------------------------------------------
     // host information
 
     STRING *hostname;                               // the hostname of this host
-
-    char *registry_hostname;                        // the registry hostname for this host
-
-    char machine_guid[GUID_LEN + 1];                // the unique ID of this host
-
+    STRING *registry_hostname;                      // the registry hostname for this host
     STRING *os;                                     // the O/S type of the host
     STRING *tags;                                   // tags for this host
-    const char *timezone;                           // the timezone of the host
+    STRING *timezone;                               // the timezone of the host
+    STRING *abbrev_timezone;                        // the abbriviated timezone of the host
+    STRING *program_name;                           // the program name that collects metrics for this host
+    STRING *program_version;                        // the program version that collects metrics for this host
 
-    const char *abbrev_timezone;                    // the abbriviated timezone of the host
     int32_t utc_offset;                             // the offset in seconds from utc
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
@@ -803,9 +803,6 @@ struct rrdhost {
 
     char *cache_dir;                                // the directory to save RRD cache files
     char *varlib_dir;                               // the directory to save health log
-
-    char *program_name;                             // the program name that collects metrics for this host
-    char *program_version;                          // the program version that collects metrics for this host
 
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
@@ -938,8 +935,13 @@ struct rrdhost {
 extern RRDHOST *localhost;
 
 #define rrdhost_hostname(host) string2str((host)->hostname)
+#define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
 #define rrdhost_os(host) string2str((host)->os)
 #define rrdhost_tags(host) string2str((host)->tags)
+#define rrdhost_timezone(host) string2str((host)->timezone)
+#define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
+#define rrdhost_program_name(host) string2str((host)->program_name)
+#define rrdhost_program_version(host) string2str((host)->program_version)
 
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
 #define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))

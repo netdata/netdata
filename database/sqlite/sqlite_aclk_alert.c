@@ -300,7 +300,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.config_hash = strdupz((char *)uuid_str);
 
         alarm_log.utc_offset = wc->host->utc_offset;
-        alarm_log.timezone = strdupz((char *)wc->host->abbrev_timezone);
+        alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
         alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
                                                                   strdupz((char *)string2str(wc->host->health_default_exec));
         alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
@@ -846,7 +846,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->config_hash = strdupz((char *)config_hash_id);
 
     alarm_log->utc_offset = host->utc_offset;
-    alarm_log->timezone = strdupz((char *)host->abbrev_timezone);
+    alarm_log->timezone = strdupz(rrdhost_abbrev_timezone(host));
     alarm_log->exec_path = ae->exec ? strdupz(ae_exec(ae)) : strdupz((char *)string2str(host->health_default_exec));
     alarm_log->conf_source = ae->source ? strdupz(ae_source(ae)) : strdupz((char *)"");
 

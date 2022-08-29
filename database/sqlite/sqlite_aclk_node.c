@@ -94,8 +94,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
         netdata_mutex_unlock(&host->receiver_lock);
     }
 
-    node_info.data.name = (char *)rrdhost_hostname(host);
-    node_info.data.os = (char *)rrdhost_os(host);
+    node_info.data.name = rrdhost_hostname(host);
+    node_info.data.os = rrdhost_os(host);
     node_info.data.os_name = host->system_info->host_os_name;
     node_info.data.os_version = host->system_info->host_os_version;
     node_info.data.kernel_name = host->system_info->kernel_name;
@@ -106,8 +106,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
     node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";
     node_info.data.version = host_version ? host_version : VERSION;
-    node_info.data.release_channel = (char *) get_release_channel();
-    node_info.data.timezone = (char *) host->abbrev_timezone;
+    node_info.data.release_channel = get_release_channel();
+    node_info.data.timezone = rrdhost_abbrev_timezone(host);
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");

@@ -61,7 +61,7 @@ static inline void registry_json_header(RRDHOST *host, struct web_client *w, con
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     buffer_sprintf(w->response.data, "{\n\t\"action\": \"%s\",\n\t\"status\": \"%s\",\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
-            action, status, host->registry_hostname, host->machine_guid);
+            action, status, rrdhost_registry_hostname(host), host->machine_guid);
 }
 
 static inline void registry_json_footer(struct web_client *w) {

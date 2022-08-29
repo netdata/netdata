@@ -494,7 +494,7 @@ char *health_edit_command_from_source(const char *source)
             netdata_configured_user_config_dir,
             file_no_path + 1,
             temp,
-            localhost->registry_hostname);
+            rrdhost_registry_hostname(localhost));
     } else
         buffer[0] = '\0';
 

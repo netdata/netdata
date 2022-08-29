@@ -929,7 +929,7 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 3, host->registry_hostname, 1);
+    rc = bind_text_null(res, 3, rrdhost_registry_hostname(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -941,7 +941,7 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 6, host->timezone, 1);
+    rc = bind_text_null(res, 6, rrdhost_timezone(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -957,7 +957,7 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 10, host->abbrev_timezone, 1);
+    rc = bind_text_null(res, 10, rrdhost_abbrev_timezone(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -965,11 +965,11 @@ int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 12, host->program_name, 1);
+    rc = bind_text_null(res, 12, rrdhost_program_name(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 13, host->program_version, 1);
+    rc = bind_text_null(res, 13, rrdhost_program_version(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1319,10 +1319,10 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
         , rrdhost_hostname(host)
-        , host->program_version
+        , rrdhost_program_version(host)
         , get_release_channel()
         , rrdhost_os(host)
-        , host->timezone
+        , rrdhost_timezone(host)
         , host->rrd_update_every
         , host->rrd_history_entries
         , rrd_memory_mode_name(host->rrd_memory_mode)
@@ -1451,10 +1451,10 @@ void free_temporary_host(RRDHOST *host)
         string_freez(host->hostname);
         string_freez(host->os);
         string_freez(host->tags);
-        freez((char *)host->timezone);
-        freez(host->program_name);
-        freez(host->program_version);
-        freez(host->registry_hostname);
+        string_freez(host->timezone);
+        string_freez(host->program_name);
+        string_freez(host->program_version);
+        string_freez(host->registry_hostname);
         freez(host->system_info);
         freez(host);
     }

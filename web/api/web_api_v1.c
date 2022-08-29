@@ -1148,7 +1148,7 @@ extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 {
     buffer_strcat(wb, "{\n");
-    buffer_sprintf(wb, "\t\"version\": \"%s\",\n", host->program_version);
+    buffer_sprintf(wb, "\t\"version\": \"%s\",\n", rrdhost_program_version(host));
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
 
     web_client_api_request_v1_info_mirrored_hosts(wb);

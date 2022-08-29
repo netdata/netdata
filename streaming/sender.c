@@ -371,12 +371,12 @@ if(!s->rrdpush_compression)
                  "Accept: */*\r\n\r\n"
                  , host->rrdpush_send_api_key
                  , rrdhost_hostname(host)
-                 , host->registry_hostname
+                 , rrdhost_registry_hostname(host)
                  , host->machine_guid
                  , default_rrd_update_every
                  , rrdhost_os(host)
-                 , host->timezone
-                 , host->abbrev_timezone
+                 , rrdhost_timezone(host)
+                 , rrdhost_abbrev_timezone(host)
                  , host->utc_offset
                  , host->system_info->hops + 1
                  , host->system_info->ml_capable
@@ -412,8 +412,8 @@ if(!s->rrdpush_compression)
                  , (host->system_info->host_ram_total) ? host->system_info->host_ram_total : ""
                  , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
                  , STREAMING_PROTOCOL_VERSION
-                 , host->program_name
-                 , host->program_version
+                 , rrdhost_program_name(host)
+                 , rrdhost_program_version(host)
                  );
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);

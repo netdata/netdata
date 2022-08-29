@@ -530,8 +530,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         wb,
         "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"",
         hostname,
-        host->program_name,
-        host->program_version);
+        rrdhost_program_name(host),
+        rrdhost_program_version(host));
 
     if (instance->labels_buffer && *buffer_tostring(instance->labels_buffer)) {
         buffer_sprintf(wb, ",%s", buffer_tostring(instance->labels_buffer));
