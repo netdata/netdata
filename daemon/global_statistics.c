@@ -1018,7 +1018,7 @@ static void update_strings_charts() {
         rd_ops_deletes      = rrddim_add(st_ops, "deletes",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_searches     = rrddim_add(st_ops, "searches",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_duplications = rrddim_add(st_ops, "duplications", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
     } else
         rrdset_next(st_ops);
 
