@@ -12,17 +12,7 @@ typedef struct dictionary DICTIONARY;
 #define DICTIONARY_INTERNALS
 
 #include "../libnetdata.h"
-
-#ifndef ENABLE_DBENGINE
-#define DICTIONARY_WITH_AVL
-#warning Compiling DICTIONARY with an AVL index
-#else
-#define DICTIONARY_WITH_JUDYHS
-#endif
-
-#ifdef DICTIONARY_WITH_JUDYHS
 #include <Judy.h>
-#endif
 
 typedef enum name_value_flags {
     NAME_VALUE_FLAG_NONE                   = 0,
@@ -38,10 +28,6 @@ typedef enum name_value_flags {
  */
 
 typedef struct name_value {
-#ifdef DICTIONARY_WITH_AVL
-    avl_t avl_node;
-#endif
-
 #ifdef NETDATA_INTERNAL_CHECKS
     DICTIONARY *dict;
 #endif
@@ -72,15 +58,7 @@ struct dictionary {
     NAME_VALUE *first_item;             // the double linked list base pointers
     NAME_VALUE *last_item;
 
-#ifdef DICTIONARY_WITH_AVL
-    avl_tree_type values_index;
-    NAME_VALUE *hash_base;
-    void *(*get_thread_static_name_value)(const char *name);
-#endif
-
-#ifdef DICTIONARY_WITH_JUDYHS
     Pvoid_t JudyHSArray;                // the hash table
-#endif
 
     netdata_rwlock_t rwlock;            // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
@@ -480,68 +458,6 @@ static uint32_t reference_counter_release(DICTIONARY *dict, NAME_VALUE *nv, bool
 // ----------------------------------------------------------------------------
 // hash table
 
-#ifdef DICTIONARY_WITH_AVL
-static inline const char *namevalue_get_name(NAME_VALUE *nv);
-
-static int name_value_compare(void* a, void* b) {
-    return strcmp(namevalue_get_name((NAME_VALUE *)a), namevalue_get_name((NAME_VALUE *)b));
-}
-
-static void *get_thread_static_name_value(const char *name) {
-    static __thread NAME_VALUE tmp = { 0 };
-    tmp.flags = NAME_VALUE_FLAG_NONE;
-    tmp.caller_name = (char *)name;
-    return &tmp;
-}
-
-static void hashtable_init_unsafe(DICTIONARY *dict) {
-    avl_init(&dict->values_index, name_value_compare);
-    dict->get_thread_static_name_value = get_thread_static_name_value;
-}
-
-static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
-    (void)dict;
-    return 0;
-}
-
-static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *nv) {
-    (void)name;
-    (void)name_len;
-
-    if(unlikely(avl_remove(&(dict->values_index), (avl_t *)(nv)) != (avl_t *)nv))
-        return 0;
-
-    return 1;
-}
-
-static inline NAME_VALUE *hashtable_get_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
-    (void)name_len;
-
-    void *tmp = dict->get_thread_static_name_value(name);
-    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *)tmp);
-}
-
-static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
-    // AVL needs a NAME_VALUE to insert into the dictionary but we don't have it yet.
-    // So, the only thing we can do, is return an existing one if it is already there.
-    // Returning NULL will make the caller thing we added it, will allocate one
-    // and will call hashtable_inserted_name_value_unsafe(), at which we will do
-    // the actual indexing.
-
-    dict->hash_base = hashtable_get_unsafe(dict, name, name_len);
-    return &dict->hash_base;
-}
-
-static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, void *nv) {
-    // we have our new NAME_VALUE object.
-    // Let's index it.
-
-    if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
-        error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
-}
-#endif
-
-#ifdef DICTIONARY_WITH_JUDYHS
 static void hashtable_init_unsafe(DICTIONARY *dict) {
     dict->JudyHSArray = NULL;
 }
@@ -562,7 +478,7 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
     return (size_t)ret;
 }
 
-static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
+static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: inserting item from the index without exclusive access to the dictionary created by %s() (%zu@%s)", dict->creation_function, dict->creation_line, dict->creation_file);
 
     JError_t J_Error;
@@ -579,7 +495,7 @@ static inline NAME_VALUE **hashtable_insert_unsafe(DICTIONARY *dict, const char 
     // put anything needed at the value of the index.
     // The pointer to pointer we return has to be used before
     // any other operation that may change the index (insert/delete).
-    return (NAME_VALUE **)Rc;
+    return Rc;
 }
 
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *nv) {
@@ -631,8 +547,6 @@ static inline void hashtable_inserted_name_value_unsafe(DICTIONARY *dict, void *
     (void)nv;
     ;
 }
-
-#endif // DICTIONARY_WITH_JUDYHS
 
 // ----------------------------------------------------------------------------
 // linked list management
@@ -979,7 +893,7 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
     // But the caller has the option to do this on his/her own.
     // So, let's do the fastest here and let the caller decide the flow of calls.
 
-    NAME_VALUE *nv, **pnv = hashtable_insert_unsafe(dict, name, name_len);
+    NAME_VALUE *nv, **pnv = (NAME_VALUE **)hashtable_insert_unsafe(dict, name, name_len);
     if(likely(*pnv == 0)) {
         // a new item added to the index
         nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
@@ -1495,68 +1409,52 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 // STRING implementation - dedup all STRINGs
 
 typedef struct string_entry {
-#ifdef DICTIONARY_WITH_AVL
-    avl_t avl_node;
-#endif
     uint32_t length;    // the string length with the terminating '\0'
     uint32_t refcount;  // how many times this string is used
     const char str[];   // the string itself
 } STRING_ENTRY;
 
-#ifdef DICTIONARY_WITH_AVL
-static int string_entry_compare(void* a, void* b) {
-    return strcmp(((STRING_ENTRY *)a)->str, ((STRING_ENTRY *)b)->str);
-}
+static struct string_hashtable {
+    Pvoid_t JudyHSArray;
+    netdata_rwlock_t rwlock;
 
-static void *get_thread_static_string_entry(const char *name) {
-    static __thread size_t _length = 0;
-    static __thread STRING_ENTRY *_tmp = NULL;
+    long int entries;           // the number of entries in the index
+    long int active_references; // the number of active references alive
+    long int memory;            // the memory used, without the JudyHS index
 
-    size_t size = sizeof(STRING_ENTRY) + strlen(name) + 1;
-    if(likely(_tmp && _length < size)) {
-        freez(_tmp);
-        _tmp = NULL;
-        _length = 0;
-    }
+    size_t inserts;             // the number of successful inserts to the index
+    size_t deletes;             // the number of successful deleted from the index
+    size_t searches;            // the number of successful searches in the index
+    size_t duplications;        // when a string is referenced, but not inserted
+    size_t releases;            // when a string is unreferenced, but not deleted
 
-    if(unlikely(!_tmp)) {
-        _tmp = callocz(1, size);
-        _length = size;
-    }
-
-    strcpy((char *)&_tmp->str[0], name);
-    return _tmp;
-}
-#endif
-
-DICTIONARY string_dictionary = {
-#ifdef DICTIONARY_WITH_AVL
-    .values_index = {
-        .root = NULL,
-        .compar = string_entry_compare
-    },
-    .get_thread_static_name_value = get_thread_static_string_entry,
-#endif
-
-    .flags = DICTIONARY_FLAG_EXCLUSIVE_ACCESS,
-    .rwlock = NETDATA_RWLOCK_INITIALIZER
+} string_base = {
+    .JudyHSArray = NULL,
+    .rwlock = NETDATA_RWLOCK_INITIALIZER,
 };
 
-void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory) {
-    *inserts = string_dictionary.inserts;
-    *deletes = string_dictionary.deletes;
-    *searches = string_dictionary.searches;
-    *entries = string_dictionary.entries;
-    *references = string_dictionary.referenced_items;
-    *memory = string_dictionary.memory;
+void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases) {
+    *inserts = string_base.inserts;
+    *deletes = string_base.deletes;
+    *searches = string_base.searches;
+    *entries = string_base.entries;
+    *references = string_base.active_references;
+    *memory = string_base.memory;
+    *duplications = string_base.duplications;
+    *releases = string_base.releases;
+}
+
+static inline void string_dup_internal(STRING_ENTRY *se) {
+    __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&string_base.active_references, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&string_base.duplications, 1, __ATOMIC_RELAXED);
 }
 
 STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
-    __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
+    string_dup_internal(se);
     return string;
 }
 
@@ -1565,20 +1463,42 @@ STRING *string_strdupz(const char *str) {
 
     size_t length = strlen(str) + 1;
 
-    netdata_rwlock_rdlock(&string_dictionary.rwlock);
-    STRING_ENTRY *se = (STRING_ENTRY *)hashtable_get_unsafe(&string_dictionary, str, length);
-    netdata_rwlock_unlock(&string_dictionary.rwlock);
+    STRING_ENTRY *se;
+    if(likely(string_base.JudyHSArray)) {
+        netdata_rwlock_rdlock(&string_base.rwlock);
+        Pvoid_t *Rc;
+        Rc = JudyHSGet(string_base.JudyHSArray, (void *)str, length);
+        if(likely(Rc)) {
+            // found in the hash table
+            se = *Rc;
+        }
+        else {
+            // not found in the hash table
+            se = NULL;
+        }
+        netdata_rwlock_unlock(&string_base.rwlock);
+        __atomic_fetch_add(&string_base.searches, 1, __ATOMIC_RELAXED);
+    }
+    else
+        se = NULL;
 
     if(likely(se)) {
-        __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&string_dictionary.searches, 1, __ATOMIC_RELAXED);
-        __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
+        string_dup_internal(se);
         return (STRING *)se;
     }
 
-    netdata_rwlock_wrlock(&string_dictionary.rwlock);
-    STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, length);
-    if(unlikely(*ptr == 0)) {
+    netdata_rwlock_wrlock(&string_base.rwlock);
+    STRING_ENTRY **ptr;
+    {
+        JError_t J_Error;
+        Pvoid_t *Rc = JudyHSIns(&string_base.JudyHSArray, (void *)str, length, &J_Error);
+        if (unlikely(Rc == PJERR)) {
+            fatal("STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                  str, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        }
+        ptr = (STRING_ENTRY **)Rc;
+    }
+    if(likely(*ptr == 0)) {
         // a new item added to the index
         size_t mem_size = sizeof(STRING_ENTRY) + length;
         se = mallocz(mem_size);
@@ -1586,25 +1506,17 @@ STRING *string_strdupz(const char *str) {
         se->length = length;
         se->refcount = 1;
         *ptr = se;
-        hashtable_inserted_name_value_unsafe(&string_dictionary, se);
-        string_dictionary.version++;
-        string_dictionary.inserts++;
-        string_dictionary.entries++;
-        string_dictionary.memory += (long)mem_size;
-
-        //fprintf(stderr, "STRING_STRDUPZ (NEW): '%s'\n", str);
+        string_base.inserts++;
+        string_base.entries++;
+        string_base.memory += (long)mem_size;
+        __atomic_fetch_add(&string_base.active_references, 1, __ATOMIC_RELAXED);
     }
     else {
         // the item is already in the index
         se = *ptr;
-        __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&string_dictionary.searches, 1, __ATOMIC_RELAXED);
-
-        //fprintf(stderr, "STRING_STRDUPZ (FOUND): '%s'\n", str);
+        string_dup_internal(se);
     }
-    netdata_rwlock_unlock(&string_dictionary.rwlock);
-
-    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
+    netdata_rwlock_unlock(&string_base.rwlock);
 
     return (STRING *)se;
 }
@@ -1614,19 +1526,17 @@ void string_freez(STRING *string) {
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
 
-    __atomic_fetch_sub(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
-
     // it is unsigned, so the prevent wrapping around the number
     // we first fetch and then we subtract 1
     uint32_t refcount = __atomic_fetch_sub(&se->refcount, 1, __ATOMIC_SEQ_CST);
 
     // if it was 0 before the subtraction, we have a problem
     if(unlikely(refcount == 0))
-        fatal("STRING: tried to free string that has zero references.");
+        fatal("STRING: INTERNAL ERROR: tried to free string that has zero references.");
 
     // if it was 1 before the subtraction, we had the last reference
     if(unlikely(refcount == 1)) {
-        netdata_rwlock_wrlock(&string_dictionary.rwlock);
+        netdata_rwlock_wrlock(&string_base.rwlock);
 
         // since we did everything without a lock, someone else may have acquired the item.
         // So, we fetch the reference counter again, now that we have a write lock.
@@ -1634,21 +1544,35 @@ void string_freez(STRING *string) {
 
         // if now it is zero, it is safe to delete the item
         if(likely(refcount == 0)) {
-            if (hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0) {
-                error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
-                se = NULL;
+            bool deleted = false;
+
+            if(likely(string_base.JudyHSArray)) {
+                JError_t J_Error;
+                int ret = JudyHSDel(&string_base.JudyHSArray, (void *)se->str, se->length, &J_Error);
+                if(unlikely(ret == JERR)) {
+                    error("STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          se->str, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+                }
+                else
+                    deleted = true;
             }
+
+            if(unlikely(!deleted))
+                error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index. Ignoring it.", se->str);
             else {
                 size_t mem_size = sizeof(STRING_ENTRY) + se->length;
-                string_dictionary.version++;
-                string_dictionary.deletes++;
-                string_dictionary.entries--;
-                string_dictionary.memory -= (long)mem_size;
+                string_base.deletes++;
+                string_base.entries--;
+                string_base.memory -= (long)mem_size;
+                freez(se);
             }
         }
-        netdata_rwlock_unlock(&string_dictionary.rwlock);
-        freez(se);
+
+        netdata_rwlock_unlock(&string_base.rwlock);
     }
+
+    __atomic_fetch_sub(&string_base.active_references, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&string_base.releases, 1, __ATOMIC_RELAXED);
 }
 
 size_t string_length(STRING *string) {
@@ -2394,7 +2318,7 @@ int dictionary_unittest(size_t entries) {
 
     // check string
     {
-        long string_entries_starting = dictionary_stats_entries(&string_dictionary);
+        long int string_entries_starting = string_base.entries;
 
         fprintf(stderr, "\nChecking strings...\n");
 
@@ -2458,9 +2382,9 @@ int dictionary_unittest(size_t entries) {
 
         freez(strings);
 
-        if(dictionary_stats_entries(&string_dictionary) != string_entries_starting + 2) {
+        if(string_base.entries != string_entries_starting + 2) {
             errors++;
-            fprintf(stderr, "ERROR: strings dictionary should have %ld items but it has %ld\n", string_entries_starting + 2, dictionary_stats_entries(&string_dictionary));
+            fprintf(stderr, "ERROR: strings dictionary should have %ld items but it has %ld\n", string_entries_starting + 2, string_base.entries);
         }
         else
             fprintf(stderr, "OK: strings dictionary has 2 items\n");

@@ -991,13 +991,13 @@ static void dbengine_statistics_charts(void) {
 
 static void update_strings_charts() {
     static RRDSET *st_ops = NULL, *st_entries = NULL, *st_mem = NULL;
-    static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL, *rd_ops_searches = NULL;
+    static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL, *rd_ops_searches = NULL, *rd_ops_duplications = NULL, *rd_ops_releases = NULL;
     static RRDDIM *rd_entries_entries = NULL, *rd_entries_refs = NULL;
     static RRDDIM *rd_mem = NULL;
 
-    size_t inserts, deletes, searches, entries, references, memory;
+    size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
 
-    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory);
+    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
 
     if (unlikely(!st_ops)) {
         st_ops = rrdset_create_localhost(
@@ -1014,15 +1014,19 @@ static void update_strings_charts() {
             , localhost->rrd_update_every
             , RRDSET_TYPE_LINE);
 
-        rd_ops_inserts  = rrddim_add(st_ops, "inserts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_ops_deletes  = rrddim_add(st_ops, "deletes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_ops_searches = rrddim_add(st_ops, "searches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_inserts      = rrddim_add(st_ops, "inserts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_deletes      = rrddim_add(st_ops, "deletes",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_searches     = rrddim_add(st_ops, "searches",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_duplications = rrddim_add(st_ops, "duplications", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
     } else
         rrdset_next(st_ops);
 
-    rrddim_set_by_pointer(st_ops, rd_ops_inserts, (collected_number)inserts);
-    rrddim_set_by_pointer(st_ops, rd_ops_deletes, (collected_number)deletes);
-    rrddim_set_by_pointer(st_ops, rd_ops_searches, (collected_number)searches);
+    rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number)inserts);
+    rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number)deletes);
+    rrddim_set_by_pointer(st_ops, rd_ops_searches,     (collected_number)searches);
+    rrddim_set_by_pointer(st_ops, rd_ops_duplications, (collected_number)duplications);
+    rrddim_set_by_pointer(st_ops, rd_ops_releases,     (collected_number)releases);
     rrdset_done(st_ops);
 
     if (unlikely(!st_entries)) {
