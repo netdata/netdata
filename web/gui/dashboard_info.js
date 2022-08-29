@@ -534,7 +534,7 @@ netdataDashboard.menu = {
     'logind': {
         title: 'Logind',
         icon: '<i class="fas fa-user"></i>',
-        info: undefined
+        info: 'Counts of users and sessions by state and type provided by either systemd-logind or elogind.'
     },
 
     'powersupply': {
@@ -5920,16 +5920,16 @@ netdataDashboard.context = {
         info: 'Temperature derived from 1-Wire temperature sensors.'
     },
 
-    'logind.sessions': {
-        info: 'Shows the number of active sessions of each type tracked by logind.'
+    'logind.session_types': {
+        info: 'Shows the number of sessions of each type tracked by logind. <code>Graphical</code> sessions are running under one of X11, Mir, or Wayland. <code>Console</code> sessions are usually regular text mode local logins, but depending on how the system is configured may have an associated GUI. <code>Remote</code> sessions are sessions accessed over a remote connection such as SSH. <code>Other</code> sessions are those that do not fall into the above categories (such as sessions for cron jobs or systemd timer units).'
+    },
+
+    'logind.session_states': {
+        info: 'Shows the number of sessions in each state tracked by logind. <code>Online</code> sessions are logged in but running in the background. <code>Active</code> sessions are logged in and running in the foreground. <code>Closing</code> sessions are in the process of logging out.'
     },
 
     'logind.users': {
-        info: 'Shows the number of active users of each type tracked by logind.'
-    },
-
-    'logind.seats': {
-        info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
+        info: 'Shows the number of active users in each state tracked by logind. <code>Offline</code> users are tracked, but not logged in. <code>Lingering</code> users are not logged in, but have one or more services still running. <code>Online</code> users are logged in, but have no active sessions. <code>Active</code> users are logged in, and have at least one active session. <code>Closing</code> users are in the process of logging out without lingering.'
     },
 
     // ------------------------------------------------------------------------
