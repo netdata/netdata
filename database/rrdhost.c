@@ -85,8 +85,10 @@ static inline RRDHOST *rrdhost_index_add(RRDHOST *host) {
     RRDHOST *ret_machine_guid = dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
     if(ret_machine_guid == host)
         rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
-    else
-        error("RRDHOST: host with machine guid '%s' is already indexed", host->machine_guid);
+    else {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
+        error("RRDHOST: %s() host with machine guid '%s' is already indexed", __FUNCTION__, host->machine_guid);
+    }
 
     return host;
 }
@@ -94,7 +96,7 @@ static inline RRDHOST *rrdhost_index_add(RRDHOST *host) {
 static inline RRDHOST *rrdhost_index_del(RRDHOST *host) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID)) {
         if(dictionary_del(rrdhost_root_index, host->machine_guid) !=  0)
-            error("RRDHOST: failed to delete machine guid '%s' from index", host->machine_guid);
+            error("RRDHOST: %s() failed to delete machine guid '%s' from index", __FUNCTION__, host->machine_guid);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
     }
@@ -108,8 +110,10 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
     RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
     if(ret_hostname == host)
         rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
-    else
-        error("RRDHOST: host with hostname '%s' is already indexed", rrdhost_hostname(host));
+    else {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
+        error("RRDHOST: %s() host with hostname '%s' is already indexed", __FUNCTION__, rrdhost_hostname(host));
+    }
 
     return host;
 }
@@ -119,7 +123,7 @@ static inline RRDHOST *rrdhost_index_del_hostname(RRDHOST *host) {
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_HOSTNAME)) {
         if(dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)) !=  0)
-            error("RRDHOST: failed to delete hostname '%s' from index", rrdhost_hostname(host));
+            error("RRDHOST: %s() failed to delete hostname '%s' from index", __FUNCTION__, rrdhost_hostname(host));
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
     }

@@ -186,6 +186,7 @@ typedef enum rrddim_flags {
 
     RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
+    RRDDIM_FLAG_INDEXED_ID                      = (1 << 7),
 } RRDDIM_FLAGS;
 
 #define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -467,27 +468,29 @@ struct rrdset_volatile {
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_DETAIL              = 1 << 1, // if set, the data set should be considered as a detail of another
-                                              // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG               = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE            = 1 << 3, // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_EXPORTING_SEND      = 1 << 4, // if set, this chart should be sent to Prometheus web API and external databases
-    RRDSET_FLAG_EXPORTING_IGNORE    = 1 << 5, // if set, this chart should not be sent to Prometheus web API and external databases
-    RRDSET_FLAG_UPSTREAM_SEND       = 1 << 6, // if set, this chart should be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_IGNORE     = 1 << 7, // if set, this chart should not be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_EXPOSED    = 1 << 8, // if set, we have sent this chart definition to netdata parent (streaming)
-    RRDSET_FLAG_STORE_FIRST         = 1 << 9, // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS       = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMOGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions are homogeneous
-    RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for exporting
-    RRDSET_FLAG_SYNC_CLOCK          = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
-    RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
-    // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
-    // least rrdset_free_obsolete_time seconds ago.
-    RRDSET_FLAG_ARCHIVED            = 1 << 15,
-    RRDSET_FLAG_ACLK                = 1 << 16,
-    RRDSET_FLAG_PENDING_FOREACH_ALARMS = 1 << 17, // contains dims with uninitialized foreach alarms
-    RRDSET_FLAG_ANOMALY_DETECTION   = 1 << 18 // flag to identify anomaly detection charts.
+    RRDSET_FLAG_DETAIL                  = (1 << 1),  // if set, the data set should be considered as a detail of another
+                                                     // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG                   = (1 << 2),  // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE                = (1 << 3),  // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_EXPORTING_SEND          = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
+    RRDSET_FLAG_EXPORTING_IGNORE        = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
+    RRDSET_FLAG_UPSTREAM_SEND           = (1 << 6),  // if set, this chart should be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_IGNORE         = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_EXPOSED        = (1 << 8),  // if set, we have sent this chart definition to netdata parent (streaming)
+    RRDSET_FLAG_STORE_FIRST             = (1 << 9),  // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS           = (1 << 10), // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMOGENEOUS_CHECK       = (1 << 11), // if set, the chart should be checked to determine if the dimensions are homogeneous
+    RRDSET_FLAG_HIDDEN                  = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
+    RRDSET_FLAG_SYNC_CLOCK              = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS     = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
+                                                     // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
+                                                     // least rrdset_free_obsolete_time seconds ago.
+    RRDSET_FLAG_ARCHIVED                = (1 << 15),
+    RRDSET_FLAG_ACLK                    = (1 << 16),
+    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
+    RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
+    RRDSET_FLAG_INDEXED_ID              = (1 << 19),
+    RRDSET_FLAG_INDEXED_NAME            = (1 << 20),
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -776,8 +779,6 @@ struct rrdhost_system_info {
 };
 
 struct rrdhost {
-    avl_t avl;                                      // the index of hosts
-
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
 
     // ------------------------------------------------------------------------

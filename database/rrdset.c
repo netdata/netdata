@@ -24,13 +24,23 @@ void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, c
 // ----------------------------------------------------------------------------
 // RRDSET index
 
-static inline RRDSET *rrdset_index_add(RRDHOST *host, RRDSET *st) {
-    return dictionary_set(host->rrdset_root_index, string2str(st->id), st, sizeof(RRDSET));
+static inline void rrdset_index_add(RRDHOST *host, RRDSET *st) {
+    if(likely(dictionary_set(host->rrdset_root_index, rrdset_id(st), st, sizeof(RRDSET)) == st)) {
+        rrdset_flag_set(st, RRDSET_FLAG_INDEXED_ID);
+    }
+    else {
+        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
+        error("RRDSET: %s() attempted to index duplicate object with key '%s'", __FUNCTION__, rrdset_id(st));
+    }
 }
 
-static inline RRDSET *rrdset_index_del(RRDHOST *host, RRDSET *st) {
-    if(dictionary_del(host->rrdset_root_index, string2str(st->id)) != 0) return NULL;
-    return st;
+static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID)) {
+        if(likely(dictionary_del(host->rrdset_root_index, rrdset_id(st)) == 0))
+            rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
+        else
+            error("RRDSET: %s() attempted to delete non-indexed object with key '%s'", __FUNCTION__, rrdset_id(st));
+    }
 }
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
@@ -40,13 +50,23 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDSET name index
 
-static inline RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
-    return dictionary_get(host->rrdset_root_index_name, string2str(st->name));
+static inline void rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
+    if(likely(dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET)) == st)) {
+        rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
+    }
+    else {
+        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
+        error("RRDSET: %s() attempted to index duplicate object with key '%s'", __FUNCTION__, rrdset_name(st));
+    }
 }
 
-static inline RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    if(dictionary_del(host->rrdset_root_index_name, string2str(st->name)) != 0) return NULL;
-    return st;
+static inline void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID)) {
+        if(likely(dictionary_del(host->rrdset_root_index_name, rrdset_name(st)) != 0))
+            rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
+        else
+            error("RRDSET: %s() attempted to delete non-index object with key '%s'", __FUNCTION__, rrdset_name(st));
+    }
 }
 
 static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
@@ -146,8 +166,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
         rrddimvar_rename_all(rd);
     rrdset_unlock(st);
 
-    if(unlikely(rrdset_index_add_name(host, st) != st))
-        error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", rrdset_name(st));
+    rrdset_index_add_name(host, st);
 
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
@@ -315,9 +334,7 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // remove it from the indexes
 
-    if(unlikely(rrdset_index_del(host, st) != st))
-        error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", rrdset_id(st));
-
+    rrdset_index_del(host, st);
     rrdset_index_del_name(host, st);
 
     // ------------------------------------------------------------------------
@@ -735,9 +752,7 @@ RRDSET *rrdset_create_custom(
         rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
     }
 
-    if(unlikely(rrdset_index_add(host, st) != st))
-        error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", rrdset_id(st));
-
+    rrdset_index_add(host, st);
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
 

@@ -10,13 +10,23 @@
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
-static inline RRDDIM *rrddim_index_add(RRDSET *st, RRDDIM *rd) {
-    return dictionary_set(st->dimensions_index, string2str(rd->id), rd, sizeof(RRDDIM));
+static inline void rrddim_index_add(RRDSET *st, RRDDIM *rd) {
+    if(likely(dictionary_set(st->dimensions_index, string2str(rd->id), rd, sizeof(RRDDIM)) == rd)) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_INDEXED_ID);
+    }
+    else {
+        rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
+        error("RRDDIM: %s() attempted to index duplicate dimension with key '%s' of chart '%s' of host '%s'", __FUNCTION__, rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+    }
 }
 
-static inline RRDDIM *rrddim_index_del(RRDSET *st, RRDDIM *rd) {
-    dictionary_del(st->dimensions_index, string2str(rd->id));
-    return rd;
+static inline void rrddim_index_del(RRDSET *st, RRDDIM *rd) {
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID)) {
+        if (likely(dictionary_del(st->dimensions_index, string2str(rd->id)) == 0))
+            rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
+        else
+            error("RRDDIM: %s() attempted to delete non-indexed dimension with key '%s' of chart '%s' of host '%s'", __FUNCTION__, rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+    }
 }
 
 static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
@@ -343,8 +353,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
     }
 
-    if(unlikely(rrddim_index_add(st, rd) != rd))
-        error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rrddim_id(rd), rrdset_id(st));
+    rrddim_index_add(st, rd);
 
     rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
     rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
@@ -407,8 +416,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     while(rd->variables)
         rrddimvar_free(rd->variables);
 
-    if(unlikely(rrddim_index_del(st, rd) != rd))
-        error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rrddim_id(rd), rrdset_id(st));
+    rrddim_index_del(st, rd);
 
     // free(rd->annotations);
 //#ifdef ENABLE_ACLK
