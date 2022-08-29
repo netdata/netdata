@@ -47,9 +47,9 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1               = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2               = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
-    DICTIONARY_FLAG_RESERVED3               = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
+    DICTIONARY_FLAG_RESERVED1               = (1 << 28), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2               = (1 << 29), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3               = (1 << 30), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary

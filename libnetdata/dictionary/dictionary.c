@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // NOT TO BE USED BY USERS
-#define DICTIONARY_FLAG_EXCLUSIVE_ACCESS    (1 << 29) // there is only one thread accessing the dictionary
-#define DICTIONARY_FLAG_DESTROYED           (1 << 30) // this dictionary has been destroyed
-#define DICTIONARY_FLAG_DEFER_ALL_DELETIONS (1 << 31) // defer all deletions of items in the dictionary
+#define DICTIONARY_FLAG_EXCLUSIVE_ACCESS    (1 << 28) // there is only one thread accessing the dictionary
+#define DICTIONARY_FLAG_DESTROYED           (1 << 29) // this dictionary has been destroyed
+#define DICTIONARY_FLAG_DEFER_ALL_DELETIONS (1 << 30) // defer all deletions of items in the dictionary
 
 // our reserved flags that cannot be set by users
 #define DICTIONARY_FLAGS_RESERVED (DICTIONARY_FLAG_EXCLUSIVE_ACCESS|DICTIONARY_FLAG_DESTROYED|DICTIONARY_FLAG_DEFER_ALL_DELETIONS)
