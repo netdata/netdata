@@ -1551,24 +1551,32 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     *memory = string_dictionary.memory;
 }
 
-static netdata_mutex_t string_mutex = NETDATA_MUTEX_INITIALIZER;
-
 STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
     __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
     return string;
 }
 
 STRING *string_strdupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
 
-    netdata_mutex_lock(&string_mutex);
-
     size_t length = strlen(str) + 1;
-    STRING_ENTRY *se;
+
+    netdata_rwlock_rdlock(&string_dictionary.rwlock);
+    STRING_ENTRY *se = (STRING_ENTRY *)hashtable_get_unsafe(&string_dictionary, str, length);
+    netdata_rwlock_unlock(&string_dictionary.rwlock);
+
+    if(likely(se)) {
+        __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&string_dictionary.searches, 1, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
+        return (STRING *)se;
+    }
+
+    netdata_rwlock_wrlock(&string_dictionary.rwlock);
     STRING_ENTRY **ptr = (STRING_ENTRY **)hashtable_insert_unsafe(&string_dictionary, str, length);
     if(unlikely(*ptr == 0)) {
         // a new item added to the index
@@ -1589,44 +1597,58 @@ STRING *string_strdupz(const char *str) {
     else {
         // the item is already in the index
         se = *ptr;
-        se->refcount++;
-        string_dictionary.searches++;
+        __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&string_dictionary.searches, 1, __ATOMIC_RELAXED);
 
         //fprintf(stderr, "STRING_STRDUPZ (FOUND): '%s'\n", str);
     }
+    netdata_rwlock_unlock(&string_dictionary.rwlock);
 
-    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
 
-    netdata_mutex_unlock(&string_mutex);
     return (STRING *)se;
 }
 
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
-    netdata_mutex_lock(&string_mutex);
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
 
-    __atomic_fetch_sub(&string_dictionary.referenced_items, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_sub(&string_dictionary.referenced_items, 1, __ATOMIC_RELAXED);
 
+    // it is unsigned, so the prevent wrapping around the number
+    // we first fetch and then we subtract 1
     uint32_t refcount = __atomic_fetch_sub(&se->refcount, 1, __ATOMIC_SEQ_CST);
 
-    if(refcount == 0)
+    // if it was 0 before the subtraction, we have a problem
+    if(unlikely(refcount == 0))
         fatal("STRING: tried to free string that has zero references.");
 
+    // if it was 1 before the subtraction, we had the last reference
     if(unlikely(refcount == 1)) {
-        if(hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0)
-            error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
+        netdata_rwlock_wrlock(&string_dictionary.rwlock);
 
-        size_t mem_size = sizeof(STRING_ENTRY) + se->length;
+        // since we did everything without a lock, someone else may have acquired the item.
+        // So, we fetch the reference counter again, now that we have a write lock.
+        refcount = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
+
+        // if now it is zero, it is safe to delete the item
+        if(likely(refcount == 0)) {
+            if (hashtable_delete_unsafe(&string_dictionary, se->str, se->length, se) == 0) {
+                error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index", se->str);
+                se = NULL;
+            }
+            else {
+                size_t mem_size = sizeof(STRING_ENTRY) + se->length;
+                string_dictionary.version++;
+                string_dictionary.deletes++;
+                string_dictionary.entries--;
+                string_dictionary.memory -= (long)mem_size;
+            }
+        }
+        netdata_rwlock_unlock(&string_dictionary.rwlock);
         freez(se);
-        string_dictionary.version++;
-        string_dictionary.deletes++;
-        string_dictionary.entries--;
-        string_dictionary.memory -= (long)mem_size;
     }
-
-    netdata_mutex_unlock(&string_mutex);
 }
 
 size_t string_length(STRING *string) {
