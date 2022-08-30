@@ -29,8 +29,7 @@ class Service(SimpleService):
         self.chart_units = 'n'
         self.collected_dims = {}
 
-    @staticmethod
-    def check():
+    def check(self):
 
         if self.chart_name not in self.charts:
             self.charts[self.chart_name] = {
