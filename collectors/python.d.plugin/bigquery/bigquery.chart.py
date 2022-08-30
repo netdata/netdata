@@ -3,6 +3,7 @@
 # Author: Andrew Maguire (andrewm4894)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from google.oauth2 import service_account
 import pandas_gbq
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -29,16 +30,20 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.sql = 'select rand() as random0, rand() as random1'
+        self.project_id = 'netdata-analytics-bi'
+        self.credentials = '/tmp/key.json'
 
     @staticmethod
     def check():
         return True
 
     def get_data(self):
-        data = dict()
 
-        df = pandas_gbq.read_gbq(self.sql)
+        credentials = service_account.Credentials.from_service_account_file(self.credentials)
+        df = pandas_gbq.read_gbq(self.sql, project_id=self.project_id, credentials=credentials)
+        print(df)
         data = df.to_dict('records')
+        print(data)
 
         for dimension_id in df.columns:
             if dimension_id not in self.charts['random']:
