@@ -9,6 +9,7 @@ import pandas_gbq
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 90000
+update_every = 5
 
 ORDER = [
     'random',
