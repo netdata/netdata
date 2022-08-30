@@ -13,8 +13,7 @@ update_every = 5
 
 ORDER = []
 
-CHARTS = {
-}
+CHARTS = {}
 
 
 class Service(SimpleService):
