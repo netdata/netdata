@@ -87,7 +87,7 @@ class Service(SimpleService):
             return False
 
         if self.mgr is None:
-            self.error('Unable to connect to ' + self.bus_name + ' service')
+            self.error('Unable to connect to {} service'.format(self.bus_name))
             return False
 
         if self.iface is None:
@@ -144,7 +144,7 @@ class Service(SimpleService):
             elif str(props['State']) == 'closing':
                 ret['sessions_closing'] += 1
             else:
-                self.error('Unknown session state ' + str(props['State']) + ' for session ' + str(p))
+                self.error('Unknown session state {} for session {}'.format(props['State'], p))
 
         for p in user_paths:
             o = self.bus.get_object(self.bus_name, p)
@@ -162,6 +162,6 @@ class Service(SimpleService):
             elif str(state) == 'closing':
                 ret['users_closing'] += 1
             else:
-                self.error('Unknown user state ' + str(state) + ' for user ' + str(p))
+                self.error('Unknown user state {} for user {}'.format(state, p))
 
         return ret
