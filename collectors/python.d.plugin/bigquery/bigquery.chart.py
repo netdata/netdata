@@ -42,7 +42,7 @@ class Service(SimpleService):
         credentials = service_account.Credentials.from_service_account_file(self.credentials)
         df = pandas_gbq.read_gbq(self.sql, project_id=self.project_id, credentials=credentials)
         print(df)
-        data = df.to_dict('records')
+        data = df.to_dict('records')[0]
         print(data)
 
         for dimension_id in df.columns:
