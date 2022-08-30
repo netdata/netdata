@@ -29,7 +29,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.sql = 'select rand() as random0, rand() as random1'
+        self.sql = 'select rand()*10000 as random0, rand()*10000 as random1'
         self.project_id = 'netdata-analytics-bi'
         self.credentials = '/tmp/key.json'
 
