@@ -1410,7 +1410,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 
 typedef struct string_entry {
     uint32_t length;    // the string length with the terminating '\0'
-    uint32_t refcount;  // how many times this string is used
+    int32_t refcount;   // how many times this string is used
     const char str[];   // the string itself
 } STRING_ENTRY;
 
@@ -1437,24 +1437,32 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     *inserts = string_base.inserts;
     *deletes = string_base.deletes;
     *searches = string_base.searches;
-    *entries = string_base.entries;
-    *references = string_base.active_references;
-    *memory = string_base.memory;
+    *entries = (size_t)string_base.entries;
+    *references = (size_t)string_base.active_references;
+    *memory = (size_t)string_base.memory;
     *duplications = string_base.duplications;
     *releases = string_base.releases;
 }
 
-static inline void string_dup_internal(STRING_ENTRY *se) {
-    __atomic_fetch_add(&se->refcount, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&string_base.active_references, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&string_base.duplications, 1, __ATOMIC_RELAXED);
+static inline int32_t string_entry_acquire_unsafe(STRING_ENTRY *se) {
+    __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&string_base.duplications, 1, __ATOMIC_RELAXED);
+    return __atomic_add_fetch(&se->refcount, 1, __ATOMIC_SEQ_CST);
+}
+
+static inline int32_t string_entry_release_unsafe(STRING_ENTRY *se) {
+    __atomic_sub_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&string_base.releases, 1, __ATOMIC_RELAXED);
+    return __atomic_sub_fetch(&se->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
 STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
-    string_dup_internal(se);
+    netdata_rwlock_rdlock(&string_base.rwlock);
+    string_entry_acquire_unsafe(se);
+    netdata_rwlock_unlock(&string_base.rwlock);
     return string;
 }
 
@@ -1463,7 +1471,8 @@ STRING *string_strdupz(const char *str) {
 
     size_t length = strlen(str) + 1;
 
-    STRING_ENTRY *se;
+    STRING_ENTRY *se = NULL;
+
     if(likely(string_base.JudyHSArray)) {
         netdata_rwlock_rdlock(&string_base.rwlock);
         Pvoid_t *Rc;
@@ -1471,21 +1480,18 @@ STRING *string_strdupz(const char *str) {
         if(likely(Rc)) {
             // found in the hash table
             se = *Rc;
+            string_entry_acquire_unsafe(se);
         }
         else {
             // not found in the hash table
             se = NULL;
         }
+        __atomic_add_fetch(&string_base.searches, 1, __ATOMIC_RELAXED);
         netdata_rwlock_unlock(&string_base.rwlock);
-        __atomic_fetch_add(&string_base.searches, 1, __ATOMIC_RELAXED);
     }
-    else
-        se = NULL;
 
-    if(likely(se)) {
-        string_dup_internal(se);
-        return (STRING *)se;
-    }
+    if(likely(se))
+            return (STRING *)se;
 
     netdata_rwlock_wrlock(&string_base.rwlock);
     STRING_ENTRY **ptr;
@@ -1509,12 +1515,12 @@ STRING *string_strdupz(const char *str) {
         string_base.inserts++;
         string_base.entries++;
         string_base.memory += (long)mem_size;
-        __atomic_fetch_add(&string_base.active_references, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
     }
     else {
         // the item is already in the index
         se = *ptr;
-        string_dup_internal(se);
+        string_entry_acquire_unsafe(se);
     }
     netdata_rwlock_unlock(&string_base.rwlock);
 
@@ -1526,24 +1532,23 @@ void string_freez(STRING *string) {
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
 
-    // it is unsigned, so the prevent wrapping around the number
-    // we first fetch and then we subtract 1
-    uint32_t refcount = __atomic_fetch_sub(&se->refcount, 1, __ATOMIC_SEQ_CST);
+    netdata_rwlock_wrlock(&string_base.rwlock);
+
+    int32_t refcount = string_entry_release_unsafe(se);
 
     // if it was 0 before the subtraction, we have a problem
-    if(unlikely(refcount == 0))
+    if(unlikely(refcount < 0))
         fatal("STRING: INTERNAL ERROR: tried to free string that has zero references.");
 
     // if it was 1 before the subtraction, we had the last reference
-    if(unlikely(refcount == 1)) {
-        netdata_rwlock_wrlock(&string_base.rwlock);
+    if(unlikely(refcount == 0)) {
 
         // since we did everything without a lock, someone else may have acquired the item.
         // So, we fetch the reference counter again, now that we have a write lock.
         refcount = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
 
         // if now it is zero, it is safe to delete the item
-        if(likely(refcount == 0)) {
+        if(likely(refcount <= 0)) {
             bool deleted = false;
 
             if(likely(string_base.JudyHSArray)) {
@@ -1567,12 +1572,9 @@ void string_freez(STRING *string) {
                 freez(se);
             }
         }
-
-        netdata_rwlock_unlock(&string_base.rwlock);
     }
 
-    __atomic_fetch_sub(&string_base.active_references, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&string_base.releases, 1, __ATOMIC_RELAXED);
+    netdata_rwlock_unlock(&string_base.rwlock);
 }
 
 size_t string_length(STRING *string) {
@@ -2180,6 +2182,27 @@ static size_t check_name_value_deleted_flag(DICTIONARY *dict, NAME_VALUE *nv, co
     return errors;
 }
 
+static int string_threads_join = 0;
+static void *string_thread(void *arg __maybe_unused) {
+    int dups = gettid() % 10;
+    for(; 1 ;) {
+        if(string_threads_join)
+            break;
+
+        STRING *s = string_strdupz("a non existing string text");
+
+        for(int i = 0; i < dups ; i++)
+            string_dup(s);
+
+        for(int i = 0; i < dups ; i++)
+            string_freez(s);
+
+        string_freez(s);
+    }
+
+    return arg;
+}
+
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 
@@ -2431,6 +2454,23 @@ int dictionary_unittest(size_t entries) {
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
+
+    fprintf(stderr, "Checking string threads concurrency for 5 seconds...\n");
+    // check string concurrency
+    netdata_thread_t threads[10];
+    string_threads_join = 0;
+    for(int i = 0; i < 10 ;i++) {
+        char buf[100 + 1];
+        snprintf(buf, 100, "string%d", i);
+        netdata_thread_create(&threads[i], buf, 0, string_thread, NULL);
+    }
+    sleep_usec(5000000);
+
+    string_threads_join = 1;
+    for(int i = 0; i < 10 ;i++) {
+        void *retval;
+        netdata_thread_join(threads[i], &retval);
+    }
 
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;
