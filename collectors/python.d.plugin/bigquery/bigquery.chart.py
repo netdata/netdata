@@ -41,7 +41,7 @@ class Service(SimpleService):
     def get_data(self):
 
         credentials = service_account.Credentials.from_service_account_file(self.credentials)
-        df = pandas_gbq.read_gbq(self.sql, project_id=self.project_id, credentials=credentials)
+        df = pandas_gbq.read_gbq(self.sql, project_id=self.project_id, credentials=credentials, progress_bar_type=None)
         print(df)
         data = df.to_dict('records')[0]
         print(data)
