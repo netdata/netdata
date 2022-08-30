@@ -21,21 +21,28 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.sql = 'select rand()*10000 as random0, rand()*10000 as random1'
-        self.project_id = 'netdata-analytics-bi'
-        self.credentials = '/tmp/key.json'
-        self.chart_name = 'random'
-        self.chart_type = 'line'
-        self.chart_units = 'n'
+        self.chart_configs = self.configuration.get('chart_configs', None)
+        self.credentials = self.configuration.get('credentials', None)
         self.collected_dims = {}
 
     def check(self):
+        
+        for chart_config in self.chart_configs:
+            if chart_config['chart_name'] not in self.charts:
+                chart_template = {
+                    'options': [None, chart_config['chart_name'], chart_config['chart_name'], chart_config['chart_name'], chart_config['chart_units'], chart_config['chart_type']],
+                    'lines': []
+                    }
+                self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
 
-        if self.chart_name not in self.charts:
-            self.charts[self.chart_name] = {
-                'options': [None, self.chart_name, self.chart_name, self.chart_name, self.chart_units, self.chart_type],
-                'lines': []
-                }
+        self.credentials = service_account.Credentials.from_service_account_file(self.credentials)
+
+        data = dict()
+        for chart_config in self.chart_configs:
+            df = pandas_gbq.read_gbq(chart_config['sql'], project_id=chart_config['project_id'], credentials=self.credentials, progress_bar_type=None)
+            chart_data = df.to_dict('records')[0] 
+            data.update(chart_data)
+            self.update_charts(chart_config['chart_name'], chart_data)
 
         return True
 
@@ -58,11 +65,11 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        credentials = service_account.Credentials.from_service_account_file(self.credentials)
-        df = pandas_gbq.read_gbq(self.sql, project_id=self.project_id, credentials=credentials, progress_bar_type=None)
-        self.debug(df)
-        data = df.to_dict('records')[0]
-        self.debug(data)
-        self.update_charts(self.chart_name, data)
+        data = dict()
+
+        for chart_config in self.chart_configs:
+            df = pandas_gbq.read_gbq(chart_config['sql'], project_id=chart_config['project_id'], credentials=self.credentials, progress_bar_type=None)
+            chart_data = df.to_dict('records')[0] 
+            data.update(chart_data)
 
         return data
