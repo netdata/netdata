@@ -1516,12 +1516,19 @@ void db_execute(const char *cmd)
             error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
             sqlite3_free(err_msg);
             if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+                sqlite3_exec_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
                 usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
             }
-            else break;
+            else {
+                sqlite3_exec_completed(false, false, false);
+                break;
+            }
         }
-        else
+        else {
+            sqlite3_exec_completed(true, false, false);
             break;
+        }
+
         ++cnt;
     }
     return;
