@@ -3,6 +3,7 @@
 # Author: Andrew Maguire (andrewm4894)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from typing_extensions import Self
 from google.oauth2 import service_account
 import pandas_gbq
 
@@ -33,10 +34,38 @@ class Service(SimpleService):
         self.sql = 'select rand()*10000 as random0, rand()*10000 as random1'
         self.project_id = 'netdata-analytics-bi'
         self.credentials = '/tmp/key.json'
+        self.chart_name = 'random'
+        self.chart_type = 'line'
+        self.chart_units = 'n'
+        self.collected_dims = {}
 
     @staticmethod
     def check():
+
+        if self.chart_name not in self.charts:
+            self.charts[self.chart_name] = {
+                'options': [None, self.chart_name, self.chart_name, self.chart_name, self.chart_units, self.chart_type],
+                'lines': []
+                }
+
         return True
+
+    def update_charts(self, chart, data, algorithm='absolute', multiplier=1, divisor=1):
+        if not self.charts:
+            return
+
+        if chart not in self.collected_dims:
+            self.collected_dims[chart] = set()
+
+        for dim in data:
+            if dim not in self.collected_dims[chart]:
+                self.collected_dims[chart].add(dim)
+                self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
+
+        for dim in list(self.collected_dims[chart]):
+            if dim not in data:
+                self.collected_dims[chart].remove(dim)
+                self.charts[chart].del_dimension(dim, hide=False)
 
     def get_data(self):
 
@@ -45,9 +74,6 @@ class Service(SimpleService):
         print(df)
         data = df.to_dict('records')[0]
         print(data)
-
-        for dimension_id in df.columns:
-            if dimension_id not in self.charts['random']:
-                self.charts['random'].add_dimension([dimension_id])
+        self.update_charts(self.chart_name, data)
 
         return data
