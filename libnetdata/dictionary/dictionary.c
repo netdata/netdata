@@ -1425,8 +1425,8 @@ static struct string_hashtable {
     size_t inserts;             // the number of successful inserts to the index
     size_t deletes;             // the number of successful deleted from the index
     size_t searches;            // the number of successful searches in the index
-    size_t duplications;        // when a string is referenced, but not inserted
-    size_t releases;            // when a string is unreferenced, but not deleted
+    size_t duplications;        // when a string is referenced
+    size_t releases;            // when a string is unreferenced
 
 } string_base = {
     .JudyHSArray = NULL,
@@ -2470,11 +2470,11 @@ int dictionary_unittest(size_t entries) {
             netdata_thread_join(threads[i], &retval);
         }
 
-        size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
-        string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
+        size_t inserts, deletes, searches, sentries, references, memory, duplications, releases;
+        string_statistics(&inserts, &deletes, &searches, &sentries, &references, &memory, &duplications, &releases);
 
         fprintf(stderr, "inserts %zu, deletes %zu, searches %zu, entries %zu, references %zu, memory %zu, duplications %zu, releases %zu\n",
-                inserts - oinserts, deletes - odeletes, searches - osearches, entries - oentries, references - oreferences, memory - omemory, duplications - oduplications, releases - oreleases);
+                inserts - oinserts, deletes - odeletes, searches - osearches, sentries - oentries, references - oreferences, memory - omemory, duplications - oduplications, releases - oreleases);
     }
 
     fprintf(stderr, "\n%zu errors found\n", errors);
