@@ -1527,19 +1527,19 @@ int test_sqlite(void) {
         return 1;
     }
 
-    rc = sqlite3_exec(db_meta, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Create table failed\n");
         return 1;
     }
 
-    rc = sqlite3_exec(db_meta, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
         return 1;
     }
 
-    rc = sqlite3_exec(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
         return 1;
@@ -1549,49 +1549,49 @@ int test_sqlite(void) {
     char *uuid_str = "0000_000";
 
     buffer_sprintf(sql, TABLE_ACLK_CHART, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     buffer_flush(sql);
     if (rc != SQLITE_OK)
         goto error;
 
     buffer_sprintf(sql, TABLE_ACLK_CHART_PAYLOAD, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     buffer_flush(sql);
     if (rc != SQLITE_OK)
         goto error;
 
     buffer_sprintf(sql, TABLE_ACLK_CHART_LATEST, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
     buffer_flush(sql);
 
     buffer_sprintf(sql, INDEX_ACLK_CHART, uuid_str, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
     buffer_flush(sql);
 
     buffer_sprintf(sql, INDEX_ACLK_CHART_LATEST, uuid_str, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
     buffer_flush(sql);
 
     buffer_sprintf(sql, TRIGGER_ACLK_CHART_PAYLOAD, uuid_str, uuid_str, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
     buffer_flush(sql);
 
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
     buffer_flush(sql);
 
     buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-    rc = sqlite3_exec(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
     buffer_flush(sql);
