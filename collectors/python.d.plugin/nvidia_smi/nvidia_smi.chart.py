@@ -4,10 +4,11 @@
 # Author: Ilya Mashchenko (ilyam8)
 # User Memory Stat Author: Guido Scatena (scatenag)
 
-import os
-import pwd
 import subprocess
 import threading
+import os
+import pwd
+
 import xml.etree.ElementTree as et
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -15,11 +16,15 @@ from bases.collection import find_binary
 
 disabled_by_default = True
 
+NVIDIA_FORMAT_MODE = 'csv'
+NVIDIA_FORMAT_MODE_CSV_QUERY_GPU = '--query-gpu=gpu_name,gpu_bus_id,utilization.gpu,utilization.memory,fan.speed,temperature.gpu,memory.free,memory.used'
 NVIDIA_SMI = 'nvidia-smi'
+DEFAULT_LOOP_MODE = False
 
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
 POLLER_BREAK_ROW = '</nvidia_smi_log>'
+POLLER_BREAK_ROW_CSV = 'endcsv'
 
 PCI_BANDWIDTH = 'pci_bandwidth'
 FAN_SPEED = 'fan_speed'
@@ -31,7 +36,6 @@ BAR_USAGE = 'bar1_mem_usage'
 TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
-POWER_STATE = 'power_state'
 PROCESSES_MEM = 'processes_mem'
 USER_MEM = 'user_mem'
 USER_NUM = 'user_num'
@@ -47,14 +51,10 @@ ORDER = [
     TEMPERATURE,
     CLOCKS,
     POWER,
-    POWER_STATE,
     PROCESSES_MEM,
     USER_MEM,
     USER_NUM,
 ]
-
-# https://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpupstate.html
-POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 
 def gpu_charts(gpu):
@@ -129,10 +129,6 @@ def gpu_charts(gpu):
                 ['power_draw', 'power', 'absolute', 1, 100],
             ]
         },
-        POWER_STATE: {
-            'options': [None, 'Power State', 'state', fam, 'nvidia_smi.power_state', 'line'],
-            'lines': [['power_state_' + v.lower(), v, 'absolute'] for v in POWER_STATES]
-        },
         PROCESSES_MEM: {
             'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
             'lines': []
@@ -165,16 +161,23 @@ class NvidiaSMI:
     def __init__(self):
         self.command = find_binary(NVIDIA_SMI)
         self.active_proc = None
+        self.format_mode = NVIDIA_FORMAT_MODE
 
     def run_once(self):
-        proc = subprocess.Popen([self.command, '-x', '-q'], stdout=subprocess.PIPE)
+        if self.format_mode == 'csv':
+            proc = subprocess.Popen([self.command, NVIDIA_FORMAT_MODE_CSV_QUERY_GPU, '--format=csv,nounits'], stdout=subprocess.PIPE)
+        else:
+            proc = subprocess.Popen([self.command, '-x', '-q'], stdout=subprocess.PIPE)
         stdout, _ = proc.communicate()
         return stdout
 
     def run_loop(self, interval):
         if self.active_proc:
             self.kill()
-        proc = subprocess.Popen([self.command, '-x', '-q', '-l', str(interval)], stdout=subprocess.PIPE)
+        if self.format_mode == 'csv':
+            proc = subprocess.Popen([self.command, NVIDIA_FORMAT_MODE_CSV_QUERY_GPU, '--format=csv,nounits', '-l', str(interval), '&& echo "endcsv"'], stdout=subprocess.PIPE)
+        else:
+            proc = subprocess.Popen([self.command, '-x', '-q', '-l', str(interval)], stdout=subprocess.PIPE)
         self.active_proc = proc
         return proc.stdout
 
@@ -197,6 +200,7 @@ class NvidiaSMIPoller(threading.Thread):
         self.exit = False
         self.empty_rows = 0
         self.rows = list()
+        self.format_mode = NVIDIA_FORMAT_MODE
 
     def has_smi(self):
         return bool(self.smi.command)
@@ -206,7 +210,6 @@ class NvidiaSMIPoller(threading.Thread):
 
     def run(self):
         out = self.smi.run_loop(self.interval)
-
         for row in out:
             if self.exit or self.empty_rows > EMPTY_ROW_LIMIT:
                 break
@@ -218,7 +221,7 @@ class NvidiaSMIPoller(threading.Thread):
         self.empty_rows += (row == EMPTY_ROW)
         self.rows.append(row)
 
-        if POLLER_BREAK_ROW in row:
+        if (POLLER_BREAK_ROW in row) or (POLLER_BREAK_ROW_CSV in row):
             self.lock.acquire()
             self.last_data = '\n'.join(self.rows)
             self.lock.release()
@@ -312,92 +315,146 @@ def get_username_by_pid_safe(pid, passwd_file):
 
 
 class GPU:
-    def __init__(self, num, root, exclude_zero_memory_users=False):
+    def __init__(self, num, root, format_mode, exclude_zero_memory_users=False):
         self.num = num
         self.root = root
+        self.format_mode = format_mode
         self.exclude_zero_memory_users = exclude_zero_memory_users
 
     def id(self):
-        return self.root.get('id')
+        if self.format_mode == 'csv':
+            return self.root.get('id')
+        else:
+            return self.root.get('id')
 
     def name(self):
-        return self.root.find('product_name').text
+        if self.format_mode == 'csv':
+            return self.root.get('product_name')
+        else:
+            return self.root.find('product_name').text
 
     def full_name(self):
         return 'gpu{0} {1}'.format(self.num, self.name())
 
     @handle_attr_error
     def rx_util(self):
-        return self.root.find('pci').find('rx_util').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('pci').find('rx_util').text.split()[0]
 
     @handle_attr_error
     def tx_util(self):
-        return self.root.find('pci').find('tx_util').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('pci').find('tx_util').text.split()[0]
 
     @handle_attr_error
     def fan_speed(self):
-        return self.root.find('fan_speed').text.split()[0]
+        if self.format_mode == 'csv':
+            return self.root.get('fan_speed')
+        else:
+            return self.root.find('fan_speed').text.split()[0]
 
     @handle_attr_error
     def gpu_util(self):
-        return self.root.find('utilization').find('gpu_util').text.split()[0]
+        if self.format_mode == 'csv':
+            return self.root.get('gpu_util')
+        else:
+            return self.root.find('utilization').find('gpu_util').text.split()[0]
 
     @handle_attr_error
     def memory_util(self):
-        return self.root.find('utilization').find('memory_util').text.split()[0]
+        if self.format_mode == 'csv':
+            return self.root.get('memory_util')
+        else:
+            return self.root.find('utilization').find('memory_util').text.split()[0]
 
     @handle_attr_error
     def encoder_util(self):
-        return self.root.find('utilization').find('encoder_util').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('utilization').find('encoder_util').text.split()[0]
 
     @handle_attr_error
     def decoder_util(self):
-        return self.root.find('utilization').find('decoder_util').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('utilization').find('decoder_util').text.split()[0]
 
     @handle_attr_error
     def fb_memory_used(self):
-        return self.root.find('fb_memory_usage').find('used').text.split()[0]
+        if self.format_mode == 'csv':
+            return self.root.get('memory_used')
+        else:
+            return self.root.find('fb_memory_usage').find('used').text.split()[0]
 
     @handle_attr_error
     def fb_memory_free(self):
-        return self.root.find('fb_memory_usage').find('free').text.split()[0]
+        if self.format_mode == 'csv':
+            return self.root.get('memory_free')
+        else:
+            return self.root.find('fb_memory_usage').find('free').text.split()[0]
 
     @handle_attr_error
     def bar1_memory_used(self):
-        return self.root.find('bar1_memory_usage').find('used').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('bar1_memory_usage').find('used').text.split()[0]
 
     @handle_attr_error
     def bar1_memory_free(self):
-        return self.root.find('bar1_memory_usage').find('free').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('bar1_memory_usage').find('free').text.split()[0]
 
     @handle_attr_error
     def temperature(self):
-        return self.root.find('temperature').find('gpu_temp').text.split()[0]
+        if self.format_mode == 'csv':
+            return self.root.get('gpu_temp')
+        else:
+            return self.root.find('temperature').find('gpu_temp').text.split()[0]
 
     @handle_attr_error
     def graphics_clock(self):
-        return self.root.find('clocks').find('graphics_clock').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('clocks').find('graphics_clock').text.split()[0]
 
     @handle_attr_error
     def video_clock(self):
-        return self.root.find('clocks').find('video_clock').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('clocks').find('video_clock').text.split()[0]
 
     @handle_attr_error
     def sm_clock(self):
-        return self.root.find('clocks').find('sm_clock').text.split()[0]
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('clocks').find('sm_clock').text.split()[0]
 
     @handle_attr_error
     def mem_clock(self):
-        return self.root.find('clocks').find('mem_clock').text.split()[0]
-
-    @handle_attr_error
-    def power_state(self):
-        return str(self.root.find('power_readings').find('power_state').text.split()[0])
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return self.root.find('clocks').find('mem_clock').text.split()[0]
 
     @handle_value_error
     @handle_attr_error
     def power_draw(self):
-        return float(self.root.find('power_readings').find('power_draw').text.split()[0]) * 100
+        if self.format_mode == 'csv':
+            return '0'
+        else:
+            return float(self.root.find('power_readings').find('power_draw').text.split()[0]) * 100
 
     @handle_attr_error
     def processes(self):
@@ -438,27 +495,21 @@ class GPU:
             'mem_clock': self.mem_clock(),
             'power_draw': self.power_draw(),
         }
-
-        for v in POWER_STATES:
-            data['power_state_' + v.lower()] = 0
-        p_state = self.power_state()
-        if p_state:
-            data['power_state_' + p_state.lower()] = 1
-
-        processes = self.processes() or []
-        users = set()
-        for p in processes:
-            data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
-            if p['username']:
-                if self.exclude_zero_memory_users and p['used_memory'] == 0:
-                    continue
-                users.add(p['username'])
-                key = 'user_mem_{0}'.format(p['username'])
-                if key in data:
-                    data[key] += p['used_memory']
-                else:
-                    data[key] = p['used_memory']
-        data['user_num'] = len(users)
+        #processes = self.processes() or []
+        #processes = []
+        #users = set()
+        # for p in processes:
+        #     data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
+        #     if p['username']:
+        #         if self.exclude_zero_memory_users and p['used_memory'] == 0:
+        #             continue
+        #         users.add(p['username'])
+        #         key = 'user_mem_{0}'.format(p['username'])
+        #         if key in data:
+        #             data[key] += p['used_memory']
+        #         else:
+        #             data[key] = p['used_memory']
+        # data['user_num'] = len(users)
 
         return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items())
 
@@ -468,8 +519,9 @@ class Service(SimpleService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-        self.loop_mode = configuration.get('loop_mode', True)
-        poll = int(configuration.get('poll_seconds', self.get_update_every()))
+        self.loop_mode = configuration.get('loop_mode', DEFAULT_LOOP_MODE)
+        self.format_mode = NVIDIA_FORMAT_MODE
+        poll = int(configuration.get('poll_seconds', 1))
         self.exclude_zero_memory_users = configuration.get('exclude_zero_memory_users', False)
         self.poller = NvidiaSMIPoller(poll)
 
@@ -492,57 +544,60 @@ class Service(SimpleService):
         else:
             last_data = self.get_data_normal_mode()
 
+        #self.debug(last_data)
+
         if not last_data:
             return None
 
-        parsed = self.parse_xml(last_data)
-        if parsed is None:
-            return None
+        parsed = self.parse_csv(last_data) if self.format_mode == 'csv' else self.parse_xml(last_data).findall('gpu')
 
         data = dict()
-        for idx, root in enumerate(parsed.findall('gpu')):
-            gpu = GPU(idx, root, self.exclude_zero_memory_users)
+        for idx, root in enumerate(parsed):
+            if self.format_mode == 'csv':
+                gpu = GPU(idx, parsed[idx], self.format_mode, self.exclude_zero_memory_users)
+            else:
+                gpu = GPU(idx, root, self.format_mode, self.exclude_zero_memory_users)
             gpu_data = gpu.data()
-            # self.debug(gpu_data)
+            #self.debug(gpu_data)
             gpu_data = dict((k, v) for k, v in gpu_data.items() if is_gpu_data_value_valid(v))
             data.update(gpu_data)
-            self.update_processes_mem_chart(gpu)
-            self.update_processes_user_mem_chart(gpu)
+            #self.update_processes_mem_chart(gpu)
+            #self.update_processes_user_mem_chart(gpu)
 
-        return data or None
+        return data
 
-    def update_processes_mem_chart(self, gpu):
-        ps = gpu.processes()
-        if not ps:
-            return
-        chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
-        active_dim_ids = []
-        for p in ps:
-            dim_id = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
-            active_dim_ids.append(dim_id)
-            if dim_id not in chart:
-                chart.add_dimension([dim_id, '{0} {1}'.format(p['pid'], p['process_name'])])
-        for dim in chart:
-            if dim.id not in active_dim_ids:
-                chart.del_dimension(dim.id, hide=False)
+    # def update_processes_mem_chart(self, gpu):
+    #     ps = gpu.processes()
+    #     if not ps:
+    #         return
+    #     chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
+    #     active_dim_ids = []
+    #     for p in ps:
+    #         dim_id = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
+    #         active_dim_ids.append(dim_id)
+    #         if dim_id not in chart:
+    #             chart.add_dimension([dim_id, '{0} {1}'.format(p['pid'], p['process_name'])])
+    #     for dim in chart:
+    #         if dim.id not in active_dim_ids:
+    #             chart.del_dimension(dim.id, hide=False)
 
-    def update_processes_user_mem_chart(self, gpu):
-        ps = gpu.processes()
-        if not ps:
-            return
-        chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_MEM)]
-        active_dim_ids = []
-        for p in ps:
-            if not p.get('username'):
-                continue
-            dim_id = 'gpu{0}_user_mem_{1}'.format(gpu.num, p['username'])
-            active_dim_ids.append(dim_id)
-            if dim_id not in chart:
-                chart.add_dimension([dim_id, '{0}'.format(p['username'])])
+    # def update_processes_user_mem_chart(self, gpu):
+    #     ps = gpu.processes()
+    #     if not ps:
+    #         return
+    #     chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_MEM)]
+    #     active_dim_ids = []
+    #     for p in ps:
+    #         if not p.get('username'):
+    #             continue
+    #         dim_id = 'gpu{0}_user_mem_{1}'.format(gpu.num, p['username'])
+    #         active_dim_ids.append(dim_id)
+    #         if dim_id not in chart:
+    #             chart.add_dimension([dim_id, '{0}'.format(p['username'])])
 
-        for dim in chart:
-            if dim.id not in active_dim_ids:
-                chart.del_dimension(dim.id, hide=False)
+    #     for dim in chart:
+    #         if dim.id not in active_dim_ids:
+    #             chart.del_dimension(dim.id, hide=False)
 
     def check(self):
         if not self.poller.has_smi():
@@ -554,14 +609,20 @@ class Service(SimpleService):
             self.error("failed to invoke '{0}' binary".format(NVIDIA_SMI))
             return False
 
-        parsed = self.parse_xml(raw_data)
-        if parsed is None:
-            return False
-
-        gpus = parsed.findall('gpu')
-        if not gpus:
-            return False
-
+        if self.format_mode == 'xml':
+            parsed = self.parse_xml(raw_data)
+            if parsed is None:
+                return False
+        
+            gpus = parsed.findall('gpu')
+            if not gpus:
+                return False
+                
+        if self.format_mode == 'csv':
+            gpus = self.parse_csv(raw_data)
+            if gpus is None:
+                return False
+            
         self.create_charts(gpus)
 
         return True
@@ -574,9 +635,39 @@ class Service(SimpleService):
 
         return None
 
+    def parse_csv(self, data):
+        try:
+            data = data.decode().splitlines()
+            labels = [l.split()[0].strip() for l in data[0].split(',')]
+            labels_map = {
+                'name': 'product_name',
+                'pci.bus_id': 'id',
+                'utilization.gpu': 'gpu_util',
+                'utilization.memory': 'memory_util',
+                'fan.speed': 'fan_speed',
+                'temperature.gpu': 'gpu_temp',
+                'memory.free': 'memory_free',
+                'memory.used': 'memory_used'
+            }
+            labels = [labels_map.get(label,label) for label in labels]
+            values = [k.strip().replace('[N/A]','0') for row in data[1:] for k in row.split(',')]
+            n_gpus = len(data)-1
+            n_cols = len(labels)
+            data = dict()
+            for gpu_n in range(n_gpus):
+                data[gpu_n] = dict(zip(labels, values[(n_cols*gpu_n):n_cols*(gpu_n+1)]))
+            return data
+        except Exception as error:
+            self.error('csv parse failed: "{0}", error: {1}'.format(data, error))
+
+        return None
+
     def create_charts(self, gpus):
         for idx, root in enumerate(gpus):
-            order, charts = gpu_charts(GPU(idx, root))
+            if self.format_mode == 'csv':
+                order, charts = gpu_charts(GPU(idx, gpus[idx], self.format_mode))
+            else:
+                order, charts = gpu_charts(GPU(idx, root, self.format_mode))
             self.order.extend(order)
             self.definitions.update(charts)
 
