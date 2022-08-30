@@ -1444,13 +1444,13 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     *releases = string_base.releases;
 }
 
-static inline int32_t string_entry_acquire_unsafe(STRING_ENTRY *se) {
+static inline int32_t string_entry_acquire(STRING_ENTRY *se) {
     __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&string_base.duplications, 1, __ATOMIC_RELAXED);
     return __atomic_add_fetch(&se->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
-static inline int32_t string_entry_release_unsafe(STRING_ENTRY *se) {
+static inline int32_t string_entry_release(STRING_ENTRY *se) {
     __atomic_sub_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&string_base.releases, 1, __ATOMIC_RELAXED);
     return __atomic_sub_fetch(&se->refcount, 1, __ATOMIC_SEQ_CST);
@@ -1460,9 +1460,7 @@ STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
     STRING_ENTRY *se = (STRING_ENTRY *)string;
-    netdata_rwlock_rdlock(&string_base.rwlock);
-    string_entry_acquire_unsafe(se);
-    netdata_rwlock_unlock(&string_base.rwlock);
+    string_entry_acquire(se);
     return string;
 }
 
@@ -1480,7 +1478,7 @@ STRING *string_strdupz(const char *str) {
         if(likely(Rc)) {
             // found in the hash table
             se = *Rc;
-            string_entry_acquire_unsafe(se);
+            string_entry_acquire(se);
         }
         else {
             // not found in the hash table
@@ -1491,7 +1489,7 @@ STRING *string_strdupz(const char *str) {
     }
 
     if(likely(se))
-            return (STRING *)se;
+        return (STRING *)se;
 
     netdata_rwlock_wrlock(&string_base.rwlock);
     STRING_ENTRY **ptr;
@@ -1510,18 +1508,18 @@ STRING *string_strdupz(const char *str) {
         se = mallocz(mem_size);
         strcpy((char *)se->str, str);
         se->length = length;
-        se->refcount = 1;
+        se->refcount = 0;
         *ptr = se;
         string_base.inserts++;
         string_base.entries++;
         string_base.memory += (long)mem_size;
-        __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
     }
     else {
         // the item is already in the index
         se = *ptr;
-        string_entry_acquire_unsafe(se);
     }
+
+    string_entry_acquire(se);
     netdata_rwlock_unlock(&string_base.rwlock);
 
     return (STRING *)se;
@@ -1530,47 +1528,36 @@ STRING *string_strdupz(const char *str) {
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
 
-    STRING_ENTRY *se = (STRING_ENTRY *)string;
-
     netdata_rwlock_wrlock(&string_base.rwlock);
 
-    int32_t refcount = string_entry_release_unsafe(se);
+    STRING_ENTRY *se = (STRING_ENTRY *)string;
+    int32_t refcount = string_entry_release(se);
 
-    // if it was 0 before the subtraction, we have a problem
     if(unlikely(refcount < 0))
         fatal("STRING: INTERNAL ERROR: tried to free string that has zero references.");
 
-    // if it was 1 before the subtraction, we had the last reference
     if(unlikely(refcount == 0)) {
+        bool deleted = false;
 
-        // since we did everything without a lock, someone else may have acquired the item.
-        // So, we fetch the reference counter again, now that we have a write lock.
-        refcount = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
-
-        // if now it is zero, it is safe to delete the item
-        if(likely(refcount <= 0)) {
-            bool deleted = false;
-
-            if(likely(string_base.JudyHSArray)) {
-                JError_t J_Error;
-                int ret = JudyHSDel(&string_base.JudyHSArray, (void *)se->str, se->length, &J_Error);
-                if(unlikely(ret == JERR)) {
-                    error("STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
-                          se->str, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
-                }
-                else
-                    deleted = true;
+        if(likely(string_base.JudyHSArray)) {
+            JError_t J_Error;
+            int ret = JudyHSDel(&string_base.JudyHSArray, (void *)se->str, se->length, &J_Error);
+            if(unlikely(ret == JERR)) {
+                error("STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
+                      se->str, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
             }
+            else
+                deleted = true;
+        }
 
-            if(unlikely(!deleted))
-                error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index. Ignoring it.", se->str);
-            else {
-                size_t mem_size = sizeof(STRING_ENTRY) + se->length;
-                string_base.deletes++;
-                string_base.entries--;
-                string_base.memory -= (long)mem_size;
-                freez(se);
-            }
+        if(unlikely(!deleted))
+            error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index. Ignoring it.", se->str);
+        else {
+            size_t mem_size = sizeof(STRING_ENTRY) + se->length;
+            string_base.deletes++;
+            string_base.entries--;
+            string_base.memory -= (long)mem_size;
+            freez(se);
         }
     }
 
@@ -2184,12 +2171,12 @@ static size_t check_name_value_deleted_flag(DICTIONARY *dict, NAME_VALUE *nv, co
 
 static int string_threads_join = 0;
 static void *string_thread(void *arg __maybe_unused) {
-    int dups = gettid() % 10;
+    int dups = 1; //(gettid() % 10);
     for(; 1 ;) {
         if(string_threads_join)
             break;
 
-        STRING *s = string_strdupz("a non existing string text");
+        STRING *s = string_strdupz("string thread checking 1234567890");
 
         for(int i = 0; i < dups ; i++)
             string_dup(s);
@@ -2455,21 +2442,39 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
 
-    fprintf(stderr, "Checking string threads concurrency for 5 seconds...\n");
-    // check string concurrency
-    netdata_thread_t threads[10];
-    string_threads_join = 0;
-    for(int i = 0; i < 10 ;i++) {
-        char buf[100 + 1];
-        snprintf(buf, 100, "string%d", i);
-        netdata_thread_create(&threads[i], buf, 0, string_thread, NULL);
-    }
-    sleep_usec(5000000);
+    {
+        size_t oinserts, odeletes, osearches, oentries, oreferences, omemory, oduplications, oreleases;
+        string_statistics(&oinserts, &odeletes, &osearches, &oentries, &oreferences, &omemory, &oduplications, &oreleases);
 
-    string_threads_join = 1;
-    for(int i = 0; i < 10 ;i++) {
-        void *retval;
-        netdata_thread_join(threads[i], &retval);
+        time_t seconds_to_run = 5;
+        int threads_to_create = 2;
+        fprintf(
+            stderr,
+            "Checking string concurrency with %d threads for %ld seconds...\n",
+            threads_to_create,
+            seconds_to_run);
+        // check string concurrency
+        netdata_thread_t threads[threads_to_create];
+        string_threads_join = 0;
+        for (int i = 0; i < threads_to_create; i++) {
+            char buf[100 + 1];
+            snprintf(buf, 100, "string%d", i);
+            netdata_thread_create(
+                &threads[i], buf, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE, string_thread, NULL);
+        }
+        sleep_usec(seconds_to_run * USEC_PER_SEC);
+
+        string_threads_join = 1;
+        for (int i = 0; i < threads_to_create; i++) {
+            void *retval;
+            netdata_thread_join(threads[i], &retval);
+        }
+
+        size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
+        string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
+
+        fprintf(stderr, "inserts %zu, deletes %zu, searches %zu, entries %zu, references %zu, memory %zu, duplications %zu, releases %zu\n",
+                inserts - oinserts, deletes - odeletes, searches - osearches, entries - oentries, references - oreferences, memory - omemory, duplications - oduplications, releases - oreleases);
     }
 
     fprintf(stderr, "\n%zu errors found\n", errors);
