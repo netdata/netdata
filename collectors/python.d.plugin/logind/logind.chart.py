@@ -75,31 +75,36 @@ class Service(SimpleService):
         self.mgr = None
         self.iface = None
 
-        try:
-            self.mgr = self.bus.get_object(self.bus_name, self.obj_path)
-            self.iface = dbus.Interface(self.mgr, MGR_IFACE)
-        except dbus.DBusException:
-            pass
-
     def check(self):
         if not HAVE_DBUS:
             self.error('dbus-python is not available')
             return False
 
-        if self.mgr is None:
+        try:
+            self.mgr = self.bus.get_object(self.bus_name, self.obj_path)
+        except dbus.DBusException:
             self.error('Unable to connect to {} service'.format(self.bus_name))
             return False
 
-        if self.iface is None:
+        try:
+            self.iface = dbus.Interface(self.mgr, MGR_IFACE)
+        except dbus.DBusException:
             self.error('Failed to construct interface')
+            return False
 
         return self._get_data()
 
     def _get_data(self):
         try:
             sessions = self.iface.ListSessions()
+        except dbus.DBusException:
+            self.error('Failed to fetch list of sessions.')
+            return None
+
+        try:
             users = self.iface.ListUsers()
         except dbus.DBusException:
+            self.error('Failed to fetch list of users.')
             return None
 
         ret = {
@@ -117,6 +122,13 @@ class Service(SimpleService):
             'users_closing': 0,
         }
 
+        # Both the ListSessions() and ListUsers() calls return lists of
+        # tuples. We specifically care about the object path, which is the
+        # fifth and third item respectively for sessions and users. Sets
+        # are being used here to efficiently deduplicate the results. This
+        # should not be nescesary for how elogind and systemd-logind are
+        # implemented, but the API spec does not specifically disallow
+        # duplicate entries.
         session_paths = {s[4] for s in sessions}
         user_paths = {u[2] for u in users}
 
