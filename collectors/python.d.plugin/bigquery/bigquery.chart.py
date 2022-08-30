@@ -3,7 +3,6 @@
 # Author: Andrew Maguire (andrewm4894)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from random import SystemRandom
 import pandas_gbq
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -29,10 +28,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.random = SystemRandom()
-        self.num_lines = self.configuration.get('num_lines', 4)
-        self.lower = self.configuration.get('lower', 0)
-        self.upper = self.configuration.get('upper', 100)
         self.sql = 'select rand() as random0, rand() as random1'
 
     @staticmethod
