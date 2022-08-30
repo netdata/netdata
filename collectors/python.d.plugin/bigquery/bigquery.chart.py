@@ -3,7 +3,6 @@
 # Author: Andrew Maguire (andrewm4894)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing_extensions import Self
 from google.oauth2 import service_account
 import pandas_gbq
 
