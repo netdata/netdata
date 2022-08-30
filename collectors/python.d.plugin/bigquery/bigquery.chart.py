@@ -60,9 +60,9 @@ class Service(SimpleService):
 
         credentials = service_account.Credentials.from_service_account_file(self.credentials)
         df = pandas_gbq.read_gbq(self.sql, project_id=self.project_id, credentials=credentials, progress_bar_type=None)
-        print(df)
+        self.debug(df)
         data = df.to_dict('records')[0]
-        print(data)
+        self.debug(data)
         self.update_charts(self.chart_name, data)
 
         return data
