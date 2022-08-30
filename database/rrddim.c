@@ -11,7 +11,7 @@
 // RRDDIM index
 
 static inline void rrddim_index_add(RRDSET *st, RRDDIM *rd) {
-    if(likely(dictionary_set(st->dimensions_index, string2str(rd->id), rd, sizeof(RRDDIM)) == rd)) {
+    if(likely(dictionary_set(st->rrddim_root_index, string2str(rd->id), rd, sizeof(RRDDIM)) == rd)) {
         rrddim_flag_set(rd, RRDDIM_FLAG_INDEXED_ID);
     }
     else {
@@ -22,7 +22,7 @@ static inline void rrddim_index_add(RRDSET *st, RRDDIM *rd) {
 
 static inline void rrddim_index_del(RRDSET *st, RRDDIM *rd) {
     if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID)) {
-        if (likely(dictionary_del(st->dimensions_index, string2str(rd->id)) == 0))
+        if (likely(dictionary_del(st->rrddim_root_index, string2str(rd->id)) == 0))
             rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
         else
             error("RRDDIM: %s() attempted to delete non-indexed dimension with key '%s' of chart '%s' of host '%s'", __FUNCTION__, rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
@@ -30,7 +30,7 @@ static inline void rrddim_index_del(RRDSET *st, RRDDIM *rd) {
 }
 
 static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
-    return dictionary_get(st->dimensions_index, id);
+    return dictionary_get(st->rrddim_root_index, id);
 }
 
 // ----------------------------------------------------------------------------

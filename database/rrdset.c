@@ -386,7 +386,7 @@ void rrdset_free(RRDSET *st) {
 
     // free directly allocated members
 
-    dictionary_destroy(st->dimensions_index);
+    dictionary_destroy(st->rrddim_root_index);
     dictionary_destroy(st->rrdvar_root_index);
 
     string_freez(st->id);
@@ -714,7 +714,7 @@ RRDSET *rrdset_create_custom(
 
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 
-    st->dimensions_index = dictionary_create(
+    st->rrddim_root_index = dictionary_create(
           DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
         | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
         | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE

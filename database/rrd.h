@@ -584,7 +584,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // the dimensions
 
-    DICTIONARY *dimensions_index;                   // the root of the dimensions index
+    DICTIONARY *rrddim_root_index;                   // the root of the dimensions index
 
     netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
     RRDDIM *dimensions;                             // the actual data for every dimension
