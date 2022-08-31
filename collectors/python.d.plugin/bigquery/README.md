@@ -3,7 +3,7 @@ title: "BigQuery"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/bigquery/README.md
 -->
 
-# BigQuery
+# BigQuery Netdata Collector
 
 A python based collector leveraging [`pandas-gbq`](https://pandas-gbq.readthedocs.io/en/latest/) to run a query against [BigQuery](https://cloud.google.com/bigquery) and save results into a chart in Netdata.
 
