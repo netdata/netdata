@@ -37,7 +37,7 @@
 // ----------------------------------------------------------------------------
 // cgroup globals
 
-static char cgroup_chart_id_prefix[]="cgroup_"
+static char cgroup_chart_id_prefix[] = "cgroup_";
 
 static int is_inside_k8s = 0;
 
