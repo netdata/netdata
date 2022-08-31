@@ -49,6 +49,8 @@ example:
 
 `chart_configs` is a list of dictionary objects where each one defines the `sql` to be run in BigQuery, the `project_id` to run the query in and then `chart_name`, `chart_title` etc to define the [CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) that will control how the results will look in netdata.
 
-
+## Notes
+- The default `update_every` is 5 but in reality you may want to set a higher value depending on your usecase and the amount of time it typically takes for your results to be returned.
+- This collector is expecting one row in the results from BigQuery. It is that first row that will be taken as the most recent values for each dimension on each chart. 
 
 
