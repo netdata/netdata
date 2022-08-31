@@ -34,6 +34,9 @@ release of that distribution. For example, `centos7` to build on CentOS 7, or `u
 to build on Ubuntu 20.04. Note that we use Alma Linux for builds on CentOS/RHEL 8 or newer. See
 [netdata/package-builders](https://hub.docker.com/r/netdata/package-builders/tags) for all available tags.
 
+The value passed in the `VERSION` environment variable can be any version number accepted by the type of package
+being built. As a general rule, it needs to start with a digit, and must include a `.` somewhere.
+
 Once it finishes, the built packages can be found under `artifacts/` in the source tree.
 
 If an error is encountered and the build is being run interactively, it will drop to a shell to allow you to
@@ -46,7 +49,7 @@ These are published on Docker
 Hub with the image name `netdata/package-builders`, and tagged using the name and version of the distribution
 (with the tag corresponding to the suffix on the associated Dockerfile).
 
-The build code has two specific requirements when run:
+The build code expects the following requirements to be met:
 
 - It expects the source tree it should build from to be located at `/netdata`, and expects that said source tree
   is clean (no artifacts left over from previous builds).
