@@ -298,6 +298,8 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
 #define rrdcontext_version_hash(host) rrdcontext_version_hash_with_callback(host, NULL, false, NULL)
 static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*callback)(RRDCONTEXT *, bool, void *), bool snapshot, void *bundle);
 
+static void rrdcontext_garbage_collect_single_host(RRDHOST *host);
+static void rrdcontext_garbage_collect(void);
 void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 #define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
@@ -2574,6 +2576,8 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
         rrdcontext_trigger_updates(rc, true);
     }
     dfe_done(rc);
+
+    rrdcontext_garbage_collect_single_host(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -2730,50 +2734,88 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
         error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.", rc->hub.id, rc->hub.version);
 }
 
+static void rrdcontext_garbage_collect_single_host(RRDHOST *host) {
+
+    internal_error(true, "RRDCONTEXT: garbage collecting context structures of host '%s'", rrdhost_hostname(host));
+
+    RRDCONTEXT *rc;
+    dfe_start_write((DICTIONARY *)host->rrdctx, rc) {
+        worker_is_busy(WORKER_JOB_CLEANUP);
+
+        rrdcontext_lock(rc);
+
+        RRDINSTANCE *ri;
+        dfe_start_write(rc->rrdinstances, ri) {
+            RRDMETRIC *rm;
+            dfe_start_write(ri->rrdmetrics, rm) {
+                if(rrdmetric_should_be_deleted(rm)) {
+                    worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                    if(dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id)) != 0)
+                        error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                              string2str(rm->id),
+                              string2str(ri->id),
+                              string2str(rc->id),
+                              rrdhost_hostname(host));
+                    else
+                        internal_error(
+                            true,
+                            "RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', deleted from rrdmetrics dictionary.",
+                            string2str(rm->id),
+                            string2str(ri->id),
+                            string2str(rc->id),
+                            rrdhost_hostname(host));
+                }
+            }
+            dfe_done(rm);
+
+            if(rrdinstance_should_be_deleted(ri)) {
+                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                if(dictionary_del_having_write_lock(rc->rrdinstances, string2str(ri->id)) != 0)
+                    error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                          string2str(ri->id),
+                          string2str(rc->id),
+                          rrdhost_hostname(host));
+                else
+                    internal_error(
+                        true,
+                        "RRDCONTEXT: instance '%s' of context '%s' of host '%s', deleted from rrdmetrics dictionary.",
+                        string2str(ri->id),
+                        string2str(rc->id),
+                        rrdhost_hostname(host));
+            }
+        }
+        dfe_done(ri);
+
+        if(unlikely(rrdcontext_should_be_deleted(rc))) {
+            worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+            rrdcontext_delete_from_sql_unsafe(rc);
+
+            if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
+                error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                      string2str(rc->id),
+                      rrdhost_hostname(host));
+            else
+                internal_error(
+                    true,
+                    "RRDCONTEXT: context '%s' of host '%s', deleted from rrdmetrics dictionary.",
+                    string2str(rc->id),
+                    rrdhost_hostname(host));
+
+            fprintf(stderr, "RRDCONTEXT: deleted context '%s'", string2str(rc->id));
+        }
+
+        // the item is referenced in the dictionary
+        // so, it is still here to unlock, even if we have deleted it
+        rrdcontext_unlock(rc);
+    }
+    dfe_done(rc);
+}
+
 static void rrdcontext_garbage_collect(void) {
     rrd_rdlock();
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        RRDCONTEXT *rc;
-        dfe_start_write((DICTIONARY *)host->rrdctx, rc) {
-            worker_is_busy(WORKER_JOB_CLEANUP);
-
-            rrdcontext_lock(rc);
-
-            if(unlikely(rrdcontext_should_be_deleted(rc))) {
-                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                rrdcontext_delete_from_sql_unsafe(rc);
-
-                if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
-                    error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                          string2str(rc->id), rrdhost_hostname(host));
-            }
-            else {
-                RRDINSTANCE *ri;
-                dfe_start_write(rc->rrdinstances, ri) {
-                    if(rrdinstance_should_be_deleted(ri)) {
-                        worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                        dictionary_del_having_write_lock(rc->rrdinstances, string2str(ri->id));
-                    }
-                    else {
-                        RRDMETRIC *rm;
-                        dfe_start_write(ri->rrdmetrics, rm) {
-                            if(rrdmetric_should_be_deleted(rm)) {
-                                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                                dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id));
-                            }
-                        }
-                        dfe_done(rm);
-                    }
-                }
-                dfe_done(ri);
-            }
-
-            // the item is referenced in the dictionary
-            // so, it is still here to unlock, even if we have deleted it
-            rrdcontext_unlock(rc);
-        }
-        dfe_done(rc);
+        rrdcontext_garbage_collect_single_host(host);
     }
     rrd_unlock();
 }
