@@ -1730,15 +1730,6 @@ check_c_source_compiles("
   int main() { char x = *strerror_r(0, &x, sizeof(x)); return 0; }
   " STRERROR_R_CHAR_P)
 
-# TODO create option for bundled protobuf
-#set(BUNDLED_PROTOBUF AUTO CACHE STRING "Use bundled (statically linked) protobuf built by installer (or manually)")
-#set_property(CACHE BUNDLED_PROTOBUF PROPERTY STRINGS AUTO ON OFF)
-#
-#if(BUNDLED_PROTOBUF STREQUAL "AUTO")
-#elseif(BUNDLED_PROTOBUF)
-#else()
-#endif()
-
 IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
     SET(LIKELY_MACRO "__builtin_expect(!!(x), 1)")
     SET(UNLIKELY_MACRO "__builtin_expect(!!(x), 0)")
