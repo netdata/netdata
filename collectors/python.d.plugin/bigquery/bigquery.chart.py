@@ -26,49 +26,49 @@ class Service(SimpleService):
         self.collected_dims = {}
 
     def check(self):
+        """ensure charts and dims all confugured and that we can get data"""
         
+        # add each chart as defined by the config
         for chart_config in self.chart_configs:
             if chart_config['chart_name'] not in self.charts:
                 chart_template = {
-                    'options': [None, chart_config['chart_name'], chart_config['chart_name'], chart_config['chart_name'], chart_config['chart_units'], chart_config['chart_type']],
+                    'options': [chart_config['chart_name'], chart_config['chart_title'], chart_config['chart_units'], chart_config['chart_family'], chart_config['chart_context'], chart_config['chart_type']],
                     'lines': []
                     }
                 self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
 
-        self.credentials = service_account.Credentials.from_service_account_file(self.credentials)
+        # get credentials if set
+        if self.credentials:
+            self.credentials = service_account.Credentials.from_service_account_file(self.credentials)
 
+        # get data and add dims to charts
         data = dict()
         for chart_config in self.chart_configs:
-            df = pandas_gbq.read_gbq(chart_config['sql'], project_id=chart_config['project_id'], credentials=self.credentials, progress_bar_type=None)
+            df = pandas_gbq.read_gbq(
+                chart_config['sql'], 
+                project_id=chart_config['project_id'], 
+                credentials=self.credentials, 
+                progress_bar_type=None
+            )
             chart_data = df.to_dict('records')[0] 
             data.update(chart_data)
-            self.update_charts(chart_config['chart_name'], chart_data)
+            for dim in chart_data:
+                self.charts[chart_config['chart_name']].add_dimension([dim, dim, algorithm='absolute', multiplier=1, divisor=1])
 
         return True
 
-    def update_charts(self, chart, data, algorithm='absolute', multiplier=1, divisor=1):
-        if not self.charts:
-            return
-
-        if chart not in self.collected_dims:
-            self.collected_dims[chart] = set()
-
-        for dim in data:
-            if dim not in self.collected_dims[chart]:
-                self.collected_dims[chart].add(dim)
-                self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
-
-        for dim in list(self.collected_dims[chart]):
-            if dim not in data:
-                self.collected_dims[chart].remove(dim)
-                self.charts[chart].del_dimension(dim, hide=False)
-
     def get_data(self):
+        """get data for each chart config"""
 
         data = dict()
 
         for chart_config in self.chart_configs:
-            df = pandas_gbq.read_gbq(chart_config['sql'], project_id=chart_config['project_id'], credentials=self.credentials, progress_bar_type=None)
+            df = pandas_gbq.read_gbq(
+                chart_config['sql'], 
+                project_id=chart_config['project_id'], 
+                credentials=self.credentials, 
+                progress_bar_type=None
+            )
             chart_data = df.to_dict('records')[0] 
             data.update(chart_data)
 
