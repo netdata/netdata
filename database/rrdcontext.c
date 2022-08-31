@@ -298,7 +298,7 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
 #define rrdcontext_version_hash(host) rrdcontext_version_hash_with_callback(host, NULL, false, NULL)
 static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*callback)(RRDCONTEXT *, bool, void *), bool snapshot, void *bundle);
 
-static void rrdcontext_garbage_collect_single_host(RRDHOST *host);
+static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker);
 static void rrdcontext_garbage_collect(void);
 void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
@@ -2577,7 +2577,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     }
     dfe_done(rc);
 
-    rrdcontext_garbage_collect_single_host(host);
+    rrdcontext_garbage_collect_single_host(host, false);
 }
 
 // ----------------------------------------------------------------------------
@@ -2734,13 +2734,13 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
         error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.", rc->hub.id, rc->hub.version);
 }
 
-static void rrdcontext_garbage_collect_single_host(RRDHOST *host) {
+static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker) {
 
     internal_error(true, "RRDCONTEXT: garbage collecting context structures of host '%s'", rrdhost_hostname(host));
 
     RRDCONTEXT *rc;
     dfe_start_write((DICTIONARY *)host->rrdctx, rc) {
-        worker_is_busy(WORKER_JOB_CLEANUP);
+        if(worker) worker_is_busy(WORKER_JOB_CLEANUP);
 
         rrdcontext_lock(rc);
 
@@ -2749,7 +2749,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host) {
             RRDMETRIC *rm;
             dfe_start_write(ri->rrdmetrics, rm) {
                 if(rrdmetric_should_be_deleted(rm)) {
-                    worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                    if(worker) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                     if(dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id)) != 0)
                         error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                               string2str(rm->id),
@@ -2769,7 +2769,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host) {
             dfe_done(rm);
 
             if(rrdinstance_should_be_deleted(ri)) {
-                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                if(worker) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                 if(dictionary_del_having_write_lock(rc->rrdinstances, string2str(ri->id)) != 0)
                     error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                           string2str(ri->id),
@@ -2787,7 +2787,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host) {
         dfe_done(ri);
 
         if(unlikely(rrdcontext_should_be_deleted(rc))) {
-            worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+            if(worker) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
             rrdcontext_delete_from_sql_unsafe(rc);
 
             if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
@@ -2815,7 +2815,7 @@ static void rrdcontext_garbage_collect(void) {
     rrd_rdlock();
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        rrdcontext_garbage_collect_single_host(host);
+        rrdcontext_garbage_collect_single_host(host, true);
     }
     rrd_unlock();
 }
