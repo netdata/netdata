@@ -88,10 +88,6 @@ typedef enum {
 #define RRD_FLAGS_PREVENTING_DELETIONS                ( \
      RRD_FLAG_QUEUED                                    \
     |RRD_FLAG_COLLECTED                                 \
-    |RRD_FLAG_UPDATE_REASON_LOAD_SQL                    \
-    |RRD_FLAG_UPDATE_REASON_NEW_OBJECT                  \
-    |RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT              \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_LINKING             \
 )
 
 #define rrd_flag_set_updated(obj, reason) (obj)->flags |=  (RRD_FLAG_UPDATED | (reason))
@@ -654,8 +650,8 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
     if(likely(rm->rrddim))
         return false;
 
-    if((now_realtime_usec() - rm->created_ut) < 600 * USEC_PER_SEC)
-        return false;
+    //if((now_realtime_usec() - rm->created_ut) < 600 * USEC_PER_SEC)
+    //    return false;
 
     rrdmetric_update_retention(rm);
     if(rm->first_time_t || rm->last_time_t)
