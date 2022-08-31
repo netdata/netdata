@@ -29,11 +29,11 @@ class Service(SimpleService):
             if chart_config['chart_name'] not in self.charts:
                 chart_template = {
                     'options': [
-                        chart_config['chart_name'], 
-                        chart_config['chart_title'], 
-                        chart_config['chart_units'], 
-                        chart_config['chart_family'], 
-                        chart_config['chart_context'], 
+                        chart_config['chart_name'],
+                        chart_config['chart_title'],
+                        chart_config['chart_units'],
+                        chart_config['chart_family'],
+                        chart_config['chart_context'],
                         chart_config['chart_type']
                         ],
                     'lines': []
