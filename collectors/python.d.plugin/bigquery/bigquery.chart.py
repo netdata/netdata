@@ -20,7 +20,6 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.chart_configs = self.configuration.get('chart_configs', None)
         self.credentials = self.configuration.get('credentials', None)
-        self.collected_dims = {}
 
     def check(self):
         """ensure charts and dims all confugured and that we can get data"""
