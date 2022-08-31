@@ -732,6 +732,8 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     info("STREAM %s [send]: sending thread now exits.", rrdhost_hostname(host));
 
     netdata_mutex_unlock(&host->sender->mutex);
+
+    freez(data);
 }
 
 void sender_init(RRDHOST *parent)
@@ -818,12 +820,11 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
-    struct rrdpush_sender_thread_data thread_data = {
-        .host = s->host,
-        .sending_definitions_data = NULL,
-        .sending_definitions_status = SENDING_DEFINITIONS_RESTART,
-    };
-    netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, &thread_data);
+    struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
+    thread_data->host = s->host;
+    thread_data->sending_definitions_data = NULL;
+    thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
+    netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
     for(; s->host->rrdpush_send_enabled && !netdata_exit ;) {
         // check for outstanding cancellation requests
@@ -832,7 +833,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
-            thread_data.sending_definitions_status = SENDING_DEFINITIONS_RESTART;
+            thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
             s->overflow = 0;
             s->read_len = 0;
             s->buffer->read = 0;
@@ -856,24 +857,24 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        if(unlikely(thread_data.sending_definitions_status != SENDING_DEFINITIONS_STOP)) {
+        if(unlikely(thread_data->sending_definitions_status != SENDING_DEFINITIONS_STOP)) {
             netdata_mutex_lock(&s->mutex);
             size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
             netdata_mutex_unlock(&s->mutex);
 
             if ((s->buffer->max_size - outstanding) > 100 * 1024) {
-                thread_data.sending_definitions_data = rrdpush_incremental_transmission_of_chart_definitions(
-                    s->host, thread_data.sending_definitions_data,
-                    thread_data.sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
+                thread_data->sending_definitions_data = rrdpush_incremental_transmission_of_chart_definitions(
+                    s->host, thread_data->sending_definitions_data,
+                    thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
 
-                if (unlikely(!thread_data.sending_definitions_data)) {
-                    thread_data.sending_definitions_status = SENDING_DEFINITIONS_STOP;
+                if (unlikely(!thread_data->sending_definitions_data)) {
+                    thread_data->sending_definitions_status = SENDING_DEFINITIONS_STOP;
 
                     // let the data collection threads know we are ready
                     __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
                 }
                 else
-                    thread_data.sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
+                    thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
             }
         }
 
