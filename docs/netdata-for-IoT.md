@@ -25,7 +25,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for
 
 ---
 
-Netdata is a **very efficient** server performance monitoring solution. When running in server hardware, it can collect
+Netdata is a [very efficient](/docs/guides/configure/performance.md) server performance monitoring solution. When running in server hardware, it can collect
 thousands of system and application metrics **per second** with just 1% CPU utilization of a single core. Its web server
 responds to most data requests in about **half a millisecond** making its web dashboards spontaneous, amazingly fast!
 

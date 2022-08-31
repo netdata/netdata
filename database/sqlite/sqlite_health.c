@@ -24,7 +24,7 @@ int sql_create_health_log_table(RRDHOST *host) {
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
 
-    rc = sqlite3_exec(db_meta, command, 0, 0, &err_msg);
+    rc = sqlite3_exec_monitored(db_meta, command, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("HEALTH [%s]: SQLite error during creation of health log table, rc = %d (%s)", host->hostname, rc, err_msg);
         sqlite3_free(err_msg);
@@ -389,7 +389,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
         return;
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to cleanup health log table, rc = %d", rc);
 
@@ -428,7 +428,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW))
         host->health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
 
@@ -556,7 +556,7 @@ uint32_t sql_get_max_unique_id (char *uuid_str)
         return 0;
     }
 
-     while (sqlite3_step(res) == SQLITE_ROW) {
+     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          max_unique_id = (uint32_t) sqlite3_column_int64(res, 0);
      }
 
@@ -584,7 +584,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
         return;
     }
 
-     while (sqlite3_step(res) == SQLITE_ROW) {
+     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
          unique_id = (uint32_t) sqlite3_column_int64(res, 1);
          alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
@@ -634,7 +634,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids

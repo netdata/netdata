@@ -32,7 +32,7 @@ public:
         }
 
         while (true) {
-            switch (int RC = sqlite3_step(ParsedStmt)) {
+            switch (int RC = sqlite3_step_monitored(ParsedStmt)) {
             case SQLITE_BUSY: case SQLITE_LOCKED:
                 usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
                 continue;

@@ -58,6 +58,15 @@ typedef enum db_check_action_type {
         return 1;                                                                                                      \
     }
 
+extern SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt);
+extern SQLITE_API int sqlite3_exec_monitored(
+    sqlite3 *db,                               /* An open database */
+    const char *sql,                           /* SQL to be evaluated */
+    int (*callback)(void*,int,char**,char**),  /* Callback function */
+    void *data,                                /* 1st argument to callback */
+    char **errmsg                              /* Error msg written here */
+    );
+
 extern int sql_init_database(db_check_action_type_t rebuild, int memory);
 extern void sql_close_database(void);
 extern int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);

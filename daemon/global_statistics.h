@@ -9,6 +9,8 @@
 // global statistics
 
 extern void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated);
+extern void sqlite3_query_completed(bool success, bool busy, bool locked);
+extern void sqlite3_row_completed(void);
 
 extern void finished_web_request_statistics(uint64_t dt,
                                      uint64_t bytes_received,

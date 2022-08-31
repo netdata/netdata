@@ -48,7 +48,7 @@ static time_t payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t p
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         send_status = (time_t) sqlite3_column_int64(res, 0);
     }
 
@@ -245,7 +245,7 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
         goto bind_fail;
 
     unsigned count = 0;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         (void) aclk_upd_dimension_event(
             wc,
             claim_id,
@@ -357,7 +357,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         int count = 0;
         first_sequence = 0;
         last_sequence = 0;
-        while (count < limit && sqlite3_step(res) == SQLITE_ROW) {
+        while (count < limit && sqlite3_step_monitored(res) == SQLITE_ROW) {
             size_t payload_size = sqlite3_column_bytes(res, 1);
             if (payload_list_max_size[count] < payload_size) {
                 freez(payload_list[count]);
@@ -487,7 +487,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
     struct chart_config_updated chart_config;
     chart_config.config_hash  = NULL;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         chart_config.type = strdupz((char *)sqlite3_column_text(res, 0));
         chart_config.family = strdupz((char *)sqlite3_column_text(res, 1));
         chart_config.context = strdupz((char *)sqlite3_column_text(res, 2));
@@ -799,7 +799,7 @@ static RRD_MEMORY_MODE sql_get_host_memory_mode(uuid_t *host_id)
         goto failed;
     }
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         memory_mode = (RRD_MEMORY_MODE)sqlite3_column_int(res, 0);
     }
 
@@ -891,7 +891,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
     rotate_data.node_id = strdupz(wc->node_id);
 
     time_t now = now_realtime_sec();
-    while (sqlite3_step(res) == SQLITE_ROW && dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW && dimension_update_count < ACLK_MAX_DIMENSION_CLEANUP) {
         if (unlikely(netdata_exit))
             break;
         if (!update_every || update_every != (uint32_t)sqlite3_column_int(res, 1)) {
@@ -1022,7 +1022,7 @@ uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc)
             return 0;
         }
     }
-    while (sqlite3_step(res) == SQLITE_ROW)
+    while (sqlite3_step_monitored(res) == SQLITE_ROW)
         chart_payload_count = (uint32_t) sqlite3_column_int(res, 0);
 
     rc = sqlite3_reset(res);
@@ -1049,7 +1049,7 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc)
 
     wc->chart_sequence_id = 0;
     wc->chart_timestamp = 0;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         wc->chart_sequence_id = (uint64_t)sqlite3_column_int64(res, 0);
         wc->chart_timestamp = (time_t)sqlite3_column_int64(res, 1);
     }
@@ -1220,37 +1220,37 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host)
         return NULL;
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         aclk_statistics->min_seqid = SQL_SEQ_NULL(res, 0);
         aclk_statistics->max_seqid = SQL_SEQ_NULL(res, 1);
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         aclk_statistics->min_seqid_pend = SQL_SEQ_NULL(res, 0);
         aclk_statistics->max_seqid_pend = SQL_SEQ_NULL(res, 1);
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         aclk_statistics->min_seqid_sent = SQL_SEQ_NULL(res, 0);
         aclk_statistics->max_seqid_sent = SQL_SEQ_NULL(res, 1);
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         aclk_statistics->min_seqid_ack = SQL_SEQ_NULL(res, 0);
         aclk_statistics->max_seqid_ack = SQL_SEQ_NULL(res, 1);
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         aclk_statistics->min_seqid_ack = SQL_SEQ_NULL(res, 0);
         aclk_statistics->max_seqid_ack = SQL_SEQ_NULL(res, 1);
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         aclk_statistics->max_date_created = (time_t) SQL_SEQ_NULL(res, 0);
         aclk_statistics->max_date_submitted = (time_t) SQL_SEQ_NULL(res, 1);

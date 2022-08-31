@@ -150,7 +150,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     }
 
     SQL_CHART_DATA chart_data = { 0 };
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         uuid_copy(chart_data.chart_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         chart_data.id = (char *) sqlite3_column_text(res, 1);
         chart_data.name = (char *) sqlite3_column_text(res, 2);
@@ -191,7 +191,7 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
 
     SQL_DIMENSION_DATA dimension_data;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
@@ -225,7 +225,7 @@ void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, v
 
     SQL_CLABEL_DATA label_data;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         label_data.label_key = (char *) sqlite3_column_text(res, 0);
         label_data.label_value = (char *) sqlite3_column_text(res, 1);
         label_data.label_source = sqlite3_column_int(res, 2);
@@ -267,7 +267,7 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
         goto failed;
     }
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         context_data.id = (char *) sqlite3_column_text(res, 0);
         context_data.version = sqlite3_column_int64(res, 1);
         context_data.title = (char *) sqlite3_column_text(res, 2);

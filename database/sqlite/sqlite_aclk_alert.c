@@ -24,7 +24,7 @@ time_t removed_when(uint32_t alarm_id, uint32_t before_unique_id, uint32_t after
         return 0;
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
         when = (time_t) sqlite3_column_int64(res, 0);
     }
@@ -70,7 +70,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         return send;
     }
 
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
         status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
         if (sqlite3_column_type(res, 1) != SQLITE_NULL)
@@ -280,7 +280,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     static __thread uint64_t log_first_sequence_id = 0;
     static __thread uint64_t log_last_sequence_id = 0;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         struct alarm_log_entry alarm_log;
         char old_value_string[100 + 1];
         char new_value_string[100 + 1];
@@ -500,7 +500,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     last_timestamp.tv_sec = 0;
     last_timestamp.tv_usec = 0;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         first_sequence = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
         if (sqlite3_column_bytes(res, 1) > 0) {
             first_timestamp.tv_sec = sqlite3_column_int64(res, 1);
@@ -603,7 +603,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
     struct provide_alarm_configuration p_alarm_config;
     p_alarm_config.cfg_hash = NULL;
 
-    if (sqlite3_step(res) == SQLITE_ROW) {
+    if (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
         alarm_config.alarm = sqlite3_column_bytes(res, 0) > 0 ? strdupz((char *)sqlite3_column_text(res, 0)) : NULL;
         alarm_config.tmpl = sqlite3_column_bytes(res, 1) > 0 ? strdupz((char *)sqlite3_column_text(res, 1)) : NULL;
@@ -1029,7 +1029,7 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
                    " (select unique_id from health_log_%s); ", uuid_str, uuid_str);
     
     char *err_msg = NULL;
-    int rc = sqlite3_exec(db_meta, buffer_tostring(sql), NULL, NULL, &err_msg);
+    int rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), NULL, NULL, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("Failed when trying to clean stale ACLK alert entries from aclk_alert_%s, error message \"%s""",
                      uuid_str, err_msg);
@@ -1064,7 +1064,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
         return 1;
     }
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         proto_alert_status->pending_min_sequence_id = sqlite3_column_bytes(res, 0) > 0 ? (uint64_t) sqlite3_column_int64(res, 0) : 0;
         proto_alert_status->pending_max_sequence_id = sqlite3_column_bytes(res, 1) > 0 ? (uint64_t) sqlite3_column_int64(res, 1) : 0;
         proto_alert_status->last_acked_sequence_id = sqlite3_column_bytes(res, 2) > 0 ? (uint64_t) sqlite3_column_int64(res, 2) : 0;
