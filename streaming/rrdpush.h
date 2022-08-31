@@ -168,7 +168,7 @@ extern int rrdpush_init();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
 extern bool rrdset_push_chart_definition_now(RRDSET *st);
-extern void *rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, void *data, bool restart, bool stop);
+extern bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
 extern void *rrdpush_sender_thread(void *ptr);
 extern void rrdpush_send_labels(RRDHOST *host);
 extern void rrdpush_claimed_id(RRDHOST *host);

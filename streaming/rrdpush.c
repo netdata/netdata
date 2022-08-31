@@ -326,22 +326,16 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     return true;
 }
 
-void *rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, void *data, bool restart, bool stop) {
-    DICTFE *dictfe = data;
-
-    if((stop || restart) && dictfe) {
+bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop) {
+    if(stop || restart)
         dictionary_foreach_done(dictfe);
-        freez((void *)dictfe);
-        dictfe = NULL;
-    }
 
     if(stop)
-        return NULL;
+        return false;
 
     RRDSET *st = NULL;
 
-    if(unlikely(!dictfe)) {
-        dictfe = callocz(1, sizeof(*dictfe));
+    if(unlikely(!dictfe->dict)) {
         st = dictionary_foreach_start_rw(dictfe, host->rrdset_root_index, DICTIONARY_LOCK_REENTRANT);
     }
     else
@@ -358,11 +352,10 @@ void *rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, void 
 
     if (!st) {
         dictionary_foreach_done(dictfe);
-        freez((void *)dictfe);
-        dictfe = NULL;
+        return false;
     }
 
-    return (void *)dictfe;
+    return true;
 }
 
 void rrdset_done_push(RRDSET *st) {

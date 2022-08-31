@@ -688,7 +688,7 @@ void execute_commands(struct sender_state *s) {
 
 struct rrdpush_sender_thread_data {
     RRDHOST *host;
-    void *sending_definitions_data;
+    DICTFE dictfe;
     enum {
         SENDING_DEFINITIONS_RESTART,
         SENDING_DEFINITIONS_CONTINUE,
@@ -702,8 +702,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     RRDHOST *host = data->host;
 
-    if(data->sending_definitions_data)
-        rrdpush_incremental_transmission_of_chart_definitions(host, data, false, true);
+    rrdpush_incremental_transmission_of_chart_definitions(host, &data->dictfe, false, true);
 
     netdata_mutex_lock(&host->sender->mutex);
 
@@ -822,8 +821,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
     struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
     thread_data->host = s->host;
-    thread_data->sending_definitions_data = NULL;
     thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
+
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
     for(; s->host->rrdpush_send_enabled && !netdata_exit ;) {
@@ -863,11 +862,11 @@ void *rrdpush_sender_thread(void *ptr) {
             netdata_mutex_unlock(&s->mutex);
 
             if ((s->buffer->max_size - outstanding) > 100 * 1024) {
-                thread_data->sending_definitions_data = rrdpush_incremental_transmission_of_chart_definitions(
-                    s->host, thread_data->sending_definitions_data,
+                bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
+                    s->host, &thread_data->dictfe,
                     thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
 
-                if (unlikely(!thread_data->sending_definitions_data)) {
+                if (unlikely(!more_defs_available)) {
                     thread_data->sending_definitions_status = SENDING_DEFINITIONS_STOP;
 
                     // let the data collection threads know we are ready
