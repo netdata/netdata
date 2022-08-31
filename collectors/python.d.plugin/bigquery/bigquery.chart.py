@@ -44,12 +44,11 @@ class Service(SimpleService):
                 chart_config['sql'], 
                 project_id=chart_config['project_id'], 
                 credentials=self.credentials, 
-                progress_bar_type=None
-            )
+                progress_bar_type=None)
             chart_data = df.to_dict('records')[0] 
             data.update(chart_data)
             for dim in chart_data:
-                self.charts[chart_config['chart_name']].add_dimension([dim, dim, algorithm='absolute', multiplier=1, divisor=1])
+                self.charts[chart_config['chart_name']].add_dimension([dim, dim, 'absolute', 1, 1])
 
         return True
 
