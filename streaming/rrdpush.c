@@ -311,17 +311,58 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
 
 // Called from the internal collectors to mark a chart obsolete.
-void rrdset_push_chart_definition_now(RRDSET *st) {
+bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(unlikely(!host->rrdpush_send_enabled || !should_send_chart_matching(st)))
-        return;
+        return false;
 
     rrdset_rdlock(st);
     sender_start(host->sender);
     rrdpush_send_chart_definition_nolock(st);
     sender_commit(host->sender);
     rrdset_unlock(st);
+
+    return true;
+}
+
+void *rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, void *data, bool restart, bool stop) {
+    DICTFE *dictfe = data;
+
+    if((stop || restart) && dictfe) {
+        dictionary_foreach_done(dictfe);
+        freez((void *)dictfe);
+        dictfe = NULL;
+    }
+
+    if(stop)
+        return NULL;
+
+    RRDSET *st = NULL;
+
+    if(unlikely(!dictfe)) {
+        dictfe = callocz(1, sizeof(*dictfe));
+        st = dictionary_foreach_start_rw(dictfe, host->rrdset_root_index, DICTIONARY_LOCK_REENTRANT);
+    }
+    else
+        st = dictionary_foreach_next(dictfe);
+
+    do {
+        while(st && !need_to_send_chart_definition(st))
+            st = dictionary_foreach_next(dictfe);
+
+        if(st && rrdset_push_chart_definition_now(st))
+            break;
+
+    } while((st = dictionary_foreach_next(dictfe)));
+
+    if (!st) {
+        dictionary_foreach_done(dictfe);
+        freez((void *)dictfe);
+        dictfe = NULL;
+    }
+
+    return (void *)dictfe;
 }
 
 void rrdset_done_push(RRDSET *st) {

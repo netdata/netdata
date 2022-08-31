@@ -561,9 +561,6 @@ static void attempt_to_connect(struct sender_state *state)
 
         // reset the bytes we have sent for this session
         state->sent_bytes_on_this_connection = 0;
-
-        // let the data collection threads know we are ready
-        __atomic_test_and_set(&state->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
     }
     else {
         // increase the failed connections counter
@@ -689,11 +686,24 @@ void execute_commands(struct sender_state *s) {
     }
 }
 
+struct rrdpush_sender_thread_data {
+    RRDHOST *host;
+    void *sending_definitions_data;
+    enum {
+        SENDING_DEFINITIONS_RESTART,
+        SENDING_DEFINITIONS_CONTINUE,
+        SENDING_DEFINITIONS_STOP,
+    } sending_definitions_status;
+};
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
+    struct rrdpush_sender_thread_data *data = ptr;
     worker_unregister();
 
-    RRDHOST *host = (RRDHOST *)ptr;
+    RRDHOST *host = data->host;
+
+    if(data->sending_definitions_data)
+        rrdpush_incremental_transmission_of_chart_definitions(host, data, false, true);
 
     netdata_mutex_lock(&host->sender->mutex);
 
@@ -808,7 +818,13 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
-    netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, s->host);
+    struct rrdpush_sender_thread_data thread_data = {
+        .host = s->host,
+        .sending_definitions_data = NULL,
+        .sending_definitions_status = SENDING_DEFINITIONS_RESTART,
+    };
+    netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, &thread_data);
+
     for(; s->host->rrdpush_send_enabled && !netdata_exit ;) {
         // check for outstanding cancellation requests
         netdata_thread_testcancel();
@@ -816,6 +832,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
+            thread_data.sending_definitions_status = SENDING_DEFINITIONS_RESTART;
             s->overflow = 0;
             s->read_len = 0;
             s->buffer->read = 0;
@@ -839,6 +856,27 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
+        if(unlikely(thread_data.sending_definitions_status != SENDING_DEFINITIONS_STOP)) {
+            netdata_mutex_lock(&s->mutex);
+            size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
+            netdata_mutex_unlock(&s->mutex);
+
+            if ((s->buffer->max_size - outstanding) > 100 * 1024) {
+                thread_data.sending_definitions_data = rrdpush_incremental_transmission_of_chart_definitions(
+                    s->host, thread_data.sending_definitions_data,
+                    thread_data.sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
+
+                if (unlikely(!thread_data.sending_definitions_data)) {
+                    thread_data.sending_definitions_status = SENDING_DEFINITIONS_STOP;
+
+                    // let the data collection threads know we are ready
+                    __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+                }
+                else
+                    thread_data.sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
+            }
+        }
+
         worker_is_idle();
 
         // Wait until buffer opens in the socket or a rrdset_done_push wakes us
@@ -847,9 +885,7 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
         netdata_mutex_lock(&s->mutex);
-        char *chunk;
-        size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, &chunk);
-        chunk = NULL;   // Do not cache pointer outside of region - could be invalidated
+        size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         netdata_mutex_unlock(&s->mutex);
         if(outstanding) {
             s->send_attempts++;
