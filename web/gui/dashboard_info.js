@@ -534,7 +534,7 @@ netdataDashboard.menu = {
     'logind': {
         title: 'Logind',
         icon: '<i class="fas fa-user"></i>',
-        info: undefined
+        info: 'Keeps track of user logins and sessions by querying the <a href="https://www.freedesktop.org/software/systemd/man/org.freedesktop.login1.html" target="_blank">systemd-logind API</a>.'
     },
 
     'powersupply': {
@@ -5921,15 +5921,16 @@ netdataDashboard.context = {
     },
 
     'logind.sessions': {
-        info: 'Shows the number of active sessions of each type tracked by logind.'
+        info: 'Local and remote sessions.'
     },
-
-    'logind.users': {
-        info: 'Shows the number of active users of each type tracked by logind.'
+    'logind.sessions_type': {
+        info: '<p>Sessions of each session type.</p><p><b>Graphical</b> - sessions are running under one of X11, Mir, or Wayland. <b>Console</b> - sessions are usually regular text mode local logins, but depending on how the system is configured may have an associated GUI. <b>Other</b> - sessions are those that do not fall into the above categories (such as sessions for cron jobs or systemd timer units).</p>'
     },
-
-    'logind.seats': {
-        info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
+    'logind.sessions_state': {
+        info: '<p>Sessions in each session state.</p><p><b>Online</b> - logged in and running in the background. <b>Closing</b> - nominally logged out, but some processes belonging to it are still around. <b>Active</b> - logged in and running in the foreground.</p>'
+    },
+    'logind.users_state': {
+        info: '<p>Users in each user state.</p><p><b>Offline</b> - users are not logged in. <b>Closing</b> - users are in the process of logging out without lingering. <b>Online</b> - users are logged in, but have no active sessions. <b>Lingering</b> - users are not logged in, but have one or more services still running. <b>Active</b> - users are logged in, and have at least one active session.</p>'
     },
 
     // ------------------------------------------------------------------------
