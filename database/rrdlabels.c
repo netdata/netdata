@@ -937,9 +937,19 @@ int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each,
     return dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
+struct label_str {
+    BUFFER  *sql;
+    int count;
+};
+
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    RRDSET *st = (RRDSET *)data;
-    sql_store_chart_label(st->chart_uuid, (int)ls, (char *)name, (char *)value);
+    struct label_str *lb = data;
+    if (unlikely(!lb->count))
+        buffer_sprintf(lb->sql, "INSERT INTO lbl_%p (source_type, label_key, label_value) VALUES ", lb->sql);
+    else
+        buffer_strcat(lb->sql, ", ");
+    buffer_sprintf(lb->sql, "(%d,'%s','%s')", ls, name, value);
+    lb->count++;
     return 1;
 }
 
@@ -953,7 +963,20 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     rrdcalc_update_rrdlabels(st);
 
     // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
-    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, st);
+    BUFFER  *sql_buf = buffer_create(1024);
+    buffer_sprintf(sql_buf, "CREATE TEMP TABLE IF NOT EXISTS lbl_%p (source_type INT, label_key TEXT, label_value TEXT); ", sql_buf);
+
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+
+    struct label_str tmp = {.sql = sql_buf, .count = 0 };
+    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, &tmp);
+    buffer_sprintf(
+        sql_buf, "; INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) "
+        "SELECT u2h('%s'), source_type, label_key, label_value, unixepoch() FROM lbl_%p; "
+        "DROP TABLE IF EXISTS lbl_%p; ", uuid_str, sql_buf, sql_buf);
+    db_execute(buffer_tostring(sql_buf));
+    buffer_free(sql_buf);
 }
 
 // ----------------------------------------------------------------------------

@@ -408,6 +408,24 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
     return 0;
 }
 
+static void _uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    uuid_t  uuid;
+
+    if ( argc != 1 ){
+        sqlite3_result_null(context);
+        return ;
+    }
+    int rc = uuid_parse((const char *) sqlite3_value_text(argv[0]), uuid);
+    if (rc == -1)  {
+        sqlite3_result_null(context);
+        return ;
+    }
+
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
+
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -527,6 +545,9 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
         (void)pthread_key_create(&key_pool[i], release_statement);
 
+    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, _uuid_parse, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal u2h function");
     return 0;
 }
 
