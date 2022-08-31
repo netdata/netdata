@@ -5,7 +5,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # BigQuery Netdata Collector
 
-A python based collector leveraging [`pandas-gbq`](https://pandas-gbq.readthedocs.io/en/latest/) to run a query against [BigQuery](https://cloud.google.com/bigquery) and save results into a chart in Netdata.
+A python based collector leveraging [`pandas-gbq`](https://pandas-gbq.readthedocs.io/en/latest/) to run a query 
+against [BigQuery](https://cloud.google.com/bigquery) and save results into a chart in Netdata.
 
 ## Requirements
 
@@ -17,11 +18,15 @@ sudo pip install google-auth pandas-gbq
 
 ## Credentials
 
-The collector expects to read the credentials for a [service account](https://cloud.google.com/iam/docs/service-accounts) from a file defined in the collector configuration (see `credentials` configuration parameter). If this is not defined then auth will fallback to the `pandas-gbq` [approach](https://pandas-gbq.readthedocs.io/en/latest/howto/authentication.html). 
+The collector expects to read the credentials for a 
+[service account](https://cloud.google.com/iam/docs/service-accounts) from a file defined in the collector 
+configuration (see `credentials` configuration parameter). If this is not defined then auth will fallback 
+to the `pandas-gbq` [approach](https://pandas-gbq.readthedocs.io/en/latest/howto/authentication.html). 
 
 ## Configuration
 
-Below is an example configuration to just query some random data from BigQuery (two times) and plot each query data as a seperate chart.
+Below is an example configuration to just query some random data from BigQuery (two times) and plot each 
+query data as a seperate chart.
 
 ```yaml
 example:
@@ -47,10 +52,15 @@ example:
         sql: "select rand()*100 as random_1, rand()*100 as random_2"
 ```
 
-`chart_configs` is a list of dictionary objects where each one defines the `sql` to be run in BigQuery, the `project_id` to run the query in and then `chart_name`, `chart_title` etc to define the [CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) that will control how the results will look in netdata.
+`chart_configs` is a list of dictionary objects where each one defines the `sql` to be run in BigQuery, 
+the `project_id` to run the query in and then `chart_name`, `chart_title` etc to define the 
+[CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) 
+that will control how the results will look in netdata.
 
 ## Notes
-- The default `update_every` is 5 but in reality you may want to set a higher value depending on your usecase and the amount of time it typically takes for your results to be returned.
-- This collector is expecting one row in the results from BigQuery. It is that first row that will be taken as the most recent values for each dimension on each chart. 
+- The default `update_every` is 5 but in reality you may want to set a higher value depending on your usecase and 
+the amount of time it typically takes for your results to be returned.
+- This collector is expecting one row in the results from BigQuery. It is that first row that will be taken as 
+the most recent values for each dimension on each chart. 
 
 

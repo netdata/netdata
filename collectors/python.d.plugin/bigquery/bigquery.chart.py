@@ -23,7 +23,7 @@ class Service(SimpleService):
 
     def check(self):
         """ensure charts and dims all confugured and that we can get data"""
-        
+
         # add each chart as defined by the config
         for chart_config in self.chart_configs:
             if chart_config['chart_name'] not in self.charts:
@@ -41,11 +41,11 @@ class Service(SimpleService):
         data = dict()
         for chart_config in self.chart_configs:
             df = pandas_gbq.read_gbq(
-                chart_config['sql'], 
-                project_id=chart_config['project_id'], 
-                credentials=self.credentials, 
+                chart_config['sql'],
+                project_id=chart_config['project_id'],
+                credentials=self.credentials,
                 progress_bar_type=None)
-            chart_data = df.to_dict('records')[0] 
+            chart_data = df.to_dict('records')[0]
             data.update(chart_data)
             for dim in chart_data:
                 self.charts[chart_config['chart_name']].add_dimension([dim, dim, 'absolute', 1, 1])
@@ -59,12 +59,12 @@ class Service(SimpleService):
 
         for chart_config in self.chart_configs:
             df = pandas_gbq.read_gbq(
-                chart_config['sql'], 
-                project_id=chart_config['project_id'], 
-                credentials=self.credentials, 
+                chart_config['sql'],
+                project_id=chart_config['project_id'],
+                credentials=self.credentials,
                 progress_bar_type=None
             )
-            chart_data = df.to_dict('records')[0] 
+            chart_data = df.to_dict('records')[0]
             data.update(chart_data)
 
         return data
