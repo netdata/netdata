@@ -41,13 +41,16 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         shell: python3 {0}
+        env:
+          PR_BODY: "${{ github.event.pull_request.body }}"
         run: |
           from ruamel.yaml import YAML
           import json
           import re
+          import os
           FULL_CI_REGEX = '/actions run full ci'
           ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
-          PR_BODY = """${{ github.event.pull_request.body }}"""
+          PR_BODY = os.environ['PR_BODY']
           yaml = YAML(typ='safe')
           entries = list()
           run_limited = False
