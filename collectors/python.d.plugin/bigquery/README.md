@@ -9,7 +9,7 @@ A python based collector leveraging [`pandas-gbq`](https://pandas-gbq.readthedoc
 
 ## Requirements
 
-This collector depend on some Python packages that can usually be installed via `pip`.
+This collector depends on some Python packages that can usually be installed via `pip`.
 
 ```bash
 sudo pip install google-auth pandas-gbq
@@ -17,7 +17,7 @@ sudo pip install google-auth pandas-gbq
 
 ## Credentials
 
-The collector expects to read the credentials for a [service account](https://cloud.google.com/iam/docs/service-accounts) from a file defined in the collector configuration. If this is not defined then auth will fallback to the `pandas-gbq` [approach](https://pandas-gbq.readthedocs.io/en/latest/howto/authentication.html). 
+The collector expects to read the credentials for a [service account](https://cloud.google.com/iam/docs/service-accounts) from a file defined in the collector configuration (see `credentials` configuration parameter). If this is not defined then auth will fallback to the `pandas-gbq` [approach](https://pandas-gbq.readthedocs.io/en/latest/howto/authentication.html). 
 
 ## Configuration
 
@@ -46,6 +46,8 @@ example:
         project_id: "your-gcp-project-id"
         sql: "select rand()*100 as random_1, rand()*100 as random_2"
 ```
+
+`chart_configs` is a list of dictionary objects where each one defines the `sql` to be run in BigQuery, the `project_id` to run the query in and then `chart_name`, `chart_title` etc to define the [CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) that will control how the results will look in netdata.
 
 
 
