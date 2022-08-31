@@ -30,6 +30,14 @@ static struct global_statistics {
     volatile uint64_t rrdr_queries_made;
     volatile uint64_t rrdr_db_points_read;
     volatile uint64_t rrdr_result_points_generated;
+
+    volatile uint64_t sqlite3_queries_made;
+    volatile uint64_t sqlite3_queries_ok;
+    volatile uint64_t sqlite3_queries_failed;
+    volatile uint64_t sqlite3_queries_failed_busy;
+    volatile uint64_t sqlite3_queries_failed_locked;
+    volatile uint64_t sqlite3_rows;
+
 } global_statistics = {
         .connected_clients = 0,
         .web_requests = 0,
@@ -44,6 +52,27 @@ static struct global_statistics {
         .rrdr_db_points_read = 0,
         .rrdr_result_points_generated = 0,
 };
+
+void sqlite3_query_completed(bool success, bool busy, bool locked) {
+    __atomic_fetch_add(&global_statistics.sqlite3_queries_made, 1, __ATOMIC_RELAXED);
+
+    if(success) {
+        __atomic_fetch_add(&global_statistics.sqlite3_queries_ok, 1, __ATOMIC_RELAXED);
+    }
+    else {
+        __atomic_fetch_add(&global_statistics.sqlite3_queries_failed, 1, __ATOMIC_RELAXED);
+
+        if(busy)
+            __atomic_fetch_add(&global_statistics.sqlite3_queries_failed_busy, 1, __ATOMIC_RELAXED);
+
+        if(locked)
+            __atomic_fetch_add(&global_statistics.sqlite3_queries_failed_locked, 1, __ATOMIC_RELAXED);
+    }
+}
+
+void sqlite3_row_completed(void) {
+    __atomic_fetch_add(&global_statistics.sqlite3_rows, 1, __ATOMIC_RELAXED);
+}
 
 void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated) {
     __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_RELAXED);
@@ -79,24 +108,31 @@ void web_client_disconnected(void) {
 
 
 static inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
-    gs->connected_clients            = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_RELAXED);
-    gs->web_requests                 = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_RELAXED);
-    gs->web_usec                     = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_RELAXED);
-    gs->web_usec_max                 = __atomic_fetch_add(&global_statistics.web_usec_max, 0, __ATOMIC_RELAXED);
-    gs->bytes_received               = __atomic_fetch_add(&global_statistics.bytes_received, 0, __ATOMIC_RELAXED);
-    gs->bytes_sent                   = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_RELAXED);
-    gs->content_size                 = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_RELAXED);
-    gs->compressed_content_size      = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_RELAXED);
-    gs->web_client_count             = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_RELAXED);
+    gs->connected_clients            = __atomic_load_n(&global_statistics.connected_clients, __ATOMIC_RELAXED);
+    gs->web_requests                 = __atomic_load_n(&global_statistics.web_requests, __ATOMIC_RELAXED);
+    gs->web_usec                     = __atomic_load_n(&global_statistics.web_usec, __ATOMIC_RELAXED);
+    gs->web_usec_max                 = __atomic_load_n(&global_statistics.web_usec_max, __ATOMIC_RELAXED);
+    gs->bytes_received               = __atomic_load_n(&global_statistics.bytes_received, __ATOMIC_RELAXED);
+    gs->bytes_sent                   = __atomic_load_n(&global_statistics.bytes_sent, __ATOMIC_RELAXED);
+    gs->content_size                 = __atomic_load_n(&global_statistics.content_size, __ATOMIC_RELAXED);
+    gs->compressed_content_size      = __atomic_load_n(&global_statistics.compressed_content_size, __ATOMIC_RELAXED);
+    gs->web_client_count             = __atomic_load_n(&global_statistics.web_client_count, __ATOMIC_RELAXED);
 
-    gs->rrdr_queries_made            = __atomic_fetch_add(&global_statistics.rrdr_queries_made, 0, __ATOMIC_RELAXED);
-    gs->rrdr_db_points_read          = __atomic_fetch_add(&global_statistics.rrdr_db_points_read, 0, __ATOMIC_RELAXED);
-    gs->rrdr_result_points_generated = __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, 0, __ATOMIC_RELAXED);
+    gs->rrdr_queries_made            = __atomic_load_n(&global_statistics.rrdr_queries_made, __ATOMIC_RELAXED);
+    gs->rrdr_db_points_read          = __atomic_load_n(&global_statistics.rrdr_db_points_read, __ATOMIC_RELAXED);
+    gs->rrdr_result_points_generated = __atomic_load_n(&global_statistics.rrdr_result_points_generated, __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
         __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
     }
+
+    gs->sqlite3_queries_made          = __atomic_load_n(&global_statistics.sqlite3_queries_made, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_ok            = __atomic_load_n(&global_statistics.sqlite3_queries_ok, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed        = __atomic_load_n(&global_statistics.sqlite3_queries_failed, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed_busy   = __atomic_load_n(&global_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
+    gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 }
 
 static void global_statistics_charts(void) {
@@ -443,6 +479,106 @@ static void global_statistics_charts(void) {
     }
 
     // ----------------------------------------------------------------
+
+    if(gs.sqlite3_queries_made) {
+        static RRDSET *st_sqlite3_queries = NULL;
+        static RRDDIM *rd_queries = NULL;
+
+        if (unlikely(!st_sqlite3_queries)) {
+            st_sqlite3_queries = rrdset_create_localhost(
+                "netdata"
+                , "sqlite3_queries"
+                , NULL
+                , "sqlite3"
+                , NULL
+                , "Netdata SQLite3 Queries"
+                , "queries/s"
+                , "netdata"
+                , "stats"
+                , 131100
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            rd_queries = rrddim_add(st_sqlite3_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_sqlite3_queries);
+
+        rrddim_set_by_pointer(st_sqlite3_queries, rd_queries, (collected_number)gs.sqlite3_queries_made);
+
+        rrdset_done(st_sqlite3_queries);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.sqlite3_queries_ok || gs.sqlite3_queries_failed) {
+        static RRDSET *st_sqlite3_queries_by_status = NULL;
+        static RRDDIM *rd_ok = NULL, *rd_failed = NULL, *rd_busy = NULL, *rd_locked = NULL;
+
+        if (unlikely(!st_sqlite3_queries_by_status)) {
+            st_sqlite3_queries_by_status = rrdset_create_localhost(
+                "netdata"
+                , "sqlite3_queries_by_status"
+                , NULL
+                , "sqlite3"
+                , NULL
+                , "Netdata SQLite3 Queries by status"
+                , "queries/s"
+                , "netdata"
+                , "stats"
+                , 131101
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            rd_ok     = rrddim_add(st_sqlite3_queries_by_status, "ok",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed = rrddim_add(st_sqlite3_queries_by_status, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_busy   = rrddim_add(st_sqlite3_queries_by_status, "busy",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_locked = rrddim_add(st_sqlite3_queries_by_status, "locked", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_sqlite3_queries_by_status);
+
+        rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_ok,     (collected_number)gs.sqlite3_queries_made);
+        rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_failed, (collected_number)gs.sqlite3_queries_failed);
+        rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_busy,   (collected_number)gs.sqlite3_queries_failed_busy);
+        rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_locked, (collected_number)gs.sqlite3_queries_failed_locked);
+
+        rrdset_done(st_sqlite3_queries_by_status);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.sqlite3_rows) {
+        static RRDSET *st_sqlite3_rows = NULL;
+        static RRDDIM *rd_rows = NULL;
+
+        if (unlikely(!st_sqlite3_rows)) {
+            st_sqlite3_rows = rrdset_create_localhost(
+                "netdata"
+                , "sqlite3_rows"
+                , NULL
+                , "sqlite3"
+                , NULL
+                , "Netdata SQLite3 Rows"
+                , "rows/s"
+                , "netdata"
+                , "stats"
+                , 131102
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            rd_rows = rrddim_add(st_sqlite3_rows, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_sqlite3_rows);
+
+        rrddim_set_by_pointer(st_sqlite3_rows, rd_rows, (collected_number)gs.sqlite3_rows);
+
+        rrdset_done(st_sqlite3_rows);
+    }
 }
 
 static void dbengine_statistics_charts(void) {

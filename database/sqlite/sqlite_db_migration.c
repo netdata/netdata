@@ -21,7 +21,7 @@ static int table_exists_in_database(const char *table)
 
     snprintf(sql, 127, "select 1 from sqlite_schema where type = 'table' and name = '%s';", table);
 
-    int rc = sqlite3_exec(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
+    int rc = sqlite3_exec_monitored(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
         info("Error checking table existence; %s", err_msg);
         sqlite3_free(err_msg);
@@ -39,7 +39,7 @@ static int column_exists_in_table(const char *table, const char *column)
 
     snprintf(sql, 127, "SELECT 1 FROM pragma_table_info('%s') where name = '%s';", table, column);
 
-    int rc = sqlite3_exec(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
+    int rc = sqlite3_exec_monitored(db_meta, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
         info("Error checking column existence; %s", err_msg);
         sqlite3_free(err_msg);
@@ -100,11 +100,11 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
         return 1;
     }
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          char *table = strdupz((char *) sqlite3_column_text(res, 0));
          if (!column_exists_in_table(table, "chart_context")) {
              snprintfz(sql, 255, "ALTER TABLE %s ADD chart_context text", table);
-             sqlite3_exec(database, sql, 0, 0, NULL);
+             sqlite3_exec_monitored(database, sql, 0, 0, NULL);
          }
          freez(table);
     }
@@ -135,7 +135,7 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
     int user_version = 0;
     char *err_msg = NULL;
 
-    int rc = sqlite3_exec(database, "PRAGMA user_version;", return_int_cb, (void *) &user_version, &err_msg);
+    int rc = sqlite3_exec_monitored(database, "PRAGMA user_version;", return_int_cb, (void *) &user_version, &err_msg);
     if (rc != SQLITE_OK) {
         info("Error checking the %s database version; %s", db_name, err_msg);
         sqlite3_free(err_msg);

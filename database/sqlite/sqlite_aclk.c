@@ -361,7 +361,7 @@ void sql_aclk_sync_init(void)
 
     for (int i = 0; aclk_sync_config[i]; i++) {
         debug(D_ACLK_SYNC, "Executing %s", aclk_sync_config[i]);
-        rc = sqlite3_exec(db_meta, aclk_sync_config[i], 0, 0, &err_msg);
+        rc = sqlite3_exec_monitored(db_meta, aclk_sync_config[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error aclk sync initialization setup, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", aclk_sync_config[i]);
@@ -373,7 +373,7 @@ void sql_aclk_sync_init(void)
     fatal_assert(0 == uv_mutex_init(&aclk_async_lock));
 
     if (likely(rrdcontext_enabled == CONFIG_BOOLEAN_YES)) {
-        rc = sqlite3_exec(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
+        rc = sqlite3_exec_monitored(db_meta, "SELECT host_id, hostname, registry_hostname, update_every, os, "
            "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "
            "program_version, entries, health_enabled FROM host WHERE hops >0;",
               create_host_callback, NULL, &err_msg);
@@ -383,7 +383,7 @@ void sql_aclk_sync_init(void)
         }
     }
 
-    rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
+    rc = sqlite3_exec_monitored(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
         "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("SQLite error when starting ACLK sync threads, rc = %d (%s)", rc, err_msg);
@@ -927,7 +927,7 @@ static int is_host_available(uuid_t *host_id)
         error_report("Failed to bind host_id parameter to select node instance information");
         goto failed;
     }
-    rc = sqlite3_step(res);
+    rc = sqlite3_step_monitored(res);
 
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
@@ -980,7 +980,7 @@ void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct a
     }
     buffer_flush(sql);
 
-    while (sqlite3_step(res) == SQLITE_ROW)
+    while (sqlite3_step_monitored(res) == SQLITE_ROW)
         buffer_strcat(sql, (char *) sqlite3_column_text(res, 0));
 
     rc = sqlite3_finalize(res);
@@ -1016,7 +1016,7 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
 {
     char *err_msg = NULL;
     debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
-    int rc = sqlite3_exec(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, (void *) wc, &err_msg);
+    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, (void *) wc, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
         sqlite3_free(err_msg);

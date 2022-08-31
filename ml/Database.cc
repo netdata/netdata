@@ -105,7 +105,7 @@ Database::Database(const std::string &Path) {
 
     // Create anomaly events table if it does not exist.
     char *ErrMsg;
-    RC = sqlite3_exec(Conn, SQL_CREATE_ANOMALIES_TABLE, nullptr, nullptr, &ErrMsg);
+    RC = sqlite3_exec_monitored(Conn, SQL_CREATE_ANOMALIES_TABLE, nullptr, nullptr, &ErrMsg);
     if (RC == SQLITE_OK)
         return;
 
