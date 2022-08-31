@@ -663,6 +663,8 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
 static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) {
     if(likely(!force && !(rm->flags & RRD_FLAG_UPDATED))) return;
 
+    rrdcontext_triggered_update_on_rrdmetric();
+
     if(unlikely(rrd_flag_is_collected(rm) && !rm->rrddim))
         rrd_flag_set_archived(rm);
 
@@ -997,6 +999,8 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
 static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate) {
     if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(ri->flags & RRD_FLAG_UPDATED))) return;
+
+    rrdcontext_triggered_update_on_rrdinstance();
 
     if(likely(ri->rrdset)) {
         if(unlikely(ri->rrdset->priority != ri->priority)) {
@@ -1653,6 +1657,8 @@ static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     if(unlikely(rc->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(rc->flags & RRD_FLAG_UPDATED))) return;
+
+    rrdcontext_triggered_update_on_rrdcontext();
 
     rrdcontext_lock(rc);
 
