@@ -67,13 +67,22 @@ void sender_commit(struct sender_state *s) {
                 return;
             }
         }
-        if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+        if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len)) {
             s->overflow = 1;
+            error("STREAM %s [send to %s]: buffer overflow while trying to add %zu bytes to the circular buffer (allocated: %zu, max_size: %zu, outstanding: %zu).",
+                  rrdhost_hostname(s->host), s->connected_to, src_len, s->buffer->size, s->buffer->max_size,
+                  cbuffer_next_unsafe(s->buffer, NULL));
+        }
     }
 #else
-    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len)) {
         s->overflow = 1;
+        error("STREAM %s [send to %s]: buffer overflow while trying to add %zu bytes to the circular buffer (allocated: %zu, max_size: %zu, outstanding: %zu).",
+              rrdhost_hostname(s->host), s->connected_to, src_len, s->buffer->size, s->buffer->max_size,
+              cbuffer_next_unsafe(s->buffer, NULL));
+    }
 #endif
+
     buffer_flush(s->build);
     netdata_mutex_unlock(&s->mutex);
 }
@@ -731,7 +740,7 @@ static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_d
 
     size_t outstanding = cbuffer_outstanding_bytes_with_lock(thread_data);
     size_t max_size = thread_data->sender_state->buffer->max_size;
-    info("STREAM %s [send to %s]: circular buffer has %zu bytes in it out of %zu, it is %zu%% full", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to, outstanding, max_size, outstanding * 100 / max_size);
+    internal_error(true, "STREAM %s [send to %s]: circular buffer has %zu bytes in it out of %zu, it is %zu%% full", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to, outstanding, max_size, outstanding * 100 / max_size);
 }
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
@@ -992,7 +1001,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if (s->overflow) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
             errno = 0;
-            error("STREAM %s [send to %s]: buffer full (%zu-bytes) after %zu bytes. Restarting connection",
+            error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
                   rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
             rrdpush_sender_thread_close_socket(s->host);
         }
