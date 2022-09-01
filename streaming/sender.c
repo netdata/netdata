@@ -67,20 +67,12 @@ void sender_commit(struct sender_state *s) {
                 return;
             }
         }
-        if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len)) {
+        if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
             s->overflow = 1;
-            error("STREAM %s [send to %s]: buffer overflow while trying to add %zu bytes to the circular buffer (allocated: %zu, max_size: %zu, outstanding: %zu).",
-                  rrdhost_hostname(s->host), s->connected_to, src_len, s->buffer->size, s->buffer->max_size,
-                  cbuffer_next_unsafe(s->buffer, NULL));
-        }
     }
 #else
-    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len)) {
+    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
         s->overflow = 1;
-        error("STREAM %s [send to %s]: buffer overflow while trying to add %zu bytes to the circular buffer (allocated: %zu, max_size: %zu, outstanding: %zu).",
-              rrdhost_hostname(s->host), s->connected_to, src_len, s->buffer->size, s->buffer->max_size,
-              cbuffer_next_unsafe(s->buffer, NULL));
-    }
 #endif
 
     buffer_flush(s->build);
