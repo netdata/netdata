@@ -695,6 +695,7 @@ struct rrdpush_sender_thread_data {
         SENDING_DEFINITIONS_CONTINUE,
         SENDING_DEFINITIONS_DONE,
     } sending_definitions_status;
+    bool enabled_metrics_streaming;
 };
 
 static size_t cbuffer_outstanding_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
@@ -880,14 +881,8 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        if(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE) {
+        if(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE)
             rrdpush_queue_incremental_definitions(thread_data);
-
-            if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE) {
-                // let the data collection threads know we are ready to push metrics
-                __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
-            }
-        }
 
         worker_is_idle();
 
@@ -897,12 +892,20 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
         size_t outstanding = cbuffer_outstanding_bytes_with_lock(thread_data);
+
         if(outstanding) {
             s->send_attempts++;
             fds[Socket].events = POLLIN | POLLOUT;
         }
         else {
             fds[Socket].events = POLLIN;
+
+            if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE && !thread_data->enabled_metrics_streaming) {
+                thread_data->enabled_metrics_streaming = true;
+
+                // let the data collection threads know we are ready to push metrics
+                __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+            }
         }
 
         int retval = poll(fds, 2, 1000);
