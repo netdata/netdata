@@ -125,7 +125,7 @@ void sql_close_context_database(void)
 // Fetching data
 //
 #define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
-        "c.update_every, c.chart_type, c.family FROM meta.chart c WHERE c.host_id = @host_id; "
+        "c.update_every, c.chart_type, c.family FROM meta.chart c WHERE c.host_id = @host_id and c.chart_id is not null; "
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
@@ -171,7 +171,7 @@ skip_load:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name FROM meta.dimension d WHERE d.chart_id = @id;"
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name FROM meta.dimension d WHERE d.chart_id = @id and d.dim_id is not null;"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
