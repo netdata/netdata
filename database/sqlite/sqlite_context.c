@@ -22,6 +22,25 @@ const char *database_context_cleanup[] = {
 
 sqlite3 *db_context_meta = NULL;
 
+static void _last_updated(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    time_t  first_entry_t;
+    time_t  tier_last_entry_t = 0;
+    time_t  last_entry_t = 0;
+
+    if (argc != 1) {
+        sqlite3_result_null(context);
+        return;
+    }
+
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        (void) rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_value_blob(argv[0]), &first_entry_t, &tier_last_entry_t, tier);
+        last_entry_t = MAX(last_entry_t, tier_last_entry_t);
+    }
+
+    sqlite3_result_int64(context, (time_t) last_entry_t);
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -100,6 +119,11 @@ int sql_init_context_database(int memory)
     if (init_database_batch(db_context_meta, DB_CHECK_NONE, 0, &database_context_cleanup[0]))
         return 1;
 
+    rc = sqlite3_create_function(db_context_meta, "last_updated", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _last_updated, 0, 0);
+
+    if (rc != SQLITE_OK)
+        error_report("Failed to initialize the last_updated sqlite function");
+
     return 0;
 }
 
@@ -171,7 +195,7 @@ skip_load:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name FROM meta.dimension d WHERE d.chart_id = @id;"
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, last_updated(d.dim_id) FROM meta.dimension d WHERE d.chart_id = @id;"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
@@ -191,11 +215,14 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
 
     SQL_DIMENSION_DATA dimension_data;
 
+    uint64_t last_time_t;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
-        dict_cb(&dimension_data, data);
+        last_time_t = sqlite3_column_int64(res, 3);
+        if (likely(last_time_t))
+            dict_cb(&dimension_data, data);
     }
 
 failed:
