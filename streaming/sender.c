@@ -706,7 +706,7 @@ static size_t cbuffer_outstanding_bytes_with_lock(struct rrdpush_sender_thread_d
 
 static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
     while(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE &&
-           (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (100 * 1024)) {
+           (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (1 * 1024 * 1024)) {
 
         bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
             thread_data->sender_state->host, &thread_data->dictfe,
