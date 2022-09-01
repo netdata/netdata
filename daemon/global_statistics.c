@@ -1183,6 +1183,17 @@ struct worker_job_type {
 
     RRDDIM *rd_jobs_started;
     RRDDIM *rd_busy_time;
+
+    WORKER_METRIC_TYPE type;
+    NETDATA_DOUBLE min_value;
+    NETDATA_DOUBLE max_value;
+    NETDATA_DOUBLE sum_value;
+    size_t count_value;
+
+    RRDSET *st;
+    RRDDIM *rd_min;
+    RRDDIM *rd_max;
+    RRDDIM *rd_avg;
 };
 
 struct worker_thread {
@@ -1469,6 +1480,9 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_BUSY_TIME))
+                continue;
+
             if (wu->per_job_type[i].name[0]) {
 
                 if(unlikely(!wu->per_job_type[i].rd_jobs_started))
@@ -1511,6 +1525,9 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_BUSY_TIME))
+                continue;
+
             if (wu->per_job_type[i].name[0]) {
 
                 if(unlikely(!wu->per_job_type[i].rd_busy_time))
@@ -1558,6 +1575,63 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
         rrdset_done(wu->st_workers_threads);
     }
+
+    // ----------------------------------------------------------------------
+    // custom metric types
+    {
+        size_t i;
+        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+            if(wu->per_job_type[i].type != WORKER_METRIC_ABSOLUTE)
+                continue;
+
+            if(!wu->per_job_type[i].count_value)
+                continue;
+
+            if(!wu->per_job_type[i].st) {
+                size_t job_name_len = strlen(wu->per_job_type[i].name);
+                if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
+
+                char job_name_sanitized[job_name_len + 1];
+                rrdset_strncpyz_name(job_name_sanitized, wu->per_job_type[i].name, job_name_len);
+
+                char name[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_custom_%s", wu->name_lowercase, job_name_sanitized);
+
+                char context[RRD_ID_LENGTH_MAX + 1];
+                snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.custom.%s", wu->name_lowercase, job_name_sanitized);
+
+                char title[1000 + 1];
+                snprintf(title, 1000, "Netdata Workers %s Variable %s", wu->name_lowercase, wu->per_job_type[i].name);
+
+                wu->per_job_type[i].st = rrdset_create_localhost(
+                    "netdata"
+                    , name
+                    , NULL
+                    , wu->family
+                    , context
+                    , title
+                    , "value"
+                    , "netdata"
+                    , "stats"
+                    , wu->priority + 5
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+                    );
+
+                wu->per_job_type[i].rd_min = rrddim_add(wu->per_job_type[i].st, "min", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(wu->per_job_type[i].st);
+
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * 1000.0));
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * 1000.0));
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_avg, (collected_number)(wu->per_job_type[i].sum_value / wu->per_job_type[i].count_value * 1000.0));
+
+            rrdset_done(wu->per_job_type[i].st);
+        }
+    }
 }
 
 static void workers_utilization_reset_statistics(struct worker_utilization *wu) {
@@ -1584,6 +1658,11 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
 
         wu->per_job_type[i].jobs_started = 0;
         wu->per_job_type[i].busy_time = 0;
+
+        wu->per_job_type[i].min_value = NAN;
+        wu->per_job_type[i].max_value = NAN;
+        wu->per_job_type[i].sum_value = NAN;
+        wu->per_job_type[i].count_value = 0;
     }
 
     struct worker_thread *wt;
@@ -1666,7 +1745,19 @@ static struct worker_thread *worker_thread_find_or_create(struct worker_utilizat
     return wt;
 }
 
-static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_started __maybe_unused, size_t is_running __maybe_unused, const char **job_types_names __maybe_unused, size_t *job_types_jobs_started __maybe_unused, usec_t *job_types_busy_time __maybe_unused) {
+static void worker_utilization_charts_callback(void *ptr
+                                               , pid_t pid __maybe_unused
+                                               , const char *thread_tag __maybe_unused
+                                               , size_t utilization_usec __maybe_unused
+                                               , size_t duration_usec __maybe_unused
+                                               , size_t jobs_started __maybe_unused
+                                               , size_t is_running __maybe_unused
+                                               , const char **job_types_names __maybe_unused
+                                               , WORKER_METRIC_TYPE *job_types_metric_types __maybe_unused
+                                               , size_t *job_types_jobs_started __maybe_unused
+                                               , usec_t *job_types_busy_time __maybe_unused
+                                               , NETDATA_DOUBLE *job_types_custom_metrics __maybe_unused
+                                               ) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
     // find the worker_thread in the list
@@ -1702,6 +1793,24 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
         // new job type found
         if(unlikely(!wu->per_job_type[i].name[0] && job_types_names[i]))
             strncpyz(wu->per_job_type[i].name, job_types_names[i], WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
+
+        wu->per_job_type[i].type = job_types_metric_types[i];
+
+        NETDATA_DOUBLE value = job_types_custom_metrics[i];
+        if(netdata_double_isnumber(value)) {
+            if(!wu->per_job_type[i].count_value) {
+                wu->per_job_type[i].count_value = 1;
+                wu->per_job_type[i].min_value = value;
+                wu->per_job_type[i].max_value = value;
+                wu->per_job_type[i].sum_value = value;
+            }
+            else {
+                wu->per_job_type[i].count_value++;
+                wu->per_job_type[i].sum_value += value;
+                if(value < wu->per_job_type[i].min_value) wu->per_job_type[i].min_value = value;
+                if(value > wu->per_job_type[i].max_value) wu->per_job_type[i].max_value = value;
+            }
+        }
     }
 
     // find its CPU utilization

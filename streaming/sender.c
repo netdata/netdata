@@ -17,8 +17,9 @@
 #define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR  12
 #define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR     13
 #define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION 14
+#define WORKER_SENDER_JOB_BUFFER_RATIO              15
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 16
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
 #endif
 
@@ -702,13 +703,6 @@ struct rrdpush_sender_thread_data {
     } sending_definitions_status;
 };
 
-static size_t cbuffer_outstanding_bytes_to_send_with_lock(struct rrdpush_sender_thread_data *thread_data) {
-    netdata_mutex_lock(&thread_data->sender_state->mutex);
-    size_t outstanding = cbuffer_next_unsafe(thread_data->sender_state->host->sender->buffer, NULL);
-    netdata_mutex_unlock(&thread_data->sender_state->mutex);
-    return outstanding;
-}
-
 static size_t cbuffer_available_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
     netdata_mutex_lock(&thread_data->sender_state->mutex);
     size_t outstanding = cbuffer_available_size_unsafe(thread_data->sender_state->host->sender->buffer);
@@ -862,6 +856,8 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", WORKER_METRIC_ABSOLUTE);
+
     struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
     thread_data->sender_state = s;
     thread_data->host = s->host;
@@ -911,7 +907,12 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].revents = 0;
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
-        size_t outstanding = cbuffer_outstanding_bytes_to_send_with_lock(thread_data);
+        netdata_mutex_lock(&s->mutex);
+        size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
+        size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
+        netdata_mutex_unlock(&s->mutex);
+
+        worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->host->sender->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->host->sender->buffer->max_size);
 
         if(outstanding) {
             s->send_attempts++;

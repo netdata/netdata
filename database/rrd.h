@@ -1271,12 +1271,13 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 extern int alarm_compare_id(void *a, void *b);
 extern int alarm_compare_name(void *a, void *b);
 
+extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
+
 // ----------------------------------------------------------------------------
 // RRD internal functions
 
 #ifdef NETDATA_RRD_INTERNALS
 
-extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);

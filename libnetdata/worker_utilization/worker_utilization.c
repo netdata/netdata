@@ -13,6 +13,9 @@ struct worker_job_type {
     // worker controlled variables
     volatile size_t worker_jobs_started;
     volatile usec_t worker_busy_time;
+
+    WORKER_METRIC_TYPE type;
+    NETDATA_DOUBLE min_value;
 };
 
 struct worker {
@@ -62,7 +65,7 @@ void worker_register(const char *workname) {
     netdata_mutex_unlock(&base_lock);
 }
 
-void worker_register_job_name(size_t job_id, const char *name) {
+void worker_register_job_custom_metric(size_t job_id, const char *name, WORKER_METRIC_TYPE type) {
     if(unlikely(!worker)) return;
 
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)) {
@@ -75,6 +78,12 @@ void worker_register_job_name(size_t job_id, const char *name) {
     }
 
     strncpy(worker->per_job_type[job_id].name, name, WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
+
+    worker->per_job_type[job_id].type = type;
+}
+
+void worker_register_job_name(size_t job_id, const char *name) {
+    worker_register_job_custom_metric(job_id, name, WORKER_METRIC_BUSY_TIME);
 }
 
 void worker_unregister(void) {
@@ -138,10 +147,30 @@ void worker_is_busy(size_t job_id) {
     worker->last_action = WORKER_BUSY;
 }
 
+void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
+    if(unlikely(!worker)) return;
+    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+        job_id = 0;
+
+    worker->per_job_type[job_id].min_value = value;
+}
 
 // statistics interface
 
-void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_started, size_t is_running, const char **job_types_names, size_t *job_types_jobs_started, usec_t *job_types_busy_time), void *data) {
+void workers_foreach(const char *workname, void (*callback)(
+                                               void *data
+                                               , pid_t pid
+                                               , const char *thread_tag
+                                               , size_t utilization_usec
+                                               , size_t duration_usec
+                                               , size_t jobs_started, size_t is_running
+                                               , const char **job_types_names
+                                               , WORKER_METRIC_TYPE *job_metric_types
+                                               , size_t *job_types_jobs_started
+                                               , usec_t *job_types_busy_time
+                                               , NETDATA_DOUBLE *job_custom_values
+                                               )
+                                               , void *data) {
     netdata_mutex_lock(&base_lock);
     uint32_t hash = simple_hash(workname);
     usec_t busy_time, delta;
@@ -155,10 +184,14 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
 
         // find per job type statistics
         const char *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        WORKER_METRIC_TYPE per_job_metric_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
         size_t per_job_type_jobs_started[WORKER_UTILIZATION_MAX_JOB_TYPES];
         usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        NETDATA_DOUBLE per_job_custom_values[WORKER_UTILIZATION_MAX_JOB_TYPES];
+
         for(i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
             per_job_type_name[i] = p->per_job_type[i].name;
+            per_job_metric_type[i] = p->per_job_type[i].type;
 
             size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
             per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_last_jobs_started;
@@ -167,6 +200,8 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
             usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
             per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
             p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
+
+            per_job_custom_values[i] = p->per_job_type[i].min_value;
         }
 
         // get a copy of the worker variables
@@ -203,7 +238,19 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
             jobs_running = 1;
         }
 
-        callback(data, p->pid, p->tag, busy_time, delta, jobs_started, jobs_running, per_job_type_name, per_job_type_jobs_started, per_job_type_busy_time);
+        callback(data
+                 , p->pid
+                 , p->tag
+                 , busy_time
+                 , delta
+                 , jobs_started
+                 , jobs_running
+                 , per_job_type_name
+                 , per_job_metric_type
+                 , per_job_type_jobs_started
+                 , per_job_type_busy_time
+                 , per_job_custom_values
+                 );
     }
 
     netdata_mutex_unlock(&base_lock);
