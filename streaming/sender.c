@@ -707,7 +707,7 @@ static size_t cbuffer_outstanding_bytes_with_lock(struct rrdpush_sender_thread_d
 
 static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
     while(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE &&
-           (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (1 * 1024 * 1024)) {
+           (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (thread_data->sender_state->buffer->max_size / 2)) {
 
         bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
             thread_data->sender_state->host, &thread_data->dictfe,
@@ -900,11 +900,13 @@ void *rrdpush_sender_thread(void *ptr) {
         else {
             fds[Socket].events = POLLIN;
 
-            if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE && !thread_data->enabled_metrics_streaming) {
+            if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE && !thread_data->enabled_metrics_streaming)) {
                 thread_data->enabled_metrics_streaming = true;
 
                 // let the data collection threads know we are ready to push metrics
                 __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+
+                fprintf(stderr, "RRDPUSH_SENDER ENABLED METRICS SENDING\n");
             }
         }
 
