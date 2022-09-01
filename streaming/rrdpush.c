@@ -368,14 +368,17 @@ void rrdset_done_push(RRDSET *st) {
         rrdpush_sender_thread_spawn(host);
 
     // Handle non-connected case
-    if(unlikely(!__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
+    if(unlikely(!__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
+                 || !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS))) {
+
         if(unlikely(!host->rrdpush_sender_error_shown))
-            error("STREAM %s [send]: not ready - discarding collected metrics.", rrdhost_hostname(host));
+            error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         host->rrdpush_sender_error_shown = 1;
+
         return;
     }
     else if(unlikely(host->rrdpush_sender_error_shown)) {
-        info("STREAM %s [send]: sending metrics...", rrdhost_hostname(host));
+        info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         host->rrdpush_sender_error_shown = 0;
     }
 

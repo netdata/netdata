@@ -80,6 +80,7 @@ void sender_commit(struct sender_state *s) {
 
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
+    rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
     __atomic_clear(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
 
     if(host->rrdpush_sender_socket != -1) {
@@ -527,7 +528,7 @@ if(!s->rrdpush_compression)
 #endif  //ENABLE_COMPRESSION
 
 
-    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
+    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d"
          , rrdhost_hostname(host)
          , s->connected_to
          , s->version);
@@ -561,6 +562,9 @@ static void attempt_to_connect(struct sender_state *state)
 
         // reset the bytes we have sent for this session
         state->sent_bytes_on_this_connection = 0;
+
+        // let the data collection threads know we are ready
+        __atomic_test_and_set(&state->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
     }
     else {
         // increase the failed connections counter
@@ -809,6 +813,7 @@ void *rrdpush_sender_thread(void *ptr) {
         remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
 
     // initialize rrdpush globals
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
     __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
     if(pipe(s->host->rrdpush_sender_pipe) == -1) {
         error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", rrdhost_hostname(s->host));
@@ -900,10 +905,12 @@ void *rrdpush_sender_thread(void *ptr) {
         else {
             fds[Socket].events = POLLIN;
 
-            if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE && !__atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
+            if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE
+                         && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
+                         && !rrdhost_flag_check(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS)
+                         )) {
                 // let the data collection threads know we are ready to push metrics
-                __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
-
+                rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
                 info("STREAM %s [send to %s]: streaming of definitions finished, enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
             }
         }
