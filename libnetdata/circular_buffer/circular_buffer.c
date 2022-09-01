@@ -46,6 +46,11 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
     return 0;
 }
 
+size_t cbuffer_available_size_unsafe(struct circular_buffer *buf) {
+    size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
+    return buf->max_size - len;
+}
+
 int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len) {
     size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
     while (d_len + len >= buf->size) {
@@ -78,6 +83,7 @@ void cbuffer_remove_unsafe(struct circular_buffer *buf, size_t num) {
 size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start) {
     if (start != NULL)
       *start = buf->data + buf->read;
+
     if (buf->read <= buf->write) {
         return buf->write - buf->read;      // Includes empty case
     }

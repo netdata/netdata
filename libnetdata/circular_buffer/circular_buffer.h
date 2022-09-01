@@ -13,4 +13,6 @@ extern void cbuffer_free(struct circular_buffer *buf);
 extern int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len);
 extern void cbuffer_remove_unsafe(struct circular_buffer *buf, size_t num);
 extern size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start);
+extern size_t cbuffer_available_size_unsafe(struct circular_buffer *buf);
+
 #endif

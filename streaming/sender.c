@@ -710,9 +710,16 @@ struct rrdpush_sender_thread_data {
     } sending_definitions_status;
 };
 
-static size_t cbuffer_outstanding_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
+static size_t cbuffer_outstanding_bytes_to_send_with_lock(struct rrdpush_sender_thread_data *thread_data) {
     netdata_mutex_lock(&thread_data->sender_state->mutex);
     size_t outstanding = cbuffer_next_unsafe(thread_data->sender_state->host->sender->buffer, NULL);
+    netdata_mutex_unlock(&thread_data->sender_state->mutex);
+    return outstanding;
+}
+
+static size_t cbuffer_available_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
+    netdata_mutex_lock(&thread_data->sender_state->mutex);
+    size_t outstanding = cbuffer_available_size_unsafe(thread_data->sender_state->host->sender->buffer);
     netdata_mutex_unlock(&thread_data->sender_state->mutex);
     return outstanding;
 }
@@ -721,7 +728,7 @@ static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_d
 
     while(__atomic_load_n(&thread_data->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
            && thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE
-           && (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (thread_data->sender_state->buffer->max_size / 2)) {
+           && cbuffer_available_bytes_with_lock(thread_data) > (thread_data->sender_state->buffer->max_size / 2)) {
 
         if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART)
             info("STREAM %s [send to %s]: sending metric definitions...", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
@@ -737,10 +744,6 @@ static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_d
         else
             thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
     }
-
-    size_t outstanding = cbuffer_outstanding_bytes_with_lock(thread_data);
-    size_t max_size = thread_data->sender_state->buffer->max_size;
-    internal_error(true, "STREAM %s [send to %s]: circular buffer has %zu bytes in it out of %zu, it is %zu%% full", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to, outstanding, max_size, outstanding * 100 / max_size);
 }
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
@@ -916,7 +919,7 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].revents = 0;
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
-        size_t outstanding = cbuffer_outstanding_bytes_with_lock(thread_data);
+        size_t outstanding = cbuffer_outstanding_bytes_to_send_with_lock(thread_data);
 
         if(outstanding) {
             s->send_attempts++;
