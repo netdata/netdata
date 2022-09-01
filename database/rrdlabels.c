@@ -503,7 +503,7 @@ static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *n
     RRDLABEL *lbold = (RRDLABEL *)oldvalue;
     RRDLABEL *lbnew = (RRDLABEL *)newvalue;
 
-    if(lbold->label_value == lbnew->label_value || strcmp(string2str(lbold->label_value), string2str(lbnew->label_value)) == 0) {
+    if(lbold->label_value == lbnew->label_value) {
         // they are the same
         lbold->label_source |=  lbnew->label_source;
         lbold->label_source |=  RRDLABEL_FLAG_OLD;
