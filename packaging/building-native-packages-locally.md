@@ -9,14 +9,14 @@ keywords: [Netdata native package, Netdata RPM, Netdata DEB, Testing native pack
 
 ## Requirements
 
-You will need:
+To build native packages locally, you will need the following:
 
 * A working Docker or Podman host.
 * A local copy of the source tree you want to build from.
 
 ## Building the packages
 
-In the root of the source tree you want to build from, clean up any existing files left over from a previous build
+In the root of the source tree from which you want to build, clean up any existing files left over from a previous build
 and then run:
 
 ```bash
@@ -56,9 +56,9 @@ The build code expects the following requirements to be met:
 - It expects an environment variable named `VERSION` to be defined, and uses this to control what version number
   will be shown in the package metadata and filenames.
 
-Internally, the source tree gets copied to a temporary location for the build process so that the souce tree can
+Internally, the source tree gets copied to a temporary location for the build process so that the source tree can
 be mounted directly from the host without worrying about leaving a dirty tree behind, any templating or file
-movements required for the build to work are done, the pakcage build command is invoked with the correct arguments,
+movements required for the build to work are done, the package build command is invoked with the correct arguments,
 and then the resultant packages are copied to the `artifacts/` directory in the original source tree so they are
 accessible after the container exits.
 
@@ -80,7 +80,7 @@ If you need to test a build for an architecture that does not match your host sy
 QEMU user-mode emulation. This requires a Linux kernel with binfmt\_misc support (all modern distributions provide
 this out of the box, but I’m not sure about WSL or Docker Desktop).
 
-The quick and easy way to do this is to run:
+The quick and easy way to do this is to run the following:
 
 ```bash
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -92,7 +92,7 @@ or
 podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
 
-Which will set up the required QEMU user-mode emulation until you reboot. Note that if using Podman, you will need
+This will set up the required QEMU user-mode emulation until you reboot. Note that if using Podman, you will need
 to run this as root and not as a rootless container (the package builds work fine in a rootless container though,
 even if doing cross-architecture builds).
 
