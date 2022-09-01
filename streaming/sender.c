@@ -863,6 +863,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
             thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
+            rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
             s->overflow = 0;
             s->read_len = 0;
             s->buffer->read = 0;
