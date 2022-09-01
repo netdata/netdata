@@ -1252,7 +1252,6 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", rrdset_name(st));
-    rrdcontext_collected_rrdset(st);
 
     RRDDIM *rd;
 
@@ -1286,6 +1285,8 @@ void rrdset_done(RRDSET *st) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
     }
+
+    rrdcontext_collected_rrdset(st);
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&

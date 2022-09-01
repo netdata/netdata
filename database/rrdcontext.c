@@ -1023,7 +1023,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
     {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
-            if(!(rm->flags & RRD_FLAG_LIVE_RETENTION))
+            if(unlikely(!(rm->flags & RRD_FLAG_LIVE_RETENTION)))
                 live_retention = false;
 
             if (unlikely((rrdmetric_should_be_deleted(rm)))) {
@@ -1048,9 +1048,9 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
         dfe_done(rm);
     }
 
-    if(live_retention && !(ri->flags & RRD_FLAG_LIVE_RETENTION))
+    if(unlikely(live_retention && !(ri->flags & RRD_FLAG_LIVE_RETENTION)))
         ri->flags |= RRD_FLAG_LIVE_RETENTION;
-    else if(!live_retention && (ri->flags & RRD_FLAG_LIVE_RETENTION))
+    else if(unlikely(!live_retention && (ri->flags & RRD_FLAG_LIVE_RETENTION)))
         ri->flags &= ~RRD_FLAG_LIVE_RETENTION;
 
     if(unlikely(!metrics_active)) {
@@ -1085,7 +1085,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
                 rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
 
-            if(unlikely(live_retention))
+            if(likely(live_retention))
                 rrd_flag_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
         }
         else {
@@ -1284,8 +1284,9 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
 }
 
 static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st) {
-    if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
-        rrd_flag_set_archived(ri);
+    if(unlikely(ri->rrdset != st))
+        fatal("RRDCONTEXT: instance '%s' is not linked to chart '%s' on host '%s'",
+              string2str(ri->id), rrdset_id(st), rrdhost_hostname(st->rrdhost));
 
     if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN))) {
         ri->flags |= RRD_FLAG_HIDDEN;
@@ -1300,6 +1301,9 @@ static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, R
 static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
+
+    if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
+        rrd_flag_set_archived(ri);
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
