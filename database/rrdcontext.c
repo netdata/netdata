@@ -739,7 +739,7 @@ static inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
     if(unlikely(!rm)) return;
 
-    if(unlikely(rd->flags & (RRDDIM_FLAG_ARCHIVED | RRDDIM_FLAG_OBSOLETE))) {
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED|RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
             rrd_flag_set_archived(rm);
     }
@@ -810,7 +810,7 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     }
 
     if(ri->rrdset) {
-        if(unlikely((ri->rrdset->flags & RRDSET_FLAG_HIDDEN) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
+        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
             ri->flags |= RRD_FLAG_HIDDEN;
         else
             ri->flags &= ~RRD_FLAG_HIDDEN;
@@ -923,7 +923,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     }
 
     if(ri->rrdset) {
-        if(unlikely((ri->rrdset->flags & RRDSET_FLAG_HIDDEN) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
+        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
             ri->flags |= RRD_FLAG_HIDDEN;
         else
             ri->flags &= ~RRD_FLAG_HIDDEN;
@@ -1288,11 +1288,11 @@ static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, R
         fatal("RRDCONTEXT: instance '%s' is not linked to chart '%s' on host '%s'",
               string2str(ri->id), rrdset_id(st), rrdhost_hostname(st->rrdhost));
 
-    if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN))) {
+    if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)) && !(ri->flags & RRD_FLAG_HIDDEN))) {
         ri->flags |= RRD_FLAG_HIDDEN;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
     }
-    else if(unlikely(!(st->flags & RRDSET_FLAG_HIDDEN) && (ri->flags & RRD_FLAG_HIDDEN))) {
+    else if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)) && (ri->flags & RRD_FLAG_HIDDEN))) {
         ri->flags &= ~RRD_FLAG_HIDDEN;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
     }
@@ -1302,7 +1302,7 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
-    if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED|RRDSET_FLAG_OBSOLETE)))
         rrd_flag_set_archived(ri);
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);

@@ -186,6 +186,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+        st->last_accessed_time = now_realtime_sec();
         st->rrdhost->obsolete_charts_count++;
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -200,6 +201,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        st->last_accessed_time = now_realtime_sec();
         st->rrdhost->obsolete_charts_count--;
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
