@@ -43,11 +43,11 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 */
 static inline void deactivate_compression(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
-    error("STREAM_COMPRESSION: Deactivating compression to avoid stream corruption");
+    error("STREAM_COMPRESSION: Compression returned error, disabling it.");
     default_compression_enabled = 0;
     s->rrdpush_compression = 0;
     s->version = STREAM_VERSION_CLABELS;
-    error("STREAM_COMPRESSION %s [send to %s]: Restarting connection without compression", rrdhost_hostname(s->host), s->connected_to);
+    error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
     rrdpush_sender_thread_close_socket(s->host);
 }
 #endif
