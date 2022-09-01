@@ -709,19 +709,29 @@ static size_t cbuffer_outstanding_bytes_with_lock(struct rrdpush_sender_thread_d
 }
 
 static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
+
     while(__atomic_load_n(&thread_data->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
            && thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE
            && (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (thread_data->sender_state->buffer->max_size / 2)) {
+
+        if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART)
+            info("STREAM %s [send to %s]: sending metric definitions...", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
 
         bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
             thread_data->sender_state->host, &thread_data->dictfe,
             thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
 
-        if (unlikely(!more_defs_available))
+        if (unlikely(!more_defs_available)) {
             thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
+            info("STREAM %s [send to %s]: sending metric definitions finished.", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
+        }
         else
             thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
     }
+
+    size_t outstanding = cbuffer_outstanding_bytes_with_lock(thread_data);
+    size_t max_size = thread_data->sender_state->buffer->max_size;
+    info("STREAM %s [send to %s]: circular buffer has %zu bytes in it out of %zu, it is %zu%% full", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to, outstanding, max_size, outstanding * 100 / max_size);
 }
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
@@ -912,7 +922,7 @@ void *rrdpush_sender_thread(void *ptr) {
                          )) {
                 // let the data collection threads know we are ready to push metrics
                 rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
-                info("STREAM %s [send to %s]: streaming of definitions finished, enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
+                info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
             }
         }
 
