@@ -1498,6 +1498,7 @@ if(BUILD_TESTING)
         exporting/tests/netdata_doubles.c
         exporting/tests/system_doubles.c
         database/rrdlabels.c
+        database/rrdvar.c
         )
     set(TEST_NAME exporting_engine)
     set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)

@@ -157,3 +157,8 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
 void rrdcalc_update_rrdlabels(RRDSET *st) {
     (void)st;
 }
+
+void db_execute(const char *cmd)
+{
+    UNUSED(cmd);
+}

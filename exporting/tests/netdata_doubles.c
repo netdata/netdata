@@ -177,12 +177,6 @@ const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
     return RRD_MEMORY_MODE_NONE_NAME;
 }
 
-NETDATA_DOUBLE rrdvar2number(RRDVAR *rv)
-{
-    (void)rv;
-    return 0;
-}
-
 int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data)
 {
     (void)host;
@@ -256,6 +250,18 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
     (void)value;
 }
 
-void rrdcalc_update_rrdlabels(RRDSET *st) {
+void rrdcalc_update_rrdlabels(RRDSET *st)
+{
     (void)st;
+}
+
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv)
+{
+    (void)host;
+    (void)rv;
+}
+
+void db_execute(const char *cmd)
+{
+    (void)cmd;
 }

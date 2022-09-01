@@ -22,6 +22,7 @@ void signals_block(void){};
 void signals_unblock(void){};
 void signals_reset(void){};
 
+#ifndef UNIT_TESTING
 // callback required by eval()
 int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result)
 {
@@ -30,6 +31,7 @@ int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE 
     (void)result;
     return 0;
 };
+#endif
 
 // required by get_system_cpus()
 char *netdata_configured_host_prefix = "";
