@@ -955,8 +955,8 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
             debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
 
-            char buffer[1000 + 1];
-            if (read(s->host->rrdpush_sender_pipe[PIPE_READ], buffer, 1000) == -1)
+            char buffer[10000 + 1];
+            if (read(s->host->rrdpush_sender_pipe[PIPE_READ], buffer, 10000) == -1)
                 error("STREAM %s [send to %s]: cannot read from internal pipe.", rrdhost_hostname(s->host), s->connected_to);
         }
 
@@ -966,17 +966,19 @@ void *rrdpush_sender_thread(void *ptr) {
             attempt_read(s);
         }
 
-        worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-        execute_commands(s);
+        if(unlikely(s->read_len)) {
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+            execute_commands(s);
+        }
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
-        if (outstanding && fds[Socket].revents & POLLOUT) {
+        if(likely(outstanding && fds[Socket].revents & POLLOUT)) {
             worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
             attempt_to_send(s);
         }
 
         // TODO-GAPS - why do we only check this on the socket, not the pipe?
-        if (outstanding) {
+        if(outstanding) {
             char *error = NULL;
             if (unlikely(fds[Socket].revents & POLLERR))
                 error = "socket reports errors (POLLERR)";
@@ -993,7 +995,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // protection from overflow
-        if (s->overflow) {
+        if(unlikely(s->overflow)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
             errno = 0;
             error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
