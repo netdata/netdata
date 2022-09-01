@@ -687,14 +687,37 @@ void execute_commands(struct sender_state *s) {
 }
 
 struct rrdpush_sender_thread_data {
+    struct sender_state *sender_state;
     RRDHOST *host;
     DICTFE dictfe;
     enum {
         SENDING_DEFINITIONS_RESTART,
         SENDING_DEFINITIONS_CONTINUE,
-        SENDING_DEFINITIONS_STOP,
+        SENDING_DEFINITIONS_DONE,
     } sending_definitions_status;
 };
+
+static size_t cbuffer_outstanding_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
+    netdata_mutex_lock(&thread_data->sender_state->mutex);
+    size_t outstanding = cbuffer_next_unsafe(thread_data->sender_state->host->sender->buffer, NULL);
+    netdata_mutex_unlock(&thread_data->sender_state->mutex);
+    return outstanding;
+}
+
+static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
+    while(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE &&
+           (thread_data->sender_state->buffer->max_size - cbuffer_outstanding_bytes_with_lock(thread_data)) > (100 * 1024)) {
+
+        bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
+            thread_data->sender_state->host, &thread_data->dictfe,
+            thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
+
+        if (unlikely(!more_defs_available))
+            thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
+        else
+            thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
+    }
+}
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     struct rrdpush_sender_thread_data *data = ptr;
@@ -820,6 +843,7 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
     struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
+    thread_data->sender_state = s;
     thread_data->host = s->host;
     thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
 
@@ -856,24 +880,12 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        if(unlikely(thread_data->sending_definitions_status != SENDING_DEFINITIONS_STOP)) {
-            netdata_mutex_lock(&s->mutex);
-            size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
-            netdata_mutex_unlock(&s->mutex);
+        if(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE) {
+            rrdpush_queue_incremental_definitions(thread_data);
 
-            if ((s->buffer->max_size - outstanding) > 100 * 1024) {
-                bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
-                    s->host, &thread_data->dictfe,
-                    thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
-
-                if (unlikely(!more_defs_available)) {
-                    thread_data->sending_definitions_status = SENDING_DEFINITIONS_STOP;
-
-                    // let the data collection threads know we are ready
-                    __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
-                }
-                else
-                    thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
+            if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE) {
+                // let the data collection threads know we are ready to push metrics
+                __atomic_test_and_set(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
             }
         }
 
@@ -884,9 +896,7 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].revents = 0;
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
-        netdata_mutex_lock(&s->mutex);
-        size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
-        netdata_mutex_unlock(&s->mutex);
+        size_t outstanding = cbuffer_outstanding_bytes_with_lock(thread_data);
         if(outstanding) {
             s->send_attempts++;
             fds[Socket].events = POLLIN | POLLOUT;
