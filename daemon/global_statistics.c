@@ -1177,8 +1177,8 @@ static void update_heartbeat_charts() {
 #define WORKERS_MIN_PERCENT_DEFAULT 10000.0
 
 struct worker_job_type {
-    const char *name;
-    const char *units;
+    STRING *name;
+    STRING *units;
 
     size_t jobs_started;
     usec_t busy_time;
@@ -1485,10 +1485,10 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
                 continue;
 
-            if (wu->per_job_type[i].name[0]) {
+            if (wu->per_job_type[i].name) {
 
                 if(unlikely(!wu->per_job_type[i].rd_jobs_started))
-                    wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, string2str(wu->per_job_type[i].name), NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
             }
@@ -1530,10 +1530,10 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
                 continue;
 
-            if (wu->per_job_type[i].name[0]) {
+            if (wu->per_job_type[i].name) {
 
                 if(unlikely(!wu->per_job_type[i].rd_busy_time))
-                    wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+                    wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, string2str(wu->per_job_type[i].name), NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
             }
@@ -1591,11 +1591,11 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 continue;
 
             if(!wu->per_job_type[i].st) {
-                size_t job_name_len = strlen(wu->per_job_type[i].name);
+                size_t job_name_len = string_length(wu->per_job_type[i].name);
                 if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
 
                 char job_name_sanitized[job_name_len + 1];
-                rrdset_strncpyz_name(job_name_sanitized, wu->per_job_type[i].name, job_name_len);
+                rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
 
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_value_%s", wu->name_lowercase, job_name_sanitized);
@@ -1604,7 +1604,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.value.%s", wu->name_lowercase, job_name_sanitized);
 
                 char title[1000 + 1];
-                snprintf(title, 1000, "Netdata Workers %s Value of %s", wu->name_lowercase, wu->per_job_type[i].name);
+                snprintf(title, 1000, "Netdata Workers %s Value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
 
                 wu->per_job_type[i].st = rrdset_create_localhost(
                     "netdata"
@@ -1613,7 +1613,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , wu->family
                     , context
                     , title
-                    , (wu->per_job_type[i].units && *wu->per_job_type[i].units)?wu->per_job_type[i].units:"value"
+                    , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"value"
                     , "netdata"
                     , "stats"
                     , wu->priority + 5
@@ -1649,11 +1649,11 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 continue;
 
             if(!wu->per_job_type[i].st) {
-                size_t job_name_len = strlen(wu->per_job_type[i].name);
+                size_t job_name_len = string_length(wu->per_job_type[i].name);
                 if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
 
                 char job_name_sanitized[job_name_len + 1];
-                rrdset_strncpyz_name(job_name_sanitized, wu->per_job_type[i].name, job_name_len);
+                rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
 
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_rate_%s", wu->name_lowercase, job_name_sanitized);
@@ -1662,7 +1662,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.rate.%s", wu->name_lowercase, job_name_sanitized);
 
                 char title[1000 + 1];
-                snprintf(title, 1000, "Netdata Workers %s Rate of %s", wu->name_lowercase, wu->per_job_type[i].name);
+                snprintf(title, 1000, "Netdata Workers %s Rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
 
                 wu->per_job_type[i].st = rrdset_create_localhost(
                     "netdata"
@@ -1671,7 +1671,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , wu->family
                     , context
                     , title
-                    , (wu->per_job_type[i].units && *wu->per_job_type[i].units)?wu->per_job_type[i].units:"rate"
+                    , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"rate"
                     , "netdata"
                     , "stats"
                     , wu->priority + 5
@@ -1813,8 +1813,8 @@ static void worker_utilization_charts_callback(void *ptr
                                                , size_t duration_usec __maybe_unused
                                                , size_t jobs_started __maybe_unused
                                                , size_t is_running __maybe_unused
-                                               , const char **job_types_names __maybe_unused
-                                               , const char **job_types_units __maybe_unused
+                                               , STRING **job_types_names __maybe_unused
+                                               , STRING **job_types_units __maybe_unused
                                                , WORKER_METRIC_TYPE *job_types_metric_types __maybe_unused
                                                , size_t *job_types_jobs_started __maybe_unused
                                                , usec_t *job_types_busy_time __maybe_unused
@@ -1849,8 +1849,12 @@ static void worker_utilization_charts_callback(void *ptr
     // accumulate per job type statistics
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-        wu->per_job_type[i].name = job_types_names[i];
-        wu->per_job_type[i].units = job_types_units[i];
+        if(!wu->per_job_type[i].name && job_types_names[i])
+            wu->per_job_type[i].name = string_dup(job_types_names[i]);
+
+        if(!wu->per_job_type[i].units && job_types_units[i])
+            wu->per_job_type[i].units = string_dup(job_types_units[i]);
+
         wu->per_job_type[i].type = job_types_metric_types[i];
 
         wu->per_job_type[i].jobs_started += job_types_jobs_started[i];
@@ -1918,6 +1922,14 @@ static void worker_utilization_finish(void) {
         if(wu->name_lowercase) {
             freez(wu->name_lowercase);
             wu->name_lowercase = NULL;
+        }
+
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            string_freez(wu->per_job_type[i].name);
+            wu->per_job_type[i].name = NULL;
+
+            string_freez(wu->per_job_type[i].units);
+            wu->per_job_type[i].units = NULL;
         }
 
         // mark all threads as not enabled

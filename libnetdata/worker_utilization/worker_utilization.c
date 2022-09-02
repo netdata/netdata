@@ -4,8 +4,8 @@
 #define WORKER_BUSY 'B'
 
 struct worker_job_type {
-    const char *name;
-    const char *units;
+    STRING *name;
+    STRING *units;
 
     // statistics controlled variables
     size_t statistics_last_jobs_started;
@@ -75,13 +75,13 @@ void worker_register_job_custom_metric(size_t job_id, const char *name, const ch
         return;
     }
     if(worker->per_job_type[job_id].name) {
-        if(worker->per_job_type[job_id].name != name || worker->per_job_type[job_id].type != type || worker->per_job_type[job_id].units != units)
-            error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, worker->per_job_type[job_id].name, name);
+        if(strcmp(string2str(worker->per_job_type[job_id].name), name) != 0 || worker->per_job_type[job_id].type != type || strcmp(string2str(worker->per_job_type[job_id].units), units) != 0)
+            error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, string2str(worker->per_job_type[job_id].name), name);
         return;
     }
 
-    worker->per_job_type[job_id].name = name;
-    worker->per_job_type[job_id].units = units;
+    worker->per_job_type[job_id].name = string_strdupz(name);
+    worker->per_job_type[job_id].units = string_strdupz(units);
     worker->per_job_type[job_id].type = type;
 }
 
@@ -102,6 +102,11 @@ void worker_unregister(void) {
             p->next = worker->next;
     }
     netdata_mutex_unlock(&base_lock);
+
+    for(int i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        string_freez(worker->per_job_type[i].name);
+        string_freez(worker->per_job_type[i].units);
+    }
 
     freez((void *)worker->tag);
     freez((void *)worker->workname);
@@ -170,8 +175,8 @@ void workers_foreach(const char *workname, void (*callback)(
                                                , size_t utilization_usec
                                                , size_t duration_usec
                                                , size_t jobs_started, size_t is_running
-                                               , const char **job_types_names
-                                               , const char **job_types_units
+                                               , STRING **job_types_names
+                                               , STRING **job_types_units
                                                , WORKER_METRIC_TYPE *job_metric_types
                                                , size_t *job_types_jobs_started
                                                , usec_t *job_types_busy_time
@@ -190,8 +195,8 @@ void workers_foreach(const char *workname, void (*callback)(
         usec_t now = now_realtime_usec();
 
         // find per job type statistics
-        const char *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
-        const char *per_job_type_units[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        STRING *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        STRING *per_job_type_units[WORKER_UTILIZATION_MAX_JOB_TYPES];
         WORKER_METRIC_TYPE per_job_metric_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
         size_t per_job_type_jobs_started[WORKER_UTILIZATION_MAX_JOB_TYPES];
         usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
