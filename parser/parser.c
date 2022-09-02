@@ -138,7 +138,7 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
     tmp_keyword->keyword_hash = keyword_hash;
     tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
 
-    worker_register_job_name(tmp_keyword->worker_job_id, tmp_keyword->keyword);
+    worker_register_job_name(tmp_keyword->worker_job_id + WORKER_PARSER_FIRST_JOB, tmp_keyword->keyword);
 
     tmp_keyword->next = parser->keyword;
     parser->keyword = tmp_keyword;

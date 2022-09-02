@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "parser/parser.h"
+
+#define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
+
+#if WORKER_PARSER_FIRST_JOB < 1
+#error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
+#endif
 
 extern struct config stream_config;
 
@@ -177,6 +184,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
         int ret = SSL_read(r->ssl.conn, r->read_buffer + r->read_len, desired);
         if (ret > 0 ) {
             r->read_len += ret;
+            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
             return 0;
         }
         // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
@@ -192,6 +200,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
         return 1;
     r->read_len = strlen(r->read_buffer);
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, r->read_len);
     return 0;
 }
 #else
@@ -297,8 +306,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     
     if (!is_compressed_data(r->read_buffer, ret)) {
         r->read_len += ret;
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
         return 0;
     }
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
     if (unlikely(!r->decompressor)) 
         r->decompressor = create_decompressor();
@@ -758,6 +769,7 @@ void *rrdpush_receiver_thread(void *ptr) {
     info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
     worker_register("STREAMRCV");
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ, "received bytes", "bytes/s", WORKER_METRIC_INCREMENTAL);
     rrdpush_receive(rpt);
     worker_unregister();
 

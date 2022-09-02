@@ -7,6 +7,7 @@
 
 #define PARSER_MAX_CALLBACKS 20
 #define PARSER_MAX_RECOVER_KEYWORDS 128
+#define WORKER_PARSER_FIRST_JOB 1
 
 // PARSER return codes
 typedef enum parser_rc {
