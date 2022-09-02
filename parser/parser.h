@@ -69,7 +69,7 @@ typedef struct parser_data {
 } PARSER_DATA;
 
 typedef struct parser {
-    size_t worker_job_ids;
+    size_t worker_job_next_id;
     uint8_t version;                // Parser version
     RRDHOST *host;
     void *input;                    // Input source e.g. stream

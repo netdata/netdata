@@ -129,16 +129,14 @@ static inline void worker_is_idle_with_time(usec_t now) {
 }
 
 void worker_is_idle(void) {
-    if(unlikely(!worker)) return;
-    if(unlikely(worker->last_action != WORKER_BUSY)) return;
+    if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
 
     worker_is_idle_with_time(now_realtime_usec());
 }
 
 void worker_is_busy(size_t job_id) {
-    if(unlikely(!worker)) return;
-    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
-        job_id = 0;
+    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+        return;
 
     usec_t now = now_realtime_usec();
 
@@ -158,7 +156,7 @@ void worker_is_busy(size_t job_id) {
 void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
     if(unlikely(!worker)) return;
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
-        job_id = 0;
+        return;
 
     if(worker->per_job_type[job_id].type == WORKER_METRIC_INCREMENTAL)
         worker->per_job_type[job_id].custom_value += value;
