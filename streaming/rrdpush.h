@@ -48,8 +48,8 @@ typedef struct {
 #ifdef ENABLE_COMPRESSION
 #define LZ4_MAX_MSG_SIZE 0x4000
 struct compressor_state {
-    char *buffer;
-    size_t buffer_size;
+    char *compression_result_buffer;
+    size_t compression_result_buffer_size;
     struct compressor_data *data; // Compression API specific data
     void (*reset)(struct compressor_state *state);
     size_t (*compress)(struct compressor_state *state, const char *data, size_t size, char **buffer);
