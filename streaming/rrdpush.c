@@ -175,20 +175,17 @@ int configured_as_parent() {
 
 // checks if the current chart definition has been sent
 static inline int need_to_send_chart_definition(RRDSET *st) {
-    rrdset_check_rdlock(st);
-
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))))
         return 1;
 
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
+    dfe_start_read(st->rrddim_root_index, rd) {
         if(unlikely(!rd->exposed)) {
-            #ifdef NETDATA_INTERNAL_CHECKS
-            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
-            #endif
+            internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             return 1;
         }
     }
+    dfe_done(rd);
 
     return 0;
 }
