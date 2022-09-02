@@ -288,34 +288,33 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
  */
 static int receiver_read(struct receiver_state *r, FILE *fp) {
     // check any decompressed data  present
-    if (r->decompressor &&
-            r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
+    if (r->decompressor && r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
         size_t available = sizeof(r->read_buffer) - r->read_len;
         if (available) {
-            size_t len = r->decompressor->get(r->decompressor,
-                    r->read_buffer + r->read_len, available);
+            size_t len = r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, available);
             if (!len)
                 return 1;
+
             r->read_len += len;
         }
         return 0;
     }
+
     int ret = 0;
     if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret))
         return 1;
     
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
+
     if (!is_compressed_data(r->read_buffer, ret)) {
         r->read_len += ret;
-        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
         return 0;
     }
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
     if (unlikely(!r->decompressor)) 
         r->decompressor = create_decompressor();
     
-    size_t bytes_to_read = r->decompressor->start(r->decompressor,
-            r->read_buffer, ret);
+    size_t bytes_to_read = r->decompressor->start(r->decompressor, r->read_buffer, ret);
 
     // Read the entire block of compressed data because
     // we're unable to decompress incomplete block
@@ -323,18 +322,23 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     do {
         if (read_stream(r, fp, compressed, bytes_to_read, &ret))
             return 1;
+
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
+
         // Send input data to decompressor
         if (ret)
             r->decompressor->put(r->decompressor, compressed, ret);
+
         bytes_to_read -= ret;
     } while (bytes_to_read > 0);
+
     // Decompress
     size_t bytes_to_parse = r->decompressor->decompress(r->decompressor);
     if (!bytes_to_parse)
         return 1;
+
     // Fill read buffer with decompressed data
-    r->read_len = r->decompressor->get(r->decompressor,
-                    r->read_buffer, sizeof(r->read_buffer));
+    r->read_len = r->decompressor->get(r->decompressor, r->read_buffer, sizeof(r->read_buffer));
     return 0;
 }
 
