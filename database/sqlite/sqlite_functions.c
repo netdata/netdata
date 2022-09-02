@@ -1910,9 +1910,8 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
             if (chart) {
                 st->context = string_strdupz((char *)sqlite3_column_text(res, 8));
                 st->id = string_strdupz(chart);
-            }
-
-            // TODO: @stelfrag, what will be the st->id if chart == NULL ?
+            } else
+                st->id = string_strdupz(n);
 
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
             st->last_entry_t = 0;
