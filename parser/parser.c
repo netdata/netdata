@@ -273,7 +273,7 @@ inline int parser_action(PARSER *parser, char *input)
         if (command_hash == tmp_keyword->keyword_hash &&
                 (!strcmp(command, tmp_keyword->keyword))) {
                     action_function_list = &tmp_keyword->func[0];
-                    worker_job_id = tmp_keyword->worker_job_id;
+                    worker_job_id = tmp_keyword->worker_job_id + WORKER_PARSER_FIRST_JOB;
                     break;
         }
         tmp_keyword = tmp_keyword->next;
