@@ -37,6 +37,8 @@
 // ----------------------------------------------------------------------------
 // cgroup globals
 
+static char cgroup_chart_id_prefix[] = "cgroup_";
+
 static int is_inside_k8s = 0;
 
 static long system_page_size = 4096; // system will be queried via sysconf() in configuration()
@@ -2682,7 +2684,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 
     cg->processed = 1;
 
-    if (strlen(cg->chart_id) >= RRD_ID_LENGTH_MAX) {
+    if ((strlen(cg->chart_id) + strlen(cgroup_chart_id_prefix)) >= RRD_ID_LENGTH_MAX) {
         info("cgroup '%s' (chart id '%s') disabled because chart_id exceeds the limit (RRD_ID_LENGTH_MAX)", cg->id, cg->chart_id);
         return;
     }
@@ -3595,7 +3597,7 @@ static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) 
     if(id[0] == '\0' || (id[0] == '/' && id[1] == '\0'))
         strncpy(buffer, "cgroup_root", len);
     else
-        snprintfz(buffer, len, "cgroup_%s", id);
+        snprintfz(buffer, len, "%s%s", cgroup_chart_id_prefix, id);
 
     netdata_fix_chart_id(buffer);
     return buffer;
