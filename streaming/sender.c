@@ -926,6 +926,13 @@ void *rrdpush_sender_thread(void *ptr) {
                 sender_commit(s);
             }
             rrdpush_claimed_id(s->host);
+
+            // TO PUSH METRICS WITH DEFINITIONS:
+            //if(unlikely(s->host->rrdpush_sender_socket != -1 && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
+            //    thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
+            //    rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
+            //}
+
             continue;
         }
 

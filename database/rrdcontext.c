@@ -665,11 +665,8 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) 
 
     rrdcontext_triggered_update_on_rrdmetric();
 
-    if(unlikely(rrd_flag_is_collected(rm) && !rm->rrddim))
-        rrd_flag_set_archived(rm);
-
-    if(unlikely((rm->flags & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) && rrd_flag_is_collected(rm)))
-        rrd_flag_set_archived(rm);
+    if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rm->flags & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD))
+            rrd_flag_set_archived(rm);
 
     rrdmetric_update_retention(rm);
 
@@ -1020,7 +1017,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t metrics_active = 0, metrics_deleted = 0;
     bool live_retention = true, currently_collected = false;
-    {
+    if(dictionary_stats_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
             if(unlikely(!(rm->flags & RRD_FLAG_LIVE_RETENTION)))
@@ -1032,7 +1029,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
                 continue;
             }
 
-            if(rm->flags & RRD_FLAG_COLLECTED)
+            if(rm->flags & RRD_FLAG_COLLECTED && rm->first_time_t)
                 currently_collected = true;
 
             metrics_active++;
@@ -1318,7 +1315,7 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
-    if(dictionary_stats_entries(ri->rrdmetrics) != 0) {
+    if(dictionary_stats_entries(ri->rrdmetrics) > 0) {
 
         if (unlikely(!rrd_flag_is_collected(ri)))
             rrd_flag_set_collected(ri);
@@ -1673,7 +1670,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
-    {
+    if(dictionary_stats_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
             if(likely(!(ri->flags & RRD_FLAG_HIDDEN)))
@@ -1688,7 +1685,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
                 continue;
             }
 
-            if(ri->flags & RRD_FLAG_COLLECTED)
+            if(ri->flags & RRD_FLAG_COLLECTED && ri->first_time_t)
                 currently_collected = true;
 
             internal_error(rc->units != ri->units,

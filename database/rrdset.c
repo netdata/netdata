@@ -1040,6 +1040,8 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         t->last_collected_ut = point_end_time_ut;
         store_metric_at_tier(rd, t, sp, point_end_time_ut);
     }
+
+    rrdcontext_collected_rrddim(rd);
 }
 
 static inline size_t rrdset_done_interpolate(
@@ -1288,8 +1290,6 @@ void rrdset_done(RRDSET *st) {
         rrdset_isnot_obsolete(st);
     }
 
-    rrdcontext_collected_rrdset(st);
-
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
@@ -1427,9 +1427,9 @@ after_first_database_work:
 
     if(unlikely(st->rrdhost->rrdpush_send_enabled))
         rrdset_done_push(st);
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
+
+    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE))
         goto after_second_database_work;
-    }
 
     #ifdef NETDATA_INTERNAL_CHECKS
     rrdset_debug(st, "last_collect_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last collection time)", (NETDATA_DOUBLE)last_collect_ut/USEC_PER_SEC);
@@ -1699,6 +1699,7 @@ after_second_database_work:
 #ifdef ENABLE_ACLK
     time_t mark = now_realtime_sec();
 #endif
+
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
@@ -1861,8 +1862,9 @@ after_second_database_work:
         }
     }
 
-    rrdset_unlock(st);
+    rrdcontext_collected_rrdset(st);
 
+    rrdset_unlock(st);
     netdata_thread_enable_cancelability();
 }
 

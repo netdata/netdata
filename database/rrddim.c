@@ -516,8 +516,6 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
 inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
-    rrdcontext_collected_rrddim(rd);
-
     now_realtime_timeval(&rd->last_collected_time);
     rd->collected_value = value;
     rd->updated = 1;
