@@ -288,7 +288,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
+static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
     buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", rrdset_id(st), (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
     if (s->version >= VERSION_GAP_FILLING)
@@ -296,16 +296,17 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     else
         buffer_strcat(host->sender->build, "\n");
 
+    size_t count_of_dimensions_written = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(rd->updated && rd->exposed)
-            buffer_sprintf(host->sender->build
-                           , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
-                           , rrddim_id(rd)
-                           , rd->collected_value
-        );
+        if(rd->updated && rd->exposed) {
+            buffer_sprintf(host->sender->build, "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n", rrddim_id(rd), rd->collected_value);
+            count_of_dimensions_written++;
+        }
     }
     buffer_strcat(host->sender->build, "END\n");
+
+    return count_of_dimensions_written != 0;
 }
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
@@ -382,18 +383,23 @@ void rrdset_done_push(RRDSET *st) {
         host->rrdpush_sender_error_shown = 0;
     }
 
+    if(dictionary_stats_entries(st->rrddim_root_index) == 0)
+        return;
+
     sender_start(host->sender);
 
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
 
-    rrdpush_send_chart_metrics_nolock(st, host->sender);
+    if(rrdpush_send_chart_metrics_nolock(st, host->sender)) {
+        // signal the sender there are more data
+        if (host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+            error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 
-    // signal the sender there are more data
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
-
-    sender_commit(host->sender);
+        sender_commit(host->sender);
+    }
+    else
+        sender_cancel(host->sender);
 }
 
 // labels

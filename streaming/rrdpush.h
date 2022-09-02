@@ -165,6 +165,7 @@ extern void sender_init(RRDHOST *parent);
 extern struct rrdpush_destinations *destinations_init(const char *destinations);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
+void sender_cancel(struct sender_state *s);
 extern int rrdpush_init();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);

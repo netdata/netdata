@@ -1318,13 +1318,16 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
-    if(unlikely(!rrd_flag_is_collected(ri)))
-        rrd_flag_set_collected(ri);
+    if(dictionary_stats_entries(ri->rrdmetrics) != 0) {
 
-    if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
-        ri->flags &= ~RRD_FLAG_DONT_PROCESS;
+        if (unlikely(!rrd_flag_is_collected(ri)))
+            rrd_flag_set_collected(ri);
 
-    rrdinstance_trigger_updates(ri, false, true);
+        if (unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
+            ri->flags &= ~RRD_FLAG_DONT_PROCESS;
+
+        rrdinstance_trigger_updates(ri, false, true);
+    }
 }
 
 // ----------------------------------------------------------------------------

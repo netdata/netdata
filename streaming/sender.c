@@ -36,6 +36,11 @@ void sender_start(struct sender_state *s) {
     buffer_flush(s->build);
 }
 
+void sender_cancel(struct sender_state *s) {
+    buffer_flush(s->build);
+    netdata_mutex_unlock(&s->mutex);
+}
+
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
 #ifdef ENABLE_COMPRESSION
