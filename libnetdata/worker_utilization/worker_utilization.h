@@ -6,17 +6,17 @@
 // workers interfaces
 
 #define WORKER_UTILIZATION_MAX_JOB_TYPES 50
-#define WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH 25
 
 typedef enum {
     WORKER_METRIC_EMPTY = 0,
-    WORKER_METRIC_BUSY_TIME = 1,
+    WORKER_METRIC_IDLE_BUSY = 1,
     WORKER_METRIC_ABSOLUTE = 2,
+    WORKER_METRIC_INCREMENTAL = 3,
 } WORKER_METRIC_TYPE;
 
 extern void worker_register(const char *workname);
 extern void worker_register_job_name(size_t job_id, const char *name);
-extern void worker_register_job_custom_metric(size_t job_id, const char *name, WORKER_METRIC_TYPE type);
+extern void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);
 extern void worker_unregister(void);
 
 extern void worker_is_idle(void);
@@ -34,6 +34,7 @@ extern void workers_foreach(const char *workname, void (*callback)(
                                                       , size_t jobs_started
                                                       , size_t is_running
                                                       , const char **job_types_names
+                                                      , const char **job_types_units
                                                       , WORKER_METRIC_TYPE *job_metric_types
                                                       , size_t *job_types_jobs_started
                                                       , usec_t *job_types_busy_time

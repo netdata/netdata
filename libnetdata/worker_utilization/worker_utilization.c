@@ -4,18 +4,20 @@
 #define WORKER_BUSY 'B'
 
 struct worker_job_type {
-    char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
+    const char *name;
+    const char *units;
 
     // statistics controlled variables
     size_t statistics_last_jobs_started;
     usec_t statistics_last_busy_time;
+    NETDATA_DOUBLE statistics_last_custom_value;
 
     // worker controlled variables
     volatile size_t worker_jobs_started;
     volatile usec_t worker_busy_time;
 
     WORKER_METRIC_TYPE type;
-    NETDATA_DOUBLE min_value;
+    NETDATA_DOUBLE custom_value;
 };
 
 struct worker {
@@ -65,25 +67,26 @@ void worker_register(const char *workname) {
     netdata_mutex_unlock(&base_lock);
 }
 
-void worker_register_job_custom_metric(size_t job_id, const char *name, WORKER_METRIC_TYPE type) {
+void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type) {
     if(unlikely(!worker)) return;
 
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)) {
         error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
         return;
     }
-    if (*worker->per_job_type[job_id].name) {
-        error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring '%s'", worker->workname, job_id, worker->per_job_type[job_id].name, name);
+    if(worker->per_job_type[job_id].name) {
+        if(worker->per_job_type[job_id].name != name || worker->per_job_type[job_id].type != type || worker->per_job_type[job_id].units != units)
+            error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, worker->per_job_type[job_id].name, name);
         return;
     }
 
-    strncpy(worker->per_job_type[job_id].name, name, WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
-
+    worker->per_job_type[job_id].name = name;
+    worker->per_job_type[job_id].units = units;
     worker->per_job_type[job_id].type = type;
 }
 
 void worker_register_job_name(size_t job_id, const char *name) {
-    worker_register_job_custom_metric(job_id, name, WORKER_METRIC_BUSY_TIME);
+    worker_register_job_custom_metric(job_id, name, "", WORKER_METRIC_IDLE_BUSY);
 }
 
 void worker_unregister(void) {
@@ -152,7 +155,10 @@ void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         job_id = 0;
 
-    worker->per_job_type[job_id].min_value = value;
+    if(worker->per_job_type[job_id].type == WORKER_METRIC_INCREMENTAL)
+        worker->per_job_type[job_id].custom_value += value;
+    else
+        worker->per_job_type[job_id].custom_value = value;
 }
 
 // statistics interface
@@ -165,6 +171,7 @@ void workers_foreach(const char *workname, void (*callback)(
                                                , size_t duration_usec
                                                , size_t jobs_started, size_t is_running
                                                , const char **job_types_names
+                                               , const char **job_types_units
                                                , WORKER_METRIC_TYPE *job_metric_types
                                                , size_t *job_types_jobs_started
                                                , usec_t *job_types_busy_time
@@ -178,12 +185,13 @@ void workers_foreach(const char *workname, void (*callback)(
 
     struct worker *p;
     for(p = base; p ; p = p->next) {
-        if(hash != p->workname_hash || strcmp(workname, p->workname)) continue;
+        if(hash != p->workname_hash || strcmp(workname, p->workname) != 0) continue;
 
         usec_t now = now_realtime_usec();
 
         // find per job type statistics
         const char *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        const char *per_job_type_units[WORKER_UTILIZATION_MAX_JOB_TYPES];
         WORKER_METRIC_TYPE per_job_metric_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
         size_t per_job_type_jobs_started[WORKER_UTILIZATION_MAX_JOB_TYPES];
         usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
@@ -191,17 +199,38 @@ void workers_foreach(const char *workname, void (*callback)(
 
         for(i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
             per_job_type_name[i] = p->per_job_type[i].name;
+            per_job_type_units[i] = p->per_job_type[i].units;
             per_job_metric_type[i] = p->per_job_type[i].type;
 
-            size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
-            per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_last_jobs_started;
-            p->per_job_type[i].statistics_last_jobs_started = tmp_jobs_started;
+            switch(p->per_job_type[i].type) {
+                default:
+                case WORKER_METRIC_EMPTY:
+                    break;
 
-            usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
-            per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
-            p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
+                case WORKER_METRIC_IDLE_BUSY: {
+                    size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
+                    per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_last_jobs_started;
+                    p->per_job_type[i].statistics_last_jobs_started = tmp_jobs_started;
 
-            per_job_custom_values[i] = p->per_job_type[i].min_value;
+                    usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
+                    per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
+                    p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
+
+                    break;
+                }
+
+                case WORKER_METRIC_ABSOLUTE:
+                    per_job_custom_values[i] = p->per_job_type[i].custom_value;
+                    break;
+
+                case WORKER_METRIC_INCREMENTAL: {
+                    NETDATA_DOUBLE tmp_custom_value = p->per_job_type[i].custom_value;
+                    per_job_custom_values[i] = tmp_custom_value - p->per_job_type[i].statistics_last_custom_value;
+                    p->per_job_type[i].statistics_last_custom_value = tmp_custom_value;
+
+                    break;
+                }
+            }
         }
 
         // get a copy of the worker variables
@@ -246,6 +275,7 @@ void workers_foreach(const char *workname, void (*callback)(
                  , jobs_started
                  , jobs_running
                  , per_job_type_name
+                 , per_job_type_units
                  , per_job_metric_type
                  , per_job_type_jobs_started
                  , per_job_type_busy_time

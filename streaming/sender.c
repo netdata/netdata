@@ -18,8 +18,10 @@
 #define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR     13
 #define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION 14
 #define WORKER_SENDER_JOB_BUFFER_RATIO              15
+#define WORKER_SENDER_JOB_BYTES_RECEIVED            16
+#define WORKER_SENDER_JOB_BYTES_SENT                17
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 16
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 18
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
 #endif
 
@@ -581,7 +583,8 @@ static void attempt_to_connect(struct sender_state *state)
 }
 
 // TCP window is open and we have data to transmit.
-void attempt_to_send(struct sender_state *s) {
+static ssize_t attempt_to_send(struct sender_state *s) {
+    ssize_t ret = 0;
 
     rrdpush_send_labels(s->host);
 
@@ -594,17 +597,17 @@ void attempt_to_send(struct sender_state *s) {
     char *chunk;
     size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
-    ssize_t ret;
+
 #ifdef ENABLE_HTTPS
     SSL *conn = s->host->ssl.conn ;
-    if(conn && !s->host->ssl.flags) {
+    if(conn && !s->host->ssl.flags)
         ret = SSL_write(conn, chunk, outstanding);
-    } else {
+    else
         ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
-    }
 #else
     ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #endif
+
     if (likely(ret > 0)) {
         cbuffer_remove_unsafe(s->buffer, ret);
         s->sent_bytes_on_this_connection += ret;
@@ -620,16 +623,18 @@ void attempt_to_send(struct sender_state *s) {
         error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
         rrdpush_sender_thread_close_socket(s->host);
     }
-    else {
+    else
         debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
-    }
 
     netdata_mutex_unlock(&s->mutex);
     netdata_thread_enable_cancelability();
+
+    return ret;
 }
 
-void attempt_read(struct sender_state *s) {
-int ret;
+static ssize_t attempt_read(struct sender_state *s) {
+    ssize_t ret = 0;
+
 #ifdef ENABLE_HTTPS
     if (s->host->ssl.conn && !s->host->stream_ssl.flags) {
         ERR_clear_error();
@@ -637,11 +642,11 @@ int ret;
         ret = SSL_read(s->host->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += ret;
-            return;
+            return ret;
         }
         int sslerrno = SSL_get_error(s->host->ssl.conn, desired);
         if (sslerrno == SSL_ERROR_WANT_READ || sslerrno == SSL_ERROR_WANT_WRITE)
-            return;
+            return ret;
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
         u_long err;
@@ -652,29 +657,31 @@ int ret;
         }
         error("Restarting connection");
         rrdpush_sender_thread_close_socket(s->host);
-        return;
+        return ret;
     }
 #endif
     ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
-    if (ret>0) {
+    if (ret > 0) {
         s->read_len += ret;
-        return;
+        return ret;
     }
 
-    debug(D_STREAM, "Socket was POLLIN, but req %zu bytes gave %d", sizeof(s->read_buffer) - s->read_len - 1, ret);
+    debug(D_STREAM, "Socket was POLLIN, but req %zu bytes gave %zd", sizeof(s->read_buffer) - s->read_len - 1, ret);
 
-    if (ret<0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
-        return;
+    if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
+        return ret;
 
-    if (ret==0) {
+    if (ret == 0) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
         error("STREAM %s [send to %s]: connection closed by far end. Restarting connection", rrdhost_hostname(s->host), s->connected_to);
     }
     else {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
-        error("STREAM %s [send to %s]: error during receive (%d). Restarting connection", rrdhost_hostname(s->host), s->connected_to, ret);
+        error("STREAM %s [send to %s]: error during receive (%zd). Restarting connection", rrdhost_hostname(s->host), s->connected_to, ret);
     }
     rrdpush_sender_thread_close_socket(s->host);
+
+    return ret;
 }
 
 // This is just a placeholder until the gap filling state machine is inserted
@@ -856,7 +863,9 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENTAL);
 
     struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
     thread_data->sender_state = s;
@@ -964,7 +973,9 @@ void *rrdpush_sender_thread(void *ptr) {
         // Read as much as possible to fill the buffer, split into full lines for execution.
         if (fds[Socket].revents & POLLIN) {
             worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
-            attempt_read(s);
+            ssize_t bytes = attempt_read(s);
+            if(bytes > 0)
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, bytes);
         }
 
         if(unlikely(s->read_len)) {
@@ -975,7 +986,9 @@ void *rrdpush_sender_thread(void *ptr) {
         // If we have data and have seen the TCP window open then try to close it by a transmission.
         if(likely(outstanding && fds[Socket].revents & POLLOUT)) {
             worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
-            attempt_to_send(s);
+            ssize_t bytes = attempt_to_send(s);
+            if(bytes > 0)
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, bytes);
         }
 
         // TODO-GAPS - why do we only check this on the socket, not the pipe?
