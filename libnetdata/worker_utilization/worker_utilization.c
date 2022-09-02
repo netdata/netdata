@@ -208,6 +208,9 @@ void workers_foreach(const char *workname, void (*callback)(
             switch(p->per_job_type[i].type) {
                 default:
                 case WORKER_METRIC_EMPTY:
+                    per_job_type_jobs_started[i] = 0;
+                    per_job_type_busy_time[i] = 0;
+                    per_job_custom_values[i] = NAN;
                     break;
 
                 case WORKER_METRIC_IDLE_BUSY: {
@@ -219,14 +222,21 @@ void workers_foreach(const char *workname, void (*callback)(
                     per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
                     p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
 
+                    per_job_custom_values[i] = NAN;
                     break;
                 }
 
                 case WORKER_METRIC_ABSOLUTE:
+                    per_job_type_jobs_started[i] = 0;
+                    per_job_type_busy_time[i] = 0;
+
                     per_job_custom_values[i] = p->per_job_type[i].custom_value;
                     break;
 
                 case WORKER_METRIC_INCREMENTAL: {
+                    per_job_type_jobs_started[i] = 0;
+                    per_job_type_busy_time[i] = 0;
+
                     NETDATA_DOUBLE tmp_custom_value = p->per_job_type[i].custom_value;
                     per_job_custom_values[i] = tmp_custom_value - p->per_job_type[i].statistics_last_custom_value;
                     p->per_job_type[i].statistics_last_custom_value = tmp_custom_value;
