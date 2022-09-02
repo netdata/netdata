@@ -1,0 +1,105 @@
+
+<!--
+Title: "Uninstall agent"
+custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/uninstall-agent.md
+learn_status: Published
+learn_topic_type: Tasks
+learn_rel_path: docs/tasks/general-configuration/uninstall-agent.md
+
+learn_docs_purpose: Instructions on how to uninstall demonstration
+-->
+
+
+
+**********************************************************************
+Template:
+
+Small intro, give some context to the user
+
+## Prerequisite
+
+Unordered list of what you will need. 
+
+## Steps
+
+Exact list of steps the user must follow
+
+## Expected result
+
+What you expect to see when you complete the steps above
+
+## Example
+
+Example configuration/actions of the task
+
+## Related topics
+
+List of reference docs user needs to be aware of.
+
+*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+title: "Uninstall Netdata"
+description: "If you are no longer interested in using the Netdata Agent, use the self-contained uninstaller to remove all traces of binaries and configuration files."
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md
+-->
+
+# Uninstall Netdata
+
+> ⚠️ If you're having trouble updating Netdata, moving from one installation method to another, or generally having
+> issues with your Netdata Agent installation, consider our [**reinstall Netdata**
+> doc](/packaging/installer/REINSTALL.md) instead of removing the Netdata Agent entirely.
+
+Our self-contained uninstaller is able to remove Netdata installations created with shell installer. It doesn't need any
+other Netdata repository files to be run. All it needs is an `.environment` file, which is created during installation
+(with shell installer) and put in `${NETDATA_USER_CONFIG_DIR}/.environment` (by default `/etc/netdata/.environment`).
+That file contains some parameters which are passed to our installer and which are needed during uninstallation process.
+Mainly two parameters are needed:
+
+```sh
+NETDATA_PREFIX
+NETDATA_ADDED_TO_GROUPS
+```
+
+A workflow for uninstallation looks like this:
+
+1.  Find your `.environment` file, which is usually `/etc/netdata/.environment` in a default installation.
+2.  If you cannot find that file and would like to uninstall Netdata, then create a new file with the following content:
+
+```sh
+NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install` flag. Otherwise it should be empty
+NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running the Netdata process
+```
+
+3.  Run `netdata-uninstaller.sh` as follows
+
+    3.1 **Interactive mode (Default)**
+
+    The default mode in the uninstaller script is **interactive**. This means that the script provides the user the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each Netdata asset in the filesystem.
+
+    ```sh
+    ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --env <environment_file>
+    ```
+
+    3.2 **Non-interactive mode**
+
+    If you are sure and you know what you are doing, you can speed up the removal of the Netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the Netdata assets in a **non-interactive** mode.
+
+    ```sh
+    ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env <environment_file>
+    ```
+
+Note: Existing installations may still need to download the file if it's not present. To execute uninstall in that case,
+run the following commands:
+
+```sh
+wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh
+chmod +x ./netdata-uninstaller.sh
+./netdata-uninstaller.sh --yes --env <environment_file>
+```
+
+The default `environment_file` is `/etc/netdata/.environment`. 
+
+> Note: This uninstallation method assumes previous installation with `netdata-installer.sh` or the kickstart script.
+> Currently using it when Netdata was installed by a package manager can work or cause unexpected results.
+
+
+*******************************************************************************
