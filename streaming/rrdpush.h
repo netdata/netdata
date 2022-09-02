@@ -46,6 +46,7 @@ typedef struct {
 } stream_encoded_t;
 
 #ifdef ENABLE_COMPRESSION
+#define LZ4_MAX_MSG_SIZE 0x4000
 struct compressor_state {
     char *buffer;
     size_t buffer_size;

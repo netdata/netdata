@@ -5,7 +5,6 @@
 
 #define STREAM_COMPRESSION_MSG "STREAM_COMPRESSION"
 
-#define LZ4_MAX_MSG_SIZE 0x4000
 #define LZ4_STREAM_BUFFER_SIZE (0x10000 + LZ4_MAX_MSG_SIZE)
 
 #define SIGNATURE ((uint32_t)('z' | 0x80) | (0x80 << 8) | (0x80 << 16) | ('\n' << 24))

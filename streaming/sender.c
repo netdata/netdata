@@ -62,15 +62,41 @@ void sender_commit(struct sender_state *s) {
 #ifdef ENABLE_COMPRESSION
     if (src && src_len) {
         if (s->compressor && s->rrdpush_compression) {
-            src_len = s->compressor->compress(s->compressor, src, src_len, &src);
-            if (!src_len) {
-                deactivate_compression(s);
-                buffer_flush(s->build);
-                netdata_mutex_unlock(&s->mutex);
-                return;
+            while(src_len) {
+                size_t size_to_compress = src_len;
+
+                if(size_to_compress > LZ4_MAX_MSG_SIZE) {
+                    // we need to find the last newline
+                    // so that the decompressor will have a whole line to work with
+
+                    const char *t = &src[LZ4_MAX_MSG_SIZE - 1];
+                    while(t-- > src)
+                        if(*t == '\n')
+                            break;
+
+                    if(t == src)
+                        size_to_compress = LZ4_MAX_MSG_SIZE;
+                    else
+                        size_to_compress = t - src + 1;
+                }
+
+                char *dst;
+                size_t dst_len = s->compressor->compress(s->compressor, src, size_to_compress, &dst);
+                if (!dst_len) {
+                    deactivate_compression(s);
+                    buffer_flush(s->build);
+                    netdata_mutex_unlock(&s->mutex);
+                    return;
+                }
+
+                if(cbuffer_add_unsafe(s->host->sender->buffer, dst, dst_len))
+                    s->overflow = 1;
+
+                src = src + size_to_compress;
+                src_len -= size_to_compress;
             }
         }
-        if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+        else if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
             s->overflow = 1;
     }
 #else
