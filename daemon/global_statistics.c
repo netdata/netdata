@@ -1176,7 +1176,7 @@ static void update_heartbeat_charts() {
 
 #define WORKERS_MIN_PERCENT_DEFAULT 10000.0
 
-struct worker_job_type {
+struct worker_job_type_gs {
     STRING *name;
     STRING *units;
 
@@ -1228,7 +1228,7 @@ struct worker_utilization {
 
     char *name_lowercase;
 
-    struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
+    struct worker_job_type_gs per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
     size_t workers_registered;
     size_t workers_busy;

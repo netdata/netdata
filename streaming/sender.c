@@ -22,7 +22,7 @@
 #define WORKER_SENDER_JOB_BYTES_SENT                17
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 18
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 18
 #endif
 
 extern struct config stream_config;
