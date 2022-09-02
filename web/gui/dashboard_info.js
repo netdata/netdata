@@ -1089,6 +1089,11 @@ netdataDashboard.submenu = {
               'IRQ (<a href="#ebpf_global_hard_irq">Hard IRQ</a> and <a href="#ebpf_global_soft_irq">Soft IRQ</a> ), <a href="#ebpf_global_shm">Shared Memory</a>, ' +
               'Syscalls (<a href="#menu_mem_submenu_synchronization__eBPF_">Sync</a>, <a href="#menu_mount_submenu_mount__eBPF_">Mount</a>), and <a href="#menu_ip_submenu_kernel">Network</a>.'
     },
+
+    'postgres.connections': {
+        info: 'A connection is an established line of communication between a client and the PostgreSQL server. Each connection adds to the load on the PostgreSQL server. To guard against running out of memory or overloading the database the <i>max_connections</i> parameter (default = 100) defines the maximum number of concurrent connections to the database server. A separate parameter, <i>superuser_reserved_connections</i> (default = 3), defines the quota for superuser connections (so that superusers can connect even if all other connection slots are blocked).'
+    },
+
 };
 
 // ----------------------------------------------------------------------------
@@ -3819,7 +3824,7 @@ netdataDashboard.context = {
                 }
             ],
         },
-        info: '<p>A connection is an established line of communication between a client and the PostgreSQL server. Each connection adds to the load on the PostgreSQL server. To guard against running out of memory or overloading the database the <i>max_connections</i> parameter (default = 100) defines the maximum number of concurrent connections to the database server. A separate parameter, <i>superuser_reserved_connections</i> (default = 3), defines the quota for superuser connections (so that superusers can connect even if all other connection slots are blocked).</p><p><br></p><p><b>Total connection utilization</b> across all databases. Utilization is measured as a percentage of (<i>max_connections</i> - <i>superuser_reserved_connections</i>). If the utilization is 100% no more new connections will be accepted (superuser connections will still be accepted if superuser quota is available).</p>'
+        info: '<b>Total connection utilization</b> across all databases. Utilization is measured as a percentage of (<i>max_connections</i> - <i>superuser_reserved_connections</i>). If the utilization is 100% no more new connections will be accepted (superuser connections will still be accepted if superuser quota is available).'
     },
     'postgres.connections_usage': {
         info: '<p><b>Connections usage</b> across all databases. The maximum number of concurrent connections to the database server is (<i>max_connections</i> - <i>superuser_reserved_connections</i>). As a general rule, if you need more than 200 connections it is advisable to use connection pooling.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
