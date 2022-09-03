@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- add Postgres total connection utilization alarm [\#13620](https://github.com/netdata/netdata/pull/13620) ([ilyam8](https://github.com/ilyam8))
+- update Postgres "connections" dashboard info [\#13619](https://github.com/netdata/netdata/pull/13619) ([ilyam8](https://github.com/ilyam8))
+- add spiceproxy to proxmox group [\#13615](https://github.com/netdata/netdata/pull/13615) ([ilyam8](https://github.com/ilyam8))
 - Improve coverage of Linux kernel threads in apps\_groups.conf [\#13612](https://github.com/netdata/netdata/pull/13612) ([Ferroin](https://github.com/Ferroin))
 - Update dashboard to version v2.28.8. [\#13609](https://github.com/netdata/netdata/pull/13609) ([netdatabot](https://github.com/netdatabot))
 - Don't try to load db rows when chart\_id or dim\_id is null [\#13608](https://github.com/netdata/netdata/pull/13608) ([MrZammler](https://github.com/MrZammler))
@@ -346,9 +349,6 @@
 - Return rc-\>last\_update from alarms\_values api [\#12968](https://github.com/netdata/netdata/pull/12968) ([MrZammler](https://github.com/MrZammler))
 - cleanup and optimize rrdeng\_load\_metric\_next\(\) [\#12966](https://github.com/netdata/netdata/pull/12966) ([ktsaou](https://github.com/ktsaou))
 - feat\(charts.d/apcupds\): add load usage chart \(Watts\) [\#12965](https://github.com/netdata/netdata/pull/12965) ([ilyam8](https://github.com/ilyam8))
-- fix: keep virtualization unknown if all used commands are not available [\#12964](https://github.com/netdata/netdata/pull/12964) ([ilyam8](https://github.com/ilyam8))
-- statsd sets should count unique values [\#12963](https://github.com/netdata/netdata/pull/12963) ([ktsaou](https://github.com/ktsaou))
-- Add automatic retries fo static builds during nightly and release builds. [\#12961](https://github.com/netdata/netdata/pull/12961) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
