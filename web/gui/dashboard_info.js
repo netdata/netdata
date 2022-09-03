@@ -2687,7 +2687,7 @@ netdataDashboard.context = {
         info: 'Real memory (RAM) used per user group. This does not include shared memory.'
     },
     'users.mem': {
-        info: 'Real memory (RAM) used per user group. This does not include shared memory.'
+        info: 'Real memory (RAM) used per user. This does not include shared memory.'
     },
 
     'apps.vmem': {
@@ -2698,7 +2698,7 @@ netdataDashboard.context = {
         info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
     'users.vmem': {
-        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
 
     'apps.minor_faults': {
