@@ -52,7 +52,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if (rrdcalc_exists(host, rrdcalc_chart_name(rc), rrdcalc_name(rc)))
         return 0;
 
-    rc->id = rrdcalc_get_unique_id(host, rrdcalc_chart_name(rc), rrdcalc_name(rc), &rc->next_event_id);
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " NETDATA_DOUBLE_FORMAT_AUTO
         ", red " NETDATA_DOUBLE_FORMAT_AUTO
@@ -104,42 +104,18 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         return 0;
     }
 
-    RRDCALCTEMPLATE *t, *last = NULL;
-    if(!rt->foreachdim) {
-        for (t = host->templates; t ; last = t, t = t->next) {
-            if(unlikely(t->name == rt->name
-                        && !strcmp(t->family_match?rrdcalctemplate_family_match(t):"*", rt->family_match?rrdcalctemplate_family_match(rt):"*")
-            )) {
-                info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
-                return 0;
-            }
-        }
-
-        if(likely(last)) {
-            last->next = rt;
-        }
-        else {
-            rt->next = host->templates;
-            host->templates = rt;
-        }
-    } else {
-        for (t = host->alarms_template_with_foreach; t ; last = t, t = t->next) {
-            if(unlikely(t->name == rt->name
-                        && !strcmp(t->family_match?rrdcalctemplate_family_match(t):"*", rt->family_match?rrdcalctemplate_family_match(rt):"*")
-            )) {
-                info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
-                return 0;
-            }
-        }
-
-        if(likely(last)) {
-            last->next = rt;
-        }
-        else {
-            rt->next = host->alarms_template_with_foreach;
-            host->alarms_template_with_foreach = rt;
+    RRDCALCTEMPLATE *t;
+    foreach_rrdcalctemplate_in_rrdhost(host, t) {
+        if(unlikely(t->name == rt->name && !strcmp(t->family_match?rrdcalctemplate_family_match(t):"*", rt->family_match?rrdcalctemplate_family_match(rt):"*"))) {
+            info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
+            return 0;
         }
     }
+
+    if(rt->foreachdim)
+        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(host->alarms_templates, rt, prev, next);
+    else
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->alarms_templates, rt, prev, next);
 
     debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " NETDATA_DOUBLE_FORMAT_AUTO
         ", red " NETDATA_DOUBLE_FORMAT_AUTO
@@ -836,9 +812,10 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg->lookup = string_strdupz(value);
                 health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
                         &rc->update_every, &rc->options, &rc->dimensions, &rc->foreachdim);
-                if(rc->foreachdim) {
+
+                if(rc->foreachdim)
                     rc->spdim = health_pattern_from_foreach(rrdcalc_foreachdim(rc));
-                }
+
                 if (rc->after) {
                     if (rc->dimensions)
                         alert_cfg->p_db_lookup_dimensions = string_dup(rc->dimensions);
@@ -1096,9 +1073,8 @@ static int health_readfile(const char *filename, void *data) {
                 health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
                         &rt->update_every, &rt->options, &rt->dimensions, &rt->foreachdim);
 
-                if(rt->foreachdim) {
+                if(rt->foreachdim)
                     rt->spdim = health_pattern_from_foreach(rrdcalctemplate_foreachdim(rt));
-                }
 
                 if (rt->after) {
                     if (rt->dimensions)

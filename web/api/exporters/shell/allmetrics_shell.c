@@ -70,7 +70,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ;rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];

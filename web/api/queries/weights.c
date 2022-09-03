@@ -605,7 +605,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     // for each dimension
     RRDDIM *d;
     int i;
-    for(i = 0, d = base_rrdr->st->dimensions ; d && i < base_rrdr->d; i++, d = d->next) {
+    for(i = 0, d = base_rrdr->st->dimensions; d && i < base_rrdr->d; i++, d = d->next) {
 
         // skip the not evaluated ones
         if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))

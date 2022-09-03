@@ -84,7 +84,11 @@ struct rrdcalctemplate {
     EVAL_EXPRESSION *critical;
 
     struct rrdcalctemplate *next;
+    struct rrdcalctemplate *prev;
 };
+
+#define foreach_rrdcalctemplate_in_rrdhost(host, rt) \
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD((host)->alarms_templates, rt, prev, next)
 
 #define rrdcalctemplate_name(rt) string2str((rt)->name)
 #define rrdcalctemplate_exec(rt) string2str((rt)->exec)

@@ -44,6 +44,7 @@ struct rrddimvar {
     struct rrddim *rrddim;
 
     struct rrddimvar *next;
+    struct rrddimvar *prev;
 };
 
 

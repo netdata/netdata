@@ -1449,7 +1449,7 @@ int unit_test(long delay, long shift)
 
     unsigned long c, dimensions = 0;
     RRDDIM *rd;
-    for(rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
+    for(rd = st->dimensions; rd ; rd = rd->next) dimensions++;
 
     for(c = 0; c < 20 ;c++) {
         i += increment;
@@ -1470,7 +1470,7 @@ int unit_test(long delay, long shift)
         }
 
         // prevent it from deleting the dimensions
-        for(rd = st->dimensions ; rd ; rd = rd->next)
+        for(rd = st->dimensions; rd ; rd = rd->next)
             rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
 
         rrdset_done(st);
@@ -1486,7 +1486,7 @@ int unit_test(long delay, long shift)
     for(c = 0 ; c < st->counter ; c++) {
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
-        for(rd = st->dimensions ; rd ; rd = rd->next) {
+        for(rd = st->dimensions; rd ; rd = rd->next) {
             sn = rd->db[c];
             cn = unpack_storage_number(sn);
             fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
@@ -1967,7 +1967,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                 time_retrieved = r->t[c];
 
                 // for each dimension
-                for (j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
+                for (j = 0, d = r->st->dimensions; d && j < r->d ; ++j, d = d->next) {
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
                     assert(rd[i][j] == d);
@@ -2103,7 +2103,7 @@ int test_dbengine(void)
                 time_t time_retrieved = r->t[c];
 
                 // for each dimension
-                for(j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
+                for(j = 0, d = r->st->dimensions; d && j < r->d ; ++j, d = d->next) {
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     NETDATA_DOUBLE value = cn[j];
                     assert(rd[i][j] == d);

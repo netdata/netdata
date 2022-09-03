@@ -634,6 +634,11 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
+    DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    RRDCALC *rc;
+    foreach_rrdcalc_in_rrdhost(host, rc)
+        dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
+
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;
 
@@ -675,18 +680,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         time_t last_repeat = 0;
         last_repeat = (time_t)sqlite3_column_int64(res, 27);
 
-        RRDCALC *rc = alarm_max_last_repeat(host, (char *) sqlite3_column_text(res, 14));
-        if (!rc) {
-            for(rc = host->alarms; rc ; rc = rc->next) {
-                RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl_t *)rc);
-                if(rdcmp != rc) {
-                    error("Cannot insert the alarm index ID using log %s", rrdcalc_name(rc));
-                }
-            }
-
-            rc = alarm_max_last_repeat(host, (char *) sqlite3_column_text(res, 14));
-        }
-
+        rc = dictionary_get(all_rrdcalcs, (char *) sqlite3_column_text(res, 14));
         if(unlikely(rc)) {
             if (rrdcalc_isrepeating(rc)) {
                 rc->last_repeat = last_repeat;
@@ -795,6 +789,9 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         loaded++;
     }
+
+    dictionary_destroy(all_rrdcalcs);
+    all_rrdcalcs = NULL;
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 

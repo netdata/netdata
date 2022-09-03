@@ -295,8 +295,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
     host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-    avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
-    avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -471,17 +469,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     // ------------------------------------------------------------------------
     // link it and add it to the index
 
-    if(is_localhost) {
-        host->next = localhost;
-        localhost = host;
-    }
-    else {
-        if(localhost) {
-            host->next = localhost->next;
-            localhost->next = host;
-        }
-        else localhost = host;
-    }
+    if(is_localhost)
+        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(localhost, host, prev, next);
+    else
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(localhost, host, prev, next);
 
     // ------------------------------------------------------------------------
     // init new ML host and update system_info to let upstreams know
@@ -1127,8 +1118,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     freez(host->exporting_flags);
 
-    while(host->alarms)
-        rrdcalc_unlink_and_free(host, host->alarms);
+    while(host->host_alarms)
+        rrdcalc_unlink_and_free(host, host->host_alarms);
 
     RRDCALC *rc,*nc;
     for(rc = host->alarms_with_foreach; rc ; rc = nc) {
@@ -1137,15 +1128,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
     }
     host->alarms_with_foreach = NULL;
 
-    while(host->templates)
-        rrdcalctemplate_unlink_and_free(host, host->templates);
-
-    RRDCALCTEMPLATE *rt,*next;
-    for(rt = host->alarms_template_with_foreach; rt ; rt = next) {
-        next = rt->next;
-        rrdcalctemplate_free(rt);
-    }
-    host->alarms_template_with_foreach = NULL;
+    while(host->alarms_templates)
+        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
 
     debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", rrdhost_hostname(host));
     rrdvar_free_remaining_variables(host, host->rrdvar_root_index);
@@ -1192,18 +1176,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // unlink it from the host
 
-    if(host == localhost) {
-        localhost = host->next;
-    }
-    else {
-        // find the previous one
-        RRDHOST *h;
-        for(h = localhost; h && h->next != host ; h = h->next) ;
-
-        // bypass it
-        if(h) h->next = host->next;
-        else error("Request to free RRDHOST '%s': cannot find it", rrdhost_hostname(host));
-    }
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(localhost, host, prev, next);
 
     // ------------------------------------------------------------------------
     // free it
@@ -1257,9 +1230,14 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
 void rrdhost_free_all(void) {
     rrd_wrlock();
+
     /* Make sure child-hosts are released before the localhost. */
-    while(localhost->next) rrdhost_free(localhost->next, 1);
-    rrdhost_free(localhost, 1);
+    while(localhost && localhost->next)
+        rrdhost_free(localhost->next, 1);
+
+    if(localhost)
+        rrdhost_free(localhost, 1);
+
     rrd_unlock();
 }
 
@@ -1545,8 +1523,8 @@ restart_after_removal:
                 RRDDIM *rd, *last;
 
                 rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-                while (st->variables)  rrdsetvar_free(st->variables);
-                while (st->alarms)     rrdsetcalc_unlink(st->alarms);
+                while (st->variables)    rrdsetvar_free(st->variables);
+                while (st->alarms) rrdsetcalc_unlink(st->alarms);
                 rrdset_wrlock(st);
                 for (rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
@@ -1807,43 +1785,6 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     }
 
     return res;
-}
-
-/**
- * Alarm Compare ID
- *
- * Callback function used with the binary trees to compare the id of RRDCALC
- *
- * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
- * @param b the pointer to the binary tree.
- *
- * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
- */
-int alarm_compare_id(void *a, void *b) {
-    register uint32_t hash1 = ((RRDCALC *)a)->id;
-    register uint32_t hash2 = ((RRDCALC *)b)->id;
-
-    if(hash1 < hash2) return -1;
-    else if(hash1 > hash2) return 1;
-
-    return 0;
-}
-
-/**
- * Alarm Compare NAME
- *
- * Callback function used with the binary trees to compare the name of RRDCALC
- *
- * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
- * @param b the pointer to the binary tree.
- *
- * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
- */
-int alarm_compare_name(void *a, void *b) {
-    RRDCALC *A = (RRDCALC *)a;
-    RRDCALC *B = (RRDCALC *)b;
-
-    return (int)((uintptr_t)A->name - (uintptr_t)B->name);
 }
 
 // Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache

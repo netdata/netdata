@@ -122,7 +122,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     
     for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
         if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
-            if (rc->chart == st->name || !strcmp(rrdcalc_chart_name(rc), rrdset_id(st))) {
+            if (rc->chart == st->name || rc->chart == st->id) {
                 char *name = alarm_name_with_dim(rrdcalc_name(rc), string_length(rc->name), rrddim_name(rd), string_length(rd->name));
                 if(rrdcalc_exists(host, rrdset_name(st), name)) {
                     freez(name);
@@ -133,13 +133,9 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
                 RRDCALC *child = rrdcalc_create_from_rrdcalc(rc, host, name, rrddim_name(rd));
                 netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-                if (child) {
+                if (child)
                     rrdcalc_add_to_host(host, child);
-                    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)child);
-                    if (rdcmp != child) {
-                        error("Cannot insert the alarm index ID %s", rrdcalc_name(child));
-                    }
-                }
+
                 else {
                     error("Cannot allocate a new alarm.");
                     rc->foreachcounter--;
@@ -321,11 +317,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st
             error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
-    // append this dimension
-    if(!st->dimensions)
-        st->dimensions = st->dimensions_last = rd;
-    else {
-        RRDDIM *td = st->dimensions_last;
+    if(st->dimensions) {
+        RRDDIM *td = st->dimensions;
 
         if(td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
@@ -342,10 +335,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st
                 rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
             }
         }
-
-        st->dimensions_last->next = rd;
-        st->dimensions_last = rd;
     }
+
+    // append this dimension
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
 
     if(host->health_enabled && !st->state->is_ar_chart) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
@@ -396,22 +389,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         }
     }
 
-    if(rd == st->dimensions)
-        st->dimensions = rd->next;
-    else {
-        RRDDIM *i;
-        for (i = st->dimensions; i && i->next != rd; i = i->next) ;
-
-        if (i && i->next == rd) {
-            if(st->dimensions_last == rd)
-                st->dimensions_last = i;
-
-            i->next = rd->next;
-        }
-        else
-            error("Request to free dimension '%s.%s' but it is not linked.", rrdset_id(st), rrddim_name(rd));
-    }
-    rd->next = NULL;
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
 
     while(rd->variables)
         rrddimvar_free(rd->variables);

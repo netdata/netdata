@@ -84,7 +84,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     }
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(rc->rrdset)
             alarms++;
     }

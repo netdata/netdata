@@ -288,6 +288,8 @@ struct rrddim {
     NETDATA_DOUBLE stored_volume;                   // the sum of all stored values so far
 
     struct rrddim *next;                            // linking of dimensions within the same data set
+    struct rrddim *prev;                            // linking of dimensions within the same data set
+
     struct rrdset *rrdset;
     RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
 
@@ -564,6 +566,7 @@ struct rrdset {
     RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
 
     struct rrdset *next;                            // linking of rrdsets
+    struct rrdset *prev;                            // linking of rrdsets
 
     // ------------------------------------------------------------------------
     // local variables
@@ -588,7 +591,6 @@ struct rrdset {
 
     netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
     RRDDIM *dimensions;                             // the actual data for every dimension
-    RRDDIM *dimensions_last;
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
@@ -869,10 +871,8 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
-    RRDCALC *alarms;
+    RRDCALC *host_alarms;
     RRDCALC *alarms_with_foreach;
-    avl_tree_lock alarms_idx_health_log;
-    avl_tree_lock alarms_idx_name;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
@@ -882,9 +882,7 @@ struct rrdhost {
     // templates of alarms
     // these are used to create alarms when charts
     // are created or renamed, that match them
-    RRDCALCTEMPLATE *templates;
-    RRDCALCTEMPLATE *alarms_template_with_foreach;
-
+    RRDCALCTEMPLATE *alarms_templates;
 
     // ------------------------------------------------------------------------
     // the charts of the host
@@ -933,6 +931,7 @@ struct rrdhost {
     aclk_rrdhost_state aclk_state;
 
     struct rrdhost *next;
+    struct rrdhost *prev;
 };
 extern RRDHOST *localhost;
 
@@ -1267,9 +1266,6 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
-
-extern int alarm_compare_id(void *a, void *b);
-extern int alarm_compare_name(void *a, void *b);
 
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 

@@ -660,11 +660,10 @@ static void aclk_submit_param_command(char *node_id, enum aclk_database_opcode a
     cmd.opcode = aclk_command;
     cmd.param1 = param;
 
-    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-    rrd_unlock();
+
     if (wc)
         aclk_database_enq_cmd(wc, &cmd);
     else {
@@ -702,8 +701,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
 
     struct aclk_database_worker_config *wc  = find_inactive_wc_by_node_id(node_id);
     rrd_rdlock();
-    RRDHOST *host = localhost;
-    while(host) {
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
         if (wc || (host->node_id && !(uuid_compare(*host->node_id, node_uuid)))) {
             rrd_unlock();
             if (!wc)
@@ -771,10 +770,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
             }
             return;
         }
-        host = host->next;
     }
     rrd_unlock();
-    return;
 }
 
 #define SQL_SELECT_HOST_MEMORY_MODE "SELECT memory_mode FROM chart WHERE host_id = @host_id LIMIT 1;"

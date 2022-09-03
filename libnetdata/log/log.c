@@ -747,7 +747,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 // ----------------------------------------------------------------------------
 // info log
 
-void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
+void info_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
     va_list args;
 
@@ -807,7 +807,7 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #error "cannot detect the format of function strerror_r()"
 #endif
 
-void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+void error_int( const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
 

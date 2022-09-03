@@ -1055,7 +1055,7 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
     rrdhost_rdlock(host);
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 

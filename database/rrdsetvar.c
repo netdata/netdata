@@ -89,8 +89,7 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, 
     rs->options = options;
     rs->rrdset = st;
 
-    rs->next = st->variables;
-    st->variables = rs;
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(st->variables, rs, prev, next);
 
     rrdsetvar_create_variables(rs);
 
@@ -111,15 +110,7 @@ void rrdsetvar_free(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
     debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", rrdset_id(st), rrdset_name(st), string2str(rs->variable));
 
-    if(st->variables == rs) {
-        st->variables = rs->next;
-    }
-    else {
-        RRDSETVAR *t;
-        for (t = st->variables; t && t->next != rs; t = t->next);
-        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", string2str(rs->key_fullname), rrdset_id(st));
-        else t->next = rs->next;
-    }
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->variables, rs, prev, next);
 
     rrdsetvar_free_variables(rs);
 

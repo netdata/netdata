@@ -155,18 +155,11 @@ static void health_reload_host(RRDHOST *host) {
     // free all running alarms
     rrdhost_wrlock(host);
 
-    while(host->templates)
-        rrdcalctemplate_unlink_and_free(host, host->templates);
+    while(host->alarms_templates)
+        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
 
-    RRDCALCTEMPLATE *rt,*next;
-    for(rt = host->alarms_template_with_foreach; rt ; rt = next) {
-        next = rt->next;
-        rrdcalctemplate_free(rt);
-    }
-    host->alarms_template_with_foreach = NULL;
-
-    while(host->alarms)
-        rrdcalc_unlink_and_free(host, host->alarms);
+    while(host->host_alarms)
+        rrdcalc_unlink_and_free(host, host->host_alarms);
 
     RRDCALC *rc,*nc;
     for(rc = host->alarms_with_foreach; rc ; rc = nc) {
@@ -330,9 +323,12 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
-    for(rc = host->alarms; rc && (n_warn + n_crit) < ACTIVE_ALARMS_LIST_EXAMINE ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
+
+        if(unlikely((n_warn + n_crit) >= ACTIVE_ALARMS_LIST_EXAMINE))
+            break;
 
         if (unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
             if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
@@ -467,7 +463,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
-        if(likely(!alarm_entry_isrepeating(host, ae))) {
+        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING))) {
             if(unlikely(
                     !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
                     !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
@@ -508,7 +504,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
         ALARM_ENTRY *t = ae->next;
 
-        if(likely(!alarm_entry_isrepeating(host, ae))) {
+        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING))) {
             health_alarm_wait_for_execution(ae);
             health_alarm_log_free_one_nochecks_nounlink(ae);
             host->health_log.count--;
@@ -839,7 +835,7 @@ void *health_main(void *ptr) {
             rrdhost_rdlock(host);
 
             // the first loop is to lookup values from the db
-            for (rc = host->alarms; rc; rc = rc->next) {
+            foreach_rrdcalc_in_rrdhost(host, rc) {
 
                 if (update_disabled_silenced(host, rc))
                     continue;
@@ -877,7 +873,7 @@ void *health_main(void *ptr) {
                             rc->units,
                             rc->info,
                             0,
-                            0);
+                            rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
                         if (ae) {
                             health_alarm_log(host, ae);
@@ -1003,7 +999,7 @@ void *health_main(void *ptr) {
             if (unlikely(runnable && !netdata_exit)) {
                 rrdhost_rdlock(host);
 
-                for (rc = host->alarms; rc; rc = rc->next) {
+                foreach_rrdcalc_in_rrdhost(host, rc) {
                     if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                         continue;
 
@@ -1161,7 +1157,8 @@ void *health_main(void *ptr) {
                             rc->delay_last,
                             (
                                 ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
+                                (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                 )
                         );
 
@@ -1181,7 +1178,7 @@ void *health_main(void *ptr) {
 
                 // process repeating alarms
                 RRDCALC *rc;
-                for(rc = host->alarms; rc ; rc = rc->next) {
+                foreach_rrdcalc_in_rrdhost(host, rc) {
                     int repeat_every = 0;
                     if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
@@ -1234,7 +1231,8 @@ void *health_main(void *ptr) {
                             rc->delay_last,
                             (
                                 ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
+                                (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                 )
                         );
 

@@ -349,8 +349,8 @@ void rrdset_free(RRDSET *st) {
     /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
      * created by a template. This leads to an effective memory leak, which cannot be detected since the
      * alarms will still be connected to the host, and freed during shutdown. */
-    while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
-    while(st->dimensions) rrddim_free(st, st->dimensions);
+    while(st->alarms) rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
+    while(st->dimensions)  rrddim_free(st, st->dimensions);
 
     rrdfamily_free(host, st->rrdfamily);
 
@@ -360,18 +360,7 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // unlink it from the host
 
-    if(st == host->rrdset_root) {
-        host->rrdset_root = st->next;
-    }
-    else {
-        // find the previous one
-        RRDSET *s;
-        for(s = host->rrdset_root; s && s->next != st ; s = s->next) ;
-
-        // bypass it
-        if(s) s->next = st->next;
-        else error("Request to free RRDSET '%s': cannot find it under host '%s'", rrdset_id(st), rrdhost_hostname(host));
-    }
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->rrdset_root, st, prev, next);
 
     rrdset_unlock(st);
 
@@ -743,8 +732,7 @@ RRDSET *rrdset_create_custom(
 
     st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
 
-    st->next = host->rrdset_root;
-    host->rrdset_root = st;
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->rrdset_root, st, prev, next);
 
     if(host->health_enabled) {
         rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);

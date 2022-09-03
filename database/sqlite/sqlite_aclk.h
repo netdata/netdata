@@ -216,13 +216,17 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
     if (uuid_parse(node_id, node_uuid))
         return NULL;
 
-    RRDHOST *host = localhost;
-    while(host) {
-        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid)))
-            return host;
-        host = host->next;
+    rrd_rdlock();
+    RRDHOST *host, *ret = NULL;
+    rrdhost_foreach_read(host) {
+        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+            ret = host;
+            break;
+        }
     }
-    return NULL;
+    rrd_unlock();
+
+    return ret;
 }
 
 

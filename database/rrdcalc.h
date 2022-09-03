@@ -149,6 +149,7 @@ struct rrdcalc {
     struct rrdcalc *rrdset_prev;
 
     struct rrdcalc *next;
+    struct rrdcalc *prev;
 };
 
 #define rrdcalc_name(rc) string2str((rc)->name)
@@ -167,6 +168,12 @@ struct rrdcalc {
 #define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
 #define rrdcalc_foreachdim(rc) string2str((rc)->foreachdim)
 #define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
+
+#define foreach_rrdcalc_in_rrdset(st, rc) \
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD((st)->alarms, rc, rrdset_prev, rrdset_next)
+
+#define foreach_rrdcalc_in_rrdhost(host, rc) \
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD((host)->host_alarms, rc, prev, next)
 
 struct alert_config {
     STRING *alarm;
@@ -206,10 +213,6 @@ struct alert_config {
     int32_t p_update_every;
 };
 
-extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);
-extern int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae);
-extern RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name);
-
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
 extern void rrdsetcalc_link_matching(RRDSET *st);
@@ -222,7 +225,7 @@ extern void rrdcalc_free(RRDCALC *rc);
 extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 
 extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name);
-extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
+extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
 extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);

@@ -170,8 +170,7 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, co
     rs->options = options;
     rs->rrddim = rd;
 
-    rs->next = rd->variables;
-    rd->variables = rs;
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(rd->variables, rs, prev, next);
 
     rrddimvar_create_variables(rs);
 
@@ -193,22 +192,11 @@ void rrddimvar_rename_all(RRDDIM *rd) {
 
 void rrddimvar_free(RRDDIMVAR *rs) {
     RRDDIM *rd = rs->rrddim;
-    RRDSET *st = rd->rrdset;
-    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd), string2str(rs->prefix), string2str(rs->suffix));
+    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset), rrddim_id(rd), rrddim_name(rd), string2str(rs->prefix), string2str(rs->suffix));
 
     rrddimvar_free_variables(rs);
 
-    if(rd->variables == rs) {
-        debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
-        rd->variables = rs->next;
-    }
-    else {
-        debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
-        RRDDIMVAR *t;
-        for (t = rd->variables; t && t->next != rs; t = t->next) ;
-        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", string2str(rs->key_name), rrdset_id(st), rrddim_id(rd));
-        else t->next = rs->next;
-    }
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rd->variables, rs, prev, next);
 
     string_freez(rs->prefix);
     string_freez(rs->suffix);

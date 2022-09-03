@@ -315,7 +315,7 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
 
             STRING *tok_string = string_strdupz(tok);
 
-            for(rc = host->alarms; rc ; rc = rc->next) {
+            foreach_rrdcalc_in_rrdhost(host, rc) {
                 if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                     continue;
                 if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
@@ -330,7 +330,7 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
         }
     }
     else {
-        for(rc = host->alarms; rc ; rc = rc->next) {
+        foreach_rrdcalc_in_rrdhost(host, rc) {
             if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                 continue;
             if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
@@ -346,8 +346,8 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
 
 static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *)) {
     RRDCALC *rc;
-    int i;
-    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
+    int i = 0;
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 

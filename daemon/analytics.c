@@ -443,7 +443,7 @@ void analytics_alarms(void)
     int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[10];
     RRDCALC *rc;
-    for (rc = localhost->alarms; rc; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(localhost, rc) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 

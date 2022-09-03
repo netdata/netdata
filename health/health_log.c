@@ -184,6 +184,11 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
+    DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    RRDCALC *rc;
+    foreach_rrdcalc_in_rrdhost(host, rc)
+        dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
+
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
         line++;
@@ -237,18 +242,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                 char* alarm_name = pointers[13];
                 last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
 
-                RRDCALC *rc = alarm_max_last_repeat(host, alarm_name);
-                if (!rc) {
-                    for(rc = host->alarms; rc ; rc = rc->next) {
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl_t *)rc);
-                        if(rdcmp != rc) {
-                            error("Cannot insert the alarm index ID using log %s", rrdcalc_name(rc));
-                        }
-                    }
-
-                    rc = alarm_max_last_repeat(host, alarm_name);
-                }
-
+                rc = dictionary_get(all_rrdcalcs, alarm_name);
                 if(unlikely(rc)) {
                     if (rrdcalc_isrepeating(rc)) {
                         rc->last_repeat = last_repeat;
@@ -303,8 +297,13 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             //    error("HEALTH [%s]: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", host->hostname, line, filename, pointers[1], host->hostname);
 
             ae->unique_id               = unique_id;
-            if (!is_valid_alarm_id(host, pointers[14], pointers[13], alarm_id))
-                alarm_id = rrdcalc_get_unique_id(host, pointers[14], pointers[13], NULL);
+            if (!is_valid_alarm_id(host, pointers[14], pointers[13], alarm_id)) {
+                STRING *chart = string_strdupz(pointers[14]);
+                STRING *name = string_strdupz(pointers[13]);
+                alarm_id = rrdcalc_get_unique_id(host, chart, name, NULL);
+                string_freez(chart);
+                string_freez(name);
+            }
             ae->alarm_id                = alarm_id;
             ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
             ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
@@ -394,6 +393,9 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             errored++;
         }
     }
+
+    dictionary_destroy(all_rrdcalcs);
+    all_rrdcalcs = NULL;
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 

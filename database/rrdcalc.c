@@ -87,7 +87,7 @@ static STRING *rrdcalc_replace_variables(const char *line, RRDCALC *rc) {
 
 void rrdcalc_update_rrdlabels(RRDSET *st) {
     RRDCALC *rc;
-    for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
+    foreach_rrdcalc_in_rrdset(st, rc) {
         if (rc->original_info) {
             if (rc->info)
                 string_freez(rc->info);
@@ -105,13 +105,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
 
-    rc->rrdset_next = st->alarms;
-    rc->rrdset_prev = NULL;
-
-    if(rc->rrdset_next)
-        rc->rrdset_next->rrdset_prev = rc;
-
-    st->alarms = rc;
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(st->alarms, rc, rrdset_prev, rrdset_next);
 
     if(rc->update_every < rc->rrdset->update_every) {
         error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
@@ -181,7 +175,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         rc->units,
         rc->info,
         0,
-        0);
+        rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
     health_alarm_log(host, ae);
 }
@@ -209,7 +203,7 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(unlikely(rc->rrdset))
             continue;
 
@@ -263,16 +257,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
     // unlink it
-    if(rc->rrdset_prev)
-        rc->rrdset_prev->rrdset_next = rc->rrdset_next;
-
-    if(rc->rrdset_next)
-        rc->rrdset_next->rrdset_prev = rc->rrdset_prev;
-
-    if(st->alarms == rc)
-        st->alarms = rc->rrdset_next;
-
-    rc->rrdset_prev = rc->rrdset_next = NULL;
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alarms, rc, rrdset_prev, rrdset_next);
 
     rrdvar_free(host, st->rrdvar_root_index, rc->local);
     rc->local = NULL;
@@ -298,7 +283,7 @@ RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
 
     STRING *name_string = string_strdupz(name);
 
-    for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
+    foreach_rrdcalc_in_rrdset(st, rc) {
         if(unlikely(rc->name == name_string))
             break;
     }
@@ -321,7 +306,7 @@ inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name) {
     int ret = 0;
 
     // make sure it does not already exist
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if (unlikely(rc->chart == chart_string && rc->name == name_string)) {
             debug(D_HEALTH, "Health alarm '%s/%s' already exists in host '%s'.", chart, name, rrdhost_hostname(host));
             info("Health alarm '%s/%s' already exists in host '%s'.", chart, name, rrdhost_hostname(host));
@@ -336,27 +321,18 @@ inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name) {
     return ret;
 }
 
-inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id) {
-    if(chart && name) {
-
-        STRING *chart_string = string_strdupz(chart);
-        STRING *name_string = string_strdupz(name);
-
-        // re-use old IDs, by looking them up in the alarm log
-        ALARM_ENTRY *ae = NULL;
-        for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-            if(unlikely(name_string == ae->name && chart_string == ae->chart)) {
-                if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
-                break;
-            }
+inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id) {
+    // re-use old IDs, by looking them up in the alarm log
+    ALARM_ENTRY *ae = NULL;
+    for(ae = host->health_log.alarms; ae ;ae = ae->next) {
+        if(unlikely(name == ae->name && chart == ae->chart)) {
+            if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
+            break;
         }
-
-        string_freez(chart_string);
-        string_freez(name_string);
-
-        if(ae)
-            return ae->alarm_id;
     }
+
+    if(ae)
+        return ae->alarm_id;
 
     if (unlikely(!host->health_log.next_alarm_id))
         host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
@@ -436,15 +412,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(!rc->foreachdim) {
         // link it to the host alarms list
-        if(likely(host->alarms)) {
-            // append it
-            RRDCALC *t;
-            for(t = host->alarms; t && t->next ; t = t->next) ;
-            t->next = rc;
-        }
-        else {
-            host->alarms = rc;
-        }
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->host_alarms, rc, prev, next);
 
         // link it to its chart
         RRDSET *st;
@@ -454,19 +422,11 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
                 break;
             }
         }
-    } else {
-        //link it case there is a foreach
-        if(likely(host->alarms_with_foreach)) {
-            // append it
-            RRDCALC *t;
-            for(t = host->alarms_with_foreach; t && t->next ; t = t->next) ;
-            t->next = rc;
-        }
-        else {
-            host->alarms_with_foreach = rc;
-        }
-
-        //I am not linking this alarm direct to the host here, this will be done when the children is created
+    }
+    else {
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->alarms_with_foreach, rc, prev, next);
+        // We are not linking this alarm directly to the host here
+        // It will eventually be done if it matches the dimensions
     }
 }
 
@@ -482,7 +442,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->chart = string_strdupz(chart);
     uuid_copy(rc->config_hash_id, rt->config_hash_id);
 
-    rc->id = rrdcalc_get_unique_id(host, rrdcalc_chart_name(rc), rrdcalc_name(rc), &rc->next_event_id);
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
     rc->dimensions = string_dup(rt->dimensions);
     rc->foreachdim = string_dup(rt->foreachdim);
@@ -568,13 +528,6 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     );
 
     rrdcalc_add_to_host(host, rc);
-    if(!rt->foreachdim) {
-        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)rc);
-        if (rdcmp != rc) {
-            error("Cannot insert the alarm index ID %s",rrdcalc_name(rc));
-        }
-    }
-
     return rc;
 }
 
@@ -595,9 +548,9 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     RRDCALC *newrc = callocz(1, sizeof(RRDCALC));
 
     newrc->next_event_id = 1;
-    newrc->id = rrdcalc_get_unique_id(host, rrdcalc_chart_name(rc), name, &rc->next_event_id);
     newrc->name = string_strdupz(name);
     newrc->chart = string_dup(rc->chart);
+    newrc->id = rrdcalc_get_unique_id(host, newrc->chart, newrc->name, &rc->next_event_id);
     uuid_copy(newrc->config_hash_id, *((uuid_t *) &rc->config_hash_id));
 
     newrc->dimensions = string_strdupz(dimension);
@@ -700,53 +653,13 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     if(rc->rrdset) rrdsetcalc_unlink(rc);
 
     // unlink it from RRDHOST
-    if(unlikely(rc == host->alarms))
-        host->alarms = rc->next;
-    else {
-        RRDCALC *t;
-        for(t = host->alarms; t && t->next != rc; t = t->next) ;
-        if(t) {
-            t->next = rc->next;
-            rc->next = NULL;
-        }
-        else
-            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdhost_hostname(host));
-    }
-
-    RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl_t *)rc);
-    if (rdcmp) {
-        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl_t *)rc);
-        if (!rdcmp) {
-            error("Cannot remove the health alarm index from health_log");
-        }
-    }
-
-    rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_name, (avl_t *)rc);
-    if (rdcmp) {
-        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl_t *)rc);
-        if (!rdcmp) {
-            error("Cannot remove the health alarm index from idx_name");
-        }
-    }
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->host_alarms, rc, prev, next);
 
     rrdcalc_free(rc);
 }
 
 void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
-
-    if(unlikely(rc == host->alarms_with_foreach))
-        host->alarms_with_foreach = rc->next;
-    else {
-        RRDCALC *t;
-        for(t = host->alarms_with_foreach; t && t->next != rc; t = t->next) ;
-        if(t) {
-            t->next = rc->next;
-            rc->next = NULL;
-        }
-        else
-            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdhost_hostname(host));
-    }
-
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->alarms_with_foreach, rc, prev, next);
     rrdcalc_free(rc);
 }
 
@@ -765,7 +678,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
                  rrdhost_hostname(host),
                  rrdcalc_host_labels(rc));
 
-            if(host->alarms == alarms)
+            if(host->host_alarms == alarms)
                 rrdcalc_unlink_and_free(host, rc);
             else
                 rrdcalc_foreach_unlink_and_free(host, rc);
@@ -775,7 +688,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
 }
 
 void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
-    rrdcalc_labels_unlink_alarm_loop(host, host->alarms);
+    rrdcalc_labels_unlink_alarm_loop(host, host->host_alarms);
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms_with_foreach);
 }
 
@@ -797,62 +710,4 @@ void rrdcalc_labels_unlink() {
     }
 
     rrd_unlock();
-}
-
-// ----------------------------------------------------------------------------
-// Alarm
-
-
-/**
- * Alarm is repeating
- *
- * Is this alarm repeating ?
- *
- * @param host The structure that has the binary tree
- * @param alarm_id the id of the alarm to search
- *
- * @return It returns 1 case it is repeating and 0 otherwise
- */
-int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
-    RRDCALC findme;
-    findme.id = alarm_id;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl_t *)&findme);
-    if (!rc) {
-        return 0;
-    }
-    return rrdcalc_isrepeating(rc);
-}
-
-/**
- * Entry is repeating
- *
- * Check whether the id of alarm entry is yet present in the host structure
- *
- * @param host The structure that has the binary tree
- * @param ae the alarm entry
- *
- * @return It returns 1 case it is repeating and 0 otherwise
- */
-int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
-    return alarm_isrepeating(host, ae->alarm_id);
-}
-
-/**
- * Max last repeat
- *
- * Check the maximum last_repeat for the alarms associated a host
- *
- * @param host The structure that has the binary tree
- *
- * @return It returns 1 case it is repeating and 0 otherwise
- */
-RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name) {
-    RRDCALC tmp = {
-        .name = string_strdupz(alarm_name)
-    };
-
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_name, (avl_t *)&tmp);
-
-    string_freez(tmp.name);
-    return rc;
 }

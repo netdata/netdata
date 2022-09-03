@@ -41,6 +41,7 @@ struct worker {
     struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
     struct worker *next;
+    struct worker *prev;
 };
 
 static netdata_mutex_t base_lock = NETDATA_MUTEX_INITIALIZER;
@@ -62,8 +63,7 @@ void worker_register(const char *workname) {
     worker->last_action = WORKER_IDLE;
 
     netdata_mutex_lock(&base_lock);
-    worker->next = base;
-    base = worker;
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(base, worker, prev, next);
     netdata_mutex_unlock(&base_lock);
 }
 
@@ -93,14 +93,7 @@ void worker_unregister(void) {
     if(unlikely(!worker)) return;
 
     netdata_mutex_lock(&base_lock);
-    if(base == worker)
-        base = worker->next;
-    else {
-        struct worker *p;
-        for(p = base; p && p->next && p->next != worker ;p = p->next);
-        if(p && p->next == worker)
-            p->next = worker->next;
-    }
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(base, worker, prev, next);
     netdata_mutex_unlock(&base_lock);
 
     for(int i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
@@ -187,7 +180,7 @@ void workers_foreach(const char *workname, void (*callback)(
     size_t i, jobs_started, jobs_running;
 
     struct worker *p;
-    for(p = base; p ; p = p->next) {
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD(base, p, prev, next) {
         if(hash != p->workname_hash || strcmp(workname, p->workname) != 0) continue;
 
         usec_t now = now_realtime_usec();

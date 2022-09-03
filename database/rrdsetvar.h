@@ -31,6 +31,7 @@ struct rrdsetvar {
     struct rrdset *rrdset;
 
     struct rrdsetvar *next;
+    struct rrdsetvar *prev;
 };
 
 extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);

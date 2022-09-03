@@ -14,6 +14,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_SILENCED              0x00000010
 #define HEALTH_ENTRY_RUN_ONCE                   0x00000020
 #define HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      0x00000040
+#define HEALTH_ENTRY_FLAG_IS_REPEATING          0x00000080
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
 #define HEALTH_ENTRY_FLAG_ACLK_QUEUED           0x20000000
