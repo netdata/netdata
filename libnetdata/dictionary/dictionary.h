@@ -255,7 +255,11 @@ extern void string_statistics(size_t *inserts, size_t *deletes, size_t *searches
 // ----------------------------------------------------------------------------
 // THREAD CACHE
 
-extern void *thread_cache_entry_get(const char *str, void *(*prepare_the_value)(const char *str, void *data), void *data);
+extern void *thread_cache_entry_get_or_set(void *key,
+                                    ssize_t key_length,
+                                    void *value,
+                                    void *(*transform_the_value_before_insert)(void *key, size_t key_length, void *value));
+
 extern void thread_cache_destroy(void);
 
 #endif /* NETDATA_DICTIONARY_H */
