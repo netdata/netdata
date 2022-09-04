@@ -141,7 +141,7 @@ ebpf_module_t ebpf_modules[] = {
       .apps_routine = ebpf_oomkill_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &oomkill_config,
       .config_file = NETDATA_OOMKILL_CONFIG_FILE,
-      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
+      .kernels =  NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL},
     { .thread_name = "shm", .config_name = "shm", .enabled = 0, .start_routine = ebpf_shm_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
