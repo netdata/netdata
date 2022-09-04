@@ -1064,7 +1064,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
   skip hash calculations
 */
 #if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
-#define DIGEST_ALERT_CONFIG_VAL(v) EVP_DigestUpdate(evpctx, (string2str(v)), string_length(v))
+#define DIGEST_ALERT_CONFIG_VAL(v) EVP_DigestUpdate(evpctx, (string2str(v)), string_strlen(v))
 #endif
 int alert_hash_and_store_config(
     uuid_t hash_id,

@@ -123,7 +123,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
         if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
             if (rc->chart == st->name || rc->chart == st->id) {
-                char *name = alarm_name_with_dim(rrdcalc_name(rc), string_length(rc->name), rrddim_name(rd), string_length(rd->name));
+                char *name = alarm_name_with_dim(rrdcalc_name(rc), string_strlen(rc->name), rrddim_name(rd), string_strlen(rd->name));
                 if(rrdcalc_exists(host, rrdset_name(st), name)) {
                     freez(name);
                     continue;
