@@ -1415,8 +1415,8 @@ typedef struct string_entry {
 } STRING_ENTRY;
 
 static struct string_hashtable {
-    Pvoid_t JudyHSArray;
-    netdata_rwlock_t rwlock;
+    Pvoid_t JudyHSArray;        // the Judy array - hashtable
+    netdata_rwlock_t rwlock;    // the R/W lock to protect the Judy array
 
     long int entries;           // the number of entries in the index
     long int active_references; // the number of active references alive
@@ -1427,6 +1427,12 @@ static struct string_hashtable {
     size_t searches;            // the number of successful searches in the index
     size_t duplications;        // when a string is referenced
     size_t releases;            // when a string is unreferenced
+
+    size_t found_deleted_on_search;
+    size_t found_available_on_search;
+    size_t found_deleted_on_insert;
+    size_t found_available_on_insert;
+    size_t spins;
 
 } string_base = {
     .JudyHSArray = NULL,
@@ -1444,15 +1450,40 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     *releases = string_base.releases;
 }
 
+static inline bool string_entry_acquire_if_possible(STRING_ENTRY *se) {
+    int32_t expected, desired, count = 0;
+    do {
+        count++;
+
+        expected = se->refcount;
+
+        if(expected <= 0) {
+            __atomic_add_fetch(&string_base.spins, count - 1, __ATOMIC_RELAXED);
+            return false;
+        }
+
+        desired = expected + 1;
+    }
+    while(!__atomic_compare_exchange_n(&se->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
+    __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&string_base.duplications, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&string_base.spins, count - 1, __ATOMIC_RELAXED);
+
+    return true;
+}
+
 static inline int32_t string_entry_acquire(STRING_ENTRY *se) {
     __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&string_base.duplications, 1, __ATOMIC_RELAXED);
+
     return __atomic_add_fetch(&se->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
 static inline int32_t string_entry_release(STRING_ENTRY *se) {
     __atomic_sub_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&string_base.releases, 1, __ATOMIC_RELAXED);
+
     return __atomic_sub_fetch(&se->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
@@ -1473,54 +1504,83 @@ STRING *string_strdupz(const char *str) {
 
     if(likely(string_base.JudyHSArray)) {
         netdata_rwlock_rdlock(&string_base.rwlock);
+
         Pvoid_t *Rc;
         Rc = JudyHSGet(string_base.JudyHSArray, (void *)str, length);
         if(likely(Rc)) {
             // found in the hash table
             se = *Rc;
-            string_entry_acquire(se);
+
+            if(string_entry_acquire_if_possible(se)) {
+                // we can use this entry
+                __atomic_add_fetch(&string_base.found_available_on_search, 1, __ATOMIC_RELAXED);
+            }
+            else {
+                // this entry is about to be deleted by another thread
+                // do not touch it, let it go...
+                se = NULL;
+                __atomic_add_fetch(&string_base.found_deleted_on_search, 1, __ATOMIC_RELAXED);
+            }
         }
         else {
             // not found in the hash table
             se = NULL;
         }
+
         __atomic_add_fetch(&string_base.searches, 1, __ATOMIC_RELAXED);
         netdata_rwlock_unlock(&string_base.rwlock);
     }
 
-    if(likely(se))
-        return (STRING *)se;
-
-    netdata_rwlock_wrlock(&string_base.rwlock);
-    STRING_ENTRY **ptr;
-    {
-        JError_t J_Error;
-        Pvoid_t *Rc = JudyHSIns(&string_base.JudyHSArray, (void *)str, length, &J_Error);
-        if (unlikely(Rc == PJERR)) {
-            fatal("STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-                  str, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+    while(!se) {
+        netdata_rwlock_wrlock(&string_base.rwlock);
+        STRING_ENTRY **ptr;
+        {
+            JError_t J_Error;
+            Pvoid_t *Rc = JudyHSIns(&string_base.JudyHSArray, (void *)str, length, &J_Error);
+            if (unlikely(Rc == PJERR)) {
+                fatal(
+                    "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                    str,
+                    JU_ERRNO(&J_Error),
+                    JU_ERRID(&J_Error));
+            }
+            ptr = (STRING_ENTRY **)Rc;
         }
-        ptr = (STRING_ENTRY **)Rc;
-    }
-    if(likely(*ptr == 0)) {
-        // a new item added to the index
-        size_t mem_size = sizeof(STRING_ENTRY) + length;
-        se = mallocz(mem_size);
-        strcpy((char *)se->str, str);
-        se->length = length;
-        se->refcount = 0;
-        *ptr = se;
-        string_base.inserts++;
-        string_base.entries++;
-        string_base.memory += (long)mem_size;
-    }
-    else {
-        // the item is already in the index
-        se = *ptr;
-    }
 
-    string_entry_acquire(se);
-    netdata_rwlock_unlock(&string_base.rwlock);
+        if (likely(*ptr == 0)) {
+            // a new item added to the index
+            size_t mem_size = sizeof(STRING_ENTRY) + length;
+            se = mallocz(mem_size);
+            strcpy((char *)se->str, str);
+            se->length = length;
+            se->refcount = 1;
+            *ptr = se;
+            string_base.inserts++;
+            string_base.entries++;
+            string_base.memory += (long)mem_size;
+
+            __atomic_add_fetch(&string_base.active_references, 1, __ATOMIC_RELAXED);
+        }
+        else {
+            // the item is already in the index
+            se = *ptr;
+
+            if(string_entry_acquire_if_possible(se)) {
+                // we can use this entry
+                __atomic_add_fetch(&string_base.found_available_on_insert, 1, __ATOMIC_RELAXED);
+            }
+            else {
+                // this entry is about to be deleted by another thread
+                // do not touch it, let it go...
+                se = NULL;
+                __atomic_add_fetch(&string_base.found_deleted_on_insert, 1, __ATOMIC_RELAXED);
+            }
+
+            __atomic_add_fetch(&string_base.searches, 1, __ATOMIC_RELAXED);
+        }
+
+        netdata_rwlock_unlock(&string_base.rwlock);
+    }
 
     return (STRING *)se;
 }
@@ -1528,29 +1588,38 @@ STRING *string_strdupz(const char *str) {
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
 
-    netdata_rwlock_wrlock(&string_base.rwlock);
-
     STRING_ENTRY *se = (STRING_ENTRY *)string;
     int32_t refcount = string_entry_release(se);
 
-    if(unlikely(refcount < 0))
-        fatal("STRING: INTERNAL ERROR: tried to free string that has zero references.");
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(refcount < 0)
+        fatal("STRING: INTERNAL ERROR: tried to delete a string that has %d references.", se->refcount);
+#endif
 
     if(unlikely(refcount == 0)) {
+        netdata_rwlock_wrlock(&string_base.rwlock);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(__atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST) != 0))
+            fatal("STRING: INTERNAL ERROR: tried to delete a string that has %d references.", se->refcount);
+#endif
+
         bool deleted = false;
 
-        if(likely(string_base.JudyHSArray)) {
+        if (likely(string_base.JudyHSArray)) {
             JError_t J_Error;
             int ret = JudyHSDel(&string_base.JudyHSArray, (void *)se->str, se->length, &J_Error);
-            if(unlikely(ret == JERR)) {
-                error("STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
-                      se->str, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
-            }
-            else
+            if (unlikely(ret == JERR)) {
+                error(
+                    "STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
+                    se->str,
+                    JU_ERRNO(&J_Error),
+                    JU_ERRID(&J_Error));
+            } else
                 deleted = true;
         }
 
-        if(unlikely(!deleted))
+        if (unlikely(!deleted))
             error("STRING: INTERNAL ERROR: tried to delete '%s' that is not in the index. Ignoring it.", se->str);
         else {
             size_t mem_size = sizeof(STRING_ENTRY) + se->length;
@@ -1559,9 +1628,9 @@ void string_freez(STRING *string) {
             string_base.memory -= (long)mem_size;
             freez(se);
         }
-    }
 
-    netdata_rwlock_unlock(&string_base.rwlock);
+        netdata_rwlock_unlock(&string_base.rwlock);
+    }
 }
 
 size_t string_length(STRING *string) {
@@ -2443,6 +2512,12 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_free_char_pp(values, entries);
 
     {
+        size_t ofound_deleted_on_search = string_base.found_deleted_on_search,
+               ofound_available_on_search = string_base.found_available_on_search,
+               ofound_deleted_on_insert = string_base.found_deleted_on_insert,
+               ofound_available_on_insert = string_base.found_available_on_insert,
+               ospins = string_base.spins;
+
         size_t oinserts, odeletes, osearches, oentries, oreferences, omemory, oduplications, oreleases;
         string_statistics(&oinserts, &odeletes, &osearches, &oentries, &oreferences, &omemory, &oduplications, &oreleases);
 
@@ -2470,11 +2545,25 @@ int dictionary_unittest(size_t entries) {
             netdata_thread_join(threads[i], &retval);
         }
 
+        size_t found_deleted_on_search = string_base.found_deleted_on_search,
+               found_available_on_search = string_base.found_available_on_search,
+               found_deleted_on_insert = string_base.found_deleted_on_insert,
+               found_available_on_insert = string_base.found_available_on_insert,
+               spins = string_base.spins;
+
         size_t inserts, deletes, searches, sentries, references, memory, duplications, releases;
         string_statistics(&inserts, &deletes, &searches, &sentries, &references, &memory, &duplications, &releases);
 
         fprintf(stderr, "inserts %zu, deletes %zu, searches %zu, entries %zu, references %zu, memory %zu, duplications %zu, releases %zu\n",
                 inserts - oinserts, deletes - odeletes, searches - osearches, sentries - oentries, references - oreferences, memory - omemory, duplications - oduplications, releases - oreleases);
+
+        fprintf(stderr, "on insert: %zu ok + %zu deleted\non search: %zu ok + %zu deleted\nspins: %zu\n",
+                found_available_on_insert - ofound_available_on_insert,
+                found_deleted_on_insert - ofound_deleted_on_insert,
+                found_available_on_search - ofound_available_on_search,
+                found_deleted_on_search - ofound_deleted_on_search,
+                spins - ospins
+                );
     }
 
     fprintf(stderr, "\n%zu errors found\n", errors);
