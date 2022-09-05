@@ -1,15 +1,11 @@
-
 <!--
 Title: "Configure the Agent"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/general-configuration/configure-the-agent.md
-
-learn_docs_purpose: demonstrate an edit-config, reference to the ref-doc of netdata.conf, plus add an admonition in case user want to change metric retention to follow the corresponding doc
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "general-configuration"
+learn_docs_purpose: "demonstrate an edit-config, reference to the ref-doc of netdata.conf, plus add an admonition in case user want to change metric retention to follow the corresponding doc"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Use host labels to organize systems, metrics, and alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/using-host-labels.md
 -->

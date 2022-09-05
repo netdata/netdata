@@ -1,15 +1,11 @@
-
 <!--
 Title: "Deploy Netdata in a Kubernetes Cluster"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-kubernetes-cluster.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/installation/deploy-netdata-in-a-kubernetes-cluster.md
-
-learn_docs_purpose: Instructions on deploying Netdata in a Kubernetes cluster
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-kubernetes-cluster.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "installation"
+learn_docs_purpose: "Instructions on deploying Netdata in a Kubernetes cluster"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Deploy Kubernetes monitoring with Netdata"
 description: "Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md

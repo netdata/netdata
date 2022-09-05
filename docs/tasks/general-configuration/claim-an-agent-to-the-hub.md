@@ -1,15 +1,11 @@
-
 <!--
 Title: "Claim an Agent to the Hub"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/claim-an-agent-to-the-hub.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/general-configuration/claim-an-agent-to-the-hub.md
-
-learn_docs_purpose: Instructions on how to claim a node on a Space in the Hub.
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/claim-an-agent-to-the-hub.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "general-configuration"
+learn_docs_purpose: "Instructions on how to claim a node on a Space in the Hub."
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Connect Agent to Cloud"
 description: "Connecting a Netdata Agent, running on a distributed node, to Netdata Cloud securely via the encrypted Agent-Cloud link (ACLK)."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md

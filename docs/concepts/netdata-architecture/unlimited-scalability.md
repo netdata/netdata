@@ -1,15 +1,11 @@
-
 <!--
 Title: "Unlimited scalability"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/unlimited-scalability.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/netdata-architecture/unlimited-scalability.md
-
-learn_docs_purpose: Explain the simplicity of scaling the Netdata Arch to an infinite number of nodes
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/unlimited-scalability.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "netdata-architecture"
+learn_docs_purpose: "Explain the simplicity of scaling the Netdata Arch to an infinite number of nodes"
 -->
-
-
 
 **********************************************************************
 Template:

@@ -1,15 +1,11 @@
-
 <!--
 Title: "Guided troubleshooting"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/netdata-architecture/guided-troubleshooting.md
-
-learn_docs_purpose: Present what tools Netdata utilize to help you troubleshoot your infrastructure
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "netdata-architecture"
+learn_docs_purpose: "Present what tools Netdata utilize to help you troubleshoot your infrastructure"
 -->
-
-
 
 **********************************************************************
 Template:

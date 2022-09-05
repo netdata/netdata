@@ -1,15 +1,11 @@
-
 <!--
 Title: "Metrics storage"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/netdata-agent/metrics-storage.md
-
-learn_docs_purpose: Explain how the Agent can manage/retain the metrics it collects, where it stores them, how it stores them and deletion policies (innovations like the tiering mechanism)
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "netdata-agent"
+learn_docs_purpose: "Explain how the Agent can manage/retain the metrics it collects, where it stores them, how it stores them and deletion policies (innovations like the tiering mechanism)"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -35,7 +31,8 @@ In the end of the document:
 
 list of related topics
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Database"
 description: "The Netdata Agent leverages multiple, user-configurable time-series databases that use RAM and/or disk to store metrics on any type of node."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/database/README.md

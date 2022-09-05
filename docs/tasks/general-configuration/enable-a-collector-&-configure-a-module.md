@@ -1,15 +1,11 @@
-
 <!--
 Title: "Enable a collector & configure a module"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/enable-a-collector-&-configure-a-module.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/general-configuration/enable-a-collector-&-configure-a-module.md
-
-learn_docs_purpose: Instructions on how to enable a collector or its orchestrator, and how to configure a module
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/enable-a-collector-&-configure-a-module.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "general-configuration"
+learn_docs_purpose: "Instructions on how to enable a collector or its orchestrator, and how to configure a module"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Enable or configure a collector"
 description: "Every collector is highly configurable, allowing them to collect metrics from any node and any infrastructure."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/enable-configure.md

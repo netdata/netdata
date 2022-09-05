@@ -1,15 +1,12 @@
-
 <!--
 Title: "Netdata Platform support"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/getting-started/deployment-options/netdata-platform-support.md
-learn_status: Published
-learn_topic_type: Getting started
-learn_rel_path: docs/getting-started/deployment-options/netdata-platform-support.md
-
-learn_docs_purpose: Present all the Netdata platform support
--->
-
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/deployment-options/netdata-platform-support.md"
+learn_status: "Published"
+learn_topic_type: "Getting started"
+learn_rel_path: "deployment-options"
+learn_docs_purpose: "Present all the Netdata platform support"
+-->*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Netdata platform support policy"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md
 -->

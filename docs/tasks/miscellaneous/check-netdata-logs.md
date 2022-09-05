@@ -1,15 +1,11 @@
-
 <!--
 Title: "Check netdata logs"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/miscellaneous/check-netdata-logs.md
-
-learn_docs_purpose: Instructions on how to inspect the logs
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "miscellaneous"
+learn_docs_purpose: "Instructions on how to inspect the logs"
 -->
-
-
 
 **********************************************************************
 Template:

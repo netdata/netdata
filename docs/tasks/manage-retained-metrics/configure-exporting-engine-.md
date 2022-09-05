@@ -1,15 +1,11 @@
-
 <!--
 Title: "Configure exporting engine "
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-exporting-engine-.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/manage-retained-metrics/configure-exporting-engine-.md
-
-learn_docs_purpose: Instructions on how to configure the exporting engine to export metrics to an external target
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-exporting-engine-.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "manage-retained-metrics"
+learn_docs_purpose: "Instructions on how to configure the exporting engine to export metrics to an external target"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Enable an exporting connector"
 description: "Learn how to enable and configure any connector using examples to start exporting metrics to external time-series databases in minutes."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/export/enable-connector.md

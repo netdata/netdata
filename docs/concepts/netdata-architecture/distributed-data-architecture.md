@@ -1,15 +1,11 @@
-
 <!--
 Title: "Distributed data architecture"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/distributed-data-architecture.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/netdata-architecture/distributed-data-architecture.md
-
-learn_docs_purpose: Explain the Netdata approach, every Agent a standalone database+data collection tool+integration tools
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/distributed-data-architecture.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "netdata-architecture"
+learn_docs_purpose: "Explain the Netdata approach, every Agent a standalone database+data collection tool+integration tools"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -35,7 +31,8 @@ In the end of the document:
 
 list of related topics
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Distributed data architecture"
 description: "Netdata's distributed data architecture stores metrics on individual nodes for high performance and scalability using all your granular metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/distributed-data-architecture.md

@@ -1,15 +1,11 @@
-
 <!--
 Title: "Configure streaming"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-streaming.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/manage-retained-metrics/configure-streaming.md
-
-learn_docs_purpose: Instructions on how to make a Parent-child setup
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-streaming.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "manage-retained-metrics"
+learn_docs_purpose: "Instructions on how to make a Parent-child setup"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
 title: "Enable streaming between nodes"
 description: "With metrics streaming enabled, you can not only replicate metrics data into a second database, but also view dashboards and trigger alarm notifications for multiple nodes in parallel."
 type: how-to

@@ -1,15 +1,11 @@
-
 <!--
 Title: "Configure health settings"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-health-settings.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/alerting/configure-health-settings.md
-
-learn_docs_purpose: Instructions on how to write a health entity, notification systems/methods
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-health-settings.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "alerting"
+learn_docs_purpose: "Instructions on how to write a health entity, notification systems/methods"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Configure health alarms"
 description: "Netdata's health monitoring watchdog is incredibly adaptable to your infrastructure's unique needs, with configurable health alarms."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/configure-alarms.md

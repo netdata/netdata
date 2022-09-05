@@ -1,15 +1,11 @@
-
 <!--
 Title: "Metric corellations"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/metric-corellations.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/metric-corellations.md
-
-learn_docs_purpose: Explain what is the metric correlation conceptually, and how it helps you by picking up the needle in a haystack of charts
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/metric-corellations.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: ""
+learn_docs_purpose: "Explain what is the metric correlation conceptually, and how it helps you by picking up the needle in a haystack of charts"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -35,7 +31,8 @@ In the end of the document:
 
 list of related topics
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
 title: Metric Correlations
 description: Quickly find metrics and charts closely related to a particular timeframe of interest anywhere in your infrastructure to discover the root cause faster.
 custom_edit_url: https://github.com/netdata/learn/blob/master/docs/cloud/insights/metric-correlations.md

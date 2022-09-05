@@ -1,15 +1,11 @@
-
 <!--
 Title: "Snapshot data"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/miscellaneous/snapshot-data.md
-
-learn_docs_purpose: Instructions on how to take snapshots of data
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "miscellaneous"
+learn_docs_purpose: "Instructions on how to take snapshots of data"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
 title: "Import, export, and print a snapshot"
 description: "Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata."
 type: how-to

@@ -1,15 +1,11 @@
-
 <!--
 Title: "Alerts"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/health-monitoring/alerts.md
-
-learn_docs_purpose: Define alerts, correlate the meaning health monitoring with alert and present how they work. Give an explanation with an alert configuration
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "health-monitoring"
+learn_docs_purpose: "Define alerts, correlate the meaning health monitoring with alert and present how they work. Give an explanation with an alert configuration"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -35,7 +31,8 @@ In the end of the document:
 
 list of related topics
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Health configuration reference"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
 -->

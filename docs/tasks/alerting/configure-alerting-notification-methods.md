@@ -1,15 +1,11 @@
-
 <!--
 Title: "Configure alerting notification methods"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-alerting-notification-methods.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/alerting/configure-alerting-notification-methods.md
-
-learn_docs_purpose: Instructions on how to configure alerting notification methods
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-alerting-notification-methods.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "alerting"
+learn_docs_purpose: "Instructions on how to configure alerting notification methods"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Alarm notifications"
 description: "Reference documentation for Netdata's alarm notification feature, which supports dozens of endpoints, user roles, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/README.md

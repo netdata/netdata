@@ -1,10 +1,15 @@
 <!--
-Title: "Access API"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/access-api.md"
+Title: "Manual installation, deploy Netdata into a linux/unix based node"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/installation/manual-installation--deploy-netdata-into-a-linux-unix-based-node.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: ""
-learn_docs_purpose: "Instructions on how to use the Netdata API (Integrate the swagger API reference inside this page)"
+learn_rel_path: "installation"
+learn_docs_purpose: "Instructions on how to manually install Netdata which include: 
+1. Fetching the necessary packets
+2. Installing
+3. Providing Netdata the necessary privileges
+4. Claiming the Netdata Agent(s)
+"
 -->
 
 **********************************************************************

@@ -1,15 +1,11 @@
-
 <!--
 Title: "Change database mode"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/change-database-mode.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/manage-retained-metrics/change-database-mode.md
-
-learn_docs_purpose: Instructions on how to change database mode
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/change-database-mode.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "manage-retained-metrics"
+learn_docs_purpose: "Instructions on how to change database mode"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Database"
 description: "The Netdata Agent leverages multiple, user-configurable time-series databases that use RAM and/or disk to store metrics on any type of node."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/database/README.md

@@ -1,15 +1,11 @@
-
 <!--
 Title: "Metrics exporting"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md
-learn_status: Published
-learn_topic_type: Concepts
-learn_rel_path: docs/concepts/netdata-agent/metrics-exporting.md
-
-learn_docs_purpose: Explain what exporting means and the purpose to export metrics
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "netdata-agent"
+learn_docs_purpose: "Explain what exporting means and the purpose to export metrics"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -35,7 +31,8 @@ In the end of the document:
 
 list of related topics
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Export metrics to external time-series databases"
 description: "Use the exporting engine to send Netdata metrics to popular external time series databases for long-term storage or further analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/export/external-databases.md

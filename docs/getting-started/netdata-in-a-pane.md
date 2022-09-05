@@ -1,15 +1,12 @@
-
 <!--
 Title: "Netdata in a pane"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/getting-started/netdata-in-a-pane.md
-learn_status: Published
-learn_topic_type: Getting started
-learn_rel_path: docs/getting-started/netdata-in-a-pane.md
-
-learn_docs_purpose: Present netdata in a nutshell
--->
-
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/netdata-in-a-pane.md"
+learn_status: "Published"
+learn_topic_type: "Getting started"
+learn_rel_path: ""
+learn_docs_purpose: "Present netdata in a nutshell"
+-->*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
 
 <h3 align="center">Netdata is high-fidelity infrastructure monitoring and troubleshooting.<br />Open-source, free, preconfigured, opinionated, and always real-time.</h3>
 <br />

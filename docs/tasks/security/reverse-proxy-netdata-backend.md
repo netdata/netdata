@@ -1,15 +1,11 @@
-
 <!--
 Title: "Reverse proxy Netdata backend"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/security/reverse-proxy-netdata-backend.md
-learn_status: Published
-learn_topic_type: Tasks
-learn_rel_path: docs/tasks/security/reverse-proxy-netdata-backend.md
-
-learn_docs_purpose: Hardening Netdata Agent's web server
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/reverse-proxy-netdata-backend.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "security"
+learn_docs_purpose: "Hardening Netdata Agent's web server"
 -->
-
-
 
 **********************************************************************
 Template:
@@ -36,7 +32,8 @@ Example configuration/actions of the task
 
 List of reference docs user needs to be aware of.
 
-*****************Suggested document to be transformed**************************From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
+*****************Suggested document to be transformed**************************
+From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
 title: "Secure your nodes"
 description: "Your data and systems are safe with Netdata, but we recommend a few easy ways to improve the security of your infrastructure."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/secure-nodes.md
