@@ -23,7 +23,7 @@ static void updateDimensionsChart(RRDHOST *RH,
         std::stringstream IdSS, NameSS;
 
         IdSS << "dimensions_on_" << localhost->machine_guid;
-        NameSS << "dimensions_on_" << localhost->hostname;
+        NameSS << "dimensions_on_" << rrdhost_hostname(localhost);
 
         RS = rrdset_create(
             RH,
@@ -69,7 +69,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
         std::stringstream IdSS, NameSS;
 
         IdSS << "anomaly_rate_on_" << localhost->machine_guid;
-        NameSS << "anomaly_rate_on_" << localhost->hostname;
+        NameSS << "anomaly_rate_on_" << rrdhost_hostname(localhost);
 
         RS = rrdset_create(
             RH,
@@ -106,7 +106,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
         std::stringstream IdSS, NameSS;
 
         IdSS << "detector_window_on_" << localhost->machine_guid;
-        NameSS << "detector_window_on_" << localhost->hostname;
+        NameSS << "detector_window_on_" << rrdhost_hostname(localhost);
 
         RS = rrdset_create(
             RH,
@@ -147,7 +147,7 @@ static void updateEventsChart(RRDHOST *RH,
         std::stringstream IdSS, NameSS;
 
         IdSS << "detector_events_on_" << localhost->machine_guid;
-        NameSS << "detector_events_on_" << localhost->hostname;
+        NameSS << "detector_events_on_" << rrdhost_hostname(localhost);
 
         RS = rrdset_create(
             RH,
@@ -193,7 +193,7 @@ static void updateDetectionChart(RRDHOST *RH) {
         std::stringstream IdSS, NameSS;
 
         IdSS << "prediction_stats_" << RH->machine_guid;
-        NameSS << "prediction_stats_for_" << RH->hostname;
+        NameSS << "prediction_stats_for_" << rrdhost_hostname(RH);
 
         RS = rrdset_create_localhost(
             "netdata", // type
@@ -233,7 +233,7 @@ static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
         std::stringstream IdSS, NameSS;
 
         IdSS << "training_stats_" << RH->machine_guid;
-        NameSS << "training_stats_for_" << RH->hostname;
+        NameSS << "training_stats_for_" << rrdhost_hostname(RH);
 
         RS = rrdset_create_localhost(
             "netdata", // type

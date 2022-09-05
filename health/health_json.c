@@ -14,7 +14,7 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 }
 
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
-    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
     char config_hash_id[GUID_LEN + 1];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
 
@@ -57,30 +57,30 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"old_value_string\": \"%s\",\n"
                     "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
-                   , host->hostname
+                   , rrdhost_hostname(host)
                    , host->utc_offset
-                   , host->abbrev_timezone
+                   , rrdhost_abbrev_timezone(host)
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id
                    , config_hash_id
-                   , ae->name
-                   , ae->chart
-                   , ae->chart_context
-                   , ae->family
-                   , ae->classification?ae->classification:"Unknown"
-                   , ae->component?ae->component:"Unknown"
-                   , ae->type?ae->type:"Unknown"
+                   , ae_name(ae)
+                   , ae_chart_name(ae)
+                   , ae_chart_context(ae)
+                   , ae_family(ae)
+                   , ae->classification?ae_classification(ae):"Unknown"
+                   , ae->component?ae_component(ae):"Unknown"
+                   , ae->type?ae_type(ae):"Unknown"
                    , (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false"
                    , (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false"
                    , (unsigned long)ae->exec_run_timestamp
                    , (ae->flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false"
-                   , ae->exec?ae->exec:host->health_default_exec
-                   , ae->recipient?ae->recipient:host->health_default_recipient
+                   , ae->exec?ae_exec(ae):string2str(host->health_default_exec)
+                   , ae->recipient?ae_recipient(ae):string2str(host->health_default_recipient)
                    , ae->exec_code
-                   , ae->source
+                   , ae_source(ae)
                    , edit_command
-                   , ae->units?ae->units:""
+                   , ae_units(ae)
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
                    , (unsigned long)ae->non_clear_duration
@@ -90,13 +90,13 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , (unsigned long)ae->delay_up_to_timestamp
                    , ae->updated_by_id
                    , ae->updates_id
-                   , ae->new_value_string
-                   , ae->old_value_string
+                   , ae_new_value_string(ae)
+                   , ae_old_value_string(ae)
                    , (unsigned long)ae->last_repeat
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
 
-    health_string2json(wb, "\t\t", "info", ae->info ? ae->info : "", ",\n");
+    health_string2json(wb, "\t\t", "info", ae->info ? ae_info(ae) : "", ",\n");
 
     if(unlikely(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
         buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
@@ -122,17 +122,20 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
 
     unsigned int max = host->health_log.max;
     unsigned int count = 0;
-    uint32_t hash_chart = 0;
-    if (chart) hash_chart = simple_hash(chart);
+
+    STRING *chart_string = string_strdupz(chart);
+
     ALARM_ENTRY *ae;
     for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
-        if ((ae->unique_id > after) && (!chart || (ae->hash_chart == hash_chart && !strcmp(ae->chart, chart)))) {
+        if ((ae->unique_id > after) && (!chart || chart_string == ae->chart)) {
             if (likely(count))
                 buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
             count++;
         }
     }
+
+    string_freez(chart_string);
 
     buffer_strcat(wb, "\n]\n");
 
@@ -144,7 +147,7 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
     buffer_sprintf(wb,
                    "\t\t\"%s.%s\": {\n"
                    "\t\t\t\"id\": %lu,\n"
-                   , rc->chart, rc->name
+                   , rrdcalc_chart_name(rc), rrdcalc_name(rc)
                    , (unsigned long)rc->id);
 
     buffer_strcat(wb, "\t\t\t\"value\":");
@@ -164,7 +167,7 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
 
 static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
     char value_string[100 + 1];
-    format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
+    format_value_and_unit(value_string, 100, rc->value, rrdcalc_units(rc), -1);
 
     char hash_id[GUID_LEN + 1];
     uuid_unparse_lower(rc->config_hash_id, hash_id);
@@ -203,23 +206,23 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"value_string\": \"%s\",\n"
                     "\t\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\t\"times_repeat\": %lu,\n"
-                   , rc->chart, rc->name
+                   , rrdcalc_chart_name(rc), rrdcalc_name(rc)
                    , (unsigned long)rc->id
                    , hash_id
-                   , rc->name
-                   , rc->chart
-                   , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
-                   , rc->classification?rc->classification:"Unknown"
-                   , rc->component?rc->component:"Unknown"
-                   , rc->type?rc->type:"Unknown"
+                   , rrdcalc_name(rc)
+                   , rrdcalc_chart_name(rc)
+                   , (rc->rrdset)?rrdset_family(rc->rrdset):""
+                   , rc->classification?rrdcalc_classification(rc):"Unknown"
+                   , rc->component?rrdcalc_component(rc):"Unknown"
+                   , rc->type?rrdcalc_type(rc):"Unknown"
                    , (rc->rrdset)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
-                   , rc->exec?rc->exec:host->health_default_exec
-                   , rc->recipient?rc->recipient:host->health_default_recipient
-                   , rc->source
-                   , rc->units?rc->units:""
-                   , rc->info?rc->info:""
+                   , rc->exec?rrdcalc_exec(rc):string2str(host->health_default_exec)
+                   , rc->recipient?rrdcalc_recipient(rc):string2str(host->health_default_recipient)
+                   , rrdcalc_source(rc)
+                   , rrdcalc_units(rc)
+                   , rrdcalc_info(rc)
                    , rrdcalc_status2string(rc->status)
                    , (unsigned long)rc->last_status_change
                    , (unsigned long)rc->last_updated
@@ -243,8 +246,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     }
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
-        if(rc->dimensions && *rc->dimensions)
-            health_string2json(wb, "\t\t\t", "lookup_dimensions", rc->dimensions, ",\n");
+        if(rc->dimensions)
+            health_string2json(wb, "\t\t\t", "lookup_dimensions", rrdcalc_dimensions(rc), ",\n");
 
         buffer_sprintf(wb,
                 "\t\t\t\"db_after\": %lu,\n"
@@ -310,20 +313,24 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
         while(p && *p && (tok = mystrsep(&p, ", |"))) {
             if(!*tok) continue;
 
-            for(rc = host->alarms; rc ; rc = rc->next) {
+            STRING *tok_string = string_strdupz(tok);
+
+            foreach_rrdcalc_in_rrdhost(host, rc) {
                 if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                     continue;
                 if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
                     continue;
-                if(unlikely(rc->rrdset && rc->rrdset->hash_context == simple_hash(tok)
-                            && !strcmp(rc->rrdset->context, tok)
-                            && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
+                if(unlikely(rc->rrdset
+                             && rc->rrdset->context == tok_string
+                             && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
                     numberOfAlarms++;
             }
+
+            string_freez(tok_string);
         }
     }
     else {
-        for(rc = host->alarms; rc ; rc = rc->next) {
+        foreach_rrdcalc_in_rrdhost(host, rc) {
             if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                 continue;
             if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
@@ -339,8 +346,8 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
 
 static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *)) {
     RRDCALC *rc;
-    int i;
-    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
+    int i = 0;
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -363,7 +370,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
                     "\n\t\"status\": %s,"
                     "\n\t\"now\": %lu,"
                     "\n\t\"alarms\": {\n",
-            host->hostname,
+            rrdhost_hostname(host),
             (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
             host->health_enabled?"true":"false",
             (unsigned long)now_realtime_sec());
@@ -383,7 +390,7 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
     rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                        "\n\t\"alarms\": {\n",
-                   host->hostname);
+                   rrdhost_hostname(host));
 
     health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc_values2json_nolock);
 

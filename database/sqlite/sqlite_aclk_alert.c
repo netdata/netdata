@@ -220,7 +220,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     int rc;
 
     if (unlikely(!wc->alert_updates)) {
-        log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+        log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         return;
     }
 
@@ -300,9 +300,9 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.config_hash = strdupz((char *)uuid_str);
 
         alarm_log.utc_offset = wc->host->utc_offset;
-        alarm_log.timezone = strdupz((char *)wc->host->abbrev_timezone);
+        alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
         alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
-                                                                  strdupz((char *)wc->host->health_default_exec);
+                                                                  strdupz((char *)string2str(wc->host->health_default_exec));
         alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
 
         char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
@@ -374,7 +374,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
             log_access(
                 "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 " batch=%" PRIu64,
                 wc->node_id,
-                wc->host ? wc->host->hostname : "N/A",
+                wc->host ? rrdhost_hostname(wc->host) : "N/A",
                 log_first_sequence_id,
                 log_last_sequence_id,
                 wc->alerts_batch_id);
@@ -424,9 +424,7 @@ void aclk_send_alarm_health_log(char *node_id)
     struct aclk_database_worker_config *wc = find_inactive_wc_by_node_id(node_id);
 
     if (likely(!wc)) {
-        rrd_rdlock();
         RRDHOST *host = find_host_by_node_id(node_id);
-        rrd_unlock();
         if (likely(host))
             wc = (struct aclk_database_worker_config *)host->dbsync_worker;
     }
@@ -460,9 +458,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     RRDHOST *host = wc->host;
     if (unlikely(!host)) {
-        rrd_rdlock();
         host = find_host_by_node_id(wc->node_id);
-        rrd_unlock();
 
         if (unlikely(!host)) {
             log_access(
@@ -554,7 +550,7 @@ void aclk_send_alarm_configuration(char *config_hash)
         return;
     }
 
-    log_access("ACLK REQ [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host ? wc->host->hostname : "N/A", config_hash);
+    log_access("ACLK REQ [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
 
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -664,14 +660,14 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
     }
 
     if (likely(p_alarm_config.cfg_hash)) {
-        log_access("ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? wc->host->hostname : "N/A", config_hash);
+        log_access("ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         freez((char *) cmd.data_param);
         freez(p_alarm_config.cfg_hash);
         destroy_aclk_alarm_configuration(&alarm_config);
     }
     else
-        log_access("ACLK STA [%s (%s)]: Alert config for %s not found.", wc->node_id, wc->host ? wc->host->hostname : "N/A", config_hash);
+        log_access("ACLK STA [%s (%s)]: Alert config for %s not found.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
 
 bind_fail:
     rc = sqlite3_finalize(res);
@@ -697,9 +693,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         return;
 
     struct aclk_database_worker_config *wc  = NULL;
-    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
-    rrd_unlock();
     if (likely(host)) {
         wc = (struct aclk_database_worker_config *)host->dbsync_worker ?
                  (struct aclk_database_worker_config *)host->dbsync_worker :
@@ -716,7 +710,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         wc = (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
 
     if (likely(wc)) {
-        log_access("ACLK REQ [%s (%s)]: ALERTS STREAM from %"PRIu64" batch=%"PRIu64, node_id, wc->host ? wc->host->hostname : "N/A", start_seq_id, batch_id);
+        log_access("ACLK REQ [%s (%s)]: ALERTS STREAM from %"PRIu64" batch=%"PRIu64, node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", start_seq_id, batch_id);
         __sync_synchronize();
         wc->alerts_batch_id = batch_id;
         wc->alerts_start_seq_id = start_seq_id;
@@ -744,7 +738,7 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 
     db_execute(buffer_tostring(sql));
 
-    log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+    log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
 
     buffer_free(sql);
 
@@ -780,17 +774,15 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
         return;
 
     struct aclk_database_worker_config *wc = NULL;
-    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-    rrd_unlock();
 
     if (likely(wc)) {
         log_access(
             "IN [%s (%s)]: Request to send alerts snapshot, snapshot_id %" PRIu64 " and ack_sequence_id %" PRIu64,
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             snapshot_id,
             sequence_id);
         if (wc->alerts_snapshot_id == snapshot_id)
@@ -831,13 +823,13 @@ void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
 #ifdef ENABLE_ACLK
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
-    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0=UNKNOWN");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
     char config_hash_id[GUID_LEN + 1];
     uuid_unparse_lower(ae->config_hash_id, config_hash_id);
 
-    alarm_log->chart = strdupz((char *)ae->chart);
-    alarm_log->name = strdupz((char *)ae->name);
-    alarm_log->family = strdupz((char *)ae->family);
+    alarm_log->chart = strdupz(ae_chart_name(ae));
+    alarm_log->name = strdupz(ae_name(ae));
+    alarm_log->family = strdupz(ae_family(ae));
 
     alarm_log->batch_id = 0;
     alarm_log->sequence_id = 0;
@@ -846,9 +838,9 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->config_hash = strdupz((char *)config_hash_id);
 
     alarm_log->utc_offset = host->utc_offset;
-    alarm_log->timezone = strdupz((char *)host->abbrev_timezone);
-    alarm_log->exec_path = ae->exec ? strdupz((char *)ae->exec) : strdupz((char *)host->health_default_exec);
-    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : strdupz((char *)"");
+    alarm_log->timezone = strdupz(rrdhost_abbrev_timezone(host));
+    alarm_log->exec_path = ae->exec ? strdupz(ae_exec(ae)) : strdupz((char *)string2str(host->health_default_exec));
+    alarm_log->conf_source = ae->source ? strdupz(ae_source(ae)) : strdupz((char *)"");
 
     alarm_log->command = strdupz((char *)edit_command);
 
@@ -861,19 +853,19 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->last_repeat = (time_t)ae->last_repeat;
 
     alarm_log->silenced =
-        ((ae->flags & HEALTH_ENTRY_FLAG_SILENCED) || (ae->recipient && !strncmp((char *)ae->recipient, "silent", 6))) ?
+        ((ae->flags & HEALTH_ENTRY_FLAG_SILENCED) || (ae->recipient && !strncmp(ae_recipient(ae), "silent", 6))) ?
             1 :
             0;
 
-    alarm_log->value_string = strdupz(ae->new_value_string);
-    alarm_log->old_value_string = strdupz(ae->old_value_string);
+    alarm_log->value_string = strdupz(ae_new_value_string(ae));
+    alarm_log->old_value_string = strdupz(ae_old_value_string(ae));
 
     alarm_log->value = (!isnan(ae->new_value)) ? (NETDATA_DOUBLE)ae->new_value : 0;
     alarm_log->old_value = (!isnan(ae->old_value)) ? (NETDATA_DOUBLE)ae->old_value : 0;
 
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-    alarm_log->rendered_info = ae->info ? strdupz(ae->info) : strdupz((char *)"");
-    alarm_log->chart_context = ae->chart_context ? strdupz(ae->chart_context) : strdupz((char *)"");
+    alarm_log->rendered_info = strdupz(ae_info(ae));
+    alarm_log->chart_context = strdupz(ae_chart_context(ae));
 
     freez(edit_command);
 }
@@ -905,7 +897,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
     UNUSED(cmd);
     // we perhaps we don't need this for snapshots
     if (unlikely(!wc->alert_updates)) {
-        log_access("ACLK STA [%s (%s)]: Ignoring alert snapshot event, updates have been turned off for this node.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+        log_access("ACLK STA [%s (%s)]: Ignoring alert snapshot event, updates have been turned off for this node.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         return;
     }
 
@@ -921,7 +913,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
     if (unlikely(!claim_id))
         return;
 
-    log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_id %" PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", wc->alerts_snapshot_id);
+    log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_id %" PRIu64, wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", wc->alerts_snapshot_id);
 
     aclk_mark_alert_cloud_ack(wc->uuid_str, wc->alerts_ack_sequence_id);
 

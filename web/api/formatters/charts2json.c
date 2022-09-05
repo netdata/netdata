@@ -57,11 +57,11 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
-                   , host->hostname
-                   , host->program_version
+                   , rrdhost_hostname(host)
+                   , rrdhost_program_version(host)
                    , get_release_channel()
-                   , host->os
-                   , host->timezone
+                   , rrdhost_os(host)
+                   , rrdhost_timezone(host)
                    , host->rrd_update_every
                    , host->rrd_history_entries
                    , rrd_memory_mode_name(host->rrd_memory_mode)
@@ -74,7 +74,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, st->id);
+            buffer_strcat(wb, rrdset_id(st));
             buffer_strcat(wb, "\": ");
             rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
@@ -84,7 +84,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     }
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(rc->rrdset)
             alarms++;
     }
@@ -117,7 +117,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                                  "\n\t\t\t\"hostname\": \"%s\""
                                  "\n\t\t}"
                                , (found > 0) ? "," : ""
-                               , h->hostname
+                               , rrdhost_hostname(h)
                 );
 
                 found++;
@@ -131,7 +131,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        , "\n\t\t{"
                          "\n\t\t\t\"hostname\": \"%s\""
                          "\n\t\t}"
-                       , host->hostname
+                       , rrdhost_hostname(host)
         );
     }
 
@@ -141,8 +141,8 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 // generate collectors list for the api/v1/info call
 
 struct collector {
-    char *plugin;
-    char *module;
+    const char *plugin;
+    const char *module;
 };
 
 struct array_printer {
@@ -176,8 +176,8 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
-                    .plugin = st->plugin_name ? st->plugin_name : "",
-                    .module = st->module_name ? st->module_name : ""
+                    .plugin = rrdset_plugin_name(st),
+                    .module = rrdset_module_name(st)
             };
             sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));

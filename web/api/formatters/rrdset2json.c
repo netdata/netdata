@@ -45,18 +45,18 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"units\": \"%s\",\n"
         "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
         "\t\t\t\"chart_type\": \"%s\",\n",
-        st->id,
-        st->name,
-        st->type,
-        st->family,
-        st->context,
-        st->title,
-        st->name,
+        rrdset_id(st),
+        rrdset_name(st),
+        rrdset_type(st),
+        rrdset_family(st),
+        rrdset_context(st),
+        rrdset_title(st),
+        rrdset_name(st),
         st->priority,
-        st->plugin_name ? st->plugin_name : "",
-        st->module_name ? st->module_name : "",
-        st->units,
-        st->name,
+        rrdset_plugin_name(st),
+        rrdset_module_name(st),
+        rrdset_units(st),
+        rrdset_name(st),
         rrdset_type_name(st->chart_type));
 
     if (likely(!skip_volatile))
@@ -98,9 +98,9 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
             buffer_strcat(wb, "\t\t\t\t\"");
-        buffer_strcat_jsonescape(wb, rd->id);
+        buffer_strcat_jsonescape(wb, rrddim_id(rd));
         buffer_strcat(wb, "\": { \"name\": \"");
-        buffer_strcat_jsonescape(wb, rd->name);
+        buffer_strcat_jsonescape(wb, rrddim_name(rd));
         buffer_strcat(wb, "\" }");
 
         dimensions++;
@@ -121,7 +121,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
         size_t alarms = 0;
         RRDCALC *rc;
-        for (rc = st->alarms; rc; rc = rc->rrdset_next) {
+        foreach_rrdcalc_in_rrdset(st, rc) {
             buffer_sprintf(
                 wb,
                 "%s"
@@ -131,7 +131,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                 "\t\t\t\t\t\"units\": \"%s\",\n"
                 "\t\t\t\t\t\"update_every\": %d\n"
                 "\t\t\t\t}",
-                (alarms) ? ",\n" : "", rc->name, rc->id, rrdcalc_status2string(rc->status), rc->units,
+                (alarms) ? ",\n" : "", rrdcalc_name(rc), rc->id, rrdcalc_status2string(rc->status), rrdcalc_units(rc),
                 rc->update_every);
 
             alarms++;

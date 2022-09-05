@@ -21,7 +21,6 @@ const char *database_context_cleanup[] = {
 };
 
 sqlite3 *db_context_meta = NULL;
-
 /*
  * Initialize the SQLite database
  * Return 0 on success

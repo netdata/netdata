@@ -7,6 +7,7 @@
 
 #define PARSER_MAX_CALLBACKS 20
 #define PARSER_MAX_RECOVER_KEYWORDS 128
+#define WORKER_PARSER_FIRST_JOB 1
 
 // PARSER return codes
 typedef enum parser_rc {
@@ -68,7 +69,7 @@ typedef struct parser_data {
 } PARSER_DATA;
 
 typedef struct parser {
-    size_t worker_job_ids;
+    size_t worker_job_next_id;
     uint8_t version;                // Parser version
     RRDHOST *host;
     void *input;                    // Input source e.g. stream

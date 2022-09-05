@@ -1020,19 +1020,19 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             label = dim;
         }
         else
-            label = st->name;
+            label = rrdset_name(st);
     }
     if(!units) {
         if(alarm) {
             if(rc->units)
-                units = rc->units;
+                units = rrdcalc_units(rc);
             else
                 units = "";
         }
         else if(options & RRDR_OPTION_PERCENTAGE)
             units = "%";
         else
-            units = st->units;
+            units = rrdset_units(st);
     }
 
     debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"

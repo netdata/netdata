@@ -6,37 +6,38 @@
 // ----------------------------------------------------------------------------
 // RRDFAMILY index
 
-int rrdfamily_compare(void *a, void *b) {
-    if(((RRDFAMILY *)a)->hash_family < ((RRDFAMILY *)b)->hash_family) return -1;
-    else if(((RRDFAMILY *)a)->hash_family > ((RRDFAMILY *)b)->hash_family) return 1;
-    else return strcmp(((RRDFAMILY *)a)->family, ((RRDFAMILY *)b)->family);
+static inline RRDFAMILY *rrdfamily_index_add(RRDHOST *host, RRDFAMILY *rc) {
+    return dictionary_set(host->rrdfamily_root_index, string2str(rc->family), rc, sizeof(RRDFAMILY));
 }
 
-#define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))
-#define rrdfamily_index_del(host, rc) (RRDFAMILY *)avl_remove_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))
-
-static RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id, uint32_t hash) {
-    RRDFAMILY tmp;
-    tmp.family = id;
-    tmp.hash_family = (hash)?hash:simple_hash(tmp.family);
-
-    return (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl_t *) &tmp);
+static inline RRDFAMILY *rrdfamily_index_del(RRDHOST *host, RRDFAMILY *rc) {
+    dictionary_del(host->rrdfamily_root_index, string2str(rc->family));
+    return rc;
 }
+
+static inline RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id) {
+    return dictionary_get(host->rrdfamily_root_index, id);
+}
+
+// ----------------------------------------------------------------------------
+// RRDFAMILY management
 
 RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
-    RRDFAMILY *rc = rrdfamily_index_find(host, id, 0);
+    RRDFAMILY *rc = rrdfamily_index_find(host, id);
     if(!rc) {
         rc = callocz(1, sizeof(RRDFAMILY));
 
-        rc->family = strdupz(id);
-        rc->hash_family = simple_hash(rc->family);
+        rc->family = string_strdupz(id);
 
-        // initialize the variables index
-        avl_init_lock(&rc->rrdvar_root_index, rrdvar_compare);
+        rc->rrdvar_root_index = dictionary_create(
+             DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+            |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+            |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+            );
 
         RRDFAMILY *ret = rrdfamily_index_add(host, rc);
         if(ret != rc)
-            error("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", rc->family, (ret)?ret->family:"NONE");
+            error("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
     }
 
     rc->use_count++;
@@ -48,12 +49,13 @@ void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
     if(!rc->use_count) {
         RRDFAMILY *ret = rrdfamily_index_del(host, rc);
         if(ret != rc)
-            error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", rc->family, (ret)?ret->family:"NONE");
+            error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
         else {
-            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", host->hostname, rc->family);
-            rrdvar_free_remaining_variables(host, &rc->rrdvar_root_index);
+            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", rrdhost_hostname(host), string2str(rc->family));
+            rrdvar_free_remaining_variables(host, rc->rrdvar_root_index);
 
-            freez((void *) rc->family);
+            dictionary_destroy(rc->rrdvar_root_index);
+            string_freez(rc->family);
             freez(rc);
         }
     }

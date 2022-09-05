@@ -173,7 +173,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
             // some interrupt may have changed without changing the total number of lines
             // if the same number of interrupts have been added and removed between two
             // calls of this function.
-            if(unlikely(!irr->rd || strncmp(irr->rd->name, irr->name, MAX_INTERRUPT_NAME) != 0)) {
+            if(unlikely(!irr->rd || strncmp(rrddim_name(irr->rd), irr->name, MAX_INTERRUPT_NAME) != 0)) {
                 irr->rd = rrddim_add(st_system_interrupts, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_set_name(st_system_interrupts, irr->rd, irr->name);
 

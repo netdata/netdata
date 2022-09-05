@@ -14,7 +14,6 @@ int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 #define RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY                 10
 
 // #define LOG_TRANSITIONS 1
-// #define LOG_RRDINSTANCES 1
 
 typedef enum {
     RRD_FLAG_NONE           = 0,
@@ -49,6 +48,9 @@ typedef enum {
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 28), // this context changed because of a db rotation
     RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 29), // this context is not used anymore
     RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS           = (1 << 30), // this context is not used anymore
+
+    // DO NOT ADD (1 << 31) or bigger!
+    // runtime error: left shift of 1 by 31 places cannot be represented in type 'int'
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
@@ -85,10 +87,6 @@ typedef enum {
 #define RRD_FLAGS_PREVENTING_DELETIONS                ( \
      RRD_FLAG_QUEUED                                    \
     |RRD_FLAG_COLLECTED                                 \
-    |RRD_FLAG_UPDATE_REASON_LOAD_SQL                    \
-    |RRD_FLAG_UPDATE_REASON_NEW_OBJECT                  \
-    |RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT              \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_LINKING             \
 )
 
 #define rrd_flag_set_updated(obj, reason) (obj)->flags |=  (RRD_FLAG_UPDATED | (reason))
@@ -295,6 +293,8 @@ static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reaso
 #define rrdcontext_version_hash(host) rrdcontext_version_hash_with_callback(host, NULL, false, NULL)
 static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*callback)(RRDCONTEXT *, bool, void *), bool snapshot, void *bundle);
 
+static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker);
+static void rrdcontext_garbage_collect(void);
 void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 #define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
@@ -303,9 +303,9 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 // ----------------------------------------------------------------------------
 // Updates triggers
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate);
-static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate);
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force);
+static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate, const char *function);
+static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate, const char *function);
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, const char *function);
 
 // ----------------------------------------------------------------------------
 // visualizing flags
@@ -354,109 +354,46 @@ static void rrd_reasons_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
 // logging of all data collected
 
 #ifdef LOG_TRANSITIONS
-static void log_transition(STRING *metric, STRING *instance, STRING *context, RRD_FLAGS flags, const char *msg) {
+static void log_transition(RRDMETRIC *rm, RRDINSTANCE *ri, RRDCONTEXT *rc, const char *function) {
     BUFFER *wb = buffer_create(1000);
+    const char *triggered_on = "triggered on ";
 
-    buffer_sprintf(wb, "RRD TRANSITION: context '%s'", string2str(context));
+    buffer_sprintf(wb, "RRD TRANSITION: %s() ", function);
 
-    if(instance)
-        buffer_sprintf(wb, ", instance '%s'", string2str(instance));
+    if(rm) {
+        buffer_sprintf(wb, "%smetric '%s' of ", triggered_on, string2str(rm->id));
+        triggered_on = "";
+    }
 
-    if(metric)
-        buffer_sprintf(wb, ", metric '%s'", string2str(metric));
+    if(ri) {
+        buffer_sprintf(wb, "%sinstance '%s' of ", triggered_on, string2str(ri->id));
+        triggered_on = "";
+    }
 
-    buffer_sprintf(wb, ", triggered by %s: ", msg);
+    buffer_sprintf(wb, "%scontext '%s' ", triggered_on, string2str(rc->id));
 
+    RRD_FLAGS flags = rc->flags;
+    const char *we_are = "context";
+    if(ri) {
+        flags = ri->flags;
+        we_are = "instance";
+    }
+    if(rm) {
+        flags = rm->flags;
+        we_are = "metric";
+    }
+
+    buffer_sprintf(wb, "%s flags: ", we_are);
     rrd_flags_to_buffer(flags, wb);
 
-    buffer_strcat(wb, ", reasons: ");
-
+    buffer_strcat(wb, ", having reasons: ");
     rrd_reasons_to_buffer(flags, wb);
 
     internal_error(true, "%s", buffer_tostring(wb));
     buffer_free(wb);
 }
 #else
-#define log_transition(metric, instance, context, flags, msg) debug_dummy()
-#endif
-
-#ifdef LOG_RRDINSTANCES
-static void rrdinstance_log(RRDINSTANCE *ri, const char *msg) {
-    char uuid[UUID_STR_LEN];
-
-    uuid_unparse(ri->uuid, uuid);
-
-    BUFFER *wb = buffer_create(1000);
-
-    buffer_sprintf(wb,
-                   "RRDINSTANCE: %s id '%s' (host '%s'), uuid '%s', name '%s', context '%s', title '%s', units '%s', family '%s', priority %zu, chart type '%s', update every %d, rrdset '%s', flags %s%s%s%s%s%s%s%s, first_time_t %ld, last_time_t %ld",
-                   msg,
-                   string2str(ri->id),
-                   ri->rc->rrdhost->hostname,
-                   uuid,
-                   string2str(ri->name),
-                   string2str(ri->rc->id),
-                   string2str(ri->title),
-                   string2str(ri->units),
-                   string2str(ri->family),
-                   ri->priority,
-                   rrdset_type_name(ri->chart_type),
-                   ri->update_every,
-                   ri->rrdset?ri->rrdset->id:"NONE",
-                   ri->flags & RRD_FLAG_DELETED ?"DELETED ":"",
-                   ri->flags & RRD_FLAG_UPDATED ?"UPDATED ":"",
-                   rrd_flag_is_collected(ri) ?"COLLECTED ":"",
-                   rrd_flag_is_archived(ri) ?"ARCHIVED ":"",
-                   ri->flags & RRD_FLAG_OWNLABELS ?"OWNLABELS ":"",
-                   ri->flags & RRD_FLAG_LIVE_RETENTION ?"LIVE ":"",
-                   ri->flags & RRD_FLAG_QUEUED ?"QUEUED ":"",
-                   ri->flags & RRD_FLAG_DONT_TRIGGER ?"BLOCKED ":"",
-                   ri->first_time_t,
-                   ri->last_time_t
-                   );
-
-    buffer_strcat(wb, ", update reasons: { ");
-    for(int i = 0, added = 0; rrdcontext_reasons[i].name ;i++)
-        if(ri->flags & rrdcontext_reasons[i].flag) {
-            if(added) buffer_strcat(wb, ", ");
-            buffer_strcat(wb, rrdcontext_reasons[i].name);
-            added++;
-        }
-    buffer_strcat(wb, " }");
-
-    buffer_strcat(wb, ", labels: { ");
-    if(ri->rrdlabels) {
-        if(!rrdlabels_to_buffer(ri->rrdlabels, wb, "", "=", "'", ", ", NULL, NULL, NULL, NULL))
-            buffer_strcat(wb, "EMPTY }");
-        else
-            buffer_strcat(wb, " }");
-    }
-    else
-        buffer_strcat(wb, "NONE }");
-
-    buffer_strcat(wb, ", metrics: { ");
-    if(ri->rrdmetrics) {
-        RRDMETRIC *v;
-        int i = 0;
-        dfe_start_read((DICTIONARY *)ri->rrdmetrics, v) {
-            buffer_sprintf(wb, "%s%s", i?",":"", v_name);
-            i++;
-        }
-        dfe_done(v);
-
-        if(!i)
-            buffer_strcat(wb, "EMPTY }");
-        else
-            buffer_strcat(wb, " }");
-    }
-    else
-        buffer_strcat(wb, "NONE }");
-
-    internal_error(true, "%s", buffer_tostring(wb));
-    buffer_free(wb);
-}
-#else
-#define rrdinstance_log(ir, msg) debug_dummy()
+#define log_transition(rm, ri, rc, function) debug_dummy()
 #endif
 
 // ----------------------------------------------------------------------------
@@ -577,7 +514,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);
-        internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rm->rrddim->id, uuid1, uuid2);
+        internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rrddim_id(rm->rrddim), uuid1, uuid2);
     }
 
     if(rm->rrddim != rm_new->rrddim)
@@ -616,7 +553,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
 static void rrdmetric_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDMETRIC *rm = value;
 
-    rrdmetric_trigger_updates(rm, false, true);
+    rrdmetric_trigger_updates(rm, false, true, __FUNCTION__);
 }
 
 static void rrdmetrics_create(RRDINSTANCE *ri) {
@@ -649,8 +586,8 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
     if(likely(rm->rrddim))
         return false;
 
-    if((now_realtime_usec() - rm->created_ut) < 600 * USEC_PER_SEC)
-        return false;
+    //if((now_realtime_usec() - rm->created_ut) < 600 * USEC_PER_SEC)
+    //    return false;
 
     rrdmetric_update_retention(rm);
     if(rm->first_time_t || rm->last_time_t)
@@ -659,38 +596,37 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
     return true;
 }
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate) {
+static void rrdmetric_trigger_updates(RRDMETRIC *rm, bool force, bool escalate, const char *function __maybe_unused) {
     if(likely(!force && !(rm->flags & RRD_FLAG_UPDATED))) return;
 
-    if(unlikely(rrd_flag_is_collected(rm) && !rm->rrddim))
-        rrd_flag_set_archived(rm);
+    // logs and statistics
+    log_transition(rm, rm->ri, rm->ri->rc, function);
+    rrdcontext_triggered_update_on_rrdmetric();
 
-    if(unlikely((rm->flags & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) && rrd_flag_is_collected(rm)))
-        rrd_flag_set_archived(rm);
+    if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rm->flags & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD))
+            rrd_flag_set_archived(rm);
 
     rrdmetric_update_retention(rm);
 
-    if(unlikely(escalate && rm->flags & RRD_FLAG_UPDATED && !(rm->ri->flags & RRD_FLAG_DONT_PROCESS))) {
-        log_transition(rm->id, rm->ri->id, rm->ri->rc->id, rm->flags, "RRDMETRIC");
-        rrdinstance_trigger_updates(rm->ri, true, true);
-    }
+    if(unlikely(escalate && rm->flags & RRD_FLAG_UPDATED))
+        rrdinstance_trigger_updates(rm->ri, true, true, __FUNCTION__);
 }
 
 static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
     if(unlikely(!rd->rrdset))
-        fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rd->id);
+        fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rrddim_id(rd));
 
     if(unlikely(!rd->rrdset->rrdhost))
-        fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rd->rrdset->id);
+        fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rrdset_id(rd->rrdset));
 
     if(unlikely(!rd->rrdset->rrdinstance))
-        fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rd->rrdset->id);
+        fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rrdset_id(rd->rrdset));
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
 
     RRDMETRIC trm = {
-        .id = string_strdupz(rd->id),
-        .name = string_strdupz(rd->name),
+        .id = string_dup(rd->id),
+        .name = string_dup(rd->name),
         .flags = RRD_FLAG_NONE,
         .rrddim = rd,
     };
@@ -707,14 +643,14 @@ static inline void rrdmetric_from_rrddim(RRDDIM *rd) {
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
 static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
     if(unlikely(!rd->rrdmetric)) {
-        error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rd->id, function);
+        error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
 
     if(unlikely(rm->rrddim != rd))
-        fatal("RRDMETRIC: '%s' is not linked to RRDDIM '%s' at %s()", string2str(rm->id), rd->id, function);
+        fatal("RRDMETRIC: '%s' is not linked to RRDDIM '%s' at %s()", string2str(rm->id), rrddim_id(rd), function);
 
     return rm;
 }
@@ -727,7 +663,7 @@ static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
         rrd_flag_set_archived(rm);
 
     rm->rrddim = NULL;
-    rrdmetric_trigger_updates(rm, false, true);
+    rrdmetric_trigger_updates(rm, false, true, __FUNCTION__);
     rrdmetric_release(rd->rrdmetric);
     rd->rrdmetric = NULL;
 }
@@ -736,12 +672,12 @@ static inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
     if(unlikely(!rm)) return;
 
-    if(unlikely(rd->flags & (RRDDIM_FLAG_ARCHIVED | RRDDIM_FLAG_OBSOLETE))) {
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED|RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
             rrd_flag_set_archived(rm);
     }
 
-    rrdmetric_trigger_updates(rm, false, true);
+    rrdmetric_trigger_updates(rm, false, true, __FUNCTION__);
 }
 
 static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
@@ -751,7 +687,7 @@ static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
     if(unlikely(!rrd_flag_is_collected(rm)))
         rrd_flag_set_collected(rm);
 
-    rrdmetric_trigger_updates(rm, false, true);
+    rrdmetric_trigger_updates(rm, false, true, __FUNCTION__);
 }
 
 // ----------------------------------------------------------------------------
@@ -807,7 +743,7 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     }
 
     if(ri->rrdset) {
-        if(unlikely((ri->rrdset->flags & RRDSET_FLAG_HIDDEN) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
+        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
             ri->flags |= RRD_FLAG_HIDDEN;
         else
             ri->flags &= ~RRD_FLAG_HIDDEN;
@@ -818,7 +754,6 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
         ri->flags |= RRD_FLAG_HIDDEN;
 
     rrdmetrics_create(ri);
-    rrdinstance_log(ri, "INSERT");
 
     // signal the react callback to do the job
     rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
@@ -828,8 +763,6 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
     (void)id;
     RRDCONTEXT *rc = data; (void)rc;
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
-
-    rrdinstance_log(ri, "DELETE");
 
     internal_error(ri->rrdset, "RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
 
@@ -858,7 +791,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
         uuid_unparse(*ri->rrdset->chart_uuid, uuid2);
-        internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), ri->rrdset->id, uuid1, uuid2);
+        internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), rrdset_id(ri->rrdset), uuid1, uuid2);
     }
 
     if(ri->name != ri_new->name) {
@@ -920,7 +853,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     }
 
     if(ri->rrdset) {
-        if(unlikely((ri->rrdset->flags & RRDSET_FLAG_HIDDEN) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
+        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || (ri->rrdset->state && ri->rrdset->state->is_ar_chart)))
             ri->flags |= RRD_FLAG_HIDDEN;
         else
             ri->flags &= ~RRD_FLAG_HIDDEN;
@@ -934,8 +867,6 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     if(ri->flags & RRD_FLAG_UPDATED)
         ri->flags |= RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT;
 
-    rrdinstance_log(ri, "CONFLICT");
-
     // free the new one
     rrdinstance_free(ri_new);
 
@@ -945,7 +876,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
 static void rrdinstance_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDINSTANCE *ri = value;
 
-    rrdinstance_trigger_updates(ri, false, true);
+    rrdinstance_trigger_updates(ri, false, true, __FUNCTION__);
 }
 
 void rrdinstances_create(RRDCONTEXT *rc) {
@@ -993,9 +924,13 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     return true;
 }
 
-static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate) {
+static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escalate, const char *function __maybe_unused) {
     if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(ri->flags & RRD_FLAG_UPDATED))) return;
+
+    // logs and stats
+    log_transition(NULL, ri, ri->rc, function);
+    rrdcontext_triggered_update_on_rrdinstance();
 
     if(likely(ri->rrdset)) {
         if(unlikely(ri->rrdset->priority != ri->priority)) {
@@ -1015,10 +950,10 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t metrics_active = 0, metrics_deleted = 0;
     bool live_retention = true, currently_collected = false;
-    {
+    if(dictionary_stats_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
-            if(!(rm->flags & RRD_FLAG_LIVE_RETENTION))
+            if(unlikely(!(rm->flags & RRD_FLAG_LIVE_RETENTION)))
                 live_retention = false;
 
             if (unlikely((rrdmetric_should_be_deleted(rm)))) {
@@ -1027,7 +962,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
                 continue;
             }
 
-            if(rm->flags & RRD_FLAG_COLLECTED)
+            if(rm->flags & RRD_FLAG_COLLECTED && rm->first_time_t)
                 currently_collected = true;
 
             metrics_active++;
@@ -1043,9 +978,9 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
         dfe_done(rm);
     }
 
-    if(live_retention && !(ri->flags & RRD_FLAG_LIVE_RETENTION))
+    if(unlikely(live_retention && !(ri->flags & RRD_FLAG_LIVE_RETENTION)))
         ri->flags |= RRD_FLAG_LIVE_RETENTION;
-    else if(!live_retention && (ri->flags & RRD_FLAG_LIVE_RETENTION))
+    else if(unlikely(!live_retention && (ri->flags & RRD_FLAG_LIVE_RETENTION)))
         ri->flags &= ~RRD_FLAG_LIVE_RETENTION;
 
     if(unlikely(!metrics_active)) {
@@ -1080,7 +1015,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
                 rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
 
-            if(unlikely(live_retention))
+            if(likely(live_retention))
                 rrd_flag_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
         }
         else {
@@ -1103,18 +1038,16 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, bool force, bool escala
         }
     }
 
-    if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED && !(ri->rc->flags & RRD_FLAG_DONT_PROCESS))) {
-        log_transition(NULL, ri->id, ri->rc->id, ri->flags, "RRDINSTANCE");
-        rrdcontext_trigger_updates(ri->rc, true);
-    }
+    if(unlikely(escalate && ri->flags & RRD_FLAG_UPDATED))
+        rrdcontext_trigger_updates(ri->rc, true, __FUNCTION__);
 }
 
 static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT trc = {
-        .id = string_strdupz(st->context),
-        .title = string_strdupz(st->title),
-        .units = string_strdupz(st->units),
-        .family = string_strdupz(st->family),
+        .id = string_dup(st->context),
+        .title = string_dup(st->title),
+        .units = string_dup(st->units),
+        .family = string_dup(st->family),
         .priority = st->priority,
         .chart_type = st->chart_type,
         .flags = RRD_FLAG_NONE,
@@ -1125,11 +1058,11 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
-        .id = string_strdupz(st->id),
-        .name = string_strdupz(st->name),
-        .units = string_strdupz(st->units),
-        .family = string_strdupz(st->family),
-        .title = string_strdupz(st->title),
+        .id = string_dup(st->id),
+        .name = string_dup(st->name),
+        .units = string_dup(st->units),
+        .family = string_dup(st->family),
+        .title = string_dup(st->title),
         .chart_type = st->chart_type,
         .priority = st->priority,
         .update_every = st->update_every,
@@ -1192,7 +1125,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         ri_old->flags &= ~RRD_FLAG_DONT_PROCESS;
         rc_old->flags &= ~RRD_FLAG_DONT_PROCESS;
 
-        rrdinstance_trigger_updates(ri_old, true, true);
+        rrdinstance_trigger_updates(ri_old, true, true, __FUNCTION__);
 
         ri_old->flags |= RRD_FLAG_DONT_PROCESS;
         rrdinstance_release(ria_old);
@@ -1205,10 +1138,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
             rc_old->first_time_t = 0;
             rc_old->last_time_t = 0;
             rrdcontext_unlock(rc_old);
-            rrdcontext_trigger_updates(rc_old, true);
+            rrdcontext_trigger_updates(rc_old, true, __FUNCTION__);
         }
         else
-            rrdcontext_trigger_updates(rc_old, true);
+            rrdcontext_trigger_updates(rc_old, true, __FUNCTION__);
         */
 
         rrdcontext_release(rca_old);
@@ -1223,14 +1156,14 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
     if(unlikely(!st->rrdinstance)) {
-        error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", st->id, function);
+        error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
 
     if(unlikely(ri->rrdset != st))
-        fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), st->id, function);
+        fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), rrdset_id(st), function);
 
     return ri;
 }
@@ -1250,7 +1183,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     ri->rrdset = NULL;
 
     ri->flags &= ~RRD_FLAG_DONT_PROCESS;
-    rrdinstance_trigger_updates(ri, false, true);
+    rrdinstance_trigger_updates(ri, false, true, __FUNCTION__);
     ri->flags |= RRD_FLAG_DONT_PROCESS;
 
     rrdinstance_release(st->rrdinstance);
@@ -1267,26 +1200,26 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
-    STRING *old = ri->name;
-    ri->name = string_strdupz(st->name);
+    if(st->name != ri->name) {
+        STRING *old = ri->name;
+        ri->name = string_dup(st->name);
+        string_freez(old);
 
-    if(ri->name != old)
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_NAME);
-
-    string_freez(old);
-
-    rrdinstance_trigger_updates(ri, false, true);
+        rrdinstance_trigger_updates(ri, false, true, __FUNCTION__);
+    }
 }
 
 static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st) {
-    if(unlikely(st->flags & (RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)))
-        rrd_flag_set_archived(ri);
+    if(unlikely(ri->rrdset != st))
+        fatal("RRDCONTEXT: instance '%s' is not linked to chart '%s' on host '%s'",
+              string2str(ri->id), rrdset_id(st), rrdhost_hostname(st->rrdhost));
 
-    if(unlikely((st->flags & RRDSET_FLAG_HIDDEN) && !(ri->flags & RRD_FLAG_HIDDEN))) {
+    if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)) && !(ri->flags & RRD_FLAG_HIDDEN))) {
         ri->flags |= RRD_FLAG_HIDDEN;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
     }
-    else if(unlikely(!(st->flags & RRDSET_FLAG_HIDDEN) && (ri->flags & RRD_FLAG_HIDDEN))) {
+    else if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)) && (ri->flags & RRD_FLAG_HIDDEN))) {
         ri->flags &= ~RRD_FLAG_HIDDEN;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
     }
@@ -1296,10 +1229,13 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED|RRDSET_FLAG_OBSOLETE)))
+        rrd_flag_set_archived(ri);
+
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
     ri->flags &= ~RRD_FLAG_DONT_PROCESS;
-    rrdinstance_trigger_updates(ri, false, true);
+    rrdinstance_trigger_updates(ri, false, true, __FUNCTION__);
     ri->flags |= RRD_FLAG_DONT_PROCESS;
 }
 
@@ -1309,13 +1245,16 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
-    if(unlikely(!rrd_flag_is_collected(ri)))
-        rrd_flag_set_collected(ri);
+    if(dictionary_stats_entries(ri->rrdmetrics) > 0) {
 
-    if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
-        ri->flags &= ~RRD_FLAG_DONT_PROCESS;
+        if(unlikely(!rrd_flag_is_collected(ri)))
+            rrd_flag_set_collected(ri);
 
-    rrdinstance_trigger_updates(ri, false, true);
+        if(unlikely(ri->flags & RRD_FLAG_DONT_PROCESS))
+            ri->flags &= ~RRD_FLAG_DONT_PROCESS;
+
+        rrdinstance_trigger_updates(ri, false, true, __FUNCTION__);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1595,7 +1534,7 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 static void rrdcontext_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
-    rrdcontext_trigger_updates(rc, false);
+    rrdcontext_trigger_updates(rc, false, __FUNCTION__);
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
@@ -1649,9 +1588,13 @@ static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
     return true;
 }
 
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force, const char *function __maybe_unused) {
     if(unlikely(rc->flags & RRD_FLAG_DONT_PROCESS)) return;
     if(unlikely(!force && !(rc->flags & RRD_FLAG_UPDATED))) return;
+
+    // logs and stats
+    log_transition(NULL, NULL, rc, function);
+    rrdcontext_triggered_update_on_rrdcontext();
 
     rrdcontext_lock(rc);
 
@@ -1659,7 +1602,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
-    {
+    if(dictionary_stats_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
             if(likely(!(ri->flags & RRD_FLAG_HIDDEN)))
@@ -1674,7 +1617,7 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
                 continue;
             }
 
-            if(ri->flags & RRD_FLAG_COLLECTED)
+            if(ri->flags & RRD_FLAG_COLLECTED && ri->first_time_t)
                 currently_collected = true;
 
             internal_error(rc->units != ri->units,
@@ -1768,8 +1711,6 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, bool force) {
     }
 
     if(unlikely(rc->flags & RRD_FLAG_UPDATED)) {
-        log_transition(NULL, NULL, rc->id, rc->flags, "RRDCONTEXT");
-
         if(check_if_cloud_version_changed_unsafe(rc, false)) {
             rc->version = rrdcontext_get_next_version(rc);
 
@@ -1945,7 +1886,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         info("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', while node '%s' has an active context streaming.",
-              cmd->claim_id, cmd->node_id, host->hostname);
+              cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         // disable it temporarily, so that our worker will not attempt to send messages in parallel
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
@@ -1955,7 +1896,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     if(cmd->version_hash != our_version_hash) {
         error("RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". Sending snapshot of all contexts.",
-              cmd->version_hash, host->hostname, our_version_hash);
+              cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
 #ifdef ENABLE_ACLK
         // prepare the snapshot
@@ -1977,11 +1918,11 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 #endif
     }
 
-    internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", host->hostname);
+    internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", rrdhost_hostname(host));
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
     uuid_unparse_lower(*host->node_id, node_str);
-    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, host->hostname);
+    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
@@ -2006,12 +1947,12 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but node '%s' does not have active context streaming. Ignoring command.",
-              cmd->claim_id, cmd->node_id, host->hostname);
+              cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         return;
     }
 
-    internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", host->hostname);
+    internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", rrdhost_hostname(host));
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
@@ -2378,7 +2319,7 @@ static inline int rrdcontext_to_json_callback(const char *id, void *value, void 
 
 int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     if(!host->rrdctx) {
-        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, host->hostname);
+        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -2418,7 +2359,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     if(!host->rrdctx) {
-        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, host->hostname);
+        error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -2440,7 +2381,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
                        ",\n\t\"machine_guid\": \"%s\""
                        ",\n\t\"node_id\": \"%s\""
                        ",\n\t\"claim_id\": \"%s\""
-                   , host->hostname
+                   , rrdhost_hostname(host)
                    , host->machine_guid
                    , node_uuid
                    , host->aclk_state.claimed_id ? host->aclk_state.claimed_id : ""
@@ -2529,7 +2470,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
     ctx_get_dimension_list(&ri->uuid, rrdinstance_load_dimension, ri);
     ctx_get_label_list(&ri->uuid, rrdinstance_load_clabel, ri);
     ri->flags &= ~RRD_FLAG_DONT_PROCESS;
-    rrdinstance_trigger_updates(ri, true, true);
+    rrdinstance_trigger_updates(ri, true, true, __FUNCTION__);
 
     // let the instance be in "don't process" mode
     // so that we process it once, when it is collected
@@ -2568,9 +2509,11 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     RRDCONTEXT *rc;
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
         rc->flags &= ~RRD_FLAG_DONT_PROCESS;
-        rrdcontext_trigger_updates(rc, true);
+        rrdcontext_trigger_updates(rc, true, __FUNCTION__);
     }
     dfe_done(rc);
+
+    rrdcontext_garbage_collect_single_host(host, false);
 }
 
 // ----------------------------------------------------------------------------
@@ -2679,19 +2622,18 @@ static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS r
 
             rrd_flag_set_updated(rm, reason);
 
-            rm->flags &= ~RRD_FLAG_DONT_PROCESS;
-            rrdmetric_trigger_updates(rm, true, false);
+            rrdmetric_trigger_updates(rm, true, false, __FUNCTION__);
         }
         dfe_done(rm);
 
         ri->flags &= ~RRD_FLAG_DONT_PROCESS;
-        rrdinstance_trigger_updates(ri, true, false);
+        rrdinstance_trigger_updates(ri, true, false, __FUNCTION__);
         ri->flags |= RRD_FLAG_DONT_PROCESS;
     }
     dfe_done(ri);
 
     rc->flags &= ~RRD_FLAG_DONT_PROCESS;
-    rrdcontext_trigger_updates(rc, true);
+    rrdcontext_trigger_updates(rc, true, __FUNCTION__);
 }
 
 static void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, int job_id) {
@@ -2727,50 +2669,88 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
         error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.", rc->hub.id, rc->hub.version);
 }
 
+static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker) {
+
+    internal_error(true, "RRDCONTEXT: garbage collecting context structures of host '%s'", rrdhost_hostname(host));
+
+    RRDCONTEXT *rc;
+    dfe_start_write((DICTIONARY *)host->rrdctx, rc) {
+        if(worker) worker_is_busy(WORKER_JOB_CLEANUP);
+
+        rrdcontext_lock(rc);
+
+        RRDINSTANCE *ri;
+        dfe_start_write(rc->rrdinstances, ri) {
+            RRDMETRIC *rm;
+            dfe_start_write(ri->rrdmetrics, rm) {
+                if(rrdmetric_should_be_deleted(rm)) {
+                    if(worker) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                    if(dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id)) != 0)
+                        error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                              string2str(rm->id),
+                              string2str(ri->id),
+                              string2str(rc->id),
+                              rrdhost_hostname(host));
+                    else
+                        internal_error(
+                            true,
+                            "RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', deleted from rrdmetrics dictionary.",
+                            string2str(rm->id),
+                            string2str(ri->id),
+                            string2str(rc->id),
+                            rrdhost_hostname(host));
+                }
+            }
+            dfe_done(rm);
+
+            if(rrdinstance_should_be_deleted(ri)) {
+                if(worker) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+                if(dictionary_del_having_write_lock(rc->rrdinstances, string2str(ri->id)) != 0)
+                    error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                          string2str(ri->id),
+                          string2str(rc->id),
+                          rrdhost_hostname(host));
+                else
+                    internal_error(
+                        true,
+                        "RRDCONTEXT: instance '%s' of context '%s' of host '%s', deleted from rrdmetrics dictionary.",
+                        string2str(ri->id),
+                        string2str(rc->id),
+                        rrdhost_hostname(host));
+            }
+        }
+        dfe_done(ri);
+
+        if(unlikely(rrdcontext_should_be_deleted(rc))) {
+            if(worker) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+            rrdcontext_delete_from_sql_unsafe(rc);
+
+            if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
+                error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                      string2str(rc->id),
+                      rrdhost_hostname(host));
+            else
+                internal_error(
+                    true,
+                    "RRDCONTEXT: context '%s' of host '%s', deleted from rrdmetrics dictionary.",
+                    string2str(rc->id),
+                    rrdhost_hostname(host));
+
+            fprintf(stderr, "RRDCONTEXT: deleted context '%s'", string2str(rc->id));
+        }
+
+        // the item is referenced in the dictionary
+        // so, it is still here to unlock, even if we have deleted it
+        rrdcontext_unlock(rc);
+    }
+    dfe_done(rc);
+}
+
 static void rrdcontext_garbage_collect(void) {
     rrd_rdlock();
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        RRDCONTEXT *rc;
-        dfe_start_write((DICTIONARY *)host->rrdctx, rc) {
-            worker_is_busy(WORKER_JOB_CLEANUP);
-
-            rrdcontext_lock(rc);
-
-            if(unlikely(rrdcontext_should_be_deleted(rc))) {
-                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                rrdcontext_delete_from_sql_unsafe(rc);
-
-                if(dictionary_del_having_write_lock((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
-                    error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                          string2str(rc->id), host->hostname);
-            }
-            else {
-                RRDINSTANCE *ri;
-                dfe_start_write(rc->rrdinstances, ri) {
-                    if(rrdinstance_should_be_deleted(ri)) {
-                        worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                        dictionary_del_having_write_lock(rc->rrdinstances, string2str(ri->id));
-                    }
-                    else {
-                        RRDMETRIC *rm;
-                        dfe_start_write(ri->rrdmetrics, rm) {
-                            if(rrdmetric_should_be_deleted(rm)) {
-                                worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                                dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id));
-                            }
-                        }
-                        dfe_done(rm);
-                    }
-                }
-                dfe_done(ri);
-            }
-
-            // the item is referenced in the dictionary
-            // so, it is still here to unlock, even if we have deleted it
-            rrdcontext_unlock(rc);
-        }
-        dfe_done(rc);
+        rrdcontext_garbage_collect_single_host(host, true);
     }
     rrd_unlock();
 }
@@ -2895,7 +2875,7 @@ void *rrdcontext_main(void *ptr) {
                         // delete it from the master dictionary
                         if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
                             error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                                  string2str(id), host->hostname);
+                                  string2str(id), rrdhost_hostname(host));
 
                         string_freez(id);
                     }

@@ -23,7 +23,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         }
         buffer_strcat(wb, separator);
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
-        buffer_strcat(wb, d->name);
+        buffer_strcat(wb, rrddim_name(d));
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
         i++;
     }

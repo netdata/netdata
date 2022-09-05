@@ -333,9 +333,7 @@ extern int simple_pattern_is_potential_name(SIMPLE_PATTERN *p)
 }
 
 char *simple_pattern_trim_around_equal(char *src) {
-    char *store = mallocz(strlen(src) +1);
-    if(!store)
-        return NULL;
+    char *store = mallocz(strlen(src) + 1);
 
     char *dst = store;
     while (*src) {

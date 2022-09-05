@@ -123,24 +123,24 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     buffer_sprintf(
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
-        (host->tags) ? host->tags : "",
+        (host->tags) ? rrdhost_tags(host) : "",
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
         rd->last_collected_value,
         (unsigned long long)rd->last_collected_time.tv_sec);
@@ -163,13 +163,13 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
@@ -182,11 +182,11 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
-        (host->tags) ? host->tags : "",
+        (host->tags) ? rrdhost_tags(host) : "",
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
         value,
         (unsigned long long)last_t);

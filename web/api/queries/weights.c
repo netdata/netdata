@@ -121,14 +121,14 @@ static void register_result(DICTIONARY *results,
     struct register_result t = {
         .flags = flags,
         .st = st,
-        .chart_id = st->id,
-        .context = st->context,
-        .dim_name = d->name,
+        .chart_id = rrdset_id(st),
+        .context = rrdset_context(st),
+        .dim_name = rrddim_name(d),
         .value = v
     };
 
     char buf[5000 + 1];
-    snprintfz(buf, 5000, "%s:%s", st->id, d->name);
+    snprintfz(buf, 5000, "%s:%s", rrdset_id(st), rrddim_name(d));
     dictionary_set(results, buf, &t, sizeof(struct register_result));
 }
 
@@ -541,7 +541,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                          group_time, options, NULL, context_param_list, group_options,
                          timeout, tier);
     if(!high_rrdr) {
-        info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
 
@@ -551,11 +551,11 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_points     += high_rrdr->internal.db_points_read;
     stats->result_points += high_rrdr->internal.result_points_generated;
     if(!high_rrdr->d) {
-        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
     if(high_rrdr->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        info("Metric correlations: rrd2rrdr() on highlighted window timed out '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() on highlighted window timed out '%s'.", rrdset_name(st));
         goto cleanup;
     }
     int high_points = rrdr_rows(high_rrdr);
@@ -571,7 +571,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                     group_time, options, NULL, context_param_list, group_options,
                     (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), tier);
     if(!base_rrdr) {
-        info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
 
@@ -581,15 +581,15 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_points     += base_rrdr->internal.db_points_read;
     stats->result_points += base_rrdr->internal.result_points_generated;
     if(!base_rrdr->d) {
-        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", rrdset_name(st));
         goto cleanup;
     }
     if (base_rrdr->d != high_rrdr->d) {
-        info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", st->name);
+        info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", rrdset_name(st));
         goto cleanup;
     }
     if(base_rrdr->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        info("Metric correlations: rrd2rrdr() on baseline window timed out '%s'.", st->name);
+        info("Metric correlations: rrd2rrdr() on baseline window timed out '%s'.", rrdset_name(st));
         goto cleanup;
     }
     int base_points = rrdr_rows(base_rrdr);
@@ -605,7 +605,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     // for each dimension
     RRDDIM *d;
     int i;
-    for(i = 0, d = base_rrdr->st->dimensions ; d && i < base_rrdr->d; i++, d = d->next) {
+    for(i = 0, d = base_rrdr->st->dimensions; d && i < base_rrdr->d; i++, d = d->next) {
 
         // skip the not evaluated ones
         if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))
@@ -692,7 +692,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         NETDATA_DOUBLE baseline_average = NAN;
         NETDATA_DOUBLE base_anomaly_rate = 0;
         value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &baseline_average, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &baseline_average, rrddim_id(d), 1,
                                   baseline_after, baseline_before,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
@@ -709,7 +709,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         NETDATA_DOUBLE highlight_average = NAN;
         NETDATA_DOUBLE high_anomaly_rate = 0;
         value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &highlight_average, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &highlight_average, rrddim_id(d), 1,
                                   after, before,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
@@ -734,7 +734,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         char highlighted_countif_options[50 + 1];
         snprintfz(highlighted_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
 
-        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, rrddim_id(d), 1,
                                   after, before,
                                   RRDR_GROUPING_COUNTIF,highlighted_countif_options,
                                   group_time, options,
@@ -803,7 +803,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
         NETDATA_DOUBLE average = NAN;
         NETDATA_DOUBLE anomaly_rate = 0;
         value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &average, d->id, 1,
+        ret = rrdset2value_api_v1(st, NULL, &average, rrddim_id(d), 1,
                                   after, before,
                                   group, group_options, group_time, options,
                                   NULL, NULL,
@@ -1006,8 +1006,8 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
-            if(!contexts || simple_pattern_matches(contexts, st->context))
-                dictionary_set(charts, st->name, NULL, 0);
+            if(!contexts || simple_pattern_matches(contexts, rrdset_context(st)))
+                dictionary_set(charts, rrdset_name(st), NULL, 0);
         }
     }
     rrdhost_unlock(host);

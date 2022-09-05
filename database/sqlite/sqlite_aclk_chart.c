@@ -153,10 +153,10 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
-        chart_payload.name = (char *)st->name;
+        chart_payload.name = (char *)rrdset_name(st);
         chart_payload.node_id = wc->node_id;
         chart_payload.claim_id = claim_id;
-        chart_payload.id = strdupz(st->id);
+        chart_payload.id = strdupz(rrdset_id(st));
 
         chart_payload.chart_labels = rrdlabels_create();
         rrdlabels_copy(chart_payload.chart_labels, st->state->chart_labels);
@@ -304,7 +304,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         log_access(
             "ACLK STA [%s (%s)]: Ignoring chart push event, updates have been turned off for this node.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A");
+            wc->host ? rrdhost_hostname(wc->host) : "N/A");
         return;
     }
 
@@ -504,7 +504,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         log_access(
             "ACLK REQ [%s (%s)]: Sending chart config for %s.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             hash_id);
         aclk_chart_config_updated(&chart_config, 1);
         destroy_chart_config_updated(&chart_config);
@@ -512,7 +512,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         log_access(
             "ACLK STA [%s (%s)]: Chart config for %s not found.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             hash_id);
 
 bind_fail:
@@ -552,7 +552,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
         log_access(
             "ACLK STA [%s (%s)]: CHARTS ACKNOWLEDGED IN THE DATABASE UP TO %" PRIu64,
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             cmd.param1);
 
 bind_fail:
@@ -637,7 +637,7 @@ void aclk_get_chart_config(char **hash_id)
         log_access(
             "ACLK REQ [%s (%s)]: Request %d for chart config with hash %s received.",
             wc->node_id,
-            wc->host ? wc->host->hostname : "N/A",
+            wc->host ? rrdhost_hostname(wc->host) : "N/A",
             i,
             hash_id[i]);
         cmd.data_param = (void *)strdupz(hash_id[i]);
@@ -660,11 +660,10 @@ static void aclk_submit_param_command(char *node_id, enum aclk_database_opcode a
     cmd.opcode = aclk_command;
     cmd.param1 = param;
 
-    rrd_rdlock();
     RRDHOST *host = find_host_by_node_id(node_id);
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-    rrd_unlock();
+
     if (wc)
         aclk_database_enq_cmd(wc, &cmd);
     else {
@@ -702,8 +701,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
 
     struct aclk_database_worker_config *wc  = find_inactive_wc_by_node_id(node_id);
     rrd_rdlock();
-    RRDHOST *host = localhost;
-    while(host) {
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
         if (wc || (host->node_id && !(uuid_compare(*host->node_id, node_uuid)))) {
             rrd_unlock();
             if (!wc)
@@ -771,10 +770,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
             }
             return;
         }
-        host = host->next;
     }
     rrd_unlock();
-    return;
 }
 
 #define SQL_SELECT_HOST_MEMORY_MODE "SELECT memory_mode FROM chart WHERE host_id = @host_id LIMIT 1;"
@@ -826,7 +823,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc)
         return;
 
     if (wc->host && rrdhost_flag_check(wc->host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        internal_error(true, "Skipping aclk_update_retention for host %s because context streaming is enabled", wc->host->hostname);
+        internal_error(true, "Skipping aclk_update_retention for host %s because context streaming is enabled", rrdhost_hostname(wc->host));
         return;
     }
 
@@ -1093,9 +1090,9 @@ void queue_dimension_to_aclk(RRDDIM *rd, time_t last_updated)
     memset(&dim_payload, 0, sizeof(dim_payload));
     dim_payload.node_id = wc->node_id;
     dim_payload.claim_id = claim_id;
-    dim_payload.name = rd->name;
-    dim_payload.id = rd->id;
-    dim_payload.chart_id = rd->rrdset->id;
+    dim_payload.name = rrddim_name(rd);
+    dim_payload.id = rrddim_id(rd);
+    dim_payload.chart_id = rrdset_id(rd->rrdset);
     dim_payload.created_at.tv_sec = created_at;
     dim_payload.last_timestamp.tv_sec = last_updated;
 
@@ -1144,9 +1141,9 @@ void aclk_send_dimension_update(RRDDIM *rd)
             rd->rrdset->rrdhost->dbsync_worker,
             claim_id,
             &rd->metric_uuid,
-            rd->id,
-            rd->name,
-            rd->rrdset->id,
+            rrddim_id(rd),
+            rrddim_name(rd),
+            rrdset_id(rd->rrdset),
             first_entry_t,
             live ? 0 : last_entry_t,
             NULL);
@@ -1155,9 +1152,9 @@ void aclk_send_dimension_update(RRDDIM *rd)
             debug(
                 D_ACLK_SYNC,
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld)",
-                rd->rrdset->rrdhost->hostname,
-                rd->rrdset->name,
-                rd->name,
+                rrdhost_hostname(rd->rrdset->rrdhost),
+                rrdset_name(rd->rrdset),
+                rrddim_name(rd),
                 live,
                 first_entry_t,
                 last_entry_t);
@@ -1165,9 +1162,9 @@ void aclk_send_dimension_update(RRDDIM *rd)
             debug(
                 D_ACLK_SYNC,
                 "%s: Update dimension chart=%s dim=%s live=%d (%ld, %ld) collected %ld seconds ago",
-                rd->rrdset->rrdhost->hostname,
-                rd->rrdset->name,
-                rd->name,
+                rrdhost_hostname(rd->rrdset->rrdhost),
+                rrdset_name(rd->rrdset),
+                rrddim_name(rd),
                 live,
                 first_entry_t,
                 last_entry_t,
@@ -1280,15 +1277,15 @@ void sql_check_chart_liveness(RRDSET *st) {
 
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
-            debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", st->name);
+            debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", rrdset_name(st));
             rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
     else
-        debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", st->name);
+        debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", rrdset_name(st));
     time_t mark = now_realtime_sec();
 
-    debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", st->name);
+    debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", rrdset_name(st));
     rrddim_foreach_read(rd, st) {
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN))
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));

@@ -10,8 +10,8 @@ extern void analytics_build_info (BUFFER *b);
 extern int aclk_connected;
 
 struct collector {
-    char *plugin;
-    char *module;
+    const char *plugin;
+    const char *module;
 };
 
 struct array_printer {
@@ -286,8 +286,10 @@ void analytics_collectors(void)
     rrdset_foreach_read(st, localhost)
     {
         if (rrdset_is_available_for_viewers(st)) {
-            struct collector col = { .plugin = st->plugin_name ? st->plugin_name : "",
-                                     .module = st->module_name ? st->module_name : "" };
+            struct collector col = {
+                .plugin = rrdset_plugin_name(st),
+                .module = rrdset_module_name(st)
+            };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
         }
@@ -441,7 +443,7 @@ void analytics_alarms(void)
     int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[10];
     RRDCALC *rc;
-    for (rc = localhost->alarms; rc; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(localhost, rc) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -539,7 +541,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_alarms_notifications();
 
     analytics_set_data(
-        &analytics_data.netdata_config_is_parent, (localhost->next || configured_as_parent()) ? "true" : "false");
+        &analytics_data.netdata_config_is_parent, (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false");
 
     char *claim_id = get_agent_claimid();
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, claim_id ? "true" : "false");

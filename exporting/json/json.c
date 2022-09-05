@@ -145,7 +145,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
-    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+    const char *tags_pre = "", *tags_post = "", *tags = rrdhost_tags(host);
     if (!tags)
         tags = "";
 
@@ -187,21 +187,20 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "\"timestamp\":%llu}",
 
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         tags_pre,
         tags,
         tags_post,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
-        st->id,
-        st->name,
-        st->family,
-        st->context,
-        st->type,
-        st->units,
-
-        rd->id,
-        rd->name,
+        rrdset_id(st),
+        rrdset_name(st),
+        rrdset_family(st),
+        rrdset_context(st),
+        rrdset_type(st),
+        rrdset_units(st),
+        rrddim_id(rd),
+        rrddim_name(rd),
         rd->last_collected_value,
 
         (unsigned long long)rd->last_collected_time.tv_sec);
@@ -231,7 +230,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
     if(isnan(value))
         return 0;
 
-    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+    const char *tags_pre = "", *tags_post = "", *tags = rrdhost_tags(host);
     if (!tags)
         tags = "";
 
@@ -272,21 +271,20 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"timestamp\": %llu}",
 
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         tags_pre,
         tags,
         tags_post,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
-        st->id,
-        st->name,
-        st->family,
-        st->context,
-        st->type,
-        st->units,
-
-        rd->id,
-        rd->name,
+        rrdset_id(st),
+        rrdset_name(st),
+        rrdset_family(st),
+        rrdset_context(st),
+        rrdset_type(st),
+        rrdset_units(st),
+        rrddim_id(rd),
+        rrddim_name(rd),
         value,
 
         (unsigned long long)last_t);

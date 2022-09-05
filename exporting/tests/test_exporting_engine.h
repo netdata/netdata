@@ -4,6 +4,7 @@
 #define TEST_EXPORTING_ENGINE_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "database/rrdvar.h"
 
 #include "exporting/exporting_engine.h"
 #include "exporting/graphite/graphite.h"

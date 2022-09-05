@@ -701,8 +701,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if (context && !chart) {
         RRDSET *st1;
 
-        uint32_t context_hash = simple_hash(context);
-
         SIMPLE_PATTERN *chart_label_key_pattern = NULL;
         if(chart_label_key)
             chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
@@ -711,14 +709,16 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         if(chart_labels_filter)
             chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
+        STRING *context_string = string_strdupz(context);
         rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
-            if (st1->hash_context == context_hash && !strcmp(st1->context, context) &&
+            if (st1->context == context_string &&
                 (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_label_key_pattern, ':')) &&
                 (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_labels_filter_pattern, ':')))
                     build_context_param_list(owa, &context_param_list, st1);
         }
         rrdhost_unlock(host);
+        string_freez(context_string);
 
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
@@ -1055,7 +1055,7 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
     rrdhost_rdlock(host);
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -1086,7 +1086,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        buffer_sprintf(wb, "\t\t\"%s\"", host->hostname);
+        buffer_sprintf(wb, "\t\t\"%s\"", rrdhost_hostname(host));
         count++;
     }
 
@@ -1101,7 +1101,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         buffer_sprintf(
             wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
             , host->machine_guid
-            , host->hostname
+            , rrdhost_hostname(host)
             , (host->receiver || host == localhost) ? "true" : "false"
             , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
             );
@@ -1148,7 +1148,7 @@ extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 {
     buffer_strcat(wb, "{\n");
-    buffer_sprintf(wb, "\t\"version\": \"%s\",\n", host->program_version);
+    buffer_sprintf(wb, "\t\"version\": \"%s\",\n", rrdhost_program_version(host));
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
 
     web_client_api_request_v1_info_mirrored_hosts(wb);

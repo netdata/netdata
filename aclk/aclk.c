@@ -762,7 +762,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
         node_instance_creation_t node_instance_creation = {
             .claim_id = localhost->aclk_state.claimed_id,
             .hops = host->system_info->hops,
-            .hostname = host->hostname,
+            .hostname = rrdhost_hostname(host),
             .machine_guid = host->machine_guid
         };
         create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
@@ -829,7 +829,7 @@ void aclk_send_node_instances()
             char host_id[UUID_STR_LEN];
             uuid_unparse_lower(list->host_id, host_id);
 
-            RRDHOST *host = rrdhost_find_by_guid(host_id, 0);
+            RRDHOST *host = rrdhost_find_by_guid(host_id);
             struct capability caps[] = {
                 { .name = "proto", .version = 1,                     .enabled = 1 },
                 { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
@@ -867,7 +867,7 @@ void aclk_send_node_instances()
             rrdhost_aclk_state_unlock(localhost);
             info("Queuing registration for host=%s, hops=%d",(char*)node_instance_creation.machine_guid,
                  list->hops);
-            freez(node_instance_creation.machine_guid);
+            freez((void *)node_instance_creation.machine_guid);
             aclk_queue_query(create_query);
         }
         freez(list->hostname);
@@ -992,7 +992,7 @@ char *aclk_state(void)
         RRDHOST *host;
         rrd_rdlock();
         rrdhost_foreach_read(host) {
-            buffer_sprintf(wb, "\n\n> Node Instance for mGUID: \"%s\" hostname \"%s\"\n", host->machine_guid, host->hostname);
+            buffer_sprintf(wb, "\n\n> Node Instance for mGUID: \"%s\" hostname \"%s\"\n", host->machine_guid, rrdhost_hostname(host));
 
             buffer_strcat(wb, "\tClaimed ID: ");
             rrdhost_aclk_state_lock(host);
@@ -1179,7 +1179,7 @@ char *aclk_state_json(void)
     rrdhost_foreach_read(host) {
         json_object *nodeinstance = json_object_new_object();
 
-        tmp = json_object_new_string(host->hostname);
+        tmp = json_object_new_string(rrdhost_hostname(host));
         json_object_object_add(nodeinstance, "hostname", tmp);
 
         tmp = json_object_new_string(host->machine_guid);

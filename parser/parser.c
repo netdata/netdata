@@ -38,6 +38,7 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
     parser->input = input;
     parser->flags = flags;
     parser->host = host;
+    parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
 
 #ifdef ENABLE_HTTPS
     parser->bytesleft = 0;
@@ -133,7 +134,7 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
 
     tmp_keyword = callocz(1, sizeof(*tmp_keyword));
 
-    tmp_keyword->worker_job_id = parser->worker_job_ids++;
+    tmp_keyword->worker_job_id = parser->worker_job_next_id++;
     tmp_keyword->keyword = strdupz(keyword);
     tmp_keyword->keyword_hash = keyword_hash;
     tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
@@ -268,7 +269,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     uint32_t command_hash = simple_hash(command);
 
-    size_t worker_job_id = 0;
+    size_t worker_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES + 1; // set an invalid value by default
     while(tmp_keyword) {
         if (command_hash == tmp_keyword->keyword_hash &&
                 (!strcmp(command, tmp_keyword->keyword))) {

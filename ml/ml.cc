@@ -16,7 +16,7 @@ bool ml_enabled(RRDHOST *RH) {
     if (!Cfg.EnableAnomalyDetection)
         return false;
 
-    if (simple_pattern_matches(Cfg.SP_HostsToSkip, RH->hostname))
+    if (simple_pattern_matches(Cfg.SP_HostsToSkip, rrdhost_hostname(RH)))
         return false;
 
     return true;
@@ -76,7 +76,7 @@ void ml_new_dimension(RRDDIM *RD) {
     if (static_cast<unsigned>(RD->update_every) != H->updateEvery())
         return;
 
-    if (simple_pattern_matches(Cfg.SP_ChartsToSkip, RS->name))
+    if (simple_pattern_matches(Cfg.SP_ChartsToSkip, rrdset_name(RS)))
         return;
 
     Dimension *D = new Dimension(RD);

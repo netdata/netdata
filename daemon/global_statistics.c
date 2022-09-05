@@ -9,8 +9,9 @@
 #define WORKER_JOB_WORKERS            2
 #define WORKER_JOB_DBENGINE           3
 #define WORKER_JOB_HEARTBEAT          4
+#define WORKER_JOB_STRINGS            5
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 6
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
 #endif
 
@@ -37,6 +38,10 @@ static struct global_statistics {
     volatile uint64_t sqlite3_queries_failed_busy;
     volatile uint64_t sqlite3_queries_failed_locked;
     volatile uint64_t sqlite3_rows;
+
+    volatile uint64_t rrdcontext_metric_triggers;
+    volatile uint64_t rrdcontext_instance_triggers;
+    volatile uint64_t rrdcontext_context_triggers;
 
 } global_statistics = {
         .connected_clients = 0,
@@ -78,6 +83,18 @@ void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_genera
     __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+}
+
+void rrdcontext_triggered_update_on_rrdmetric() {
+    __atomic_fetch_add(&global_statistics.rrdcontext_metric_triggers, 1, __ATOMIC_RELAXED);
+}
+
+void rrdcontext_triggered_update_on_rrdinstance() {
+    __atomic_fetch_add(&global_statistics.rrdcontext_instance_triggers, 1, __ATOMIC_RELAXED);
+}
+
+void rrdcontext_triggered_update_on_rrdcontext() {
+    __atomic_fetch_add(&global_statistics.rrdcontext_context_triggers, 1, __ATOMIC_RELAXED);
 }
 
 void finished_web_request_statistics(uint64_t dt,
@@ -133,6 +150,10 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->sqlite3_queries_failed_busy   = __atomic_load_n(&global_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
+
+    gs->rrdcontext_metric_triggers    = __atomic_load_n(&global_statistics.rrdcontext_metric_triggers, __ATOMIC_RELAXED);
+    gs->rrdcontext_instance_triggers  = __atomic_load_n(&global_statistics.rrdcontext_instance_triggers, __ATOMIC_RELAXED);
+    gs->rrdcontext_context_triggers   = __atomic_load_n(&global_statistics.rrdcontext_context_triggers, __ATOMIC_RELAXED);
 }
 
 static void global_statistics_charts(void) {
@@ -579,6 +600,42 @@ static void global_statistics_charts(void) {
 
         rrdset_done(st_sqlite3_rows);
     }
+
+    // ----------------------------------------------------------------
+
+    if(gs.rrdcontext_context_triggers || gs.rrdcontext_instance_triggers || gs.rrdcontext_metric_triggers) {
+        static RRDSET *st_rrdcontext_triggers = NULL;
+        static RRDDIM *rd_context = NULL, *rd_instance = NULL, *rd_metric = NULL;
+
+        if (unlikely(!st_rrdcontext_triggers)) {
+            st_rrdcontext_triggers = rrdset_create_localhost(
+                "netdata"
+                , "rrdcontext_triggers"
+                , NULL
+                , "rrdcontext"
+                , NULL
+                , "Netdata RRD context triggers"
+                , "triggers/s"
+                , "netdata"
+                , "stats"
+                , 131200
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            rd_metric = rrddim_add(st_rrdcontext_triggers, "metric", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_instance = rrddim_add(st_rrdcontext_triggers, "instance", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_context = rrddim_add(st_rrdcontext_triggers, "context", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_rrdcontext_triggers);
+
+        rrddim_set_by_pointer(st_rrdcontext_triggers, rd_metric,   (collected_number)gs.rrdcontext_metric_triggers);
+        rrddim_set_by_pointer(st_rrdcontext_triggers, rd_instance, (collected_number)gs.rrdcontext_instance_triggers);
+        rrddim_set_by_pointer(st_rrdcontext_triggers, rd_context,  (collected_number)gs.rrdcontext_context_triggers);
+
+        rrdset_done(st_rrdcontext_triggers);
+    }
 }
 
 static void dbengine_statistics_charts(void) {
@@ -988,6 +1045,93 @@ static void dbengine_statistics_charts(void) {
 #endif
 }
 
+static void update_strings_charts() {
+    static RRDSET *st_ops = NULL, *st_entries = NULL, *st_mem = NULL;
+    static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL, *rd_ops_searches = NULL, *rd_ops_duplications = NULL, *rd_ops_releases = NULL;
+    static RRDDIM *rd_entries_entries = NULL, *rd_entries_refs = NULL;
+    static RRDDIM *rd_mem = NULL;
+
+    size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
+
+    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
+
+    if (unlikely(!st_ops)) {
+        st_ops = rrdset_create_localhost(
+            "netdata"
+            , "strings_ops"
+            , NULL
+            , "strings"
+            , NULL
+            , "Strings operations"
+            , "ops/s"
+            , "netdata"
+            , "stats"
+            , 910000
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE);
+
+        rd_ops_inserts      = rrddim_add(st_ops, "inserts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_deletes      = rrddim_add(st_ops, "deletes",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_searches     = rrddim_add(st_ops, "searches",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_duplications = rrddim_add(st_ops, "duplications", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+    } else
+        rrdset_next(st_ops);
+
+    rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number)inserts);
+    rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number)deletes);
+    rrddim_set_by_pointer(st_ops, rd_ops_searches,     (collected_number)searches);
+    rrddim_set_by_pointer(st_ops, rd_ops_duplications, (collected_number)duplications);
+    rrddim_set_by_pointer(st_ops, rd_ops_releases,     (collected_number)releases);
+    rrdset_done(st_ops);
+
+    if (unlikely(!st_entries)) {
+        st_entries = rrdset_create_localhost(
+            "netdata"
+            , "strings_entries"
+            , NULL
+            , "strings"
+            , NULL
+            , "Strings entries"
+            , "entries"
+            , "netdata"
+            , "stats"
+            , 910001
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA);
+
+        rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, -1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st_entries);
+
+    rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number)entries);
+    rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
+    rrdset_done(st_entries);
+
+    if (unlikely(!st_mem)) {
+        st_mem = rrdset_create_localhost(
+            "netdata"
+            , "strings_memory"
+            , NULL
+            , "strings"
+            , NULL
+            , "Strings memory"
+            , "bytes"
+            , "netdata"
+            , "stats"
+            , 910001
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA);
+
+        rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st_mem);
+
+    rrddim_set_by_pointer(st_mem, rd_mem, (collected_number)memory);
+    rrdset_done(st_mem);
+}
+
 static void update_heartbeat_charts() {
     static RRDSET *st_heartbeat = NULL;
     static RRDDIM *rd_heartbeat_min = NULL;
@@ -1032,13 +1176,26 @@ static void update_heartbeat_charts() {
 
 #define WORKERS_MIN_PERCENT_DEFAULT 10000.0
 
-struct worker_job_type {
-    char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
+struct worker_job_type_gs {
+    STRING *name;
+    STRING *units;
+
     size_t jobs_started;
     usec_t busy_time;
 
     RRDDIM *rd_jobs_started;
     RRDDIM *rd_busy_time;
+
+    WORKER_METRIC_TYPE type;
+    NETDATA_DOUBLE min_value;
+    NETDATA_DOUBLE max_value;
+    NETDATA_DOUBLE sum_value;
+    size_t count_value;
+
+    RRDSET *st;
+    RRDDIM *rd_min;
+    RRDDIM *rd_max;
+    RRDDIM *rd_avg;
 };
 
 struct worker_thread {
@@ -1071,7 +1228,7 @@ struct worker_utilization {
 
     char *name_lowercase;
 
-    struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
+    struct worker_job_type_gs per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
     size_t workers_registered;
     size_t workers_busy;
@@ -1170,13 +1327,15 @@ static void workers_total_cpu_utilization_chart(void) {
         if(!wu->workers_cpu_registered) continue;
 
         if(!wu->rd_total_cpu_utilizaton)
-            wu->rd_total_cpu_utilizaton = rrddim_add(st, wu->name_lowercase, NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_total_cpu_utilizaton = rrddim_add(st, wu->name_lowercase, NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
-        rrddim_set_by_pointer(st, wu->rd_total_cpu_utilizaton, (collected_number)((double)wu->workers_cpu_total * 10000.0));
+        rrddim_set_by_pointer(st, wu->rd_total_cpu_utilizaton, (collected_number)((double)wu->workers_cpu_total * 100.0));
     }
 
     rrdset_done(st);
 }
+
+#define WORKER_CHART_DECIMAL_PRECISION 100
 
 static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(!wu->workers_registered) return;
@@ -1215,28 +1374,28 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     // we add the min and max dimensions only when we have multiple workers
 
     if(unlikely(!wu->rd_workers_time_min && wu->workers_registered > 1))
-        wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
     if(unlikely(!wu->rd_workers_time_max && wu->workers_registered > 1))
-        wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
     if(unlikely(!wu->rd_workers_time_avg))
-        wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
     rrdset_next(wu->st_workers_time);
 
     if(unlikely(wu->workers_min_busy_time == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_min_busy_time = 0.0;
 
     if(wu->rd_workers_time_min)
-        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * 10000.0));
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * WORKER_CHART_DECIMAL_PRECISION));
 
     if(wu->rd_workers_time_max)
-        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * 10000.0));
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_max, (collected_number)((double)wu->workers_max_busy_time * WORKER_CHART_DECIMAL_PRECISION));
 
     if(wu->workers_total_duration == 0)
         rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, 0);
     else
-        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * 10000.0 / (double)wu->workers_total_duration));
+        rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_avg, (collected_number)((double)wu->workers_total_busy_time * 100.0 * WORKER_CHART_DECIMAL_PRECISION / (double)wu->workers_total_duration));
 
     rrdset_done(wu->st_workers_time);
 
@@ -1268,28 +1427,28 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         }
 
         if (unlikely(!wu->rd_workers_cpu_min && wu->workers_registered > 1))
-            wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
         if (unlikely(!wu->rd_workers_cpu_max && wu->workers_registered > 1))
-            wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
         if(unlikely(!wu->rd_workers_cpu_avg))
-            wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, 10000ULL, RRD_ALGORITHM_ABSOLUTE);
+            wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
         rrdset_next(wu->st_workers_cpu);
 
         if(unlikely(wu->workers_cpu_min == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_cpu_min = 0.0;
 
         if(wu->rd_workers_cpu_min)
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(wu->workers_cpu_min * 10000ULL));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(wu->workers_cpu_min * WORKER_CHART_DECIMAL_PRECISION));
 
         if(wu->rd_workers_cpu_max)
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(wu->workers_cpu_max * 10000ULL));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_max, (collected_number)(wu->workers_cpu_max * WORKER_CHART_DECIMAL_PRECISION));
 
         if(wu->workers_cpu_registered == 0)
             rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, 0);
         else
-            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * 10000ULL / (NETDATA_DOUBLE)wu->workers_cpu_registered ));
+            rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_avg, (collected_number)( wu->workers_cpu_total * WORKER_CHART_DECIMAL_PRECISION / (NETDATA_DOUBLE)wu->workers_cpu_registered ));
 
         rrdset_done(wu->st_workers_cpu);
     }
@@ -1325,10 +1484,13 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            if (wu->per_job_type[i].name[0]) {
+            if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
+                continue;
+
+            if (wu->per_job_type[i].name) {
 
                 if(unlikely(!wu->per_job_type[i].rd_jobs_started))
-                    wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, string2str(wu->per_job_type[i].name), NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
             }
@@ -1367,10 +1529,13 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            if (wu->per_job_type[i].name[0]) {
+            if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
+                continue;
+
+            if (wu->per_job_type[i].name) {
 
                 if(unlikely(!wu->per_job_type[i].rd_busy_time))
-                    wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, wu->per_job_type[i].name, NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
+                    wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, string2str(wu->per_job_type[i].name), NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
             }
@@ -1414,6 +1579,122 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
         rrdset_done(wu->st_workers_threads);
     }
+
+    // ----------------------------------------------------------------------
+    // custom metric types WORKER_METRIC_ABSOLUTE
+
+    {
+        size_t i;
+        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+            if(wu->per_job_type[i].type != WORKER_METRIC_ABSOLUTE)
+                continue;
+
+            if(!wu->per_job_type[i].count_value)
+                continue;
+
+            if(!wu->per_job_type[i].st) {
+                size_t job_name_len = string_strlen(wu->per_job_type[i].name);
+                if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
+
+                char job_name_sanitized[job_name_len + 1];
+                rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
+
+                char name[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_value_%s", wu->name_lowercase, job_name_sanitized);
+
+                char context[RRD_ID_LENGTH_MAX + 1];
+                snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.value.%s", wu->name_lowercase, job_name_sanitized);
+
+                char title[1000 + 1];
+                snprintf(title, 1000, "Netdata Workers %s Value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
+
+                wu->per_job_type[i].st = rrdset_create_localhost(
+                    "netdata"
+                    , name
+                    , NULL
+                    , wu->family
+                    , context
+                    , title
+                    , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"value"
+                    , "netdata"
+                    , "stats"
+                    , wu->priority + 5
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+                    );
+
+                wu->per_job_type[i].rd_min = rrddim_add(wu->per_job_type[i].st, "min", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(wu->per_job_type[i].st);
+
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * WORKER_CHART_DECIMAL_PRECISION));
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * WORKER_CHART_DECIMAL_PRECISION));
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_avg, (collected_number)(wu->per_job_type[i].sum_value / wu->per_job_type[i].count_value * WORKER_CHART_DECIMAL_PRECISION));
+
+            rrdset_done(wu->per_job_type[i].st);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // custom metric types WORKER_METRIC_INCREMENTAL
+
+    {
+        size_t i;
+        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+            if(wu->per_job_type[i].type != WORKER_METRIC_INCREMENTAL)
+                continue;
+
+            if(!wu->per_job_type[i].count_value)
+                continue;
+
+            if(!wu->per_job_type[i].st) {
+                size_t job_name_len = string_strlen(wu->per_job_type[i].name);
+                if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
+
+                char job_name_sanitized[job_name_len + 1];
+                rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
+
+                char name[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_rate_%s", wu->name_lowercase, job_name_sanitized);
+
+                char context[RRD_ID_LENGTH_MAX + 1];
+                snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.rate.%s", wu->name_lowercase, job_name_sanitized);
+
+                char title[1000 + 1];
+                snprintf(title, 1000, "Netdata Workers %s Rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
+
+                wu->per_job_type[i].st = rrdset_create_localhost(
+                    "netdata"
+                    , name
+                    , NULL
+                    , wu->family
+                    , context
+                    , title
+                    , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"rate"
+                    , "netdata"
+                    , "stats"
+                    , wu->priority + 5
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+                );
+
+                wu->per_job_type[i].rd_min = rrddim_add(wu->per_job_type[i].st, "min", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+                wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(wu->per_job_type[i].st);
+
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * WORKER_CHART_DECIMAL_PRECISION));
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * WORKER_CHART_DECIMAL_PRECISION));
+            rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_avg, (collected_number)(wu->per_job_type[i].sum_value / wu->per_job_type[i].count_value * WORKER_CHART_DECIMAL_PRECISION));
+
+            rrdset_done(wu->per_job_type[i].st);
+        }
+    }
 }
 
 static void workers_utilization_reset_statistics(struct worker_utilization *wu) {
@@ -1440,6 +1721,11 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
 
         wu->per_job_type[i].jobs_started = 0;
         wu->per_job_type[i].busy_time = 0;
+
+        wu->per_job_type[i].min_value = NAN;
+        wu->per_job_type[i].max_value = NAN;
+        wu->per_job_type[i].sum_value = NAN;
+        wu->per_job_type[i].count_value = 0;
     }
 
     struct worker_thread *wt;
@@ -1522,7 +1808,20 @@ static struct worker_thread *worker_thread_find_or_create(struct worker_utilizat
     return wt;
 }
 
-static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unused, const char *thread_tag __maybe_unused, size_t utilization_usec __maybe_unused, size_t duration_usec __maybe_unused, size_t jobs_started __maybe_unused, size_t is_running __maybe_unused, const char **job_types_names __maybe_unused, size_t *job_types_jobs_started __maybe_unused, usec_t *job_types_busy_time __maybe_unused) {
+static void worker_utilization_charts_callback(void *ptr
+                                               , pid_t pid __maybe_unused
+                                               , const char *thread_tag __maybe_unused
+                                               , size_t utilization_usec __maybe_unused
+                                               , size_t duration_usec __maybe_unused
+                                               , size_t jobs_started __maybe_unused
+                                               , size_t is_running __maybe_unused
+                                               , STRING **job_types_names __maybe_unused
+                                               , STRING **job_types_units __maybe_unused
+                                               , WORKER_METRIC_TYPE *job_types_metric_types __maybe_unused
+                                               , size_t *job_types_jobs_started __maybe_unused
+                                               , usec_t *job_types_busy_time __maybe_unused
+                                               , NETDATA_DOUBLE *job_types_custom_metrics __maybe_unused
+                                               ) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
     // find the worker_thread in the list
@@ -1552,12 +1851,32 @@ static void worker_utilization_charts_callback(void *ptr, pid_t pid __maybe_unus
     // accumulate per job type statistics
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        if(!wu->per_job_type[i].name && job_types_names[i])
+            wu->per_job_type[i].name = string_dup(job_types_names[i]);
+
+        if(!wu->per_job_type[i].units && job_types_units[i])
+            wu->per_job_type[i].units = string_dup(job_types_units[i]);
+
+        wu->per_job_type[i].type = job_types_metric_types[i];
+
         wu->per_job_type[i].jobs_started += job_types_jobs_started[i];
         wu->per_job_type[i].busy_time += job_types_busy_time[i];
 
-        // new job type found
-        if(unlikely(!wu->per_job_type[i].name[0] && job_types_names[i]))
-            strncpyz(wu->per_job_type[i].name, job_types_names[i], WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
+        NETDATA_DOUBLE value = job_types_custom_metrics[i];
+        if(netdata_double_isnumber(value)) {
+            if(!wu->per_job_type[i].count_value) {
+                wu->per_job_type[i].count_value = 1;
+                wu->per_job_type[i].min_value = value;
+                wu->per_job_type[i].max_value = value;
+                wu->per_job_type[i].sum_value = value;
+            }
+            else {
+                wu->per_job_type[i].count_value++;
+                wu->per_job_type[i].sum_value += value;
+                if(value < wu->per_job_type[i].min_value) wu->per_job_type[i].min_value = value;
+                if(value > wu->per_job_type[i].max_value) wu->per_job_type[i].max_value = value;
+            }
+        }
     }
 
     // find its CPU utilization
@@ -1607,6 +1926,14 @@ static void worker_utilization_finish(void) {
             wu->name_lowercase = NULL;
         }
 
+        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+            string_freez(wu->per_job_type[i].name);
+            wu->per_job_type[i].name = NULL;
+
+            string_freez(wu->per_job_type[i].units);
+            wu->per_job_type[i].units = NULL;
+        }
+
         // mark all threads as not enabled
         struct worker_thread *t;
         for(t = wu->threads; t ; t = t->next) t->enabled = 0;
@@ -1639,6 +1966,7 @@ void *global_statistics_main(void *ptr)
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_WORKERS, "workers");
     worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
+    worker_register_job_name(WORKER_JOB_STRINGS, "strings");
 
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
@@ -1673,6 +2001,9 @@ void *global_statistics_main(void *ptr)
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);
         update_heartbeat_charts();
+        
+        worker_is_busy(WORKER_JOB_STRINGS);
+        update_strings_charts();
     }
 
     netdata_thread_cleanup_pop(1);

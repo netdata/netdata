@@ -503,7 +503,7 @@ static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *n
     RRDLABEL *lbold = (RRDLABEL *)oldvalue;
     RRDLABEL *lbnew = (RRDLABEL *)newvalue;
 
-    if(lbold->label_value == lbnew->label_value || strcmp(string2str(lbold->label_value), string2str(lbnew->label_value)) == 0) {
+    if(lbold->label_value == lbnew->label_value) {
         // they are the same
         lbold->label_source |=  lbnew->label_source;
         lbold->label_source |=  RRDLABEL_FLAG_OLD;
@@ -937,9 +937,20 @@ int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each,
     return dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
+struct label_str {
+    BUFFER  *sql;
+    int count;
+    char uuid_str[UUID_STR_LEN];
+};
+
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    RRDSET *st = (RRDSET *)data;
-    sql_store_chart_label(st->chart_uuid, (int)ls, (char *)name, (char *)value);
+    struct label_str *lb = data;
+    if (unlikely(!lb->count))
+        buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");
+    else
+        buffer_strcat(lb->sql, ", ");
+    buffer_sprintf(lb->sql, "(u2h('%s'), %d,'%s','%s', unixepoch())", lb->uuid_str, ls, name, value);
+    lb->count++;
     return 1;
 }
 
@@ -953,7 +964,12 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     rrdcalc_update_rrdlabels(st);
 
     // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
-    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, st);
+    BUFFER  *sql_buf = buffer_create(1024);
+    struct label_str tmp = {.sql = sql_buf, .count = 0 };
+    uuid_unparse_lower(*st->chart_uuid, tmp.uuid_str);
+    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, &tmp);
+    db_execute(buffer_tostring(sql_buf));
+    buffer_free(sql_buf);
 }
 
 // ----------------------------------------------------------------------------

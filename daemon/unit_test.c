@@ -1197,12 +1197,12 @@ int run_test(struct test *test)
             fprintf(stderr, "    > %s: feeding position %lu\n", test->name, c+1);
         }
 
-        fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd->name, test->feed[c].value);
+        fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rrddim_name(rd), test->feed[c].value);
         rrddim_set(st, "dim1", test->feed[c].value);
         last = test->feed[c].value;
 
         if(rd2) {
-            fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd2->name, test->feed2[c]);
+            fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rrddim_name(rd2), test->feed2[c]);
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
@@ -1231,7 +1231,7 @@ int run_test(struct test *test)
         int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
             ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
-            test->name, rd->name, c+1,
+            test->name, rrddim_name(rd), c+1,
             (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
@@ -1243,7 +1243,7 @@ int run_test(struct test *test)
             same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
                 ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
-                test->name, rd2->name, c+1,
+                test->name, rrddim_name(rd2), c+1,
                 (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
@@ -1258,39 +1258,39 @@ static int test_variable_renames(void) {
 
     fprintf(stderr, "Creating chart\n");
     RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
-    fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
+    fprintf(stderr, "Created chart with id '%s', name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Creating dimension DIM1\n");
     RRDDIM *rd1 = rrddim_add(st, "DIM1", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd1->id, rd1->name);
+    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Creating dimension DIM2\n");
     RRDDIM *rd2 = rrddim_add(st, "DIM2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd2->id, rd2->name);
+    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming chart to CHARTNAME1\n");
     rrdset_set_name(st, "CHARTNAME1");
-    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, st->name);
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming chart to CHARTNAME2\n");
     rrdset_set_name(st, "CHARTNAME2");
-    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, st->name);
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");
     rrddim_set_name(st, rd1, "DIM1NAME1");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd1->id, rd1->name);
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME2\n");
     rrddim_set_name(st, rd1, "DIM1NAME2");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd1->id, rd1->name);
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME1\n");
     rrddim_set_name(st, rd2, "DIM2NAME1");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME2\n");
     rrddim_set_name(st, rd2, "DIM2NAME2");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     BUFFER *buf = buffer_create(1);
     health_api_v1_chart_variables2json(st, buf);
@@ -1449,7 +1449,7 @@ int unit_test(long delay, long shift)
 
     unsigned long c, dimensions = 0;
     RRDDIM *rd;
-    for(rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
+    for(rd = st->dimensions; rd ; rd = rd->next) dimensions++;
 
     for(c = 0; c < 20 ;c++) {
         i += increment;
@@ -1470,7 +1470,7 @@ int unit_test(long delay, long shift)
         }
 
         // prevent it from deleting the dimensions
-        for(rd = st->dimensions ; rd ; rd = rd->next)
+        for(rd = st->dimensions; rd ; rd = rd->next)
             rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
 
         rrdset_done(st);
@@ -1486,10 +1486,10 @@ int unit_test(long delay, long shift)
     for(c = 0 ; c < st->counter ; c++) {
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
-        for(rd = st->dimensions ; rd ; rd = rd->next) {
+        for(rd = st->dimensions; rd ; rd = rd->next) {
             sn = rd->db[c];
             cn = unpack_storage_number(sn);
-            fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
+            fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
 
             if(rd == rdabs) v =
                 (     oincrement
@@ -1909,14 +1909,14 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
                         if(!value_errors)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                                 ", found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, expected, value);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now + k * update_every, expected, value);
                         value_errors++;
                         errors++;
                     }
                     if(end_time != time_now + k * update_every) {
                         if(!time_errors)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, (unsigned long)time_retrieved);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now + k * update_every, (unsigned long)time_retrieved);
                         time_errors++;
                         errors++;
                     }
@@ -1957,7 +1957,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                            NULL, NULL, NULL, 0, 0);
 
         if (!r) {
-            fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", st[i]->name, current_region);
+            fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
         } else {
             assert(r->st == st[i]);
@@ -1967,7 +1967,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                 time_retrieved = r->t[c];
 
                 // for each dimension
-                for (j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
+                for (j = 0, d = r->st->dimensions; d && j < r->d ; ++j, d = d->next) {
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
                     assert(rd[i][j] == d);
@@ -1980,13 +1980,13 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                         if(value_errors < 20)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                                 ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, expected, value);
                         value_errors++;
                     }
                     if(time_retrieved != time_now) {
                         if(time_errors < 20)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, (unsigned long)time_retrieved);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, (unsigned long)time_retrieved);
                         time_errors++;
                     }
                 }
@@ -2090,7 +2090,7 @@ int test_dbengine(void)
                            time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
                            RRDR_OPTION_NATURAL_POINTS, NULL, NULL, NULL, 0, 0);
         if (!r) {
-            fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
+            fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));
             ++errors;
         } else {
             long c;
@@ -2103,7 +2103,7 @@ int test_dbengine(void)
                 time_t time_retrieved = r->t[c];
 
                 // for each dimension
-                for(j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
+                for(j = 0, d = r->st->dimensions; d && j < r->d ; ++j, d = d->next) {
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     NETDATA_DOUBLE value = cn[j];
                     assert(rd[i][j] == d);
@@ -2116,13 +2116,13 @@ int test_dbengine(void)
                         if(!value_errors)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                                 ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, expected, value);
                         value_errors++;
                     }
                     if(time_retrieved != time_now) {
                         if(!time_errors)
                             fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, (unsigned long)time_retrieved);
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, (unsigned long)time_retrieved);
                         time_errors++;
                     }
                 }
@@ -2350,7 +2350,7 @@ static void query_dbengine_chart(void *arg)
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected);
+                            rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, expected);
                     ++thread_info->errors;
                 }
                 break;
@@ -2365,7 +2365,7 @@ static void query_dbengine_chart(void *arg)
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected);
+                            rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, expected);
                     ++thread_info->errors;
                 }
                 break;
@@ -2378,7 +2378,7 @@ static void query_dbengine_chart(void *arg)
                     if(!value_errors)
                        fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                             ", found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected, value);
+                                rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, expected, value);
                     value_errors++;
                     thread_info->errors++;
                 }
@@ -2388,7 +2388,7 @@ static void query_dbengine_chart(void *arg)
                     if(!time_errors)
                         fprintf(stderr,
                             "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
+                                rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, (unsigned long) time_retrieved);
                     time_errors++;
                     thread_info->errors++;
                 }

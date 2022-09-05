@@ -16,8 +16,8 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector_info col = {
-                    .plugin = st->plugin_name ? st->plugin_name : "",
-                    .module = st->module_name ? st->module_name : ""
+                    .plugin = rrdset_plugin_name(st),
+                    .module = rrdset_module_name(st)
             };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector_info));
@@ -47,7 +47,7 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
     dictionary_destroy(dict);
     freez(upd_node_collectors.claim_id);
 
-    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, wc->host->hostname);
+    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(wc->host));
 #else
     UNUSED(wc);
 #endif
@@ -94,8 +94,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
         netdata_mutex_unlock(&host->receiver_lock);
     }
 
-    node_info.data.name = host->hostname;
-    node_info.data.os = (char *) host->os;
+    node_info.data.name = rrdhost_hostname(host);
+    node_info.data.os = rrdhost_os(host);
     node_info.data.os_name = host->system_info->host_os_name;
     node_info.data.os_version = host->system_info->host_os_version;
     node_info.data.kernel_name = host->system_info->kernel_name;
@@ -106,8 +106,8 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
     node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";
     node_info.data.version = host_version ? host_version : VERSION;
-    node_info.data.release_channel = (char *) get_release_channel();
-    node_info.data.timezone = (char *) host->abbrev_timezone;
+    node_info.data.release_channel = get_release_channel();
+    node_info.data.timezone = rrdhost_abbrev_timezone(host);
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
     node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
@@ -126,7 +126,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.host_labels_ptr = host->host_labels;
 
     aclk_update_node_info(&node_info);
-    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, wc->host->hostname, wc->host_guid, wc->host == localhost ? "parent" : "child");
+    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), wc->host_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);

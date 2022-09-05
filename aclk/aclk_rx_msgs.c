@@ -274,7 +274,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         .node_id = res.node_id
     };
 
-    RRDHOST *host = rrdhost_find_by_guid(res.machine_guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
     if (host) {
         // not all host must have RRDHOST struct created for them
         // if they never connected during runtime of agent
@@ -527,7 +527,7 @@ unsigned int aclk_init_rx_msg_handlers(void)
     return i;
 }
 
-void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic)
+void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic __maybe_unused)
 {
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;

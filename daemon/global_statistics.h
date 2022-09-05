@@ -12,6 +12,10 @@ extern void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points
 extern void sqlite3_query_completed(bool success, bool busy, bool locked);
 extern void sqlite3_row_completed(void);
 
+extern void rrdcontext_triggered_update_on_rrdmetric(void);
+extern void rrdcontext_triggered_update_on_rrdinstance(void);
+extern void rrdcontext_triggered_update_on_rrdcontext(void);
+
 extern void finished_web_request_statistics(uint64_t dt,
                                      uint64_t bytes_received,
                                      uint64_t bytes_sent,

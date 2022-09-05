@@ -1305,11 +1305,9 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(url && *url) strncpyz(&w->last_url[1], url, NETDATA_WEB_REQUEST_URL_SIZE - 1);
         else w->last_url[1] = '\0';
 
-        uint32_t hash = simple_hash(tok);
-
-        host = rrdhost_find_by_hostname(tok, hash);
+        host = rrdhost_find_by_hostname(tok);
         if (!host)
-            host = rrdhost_find_by_guid(tok, hash);
+            host = rrdhost_find_by_guid(tok);
         if (!host) {
             host = sql_create_host_by_uuid(tok);
             if (likely(host)) {

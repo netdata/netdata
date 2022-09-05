@@ -214,6 +214,76 @@ extern "C" {
 
 #define GUID_LEN 36
 
+// ---------------------------------------------------------------------------------------------
+// double linked list management
+
+#define DOUBLE_LINKED_LIST_PREPEND_UNSAFE(head, item, prev, next)                              \
+    do {                                                                                       \
+        (item)->next = (head);                                                                 \
+                                                                                               \
+        if(likely(head)) {                                                                     \
+            (item)->prev = (head)->prev;                                                       \
+            (head)->prev = (item);                                                             \
+        }                                                                                      \
+        else                                                                                   \
+            (item)->prev = (item);                                                             \
+                                                                                               \
+        (head) = (item);                                                                       \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_APPEND_UNSAFE(head, item, prev, next)                               \
+    do {                                                                                       \
+        if(likely(head)) {                                                                     \
+            (item)->prev = (head)->prev;                                                       \
+            (head)->prev->next = (item);                                                       \
+            (head)->prev = (item);                                                             \
+            (item)->next = NULL;                                                               \
+        }                                                                                      \
+        else {                                                                                 \
+            (head) = (item);                                                                   \
+            (head)->prev = (head);                                                             \
+            (head)->next = NULL;                                                               \
+        }                                                                                      \
+                                                                                               \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_REMOVE_UNSAFE(head, item, prev, next)                               \
+    do {                                                                                       \
+        fatal_assert((head) != NULL);                                                          \
+        fatal_assert((item)->prev != NULL);                                                    \
+                                                                                               \
+        if((item)->prev == (item)) {                                                           \
+            /* it is the only item in the list */                                              \
+            (head) = NULL;                                                                     \
+        }                                                                                      \
+        else if((item) == (head)) {                                                            \
+            /* it is the first item */                                                         \
+            (item)->next->prev = (item)->prev;                                                 \
+            (head) = (item)->next;                                                             \
+        }                                                                                      \
+        else {                                                                                 \
+            (item)->prev->next = (item)->next;                                                 \
+            if ((item)->next) {                                                                \
+                (item)->next->prev = (item)->prev;                                             \
+            }                                                                                  \
+            else {                                                                             \
+                (head)->prev = (item)->prev;                                                   \
+            }                                                                                  \
+        }                                                                                      \
+                                                                                               \
+        (item)->next = NULL;                                                                   \
+        (item)->prev = NULL;                                                                   \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_FOREACH_FORWARD(head, var, prev, next)                              \
+    for ((var) = (head); (var) ; (var) = (var)->next)
+
+#define DOUBLE_LINKED_LIST_FOREACH_BACKWARD(head, var, prev, next)                             \
+    for ((var) = (head)?(head)->prev:NULL; (var) && (var) != (head)->prev ; (var) = (var)->prev)
+
+// ---------------------------------------------------------------------------------------------
+
+
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
 

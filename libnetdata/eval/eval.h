@@ -18,8 +18,7 @@ typedef enum rrdcalc_status {
 } RRDCALC_STATUS;
 
 typedef struct eval_variable {
-    char *name;
-    uint32_t hash;
+    STRING *name;
     struct eval_variable *next;
 } EVAL_VARIABLE;
 
@@ -83,6 +82,6 @@ extern const char *expression_strerror(int error);
 // 2 = FAILED, the error message is in: buffer_tostring(expression->error_msg)
 extern int expression_evaluate(EVAL_EXPRESSION *expression);
 
-extern int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, NETDATA_DOUBLE *result);
+extern int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result);
 
 #endif //NETDATA_EVAL_H

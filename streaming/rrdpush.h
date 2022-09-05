@@ -46,9 +46,10 @@ typedef struct {
 } stream_encoded_t;
 
 #ifdef ENABLE_COMPRESSION
+#define LZ4_MAX_MSG_SIZE 0x4000
 struct compressor_state {
-    char *buffer;
-    size_t buffer_size;
+    char *compression_result_buffer;
+    size_t compression_result_buffer_size;
     struct compressor_data *data; // Compression API specific data
     void (*reset)(struct compressor_state *state);
     size_t (*compress)(struct compressor_state *state, const char *data, size_t size, char **buffer);
@@ -164,10 +165,12 @@ extern void sender_init(RRDHOST *parent);
 extern struct rrdpush_destinations *destinations_init(const char *destinations);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
+void sender_cancel(struct sender_state *s);
 extern int rrdpush_init();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
-extern void rrdset_push_chart_definition_now(RRDSET *st);
+extern bool rrdset_push_chart_definition_now(RRDSET *st);
+extern bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
 extern void *rrdpush_sender_thread(void *ptr);
 extern void rrdpush_send_labels(RRDHOST *host);
 extern void rrdpush_claimed_id(RRDHOST *host);

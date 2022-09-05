@@ -33,33 +33,32 @@
 
 struct rrdcalc {
     avl_t avl;                      // the index, with key the id - this has to be first!
+
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 
-    char *name;                     // the name of this alarm
-    uint32_t hash;                  // the hash of the alarm name
     uuid_t config_hash_id;          // a predictable hash_id based on specific alert configuration
 
-    char *exec;                     // the command to execute when this alarm switches state
-    char *recipient;                // the recipient of the alarm (the first parameter to exec)
+    STRING *name;                   // the name of this alarm
+    STRING *chart;                  // the chart id this should be linked to
 
-    char *classification;           // the class that this alarm belongs
-    char *component;                // the component that this alarm refers to
-    char *type;                     // type of the alarm
+    STRING *exec;                   // the command to execute when this alarm switches state
+    STRING *recipient;              // the recipient of the alarm (the first parameter to exec)
 
-    char *chart;                    // the chart id this should be linked to
-    uint32_t hash_chart;
+    STRING *classification;         // the class that this alarm belongs
+    STRING *component;              // the component that this alarm refers to
+    STRING *type;                   // type of the alarm
 
-    char *plugin_match;             //the plugin name that should be linked to
+    STRING *plugin_match;           // the plugin name that should be linked to
     SIMPLE_PATTERN *plugin_pattern;
 
-    char *module_match;             //the module name that should be linked to
+    STRING *module_match;           // the module name that should be linked to
     SIMPLE_PATTERN *module_pattern;
 
-    char *source;                   // the source of this alarm
-    char *units;                    // the units of the alarm
-    char *original_info;            // the original info field before any variable replacement
-    char *info;                     // a short description of the alarm
+    STRING *source;                 // the source of this alarm
+    STRING *units;                  // the units of the alarm
+    STRING *original_info;          // the original info field before any variable replacement
+    STRING *info;                   // a short description of the alarm
 
     int update_every;               // update frequency for the alarm
 
@@ -70,8 +69,8 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // database lookup settings
 
-    char *dimensions;               // the chart dimensions
-    char *foreachdim;               // the group of dimensions that the `foreach` will be applied.
+    STRING *dimensions;             // the chart dimensions
+    STRING *foreachdim;             // the group of dimensions that the `foreach` will be applied.
     SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
     int foreachcounter;             // the number of alarms created with foreachdim, this also works as an id of the
                                     // children
@@ -99,29 +98,29 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // notification repeat settings
 
-    uint32_t warn_repeat_every;     // interval between repeating warning notifications
-    uint32_t crit_repeat_every; // interval between repeating critical notifications
+    uint32_t warn_repeat_every;    // interval between repeating warning notifications
+    uint32_t crit_repeat_every;    // interval between repeating critical notifications
 
     // ------------------------------------------------------------------------
     // Labels settings
-    char *host_labels;                   // the label read from an alarm file
+    STRING *host_labels;                 // the label read from an alarm file
     SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
 
     // ------------------------------------------------------------------------
     // runtime information
 
-    RRDCALC_STATUS old_status; // the old status of the alarm
+    RRDCALC_STATUS old_status;      // the old status of the alarm
     RRDCALC_STATUS status;          // the current status of the alarm
 
-    NETDATA_DOUBLE value;        // the current value of the alarm
-    NETDATA_DOUBLE old_value;    // the previous value of the alarm
+    NETDATA_DOUBLE value;           // the current value of the alarm
+    NETDATA_DOUBLE old_value;       // the previous value of the alarm
 
     uint32_t rrdcalc_flags;         // check RRDCALC_FLAG_*
 
     time_t last_updated;            // the last update timestamp of the alarm
     time_t next_update;             // the next update timestamp of the alarm
     time_t last_status_change;      // the timestamp of the last time this alarm changed status
-    time_t last_repeat; // the last time the alarm got repeated
+    time_t last_repeat;             // the last time the alarm got repeated
     uint32_t times_repeat;          // number of times the alarm got repeated
 
     time_t db_after;                // the first timestamp evaluated by the db lookup
@@ -150,48 +149,69 @@ struct rrdcalc {
     struct rrdcalc *rrdset_prev;
 
     struct rrdcalc *next;
+    struct rrdcalc *prev;
 };
 
-struct alert_config {
-    char *alarm;
-    char *template_key;
-    char *os;
-    char *host;
-    char *on;
-    char *families;
-    char *plugin;
-    char *module;
-    char *charts;
-    char *lookup;
-    char *calc;
-    char *warn;
-    char *crit;
-    char *every;
-    char *green;
-    char *red;
-    char *exec;
-    char *to;
-    char *units;
-    char *info;
-    char *classification;
-    char *component;
-    char *type;
-    char *delay;
-    char *options;
-    char *repeat;
-    char *host_labels;
+#define rrdcalc_name(rc) string2str((rc)->name)
+#define rrdcalc_chart_name(rc) string2str((rc)->chart)
+#define rrdcalc_exec(rc) string2str((rc)->exec)
+#define rrdcalc_recipient(rc) string2str((rc)->recipient)
+#define rrdcalc_classification(rc) string2str((rc)->classification)
+#define rrdcalc_component(rc) string2str((rc)->component)
+#define rrdcalc_type(rc) string2str((rc)->type)
+#define rrdcalc_plugin_match(rc) string2str((rc)->plugin_match)
+#define rrdcalc_module_match(rc) string2str((rc)->module_match)
+#define rrdcalc_source(rc) string2str((rc)->source)
+#define rrdcalc_units(rc) string2str((rc)->units)
+#define rrdcalc_original_info(rc) string2str((rc)->original_info)
+#define rrdcalc_info(rc) string2str((rc)->info)
+#define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
+#define rrdcalc_foreachdim(rc) string2str((rc)->foreachdim)
+#define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
 
-    char *p_db_lookup_dimensions;
-    char *p_db_lookup_method;
+#define foreach_rrdcalc_in_rrdset(st, rc) \
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD((st)->alarms, rc, rrdset_prev, rrdset_next)
+
+#define foreach_rrdcalc_in_rrdhost(host, rc) \
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD((host)->host_alarms, rc, prev, next)
+
+struct alert_config {
+    STRING *alarm;
+    STRING *template_key;
+    STRING *os;
+    STRING *host;
+    STRING *on;
+    STRING *families;
+    STRING *plugin;
+    STRING *module;
+    STRING *charts;
+    STRING *lookup;
+    STRING *calc;
+    STRING *warn;
+    STRING *crit;
+    STRING *every;
+    STRING *green;
+    STRING *red;
+    STRING *exec;
+    STRING *to;
+    STRING *units;
+    STRING *info;
+    STRING *classification;
+    STRING *component;
+    STRING *type;
+    STRING *delay;
+    STRING *options;
+    STRING *repeat;
+    STRING *host_labels;
+
+    STRING *p_db_lookup_dimensions;
+    STRING *p_db_lookup_method;
+
     uint32_t p_db_lookup_options;
     int32_t p_db_lookup_after;
     int32_t p_db_lookup_before;
     int32_t p_update_every;
 };
-
-extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);
-extern int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae);
-extern RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name, uint32_t hash);
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
@@ -204,13 +224,13 @@ extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 extern void rrdcalc_free(RRDCALC *rc);
 extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 
-extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
-extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
+extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name);
+extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
 extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe_comma(char *str);
-extern char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen);
+extern char *alarm_name_with_dim(const char *name, size_t namelen, const char *dim, size_t dimlen);
 extern void rrdcalc_update_rrdlabels(RRDSET *st);
 
 extern void rrdcalc_labels_unlink();

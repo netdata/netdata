@@ -47,9 +47,9 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1               = (1 << 29), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2               = (1 << 30), // reserved for DICTIONARY_FLAG_DESTROYED
-    DICTIONARY_FLAG_RESERVED3               = (1 << 31), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
+    DICTIONARY_FLAG_RESERVED1               = (1 << 28), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2               = (1 << 29), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3               = (1 << 30), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
@@ -179,9 +179,10 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTFE_CONST const
 #endif
 
-#define DICTIONARY_LOCK_READ  'r'
-#define DICTIONARY_LOCK_WRITE 'w'
-#define DICTIONARY_LOCK_NONE  'u'
+#define DICTIONARY_LOCK_READ      'r'
+#define DICTIONARY_LOCK_WRITE     'w'
+#define DICTIONARY_LOCK_REENTRANT 'z'
+#define DICTIONARY_LOCK_NONE      'u'
 
 typedef DICTFE_CONST struct dictionary_foreach {
     DICTFE_CONST char *name;    // the dictionary name of the last item used
@@ -235,7 +236,7 @@ typedef struct netdata_string STRING;
 extern STRING *string_strdupz(const char *str);
 extern STRING *string_dup(STRING *string);
 extern void string_freez(STRING *string);
-extern size_t string_length(STRING *string);
+extern size_t string_strlen(STRING *string);
 extern const char *string2str(STRING *string) NEVERNULL;
 
 // keep common prefix/suffix and replace everything else with [x]
@@ -243,10 +244,20 @@ extern STRING *string_2way_merge(STRING *a, STRING *b);
 
 static inline int string_cmp(STRING *s1, STRING *s2) {
     // STRINGs are deduplicated, so the same strings have the same pointer
-    if(unlikely(s1 == s2)) return 0;
-
-    // they differ, do the typical comparison
-    return strcmp(string2str(s1), string2str(s2));
+    // when they differ, we do the typical strcmp() comparison
+    return (s1 == s2)?0:strcmp(string2str(s1), string2str(s2));
 }
+
+extern void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases);
+
+// ----------------------------------------------------------------------------
+// THREAD CACHE
+
+extern void *thread_cache_entry_get_or_set(void *key,
+                                    ssize_t key_length,
+                                    void *value,
+                                    void *(*transform_the_value_before_insert)(void *key, size_t key_length, void *value));
+
+extern void thread_cache_destroy(void);
 
 #endif /* NETDATA_DICTIONARY_H */

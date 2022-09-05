@@ -442,8 +442,8 @@ static void test_format_dimension_collected_json_plaintext(void **state)
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
         "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\","
-        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\","
-        "\"chart_context\":\"(null)\",\"chart_type\":\"(null)\",\"units\":\"(null)\",\"id\":\"dimension_id\","
+        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"\","
+        "\"chart_context\":\"\",\"chart_type\":\"\",\"units\":\"\",\"id\":\"dimension_id\","
         "\"name\":\"dimension_name\",\"value\":123000321,\"timestamp\":15051}\n");
 }
 
@@ -459,8 +459,8 @@ static void test_format_dimension_stored_json_plaintext(void **state)
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
         "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\","
-        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\"," \
-        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\","
+        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"\"," \
+        "\"chart_context\": \"\",\"chart_type\":\"\",\"units\": \"\",\"id\":\"dimension_id\","
         "\"name\":\"dimension_name\",\"value\":690565856.0000000,\"timestamp\": 15052}\n");
 }
 
@@ -1055,9 +1055,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     BUFFER *buffer = buffer_create(0);
 
-    localhost->hostname = strdupz("test_hostname");
-    localhost->rrdset_root->family = strdupz("test_family");
-    localhost->rrdset_root->context = strdupz("test_context");
+    localhost->hostname = string_strdupz("test_hostname");
+    localhost->rrdset_root->family = string_strdupz("test_family");
+    localhost->rrdset_root->context = string_strdupz("test_context");
 
     expect_function_call(__wrap_now_realtime_sec);
     will_return(__wrap_now_realtime_sec, 2);
@@ -1069,7 +1069,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     assert_string_equal(
         buffer_tostring(buffer),
-        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_info{instance=\"test_hostname\",application=\"\",version=\"\",key1=\"value1\",key2=\"value2\"} 1\n"
         "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\"} 690565856.0000000\n");
 
     buffer_flush(buffer);
@@ -1085,7 +1085,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     assert_string_equal(
         buffer_tostring(buffer),
-        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_info{instance=\"test_hostname\",application=\"\",version=\"\",key1=\"value1\",key2=\"value2\"} 1\n"
         "# TYPE test_prefix_test_context gauge\n"
         "test_prefix_test_context{chart=\"chart_name\",family=\"test_family\",dimension=\"dimension_name\"} 690565856.0000000\n");
 
@@ -1101,7 +1101,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     assert_string_equal(
         buffer_tostring(buffer),
-        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_info{instance=\"test_hostname\",application=\"\",version=\"\",key1=\"value1\",key2=\"value2\"} 1\n"
         "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\",instance=\"test_hostname\"} 690565856.0000000\n");
 
     free(localhost->rrdset_root->context);
@@ -1207,8 +1207,8 @@ static void test_format_host_prometheus_remote_write(void **state)
     simple_connector_data->connector_specific_data = (void *)connector_specific_data;
     connector_specific_data->write_request = (void *)0xff;
 
-    localhost->program_name = strdupz("test_program");
-    localhost->program_version = strdupz("test_version");
+    localhost->program_name = string_strdupz("test_program");
+    localhost->program_version = string_strdupz("test_version");
 
     expect_function_call(__wrap_add_host_info);
     expect_value(__wrap_add_host_info, write_request_p, 0xff);

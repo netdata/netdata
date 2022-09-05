@@ -105,13 +105,13 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
         if (rv)
             rrdvar_custom_host_variable_set(host, rv, value);
         else
-            error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, host->hostname);
+            error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, rrdhost_hostname(host));
     } else {
         RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
         if (rs)
             rrdsetvar_custom_chart_variable_set(rs, value);
         else
-            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, host->hostname, st->id);
+            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }
     return PARSER_RC_OK;
 }
@@ -184,7 +184,7 @@ PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, DICTIONARY *n
 {
     RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
     if (unlikely(!st)) {
-        error("requested CLABEL_COMMIT on host '%s', without a BEGIN, ignoring it.", host->hostname);
+        error("requested CLABEL_COMMIT on host '%s', without a BEGIN, ignoring it.", rrdhost_hostname(host));
         return PARSER_RC_OK;
     }
 
@@ -215,7 +215,7 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     if (unlikely(!dimension || !*dimension)) {
-        error("requested a SET on chart '%s' of host '%s', without a dimension. Disabling it.", st->id, host->hostname);
+        error("requested a SET on chart '%s' of host '%s', without a dimension. Disabling it.", rrdset_id(st), rrdhost_hostname(host));
         goto disable;
     }
 
@@ -225,19 +225,19 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     if (unlikely(!st)) {
         error(
             "requested a SET on dimension %s with value %s on host '%s', without a BEGIN. Disabling it.", dimension,
-            value ? value : "<nothing>", host->hostname);
+            value ? value : "<nothing>", rrdhost_hostname(host));
         goto disable;
     }
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "is setting dimension %s/%s to %s", st->id, dimension, value ? value : "<nothing>");
+        debug(D_PLUGINSD, "is setting dimension '%s'/'%s' to '%s'", rrdset_id(st), dimension, value ? value : "<nothing>");
 
     if (value) {
         RRDDIM *rd = rrddim_find(st, dimension);
         if (unlikely(!rd)) {
             error(
                 "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
-                dimension, st->name, st->id, st->rrdhost->hostname);
+                dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
             goto disable;
         } else {
             if (plugins_action->set_action) {
@@ -262,13 +262,13 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 
     if (unlikely(!id)) {
-        error("requested a BEGIN without a chart id for host '%s'. Disabling it.", host->hostname);
+        error("requested a BEGIN without a chart id for host '%s'. Disabling it.", rrdhost_hostname(host));
         goto disable;
     }
 
     st = rrdset_find(host, id);
     if (unlikely(!st)) {
-        error("requested a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", id, host->hostname);
+        error("requested a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", id, rrdhost_hostname(host));
         goto disable;
     }
     ((PARSER_USER_OBJECT *)user)->st = st;
@@ -294,13 +294,13 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     if (unlikely(!st)) {
-        error("requested an END, without a BEGIN on host '%s'. Disabling it.", host->hostname);
+        error("requested an END, without a BEGIN on host '%s'. Disabling it.", rrdhost_hostname(host));
         ((PARSER_USER_OBJECT *) user)->enabled = 0;
         return PARSER_RC_ERROR;
     }
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "requested an END on chart %s", st->id);
+        debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
@@ -343,7 +343,7 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     // make sure we have the required variables
     if (unlikely((!type || !*type || !id || !*id))) {
         if (likely(host))
-            error("requested a CHART, without a type.id, on host '%s'. Disabling it.", host->hostname);
+            error("requested a CHART, without a type.id, on host '%s'. Disabling it.", rrdhost_hostname(host));
         else
             error("requested a CHART, without a type.id. Disabling it.");
         ((PARSER_USER_OBJECT *) user)->enabled = 0;
@@ -424,13 +424,13 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
 
     if (unlikely(!id)) {
         error(
-            "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname,
-            st ? st->id : "UNSET");
+            "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", rrdhost_hostname(host),
+            st ? rrdset_id(st) : "UNSET");
         goto disable;
     }
 
     if (unlikely(!st && !((PARSER_USER_OBJECT *) user)->st_exists)) {
-        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
+        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", rrdhost_hostname(host));
         goto disable;
     }
 
@@ -455,7 +455,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
         debug(
             D_PLUGINSD,
             "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
-            st->id, id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
+            rrdset_id(st), id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
             options ? options : "");
 
     if (plugins_action->dimension_action) {
@@ -494,7 +494,7 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
     }
 
     if (unlikely(!name || !*name)) {
-        error("requested a VARIABLE on host '%s', without a variable name. Disabling it.", host->hostname);
+        error("requested a VARIABLE on host '%s', without a variable name. Disabling it.", rrdhost_hostname(host));
         ((PARSER_USER_OBJECT *)user)->enabled = 0;
         return PARSER_RC_ERROR;
     }
@@ -504,12 +504,12 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
 
     if (unlikely(!value)) {
         error("cannot set %s VARIABLE '%s' on host '%s' to an empty value", (global) ? "HOST" : "CHART", name,
-              host->hostname);
+              rrdhost_hostname(host));
         return PARSER_RC_OK;
     }
 
     if (!global && !st) {
-        error("cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", name, host->hostname);
+        error("cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", name, rrdhost_hostname(host));
         return PARSER_RC_OK;
     }
 
@@ -519,10 +519,10 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
         if (endptr == value)
             error(
                 "the value '%s' of VARIABLE '%s' on host '%s' cannot be parsed as a number", value, name,
-                host->hostname);
+                rrdhost_hostname(host));
         else
             error(
-                "the value '%s' of VARIABLE '%s' on host '%s' has leftovers: '%s'", value, name, host->hostname,
+                "the value '%s' of VARIABLE '%s' on host '%s' has leftovers: '%s'", value, name, rrdhost_hostname(host),
                 endptr);
     }
 

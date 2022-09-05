@@ -160,14 +160,10 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 // RRD FAMILY
 
 struct rrdfamily {
-    avl_t avl;
-
-    const char *family;
-    uint32_t hash_family;
+    STRING *family;
+    DICTIONARY *rrdvar_root_index;
 
     size_t use_count;
-
-    avl_tree_lock rrdvar_root_index;
 };
 typedef struct rrdfamily RRDFAMILY;
 
@@ -190,6 +186,7 @@ typedef enum rrddim_flags {
 
     RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
+    RRDDIM_FLAG_INDEXED_ID                      = (1 << 7),
 } RRDDIM_FLAGS;
 
 #define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -244,27 +241,13 @@ extern bool exporting_labels_filter_callback(const char *name, const char *value
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    // ------------------------------------------------------------------------
-    // binary indexing structures
-
-    avl_t avl;                                      // the binary index - this has to be first member!
-
     uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
 
     // ------------------------------------------------------------------------
     // the dimension definition
 
-    const char *id;                                 // the id of this dimension (for internal identification)
-    const char *name;                               // the name of this dimension (as presented to user)
-                                                    // this is a pointer to the config structure
-                                                    // since the config always has a higher priority
-                                                    // (the user overwrites the name of the charts)
-    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
-                                                    // instead of strcmp() every item in the binary index
-                                                    // we first compare the hashes
-    uint32_t hash_name;                             // a simple hash of the name
-
-
+    STRING *id;                                     // the id of this dimension (for internal identification)
+    STRING *name;                                   // the name of this dimension (as presented to user)
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // configuration flags for the dimension
@@ -305,6 +288,8 @@ struct rrddim {
     NETDATA_DOUBLE stored_volume;                   // the sum of all stored values so far
 
     struct rrddim *next;                            // linking of dimensions within the same data set
+    struct rrddim *prev;                            // linking of dimensions within the same data set
+
     struct rrdset *rrdset;
     RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
 
@@ -327,6 +312,9 @@ struct rrddim {
     void *rd_on_file;                               // pointer to the header written on disk
     storage_number *db;                             // the array of values
 };
+
+#define rrddim_id(rd) string2str((rd)->id)
+#define rrddim_name(rd) string2str((rd) ->name)
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 extern const char *rrddim_cache_filename(RRDDIM *rd);
@@ -459,9 +447,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
-    char *old_title;
-    char *old_units;
-    char *old_context;
     uuid_t hash_id;
     DICTIONARY *chart_labels;
     bool is_ar_chart;
@@ -485,75 +470,66 @@ struct rrdset_volatile {
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_DETAIL              = 1 << 1, // if set, the data set should be considered as a detail of another
-                                              // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG               = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE            = 1 << 3, // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_EXPORTING_SEND      = 1 << 4, // if set, this chart should be sent to Prometheus web API and external databases
-    RRDSET_FLAG_EXPORTING_IGNORE    = 1 << 5, // if set, this chart should not be sent to Prometheus web API and external databases
-    RRDSET_FLAG_UPSTREAM_SEND       = 1 << 6, // if set, this chart should be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_IGNORE     = 1 << 7, // if set, this chart should not be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_EXPOSED    = 1 << 8, // if set, we have sent this chart definition to netdata parent (streaming)
-    RRDSET_FLAG_STORE_FIRST         = 1 << 9, // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS       = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMOGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions are homogeneous
-    RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for exporting
-    RRDSET_FLAG_SYNC_CLOCK          = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
-    RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
-    // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
-    // least rrdset_free_obsolete_time seconds ago.
-    RRDSET_FLAG_ARCHIVED            = 1 << 15,
-    RRDSET_FLAG_ACLK                = 1 << 16,
-    RRDSET_FLAG_PENDING_FOREACH_ALARMS = 1 << 17, // contains dims with uninitialized foreach alarms
-    RRDSET_FLAG_ANOMALY_DETECTION   = 1 << 18 // flag to identify anomaly detection charts.
+    RRDSET_FLAG_DETAIL                  = (1 << 1),  // if set, the data set should be considered as a detail of another
+                                                     // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG                   = (1 << 2),  // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE                = (1 << 3),  // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_EXPORTING_SEND          = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
+    RRDSET_FLAG_EXPORTING_IGNORE        = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
+    RRDSET_FLAG_UPSTREAM_SEND           = (1 << 6),  // if set, this chart should be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_IGNORE         = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_EXPOSED        = (1 << 8),  // if set, we have sent this chart definition to netdata parent (streaming)
+    RRDSET_FLAG_STORE_FIRST             = (1 << 9),  // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS           = (1 << 10), // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMOGENEOUS_CHECK       = (1 << 11), // if set, the chart should be checked to determine if the dimensions are homogeneous
+    RRDSET_FLAG_HIDDEN                  = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
+    RRDSET_FLAG_SYNC_CLOCK              = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS     = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
+                                                     // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
+                                                     // least rrdset_free_obsolete_time seconds ago.
+    RRDSET_FLAG_ARCHIVED                = (1 << 15),
+    RRDSET_FLAG_ACLK                    = (1 << 16),
+    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
+    RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
+    RRDSET_FLAG_INDEXED_ID              = (1 << 19),
+    RRDSET_FLAG_INDEXED_NAME            = (1 << 20),
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
+#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 struct rrdset {
     // ------------------------------------------------------------------------
-    // binary indexing structures
-
-    avl_t avl;                                      // the index, with key the id - this has to be first!
-    avl_t avlname;                                  // the index, with key the name
-
-    // ------------------------------------------------------------------------
     // the set configuration
 
-    char id[RRD_ID_LENGTH_MAX + 1];                 // id of the data set
-
-    const char *name;                               // the name of this dimension (as presented to user)
-                                                    // this is a pointer to the config structure
-                                                    // since the config always has a higher priority
-                                                    // (the user overwrites the name of the charts)
-
-    char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
-    char *family;                                   // grouping sets under the same family
-    char *title;                                    // title shown to user
-    char *units;                                    // units of measurement
-
-    char *context;                                  // the template of this data set
-    uint32_t hash_context;                          // the hash of the chart's context
+    STRING *id;                                     // the ID of the data set
+    STRING *name;                                   // the name of this dimension (as presented to user)
+    STRING *type;                                   // the type of graph RRD_TYPE_* (a category, for determining graphing options)
+    STRING *family;                                 // grouping sets under the same family
+    STRING *title;                                  // title shown to user
+    STRING *units;                                  // units of measurement
+    STRING *context;                                // the template of this data set
+    STRING *plugin_name;                            // the name of the plugin that generated this
+    STRING *module_name;                            // the name of the plugin module that generated this
 
     RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
     RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
 
+    RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
     RRDSET_TYPE chart_type;                         // line, area, stacked
+    RRDSET_FLAGS flags;                             // configuration flags
+    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
 
     int update_every;                               // every how many seconds is this updated?
+
+    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
+                                                    // netdata will interpolate values for gaps lower than this
 
     long entries;                                   // total number of entries in the data set
 
     long current_entry;                             // the entry that is currently being updated
                                                     // it goes around in a round-robin fashion
-
-    RRDSET_FLAGS flags;                             // configuration flags
-    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
-
-    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
-                                                    // netdata will interpolate values for gaps lower than this
 
     long priority;                                  // the sorting priority of this chart
 
@@ -561,11 +537,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
-    RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
-
     char *cache_dir;                                // the directory to store dimensions
-
-    netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
 
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
@@ -576,18 +548,11 @@ struct rrdset {
     };
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
-    char *plugin_name;                              // the name of the plugin that generated this
-    char *module_name;                              // the name of the plugin module that generated this
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
-
-    uint32_t hash;                                  // a simple hash on the id, to speed up searching
-                                                    // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    uint32_t hash_name;                             // a simple hash on the name
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
@@ -601,14 +566,15 @@ struct rrdset {
     RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
 
     struct rrdset *next;                            // linking of rrdsets
+    struct rrdset *prev;                            // linking of rrdsets
 
     // ------------------------------------------------------------------------
     // local variables
 
-    NETDATA_DOUBLE green;                        // green threshold for this chart
-    NETDATA_DOUBLE red;                          // red threshold for this chart
+    NETDATA_DOUBLE green;                           // green threshold for this chart
+    NETDATA_DOUBLE red;                             // red threshold for this chart
 
-    avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
+    DICTIONARY *rrdvar_root_index;                  // RRDVAR index for this chart
     RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
 
@@ -621,14 +587,27 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // the dimensions
 
-    avl_tree_lock dimensions_index;                 // the root of the dimensions index
+    DICTIONARY *rrddim_root_index;                   // the root of the dimensions index
+
+    netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
     RRDDIM *dimensions;                             // the actual data for every dimension
 };
+
+#define rrdset_plugin_name(st) string2str((st)->plugin_name)
+#define rrdset_module_name(st) string2str((st)->module_name)
+#define rrdset_units(st) string2str((st)->units)
+#define rrdset_type(st) string2str((st)->type)
+#define rrdset_family(st) string2str((st)->family)
+#define rrdset_title(st) string2str((st)->title)
+#define rrdset_context(st) string2str((st)->context)
+#define rrdset_name(st) string2str((st)->name)
+#define rrdset_id(st) string2str((st)->id)
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
 #define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
 
+extern STRING *rrd_string_strdupz(const char *s);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -653,26 +632,29 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                 = (1 << 0), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = (1 << 1), // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = (1 << 2), // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND         = (1 << 3), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND    = (1 << 4), // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED               = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_MULTIHOST              = (1 << 6), // Host belongs to localhost/megadb
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS = (1 << 7), // contains dims with uninitialized foreach alarms
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE   = (1 << 8),
-    RRDHOST_FLAG_STREAM_LABELS_STOP     = (1 << 9),
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS   = (1 << 10), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ORPHAN                   = (1 << 0), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS   = (1 << 1), // delete files of obsolete charts
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST       = (1 << 2), // delete the entire host when orphan
+    RRDHOST_FLAG_EXPORTING_SEND           = (1 << 3), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND      = (1 << 4), // don't send it to external databases
+    RRDHOST_FLAG_ARCHIVED                 = (1 << 5), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_MULTIHOST                = (1 << 6), // Host belongs to localhost/megadb
+    RRDHOST_FLAG_PENDING_FOREACH_ALARMS   = (1 << 7), // contains dims with uninitialized foreach alarms
+    RRDHOST_FLAG_STREAM_LABELS_UPDATE     = (1 << 8),
+    RRDHOST_FLAG_STREAM_LABELS_STOP       = (1 << 9),
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS     = (1 << 10), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_INDEXED_MACHINE_GUID     = (1 << 11), // when set, we have indexed its machine guid
+    RRDHOST_FLAG_INDEXED_HOSTNAME         = (1 << 12), // when set, we have indexed its hostname
+    RRDHOST_FLAG_STREAM_COLLECTED_METRICS = (1 << 13), // when set, rrdset_done() should push metrics to parent
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~flag, __ATOMIC_SEQ_CST)
+#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, st->name, ##args); } while(0)
+            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
@@ -690,34 +672,30 @@ struct alarm_entry {
     time_t duration;
     time_t non_clear_duration;
 
-    char *name;
-    uint32_t hash_name;
+    STRING *name;
+    STRING *chart;
+    STRING *chart_context;
+    STRING *family;
 
-    char *chart;
-    uint32_t hash_chart;
-    char *chart_context;
+    STRING *classification;
+    STRING *component;
+    STRING *type;
 
-    char *family;
-
-    char *classification;
-    char *component;
-    char *type;
-
-    char *exec;
-    char *recipient;
+    STRING *exec;
+    STRING *recipient;
     time_t exec_run_timestamp;
     int exec_code;
     uint64_t exec_spawn_serial;
 
-    char *source;
-    char *units;
-    char *info;
+    STRING *source;
+    STRING *units;
+    STRING *info;
 
     NETDATA_DOUBLE old_value;
     NETDATA_DOUBLE new_value;
 
-    char *old_value_string;
-    char *new_value_string;
+    STRING *old_value_string;
+    STRING *new_value_string;
 
     RRDCALC_STATUS old_status;
     RRDCALC_STATUS new_status;
@@ -737,6 +715,20 @@ struct alarm_entry {
     struct alarm_entry *prev_in_progress;
 };
 
+#define ae_name(ae) string2str((ae)->name)
+#define ae_chart_name(ae) string2str((ae)->chart)
+#define ae_chart_context(ae) string2str((ae)->chart_context)
+#define ae_family(ae) string2str((ae)->family)
+#define ae_classification(ae) string2str((ae)->classification)
+#define ae_component(ae) string2str((ae)->component)
+#define ae_type(ae) string2str((ae)->type)
+#define ae_exec(ae) string2str((ae)->exec)
+#define ae_recipient(ae) string2str((ae)->recipient)
+#define ae_source(ae) string2str((ae)->source)
+#define ae_units(ae) string2str((ae)->units)
+#define ae_info(ae) string2str((ae)->info)
+#define ae_old_value_string(ae) string2str((ae)->old_value_string)
+#define ae_new_value_string(ae) string2str((ae)->new_value_string)
 
 typedef struct alarm_log {
     uint32_t next_log_id;
@@ -790,24 +782,20 @@ struct rrdhost_system_info {
 };
 
 struct rrdhost {
-    avl_t avl;                                      // the index of hosts
+    char machine_guid[GUID_LEN + 1];                // the unique ID of this host
 
     // ------------------------------------------------------------------------
     // host information
 
-    char *hostname;                                 // the hostname of this host
-    uint32_t hash_hostname;                         // the hostname hash
+    STRING *hostname;                               // the hostname of this host
+    STRING *registry_hostname;                      // the registry hostname for this host
+    STRING *os;                                     // the O/S type of the host
+    STRING *tags;                                   // tags for this host
+    STRING *timezone;                               // the timezone of the host
+    STRING *abbrev_timezone;                        // the abbriviated timezone of the host
+    STRING *program_name;                           // the program name that collects metrics for this host
+    STRING *program_version;                        // the program version that collects metrics for this host
 
-    char *registry_hostname;                        // the registry hostname for this host
-
-    char machine_guid[GUID_LEN + 1];                // the unique ID of this host
-    uint32_t hash_machine_guid;                     // the hash of the unique ID
-
-    const char *os;                                 // the O/S type of the host
-    const char *tags;                               // tags for this host
-    const char *timezone;                           // the timezone of the host
-
-    const char *abbrev_timezone;                    // the abbriviated timezone of the host
     int32_t utc_offset;                             // the offset in seconds from utc
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
@@ -819,9 +807,6 @@ struct rrdhost {
 
     char *cache_dir;                                // the directory to save RRD cache files
     char *varlib_dir;                               // the directory to save health log
-
-    char *program_name;                             // the program name that collects metrics for this host
-    char *program_version;                          // the program version that collects metrics for this host
 
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
@@ -873,23 +858,21 @@ struct rrdhost {
     // health monitoring options
 
     unsigned int health_enabled;                  // 1 when this host has health enabled
-    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
-    char *health_default_exec;                      // the full path of the alarms notifications program
-    char *health_default_recipient;                 // the default recipient for all alarms
-    char *health_log_filename;                      // the alarms event log filename
-    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
+    time_t health_delay_up_to;                    // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                  // the full path of the alarms notifications program
+    STRING *health_default_recipient;             // the default recipient for all alarms
+    char *health_log_filename;                    // the alarms event log filename
+    size_t health_log_entries_written;            // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                          // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;    // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;    // the default value for the interval between repeating critical notifications
 
 
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
-    RRDCALC *alarms;
+    RRDCALC *host_alarms;
     RRDCALC *alarms_with_foreach;
-    avl_tree_lock alarms_idx_health_log;
-    avl_tree_lock alarms_idx_name;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
@@ -899,9 +882,7 @@ struct rrdhost {
     // templates of alarms
     // these are used to create alarms when charts
     // are created or renamed, that match them
-    RRDCALCTEMPLATE *templates;
-    RRDCALCTEMPLATE *alarms_template_with_foreach;
-
+    RRDCALCTEMPLATE *alarms_templates;
 
     // ------------------------------------------------------------------------
     // the charts of the host
@@ -927,11 +908,11 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // indexes
 
-    avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
-    avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
+    DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
+    DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
-    avl_tree_lock rrdfamily_root_index;             // the host's chart families index
-    avl_tree_lock rrdvar_root_index;                // the host's chart variables index
+    DICTIONARY *rrdfamily_root_index;               // the host's chart families index
+    DICTIONARY *rrdvar_root_index;                  // the host's chart variables index
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
@@ -950,8 +931,18 @@ struct rrdhost {
     aclk_rrdhost_state aclk_state;
 
     struct rrdhost *next;
+    struct rrdhost *prev;
 };
 extern RRDHOST *localhost;
+
+#define rrdhost_hostname(host) string2str((host)->hostname)
+#define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
+#define rrdhost_os(host) string2str((host)->os)
+#define rrdhost_tags(host) string2str((host)->tags)
+#define rrdhost_timezone(host) string2str((host)->timezone)
+#define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
+#define rrdhost_program_name(host) string2str((host)->program_name)
+#define rrdhost_program_version(host) string2str((host)->program_version)
 
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
 #define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))
@@ -959,6 +950,8 @@ extern RRDHOST *localhost;
 
 #define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
 #define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
+
+extern long rrdhost_hosts_available(void);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -990,8 +983,8 @@ extern time_t rrdhost_free_orphan_time;
 
 extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
-extern RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash);
-extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
+extern RRDHOST *rrdhost_find_by_hostname(const char *hostname);
+extern RRDHOST *rrdhost_find_by_guid(const char *guid);
 
 extern RRDHOST *rrdhost_find_or_create(
         const char *hostname
@@ -1237,11 +1230,18 @@ time_t rrdhost_last_entry_t(RRDHOST *h);
 // RRD DIMENSION functions
 
 extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
-extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
-                                 collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);//,
-                                 //int is_archived, uuid_t *dim_uuid);
-#define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, \
-                                                                                   algorithm, (st)->rrd_memory_mode)//, 0, NULL)
+
+extern RRDDIM *rrddim_add_custom(RRDSET *st
+                                 , const char *id
+                                 , const char *name
+                                 , collected_number multiplier
+                                 , collected_number divisor
+                                 , RRD_ALGORITHM algorithm
+                                 , RRD_MEMORY_MODE memory_mode
+                                 );
+
+#define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
+    rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
 extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
@@ -1249,15 +1249,7 @@ extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
 extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
 
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
-/* This will not return dimensions that are archived */
-static inline RRDDIM *rrddim_find_active(RRDSET *st, const char *id)
-{
-    RRDDIM *rd = rrddim_find(st, id);
-    if (unlikely(rd && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)))
-        return NULL;
-    return rd;
-}
-
+extern RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 
 extern int rrddim_hide(RRDSET *st, const char *id);
 extern int rrddim_unhide(RRDSET *st, const char *id);
@@ -1275,32 +1267,19 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-extern int alarm_compare_id(void *a, void *b);
-extern int alarm_compare_name(void *a, void *b);
+extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions
 
 #ifdef NETDATA_RRD_INTERNALS
 
-extern avl_tree_lock rrdhost_root_index;
-
-extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
-extern int rrddim_compare(void* a, void* b);
-extern int rrdset_compare(void* a, void* b);
-extern int rrdset_compare_name(void* a, void* b);
-extern int rrdfamily_compare(void *a, void *b);
-
 extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
 extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
-
-#define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl_t *)(st))
-#define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl_t *)(st))
-extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
@@ -1318,8 +1297,8 @@ extern RRDHOST *rrdhost_create(
 #endif /* NETDATA_RRD_INTERNALS */
 
 extern void set_host_properties(
-    RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
-    const char *guid, const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
+    RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
+    const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
 
 extern int get_tier_grouping(int tier);

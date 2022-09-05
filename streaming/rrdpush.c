@@ -140,8 +140,8 @@ static inline int should_send_chart_matching(RRDSET *st) {
     if(!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE)) {
         RRDHOST *host = st->rrdhost;
 
-        if(simple_pattern_matches(host->rrdpush_send_charts_matching, st->id) ||
-            simple_pattern_matches(host->rrdpush_send_charts_matching, st->name)) {
+        if(simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_id(st)) ||
+            simple_pattern_matches(host->rrdpush_send_charts_matching, rrdset_name(st))) {
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         }
@@ -175,20 +175,17 @@ int configured_as_parent() {
 
 // checks if the current chart definition has been sent
 static inline int need_to_send_chart_definition(RRDSET *st) {
-    rrdset_check_rdlock(st);
-
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))))
         return 1;
 
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
+    dfe_start_read(st->rrddim_root_index, rd) {
         if(unlikely(!rd->exposed)) {
-            #ifdef NETDATA_INTERNAL_CHECKS
-            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, st->id, rd->id);
-            #endif
+            internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             return 1;
         }
     }
+    dfe_done(rd);
 
     return 0;
 }
@@ -216,9 +213,9 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // properly set the name for the remote end to parse it
     char *name = "";
     if(likely(st->name)) {
-        if(unlikely(strcmp(st->id, st->name))) {
+        if(unlikely(st->id != st->name)) {
             // they differ
-            name = strchr(st->name, '.');
+            name = strchr(rrdset_name(st), '.');
             if(name)
                 name++;
             else
@@ -230,12 +227,12 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     buffer_sprintf(
             host->sender->build
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
-            , st->id
+            , rrdset_id(st)
             , name
-            , st->title
-            , st->units
-            , st->family
-            , st->context
+            , rrdset_title(st)
+            , rrdset_units(st)
+            , rrdset_family(st)
+            , rrdset_context(st)
             , rrdset_type_name(st->chart_type)
             , st->priority
             , st->update_every
@@ -243,8 +240,8 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
             , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
             , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
-            , (st->plugin_name)?st->plugin_name:""
-            , (st->module_name)?st->module_name:""
+            , rrdset_plugin_name(st)
+            , rrdset_module_name(st)
     );
 
     // send the chart labels
@@ -257,8 +254,8 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         buffer_sprintf(
                 host->sender->build
                 , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
-                , rd->id
-                , rd->name
+                , rrddim_id(rd)
+                , rrddim_name(rd)
                 , rrd_algorithm_name(rd->algorithm)
                 , rd->multiplier
                 , rd->divisor
@@ -278,7 +275,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             buffer_sprintf(
                     host->sender->build
                     , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
-                    , rs->variable
+                    , string2str(rs->variable)
                     , *value
             );
         }
@@ -288,40 +285,75 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
+static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", rrdset_id(st), (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
     if (s->version >= VERSION_GAP_FILLING)
         buffer_sprintf(host->sender->build, " %"PRId64"\n", (int64_t)st->last_collected_time.tv_sec);
     else
         buffer_strcat(host->sender->build, "\n");
 
+    size_t count_of_dimensions_written = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(rd->updated && rd->exposed)
-            buffer_sprintf(host->sender->build
-                           , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
-                           , rd->id
-                           , rd->collected_value
-        );
+        if(rd->updated && rd->exposed) {
+            buffer_sprintf(host->sender->build, "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n", rrddim_id(rd), rd->collected_value);
+            count_of_dimensions_written++;
+        }
     }
     buffer_strcat(host->sender->build, "END\n");
+
+    return count_of_dimensions_written != 0;
 }
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
 
 // Called from the internal collectors to mark a chart obsolete.
-void rrdset_push_chart_definition_now(RRDSET *st) {
+bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(unlikely(!host->rrdpush_send_enabled || !should_send_chart_matching(st)))
-        return;
+        return false;
 
     rrdset_rdlock(st);
     sender_start(host->sender);
     rrdpush_send_chart_definition_nolock(st);
     sender_commit(host->sender);
     rrdset_unlock(st);
+
+    return true;
+}
+
+bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop) {
+    if(stop || restart)
+        dictionary_foreach_done(dictfe);
+
+    if(stop)
+        return false;
+
+    RRDSET *st = NULL;
+
+    if(unlikely(!dictfe->dict)) {
+        st = dictionary_foreach_start_rw(dictfe, host->rrdset_root_index, DICTIONARY_LOCK_REENTRANT);
+    }
+    else
+        st = dictionary_foreach_next(dictfe);
+
+    do {
+        while(st && !need_to_send_chart_definition(st))
+            st = dictionary_foreach_next(dictfe);
+
+        if(st && rrdset_push_chart_definition_now(st))
+            break;
+
+    } while((st = dictionary_foreach_next(dictfe)));
+
+    if (!st) {
+        dictionary_foreach_done(dictfe);
+        return false;
+    }
+
+    return true;
 }
 
 void rrdset_done_push(RRDSET *st) {
@@ -334,29 +366,37 @@ void rrdset_done_push(RRDSET *st) {
         rrdpush_sender_thread_spawn(host);
 
     // Handle non-connected case
-    if(unlikely(!__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
+    if(unlikely(!__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
+                 || !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS))) {
+
         if(unlikely(!host->rrdpush_sender_error_shown))
-            error("STREAM %s [send]: not ready - discarding collected metrics.", host->hostname);
+            error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         host->rrdpush_sender_error_shown = 1;
+
         return;
     }
     else if(unlikely(host->rrdpush_sender_error_shown)) {
-        info("STREAM %s [send]: sending metrics...", host->hostname);
+        info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         host->rrdpush_sender_error_shown = 0;
     }
+
+    if(dictionary_stats_entries(st->rrddim_root_index) == 0)
+        return;
 
     sender_start(host->sender);
 
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
 
-    rrdpush_send_chart_metrics_nolock(st, host->sender);
+    if(rrdpush_send_chart_metrics_nolock(st, host->sender)) {
+        // signal the sender there are more data
+        if (host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+            error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 
-    // signal the sender there are more data
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
-
-    sender_commit(host->sender);
+        sender_commit(host->sender);
+    }
+    else
+        sender_cancel(host->sender);
 }
 
 // labels
@@ -376,7 +416,7 @@ void rrdpush_send_labels(RRDHOST *host) {
     sender_commit(host->sender);
 
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
 }
@@ -399,7 +439,7 @@ void rrdpush_claimed_id(RRDHOST *host)
 
     // signal the sender there are more data
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
 }
 
 int connect_to_one_of_destinations(
@@ -496,7 +536,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     netdata_thread_t thr = 0;
 
     if(host->rrdpush_sender_spawn) {
-        info("STREAM %s [send]: signaling sending thread to stop...", host->hostname);
+        info("STREAM %s [send]: signaling sending thread to stop...", rrdhost_hostname(host));
 
         // signal the thread that we want to join it
         host->rrdpush_sender_join = 1;
@@ -512,10 +552,10 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     netdata_mutex_unlock(&host->sender->mutex);
 
     if(thr != 0) {
-        info("STREAM %s [send]: waiting for the sending thread to stop...", host->hostname);
+        info("STREAM %s [send]: waiting for the sending thread to stop...", rrdhost_hostname(host));
         void *result;
         netdata_thread_join(thr, &result);
-        info("STREAM %s [send]: sending thread has exited.", host->hostname);
+        info("STREAM %s [send]: sending thread has exited.", rrdhost_hostname(host));
     }
 }
 
@@ -533,10 +573,10 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
 
     if(!host->rrdpush_sender_spawn) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", host->hostname);
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", rrdhost_hostname(host));
 
         if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host->sender))
-            error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
+            error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             host->rrdpush_sender_spawn = 1;
     }
@@ -746,7 +786,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
 
     rrd_rdlock();
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
     if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
         host = NULL;
     if (host) {
@@ -763,7 +803,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 info(
                     "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
                     "existing connection is dead (%"PRId64" sec), accepting new connection.",
-                    host->hostname,
+                    rrdhost_hostname(host),
                     w->client_ip,
                     w->client_port,
                     (int64_t)age);
@@ -772,12 +812,12 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                 netdata_mutex_unlock(&host->receiver_lock);
                 rrdhost_unlock(host);
                 rrd_unlock();
-                log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
+                log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, rrdhost_hostname(host),
                                       "REJECTED - ALREADY CONNECTED");
                 info(
                     "STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - "
                     "existing connection is active (within last %"PRId64" sec), rejecting new connection.",
-                    host->hostname,
+                    rrdhost_hostname(host),
                     w->client_ip,
                     w->client_port,
                     (int64_t)age);
