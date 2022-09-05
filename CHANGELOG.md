@@ -9,6 +9,7 @@
 - fix apps plugin users charts descriptipon [\#13621](https://github.com/netdata/netdata/pull/13621) ([ilyam8](https://github.com/ilyam8))
 - add Postgres total connection utilization alarm [\#13620](https://github.com/netdata/netdata/pull/13620) ([ilyam8](https://github.com/ilyam8))
 - update Postgres "connections" dashboard info [\#13619](https://github.com/netdata/netdata/pull/13619) ([ilyam8](https://github.com/ilyam8))
+- Assorted updates for apps\_groups.conf. [\#13618](https://github.com/netdata/netdata/pull/13618) ([Ferroin](https://github.com/Ferroin))
 - add spiceproxy to proxmox group [\#13615](https://github.com/netdata/netdata/pull/13615) ([ilyam8](https://github.com/ilyam8))
 - Improve coverage of Linux kernel threads in apps\_groups.conf [\#13612](https://github.com/netdata/netdata/pull/13612) ([Ferroin](https://github.com/Ferroin))
 - Update dashboard to version v2.28.8. [\#13609](https://github.com/netdata/netdata/pull/13609) ([netdatabot](https://github.com/netdatabot))
@@ -348,7 +349,6 @@
 - Don't permanetly disable a destination because of denied access [\#12971](https://github.com/netdata/netdata/pull/12971) ([MrZammler](https://github.com/MrZammler))
 - modify code to resolve compile warning issue [\#12969](https://github.com/netdata/netdata/pull/12969) ([kklionz](https://github.com/kklionz))
 - Return rc-\>last\_update from alarms\_values api [\#12968](https://github.com/netdata/netdata/pull/12968) ([MrZammler](https://github.com/MrZammler))
-- cleanup and optimize rrdeng\_load\_metric\_next\(\) [\#12966](https://github.com/netdata/netdata/pull/12966) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
