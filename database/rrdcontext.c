@@ -10,7 +10,7 @@ int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
-#define RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC             (250 * USEC_PER_MS)
+#define RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC             (1000 * USEC_PER_MS)
 #define RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY                 10
 
 #define WORKER_JOB_HOSTS            1
@@ -2787,7 +2787,7 @@ static void rrdcontext_dequeue_from_post_processing(RRDHOST *host, RRDCONTEXT *r
     dictionary_del((DICTIONARY *)host->rrdctx_post_processing_queue, string2str(rc->id));
 }
 
-static void rrdcontext_post_process(RRDHOST *host) {
+static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
     RRDCONTEXT *rc;
     dfe_start_rw((DICTIONARY *)host->rrdctx_post_processing_queue, rc, DICTIONARY_LOCK_REENTRANT) {
         rrdcontext_post_process_updates(rc, true, RRD_FLAG_NONE, true);
@@ -2826,10 +2826,10 @@ static inline usec_t rrdcontext_calculate_queued_dispatch_time_ut(RRDCONTEXT *rc
     return dispatch_ut;
 }
 
-static void rrdcontext_process_hub_queued_contexts(RRDHOST *host, usec_t now_ut) {
+static void rrdcontext_dispatch_hub_queued_contexts(RRDHOST *host, usec_t now_ut) {
 
     // check if we have received a streaming command for this host
-    if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
+    if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected)
         return;
 
     // check if there are queued items to send
@@ -2852,6 +2852,7 @@ static void rrdcontext_process_hub_queued_contexts(RRDHOST *host, usec_t now_ut)
         worker_is_busy(WORKER_JOB_QUEUED);
         usec_t dispatch_ut = rrdcontext_calculate_queued_dispatch_time_ut(rc, now_ut);
         char *claim_id = get_agent_claimid();
+
         if(unlikely(now_ut >= dispatch_ut) && claim_id) {
             worker_is_busy(WORKER_JOB_CHECK);
 
@@ -2967,8 +2968,6 @@ void *rrdcontext_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        if(!aclk_connected) continue;
-
         usec_t now_ut = now_realtime_usec();
 
         if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
@@ -2990,8 +2989,8 @@ void *rrdcontext_main(void *ptr) {
             hub_queued_contexts_for_all_hosts += dictionary_stats_entries((DICTIONARY *)host->rrdctx_hub_queue);
             pp_queued_contexts_for_all_hosts += dictionary_stats_entries((DICTIONARY *)host->rrdctx_post_processing_queue);
 
-            rrdcontext_post_process(host);
-            rrdcontext_process_hub_queued_contexts(host, now_ut);
+            rrdcontext_post_process_queued_contexts(host);
+            rrdcontext_dispatch_hub_queued_contexts(host, now_ut);
         }
         rrd_unlock();
 
