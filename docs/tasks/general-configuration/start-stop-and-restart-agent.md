@@ -1,6 +1,6 @@
 <!--
 Title: "Start, stop and restart Agent"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start--stop-and-restart-agent.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "general-configuration"
