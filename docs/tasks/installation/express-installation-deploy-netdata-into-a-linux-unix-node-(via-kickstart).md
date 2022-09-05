@@ -1,13 +1,13 @@
 <!--
 Title: "Express installation, deploy Netdata into a linux/unix node (via kickstart)"
-custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation,-deploy-netdata-into-a-linux/unix-node-(via-kickstart).md
+custom_edit_url: https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "/installation/express-installation,-deploy-netdata-into-a-linux/"
+learn_rel_path: "/installation/"
 learn_docs_purpose: "Instructions on running the kickstart script on Unix systems."
 -->
 
-import { OneLineInstallWget, OneLineInstallCurl } from '../../../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
 
 This page will guide you through installation using the automatic one-line installation script named `kickstart.sh`.
 
