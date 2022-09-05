@@ -2775,7 +2775,6 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
 static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc) {
     if(!rrd_flag_check_any(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING)) {
-        info("RRDCONTEXT: post-processing queue, ADD '%s' of host '%s'", string2str(rc->id), rrdhost_hostname(rc->rrdhost));
         rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
         dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue, string2str(rc->id), rc, sizeof(*rc));
     }
@@ -2783,7 +2782,6 @@ static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc) {
 
 static void rrdcontext_dequeue_from_post_processing(RRDHOST *host, RRDCONTEXT *rc) {
     rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
-    info("RRDCONTEXT: post-processing queue, DEL '%s' of host '%s'", string2str(rc->id), rrdhost_hostname(rc->rrdhost));
     dictionary_del((DICTIONARY *)host->rrdctx_post_processing_queue, string2str(rc->id));
 }
 
