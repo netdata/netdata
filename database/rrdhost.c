@@ -43,7 +43,7 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 
 
 // ----------------------------------------------------------------------------
-// RRDHOST index
+// RRDHOST indexes management
 
 static DICTIONARY *rrdhost_root_index = NULL;
 static DICTIONARY *rrdhost_root_index_hostname = NULL;
@@ -66,22 +66,18 @@ static inline void rrdhost_init() {
     }
 }
 
-inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
-    return dictionary_get(rrdhost_root_index, guid);
-}
-
-inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
-    if(unlikely(!strcmp(hostname, "localhost")))
-        return localhost;
-
-    return dictionary_get(rrdhost_root_index_hostname, hostname);
-}
+// ----------------------------------------------------------------------------
+// RRDHOST index by UUID
 
 inline long rrdhost_hosts_available(void) {
     return dictionary_stats_entries(rrdhost_root_index);
 }
 
-static inline RRDHOST *rrdhost_index_add(RRDHOST *host) {
+inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
+    return dictionary_get(rrdhost_root_index, guid);
+}
+
+static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
     RRDHOST *ret_machine_guid = dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
     if(ret_machine_guid == host)
         rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
@@ -93,15 +89,23 @@ static inline RRDHOST *rrdhost_index_add(RRDHOST *host) {
     return host;
 }
 
-static inline RRDHOST *rrdhost_index_del(RRDHOST *host) {
+static void rrdhost_index_del_by_guid(RRDHOST *host) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID)) {
         if(dictionary_del(rrdhost_root_index, host->machine_guid) !=  0)
             error("RRDHOST: %s() failed to delete machine guid '%s' from index", __FUNCTION__, host->machine_guid);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
     }
+}
 
-    return host;
+// ----------------------------------------------------------------------------
+// RRDHOST index by hostname
+
+inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
+    if(unlikely(!strcmp(hostname, "localhost")))
+        return localhost;
+
+    return dictionary_get(rrdhost_root_index_hostname, hostname);
 }
 
 static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
@@ -118,8 +122,8 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
     return host;
 }
 
-static inline RRDHOST *rrdhost_index_del_hostname(RRDHOST *host) {
-    if(unlikely(!host->hostname)) return host;
+static inline void rrdhost_index_del_hostname(RRDHOST *host) {
+    if(unlikely(!host->hostname)) return;
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_HOSTNAME)) {
         if(dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)) !=  0)
@@ -127,8 +131,6 @@ static inline RRDHOST *rrdhost_index_del_hostname(RRDHOST *host) {
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
     }
-
-    return host;
 }
 
 // ----------------------------------------------------------------------------
@@ -183,23 +185,14 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
     host->utc_offset = utc_offset;
 }
 
-static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
-    strncpy(host->machine_guid, machine_guid, GUID_LEN);
-    host->machine_guid[GUID_LEN] = '\0';
-}
-
-void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname,
-                         const char *registry_hostname, const char *guid, const char *os, const char *tags,
+void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode,
+                         const char *registry_hostname, const char *os, const char *tags,
                          const char *tzone, const char *abbrev_tzone, int32_t utc_offset, const char *program_name,
                          const char *program_version)
 {
 
     host->rrd_update_every = update_every;
     host->rrd_memory_mode = memory_mode;
-
-    rrdhost_init_hostname(host, hostname);
-
-    rrdhost_init_machine_guid(host, guid);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, tzone, abbrev_tzone, utc_offset);
@@ -247,8 +240,13 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, hostname, registry_hostname, guid, os,
+    strncpy(host->machine_guid, guid, GUID_LEN);
+    host->machine_guid[GUID_LEN] = '\0';
+
+    set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, registry_hostname, os,
                         tags, timezone, abbrev_timezone, utc_offset, program_name, program_version);
+
+    rrdhost_init_hostname(host, hostname);
 
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
@@ -374,8 +372,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         rrdhost_unlock(host);
     }
 
-    RRDHOST *t = rrdhost_index_add(host);
-
+    RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
         error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
         rrdhost_free(host, 1);
@@ -1170,8 +1167,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // remove it from the indexes
 
-    if(rrdhost_index_del(host) != host)
-        error("RRDHOST '%s' removed from index, deleted the wrong entry.", rrdhost_hostname(host));
+    rrdhost_index_del_hostname(host);
+    rrdhost_index_del_by_guid(host);
 
     // ------------------------------------------------------------------------
     // unlink it from the host
