@@ -17,12 +17,12 @@ struct tc_class {
     STRING *leafid;
     STRING *parentid;
 
-    bool hasparent:1;
-    bool isleaf:1;
-    bool isqdisc:1;
-    bool render:1;
-    bool name_updated:1;
-    bool updated:1;
+    char hasparent;
+    char isleaf;
+    char isqdisc;
+    char render;
+    char name_updated;
+    char updated;
 
     int  unupdated; // the number of times, this has been found un-updated
 
@@ -52,8 +52,8 @@ struct tc_device {
     STRING *name;
     STRING *family;
 
-    bool name_updated:1;
-    bool family_updated:1;
+    char name_updated;
+    char family_updated;
 
     char enabled;
     char enabled_bytes;
@@ -194,8 +194,8 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
         if(cleanup_every < 0) cleanup_every = -cleanup_every;
     }
 
-    d->name_updated = false;
-    d->family_updated = false;
+    d->name_updated = 0;
+    d->family_updated = 0;
 
     struct tc_class *c;
     dfe_start_unsafe(d->classes, c) {
@@ -203,8 +203,8 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
             tc_class_free(d, c);
 
         else {
-            c->updated = false;
-            c->name_updated = false;
+            c->updated = 0;
+            c->name_updated = 0;
         }
     }
     dfe_done(c);
@@ -257,9 +257,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // we set reasonable defaults for the rest of the code below
 
     dfe_start_unsafe(d->classes, c) {
-        c->render = false;      // do not render this class
-        c->isleaf = true;       // this is a leaf class
-        c->hasparent = false;   // without a parent
+        c->render = 0;      // do not render this class
+        c->isleaf = 1;      // this is a leaf class
+        c->hasparent = 0;   // without a parent
 
         if(unlikely(!c->updated))
             c->unupdated++;     // increase its unupdated counter
@@ -287,7 +287,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         // set all classes to !updated
         dfe_start_unsafe(d->classes, c) {
             if (unlikely(!c->isqdisc && c->updated))
-                c->updated = false;
+                c->updated = 0;
         }
         dfe_done(c);
         updated_classes = 0;
@@ -332,8 +332,8 @@ static inline void tc_device_commit(struct tc_device *d) {
                 if((c->parentid && c->id == x->parentid) ||
                    (c->leafid && c->leafid == x->parentid)) {
                     // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
-                    c->isleaf = false;
-                    x->hasparent = true;
+                    c->isleaf = 0;
+                    x->hasparent = 1;
                 }
             }
             dfe_done(x);
@@ -348,7 +348,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         // debug(D_TC_LOOP, "TC: device '%s', %s '%s' isleaf=%d, hasparent=%d", d->id, (c->isqdisc)?"qdisc":"class", c->id, c->isleaf, c->hasparent);
 
         if(unlikely((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs)) {
-            c->render = true;
+            c->render = 1;
             active_nodes++;
             bytes_sum += c->bytes;
             packets_sum += c->packets;
@@ -525,8 +525,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // dropped
 
     if(d->enabled_dropped == CONFIG_BOOLEAN_YES || (d->enabled_dropped == CONFIG_BOOLEAN_AUTO &&
-                                                    (dropped_sum ||
-                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                    (dropped_sum || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_dropped = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_dropped)) {
@@ -738,7 +737,7 @@ static inline void tc_device_set_class_name(struct tc_device *d, char *id, char 
         if(likely(name && *name && strcmp(string2str(c->id), name) != 0)) {
             debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", string2str(d->id), id, name);
             c->name = string_strdupz(name);
-            c->name_updated = true;
+            c->name_updated = 1;
         }
     }
 }
@@ -755,7 +754,7 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
     if(likely(name && *name && strcmp(string2str(d->id), name) != 0)) {
         debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", string2str(d->id), name);
         d->name = string_strdupz(name);
-        d->name_updated = true;
+        d->name_updated = 1;
     }
 }
 
@@ -766,7 +765,7 @@ static inline void tc_device_set_device_family(struct tc_device *d, char *family
     if(likely(family && *family && strcmp(string2str(d->id), family) != 0)) {
         debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", string2str(d->id), family);
         d->family = string_strdupz(family);
-        d->family_updated = true;
+        d->family_updated = 1;
     }
     // no need for null termination - it is already null
 }
@@ -787,7 +786,7 @@ static inline struct tc_device *tc_device_create(char *id) {
     return(d);
 }
 
-static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, bool qdisc, char *parentid, char *leafid) {
+static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char qdisc, char *parentid, char *leafid) {
     struct tc_class *c = tc_class_index_find(n, id);
 
     if(!c) {
@@ -998,10 +997,10 @@ void *tc_main(void *ptr) {
                 }
 
                 if(likely(type && id && (parent_is_root || parent_is_parent))) {
-                    bool qdisc = false;
+                    char qdisc = 0;
 
                     if(first_hash == QDISC_HASH) {
-                        qdisc = true;
+                        qdisc = 1;
 
                         if(!strcmp(type, "ingress")) {
                             // we don't want to get the ingress qdisc
@@ -1080,10 +1079,10 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
                     class->bytes = str2ull(words[1]);
-                    class->updated = true;
+                    class->updated = 1;
                 }
                 else {
-                    class->updated = false;
+                    class->updated = 0;
                 }
 
                 if(likely(words[3] && *words[3]))
