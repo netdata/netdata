@@ -2308,7 +2308,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
     internal_error(true, "RRDCONTEXT: garbage collecting context structures of host '%s'", rrdhost_hostname(host));
 
     RRDCONTEXT *rc;
-    dfe_start_rw((DICTIONARY *)host->rrdctx, rc, DICTIONARY_LOCK_REENTRANT) {
+    dfe_start_reentrant((DICTIONARY *)host->rrdctx, rc) {
         if(unlikely(netdata_exit)) break;
 
         if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP);
@@ -2316,7 +2316,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
         rrdcontext_lock(rc);
 
         RRDINSTANCE *ri;
-        dfe_start_rw(rc->rrdinstances, ri, DICTIONARY_LOCK_REENTRANT) {
+        dfe_start_reentrant(rc->rrdinstances, ri) {
             if(unlikely(netdata_exit)) break;
 
             RRDMETRIC *rm;
@@ -2531,7 +2531,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_stats_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
-        dfe_start_rw(rc->rrdinstances, ri, DICTIONARY_LOCK_REENTRANT) {
+        dfe_start_reentrant(rc->rrdinstances, ri) {
             if(unlikely(netdata_exit)) break;
 
             rrdinstance_post_process_updates(ri, force, reason, worker_jobs);
@@ -2685,7 +2685,7 @@ static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
     if(unlikely(!host->rrdctx_post_processing_queue)) return;
 
     RRDCONTEXT *rc;
-    dfe_start_rw((DICTIONARY *)host->rrdctx_post_processing_queue, rc, DICTIONARY_LOCK_REENTRANT) {
+    dfe_start_reentrant((DICTIONARY *)host->rrdctx_post_processing_queue, rc) {
         if(unlikely(netdata_exit)) break;
 
         rrdcontext_post_process_updates(rc, true, RRD_FLAG_NONE, true);
@@ -2860,7 +2860,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
     contexts_updated_t bundle = NULL;
 
     RRDCONTEXT *rc;
-    dfe_start_rw((DICTIONARY *)host->rrdctx_hub_queue, rc, DICTIONARY_LOCK_REENTRANT) {
+    dfe_start_reentrant((DICTIONARY *)host->rrdctx_hub_queue, rc) {
         if(unlikely(netdata_exit)) break;
 
         if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
