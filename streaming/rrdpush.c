@@ -197,8 +197,8 @@ static int send_clabels_callback(const char *name, const char *value, RRDLABEL_S
     return 1;
 }
 void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
-    if (st->chart_labels) {
-        if(rrdlabels_walkthrough_read(st->chart_labels, send_clabels_callback, host->sender->build) > 0)
+    if (st->rrdlabels) {
+        if(rrdlabels_walkthrough_read(st->rrdlabels, send_clabels_callback, host->sender->build) > 0)
             buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
     }
 }

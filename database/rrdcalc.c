@@ -67,8 +67,8 @@ static STRING *rrdcalc_replace_variables(const char *line, RRDCALC *rc) {
             temp = buf;
         }
         else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
-            if(likely(rc->rrdset && rc->rrdset->chart_labels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->chart_labels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
+            if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
+                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);

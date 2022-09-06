@@ -586,7 +586,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // chart labels
 
-    DICTIONARY *chart_labels;
+    DICTIONARY *rrdlabels;
 
     // ------------------------------------------------------------------------
     // the dimensions
