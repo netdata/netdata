@@ -2525,15 +2525,13 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     if(worker_jobs)
         worker_is_busy(WORKER_JOB_PP_CONTEXT);
 
-    rrdcontext_lock(rc);
-
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_stats_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri) {
+        dfe_start_rw(rc->rrdinstances, ri, DICTIONARY_LOCK_REENTRANT) {
             if(unlikely(netdata_exit)) break;
 
             rrdinstance_post_process_updates(ri, force, reason, worker_jobs);
@@ -2583,6 +2581,8 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         rrd_flag_set(rc, RRD_FLAG_LIVE_RETENTION);
     else if(!live_retention && rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
         rrd_flag_clear(rc, RRD_FLAG_LIVE_RETENTION);
+
+    rrdcontext_lock(rc);
 
     if(unlikely(!instances_active)) {
         // we had some instances, but they are gone now...
