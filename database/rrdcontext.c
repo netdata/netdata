@@ -382,7 +382,7 @@ static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
 static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused, void *bundle __maybe_unused);
 
-static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function);
+static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function, RRD_FLAGS flags);
 static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 
 static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
@@ -569,7 +569,7 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
 
     if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(rm->ri, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(rm->ri->rc, function);
+        rrdcontext_queue_for_post_processing(rm->ri->rc, function, rm->flags);
     }
 }
 
@@ -888,7 +888,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
 
     if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(ri->rc, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(ri->rc, function);
+        rrdcontext_queue_for_post_processing(ri->rc, function, ri->flags);
     }
 }
 
@@ -1271,7 +1271,7 @@ static void rrdcontext_react_callback(const char *id __maybe_unused, void *value
 
 static void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function) {
     if(rrd_flag_is_updated(rc) || !rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
-        rrdcontext_queue_for_post_processing(rc, function);
+        rrdcontext_queue_for_post_processing(rc, function, rc->flags);
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
@@ -2682,13 +2682,31 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     rrdcontext_unlock(rc);
 }
 
-static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused) {
+static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {
     if(unlikely(!rc->rrdhost->rrdctx_post_processing_queue)) return;
 
     if(!rrd_flag_check(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING)) {
         rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
         dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue, string2str(rc->id), rc, sizeof(*rc));
-        internal_error(true, "RRDCONTEXT: '%s' update triggered by function %s()", string2str(rc->id), function);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        {
+            BUFFER *wb_flags = buffer_create(1000);
+            rrd_flags_to_buffer(flags, wb_flags);
+
+            BUFFER *wb_reasons = buffer_create(1000);
+            rrd_reasons_to_buffer(flags, wb_reasons);
+
+            internal_error(true, "RRDCONTEXT: '%s' update triggered by function %s(), due to flags: %s, reasons: %s",
+                           string2str(rc->id), function,
+                           buffer_tostring(wb_flags),
+                           buffer_tostring(wb_reasons));
+
+            buffer_free(wb_reasons);
+            buffer_free(wb_flags);
+        }
+#endif
+        
     }
 }
 
