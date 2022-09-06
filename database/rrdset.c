@@ -391,7 +391,6 @@ void rrdset_free(RRDSET *st) {
     string_freez(st->module_name);
 
     freez(st->cache_dir);
-    freez(st->state);
     freez(st->chart_uuid);
 
     freez(st);
@@ -667,7 +666,6 @@ RRDSET *rrdset_create_custom(
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     st = callocz(1, sizeof(RRDSET));
-    st->state = callocz(1, sizeof(*st->state));
 
     st->id = string_strdupz(fullid); // fullid is already json_fix'ed
 

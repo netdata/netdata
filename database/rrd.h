@@ -445,11 +445,6 @@ struct rrddim_tier {
 extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
 // ----------------------------------------------------------------------------
-// volatile state per chart
-struct rrdset_volatile {
-};
-
-// ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrddim_foreach_read(rd, st) \
@@ -491,7 +486,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
 
-    RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimesions
+    RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -553,8 +548,6 @@ struct rrdset {
 
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
-    struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data

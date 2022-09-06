@@ -4,7 +4,7 @@
 
 void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 {
-    if(unlikely(!st->state || !st->rrdlabels))
+    if(unlikely(!st->rrdlabels))
         return;
 
     char tabs[11];
