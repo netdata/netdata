@@ -639,7 +639,6 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_EXPORTING_SEND           = (1 << 3), // send it to external databases
     RRDHOST_FLAG_EXPORTING_DONT_SEND      = (1 << 4), // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED                 = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_MULTIHOST                = (1 << 6), // Host belongs to localhost/megadb
     RRDHOST_FLAG_PENDING_FOREACH_ALARMS   = (1 << 7), // contains dims with uninitialized foreach alarms
     RRDHOST_FLAG_STREAM_LABELS_UPDATE     = (1 << 8),
     RRDHOST_FLAG_STREAM_LABELS_STOP       = (1 << 9),
