@@ -713,8 +713,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
             if (st1->context == context_string &&
-                (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_label_key_pattern, ':')) &&
-                (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->state->chart_labels, chart_labels_filter_pattern, ':')))
+                (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->chart_labels, chart_label_key_pattern, ':')) &&
+                (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->chart_labels, chart_labels_filter_pattern, ':')))
                     build_context_param_list(owa, &context_param_list, st1);
         }
         rrdhost_unlock(host);

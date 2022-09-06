@@ -373,7 +373,7 @@ void rrdset_free(RRDSET *st) {
     netdata_rwlock_destroy(&st->rrdset_rwlock);
 
     rrdset_memory_file_free(st);
-    rrdlabels_destroy(st->state->chart_labels);
+    rrdlabels_destroy(st->chart_labels);
 
     // free directly allocated members
 
@@ -469,11 +469,11 @@ static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
 }
 
 static inline void rrdset_update_permanent_labels(RRDSET *st) {
-    if(!st->state || !st->state->chart_labels) return;
+    if(!st->chart_labels) return;
 
-    rrdlabels_add(st->state->chart_labels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_instance_family",rrdset_family(st),      RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->chart_labels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->chart_labels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->chart_labels, "_instance_family",rrdset_family(st),      RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
 }
 
 RRDSET *rrdset_create_custom(
@@ -718,7 +718,7 @@ RRDSET *rrdset_create_custom(
         );
 
     netdata_rwlock_init(&st->rrdset_rwlock);
-    st->state->chart_labels = rrdlabels_create();
+    st->chart_labels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
     if(name && *name && rrdset_set_name(st, name))

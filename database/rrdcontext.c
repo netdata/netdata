@@ -268,7 +268,7 @@ typedef struct rrdinstance {
     int update_every;                   // data collection frequency
     RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
 
-    DICTIONARY *rrdlabels;              // linked to RRDSET->state->chart_labels or own version
+    DICTIONARY *rrdlabels;              // linked to RRDSET->chart_labels or own version
 
     struct rrdcontext *rc;
     DICTIONARY *rrdmetrics;
@@ -705,8 +705,8 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     if(!ri->name)
         ri->name = string_dup(ri->id);
 
-    if(ri->rrdset && ri->rrdset->state) {
-        ri->rrdlabels = ri->rrdset->state->chart_labels;
+    if(ri->rrdset) {
+        ri->rrdlabels = ri->rrdset->chart_labels;
         ri->flags &= ~RRD_FLAG_OWN_LABELS; // no need of atomics at the constructor
     }
     else {
@@ -814,7 +814,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
 
         if(ri->rrdset && rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
             DICTIONARY *old = ri->rrdlabels;
-            ri->rrdlabels = ri->rrdset->state->chart_labels;
+            ri->rrdlabels = ri->rrdset->chart_labels;
             rrd_flag_clear(ri, RRD_FLAG_OWN_LABELS);
             rrdlabels_destroy(old);
         }
@@ -1034,7 +1034,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     if(!rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
         ri->rrdlabels = rrdlabels_create();
-        rrdlabels_copy(ri->rrdlabels, st->state->chart_labels);
+        rrdlabels_copy(ri->rrdlabels, st->chart_labels);
         rrd_flag_set(ri, RRD_FLAG_OWN_LABELS);
     }
 

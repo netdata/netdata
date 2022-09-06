@@ -448,7 +448,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // volatile state per chart
 struct rrdset_volatile {
     uuid_t hash_id;
-    DICTIONARY *chart_labels;
     bool is_ar_chart;
 };
 
@@ -583,6 +582,11 @@ struct rrdset {
 
     unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
     void *st_on_file;                               // compatibility with V019 RRDSET files
+
+    // ------------------------------------------------------------------------
+    // chart labels
+
+    DICTIONARY *chart_labels;
 
     // ------------------------------------------------------------------------
     // the dimensions
