@@ -571,7 +571,7 @@ size_t rrddim_memory_file_header_size(void) {
 }
 
 void rrddim_memory_file_update(RRDDIM *rd) {
-    if(!rd->rd_on_file) return;
+    if(!rd || !rd->rd_on_file) return;
     struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
 
     rd_on_file->last_collected_time.tv_sec = rd->last_collected_time.tv_sec;
@@ -579,7 +579,7 @@ void rrddim_memory_file_update(RRDDIM *rd) {
 }
 
 void rrddim_memory_file_free(RRDDIM *rd) {
-    if(!rd->rd_on_file) return;
+    if(!rd || !rd->rd_on_file) return;
 
     // needed for memory mode map, to save the latest state
     rrddim_memory_file_update(rd);
@@ -594,13 +594,13 @@ void rrddim_memory_file_free(RRDDIM *rd) {
 }
 
 const char *rrddim_cache_filename(RRDDIM *rd) {
-    if(!rd->rd_on_file) return NULL;
+    if(!rd || !rd->rd_on_file) return NULL;
     struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
     return rd_on_file->cache_filename;
 }
 
 void rrddim_memory_file_save(RRDDIM *rd) {
-    if(!rd->rd_on_file) return;
+    if(!rd || !rd->rd_on_file) return;
 
     rrddim_memory_file_update(rd);
 
