@@ -2096,7 +2096,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 }
 
 // ----------------------------------------------------------------------------
-// retention recalculation
+// version hash calculation
 
 static uint64_t rrdcontext_version_hash_with_callback(
     RRDHOST *host,
@@ -2147,6 +2147,9 @@ static uint64_t rrdcontext_version_hash_with_callback(
 
     return hash;
 }
+
+// ----------------------------------------------------------------------------
+// retention recalculation
 
 static void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
     rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
