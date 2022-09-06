@@ -123,7 +123,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
     node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
 
-    node_info.data.host_labels_ptr = host->host_labels;
+    node_info.data.host_labels_ptr = host->rrdlabels;
 
     aclk_update_node_info(&node_info);
     log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), wc->host_guid, wc->host == localhost ? "parent" : "child");

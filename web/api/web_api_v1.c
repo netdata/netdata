@@ -1140,7 +1140,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
         indentation--;
     }
 
-    rrdlabels_to_buffer(host->host_labels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
+    rrdlabels_to_buffer(host->rrdlabels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
     buffer_strcat(wb, "\n");
 }
 

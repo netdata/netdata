@@ -406,12 +406,12 @@ static int send_labels_callback(const char *name, const char *value, RRDLABEL_SR
     return 1;
 }
 void rrdpush_send_labels(RRDHOST *host) {
-    if (!host->host_labels || !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE) || (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_LABELS_STOP)))
+    if (!host->rrdlabels || !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE) || (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_LABELS_STOP)))
         return;
 
     sender_start(host->sender);
 
-    rrdlabels_walkthrough_read(host->host_labels, send_labels_callback, host->sender->build);
+    rrdlabels_walkthrough_read(host->rrdlabels, send_labels_callback, host->sender->build);
     buffer_sprintf(host->sender->build, "OVERWRITE %s\n", "labels");
     sender_commit(host->sender);
 

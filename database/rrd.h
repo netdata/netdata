@@ -900,7 +900,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    DICTIONARY *host_labels;
+    DICTIONARY *rrdlabels;
 
     // ------------------------------------------------------------------------
     // indexes

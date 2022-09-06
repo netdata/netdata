@@ -313,7 +313,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , 1
     );
     if (likely(host))
-        host->host_labels = sql_load_host_labels((uuid_t *)argv[IDX_HOST_ID]);
+        host->rrdlabels = sql_load_host_labels((uuid_t *)argv[IDX_HOST_ID]);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     char node_str[UUID_STR_LEN] = "<none>";

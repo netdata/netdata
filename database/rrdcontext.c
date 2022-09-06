@@ -1995,7 +1995,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 
     if(options & RRDCONTEXT_OPTION_SHOW_LABELS) {
         buffer_sprintf(wb, ",\n\t\"host_labels\": {\n");
-        rrdlabels_to_buffer(host->host_labels, wb, "\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
+        rrdlabels_to_buffer(host->rrdlabels, wb, "\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
         buffer_strcat(wb, "\n\t}");
     }
 

@@ -125,7 +125,7 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
         return 0;
 
     buffer_strcat(instance->labels_buffer, "\"labels\":{");
-    rrdlabels_to_buffer(host->host_labels, instance->labels_buffer, "", ":", "\"", ",",
+    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, "", ":", "\"", ",",
                         exporting_labels_filter_callback, instance,
                         NULL, sanitize_json_string);
     buffer_strcat(instance->labels_buffer, "},");

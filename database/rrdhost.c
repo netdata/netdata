@@ -274,7 +274,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
-    host->host_labels = rrdlabels_create();
+    host->rrdlabels = rrdlabels_create();
 
     netdata_mutex_init(&host->aclk_state_lock);
 
@@ -1182,7 +1182,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->aclk_state.claimed_id);
     freez(host->aclk_state.prev_claimed_id);
     string_freez(host->tags);
-    rrdlabels_destroy(host->host_labels);
+    rrdlabels_destroy(host->rrdlabels);
     string_freez(host->os);
     string_freez(host->timezone);
     string_freez(host->abbrev_timezone);
@@ -1262,7 +1262,7 @@ void rrdhost_save_charts(RRDHOST *host) {
 }
 
 static void rrdhost_load_auto_labels(void) {
-    DICTIONARY *labels = localhost->host_labels;
+    DICTIONARY *labels = localhost->rrdlabels;
 
     if (localhost->system_info->cloud_provider_type)
         rrdlabels_add(labels, "_cloud_provider_type", localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
@@ -1343,7 +1343,7 @@ static void rrdhost_load_config_labels(void) {
         config_section_wrlock(co);
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
-            rrdlabels_add(localhost->host_labels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
+            rrdlabels_add(localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
             cv->flags |= CONFIG_VALUE_USED;
         }
         config_section_unlock(co);
@@ -1367,7 +1367,7 @@ static void rrdhost_load_kubernetes_labels(void) {
 
     char buffer[1000 + 1];
     while (fgets(buffer, 1000, fp) != NULL)
-        rrdlabels_add_pair(localhost->host_labels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
+        rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
@@ -1376,17 +1376,17 @@ static void rrdhost_load_kubernetes_labels(void) {
 }
 
 void reload_host_labels(void) {
-    if(!localhost->host_labels)
-        localhost->host_labels = rrdlabels_create();
+    if(!localhost->rrdlabels)
+        localhost->rrdlabels = rrdlabels_create();
 
-    rrdlabels_unmark_all(localhost->host_labels);
+    rrdlabels_unmark_all(localhost->rrdlabels);
 
     // priority is important here
     rrdhost_load_config_labels();
     rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
 
-    rrdlabels_remove_all_unmarked(localhost->host_labels);
+    rrdlabels_remove_all_unmarked(localhost->rrdlabels);
     sql_store_host_labels(localhost);
 
     health_label_log_save(localhost);
