@@ -40,6 +40,7 @@ typedef enum {
     RRD_FLAG_QUEUED_FOR_POST_PROCESSING = (1 << 7), // this context is currently queued to be post-processed
     RRD_FLAG_HIDDEN         = (1 << 8), // don't expose this to the hub or the API
 
+    RRD_FLAG_UPDATE_REASON_TRIGGERED               = (1 << 9),  // the update was triggered by the child object
     RRD_FLAG_UPDATE_REASON_LOAD_SQL                = (1 << 10), // this object has just been loaded from SQL
     RRD_FLAG_UPDATE_REASON_NEW_OBJECT              = (1 << 11), // this object has just been created
     RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT          = (1 << 12), // we received an update on this object
@@ -67,7 +68,8 @@ typedef enum {
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
-     RRD_FLAG_UPDATE_REASON_LOAD_SQL                    \
+     RRD_FLAG_UPDATE_REASON_TRIGGERED                   \
+    |RRD_FLAG_UPDATE_REASON_LOAD_SQL                    \
     |RRD_FLAG_UPDATE_REASON_NEW_OBJECT                  \
     |RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT              \
     |RRD_FLAG_UPDATE_REASON_CHANGED_LINKING             \
@@ -203,6 +205,7 @@ static struct rrdcontext_reason {
     usec_t delay_ut;
 } rrdcontext_reasons[] = {
     // context related
+    { RRD_FLAG_UPDATE_REASON_TRIGGERED,               "triggered transition", 60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_NEW_OBJECT,              "object created",       60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT,          "object updated",       60 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_LOAD_SQL,                "loaded from sql",      60 * USEC_PER_SEC },
@@ -564,8 +567,10 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm) {
     if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD)))
             rrd_flag_set_archived(rm);
 
-    if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION))
+    if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
+        rrd_flag_set_updated(rm->ri, RRD_FLAG_UPDATE_REASON_TRIGGERED);
         rrdcontext_queue_for_post_processing(rm->ri->rc);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -877,8 +882,10 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
-    if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION))
+    if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)) {
+        rrd_flag_set_updated(ri->rc, RRD_FLAG_UPDATE_REASON_TRIGGERED);
         rrdcontext_queue_for_post_processing(ri->rc);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -2407,6 +2414,8 @@ static void rrdmetric_process_updates(RRDMETRIC *rm, bool force, RRD_FLAGS reaso
         worker_is_busy(WORKER_JOB_PP_METRIC);
 
     rrdmetric_update_retention(rm);
+
+    rrd_flag_unset_updated(rm);
 }
 
 static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FLAGS reason, bool worker_jobs) {
@@ -2434,7 +2443,6 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
 
             if (unlikely((rrdmetric_should_be_deleted(rm)))) {
                 metrics_deleted++;
-                rrd_flag_unset_updated(rm);
                 continue;
             }
 
@@ -2448,8 +2456,6 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
 
             if (rm->last_time_t && rm->last_time_t > max_last_time_t)
                 max_last_time_t = rm->last_time_t;
-
-            rrd_flag_unset_updated(rm);
         }
         dfe_done(rm);
     }
@@ -2513,6 +2519,8 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                 rrd_flag_set_archived(ri);
         }
     }
+
+    rrd_flag_unset_updated(ri);
 }
 
 static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
@@ -2544,7 +2552,6 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
             if (unlikely(rrdinstance_should_be_deleted(ri))) {
                 instances_deleted++;
-                rrd_flag_unset_updated(ri);
                 continue;
             }
 
@@ -2566,21 +2573,27 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
             if (ri->last_time_t && ri->last_time_t > max_last_time_t)
                 max_last_time_t = ri->last_time_t;
-
-            rrd_flag_unset_updated(ri);
         }
         dfe_done(ri);
     }
 
-    if(hidden && !rrd_flag_check(rc, RRD_FLAG_HIDDEN))
-        rrd_flag_set(rc, RRD_FLAG_HIDDEN);
-    else if(!hidden && rrd_flag_check(rc, RRD_FLAG_HIDDEN))
-        rrd_flag_clear(rc, RRD_FLAG_HIDDEN);
+    {
+        bool previous_hidden = rrd_flag_check(rc, RRD_FLAG_HIDDEN);
+        if (hidden != previous_hidden) {
+            if (hidden && !rrd_flag_check(rc, RRD_FLAG_HIDDEN))
+                rrd_flag_set(rc, RRD_FLAG_HIDDEN);
+            else if (!hidden && rrd_flag_check(rc, RRD_FLAG_HIDDEN))
+                rrd_flag_clear(rc, RRD_FLAG_HIDDEN);
+        }
 
-    if(live_retention && !rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
-        rrd_flag_set(rc, RRD_FLAG_LIVE_RETENTION);
-    else if(!live_retention && rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
-        rrd_flag_clear(rc, RRD_FLAG_LIVE_RETENTION);
+        bool previous_live_retention = rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION);
+        if (live_retention != previous_live_retention) {
+            if (live_retention && !rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
+                rrd_flag_set(rc, RRD_FLAG_LIVE_RETENTION);
+            else if (!live_retention && rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
+                rrd_flag_clear(rc, RRD_FLAG_LIVE_RETENTION);
+        }
+    }
 
     rrdcontext_lock(rc);
 
@@ -2658,10 +2671,9 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_hub_queue, string2str(rc->id), rc, sizeof(*rc));
             }
         }
-
-        rrd_flag_unset_updated(rc);
     }
 
+    rrd_flag_unset_updated(rc);
     rrdcontext_unlock(rc);
 }
 
@@ -2688,7 +2700,7 @@ static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
     dfe_start_reentrant((DICTIONARY *)host->rrdctx_post_processing_queue, rc) {
         if(unlikely(netdata_exit)) break;
 
-        rrdcontext_post_process_updates(rc, true, RRD_FLAG_NONE, true);
+        rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
         rrdcontext_dequeue_from_post_processing(rc);
     }
     dfe_done(rc);
