@@ -99,7 +99,7 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, DICTION
 
 void rrdvar_free_remaining_variables(RRDHOST *host, DICTIONARY *dict) {
     RRDVAR *rv;
-    dfe_start_rw(dict, rv, DICTIONARY_LOCK_REENTRANT) {
+    dfe_start_reentrant(dict, rv) {
         rrdvar_free(host, dict, rv);
     }
     dfe_done(rv);

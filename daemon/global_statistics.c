@@ -39,10 +39,6 @@ static struct global_statistics {
     volatile uint64_t sqlite3_queries_failed_locked;
     volatile uint64_t sqlite3_rows;
 
-    volatile uint64_t rrdcontext_metric_triggers;
-    volatile uint64_t rrdcontext_instance_triggers;
-    volatile uint64_t rrdcontext_context_triggers;
-
 } global_statistics = {
         .connected_clients = 0,
         .web_requests = 0,
@@ -83,18 +79,6 @@ void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_genera
     __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
-}
-
-void rrdcontext_triggered_update_on_rrdmetric() {
-    __atomic_fetch_add(&global_statistics.rrdcontext_metric_triggers, 1, __ATOMIC_RELAXED);
-}
-
-void rrdcontext_triggered_update_on_rrdinstance() {
-    __atomic_fetch_add(&global_statistics.rrdcontext_instance_triggers, 1, __ATOMIC_RELAXED);
-}
-
-void rrdcontext_triggered_update_on_rrdcontext() {
-    __atomic_fetch_add(&global_statistics.rrdcontext_context_triggers, 1, __ATOMIC_RELAXED);
 }
 
 void finished_web_request_statistics(uint64_t dt,
@@ -150,10 +134,6 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->sqlite3_queries_failed_busy   = __atomic_load_n(&global_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
-
-    gs->rrdcontext_metric_triggers    = __atomic_load_n(&global_statistics.rrdcontext_metric_triggers, __ATOMIC_RELAXED);
-    gs->rrdcontext_instance_triggers  = __atomic_load_n(&global_statistics.rrdcontext_instance_triggers, __ATOMIC_RELAXED);
-    gs->rrdcontext_context_triggers   = __atomic_load_n(&global_statistics.rrdcontext_context_triggers, __ATOMIC_RELAXED);
 }
 
 static void global_statistics_charts(void) {
@@ -602,40 +582,6 @@ static void global_statistics_charts(void) {
     }
 
     // ----------------------------------------------------------------
-
-    if(gs.rrdcontext_context_triggers || gs.rrdcontext_instance_triggers || gs.rrdcontext_metric_triggers) {
-        static RRDSET *st_rrdcontext_triggers = NULL;
-        static RRDDIM *rd_context = NULL, *rd_instance = NULL, *rd_metric = NULL;
-
-        if (unlikely(!st_rrdcontext_triggers)) {
-            st_rrdcontext_triggers = rrdset_create_localhost(
-                "netdata"
-                , "rrdcontext_triggers"
-                , NULL
-                , "rrdcontext"
-                , NULL
-                , "Netdata RRD context triggers"
-                , "triggers/s"
-                , "netdata"
-                , "stats"
-                , 131200
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-            );
-
-            rd_metric = rrddim_add(st_rrdcontext_triggers, "metric", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_instance = rrddim_add(st_rrdcontext_triggers, "instance", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_context = rrddim_add(st_rrdcontext_triggers, "context", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-        else
-            rrdset_next(st_rrdcontext_triggers);
-
-        rrddim_set_by_pointer(st_rrdcontext_triggers, rd_metric,   (collected_number)gs.rrdcontext_metric_triggers);
-        rrddim_set_by_pointer(st_rrdcontext_triggers, rd_instance, (collected_number)gs.rrdcontext_instance_triggers);
-        rrddim_set_by_pointer(st_rrdcontext_triggers, rd_context,  (collected_number)gs.rrdcontext_context_triggers);
-
-        rrdset_done(st_rrdcontext_triggers);
-    }
 }
 
 static void dbengine_statistics_charts(void) {
@@ -1289,7 +1235,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
     { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
-    { .name = "RRDCONTEXT",  .family = "workers aclk contexts",           .priority = 1000000 },
+    { .name = "RRDCONTEXT",  .family = "workers contexts",                .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }

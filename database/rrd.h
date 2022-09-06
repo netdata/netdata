@@ -916,7 +916,8 @@ struct rrdhost {
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
-    RRDCONTEXTS *rrdctx_queue;
+    RRDCONTEXTS *rrdctx_hub_queue;
+    RRDCONTEXTS *rrdctx_post_processing_queue;
     RRDCONTEXTS *rrdctx;
 
     uuid_t  host_uuid;                              // Global GUID for this host

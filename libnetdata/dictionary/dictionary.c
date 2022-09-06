@@ -121,30 +121,39 @@ void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)
 // dictionary statistics maintenance
 
 long int dictionary_stats_allocated_memory(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->memory;
 }
 long int dictionary_stats_entries(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->entries;
 }
 size_t dictionary_stats_version(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->version;
 }
 size_t dictionary_stats_searches(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->searches;
 }
 size_t dictionary_stats_inserts(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->inserts;
 }
 size_t dictionary_stats_deletes(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->deletes;
 }
 size_t dictionary_stats_resets(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->resets;
 }
 size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return dict->walkthroughs;
 }
 size_t dictionary_stats_referenced_items(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
     return __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
 }
 
