@@ -897,8 +897,11 @@ static void tc_main_cleanup(void *ptr) {
 #define WORKER_TC_SETDEVICEGROUP 7
 #define WORKER_TC_SETCLASSNAME   8
 #define WORKER_TC_WORKTIME       9
+#define WORKER_TC_PLUGIN_TIME   10
+#define WORKER_TC_DEVICES       11
+#define WORKER_TC_CLASSES       12
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 13
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
@@ -914,6 +917,10 @@ void *tc_main(void *ptr) {
     worker_register_job_name(WORKER_TC_SETDEVICEGROUP, "devicegroup");
     worker_register_job_name(WORKER_TC_SETCLASSNAME, "classname");
     worker_register_job_name(WORKER_TC_WORKTIME, "worktime");
+
+    worker_register_job_custom_metric(WORKER_TC_PLUGIN_TIME, "tc script execution time", "milliseconds/run", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_TC_DEVICES, "number of devices", "devices", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_TC_CLASSES, "number of classes", "classes", WORKER_METRIC_ABSOLUTE);
 
     tc_device_index_init();
     netdata_thread_cleanup_push(tc_main_cleanup, ptr);
@@ -1139,33 +1146,19 @@ void *tc_main(void *ptr) {
             }
             else if(unlikely(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0)) {
                 worker_is_busy(WORKER_TC_WORKTIME);
+                worker_set_metric(WORKER_TC_PLUGIN_TIME, str2ll(words[1], NULL));
 
-                // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
-                static RRDSET *sttime = NULL;
-                static RRDDIM *rd_run_time = NULL;
+                size_t number_of_devices = dictionary_stats_entries(tc_device_root_index);
+                size_t number_of_classes = 0;
 
-                if(unlikely(!sttime)) {
-                    sttime = rrdset_create_localhost(
-                            "netdata"
-                            , "plugin_tc_time"
-                            , NULL
-                            , "workers plugin tc"
-                            , "netdata.workers.tc.script_time"
-                            , "Netdata TC script execution"
-                            , "milliseconds/run"
-                            , PLUGIN_TC_NAME
-                            , NULL
-                            , NETDATA_CHART_PRIO_NETDATA_TC_TIME
-                            , localhost->rrd_update_every
-                            , RRDSET_TYPE_AREA
-                    );
-                    rd_run_time = rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                struct tc_device *d;
+                dfe_start_unsafe(tc_device_root_index, d) {
+                    number_of_classes += dictionary_stats_entries(d->classes);
                 }
-                else rrdset_next(sttime);
+                dfe_done(d);
 
-                rrddim_set_by_pointer(sttime, rd_run_time, str2ll(words[1], NULL));
-                rrdset_done(sttime);
-
+                worker_set_metric(WORKER_TC_DEVICES, number_of_devices);
+                worker_set_metric(WORKER_TC_CLASSES, number_of_classes);
             }
             //else {
             //  debug(D_TC_LOOP, "IGNORED line");
