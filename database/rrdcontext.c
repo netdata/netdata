@@ -248,8 +248,6 @@ typedef struct rrdmetric {
     RRD_FLAGS flags;
 
     struct rrdinstance *ri;
-
-    usec_t created_ut;                  // the time this object was created
 } RRDMETRIC;
 
 typedef struct rrdinstance {
@@ -274,6 +272,12 @@ typedef struct rrdinstance {
 
     struct rrdcontext *rc;
     DICTIONARY *rrdmetrics;
+
+    struct {
+        uint32_t collected_metrics;     // a temporary variable to detect BEGIN/END without SET
+                                        // don't use it for other purposes
+                                        // it goes up and then resets to zero, on every iteration
+    } internal;
 } RRDINSTANCE;
 
 typedef struct rrdcontext {
@@ -456,8 +460,6 @@ static void rrdmetric_insert_callback(const char *id __maybe_unused, void *value
 
     // remove flags that we need to figure out at runtime
     rm->flags = rm->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS; // no need for atomics
-
-    rm->created_ut = now_realtime_usec();
 
     // signal the react callback to do the job
     rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
@@ -654,6 +656,9 @@ static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
 
     if(unlikely(!rrd_flag_is_collected(rm)))
         rrd_flag_set_collected(rm);
+
+    // we use this variable to detect BEGIN/END without SET
+    rm->ri->internal.collected_metrics++;
 
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
@@ -1098,13 +1103,13 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
-    if(dictionary_stats_entries(ri->rrdmetrics) > 0) {
+    if(unlikely(ri->internal.collected_metrics && !rrd_flag_is_collected(ri)))
+        rrd_flag_set_collected(ri);
 
-        if(unlikely(!rrd_flag_is_collected(ri)))
-            rrd_flag_set_collected(ri);
+    // we use this variable to detect BEGIN/END without SET
+    ri->internal.collected_metrics = 0;
 
-        rrdinstance_trigger_updates(ri, __FUNCTION__ );
-    }
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
 }
 
 // ----------------------------------------------------------------------------
@@ -2706,7 +2711,7 @@ static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *fun
             buffer_free(wb_flags);
         }
 #endif
-        
+
     }
 }
 
