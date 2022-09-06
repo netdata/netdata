@@ -447,7 +447,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
-    bool is_ar_chart;
 };
 
 // ----------------------------------------------------------------------------
@@ -489,13 +488,17 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_ACLK                    = (1 << 16),
     RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
-    RRDSET_FLAG_INDEXED_ID              = (1 << 19),
-    RRDSET_FLAG_INDEXED_NAME            = (1 << 20),
+    RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
+    RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
+
+    RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimesions
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
+
+#define rrdset_is_ar_chart(st) rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_RATE_CHART)
 
 struct rrdset {
     uuid_t uuid;

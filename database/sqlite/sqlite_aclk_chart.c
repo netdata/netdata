@@ -1265,7 +1265,7 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host)
 void sql_check_chart_liveness(RRDSET *st) {
     RRDDIM *rd;
 
-    if (unlikely(st->state->is_ar_chart))
+    if (unlikely(rrdset_is_ar_chart(st)))
         return;
 
     rrdset_rdlock(st);

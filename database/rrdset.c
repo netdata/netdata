@@ -690,7 +690,8 @@ RRDSET *rrdset_create_custom(
     st->type        = rrd_string_strdupz(type);
     st->family      = family ? rrd_string_strdupz(family) : string_dup(st->type);
 
-    st->state->is_ar_chart = strcmp(rrdset_id(st), ML_ANOMALY_RATES_CHART_ID) == 0;
+    if(strcmp(rrdset_id(st), ML_ANOMALY_RATES_CHART_ID) == 0)
+        rrdset_flag_set(st, RRDSET_FLAG_ANOMALY_RATE_CHART);
 
     st->units = rrd_string_strdupz(units);
 
@@ -1264,7 +1265,7 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    if (likely(!st->state->is_ar_chart)) {
+    if (likely(!rrdset_is_ar_chart(st))) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
             if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
@@ -1693,7 +1694,7 @@ after_second_database_work:
             continue;
 
 #ifdef ENABLE_ACLK
-        if (likely(!st->state->is_ar_chart)) {
+        if (likely(!rrdset_is_ar_chart(st))) {
             if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
                 queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
         }

@@ -29,7 +29,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
 #endif
 
     // Do not send anomaly rates charts.
-    if (st->state && st->state->is_ar_chart)
+    if (rrdset_is_ar_chart(st))
         return 0;
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
