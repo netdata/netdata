@@ -447,7 +447,6 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
-    uuid_t hash_id;
     bool is_ar_chart;
 };
 
@@ -499,6 +498,8 @@ typedef enum rrdset_flags {
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 struct rrdset {
+    uuid_t uuid;
+
     // ------------------------------------------------------------------------
     // the set configuration
 

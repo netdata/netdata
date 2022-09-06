@@ -150,7 +150,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
     if (likely(claim_id)) {
         struct chart_instance_updated chart_payload;
         memset(&chart_payload, 0, sizeof(chart_payload));
-        chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
+        chart_payload.config_hash = get_str_from_uuid(&st->uuid);
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
         chart_payload.name = (char *)rrdset_name(st);

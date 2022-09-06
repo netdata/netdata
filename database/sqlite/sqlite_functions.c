@@ -2122,7 +2122,7 @@ void compute_chart_hash(RRDSET *st)
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*((uuid_t *) &hash_value), uuid_str);
     //info("Calculating HASH %s for chart %s", uuid_str, st->name);
-    uuid_copy(st->state->hash_id, *((uuid_t *) &hash_value));
+    uuid_copy(st->uuid, *((uuid_t *) &hash_value));
 
     (void)sql_store_chart_hash(
         (uuid_t *)&hash_value,
