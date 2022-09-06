@@ -7,51 +7,18 @@ learn_rel_path: "installation"
 learn_docs_purpose: "Instruction to deploy Netdata in a Docker container"
 -->
 
-**********************************************************************
-Template:
-
-Small intro, give some context to the user
-
-## Prerequisite
-
-Unordered list of what you will need. 
-
-## Steps
-
-Exact list of steps the user must follow
-
-## Expected result
-
-What you expect to see when you complete the steps above
-
-## Example
-
-Example configuration/actions of the task
-
-## Related topics
-
-List of reference docs user needs to be aware of.
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Install Netdata with Docker"
-date: 2020-04-23
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
--->
-
-# Install the Netdata Agent with Docker
-
-Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
-you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
+Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
+:::note
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog instance within the Netdata infrastructure. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
+:::
 
 ## Limitations running the Agent in Docker
 
@@ -70,10 +37,13 @@ documentation](https://docs.docker.com/engine/reference/builder/#understand-how-
 Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
 and unfortunately not something we can realistically work around.
 
-## Create a new Netdata Agent container
+## Prerequisites
 
-You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
-visit the Agent dashboard `http://NODE:19999`.
+- `docker` and (optional) `docker-compose` installed on the node.
+
+## Steps
+
+You can create a new Agent container using either `docker run` or Docker Compose.
 
 Both methods create a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`. See the [configuration section](#configure-agent-containers) for details. If
@@ -132,14 +102,14 @@ volumes:
   netdatacache:
 ```
 
-## Docker tags
+### Docker tags
 
 The official `netdata/netdata` Docker image provides the following named tags:
 
-* `stable`: The `stable` tag will always point to the most recently published stable build.
-* `edge`: The `edge` tag will always point ot the most recently published nightly build. In most cases, this is
+- `stable`: The `stable` tag will always point to the most recently published stable build.
+- `edge`: The `edge` tag will always point ot the most recently published nightly build. In most cases, this is
   updated daily at around 01:00 UTC.
-* `latest`: The `latest` tag will always point to the most recently published build, whether it’s a stable build
+- `latest`: The `latest` tag will always point to the most recently published build, whether it’s a stable build
   or a nightly build. This is what Docker will use by default if you do not specify a tag.
 
 Additionally, for each stable release, three tags are pushed, one with the full version of the release (for example,
@@ -148,20 +118,22 @@ Additionally, for each stable release, three tags are pushed, one with the full 
 that would match that tag (for example, if `v1.30.1` were to be published, the `v1.30` tag would be updated to
 point to that instead of `v1.30.0`).
 
-## Health Checks
+## Further Actions
+
+### Health Checks
 
 Our Docker image provides integrated support for health checks through the standard Docker interfaces.
 
 You can control how the health checks run by using the environment variable `NETDATA_HEALTHCHECK_TARGET` as follows:
 
--   If left unset, the health check will attempt to access the
+- If left unset, the health check will attempt to access the
     `/api/v1/info` endpoint of the agent.
--   If set to the exact value 'cli', the health check
+- If set to the exact value 'cli', the health check
     script will use `netdatacli ping` to determine if the agent is running
     correctly or not. This is sufficient to ensure that Netdata did not
     hang during startup, but does not provide a rigorous verification
     that the daemon is collecting data or is otherwise usable.
--   If set to anything else, the health check will treat the value as a
+- If set to anything else, the health check will treat the value as a
     URL to check for a 200 status code on. In most cases, this should
     start with `http://localhost:19999/` to check the agent running in
     the container.
@@ -171,9 +143,77 @@ endpoint will be sufficient. If you are using a configuration which
 disables the web server or restricts access to certain APIs, you will
 need to use a non-default configuration for health checks to work.
 
-## Configure Agent containers
+### Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 
-If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container), and you
+For a permanent installation on a public server, you should [secure the Netdata
+instance](/docs/agent/netdata-security). This section contains an example of how to install Netdata with an SSL
+reverse proxy and basic authentication.
+
+You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
+email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
+
+### Caddyfile
+
+This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain, and you need to provide
+your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be
+executed internally by the caddy server.
+
+```caddyfile
+netdata.example.org {
+  reverse_proxy netdata:19999
+  tls admin@example.org
+}
+```
+
+### docker-compose.yml
+
+After setting Caddyfile run this with `docker-compose up -d` to have fully functioning Netdata setup behind HTTP reverse
+proxy.
+
+```yaml
+version: '3'
+volumes:
+  caddy_data:
+  caddy_config:
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+  netdata:
+    restart: always
+    hostname: netdata.example.org
+    image: netdata/netdata
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+volumes:
+  netdatalib:
+  netdatacache:
+```
+
+### Restrict access with basic auth
+
+You can restrict access by following [official caddy guide](https://caddyserver.com/docs/caddyfile/directives/basicauth#basicauth) and adding lines to
+Caddyfile.
+
+### Configure Agent containers
+
+If you started an Agent container using one of the [recommended methods](#steps), and you
 want to edit Netdata's configuration, you must first use `docker exec` to attach to the container. Replace `netdata`
 with the name of your container.
 
@@ -186,9 +226,9 @@ cd /etc/netdata
 You need to restart the Agent to apply changes. Exit the container if you haven't already, then use the `docker` command
 to restart the container: `docker restart netdata`.
 
-### Host-editable configuration
+#### Host-editable configuration
 
-> **Warning**: [edit-config](/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
+> **Warning**: [edit-config](/docs/configure/nodes#the-netdata-config-directory) script doesn't work when executed on
 > the host system.
 
 If you want to make your container's configuration directory accessible from the host system, you need to use a
@@ -250,16 +290,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
-
 volumes:
   netdatalib:
   netdatacache:
 ```
 
-### Change the default hostname
+#### Change the default hostname
 
-You can change the hostname of a Docker container, and thus the name that appears in the local dashboard and in Netdata
-Cloud, when creating a new container. If you want to change the hostname of a Netdata container _after_ you started it,
+You can change the hostname of a Docker container, and thus the name that appears in the local dashboard and in Netdata Cloud, when creating a new container. If you want to change the hostname of a Netdata container _after_ you started it,
 you can safely stop and remove it. Your configuration and metrics data reside in persistent volumes and are reattached to
 the recreated container.
 
@@ -287,16 +325,16 @@ If you don't want to destroy and recreate your container, you can edit the Agent
 above section on [configuring Agent containers](#configure-agent-containers) to find the appropriate method based on
 how you created the container.
 
-### Add or remove other volumes
+#### Add or remove other volumes
 
 Some volumes are optional depending on how you use Netdata:
 
--   If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
+- If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
     (they are used to get proper user and group names for the monitored host) to get slightly better security.
--   Most modern linux distros supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
+- Most modern linux distros supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
     this is the case you can change the line above that mounts the file inside the container to
     `-v /etc/lsb-release:/host/etc/lsb-release:ro`.
--   If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
+- If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
     metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
     using, e.g. `--env VIRTUALIZATION=$(systemd-detect-virt -v)`. If you are using a `docker-compose.yml` then add:
 
@@ -311,21 +349,21 @@ This allows the information to be passed into `docker-compose` using:
 VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
 
-#### Files inside systemd volumes
+##### Files inside systemd volumes
 
-If a volume is used by systemd service, some files can be removed during 
+If a volume is used by systemd service, some files can be removed during
 [reinitialization](https://github.com/netdata/netdata/issues/9916). To avoid this, you need to add
 `RuntimeDirectoryPreserve=yes` to the service file.
 
-### Docker container names resolution
+#### Docker container names resolution
 
 There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to
 your machine from within the container. Please read the following carefully.
 
-#### Docker socket proxy (safest option)
+##### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
+[HAProxy](/docs/agent/running-behind-haproxy) so that it restricts connections to read-only access to the CONTAINERS
 endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
@@ -353,15 +391,14 @@ services:
      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CONTAINERS=1
-
 ```
+
 **Note:** Replace `2375` with the port of your proxy.
 
-#### Giving group access to the Docker socket (less safe)
+##### Giving group access to the Docker socket (less safe)
 
 > You should seriously consider the necessity of activating this option, as it grants to the `netdata`
 user access to the privileged socket connection of docker service and therefore your whole machine.
-
 If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the
 socket.
 
@@ -387,7 +424,7 @@ This group number can be found by running the following (if socket group ownersh
 grep docker /etc/group | cut -d ':' -f 3
 ```
 
-#### Running as root (unsafe)
+##### Running as root (unsafe)
 
 > You should seriously consider the necessity of activating this option, as it grants to the `netdata` user access to
 > the privileged socket connection of docker service, and therefore your whole machine.
@@ -405,7 +442,7 @@ services:
       - DOCKER_USR=root
 ```
 
-### Docker container network interfaces monitoring
+#### Docker container network interfaces monitoring
 
 Netdata can map a virtual interface in the system namespace to an interface inside a Docker container
 when using network [bridge](https://docs.docker.com/network/bridge/) driver. To do this, the Netdata container needs
@@ -441,127 +478,54 @@ services:
     ...
 ```
 
-### Pass command line options to Netdata
+#### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
-[Netdata daemon command line options](/daemon/README.md#command-line-options) such as the IP address Netdata will be
-running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
+[Netdata daemon command line options](/docs/agent/daemon#command-line-options) such as the IP address Netdata will be
+running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd).
 
-## Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
-
-For a permanent installation on a public server, you should [secure the Netdata
-instance](/docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
-reverse proxy and basic authentication.
-
-You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
-email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
-
-### Caddyfile
-
-This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain, and you need to provide
-your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be
-executed internally by the caddy server.
-
-```caddyfile
-netdata.example.org {
-  reverse_proxy netdata:19999
-  tls admin@example.org
-}
-```
-
-### docker-compose.yml
-
-After setting Caddyfile run this with `docker-compose up -d` to have fully functioning Netdata setup behind HTTP reverse
-proxy.
-
-```yaml
-version: '3'
-volumes:
-  caddy_data:
-  caddy_config:
-
-services:
-  caddy:
-    image: caddy:2
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /opt/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-  netdata:
-    restart: always
-    hostname: netdata.example.org
-    image: netdata/netdata
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - apparmor:unconfined
-    volumes:
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-
-volumes:
-  netdatalib:
-  netdatacache:
-```
-
-### Restrict access with basic auth
-
-You can restrict access by following [official caddy guide](https://caddyserver.com/docs/caddyfile/directives/basicauth#basicauth) and adding lines to
-Caddyfile.
-
-## Publish a test image to your own repository
+### Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our Travis CI infrastructure.
 
-### Inside Netdata organization, using Travis CI
+#### Inside Netdata organization, using Travis CI
 
 To enable Travis CI integration on your own repositories (Docker and GitHub), you need to be part of the Netdata
 organization.
 
 Once you have contacted the Netdata owners to setup you up on GitHub and Travis, execute the following steps
 
--   Preparation
-    -   Have Netdata forked on your personal GitHub account
-    -   Get a GitHub token: Go to **GitHub settings** -> **Developer Settings** -> **Personal access tokens**, and
+- Preparation
+  - Have Netdata forked on your personal GitHub account
+  - Get a GitHub token: Go to **GitHub settings** -> **Developer Settings** -> **Personal access tokens**, and
         generate a new token with full access to `repo_hook`, read-only access to `admin:org`, `public_repo`,
         `repo_deployment`, `repo:status`, and `user:email` settings enabled. This will be your `GITHUB_TOKEN` that is
         described later in the instructions, so keep it somewhere safe.
-    -   Contact the Netdata team and seek for permissions on `https://scan.coverity.com` should you require Travis to be
+  - Contact the Netdata team and seek for permissions on `https://scan.coverity.com` should you require Travis to be
         able to push your forked code to coverity for analysis and report. Once you are setup, you should have your
         email you used in coverity and a token from them. These will be your `COVERITY_SCAN_SUBMIT_EMAIL` and
         `COVERITY_SCAN_TOKEN` that we will refer to later.
-    -   Have a valid Docker hub account, the credentials from this account will be your `DOCKER_USERNAME` and
+  - Have a valid Docker hub account, the credentials from this account will be your `DOCKER_USERNAME` and
         `DOCKER_PWD` mentioned later.
 
--   Setting up Travis CI for your own fork (Detailed instructions provided by Travis team [here](https://docs.travis-ci.com/user/tutorial/))
-    -   Login to travis with your own GITHUB credentials (There is Open Auth access)
-    -   Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup
+- Setting up Travis CI for your own fork (Detailed instructions provided by Travis team [here](https://docs.travis-ci.com/user/tutorial/))
+  - Login to travis with your own GITHUB credentials (There is Open Auth access)
+  - Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup
         your Netdata fork to be built by Travis CI.
-    -   Once the repository has been setup, go to repository settings within Travis CI (usually under
+  - Once the repository has been setup, go to repository settings within Travis CI (usually under
         `https://travis-ci.com/NETDATA_DEVELOPER/netdata/settings`, where `NETDATA_DEVELOPER` is your GitHub handle),
         and select your desired settings.
 
--   While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add
+- While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add
     the following:
-    -   `DOCKER_USERNAME` and `DOCKER_PWD` variables so that Travis can log in to your Docker Hub account and publish
-        Docker images there. 
-    -   `REPOSITORY` variable to `NETDATA_DEVELOPER/netdata`, where `NETDATA_DEVELOPER` is your GitHub handle again.
-    -   `GITHUB_TOKEN` variable with the token generated on the preparation step, for Travis workflows to function
+  - `DOCKER_USERNAME` and `DOCKER_PWD` variables so that Travis can log in to your Docker Hub account and publish
+        Docker images there.
+  - `REPOSITORY` variable to `NETDATA_DEVELOPER/netdata`, where `NETDATA_DEVELOPER` is your GitHub handle again.
+  - `GITHUB_TOKEN` variable with the token generated on the preparation step, for Travis workflows to function
         properly.
-    -   `COVERITY_SCAN_SUBMIT_EMAIL` and `COVERITY_SCAN_TOKEN` variables to enable Travis to submit your code for
+  - `COVERITY_SCAN_SUBMIT_EMAIL` and `COVERITY_SCAN_TOKEN` variables to enable Travis to submit your code for
         analysis to Coverity.
 
 Having followed these instructions, your forked repository should be all set up for integration with Travis CI. Happy
 testing!
-
-
-*******************************************************************************
