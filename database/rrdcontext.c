@@ -382,12 +382,12 @@ static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
 static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused, void *bundle __maybe_unused);
 
-static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc);
+static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function);
 static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm);
-static void rrdinstance_trigger_updates(RRDINSTANCE *ri);
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc);
+static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
+static void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function);
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function);
 
 // ----------------------------------------------------------------------------
 // visualizing flags
@@ -542,7 +542,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
 // but the dictionary is now unlocked
 static void rrdmetric_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDMETRIC *rm = value;
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
 
 static void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
@@ -563,13 +563,13 @@ static void rrdmetrics_destroy_from_rrdinstance(RRDINSTANCE *ri) {
 }
 
 // trigger post-processing of the rrdmetric, escalating changes to the rrdinstance it belongs
-static void rrdmetric_trigger_updates(RRDMETRIC *rm) {
+static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
     if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD)))
             rrd_flag_set_archived(rm);
 
     if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(rm->ri, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(rm->ri->rc);
+        rrdcontext_queue_for_post_processing(rm->ri->rc, function);
     }
 }
 
@@ -631,7 +631,7 @@ static inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
         rrd_flag_set_archived(rm);
 
     rm->rrddim = NULL;
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, __FUNCTION__ );
     rrdmetric_release(rd->rrdmetric);
     rd->rrdmetric = NULL;
 }
@@ -645,7 +645,7 @@ static inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
             rrd_flag_set_archived(rm);
     }
 
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
 
 static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
@@ -655,7 +655,7 @@ static inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
     if(unlikely(!rrd_flag_is_collected(rm)))
         rrd_flag_set_collected(rm);
 
-    rrdmetric_trigger_updates(rm);
+    rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
 
 // ----------------------------------------------------------------------------
@@ -843,7 +843,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
 static void rrdinstance_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDINSTANCE *ri = value;
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
 }
 
 void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
@@ -866,7 +866,7 @@ void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
     rc->rrdinstances = NULL;
 }
 
-static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
+static void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
     RRDSET *st = ri->rrdset;
 
     if(likely(st)) {
@@ -888,7 +888,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri) {
 
     if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(ri->rc, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(ri->rc);
+        rrdcontext_queue_for_post_processing(ri->rc, function);
     }
 }
 
@@ -976,7 +976,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         ri_old->first_time_t = 0;
         ri_old->last_time_t = 0;
 
-        rrdinstance_trigger_updates(ri_old);
+        rrdinstance_trigger_updates(ri_old, __FUNCTION__ );
         rrdinstance_release(ria_old);
 
         /*
@@ -987,10 +987,10 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
             rc_old->first_time_t = 0;
             rc_old->last_time_t = 0;
             rrdcontext_unlock(rc_old);
-            rrdcontext_trigger_updates(rc_old);
+            rrdcontext_trigger_updates(rc_old, __FUNCTION__ );
         }
         else
-            rrdcontext_trigger_updates(rc_old);
+            rrdcontext_trigger_updates(rc_old, __FUNCTION__ );
         */
 
         rrdcontext_release(rca_old);
@@ -1035,7 +1035,7 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     ri->rrdset = NULL;
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
 
     rrdinstance_release(st->rrdinstance);
     st->rrdinstance = NULL;
@@ -1057,7 +1057,7 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
         string_freez(old);
 
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_NAME);
-        rrdinstance_trigger_updates(ri);
+        rrdinstance_trigger_updates(ri, __FUNCTION__ );
     }
 }
 
@@ -1089,7 +1089,7 @@ static inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
 }
 
 static inline void rrdinstance_collected_rrdset(RRDSET *st) {
@@ -1103,7 +1103,7 @@ static inline void rrdinstance_collected_rrdset(RRDSET *st) {
         if(unlikely(!rrd_flag_is_collected(ri)))
             rrd_flag_set_collected(ri);
 
-        rrdinstance_trigger_updates(ri);
+        rrdinstance_trigger_updates(ri, __FUNCTION__ );
     }
 }
 
@@ -1266,12 +1266,12 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
 static void rrdcontext_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
-    rrdcontext_trigger_updates(rc);
+    rrdcontext_trigger_updates(rc, __FUNCTION__ );
 }
 
-static void rrdcontext_trigger_updates(RRDCONTEXT *rc) {
+static void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function) {
     if(rrd_flag_is_updated(rc) || !rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
-        rrdcontext_queue_for_post_processing(rc);
+        rrdcontext_queue_for_post_processing(rc, function);
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
@@ -2070,7 +2070,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
 
     ctx_get_dimension_list(&ri->uuid, rrdinstance_load_dimension, ri);
     ctx_get_label_list(&ri->uuid, rrdinstance_load_clabel, ri);
-    rrdinstance_trigger_updates(ri);
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
     rrdinstance_release(ria);
     rrdcontext_release(rca);
 }
@@ -2103,7 +2103,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     RRDCONTEXT *rc;
     dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
-        rrdcontext_trigger_updates(rc);
+        rrdcontext_trigger_updates(rc, __FUNCTION__ );
     }
     dfe_done(rc);
 
@@ -2682,12 +2682,13 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     rrdcontext_unlock(rc);
 }
 
-static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc) {
+static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused) {
     if(unlikely(!rc->rrdhost->rrdctx_post_processing_queue)) return;
 
     if(!rrd_flag_check(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING)) {
         rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
         dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue, string2str(rc->id), rc, sizeof(*rc));
+        internal_error(true, "RRDCONTEXT: '%s' update triggered by function %s()", string2str(rc->id), function);
     }
 }
 
@@ -2705,8 +2706,8 @@ static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
     dfe_start_reentrant((DICTIONARY *)host->rrdctx_post_processing_queue, rc) {
         if(unlikely(netdata_exit)) break;
 
-        rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
         rrdcontext_dequeue_from_post_processing(rc);
+        rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
     }
     dfe_done(rc);
 }
