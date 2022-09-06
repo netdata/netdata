@@ -329,8 +329,8 @@ static inline void tc_device_commit(struct tc_device *d) {
                 // qdiscs have only parentid
                 // the following works for both (it is an OR)
 
-                if((c->parentid && c->id == x->parentid) ||
-                   (c->leafid && c->leafid == x->parentid)) {
+                if((x->parentid && c->id == x->parentid) ||
+                   (c->leafid && x->parentid && c->leafid == x->parentid)) {
                     // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
                     c->isleaf = false;
                     x->hasparent = true;
