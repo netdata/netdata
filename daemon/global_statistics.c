@@ -1863,7 +1863,7 @@ static void worker_utilization_charts(void) {
 }
 
 static void worker_utilization_finish(void) {
-    int i;
+    int i, j;
     for(i = 0; all_workers_utilization[i].name ;i++) {
         struct worker_utilization *wu = &all_workers_utilization[i];
 
@@ -1872,12 +1872,12 @@ static void worker_utilization_finish(void) {
             wu->name_lowercase = NULL;
         }
 
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-            string_freez(wu->per_job_type[i].name);
-            wu->per_job_type[i].name = NULL;
+        for(j = 0; j < WORKER_UTILIZATION_MAX_JOB_TYPES ;j++) {
+            string_freez(wu->per_job_type[j].name);
+            wu->per_job_type[j].name = NULL;
 
-            string_freez(wu->per_job_type[i].units);
-            wu->per_job_type[i].units = NULL;
+            string_freez(wu->per_job_type[j].units);
+            wu->per_job_type[j].units = NULL;
         }
 
         // mark all threads as not enabled
