@@ -612,6 +612,10 @@ static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char 
     }
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
+    if(unlikely(!rm)) {
+        error("RRDMETRIC: RRDDIM '%s' lost the link to its RRDMETRIC at %s()", rrddim_id(rd), function);
+        return NULL;
+    }
 
     if(unlikely(rm->rrddim != rd))
         fatal("RRDMETRIC: '%s' is not linked to RRDDIM '%s' at %s()", string2str(rm->id), rrddim_id(rd), function);
@@ -1006,6 +1010,10 @@ static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const c
     }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
+    if(unlikely(!ri)) {
+        error("RRDINSTANCE: RRDSET '%s' lost its link to an RRDINSTANCE at %s()", rrdset_id(st), function);
+        return NULL;
+    }
 
     if(unlikely(ri->rrdset != st))
         fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), rrdset_id(st), function);
