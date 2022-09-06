@@ -2535,9 +2535,6 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     if(reason != RRD_FLAG_NONE)
         rrd_flag_set_updated(rc, reason);
 
-    if(!force && !rrd_flag_is_updated(rc) && rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
-        return;
-
     if(worker_jobs)
         worker_is_busy(WORKER_JOB_PP_CONTEXT);
 
