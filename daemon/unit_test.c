@@ -1269,11 +1269,11 @@ static int test_variable_renames(void) {
     fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming chart to CHARTNAME1\n");
-    rrdset_set_name(st, "CHARTNAME1");
+    rrdset_reset_name(st, "CHARTNAME1");
     fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming chart to CHARTNAME2\n");
-    rrdset_set_name(st, "CHARTNAME2");
+    rrdset_reset_name(st, "CHARTNAME2");
     fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");

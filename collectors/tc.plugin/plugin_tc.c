@@ -426,7 +426,8 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
         else {
             rrdset_next(d->st_bytes);
-            if(unlikely(d->name_updated)) rrdset_set_name(d->st_bytes, string2str(d->name));
+            if(unlikely(d->name_updated))
+                rrdset_reset_name(d->st_bytes, string2str(d->name));
 
             if(d->name && d->name_updated)
                 rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
@@ -491,7 +492,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_packets, name);
+                rrdset_reset_name(d->st_packets, name);
             }
 
             if(d->name && d->name_updated)
@@ -557,7 +558,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_dropped, name);
+                rrdset_reset_name(d->st_dropped, name);
             }
 
             if(d->name && d->name_updated)
@@ -623,7 +624,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_tokens, name);
+                rrdset_reset_name(d->st_tokens, name);
             }
 
             if(d->name && d->name_updated)
@@ -691,7 +692,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_ctokens, name);
+                rrdset_reset_name(d->st_ctokens, name);
             }
 
             if(d->name && d->name_updated)

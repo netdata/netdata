@@ -973,6 +973,8 @@ extern netdata_rwlock_t rrd_rwlock;
 // ----------------------------------------------------------------------------
 
 extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
+extern void rrdhost_init_rrdset_index(RRDHOST *host);
+extern void rrdhost_free_rrdset_index(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 
@@ -1058,7 +1060,7 @@ extern void __rrd_check_wrlock(const char *file, const char *function, const uns
 // ----------------------------------------------------------------------------
 // RRDSET functions
 
-extern int rrdset_set_name(RRDSET *st, const char *name);
+extern int rrdset_reset_name(RRDSET *st, const char *name);
 
 extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *type

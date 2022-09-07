@@ -281,8 +281,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->system_info = system_info;
 
-    host->rrdset_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    host->rrdset_root_index_name = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    rrdhost_init_rrdset_index(host);
     host->rrdfamily_root_index   = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     host->rrdvar_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
@@ -1208,8 +1207,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host->node_id);
 
-    dictionary_destroy(host->rrdset_root_index);
-    dictionary_destroy(host->rrdset_root_index_name);
+    rrdhost_free_rrdset_index(host);
     dictionary_destroy(host->rrdfamily_root_index);
     dictionary_destroy(host->rrdvar_root_index);
 

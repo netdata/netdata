@@ -194,13 +194,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st
             }
 
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
 
-            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-            rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
+            if(host->health_enabled) {
+                rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
+                rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
+                rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+
+                rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+                rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+                rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
+            }
         }
 
         if (unlikely(rc)) {
@@ -344,13 +347,13 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
     }
 
     rrddim_index_add(st, rd);
-
-    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-    rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
 
     ml_new_dimension(rd);
 
