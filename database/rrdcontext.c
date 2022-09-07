@@ -106,9 +106,7 @@ typedef enum {
 #define RRD_FLAGS_PREVENTING_DELETIONS                ( \
      RRD_FLAG_QUEUED_FOR_HUB                            \
     |RRD_FLAG_COLLECTED                                 \
-                                                        \
-    /* RRD_FLAG_QUEUED_FOR_POST_PROCESSING */           \
-    /* should not be here or nothing will be deleted */ \
+    |RRD_FLAG_QUEUED_FOR_POST_PROCESSING                \
 )
 
 // get all the flags of an object
@@ -374,7 +372,6 @@ static uint64_t rrdcontext_version_hash_with_callback(RRDHOST *host, void (*call
 
 static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs);
 static void rrdcontext_garbage_collect_for_all_hosts(void);
-void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 #define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
 #define rrdcontext_unlock(rc) netdata_mutex_unlock(&((rc)->mutex))
@@ -386,6 +383,9 @@ static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
 static void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused, void *bundle __maybe_unused);
 
+static void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
+
+static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc);
 static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function, RRD_FLAGS flags);
 static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 
@@ -2381,6 +2381,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
         if(unlikely(rrdcontext_should_be_deleted(rc))) {
             if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
+            rrdcontext_dequeue_from_post_processing(rc);
             rrdcontext_delete_from_sql_unsafe(rc);
 
             if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
@@ -2711,15 +2712,14 @@ static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *fun
             buffer_free(wb_flags);
         }
 #endif
-
     }
 }
 
 static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc) {
     if(unlikely(!rc->rrdhost->rrdctx_post_processing_queue)) return;
 
-    rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
     dictionary_del((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue, string2str(rc->id));
+    rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
 }
 
 static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
