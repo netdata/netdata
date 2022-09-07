@@ -914,6 +914,10 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
         // so, either we will return the old one
         // or overwrite the value, depending on dictionary flags
 
+        // We should not compare the values here!
+        // even if they are the same, we have to do the whole job
+        // so that the callbacks will be called.
+
         nv = *pnv;
 
         if(!(dict->flags & DICTIONARY_FLAG_DONT_OVERWRITE_VALUE)) {
@@ -927,7 +931,8 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
         }
 
         else {
-            // make sure this flag is not set
+            // we did really nothing!
+            // make sure this flag is not set.
             nv->flags &= ~NAME_VALUE_FLAG_NEW_OR_UPDATED;
         }
     }
