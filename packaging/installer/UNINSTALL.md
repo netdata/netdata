@@ -41,7 +41,7 @@ Most official installs of Netdata include an uninstaller script that can be manu
 kickstart script (internally, the kickstart script also uses this uninstaller script, it just handles the process
 outlined below for you).
 
-This uninstaller script is self-contained other than requiring a `.environment` file that was generated ruing
+This uninstaller script is self-contained other than requiring a `.environment` file that was generated during
 installation. In most cases, this will be found in `/etc/netdata/.environment`, though if you used a non-standard
 installation prefix it will usually be located in a similar place under that prefix.
 
