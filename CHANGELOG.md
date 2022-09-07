@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix worker utilization cleanup [\#13633](https://github.com/netdata/netdata/pull/13633) ([stelfrag](https://github.com/stelfrag))
+- remove forgotten avl structure from rrdcalc [\#13632](https://github.com/netdata/netdata/pull/13632) ([ktsaou](https://github.com/ktsaou))
+- Faster rrdcontext [\#13629](https://github.com/netdata/netdata/pull/13629) ([ktsaou](https://github.com/ktsaou))
 - fix apps plugin users charts descriptipon [\#13621](https://github.com/netdata/netdata/pull/13621) ([ilyam8](https://github.com/ilyam8))
 - add Postgres total connection utilization alarm [\#13620](https://github.com/netdata/netdata/pull/13620) ([ilyam8](https://github.com/ilyam8))
 - update Postgres "connections" dashboard info [\#13619](https://github.com/netdata/netdata/pull/13619) ([ilyam8](https://github.com/ilyam8))
@@ -346,9 +349,6 @@
 - fix\(kickstart.sh\): handle the case when `tput colors` doesn't return a number [\#12979](https://github.com/netdata/netdata/pull/12979) ([ilyam8](https://github.com/ilyam8))
 - query engine optimizations and cleanup [\#12978](https://github.com/netdata/netdata/pull/12978) ([ktsaou](https://github.com/ktsaou))
 - optimize poll\_events\(\) to spread the work over the threads more evenly [\#12975](https://github.com/netdata/netdata/pull/12975) ([ktsaou](https://github.com/ktsaou))
-- chore: check link local address before querying cloud instance metadata [\#12973](https://github.com/netdata/netdata/pull/12973) ([ilyam8](https://github.com/ilyam8))
-- Alarms py collector add filtering [\#12972](https://github.com/netdata/netdata/pull/12972) ([andrewm4894](https://github.com/andrewm4894))
-- Don't permanetly disable a destination because of denied access [\#12971](https://github.com/netdata/netdata/pull/12971) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
