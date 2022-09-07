@@ -6,10 +6,6 @@
 #include "aclk/aclk_contexts_api.h"
 #include "aclk/aclk.h"
 
-int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
-
-// #define LOG_POST_PROCESSING_QUEUE_INSERTIONS 1
-
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
 #define RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC             (1000 * USEC_PER_MS)
@@ -834,9 +830,6 @@ static void rrdinstance_react_callback(const DICTIONARY_ITEM *item __maybe_unuse
 }
 
 void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     if(unlikely(!rc || rc->rrdinstances)) return;
 
     rc->rrdinstances = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
@@ -1286,9 +1279,6 @@ static void rrdcontext_post_processing_queue_delete_callback(const DICTIONARY_IT
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     if(unlikely(!host)) return;
     if(likely(host->rrdctx)) return;
 
@@ -1349,102 +1339,61 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 // public API
 
 void rrdcontext_updated_rrddim(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_from_rrddim(rd);
 }
 
 void rrdcontext_removed_rrddim(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_rrddim_is_freed(rd);
 }
 
 void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_divisor(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_updated_rrddim_flags(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_updated_rrddim_flags(rd);
 }
 
 void rrdcontext_collected_rrddim(RRDDIM *rd) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdmetric_collected_rrddim(rd);
 }
 
 void rrdcontext_updated_rrdset(RRDSET *st) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdinstance_from_rrdset(st);
 }
 
 void rrdcontext_removed_rrdset(RRDSET *st) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdinstance_rrdset_is_freed(st);
 }
 
 void rrdcontext_updated_rrdset_name(RRDSET *st) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdinstance_updated_rrdset_name(st);
 }
 
 void rrdcontext_updated_rrdset_flags(RRDSET *st) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdinstance_updated_rrdset_flags(st);
 }
 
 void rrdcontext_collected_rrdset(RRDSET *st) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     rrdinstance_collected_rrdset(st);
 }
 
 void rrdcontext_host_child_connected(RRDHOST *host) {
     (void)host;
 
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     // no need to do anything here
     ;
 }
 
 void rrdcontext_host_child_disconnected(RRDHOST *host) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
 
     rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
 }
@@ -2142,9 +2091,6 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        return;
-
     if(host->rrdctx) return;
 
     rrdhost_create_rrdcontexts(host);
@@ -3044,9 +2990,6 @@ static void rrdcontext_main_cleanup(void *ptr) {
 void *rrdcontext_main(void *ptr) {
     netdata_thread_cleanup_push(rrdcontext_main_cleanup, ptr);
 
-    if(unlikely(rrdcontext_enabled == CONFIG_BOOLEAN_NO))
-        goto exit;
-
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
     worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
@@ -3108,7 +3051,6 @@ void *rrdcontext_main(void *ptr) {
         worker_set_metric(WORKER_JOB_PP_QUEUE_SIZE, (NETDATA_DOUBLE)pp_queued_contexts_for_all_hosts);
     }
 
-exit:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
