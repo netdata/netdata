@@ -12,60 +12,46 @@
 #define TC_LINE_MAX 1024
 
 struct tc_class {
-    avl_t avl;
+    STRING *id;
+    STRING *name;
+    STRING *leafid;
+    STRING *parentid;
 
-    char *id;
-    uint32_t hash;
+    bool hasparent;
+    bool isleaf;
+    bool isqdisc;
+    bool render;
+    bool name_updated;
+    bool updated;
 
-    char *name;
-
-    char *leafid;
-    uint32_t leaf_hash;
-
-    char *parentid;
-    uint32_t parent_hash;
-
-    char hasparent;
-    char isleaf;
-    char isqdisc;
-    char render;
+    int  unupdated; // the number of times, this has been found un-updated
 
     unsigned long long bytes;
     unsigned long long packets;
     unsigned long long dropped;
-    unsigned long long overlimits;
-    unsigned long long requeues;
-    unsigned long long lended;
-    unsigned long long borrowed;
-    unsigned long long giants;
     unsigned long long tokens;
     unsigned long long ctokens;
+
+    //unsigned long long overlimits;
+    //unsigned long long requeues;
+    //unsigned long long lended;
+    //unsigned long long borrowed;
+    //unsigned long long giants;
 
     RRDDIM *rd_bytes;
     RRDDIM *rd_packets;
     RRDDIM *rd_dropped;
     RRDDIM *rd_tokens;
     RRDDIM *rd_ctokens;
-
-    char name_updated;
-    char updated;   // updated bytes
-    int  unupdated; // the number of times, this has been found un-updated
-
-    struct tc_class *next;
-    struct tc_class *prev;
 };
 
 struct tc_device {
-    avl_t avl;
+    STRING *id;
+    STRING *name;
+    STRING *family;
 
-    char *id;
-    uint32_t hash;
-
-    char *name;
-    char *family;
-
-    char name_updated;
-    char family_updated;
+    bool name_updated;
+    bool family_updated;
 
     char enabled;
     char enabled_bytes;
@@ -81,94 +67,121 @@ struct tc_device {
     RRDSET *st_tokens;
     RRDSET *st_ctokens;
 
-    avl_tree_type classes_index;
-
-    struct tc_class *classes;
-    struct tc_class *last_class;
-
-    struct tc_device *next;
-    struct tc_device *prev;
+    DICTIONARY *classes;
 };
-
-
-struct tc_device *tc_device_root = NULL;
-
-// ----------------------------------------------------------------------------
-// tc_device index
-
-static int tc_device_compare(void* a, void* b) {
-    if(((struct tc_device *)a)->hash < ((struct tc_device *)b)->hash) return -1;
-    else if(((struct tc_device *)a)->hash > ((struct tc_device *)b)->hash) return 1;
-    else return strcmp(((struct tc_device *)a)->id, ((struct tc_device *)b)->id);
-}
-
-avl_tree_type tc_device_root_index = {
-        NULL,
-        tc_device_compare
-};
-
-#define tc_device_index_add(st) (struct tc_device *)avl_insert(&tc_device_root_index, (avl_t *)(st))
-#define tc_device_index_del(st) (struct tc_device *)avl_remove(&tc_device_root_index, (avl_t *)(st))
-
-static inline struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
-    struct tc_device tmp;
-    tmp.id = (char *)id;
-    tmp.hash = (hash)?hash:simple_hash(tmp.id);
-
-    return (struct tc_device *)avl_search(&(tc_device_root_index), (avl_t *)&tmp);
-}
 
 
 // ----------------------------------------------------------------------------
 // tc_class index
 
-static int tc_class_compare(void* a, void* b) {
-    if(((struct tc_class *)a)->hash < ((struct tc_class *)b)->hash) return -1;
-    else if(((struct tc_class *)a)->hash > ((struct tc_class *)b)->hash) return 1;
-    else return strcmp(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
+static void tc_class_free_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+    // struct tc_device *d = data;
+    struct tc_class *c = value;
+
+    string_freez(c->id);
+    string_freez(c->name);
+    string_freez(c->leafid);
+    string_freez(c->parentid);
 }
 
-#define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl_t *)(rd))
-#define tc_class_index_del(st, rd) (struct tc_class *)avl_remove(&((st)->classes_index), (avl_t *)(rd))
+static void tc_class_conflict_callback(const char *name __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+    struct tc_device *d = data; (void)d;
+    struct tc_class *c = old_value; (void)c;
+    struct tc_class *new_c = new_value; (void)new_c;
 
-static inline struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
-    struct tc_class tmp;
-    tmp.id = (char *)id;
-    tmp.hash = (hash)?hash:simple_hash(tmp.id);
+    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", name, string2str(d->id));
 
-    return (struct tc_class *)avl_search(&(st->classes_index), (avl_t *) &tmp);
+    tc_class_free_callback(name, new_value, data);
+}
+
+static void tc_class_index_init(struct tc_device *d) {
+    if(!d->classes) {
+        d->classes = dictionary_create(
+             DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+            |DICTIONARY_FLAG_SINGLE_THREADED
+        );
+
+        dictionary_register_delete_callback(d->classes, tc_class_free_callback, d);
+        dictionary_register_conflict_callback(d->classes, tc_class_conflict_callback, d);
+    }
+}
+
+static void tc_class_index_destroy(struct tc_device *d) {
+    dictionary_destroy(d->classes);
+    d->classes = NULL;
+}
+
+static struct tc_class *tc_class_index_add(struct tc_device *d, struct tc_class *c) {
+    return dictionary_set(d->classes, string2str(c->id), c, sizeof(*c));
+}
+
+static void tc_class_index_del(struct tc_device *d, struct tc_class *c) {
+    dictionary_del(d->classes, string2str(c->id));
+}
+
+static inline struct tc_class *tc_class_index_find(struct tc_device *d, const char *id) {
+    return dictionary_get(d->classes, id);
+}
+
+// ----------------------------------------------------------------------------
+// tc_device index
+
+static DICTIONARY *tc_device_root_index = NULL;
+
+static void tc_device_add_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+    struct tc_device *d = value;
+    tc_class_index_init(d);
+}
+
+static void tc_device_free_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+    struct tc_device *d = value;
+
+    tc_class_index_destroy(d);
+
+    string_freez(d->id);
+    string_freez(d->name);
+    string_freez(d->family);
+}
+
+static void tc_device_index_init() {
+    if(!tc_device_root_index) {
+        tc_device_root_index = dictionary_create(
+             DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+            |DICTIONARY_FLAG_SINGLE_THREADED
+            |DICTIONARY_FLAG_ADD_IN_FRONT
+            );
+
+        dictionary_register_insert_callback(tc_device_root_index, tc_device_add_callback, NULL);
+        dictionary_register_delete_callback(tc_device_root_index, tc_device_free_callback, NULL);
+    }
+}
+
+static void tc_device_index_destroy() {
+    dictionary_destroy(tc_device_root_index);
+    tc_device_root_index = NULL;
+}
+
+static struct tc_device *tc_device_index_add(struct tc_device *d) {
+    return dictionary_set(tc_device_root_index, string2str(d->id), d, sizeof(*d));
+}
+
+//static struct tc_device *tc_device_index_del(struct tc_device *d) {
+//    dictionary_del(tc_device_root_index, string2str(d->id));
+//    return d;
+//}
+
+static inline struct tc_device *tc_device_index_find(const char *id) {
+    return dictionary_get(tc_device_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
 
 static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
-    if(c == n->classes) {
-        if(likely(c->next))
-            n->classes = c->next;
-        else
-            n->classes = c->prev;
-    }
+    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', unused=%d",
+          string2str(n->id), string2str(c->id), string2str(c->parentid), string2str(c->leafid),
+          c->unupdated);
 
-    if(c == n->last_class) {
-        if(unlikely(c->next))
-            n->last_class = c->next;
-        else
-            n->last_class = c->prev;
-    }
-
-    if(c->next) c->next->prev = c->prev;
-    if(c->prev) c->prev->next = c->next;
-
-    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', unused=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->unupdated);
-
-    if(unlikely(tc_class_index_del(n, c) != c))
-        error("plugin_tc: INTERNAL ERROR: attempt remove class '%s' from device '%s': removed a different calls", c->id, n->id);
-
-    freez(c->id);
-    freez(c->name);
-    freez(c->leafid);
-    freez(c->parentid);
-    freez(c);
+    tc_class_index_del(n, c);
 }
 
 static inline void tc_device_classes_cleanup(struct tc_device *d) {
@@ -179,23 +192,20 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
         if(cleanup_every < 0) cleanup_every = -cleanup_every;
     }
 
-    d->name_updated = 0;
-    d->family_updated = 0;
+    d->name_updated = false;
+    d->family_updated = false;
 
-    struct tc_class *c = d->classes;
-    while(c) {
-        if(unlikely(cleanup_every && c->unupdated >= cleanup_every)) {
-            struct tc_class *nc = c->next;
+    struct tc_class *c;
+    dfe_start_unsafe(d->classes, c) {
+        if(unlikely(cleanup_every && c->unupdated >= cleanup_every))
             tc_class_free(d, c);
-            c = nc;
-        }
-        else {
-            c->updated = 0;
-            c->name_updated = 0;
 
-            c = c->next;
+        else {
+            c->updated = false;
+            c->name_updated = false;
         }
     }
+    dfe_done(c);
 }
 
 static inline void tc_device_commit(struct tc_device *d) {
@@ -213,26 +223,26 @@ static inline void tc_device_commit(struct tc_device *d) {
 
     if(unlikely(d->enabled == (char)-1)) {
         char var_name[CONFIG_MAX_NAME + 1];
-        snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", string2str(d->id));
 
         d->enabled                    = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_new_interfaces);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "traffic chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "traffic chart for %s", string2str(d->id));
         d->enabled_bytes              = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_bytes);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "packets chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "packets chart for %s", string2str(d->id));
         d->enabled_packets            = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_packets);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", string2str(d->id));
         d->enabled_dropped            = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", string2str(d->id));
         d->enabled_tokens             = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_tokens);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", string2str(d->id));
         d->enabled_ctokens            = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_ctokens);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "show all classes for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "show all classes for %s", string2str(d->id));
         d->enabled_all_classes_qdiscs = (char)config_get_boolean_ondemand("plugin:tc", var_name, enabled_all_classes_qdiscs);
     }
 
@@ -244,11 +254,10 @@ static inline void tc_device_commit(struct tc_device *d) {
     // prepare all classes
     // we set reasonable defaults for the rest of the code below
 
-    for(c = d->classes ; c ; c = c->next) {
-        c->render = 0;          // do not render this class
-
-        c->isleaf = 1;          // this is a leaf class
-        c->hasparent = 0;       // without a parent
+    dfe_start_unsafe(d->classes, c) {
+        c->render = false;      // do not render this class
+        c->isleaf = true;       // this is a leaf class
+        c->hasparent = false;   // without a parent
 
         if(unlikely(!c->updated))
             c->unupdated++;     // increase its unupdated counter
@@ -262,21 +271,23 @@ static inline void tc_device_commit(struct tc_device *d) {
                 updated_classes++;
         }
     }
+    dfe_done(c);
 
     if(unlikely(!d->enabled || (!updated_classes && !updated_qdiscs))) {
-        debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. It is not enabled/updated.", d->name?d->name:d->id);
+        debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. It is not enabled/updated.", string2str(d->name?d->name:d->id));
         tc_device_classes_cleanup(d);
         return;
     }
 
     if(unlikely(updated_classes && updated_qdiscs)) {
-        error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", d->id, updated_classes, updated_qdiscs);
+        error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
 
         // set all classes to !updated
-        for(c = d->classes ; c ; c = c->next)
-            if(unlikely(!c->isqdisc && c->updated))
-                c->updated = 0;
-
+        dfe_start_unsafe(d->classes, c) {
+            if (unlikely(!c->isqdisc && c->updated))
+                c->updated = false;
+        }
+        dfe_done(c);
         updated_classes = 0;
     }
 
@@ -296,8 +307,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // so, here we remove the isleaf flag from nodes in the middle
     // and we add the hasparent flag to leaf nodes we found their parent
     if(likely(!d->enabled_all_classes_qdiscs)) {
-        for(c = d->classes; c; c = c->next) {
-            if(unlikely(!c->updated)) continue;
+        dfe_start_unsafe(d->classes, c) {
+            if(unlikely(!c->updated))
+                continue;
 
             //debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
             //    d->id,
@@ -307,30 +319,34 @@ static inline void tc_device_commit(struct tc_device *d) {
             //    c->parentid?c->parentid:"NULL");
 
             // find if c is leaf or not
-            for(x = d->classes; x; x = x->next) {
-                if(unlikely(!x->updated || c == x || !x->parentid)) continue;
+            dfe_start_unsafe(d->classes, x) {
+                if(unlikely(!x->updated || c == x || !x->parentid))
+                    continue;
 
                 // classes have both parentid and leafid
                 // qdiscs have only parentid
                 // the following works for both (it is an OR)
 
-                if((c->hash == x->parent_hash && strcmp(c->id, x->parentid) == 0) ||
-                   (c->leafid && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0)) {
+                if((x->parentid && c->id == x->parentid) ||
+                   (c->leafid && x->parentid && c->leafid == x->parentid)) {
                     // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
-                    c->isleaf = 0;
-                    x->hasparent = 1;
+                    c->isleaf = false;
+                    x->hasparent = true;
                 }
             }
+            dfe_done(x);
         }
+        dfe_done(c);
     }
 
-    for(c = d->classes ; c ; c = c->next) {
-        if(unlikely(!c->updated)) continue;
+    dfe_start_unsafe(d->classes, c) {
+        if(unlikely(!c->updated))
+            continue;
 
         // debug(D_TC_LOOP, "TC: device '%s', %s '%s' isleaf=%d, hasparent=%d", d->id, (c->isqdisc)?"qdisc":"class", c->id, c->isleaf, c->hasparent);
 
         if(unlikely((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs)) {
-            c->render = 1;
+            c->render = true;
             active_nodes++;
             bytes_sum += c->bytes;
             packets_sum += c->packets;
@@ -345,26 +361,29 @@ static inline void tc_device_commit(struct tc_device *d) {
         //    debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
         //}
     }
+    dfe_done(c);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // dump all the list to see what we know
 
     if(unlikely(debug_flags & D_TC_LOOP)) {
-        for(c = d->classes ; c ; c = c->next) {
-            if(c->render) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", d->name, c->id);
-            else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: %s)", d->name?d->name:d->id, c->id, c->updated, c->isleaf, c->hasparent, c->parentid?c->parentid:"(unset)");
+        dfe_start_unsafe(d->classes, c) {
+            if(c->render) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", string2str(d->name), string2str(c->id));
+            else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class '%s', IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: '%s')",
+                      string2str(d->name?d->name:d->id), string2str(c->id), c->updated, c->isleaf, c->hasparent, string2str(c->parentid));
         }
+        dfe_done(c);
     }
 #endif
 
     if(unlikely(!active_nodes)) {
-        debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No useful classes/qdiscs.", d->name?d->name:d->id);
+        debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No useful classes/qdiscs.", string2str(d->name?d->name:d->id));
         tc_device_classes_cleanup(d);
         return;
     }
 
     debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d, all_classes_qdiscs: %d/%d), classes: (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
-        d->name?d->name:d->id,
+        string2str(d->name?d->name:d->id),
         d->enabled, enable_new_interfaces,
         d->enabled_bytes, enable_bytes,
         d->enabled_packets, enable_packets,
@@ -383,44 +402,54 @@ static inline void tc_device_commit(struct tc_device *d) {
     // bytes
 
     if(d->enabled_bytes == CONFIG_BOOLEAN_YES || (d->enabled_bytes == CONFIG_BOOLEAN_AUTO &&
-                                                  (bytes_sum ||
-                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                  (bytes_sum || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_bytes = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!d->st_bytes))
+        if(unlikely(!d->st_bytes)) {
             d->st_bytes = rrdset_create_localhost(
-                    RRD_TYPE_TC
-                    , d->id
-                    , d->name ? d->name : d->id
-                    , d->family ? d->family : d->id
-                    , RRD_TYPE_TC ".qos"
-                    , "Class Usage"
-                    , "kilobits/s"
-                    , PLUGIN_TC_NAME
-                    , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS
-                    , localhost->rrd_update_every
-                    , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
-            );
+                RRD_TYPE_TC,
+                string2str(d->id),
+                string2str(d->name ? d->name : d->id),
+                string2str(d->family ? d->family : d->id),
+                RRD_TYPE_TC ".qos",
+                "Class Usage",
+                "kilobits/s",
+                PLUGIN_TC_NAME,
+                NULL,
+                NETDATA_CHART_PRIO_TC_QOS,
+                localhost->rrd_update_every,
+                d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
+            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+        }
         else {
             rrdset_next(d->st_bytes);
-            if(unlikely(d->name_updated)) rrdset_set_name(d->st_bytes, d->name);
+            if(unlikely(d->name_updated)) rrdset_set_name(d->st_bytes, string2str(d->name));
+
+            if(d->name && d->name_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+
+            if(d->family && d->family_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
         }
 
-        for(c = d->classes ; c ; c = c->next) {
+        dfe_start_unsafe(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_bytes))
-                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                c->rd_bytes = rrddim_add(d->st_bytes, string2str(c->id), string2str(c->name?c->name:c->id), 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
+                rrddim_set_name(d->st_bytes, c->rd_bytes, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
         }
+        dfe_done(c);
+
         rrdset_done(d->st_bytes);
     }
 
@@ -435,47 +464,58 @@ static inline void tc_device_commit(struct tc_device *d) {
         if(unlikely(!d->st_packets)) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_packets", d->id);
-            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", d->name?d->name:d->id);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->id));
+            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name ? d->name : d->id));
 
             d->st_packets = rrdset_create_localhost(
-                    RRD_TYPE_TC
-                    , id
-                    , name
-                    , d->family ? d->family : d->id
-                    , RRD_TYPE_TC ".qos_packets"
-                    , "Class Packets"
-                    , "packets/s"
-                    , PLUGIN_TC_NAME
-                    , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_PACKETS
-                    , localhost->rrd_update_every
-                    , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
-            );
+                RRD_TYPE_TC,
+                id,
+                name,
+                string2str(d->family ? d->family : d->id),
+                RRD_TYPE_TC ".qos_packets",
+                "Class Packets",
+                "packets/s",
+                PLUGIN_TC_NAME,
+                NULL,
+                NETDATA_CHART_PRIO_TC_QOS_PACKETS,
+                localhost->rrd_update_every,
+                d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
+
+            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_packets);
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
-                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", d->name?d->name:d->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name?d->name:d->id));
                 rrdset_set_name(d->st_packets, name);
             }
+
+            if(d->name && d->name_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+
+            if(d->family && d->family_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
         }
 
-        for(c = d->classes ; c ; c = c->next) {
+        dfe_start_unsafe(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_packets))
-                c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                c->rd_packets = rrddim_add(d->st_packets, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_packets, c->rd_packets, c->name);
+                rrddim_set_name(d->st_packets, c->rd_packets, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
         }
+        dfe_done(c);
+
         rrdset_done(d->st_packets);
     }
 
@@ -490,47 +530,58 @@ static inline void tc_device_commit(struct tc_device *d) {
         if(unlikely(!d->st_dropped)) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_dropped", d->id);
-            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", d->name?d->name:d->id);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->id));
+            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name ? d->name : d->id));
 
             d->st_dropped = rrdset_create_localhost(
-                    RRD_TYPE_TC
-                    , id
-                    , name
-                    , d->family ? d->family : d->id
-                    , RRD_TYPE_TC ".qos_dropped"
-                    , "Class Dropped Packets"
-                    , "packets/s"
-                    , PLUGIN_TC_NAME
-                    , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_DROPPED
-                    , localhost->rrd_update_every
-                    , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
-            );
+                RRD_TYPE_TC,
+                id,
+                name,
+                string2str(d->family ? d->family : d->id),
+                RRD_TYPE_TC ".qos_dropped",
+                "Class Dropped Packets",
+                "packets/s",
+                PLUGIN_TC_NAME,
+                NULL,
+                NETDATA_CHART_PRIO_TC_QOS_DROPPED,
+                localhost->rrd_update_every,
+                d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
+
+            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_dropped);
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
-                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", d->name?d->name:d->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name?d->name:d->id));
                 rrdset_set_name(d->st_dropped, name);
             }
+
+            if(d->name && d->name_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+
+            if(d->family && d->family_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
         }
 
-        for(c = d->classes ; c ; c = c->next) {
+        dfe_start_unsafe(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_dropped))
-                c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                c->rd_dropped = rrddim_add(d->st_dropped, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_dropped, c->rd_dropped, c->name);
+                rrddim_set_name(d->st_dropped, c->rd_dropped, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
         }
+        dfe_done(c);
+
         rrdset_done(d->st_dropped);
     }
 
@@ -545,48 +596,59 @@ static inline void tc_device_commit(struct tc_device *d) {
         if(unlikely(!d->st_tokens)) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_tokens", d->id);
-            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", d->name?d->name:d->id);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->id));
+            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name ? d->name : d->id));
 
             d->st_tokens = rrdset_create_localhost(
-                    RRD_TYPE_TC
-                    , id
-                    , name
-                    , d->family ? d->family : d->id
-                    , RRD_TYPE_TC ".qos_tokens"
-                    , "Class Tokens"
-                    , "tokens"
-                    , PLUGIN_TC_NAME
-                    , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_TOKENS
-                    , localhost->rrd_update_every
-                    , RRDSET_TYPE_LINE
-            );
+                RRD_TYPE_TC,
+                id,
+                name,
+                string2str(d->family ? d->family : d->id),
+                RRD_TYPE_TC ".qos_tokens",
+                "Class Tokens",
+                "tokens",
+                PLUGIN_TC_NAME,
+                NULL,
+                NETDATA_CHART_PRIO_TC_QOS_TOKENS,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_LINE);
+
+            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_tokens);
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
-                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", d->name?d->name:d->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name?d->name:d->id));
                 rrdset_set_name(d->st_tokens, name);
             }
+
+            if(d->name && d->name_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+
+            if(d->family && d->family_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
         }
 
-        for(c = d->classes ; c ; c = c->next) {
+        dfe_start_unsafe(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_tokens)) {
-                c->rd_tokens = rrddim_add(d->st_tokens, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                c->rd_tokens = rrddim_add(d->st_tokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_tokens, c->rd_tokens, c->name);
+                rrddim_set_name(d->st_tokens, c->rd_tokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_tokens, c->rd_tokens, c->tokens);
         }
+        dfe_done(c);
+
         rrdset_done(d->st_tokens);
     }
 
@@ -601,48 +663,59 @@ static inline void tc_device_commit(struct tc_device *d) {
         if(unlikely(!d->st_ctokens)) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_ctokens", d->id);
-            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", d->name?d->name:d->id);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->id));
+            snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->name ? d->name : d->id));
 
             d->st_ctokens = rrdset_create_localhost(
-                    RRD_TYPE_TC
-                    , id
-                    , name
-                    , d->family ? d->family : d->id
-                    , RRD_TYPE_TC ".qos_ctokens"
-                    , "Class cTokens"
-                    , "ctokens"
-                    , PLUGIN_TC_NAME
-                    , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_CTOKENS
-                    , localhost->rrd_update_every
-                    , RRDSET_TYPE_LINE
-            );
+                RRD_TYPE_TC,
+                id,
+                name,
+                string2str(d->family ? d->family : d->id),
+                RRD_TYPE_TC ".qos_ctokens",
+                "Class cTokens",
+                "ctokens",
+                PLUGIN_TC_NAME,
+                NULL,
+                NETDATA_CHART_PRIO_TC_QOS_CTOKENS,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_LINE);
+
+            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", d->name?d->name:d->id);
+            debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
             rrdset_next(d->st_ctokens);
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
-                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", d->name?d->name:d->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->name?d->name:d->id));
                 rrdset_set_name(d->st_ctokens, name);
             }
+
+            if(d->name && d->name_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+
+            if(d->family && d->family_updated)
+                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
         }
 
-        for(c = d->classes ; c ; c = c->next) {
+        dfe_start_unsafe(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_ctokens))
-                c->rd_ctokens = rrddim_add(d->st_ctokens, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                c->rd_ctokens = rrddim_add(d->st_ctokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_ctokens, c->rd_ctokens, c->name);
+                rrddim_set_name(d->st_ctokens, c->rd_ctokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_ctokens, c->rd_ctokens, c->ctokens);
         }
+        dfe_done(c);
+
         rrdset_done(d->st_ctokens);
     }
 
@@ -652,18 +725,18 @@ static inline void tc_device_commit(struct tc_device *d) {
 static inline void tc_device_set_class_name(struct tc_device *d, char *id, char *name) {
     if(unlikely(!name || !*name)) return;
 
-    struct tc_class *c = tc_class_index_find(d, id, 0);
+    struct tc_class *c = tc_class_index_find(d, id);
     if(likely(c)) {
         if(likely(c->name)) {
-            if(!strcmp(c->name, name)) return;
-            freez(c->name);
+            if(!strcmp(string2str(c->name), name)) return;
+            string_freez(c->name);
             c->name = NULL;
         }
 
-        if(likely(name && *name && strcmp(c->id, name) != 0)) {
-            debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", d->id, id, name);
-            c->name = strdupz(name);
-            c->name_updated = 1;
+        if(likely(name && *name && strcmp(string2str(c->id), name) != 0)) {
+            debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", string2str(d->id), id, name);
+            c->name = string_strdupz(name);
+            c->name_updated = true;
         }
     }
 }
@@ -672,124 +745,68 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
     if(unlikely(!name || !*name)) return;
 
     if(d->name) {
-        if(!strcmp(d->name, name)) return;
-        freez(d->name);
+        if(!strcmp(string2str(d->name), name)) return;
+        string_freez(d->name);
         d->name = NULL;
     }
 
-    if(likely(name && *name && strcmp(d->id, name) != 0)) {
-        debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", d->id, name);
-        d->name = strdupz(name);
-        d->name_updated = 1;
+    if(likely(name && *name && strcmp(string2str(d->id), name) != 0)) {
+        debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", string2str(d->id), name);
+        d->name = string_strdupz(name);
+        d->name_updated = true;
     }
 }
 
 static inline void tc_device_set_device_family(struct tc_device *d, char *family) {
-    freez(d->family);
+    string_freez(d->family);
     d->family = NULL;
 
-    if(likely(family && *family && strcmp(d->id, family) != 0)) {
-        debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", d->id, family);
-        d->family = strdupz(family);
-        d->family_updated = 1;
+    if(likely(family && *family && strcmp(string2str(d->id), family) != 0)) {
+        debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", string2str(d->id), family);
+        d->family = string_strdupz(family);
+        d->family_updated = true;
     }
     // no need for null termination - it is already null
 }
 
-static inline struct tc_device *tc_device_create(char *id)
-{
-    struct tc_device *d = tc_device_index_find(id, 0);
+static inline struct tc_device *tc_device_create(char *id) {
+    struct tc_device *d = tc_device_index_find(id);
 
     if(!d) {
         debug(D_TC_LOOP, "TC: Creating device '%s'", id);
 
-        d = callocz(1, sizeof(struct tc_device));
-
-        d->id = strdupz(id);
-        d->hash = simple_hash(d->id);
-        d->enabled = (char)-1;
-
-        avl_init(&d->classes_index, tc_class_compare);
-        if(unlikely(tc_device_index_add(d) != d))
-            error("plugin_tc: INTERNAL ERROR: removing device '%s' removed a different device.", d->id);
-
-        if(!tc_device_root) {
-            tc_device_root = d;
-        }
-        else {
-            d->next = tc_device_root;
-            tc_device_root->prev = d;
-            tc_device_root = d;
-        }
+        struct tc_device tmp = {
+            .id = string_strdupz(id),
+            .enabled = (char)-1,
+        };
+        d = tc_device_index_add(&tmp);
     }
 
     return(d);
 }
 
-static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char qdisc, char *parentid, char *leafid)
-{
-    struct tc_class *c = tc_class_index_find(n, id, 0);
+static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, bool qdisc, char *parentid, char *leafid) {
+    struct tc_class *c = tc_class_index_find(n, id);
 
     if(!c) {
-        debug(D_TC_LOOP, "TC: Creating in device '%s', class id '%s', parentid '%s', leafid '%s'", n->id, id, parentid?parentid:"", leafid?leafid:"");
+        debug(D_TC_LOOP, "TC: Creating in device '%s', class id '%s', parentid '%s', leafid '%s'",
+              string2str(n->id), id, parentid?parentid:"", leafid?leafid:"");
 
-        c = callocz(1, sizeof(struct tc_class));
+        struct tc_class tmp = {
+            .id = string_strdupz(id),
+            .isqdisc = qdisc,
+            .parentid = string_strdupz(parentid),
+            .leafid = string_strdupz(leafid),
+        };
 
-        if(unlikely(!n->classes))
-            n->classes = c;
-
-        else if(likely(n->last_class)) {
-            n->last_class->next = c;
-            c->prev = n->last_class;
-        }
-
-        n->last_class = c;
-
-        c->id = strdupz(id);
-        c->hash = simple_hash(c->id);
-
-        c->isqdisc = qdisc;
-        if(parentid && *parentid) {
-            c->parentid = strdupz(parentid);
-            c->parent_hash = simple_hash(c->parentid);
-        }
-
-        if(leafid && *leafid) {
-            c->leafid = strdupz(leafid);
-            c->leaf_hash = simple_hash(c->leafid);
-        }
-
-        if(unlikely(tc_class_index_add(n, c) != c))
-            error("plugin_tc: INTERNAL ERROR: attempt index class '%s' on device '%s': already exists", c->id, n->id);
+        tc_class_index_add(n, &tmp);
     }
     return(c);
 }
 
-static inline void tc_device_free(struct tc_device *n)
-{
-    if(n->next) n->next->prev = n->prev;
-    if(n->prev) n->prev->next = n->next;
-    if(tc_device_root == n) {
-        if(n->next) tc_device_root = n->next;
-        else tc_device_root = n->prev;
-    }
-
-    if(unlikely(tc_device_index_del(n) != n))
-        error("plugin_tc: INTERNAL ERROR: removing device '%s' removed a different device.", n->id);
-
-    while(n->classes) tc_class_free(n, n->classes);
-
-    freez(n->id);
-    freez(n->name);
-    freez(n->family);
-    freez(n);
-}
-
-static inline void tc_device_free_all()
-{
-    while(tc_device_root)
-        tc_device_free(tc_device_root);
-}
+//static inline void tc_device_free(struct tc_device *d) {
+//    tc_device_index_del(d);
+//}
 
 #define PLUGINSD_MAX_WORDS 20
 
@@ -846,6 +863,8 @@ static pid_t tc_child_pid = 0;
 static void tc_main_cleanup(void *ptr) {
     worker_unregister();
 
+    tc_device_index_destroy();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -876,8 +895,11 @@ static void tc_main_cleanup(void *ptr) {
 #define WORKER_TC_SETDEVICEGROUP 7
 #define WORKER_TC_SETCLASSNAME   8
 #define WORKER_TC_WORKTIME       9
+#define WORKER_TC_PLUGIN_TIME   10
+#define WORKER_TC_DEVICES       11
+#define WORKER_TC_CLASSES       12
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 13
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
@@ -894,6 +916,11 @@ void *tc_main(void *ptr) {
     worker_register_job_name(WORKER_TC_SETCLASSNAME, "classname");
     worker_register_job_name(WORKER_TC_WORKTIME, "worktime");
 
+    worker_register_job_custom_metric(WORKER_TC_PLUGIN_TIME, "tc script execution time", "milliseconds/run", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_TC_DEVICES, "number of devices", "devices", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_TC_CLASSES, "number of classes", "classes", WORKER_METRIC_ABSOLUTE);
+
+    tc_device_index_init();
     netdata_thread_cleanup_push(tc_main_cleanup, ptr);
 
     char command[FILENAME_MAX + 1];
@@ -969,10 +996,10 @@ void *tc_main(void *ptr) {
                 }
 
                 if(likely(type && id && (parent_is_root || parent_is_parent))) {
-                    char qdisc = 0;
+                    bool qdisc = false;
 
                     if(first_hash == QDISC_HASH) {
-                        qdisc = 1;
+                        qdisc = true;
 
                         if(!strcmp(type, "ingress")) {
                             // we don't want to get the ingress qdisc
@@ -1051,10 +1078,10 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
                     class->bytes = str2ull(words[1]);
-                    class->updated = 1;
+                    class->updated = true;
                 }
                 else {
-                    class->updated = 0;
+                    class->updated = false;
                 }
 
                 if(likely(words[3] && *words[3]))
@@ -1063,24 +1090,24 @@ void *tc_main(void *ptr) {
                 if(likely(words[6] && *words[6]))
                     class->dropped = str2ull(words[6]);
 
-                if(likely(words[8] && *words[8]))
-                    class->overlimits = str2ull(words[8]);
+                //if(likely(words[8] && *words[8]))
+                //    class->overlimits = str2ull(words[8]);
 
-                if(likely(words[10] && *words[10]))
-                    class->requeues = str2ull(words[8]);
+                //if(likely(words[10] && *words[10]))
+                //    class->requeues = str2ull(words[8]);
             }
             else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
                 worker_is_busy(WORKER_TC_LENDED);
 
                 // debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
-                if(likely(words[1] && *words[1]))
-                    class->lended = str2ull(words[1]);
+                //if(likely(words[1] && *words[1]))
+                //    class->lended = str2ull(words[1]);
 
-                if(likely(words[3] && *words[3]))
-                    class->borrowed = str2ull(words[3]);
+                //if(likely(words[3] && *words[3]))
+                //    class->borrowed = str2ull(words[3]);
 
-                if(likely(words[5] && *words[5]))
-                    class->giants = str2ull(words[5]);
+                //if(likely(words[5] && *words[5]))
+                //    class->giants = str2ull(words[5]);
             }
             else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
                 worker_is_busy(WORKER_TC_TOKENS);
@@ -1117,33 +1144,19 @@ void *tc_main(void *ptr) {
             }
             else if(unlikely(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0)) {
                 worker_is_busy(WORKER_TC_WORKTIME);
+                worker_set_metric(WORKER_TC_PLUGIN_TIME, str2ll(words[1], NULL));
 
-                // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
-                static RRDSET *sttime = NULL;
-                static RRDDIM *rd_run_time = NULL;
+                size_t number_of_devices = dictionary_stats_entries(tc_device_root_index);
+                size_t number_of_classes = 0;
 
-                if(unlikely(!sttime)) {
-                    sttime = rrdset_create_localhost(
-                            "netdata"
-                            , "plugin_tc_time"
-                            , NULL
-                            , "workers plugin tc"
-                            , "netdata.workers.tc.script_time"
-                            , "Netdata TC script execution"
-                            , "milliseconds/run"
-                            , PLUGIN_TC_NAME
-                            , NULL
-                            , NETDATA_CHART_PRIO_NETDATA_TC_TIME
-                            , localhost->rrd_update_every
-                            , RRDSET_TYPE_AREA
-                    );
-                    rd_run_time = rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                struct tc_device *d;
+                dfe_start_unsafe(tc_device_root_index, d) {
+                    number_of_classes += dictionary_stats_entries(d->classes);
                 }
-                else rrdset_next(sttime);
+                dfe_done(d);
 
-                rrddim_set_by_pointer(sttime, rd_run_time, str2ll(words[1], NULL));
-                rrdset_done(sttime);
-
+                worker_set_metric(WORKER_TC_DEVICES, number_of_devices);
+                worker_set_metric(WORKER_TC_CLASSES, number_of_classes);
             }
             //else {
             //  debug(D_TC_LOOP, "IGNORED line");
@@ -1162,17 +1175,13 @@ void *tc_main(void *ptr) {
             class = NULL;
         }
 
-        if(unlikely(netdata_exit)) {
-            tc_device_free_all();
+        if(unlikely(netdata_exit))
             goto cleanup;
-        }
 
         if(code == 1 || code == 127) {
             // 1 = DISABLE
             // 127 = cannot even run it
             error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
-
-            tc_device_free_all();
             goto cleanup;
         }
 

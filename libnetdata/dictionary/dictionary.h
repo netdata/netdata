@@ -199,6 +199,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
 #define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_reentrant(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_REENTRANT)
+#define dfe_start_unsafe(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_NONE)
 #define dfe_start_rw(dict, value, mode) \
         do { \
             DICTFE value ## _dfe = {};  \
