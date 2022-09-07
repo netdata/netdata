@@ -274,7 +274,8 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
-    host->rrdlabels = rrdlabels_create();
+    if (likely(!archived))
+        host->rrdlabels = rrdlabels_create();
 
     netdata_mutex_init(&host->aclk_state_lock);
 
