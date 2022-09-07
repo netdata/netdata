@@ -420,19 +420,19 @@ static inline void tc_device_commit(struct tc_device *d) {
                 localhost->rrd_update_every,
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
-            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_bytes);
             if(unlikely(d->name_updated)) rrdset_set_name(d->st_bytes, string2str(d->name));
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -481,9 +481,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                 localhost->rrd_update_every,
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
-            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_packets);
@@ -495,10 +495,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -547,9 +547,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                 localhost->rrd_update_every,
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
-            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_dropped);
@@ -561,10 +561,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -613,9 +613,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_LINE);
 
-            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             rrdset_next(d->st_tokens);
@@ -627,10 +627,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family
@@ -680,9 +680,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_LINE);
 
-            rrdlabels_add(d->st_bytes->state->chart_labels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name?d->name:d->id), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
             debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
@@ -695,10 +695,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
 
             if(d->name && d->name_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
             if(d->family && d->family_updated)
-                rrdlabels_add(d->st_bytes->state->chart_labels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family), RRDLABEL_SRC_AUTO);
 
             // TODO
             // update the family

@@ -218,6 +218,9 @@ ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filena
 }
 
 void *arrayalloc_mallocz(ARAL *ar) {
+    if(unlikely(!ar->internal.initialized))
+        arrayalloc_init(ar);
+
     arrayalloc_lock(ar);
 
     if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list))
