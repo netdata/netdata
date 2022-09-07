@@ -47,8 +47,6 @@ struct tc_class {
 
 struct tc_device {
     STRING *id;
-    uint32_t hash;
-
     STRING *name;
     STRING *family;
 
@@ -806,9 +804,9 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, bool 
     return(c);
 }
 
-static inline void tc_device_free(struct tc_device *d) {
-    tc_device_index_del(d);
-}
+//static inline void tc_device_free(struct tc_device *d) {
+//    tc_device_index_del(d);
+//}
 
 #define PLUGINSD_MAX_WORDS 20
 
