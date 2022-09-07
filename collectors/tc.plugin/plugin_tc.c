@@ -165,10 +165,10 @@ static struct tc_device *tc_device_index_add(struct tc_device *d) {
     return dictionary_set(tc_device_root_index, string2str(d->id), d, sizeof(*d));
 }
 
-static struct tc_device *tc_device_index_del(struct tc_device *d) {
-    dictionary_del(tc_device_root_index, string2str(d->id));
-    return d;
-}
+//static struct tc_device *tc_device_index_del(struct tc_device *d) {
+//    dictionary_del(tc_device_root_index, string2str(d->id));
+//    return d;
+//}
 
 static inline struct tc_device *tc_device_index_find(const char *id) {
     return dictionary_get(tc_device_root_index, id);
