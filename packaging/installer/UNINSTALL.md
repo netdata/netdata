@@ -22,7 +22,7 @@ Or (if you have curl but not wget):
 curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sha --uninstall
 ```
 
-This will work in most cases without the user needing to do anything more other than accept removal of configuration
+This will work in most cases without you needing to do anything more other than accepting removal of configuration
 and data files. You can confirm whether this approach will work for you by adding `--dry-run` to the list of
 options. If that produces a line with a message like `Would attempt to uninstall existing install`, then this
 method will work on your system.
@@ -59,7 +59,7 @@ NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user ru
 
     3.1 **Interactive mode (Default)**
 
-    The default mode in the uninstaller script is **interactive**. This means that the script provides the user
+    The default mode in the uninstaller script is **interactive**. This means that the script provides you
     the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each Netdata asset in
     the filesystem.
 
