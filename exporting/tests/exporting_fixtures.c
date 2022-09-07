@@ -41,9 +41,9 @@ int setup_rrdhost()
 
     localhost->tags = string_strdupz("TAG1=VALUE1 TAG2=VALUE2");
 
-    localhost->host_labels = rrdlabels_create();
-    rrdlabels_add(localhost->host_labels, "key1", "value1", RRDLABEL_SRC_CONFIG);
-    rrdlabels_add(localhost->host_labels, "key2", "value2", RRDLABEL_SRC_CONFIG);
+    localhost->rrdlabels = rrdlabels_create();
+    rrdlabels_add(localhost->rrdlabels, "key1", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(localhost->rrdlabels, "key2", "value2", RRDLABEL_SRC_CONFIG);
 
     localhost->rrdset_root = calloc(1, sizeof(RRDSET));
     RRDSET *st = localhost->rrdset_root;
@@ -86,7 +86,7 @@ int teardown_rrdhost()
     string_freez(st->name);
     free(st);
 
-    rrdlabels_destroy(localhost->host_labels);
+    rrdlabels_destroy(localhost->rrdlabels);
 
     string_freez(localhost->tags);
     free(localhost);
