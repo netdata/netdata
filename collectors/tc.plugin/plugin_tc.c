@@ -17,12 +17,12 @@ struct tc_class {
     STRING *leafid;
     STRING *parentid;
 
-    bool hasparent:1;
-    bool isleaf:1;
-    bool isqdisc:1;
-    bool render:1;
-    bool name_updated:1;
-    bool updated:1;
+    bool hasparent;
+    bool isleaf;
+    bool isqdisc;
+    bool render;
+    bool name_updated;
+    bool updated;
 
     int  unupdated; // the number of times, this has been found un-updated
 
@@ -52,8 +52,8 @@ struct tc_device {
     STRING *name;
     STRING *family;
 
-    bool name_updated:1;
-    bool family_updated:1;
+    bool name_updated;
+    bool family_updated;
 
     char enabled;
     char enabled_bytes;
