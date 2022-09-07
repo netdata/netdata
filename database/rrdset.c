@@ -203,6 +203,7 @@ static void rrdset_insert_callback(const char *fullid, void *rrdset, void *const
 
     // add it to the name index
     rrdset_index_add_name(host, st);
+    rrdcontext_updated_rrdset(st);
 }
 
 static void rrdset_delete_callback(const char *name, void *rrdset, void *rrdhost) {
@@ -264,6 +265,8 @@ static void rrdset_conflict_callback(const char *full_id, void *rrdset, void *ne
     struct rrdset_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
+
+    rrdset_isnot_obsolete(st);
 
     int changed_from_archived_to_active = 0, mark_rebuild = 0;
 
@@ -379,8 +382,7 @@ static void rrdset_conflict_callback(const char *full_id, void *rrdset, void *ne
 
 void rrdhost_init_rrdset_index(RRDHOST *host) {
     if(!host->rrdset_root_index) {
-        host->rrdset_root_index = dictionary_create(
-            DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+        host->rrdset_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
         dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, host);
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, host);
@@ -714,17 +716,6 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
-static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
-    RRDSET *st = rrdset_find(host, fullid);
-    if(unlikely(st)) {
-        rrdset_isnot_obsolete(st);
-        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
-        return st;
-    }
-
-    return NULL;
-}
-
 RRDSET *rrdset_create_custom(
           RRDHOST *host
         , const char *type
@@ -772,8 +763,8 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // check if it already exists
 
-    char fullid[RRD_ID_LENGTH_MAX + 1];
-    snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+    char full_id[RRD_ID_LENGTH_MAX + 1];
+    snprintfz(full_id, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     // ------------------------------------------------------------------------
     // allocate it
@@ -800,10 +791,9 @@ RRDSET *rrdset_create_custom(
         .history_entries = history_entries,
     };
 
-    RRDSET *st = rrdset_index_add(host, fullid, &tmp);
+    RRDSET *st = rrdset_index_add(host, full_id, &tmp);
 
     rrdhost_unlock(host);
-    rrdcontext_updated_rrdset(st);
     return(st);
 }
 
