@@ -199,7 +199,7 @@ static void configure_device(int do_status, int do_quality, int do_discarded_pac
 }
 
 static void add_labels_to_wireless(struct netwireless *w, RRDSET *st) {
-    rrdlabels_add(st->state->chart_labels, "device", w->name, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "device", w->name, RRDLABEL_SRC_AUTO);
     rrdcalc_update_rrdlabels(st);
 }
 

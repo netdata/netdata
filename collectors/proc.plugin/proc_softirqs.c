@@ -220,7 +220,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
                 char core[50+1];
                 snprintfz(core, 50, "cpu%d", c);
-                rrdlabels_add(core_st[c]->state->chart_labels, "cpu", core, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(core_st[c]->rrdlabels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
             else
                 rrdset_next(core_st[c]);

@@ -64,7 +64,7 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     string_freez(rd->name);
     rd->name = rrd_string_strdupz(name);
 
-    if (!st->state->is_ar_chart)
+    if (!rrdset_is_ar_chart(st))
         rrddimvar_rename_all(rd);
 
     rd->exposed = 0;
@@ -340,7 +340,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st
     // append this dimension
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
 
-    if(host->health_enabled && !st->state->is_ar_chart) {
+    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);

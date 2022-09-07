@@ -75,7 +75,7 @@ inline void health_label_log_save(RRDHOST *host) {
     if(unlikely(host->health_log_fp)) {
         BUFFER *wb = buffer_create(1024);
 
-        rrdlabels_to_buffer(localhost->host_labels, wb, "", "=", "", "\t ", NULL, NULL, NULL, NULL);
+        rrdlabels_to_buffer(localhost->rrdlabels, wb, "", "=", "", "\t ", NULL, NULL, NULL, NULL);
         char *write = (char *) buffer_tostring(wb);
 
         if (unlikely(fprintf(host->health_log_fp, "L\t%s", write) < 0))

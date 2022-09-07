@@ -67,8 +67,8 @@ static STRING *rrdcalc_replace_variables(const char *line, RRDCALC *rc) {
             temp = buf;
         }
         else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
-            if(likely(rc->rrdset && rc->rrdset->state && rc->rrdset->state->chart_labels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->state->chart_labels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
+            if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
+                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);
@@ -191,7 +191,7 @@ static inline int rrdcalc_is_matching_rrdset(RRDCALC *rc, RRDSET *st) {
     if (rc->plugin_pattern && !simple_pattern_matches(rc->plugin_pattern, rrdset_plugin_name(st)))
         return 0;
 
-    if (st->rrdhost->host_labels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->host_labels, rc->host_labels_pattern, '='))
+    if (st->rrdhost->rrdlabels && rc->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdhost->rrdlabels, rc->host_labels_pattern, '='))
         return 0;
 
     return 1;
@@ -672,7 +672,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
             continue;
         }
 
-        if(!rrdlabels_match_simple_pattern_parsed(host->host_labels, rc->host_labels_pattern, '=')) {
+        if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=')) {
             info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rrdcalc_name(rc),
                  rrdhost_hostname(host),
@@ -700,7 +700,7 @@ void rrdcalc_labels_unlink() {
         if (unlikely(!host->health_enabled))
             continue;
 
-        if (host->host_labels) {
+        if (host->rrdlabels) {
             rrdhost_wrlock(host);
 
             rrdcalc_labels_unlink_alarm_from_host(host);

@@ -27,7 +27,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, rrdset_plugin_name(st)))
         return;
 
-    if(host->host_labels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->host_labels, rt->host_labels_pattern, '='))
+    if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rt->host_labels_pattern, '='))
         return;
 
     RRDCALC *rc = rrdcalc_create_from_template(host, rt, rrdset_id(st));

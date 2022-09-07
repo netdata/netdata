@@ -853,25 +853,25 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 }
 
 static void add_labels_to_disk(struct disk *d, RRDSET *st) {
-    rrdlabels_add(st->state->chart_labels, "device", d->disk, RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->state->chart_labels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "device", d->disk, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
 
     switch (d->type) {
         default:
         case DISK_TYPE_UNKNOWN:
-            rrdlabels_add(st->state->chart_labels, "device_type", "unknown", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "unknown", RRDLABEL_SRC_AUTO);
             break;
 
         case DISK_TYPE_PHYSICAL:
-            rrdlabels_add(st->state->chart_labels, "device_type", "physical", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "physical", RRDLABEL_SRC_AUTO);
             break;
 
         case DISK_TYPE_PARTITION:
-            rrdlabels_add(st->state->chart_labels, "device_type", "partition", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "partition", RRDLABEL_SRC_AUTO);
             break;
 
         case DISK_TYPE_VIRTUAL:
-            rrdlabels_add(st->state->chart_labels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
             break;
     }
 

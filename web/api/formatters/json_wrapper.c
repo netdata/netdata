@@ -174,8 +174,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             st = rd->rrdset;
-            if (st->state && st->state->chart_labels)
-                rrdlabels_walkthrough_read(st->state->chart_labels, fill_formatted_callback, dict);
+            if (st->rrdlabels)
+                rrdlabels_walkthrough_read(st->rrdlabels, fill_formatted_callback, dict);
         }
         dictionary_walkthrough_read(dict, value_list_output, &co);
         dictionary_destroy(dict);
@@ -231,7 +231,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                     if (i)
                         buffer_strcat(wb, ", ");
 
-                    rrdlabels_get_value_to_buffer_or_null(rd->rrdset->state->chart_labels, wb, label_key, sq, "null");
+                    rrdlabels_get_value_to_buffer_or_null(rd->rrdset->rrdlabels, wb, label_key, sq, "null");
                     i++;
                 }
                 if (!i) {

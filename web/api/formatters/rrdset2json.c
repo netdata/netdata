@@ -4,7 +4,7 @@
 
 void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 {
-    if(unlikely(!st->state || !st->state->chart_labels))
+    if(unlikely(!st->rrdlabels))
         return;
 
     char tabs[11];
@@ -18,7 +18,7 @@ void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
         indentation--;
     }
 
-    rrdlabels_to_buffer(st->state->chart_labels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
+    rrdlabels_to_buffer(st->rrdlabels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
     buffer_strcat(wb, "\n");
 }
 

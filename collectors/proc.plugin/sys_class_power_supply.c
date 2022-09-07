@@ -113,7 +113,7 @@ void power_supply_free(struct power_supply *ps) {
 }
 
 static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
-    rrdlabels_add(st->state->chart_labels, "device", ps->name, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
     rrdcalc_update_rrdlabels(st);
 }
 

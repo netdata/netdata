@@ -445,14 +445,6 @@ struct rrddim_tier {
 extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
 // ----------------------------------------------------------------------------
-// volatile state per chart
-struct rrdset_volatile {
-    uuid_t hash_id;
-    DICTIONARY *chart_labels;
-    bool is_ar_chart;
-};
-
-// ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrddim_foreach_read(rd, st) \
@@ -491,15 +483,21 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_ACLK                    = (1 << 16),
     RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
-    RRDSET_FLAG_INDEXED_ID              = (1 << 19),
-    RRDSET_FLAG_INDEXED_NAME            = (1 << 20),
+    RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
+    RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
+
+    RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
+#define rrdset_is_ar_chart(st) rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_RATE_CHART)
+
 struct rrdset {
+    uuid_t uuid;
+
     // ------------------------------------------------------------------------
     // the set configuration
 
@@ -550,8 +548,6 @@ struct rrdset {
 
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
                                                     // this object.
-    struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
@@ -583,6 +579,11 @@ struct rrdset {
 
     unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
     void *st_on_file;                               // compatibility with V019 RRDSET files
+
+    // ------------------------------------------------------------------------
+    // chart labels
+
+    DICTIONARY *rrdlabels;
 
     // ------------------------------------------------------------------------
     // the dimensions
@@ -638,7 +639,6 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_EXPORTING_SEND           = (1 << 3), // send it to external databases
     RRDHOST_FLAG_EXPORTING_DONT_SEND      = (1 << 4), // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED                 = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_MULTIHOST                = (1 << 6), // Host belongs to localhost/megadb
     RRDHOST_FLAG_PENDING_FOREACH_ALARMS   = (1 << 7), // contains dims with uninitialized foreach alarms
     RRDHOST_FLAG_STREAM_LABELS_UPDATE     = (1 << 8),
     RRDHOST_FLAG_STREAM_LABELS_STOP       = (1 << 9),
@@ -842,9 +842,6 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush
 
-    volatile size_t connected_senders;              // when remote hosts are streaming to this
-                                                    // host, this is the counter of connected clients
-
     time_t senders_connect_time;                    // the time the last sender was connected
     time_t senders_last_chart_command;              // the time of the last CHART streaming command
     time_t senders_disconnected_time;               // the time the last sender was disconnected
@@ -903,7 +900,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    DICTIONARY *host_labels;
+    DICTIONARY *rrdlabels;
 
     // ------------------------------------------------------------------------
     // indexes

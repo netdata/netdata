@@ -150,7 +150,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
     if (likely(claim_id)) {
         struct chart_instance_updated chart_payload;
         memset(&chart_payload, 0, sizeof(chart_payload));
-        chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
+        chart_payload.config_hash = get_str_from_uuid(&st->uuid);
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
         chart_payload.name = (char *)rrdset_name(st);
@@ -159,7 +159,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.id = strdupz(rrdset_id(st));
 
         chart_payload.chart_labels = rrdlabels_create();
-        rrdlabels_copy(chart_payload.chart_labels, st->state->chart_labels);
+        rrdlabels_copy(chart_payload.chart_labels, st->rrdlabels);
 
         size_t size;
         char *payload = generate_chart_instance_updated(&size, &chart_payload);
@@ -1265,7 +1265,7 @@ struct aclk_chart_sync_stats *aclk_get_chart_sync_stats(RRDHOST *host)
 void sql_check_chart_liveness(RRDSET *st) {
     RRDDIM *rd;
 
-    if (unlikely(st->state->is_ar_chart))
+    if (unlikely(rrdset_is_ar_chart(st)))
         return;
 
     rrdset_rdlock(st);

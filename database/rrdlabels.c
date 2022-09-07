@@ -955,11 +955,11 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
 }
 
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
-    if(!st->state->chart_labels)
-        st->state->chart_labels = rrdlabels_create();
+    if(!st->rrdlabels)
+        st->rrdlabels = rrdlabels_create();
 
     if (new_rrdlabels)
-        rrdlabels_migrate_to_these(st->state->chart_labels, new_rrdlabels);
+        rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
     rrdcalc_update_rrdlabels(st);
 
@@ -967,7 +967,7 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     BUFFER  *sql_buf = buffer_create(1024);
     struct label_str tmp = {.sql = sql_buf, .count = 0 };
     uuid_unparse_lower(*st->chart_uuid, tmp.uuid_str);
-    rrdlabels_walkthrough_read(st->state->chart_labels, chart_label_store_to_sql_callback, &tmp);
+    rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
     db_execute(buffer_tostring(sql_buf));
     buffer_free(sql_buf);
 }

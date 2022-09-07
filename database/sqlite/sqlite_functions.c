@@ -2122,7 +2122,7 @@ void compute_chart_hash(RRDSET *st)
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*((uuid_t *) &hash_value), uuid_str);
     //info("Calculating HASH %s for chart %s", uuid_str, st->name);
-    uuid_copy(st->state->hash_id, *((uuid_t *) &hash_value));
+    uuid_copy(st->uuid, *((uuid_t *) &hash_value));
 
     (void)sql_store_chart_hash(
         (uuid_t *)&hash_value,
@@ -2710,7 +2710,7 @@ void sql_store_host_labels(RRDHOST *host)
     if (rc != SQLITE_OK)
         error_report("Failed to remove old host labels for host %s", rrdhost_hostname(host));
 
-    rrdlabels_walkthrough_read(host->host_labels, save_host_label_callback, host);
+    rrdlabels_walkthrough_read(host->rrdlabels, save_host_label_callback, host);
 }
 
 #define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \

@@ -373,7 +373,7 @@ void rrdset_free(RRDSET *st) {
     netdata_rwlock_destroy(&st->rrdset_rwlock);
 
     rrdset_memory_file_free(st);
-    rrdlabels_destroy(st->state->chart_labels);
+    rrdlabels_destroy(st->rrdlabels);
 
     // free directly allocated members
 
@@ -391,7 +391,6 @@ void rrdset_free(RRDSET *st) {
     string_freez(st->module_name);
 
     freez(st->cache_dir);
-    freez(st->state);
     freez(st->chart_uuid);
 
     freez(st);
@@ -469,11 +468,11 @@ static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
 }
 
 static inline void rrdset_update_permanent_labels(RRDSET *st) {
-    if(!st->state || !st->state->chart_labels) return;
+    if(!st->rrdlabels) return;
 
-    rrdlabels_add(st->state->chart_labels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->state->chart_labels, "_instance_family",rrdset_family(st),      RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->rrdlabels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->rrdlabels, "_instance_family",rrdset_family(st),      RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
 }
 
 RRDSET *rrdset_create_custom(
@@ -667,7 +666,6 @@ RRDSET *rrdset_create_custom(
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     st = callocz(1, sizeof(RRDSET));
-    st->state = callocz(1, sizeof(*st->state));
 
     st->id = string_strdupz(fullid); // fullid is already json_fix'ed
 
@@ -690,7 +688,8 @@ RRDSET *rrdset_create_custom(
     st->type        = rrd_string_strdupz(type);
     st->family      = family ? rrd_string_strdupz(family) : string_dup(st->type);
 
-    st->state->is_ar_chart = strcmp(rrdset_id(st), ML_ANOMALY_RATES_CHART_ID) == 0;
+    if(strcmp(rrdset_id(st), ML_ANOMALY_RATES_CHART_ID) == 0)
+        rrdset_flag_set(st, RRDSET_FLAG_ANOMALY_RATE_CHART);
 
     st->units = rrd_string_strdupz(units);
 
@@ -718,7 +717,7 @@ RRDSET *rrdset_create_custom(
         );
 
     netdata_rwlock_init(&st->rrdset_rwlock);
-    st->state->chart_labels = rrdlabels_create();
+    st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
     if(name && *name && rrdset_set_name(st, name))
@@ -1264,7 +1263,7 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    if (likely(!st->state->is_ar_chart)) {
+    if (likely(!rrdset_is_ar_chart(st))) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
             if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
@@ -1693,7 +1692,7 @@ after_second_database_work:
             continue;
 
 #ifdef ENABLE_ACLK
-        if (likely(!st->state->is_ar_chart)) {
+        if (likely(!rrdset_is_ar_chart(st))) {
             if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
                 queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
         }

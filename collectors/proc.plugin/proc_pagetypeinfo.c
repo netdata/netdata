@@ -261,9 +261,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
             char node[50+1];
             snprintfz(node, 50, "node%d", pgl->node);
-            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_id", node, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_zone", pgl->zone, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_type", pgl->type, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_id", node, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_zone", pgl->zone, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_type", pgl->type, RRDLABEL_SRC_AUTO);
 
             for (o = 0; o < pageorders_cnt; o++) {
                 char dimid[3+1];
