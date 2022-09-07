@@ -367,11 +367,17 @@ void *ebpf_oomkill_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = oomkill_maps;
 
+#define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"
     if (unlikely(!all_pids || !em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
         if (em->enabled)
-            info("Disabling OOMKILL thread, because apps integration is completely disabled.");
+            info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+
+        em->enabled = 0;
+    } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
+        if (em->enabled)
+            info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
 
         em->enabled = 0;
     }

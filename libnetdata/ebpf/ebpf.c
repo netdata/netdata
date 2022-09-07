@@ -696,6 +696,10 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode);
 
+    // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
+    em->load &= ~ NETDATA_EBPF_LOAD_METHODS;
+    em->load |= EBPF_LOAD_LEGACY;
+
     *obj = bpf_object__open_file(lpath, NULL);
     if (libbpf_get_error(obj)) {
         error("Cannot open BPF object %s", lpath);
