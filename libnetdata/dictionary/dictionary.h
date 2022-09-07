@@ -101,7 +101,8 @@ extern size_t dictionary_destroy(DICTIONARY *dict);
 //
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
 // Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
-extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+#define dictionary_set(dict, name, value, value_len) dictionary_set_advanced(dict, name, -1, value, value_len, NULL)
+extern void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
 // Get an item from the dictionary
 // If it returns NULL, the item is not found
@@ -115,8 +116,11 @@ extern int dictionary_del(DICTIONARY *dict, const char *name);
 extern DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name);
 extern DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name);
 
-extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len);
-extern DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+#define dictionary_set_and_acquire_item_unsafe(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced_unsafe(dict, name, -1, value, value_len, NULL)
+extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
+
+#define dictionary_set_and_acquire_item(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced(dict, name, -1, value, value_len, NULL)
+extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
 extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
 extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
@@ -136,7 +140,8 @@ extern void *dictionary_acquired_item_value(DICTIONARY_ITEM *item);
 #define dictionary_del_having_write_lock(dict, name) dictionary_del_unsafe(dict, name)
 
 extern void *dictionary_get_unsafe(DICTIONARY *dict, const char *name);
-extern void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+#define dictionary_set_unsafe(dict, name, value, value_len) dictionary_set_advanced_unsafe(dict, name, -1, value, value_len, NULL)
+extern void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 extern int dictionary_del_unsafe(DICTIONARY *dict, const char *name);
 
 // Traverse (walk through) the items of the dictionary.

@@ -625,7 +625,7 @@ static inline const char *namevalue_get_name(NAME_VALUE *nv) {
         return nv->caller_name;
 }
 
-static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len) {
+static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data) {
     debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
     size_t size = sizeof(NAME_VALUE);
@@ -669,7 +669,8 @@ static NAME_VALUE *namevalue_create_unsafe(DICTIONARY *dict, const char *name, s
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, allocated);
 
     if(dict->ins_callback)
-        dict->ins_callback(namevalue_get_name(nv), nv->value, dict->ins_callback_data);
+        dict->ins_callback(namevalue_get_name(nv), nv->value,
+                           constructor_data?constructor_data:dict->ins_callback_data);
 
     return nv;
 }
@@ -873,7 +874,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // helpers
 
-static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     if(unlikely(!name)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_set() a dictionary item without a name");
         return NULL;
@@ -886,7 +887,8 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
 
     internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: inserting dictionary item '%s' without exclusive access to dictionary", name);
 
-    size_t name_len = strlen(name) + 1; // we need the terminating null too
+    if(name_len == -1)
+        name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
@@ -904,7 +906,7 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
     NAME_VALUE *nv, **pnv = (NAME_VALUE **)hashtable_insert_unsafe(dict, name, name_len);
     if(likely(*pnv == 0)) {
         // a new item added to the index
-        nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len);
+        nv = *pnv = namevalue_create_unsafe(dict, name, name_len, value, value_len, constructor_data);
         hashtable_inserted_name_value_unsafe(dict, nv);
         linkedlist_namevalue_link_unsafe(dict, nv);
         nv->flags |= NAME_VALUE_FLAG_NEW_OR_UPDATED;
@@ -926,7 +928,9 @@ static NAME_VALUE *dictionary_set_name_value_unsafe(DICTIONARY *dict, const char
         }
 
         else if(dict->conflict_callback) {
-            dict->conflict_callback(namevalue_get_name(nv), nv->value, value, dict->conflict_callback_data);
+            dict->conflict_callback(namevalue_get_name(nv), nv->value, value,
+                                    constructor_data?constructor_data:dict->conflict_callback_data);
+
             nv->flags |= NAME_VALUE_FLAG_NEW_OR_UPDATED;
         }
 
@@ -968,8 +972,8 @@ static NAME_VALUE *dictionary_get_name_value_unsafe(DICTIONARY *dict, const char
 // ----------------------------------------------------------------------------
 // API - items management
 
-void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
-    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     if(unlikely(dict->react_callback && nv && (nv->flags & NAME_VALUE_FLAG_NEW_OR_UPDATED))) {
         // we need to call the react callback with a reference counter on nv
@@ -981,9 +985,12 @@ void *dictionary_set_unsafe(DICTIONARY *dict, const char *name, void *value, siz
     return nv ? nv->value : NULL;
 }
 
-void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(name_len == -1)
+        name_len = (ssize_t)strlen((const char *)name) + 1;
+
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
-    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     // we need to get a reference counter for the react callback
     // before we unlock the dictionary
@@ -1001,8 +1008,8 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
     return nv ? nv->value : NULL;
 }
 
-DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
-    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     if(unlikely(!nv))
         return NULL;
@@ -1016,9 +1023,9 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_unsafe(DICTIONARY *dict, const 
     return (DICTIONARY_ITEM *)nv;
 }
 
-DICTIONARY_ITEM *dictionary_set_and_acquire_item(DICTIONARY *dict, const char *name, void *value, size_t value_len) {
+DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
-    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, value, value_len);
+    NAME_VALUE *nv = dictionary_set_name_value_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     // we need to get the reference counter before we unlock
     if(nv) reference_counter_acquire(dict, nv);

@@ -498,12 +498,17 @@ typedef enum rrdset_flags {
 struct rrdset {
     uuid_t uuid;
 
+    struct {
+        STRING *type;                               // the type of {type}.{id}
+        STRING *id;                                 // the id of {type}.{id}
+        STRING *name;                               // the name of {type}.{name}
+    } parts;
+
     // ------------------------------------------------------------------------
     // the set configuration
 
-    STRING *id;                                     // the ID of the data set
-    STRING *name;                                   // the name of this dimension (as presented to user)
-    STRING *type;                                   // the type of graph RRD_TYPE_* (a category, for determining graphing options)
+    STRING *id;                                     // the unique ID of the rrdset as {type}.{id}
+    STRING *name;                                   // the unique name of the rrdset as {type}.{name}
     STRING *family;                                 // grouping sets under the same family
     STRING *title;                                  // title shown to user
     STRING *units;                                  // units of measurement
@@ -597,7 +602,7 @@ struct rrdset {
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
 #define rrdset_module_name(st) string2str((st)->module_name)
 #define rrdset_units(st) string2str((st)->units)
-#define rrdset_type(st) string2str((st)->type)
+#define rrdset_parts_type(st) string2str((st)->parts.type)
 #define rrdset_family(st) string2str((st)->family)
 #define rrdset_title(st) string2str((st)->title)
 #define rrdset_context(st) string2str((st)->context)

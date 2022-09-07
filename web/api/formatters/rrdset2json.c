@@ -47,7 +47,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"chart_type\": \"%s\",\n",
         rrdset_id(st),
         rrdset_name(st),
-        rrdset_type(st),
+        rrdset_parts_type(st),
         rrdset_family(st),
         rrdset_context(st),
         rrdset_title(st),
