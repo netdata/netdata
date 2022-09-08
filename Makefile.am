@@ -467,8 +467,6 @@ RRD_PLUGIN_FILES = \
     database/sqlite/sqlite_health.h \
     database/sqlite/sqlite_aclk_node.c \
     database/sqlite/sqlite_aclk_node.h \
-    database/sqlite/sqlite_aclk_chart.c \
-    database/sqlite/sqlite_aclk_chart.h \
     database/sqlite/sqlite_aclk_alert.c \
     database/sqlite/sqlite_aclk_alert.h \
     database/sqlite/sqlite3.c \
