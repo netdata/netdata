@@ -173,6 +173,8 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
+    rrdhost_rdlock(host);
+
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -187,7 +189,8 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
         rrdset_unlock(st);
     }
-    rrdset_foreach_done(st);
+
+    rrdhost_unlock(host);
 }
 
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {

@@ -192,6 +192,10 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     store_active_chart(st->chart_uuid);
     compute_chart_hash(st);
 
+    // add it to the host linked list
+    rrdhost_check_wrlock(host);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->rrdset_root, st, prev, next);
+
     // add it to the name index
     rrdset_index_add_name(host, st);
     rrdcontext_updated_rrdset(st);
@@ -202,6 +206,10 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
+
+    // remove it from the host linked list
+    rrdhost_check_wrlock(host);
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->rrdset_root, st, prev, next);
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
@@ -393,7 +401,6 @@ static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
 }
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
-    // TODO - the name index should have an acquired dictionary item, not just a pointer to RRDSET
     return dictionary_get(host->rrdset_root_index, id);
 }
 
@@ -489,7 +496,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time = now_realtime_sec();
-        __atomic_add_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
+        st->rrdhost->obsolete_charts_count++;
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -504,7 +511,7 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time = now_realtime_sec();
-        __atomic_sub_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
+        st->rrdhost->obsolete_charts_count--;
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 

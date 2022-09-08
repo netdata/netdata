@@ -422,7 +422,6 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
                 break;
             }
         }
-        rrdset_foreach_done(st);
     }
     else {
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->alarms_with_foreach, rc, prev, next);
