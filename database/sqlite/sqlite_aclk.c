@@ -665,30 +665,6 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
 
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
 
-    buffer_sprintf(sql, TABLE_ACLK_CHART, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, TABLE_ACLK_CHART_PAYLOAD, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, TABLE_ACLK_CHART_LATEST, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, INDEX_ACLK_CHART, uuid_str, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, INDEX_ACLK_CHART_LATEST, uuid_str, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, TRIGGER_ACLK_CHART_PAYLOAD, uuid_str, uuid_str, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_flush(sql);

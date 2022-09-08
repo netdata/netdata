@@ -85,33 +85,11 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
     return strdupz(uuid_str);
 }
 
-#define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY, " \
-        "date_created, date_updated, date_submitted, status, uuid, type, unique_id, " \
-        "update_count default 1, unique(uuid, status));"
-
-#define TABLE_ACLK_CHART_PAYLOAD "CREATE TABLE IF NOT EXISTS aclk_chart_payload_%s (unique_id BLOB PRIMARY KEY, " \
-        "uuid, claim_id, type, date_created, payload);"
-
-#define TABLE_ACLK_CHART_LATEST "CREATE TABLE IF NOT EXISTS aclk_chart_latest_%s (uuid BLOB PRIMARY KEY, " \
-        "unique_id, date_submitted);"
-
-#define TRIGGER_ACLK_CHART_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_chart_payload_%s " \
-        "after insert on aclk_chart_payload_%s " \
-        "begin insert into aclk_chart_%s (uuid, unique_id, type, status, date_created) values " \
-        " (new.uuid, new.unique_id, new.type, 'pending', unixepoch()) on conflict(uuid, status) " \
-        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
-        "end;"
-
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
         "alert_unique_id, date_created, date_submitted, date_cloud_ack, " \
         "unique(alert_unique_id));"
 
-#define INDEX_ACLK_CHART "CREATE INDEX IF NOT EXISTS aclk_chart_index_%s ON aclk_chart_%s (unique_id);"
-
-#define INDEX_ACLK_CHART_LATEST  "CREATE INDEX IF NOT EXISTS aclk_chart_latest_index_%s ON aclk_chart_latest_%s (unique_id);"
-
 #define INDEX_ACLK_ALERT "CREATE INDEX IF NOT EXISTS aclk_alert_index_%s ON aclk_alert_%s (alert_unique_id);"
-
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
 
