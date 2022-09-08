@@ -496,16 +496,16 @@ typedef enum rrdset_flags {
 #define rrdset_is_ar_chart(st) rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_RATE_CHART)
 
 struct rrdset {
-    uuid_t uuid;
+    uuid_t *chart_uuid;                             // the global UUID for this chart
+
+    // ------------------------------------------------------------------------
+    // chart configuration
 
     struct {
         STRING *type;                               // the type of {type}.{id}
         STRING *id;                                 // the id of {type}.{id}
         STRING *name;                               // the name of {type}.{name}
     } parts;
-
-    // ------------------------------------------------------------------------
-    // the set configuration
 
     STRING *id;                                     // the unique ID of the rrdset as {type}.{id}
     STRING *name;                                   // the unique name of the rrdset as {type}.{name}
@@ -516,44 +516,54 @@ struct rrdset {
     STRING *plugin_name;                            // the name of the plugin that generated this
     STRING *module_name;                            // the name of the plugin module that generated this
 
-    RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
-    RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
+    RRDSET_TYPE chart_type;                         // line, area, stacked
 
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
-    RRDSET_TYPE chart_type;                         // line, area, stacked
-    RRDSET_FLAGS flags;                             // configuration flags
-    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
-
-    int update_every;                               // every how many seconds is this updated?
-
-    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
-                                                    // netdata will interpolate values for gaps lower than this
-
-    long entries;                                   // total number of entries in the data set
-
-    long current_entry;                             // the entry that is currently being updated
-                                                    // it goes around in a round-robin fashion
 
     long priority;                                  // the sorting priority of this chart
 
+    int update_every;                               // data collection frequency
+
+    DICTIONARY *rrdlabels;                          // chart labels
+
+    RRDSETVAR *variables;                           // chart variables - linked list (one RRDSETVAR, many RRDVARs)
+
+    RRDDIM *dimensions;                             // chart metrics
 
     // ------------------------------------------------------------------------
-    // members for temporary data we need for calculations
+    // operational state members
 
-    char *cache_dir;                                // the directory to store dimensions
+    uuid_t hash_uuid;                               // hash_id for syncing with cloud
+                                                    // TODO - obsolete now - cleanup
+
+    netdata_rwlock_t rrdset_rwlock;                 // protects linked lists
+
+    RRDSET_FLAGS flags;                             // configuration flags
+
+    DICTIONARY *rrddim_root_index;                  // dimensions index
+
+    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
+                                                    // netdata will interpolate values for gaps lower than this
+                                                    // TODO - use the global - all charts have the same value
+
+    // ------------------------------------------------------------------------
+    // linking to siblings and parents
+
+    RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
+
+    RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
+    RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
+
+    struct rrdset *next;                            // linking of rrdsets
+    struct rrdset *prev;                            // linking of rrdsets
+
+    // ------------------------------------------------------------------------
+    // data collection members
 
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
-    union {
-        time_t last_accessed_time;                  // the last time this RRDSET has been accessed
-        time_t last_entry_t;                        // the last_entry_t computed for transient RRDSET
-    };
-    time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
-
-    uuid_t *chart_uuid;                             // Store the global GUID for this chart
-                                                    // this object.
-    size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
+    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
@@ -563,40 +573,61 @@ struct rrdset {
     total_number collected_total;                   // used internally to calculate percentages
     total_number last_collected_total;              // used internally to calculate percentages
 
-    RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
-    RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
+    // ------------------------------------------------------------------------
+    // data collection - streaming to parents, temp variables
 
-    struct rrdset *next;                            // linking of rrdsets
-    struct rrdset *prev;                            // linking of rrdsets
+    time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
     // ------------------------------------------------------------------------
-    // local variables
+    // context queries temp variables
+    // TODO - eliminate these
+
+    time_t last_entry_t;                            // the last_entry_t computed for transient RRDSET
+
+    // ------------------------------------------------------------------------
+    // dbengine specifics
+    // TODO - they should be managed by storage engine
+    //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
+
+    size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
+
+    // ------------------------------------------------------------------------
+    // db mode SAVE, MAP specifics
+    // TODO - they should be managed by storage engine
+    //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
+
+    char *cache_dir;                                // the directory to store dimensions
+    unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
+    void *st_on_file;                               // compatibility with V019 RRDSET files
+
+    // ------------------------------------------------------------------------
+    // db mode RAM, SAVE, MAP, ALLOC, NONE specifics
+    // TODO - they should be managed by storage engine
+    //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
+
+    long entries;                                   // total number of entries in the data set
+
+    long current_entry;                             // the entry that is currently being updated
+                                                    // it goes around in a round-robin fashion
+
+    // ------------------------------------------------------------------------
+    // exporting to 3rd party time-series members
+    // TODO - they should be managed by exporting engine
+    //        (RRDSET_EXPORTING_STATE ptr to an undefined structure, and a call to clean this up during destruction)
+
+    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
+
+    // ------------------------------------------------------------------------
+    // health monitoring members
+    // TODO - they should be managed by health
+    //        (RRDSET_HEALTH_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
     NETDATA_DOUBLE green;                           // green threshold for this chart
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
     DICTIONARY *rrdvar_root_index;                  // RRDVAR index for this chart
-    RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
-
-    // ------------------------------------------------------------------------
-    // members for checking the data when loading from disk
-
-    unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
-    void *st_on_file;                               // compatibility with V019 RRDSET files
-
-    // ------------------------------------------------------------------------
-    // chart labels
-
-    DICTIONARY *rrdlabels;
-
-    // ------------------------------------------------------------------------
-    // the dimensions
-
-    DICTIONARY *rrddim_root_index;                   // the root of the dimensions index
-
-    netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
-    RRDDIM *dimensions;                             // the actual data for every dimension
+    RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)

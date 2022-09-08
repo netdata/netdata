@@ -108,7 +108,7 @@ struct rrdset_constructor {
     long history_entries;
 };
 
-static void rrdset_insert_callback(const char *fullid, void *rrdset, void *constructor_data) {
+static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void *constructor_data) {
     static STRING *anomaly_rates_chart = NULL;
 
     if(!unlikely(!anomaly_rates_chart))
@@ -118,21 +118,26 @@ static void rrdset_insert_callback(const char *fullid, void *rrdset, void *const
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
 
-    st->id = string_strdupz(fullid);
+    st->id = string_strdupz(chart_full_id);
+
+    st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
+    if(!st->name)
+        st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
 
     st->parts.id = string_strdupz(ctr->id);
     st->parts.type = string_strdupz(ctr->type);
     st->parts.name = string_strdupz(ctr->name);
 
     st->family = (ctr->family && *ctr->family) ? rrd_string_strdupz(ctr->family) : rrd_string_strdupz(ctr->type);
-    st->context = (ctr->context && *ctr->context) ? rrd_string_strdupz(ctr->context) : rrd_string_strdupz(fullid);
+    st->context = (ctr->context && *ctr->context) ? rrd_string_strdupz(ctr->context) : rrd_string_strdupz(chart_full_id);
+
     st->units = rrd_string_strdupz(ctr->units);
     st->title = rrd_string_strdupz(ctr->title);
-    st->plugin_name = string_strdupz(ctr->plugin);
-    st->module_name = string_strdupz(ctr->module);
+    st->plugin_name = rrd_string_strdupz(ctr->plugin);
+    st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->cache_dir = rrdset_cache_dir(host, fullid);
+    st->cache_dir = rrdset_cache_dir(host, chart_full_id);
     st->entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
     st->rrd_memory_mode = ctr->memory_mode;
@@ -146,10 +151,6 @@ static void rrdset_insert_callback(const char *fullid, void *rrdset, void *const
     st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
     if(unlikely(st->id == anomaly_rates_chart))
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
-
-    st->name = rrdset_fix_name(host, fullid, ctr->type, NULL, ctr->name);
-    if(!st->name)
-        st->name = rrdset_fix_name(host, fullid, ctr->type, NULL, ctr->id);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
