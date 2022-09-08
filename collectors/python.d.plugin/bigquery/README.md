@@ -10,7 +10,7 @@ against [BigQuery](https://cloud.google.com/bigquery) and save results into a ch
 
 ## Requirements
 
-This collector depends on some Python packages that can usually be installed via `pip`.
+This collector depends on some Python (Python 3 only) packages that can usually be installed via `pip` or `pip3`.
 
 ```bash
 $ sudo pip install google-auth pandas-gbq
