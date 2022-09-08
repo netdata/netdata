@@ -66,6 +66,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
             rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
@@ -100,7 +101,6 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     buffer_strcat(wb, "{");
 
@@ -166,9 +166,9 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
             rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n}");
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 

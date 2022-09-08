@@ -551,9 +551,6 @@ struct rrdset {
     RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
     RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
 
-    struct rrdset *next;                            // linking of rrdsets
-    struct rrdset *prev;                            // linking of rrdsets
-
     // ------------------------------------------------------------------------
     // data collection members
 
@@ -647,11 +644,16 @@ extern STRING *rrd_string_strdupz(const char *s);
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrdset_foreach_read(st, host) \
-    for((st) = (host)->rrdset_root, rrdhost_check_rdlock(host); st ; (st) = (st)->next)
+    dfe_start_read((host)->rrdset_root_index, st)
 
 #define rrdset_foreach_write(st, host) \
-    for((st) = (host)->rrdset_root, rrdhost_check_wrlock(host); st ; (st) = (st)->next)
+    dfe_start_write((host)->rrdset_root_index, st)
 
+#define rrdset_foreach_reentrant(st, host) \
+    dfe_start_reentrant((host)->rrdset_root_index, st)
+
+#define rrdset_foreach_done(st) \
+    dfe_done(st)
 
 extern void rrdset_memory_file_save(RRDSET *st);
 extern void rrdset_memory_file_free(RRDSET *st);
@@ -916,8 +918,6 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // the charts of the host
-
-    RRDSET *rrdset_root;                            // the host charts
 
     unsigned int obsolete_charts_count;
 

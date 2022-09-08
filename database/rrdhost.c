@@ -1108,8 +1108,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
     }
 #endif
 
-    while(host->rrdset_root)
-        rrdset_free(host->rrdset_root);
+    // delete all the RRDSETs of the host
+    rrdhost_free_rrdset_index(host);
 
     freez(host->exporting_flags);
 
@@ -1207,7 +1207,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host->node_id);
 
-    rrdhost_free_rrdset_index(host);
     dictionary_destroy(host->rrdfamily_root_index);
     dictionary_destroy(host->rrdvar_root_index);
 
@@ -1254,6 +1253,7 @@ void rrdhost_save_charts(RRDHOST *host) {
         rrdset_save(st);
         rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
 
     rrdhost_unlock(host);
 }
@@ -1416,6 +1416,7 @@ void rrdhost_delete_charts(RRDHOST *host) {
         rrdset_delete_files(st);
         rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
 
     recursively_delete_dir(host->cache_dir, "left over host");
 
@@ -1442,13 +1443,16 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
 
         if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
             rrdset_delete_files(st);
+
         else if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
             rrdset_delete_obsolete_dimensions(st);
+
         else
             rrdset_save(st);
 
         rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
 
     rrdhost_unlock(host);
 }
@@ -1504,21 +1508,24 @@ void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
 
     uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
-restart_after_removal:
-    rrdset_foreach_write(st, host) {
+    rrdset_foreach_reentrant(st, host) {
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
                     && st->last_accessed_time + rrdset_free_obsolete_time < now
                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
         )) {
-            st->rrdhost->obsolete_charts_count--;
+
+            __atomic_sub_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
+
+            // TODO - why is this ifdef ENABLE_DBENGINE?
 #ifdef ENABLE_DBENGINE
             if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 RRDDIM *rd, *last;
 
                 rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-                while (st->variables)    rrdsetvar_free(st->variables);
-                while (st->alarms) rrdsetcalc_unlink(st->alarms);
+                while (st->variables) rrdsetvar_free(st->variables);
+                while (st->alarms)    rrdsetcalc_unlink(st->alarms);
+
                 rrdset_wrlock(st);
                 for (rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
@@ -1532,6 +1539,7 @@ restart_after_removal:
                         rd = rd->next;
                         continue;
                     }
+
                     rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
                     while (rd->variables)
                         rrddimvar_free(rd->variables);
@@ -1596,13 +1604,13 @@ restart_after_removal:
             rrdset_unlock(st);
 
             rrdset_free(st);
-            goto restart_after_removal;
         }
 #ifdef ENABLE_ACLK
         else
             sql_check_chart_liveness(st);
 #endif
     }
+    rrdset_foreach_done(st);
 }
 
 void rrdset_check_obsoletion(RRDHOST *host)
@@ -1611,10 +1619,10 @@ void rrdset_check_obsoletion(RRDHOST *host)
     time_t last_entry_t;
     rrdset_foreach_read(st, host) {
         last_entry_t = rrdset_last_entry_t(st);
-        if (last_entry_t && last_entry_t < host->senders_connect_time) {
+        if(last_entry_t && last_entry_t < host->senders_connect_time)
             rrdset_is_obsolete(st);
-        }
     }
+    rrdset_foreach_done(st);
 }
 
 void rrd_cleanup_obsolete_charts()
@@ -1624,7 +1632,7 @@ void rrd_cleanup_obsolete_charts()
     RRDHOST *host;
     rrdhost_foreach_read(host)
     {
-        if (host->obsolete_charts_count) {
+        if (__atomic_load_n(&host->obsolete_charts_count, __ATOMIC_SEQ_CST)) {
             rrdhost_wrlock(host);
             rrdhost_cleanup_obsolete_charts(host);
             rrdhost_unlock(host);
@@ -1784,14 +1792,16 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 // Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
 // the last entry times as the metric updates, but let's see if it is a problem first.
 time_t rrdhost_last_entry_t(RRDHOST *h) {
-    rrdhost_rdlock(h);
     RRDSET *st;
     time_t result = 0;
+
     rrdset_foreach_read(st, h) {
         time_t st_last = rrdset_last_entry_t(st);
+
         if (st_last > result)
             result = st_last;
     }
-    rrdhost_unlock(h);
+    rrdset_foreach_done(st);
+
     return result;
 }

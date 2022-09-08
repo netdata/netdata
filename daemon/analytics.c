@@ -283,17 +283,18 @@ void analytics_collectors(void)
     char name[500];
     BUFFER *bt = buffer_create(1000);
 
-    rrdset_foreach_read(st, localhost)
-    {
-        if (rrdset_is_available_for_viewers(st)) {
-            struct collector col = {
-                .plugin = rrdset_plugin_name(st),
-                .module = rrdset_module_name(st)
-            };
-            snprintfz(name, 499, "%s:%s", col.plugin, col.module);
-            dictionary_set(dict, name, &col, sizeof(struct collector));
-        }
+    rrdset_foreach_read(st, localhost) {
+        if(!rrdset_is_available_for_viewers(st))
+            continue;
+
+        struct collector col = {
+            .plugin = rrdset_plugin_name(st),
+            .module = rrdset_module_name(st)
+        };
+        snprintfz(name, 499, "%s:%s", col.plugin, col.module);
+        dictionary_set(dict, name, &col, sizeof(struct collector));
     }
+    rrdset_foreach_done(st);
 
     struct array_printer ap;
     ap.c = 0;
@@ -398,12 +399,11 @@ void analytics_charts(void)
 {
     RRDSET *st;
     int c = 0;
+
     rrdset_foreach_read(st, localhost)
-    {
-        if (rrdset_is_available_for_viewers(st)) {
-            c++;
-        }
-    }
+        if(rrdset_is_available_for_viewers(st)) c++;
+    rrdset_foreach_done(st);
+
     {
         char b[7];
         snprintfz(b, 6, "%d", c);
@@ -416,13 +416,11 @@ void analytics_metrics(void)
     RRDSET *st;
     long int dimensions = 0;
     RRDDIM *rd;
-    rrdset_foreach_read(st, localhost)
-    {
+    rrdset_foreach_read(st, localhost) {
         rrdset_rdlock(st);
 
         if (rrdset_is_available_for_viewers(st)) {
-            rrddim_foreach_read(rd, st)
-            {
+            rrddim_foreach_read(rd, st) {
                 if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
                     continue;
                 dimensions++;
@@ -431,6 +429,8 @@ void analytics_metrics(void)
 
         rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
+
     {
         char b[7];
         snprintfz(b, 6, "%ld", dimensions);

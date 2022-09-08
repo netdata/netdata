@@ -69,7 +69,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     );
 
     c = 0;
-    rrdhost_rdlock(host);
+
     rrdset_foreach_read(st, host) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             if(c) buffer_strcat(wb, ",");
@@ -82,7 +82,9 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
             st->last_accessed_time = now;
         }
     }
+    rrdset_foreach_done(st);
 
+    rrdhost_rdlock(host);
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost(host, rc) {
         if(rc->rrdset)
@@ -172,7 +174,7 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
     char name[500];
 
     time_t now = now_realtime_sec();
-    rrdhost_rdlock(host);
+
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
@@ -184,7 +186,8 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             st->last_accessed_time = now;
         }
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
+
     struct array_printer ap = {
             .c = 0,
             .wb = wb

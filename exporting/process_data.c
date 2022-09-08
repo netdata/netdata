@@ -338,13 +338,11 @@ void prepare_buffers(struct engine *engine)
 
     rrd_rdlock();
     RRDHOST *host;
-    rrdhost_foreach_read(host)
-    {
+    rrdhost_foreach_read(host) {
         rrdhost_rdlock(host);
         start_host_formatting(engine, host);
         RRDSET *st;
-        rrdset_foreach_read(st, host)
-        {
+        rrdset_foreach_read(st, host) {
             rrdset_rdlock(st);
             start_chart_formatting(engine, st);
 
@@ -355,6 +353,7 @@ void prepare_buffers(struct engine *engine)
             end_chart_formatting(engine, st);
             rrdset_unlock(st);
         }
+        rrdset_foreach_done(st);
         variables_formatting(engine, host);
         end_host_formatting(engine, host);
         rrdhost_unlock(host);

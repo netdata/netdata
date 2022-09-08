@@ -1003,14 +1003,13 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     // dont lock here and wait for results
     // get the charts and run mc after
     RRDSET *st;
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             if(!contexts || simple_pattern_matches(contexts, rrdset_context(st)))
                 dictionary_set(charts, rrdset_name(st), NULL, 0);
         }
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 
     size_t examined_dimensions = 0;
     void *ptr;
