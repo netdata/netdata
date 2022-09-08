@@ -29,7 +29,6 @@ typedef void *ml_dimension_t;
 
 // forward declarations
 struct rrddim_tier;
-struct rrdset_volatile;
 struct context_param;
 
 #ifdef ENABLE_DBENGINE
@@ -179,7 +178,7 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_HIDDEN                          = (1 << 0),  // this dimension will not be offered to callers
     RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = (1 << 1),  // do not offer RESET or OVERFLOW info to callers
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
-    // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
+    // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
@@ -347,7 +346,6 @@ struct rrddim_query_handle {
     RRDDIM *rd;
     time_t start_time;
     time_t end_time;
-    TIER_QUERY_FETCH tier_query_fetch_type;
     STORAGE_QUERY_HANDLE* handle;
 };
 
@@ -400,7 +398,7 @@ struct rrddim_collect_ops {
     // run this to flush / reset the current data collection sequence
     void (*flush)(STORAGE_COLLECT_HANDLE *collection_handle);
 
-    // an finalization function to run after collection is over
+    // a finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
     int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
 };
@@ -433,7 +431,6 @@ struct rrddim_query_ops {
 struct rrddim_tier {
     int tier_grouping;
     RRD_MEMORY_MODE mode;                           // the memory mode of this tier
-    RRD_BACKFILL backfill;                          // backfilling configuration
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     STORAGE_POINT virtual_point;
@@ -478,7 +475,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_HIDDEN                  = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
     RRDSET_FLAG_SYNC_CLOCK              = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
     RRDSET_FLAG_OBSOLETE_DIMENSIONS     = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
-                                                     // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
+                                                     // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
     RRDSET_FLAG_ACLK                    = (1 << 16),
@@ -1185,7 +1182,7 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 
-// get the timestamp of the last entry in the round robin database
+// get the timestamp of the last entry in the round-robin database
 static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
     time_t latest = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
 
@@ -1214,7 +1211,7 @@ static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
     return oldest;
 }
 
-// get the timestamp of the last entry in the round robin database
+// get the timestamp of the last entry in the round-robin database
 static inline time_t rrdset_last_entry_t_nolock(RRDSET *st) {
     RRDDIM *rd;
     time_t last_entry_t  = 0;
@@ -1237,7 +1234,7 @@ static inline time_t rrdset_last_entry_t(RRDSET *st) {
     return last_entry_t;
 }
 
-// get the timestamp of first entry in the round robin database
+// get the timestamp of first entry in the round-robin database
 static inline time_t rrdset_first_entry_t_nolock(RRDSET *st) {
     RRDDIM *rd;
     time_t first_entry_t = LONG_MAX;
