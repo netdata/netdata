@@ -194,11 +194,14 @@ typedef DICTFE_CONST struct dictionary_foreach {
     void *value;                // the dictionary value of the last item used
                                 // same as the return value of dictfe_start() and dictfe_next()
 
+    DICTIONARY_ITEM *item;      // the item we work on, to remember the position we are at
+                                // this can be used with dictionary_acquired_item_dup() to
+                                // acquire the currently working item.
+
     // the following are for internal use only - to keep track of the point we are
     char rw;                    // the lock mode 'r' or 'w'
     usec_t started_ut;          // the time the caller started iterating (now_realtime_usec())
     DICTIONARY *dict;           // the dictionary upon we work
-    void *last_item;            // the item we work on, to remember the position we are at
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
