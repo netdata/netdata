@@ -47,9 +47,7 @@ public:
         rrddim_set_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
     }
 
-    virtual ~RrdDimension() {
-        rrddim_free(AnomalyRateRD->rrdset, AnomalyRateRD);
-    }
+    virtual ~RrdDimension() {}
 
 private:
     RRDDIM *RD;
