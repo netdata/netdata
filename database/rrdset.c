@@ -1355,20 +1355,6 @@ void rrdset_done(RRDSET *st) {
 
     netdata_thread_disable_cancelability();
 
-#ifdef ENABLE_ACLK
-    time_t mark = now_realtime_sec();
-    bool rrdset_flag_aclk = rrdset_flag_check(st, RRDSET_FLAG_ACLK);
-    bool rrdset_is_ar = rrdset_is_ar_chart(st);
-
-    if (likely(!rrdset_is_ar)) {
-        if (unlikely(!rrdset_flag_aclk)) {
-            if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
-                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-            }
-        }
-    }
-#endif
-
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
@@ -1805,12 +1791,6 @@ after_second_database_work:
         rd = rda->rd;
         if(unlikely(!rd)) continue;
 
-#ifdef ENABLE_ACLK
-        if (likely(!rrdset_is_ar)) {
-            if (!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) && likely(rrdset_flag_aclk))
-                queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
-        }
-#endif
         if(unlikely(!rd->updated))
             continue;
 

@@ -431,6 +431,8 @@ time_t rrddim_first_entry_t(RRDDIM *rd) {
 //   last collected time : Dimension is not live
 
 #ifdef ENABLE_ACLK
+#define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
+#define RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER (30)
 time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
 {
     time_t last_updated = rd->last_collected_time.tv_sec;

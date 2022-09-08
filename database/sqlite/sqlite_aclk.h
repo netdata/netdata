@@ -5,8 +5,6 @@
 
 #include "sqlite3.h"
 
-// TODO: To be added
-#include "../../aclk/schema-wrappers/chart_stream.h"
 
 #ifndef ACLK_MAX_CHART_BATCH
 #define ACLK_MAX_CHART_BATCH    (200)
@@ -117,14 +115,6 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
 
-    ACLK_DATABASE_ADD_CHART,
-    ACLK_DATABASE_ADD_DIMENSION,
-    ACLK_DATABASE_PUSH_CHART,
-    ACLK_DATABASE_PUSH_CHART_CONFIG,
-    ACLK_DATABASE_RESET_CHART,
-    ACLK_DATABASE_CHART_ACK,
-    ACLK_DATABASE_UPD_RETENTION,
-    ACLK_DATABASE_DIM_DELETION,
     ACLK_DATABASE_ORPHAN_HOST,
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
