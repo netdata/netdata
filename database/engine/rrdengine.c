@@ -1329,7 +1329,7 @@ void rrdeng_worker(void* arg)
     }
 
     /* cleanup operations of the event loop */
-    info("Shutting down RRD engine event loop.");
+    info("Shutting down RRD engine event loop for tier %d", ctx->tier);
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
@@ -1344,7 +1344,7 @@ void rrdeng_worker(void* arg)
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 
-    info("Shutting down RRD engine event loop complete.");
+    info("Shutting down RRD engine event loop for tier %d complete", ctx->tier);
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */

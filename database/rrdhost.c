@@ -1007,8 +1007,6 @@ void __rrd_check_wrlock(const char *file, const char *function, const unsigned l
 // RRDHOST - free
 
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
-    info("SYSTEM_INFO: free %p", system_info);
-
     if(likely(system_info)) {
         freez(system_info->cloud_provider_type);
         freez(system_info->cloud_instance_type);
