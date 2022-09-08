@@ -322,44 +322,19 @@ int send_node_instances(const char *msg, size_t msg_len)
 
 int stream_charts_and_dimensions(const char *msg, size_t msg_len)
 {
-    aclk_ctx_based = 0;
-    stream_charts_and_dims_t res = parse_stream_charts_and_dims(msg, msg_len);
-    if (!res.claim_id || !res.node_id) {
-        error("Error parsing StreamChartsAndDimensions msg");
-        freez(res.claim_id);
-        freez(res.node_id);
-        return 1;
-    }
-    chart_batch_id = res.batch_id;
-    aclk_start_streaming(res.node_id, res.seq_id, res.seq_id_created_at.tv_sec, res.batch_id);
-    freez(res.claim_id);
-    freez(res.node_id);
+    error_report("Received obsolete StreamChartsAndDimensions msg");
     return 0;
 }
 
 int charts_and_dimensions_ack(const char *msg, size_t msg_len)
 {
-    chart_and_dim_ack_t res = parse_chart_and_dimensions_ack(msg, msg_len);
-    if (!res.claim_id || !res.node_id) {
-        error("Error parsing StreamChartsAndDimensions msg");
-        freez(res.claim_id);
-        freez(res.node_id);
-        return 1;
-    }
-    aclk_ack_chart_sequence_id(res.node_id, res.last_seq_id);
-    freez(res.claim_id);
-    freez(res.node_id);
+    error_report("Received obsolete StreamChartsAndDimensionsAck msg");
     return 0;
 }
 
 int update_chart_configs(const char *msg, size_t msg_len)
 {
-    struct update_chart_config res = parse_update_chart_config(msg, msg_len);
-    if (!res.claim_id || !res.node_id || !res.hashes)
-        error("Error parsing UpdateChartConfigs msg");
-    else
-        aclk_get_chart_config(res.hashes);
-    destroy_update_chart_config(&res);
+    error_report("Received obsolete UpdateChartConfigs msg");
     return 0;
 }
 
