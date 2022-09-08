@@ -322,18 +322,24 @@ int send_node_instances(const char *msg, size_t msg_len)
 
 int stream_charts_and_dimensions(const char *msg, size_t msg_len)
 {
+    UNUSED(msg);
+    UNUSED(msg_len);
     error_report("Received obsolete StreamChartsAndDimensions msg");
     return 0;
 }
 
 int charts_and_dimensions_ack(const char *msg, size_t msg_len)
 {
+    UNUSED(msg);
+    UNUSED(msg_len);
     error_report("Received obsolete StreamChartsAndDimensionsAck msg");
     return 0;
 }
 
 int update_chart_configs(const char *msg, size_t msg_len)
 {
+    UNUSED(msg);
+    UNUSED(msg_len);
     error_report("Received obsolete UpdateChartConfigs msg");
     return 0;
 }
