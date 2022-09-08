@@ -24,25 +24,23 @@ void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, c
 // ----------------------------------------------------------------------------
 // RRDSET name index
 
+static void rrdset_name_insert_callback(const char *name __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+    RRDSET *st = rrdset;
+    rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
+}
+static void rrdset_name_delete_callback(const char *name __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+    RRDSET *st = rrdset;
+    rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
+}
+
 static inline void rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
     if(!st->name) return;
-
-    if(likely(dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET)) == st)) {
-        rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
-    }
-    else {
-        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
-        error("RRDSET: %s() attempted to index duplicate object with key '%s'", __FUNCTION__, rrdset_name(st));
-    }
+    dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET));
 }
 
 static inline void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID)) {
-        if(likely(dictionary_del(host->rrdset_root_index_name, rrdset_name(st)) != 0))
-            rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
-        else
-            error("RRDSET: %s() attempted to delete non-index object with key '%s'", __FUNCTION__, rrdset_name(st));
-    }
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID))
+        dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
 }
 
 static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
@@ -207,9 +205,11 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     rrdcontext_updated_rrdset(st);
 }
 
-static void rrdset_delete_callback(const char *name, void *rrdset, void *rrdhost) {
+static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *rrdhost) {
     RRDHOST *host = rrdhost;
     RRDSET *st = rrdset;
+
+    rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
     // remove it from the host linked list
     rrdhost_check_wrlock(host);
@@ -260,7 +260,7 @@ static void rrdset_delete_callback(const char *name, void *rrdset, void *rrdhost
     freez(st->chart_uuid);
 }
 
-static void rrdset_conflict_callback(const char *full_id, void *rrdset, void *new_rrdset, void *constructor_data) {
+static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
     (void)new_rrdset; // it is NULL
 
     struct rrdset_constructor *ctr = constructor_data;
@@ -340,44 +340,28 @@ static void rrdset_conflict_callback(const char *full_id, void *rrdset, void *ne
             info("Collector updated metadata for chart %s", rrdset_id(st));
     }
 
-    bool stop_processing = false;
+    /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
+
+    rrdset_update_permanent_labels(st);
+    rrdcontext_updated_rrdset(st);
+
+    if(host->health_enabled && changed_from_archived_to_active) {
+        rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
+        rrdsetcalc_link_matching(st);
+        rrdcalctemplate_link_matching(st);
+    }
+
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
     if(mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
         debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
         if(unlikely(update_chart_metadata(st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");
-
-        if(!changed_from_archived_to_active) {
-            rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-            stop_processing = true;
-        }
-    }
-
-    if(!stop_processing) {
-
-        /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
-
-        if (!changed_from_archived_to_active) {
-            rrdset_update_permanent_labels(st);
-            rrdcontext_updated_rrdset(st);
-        } else {
-            if (changed_from_archived_to_active) {
-                rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-
-                if (host->health_enabled) {
-                    rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-                    rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
-                    rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
-                    rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
-                    rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
-                    rrdsetcalc_link_matching(st);
-                    rrdcalctemplate_link_matching(st);
-                }
-            }
-
-            rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        }
     }
 }
 
@@ -395,6 +379,9 @@ void rrdhost_init_rrdset_index(RRDHOST *host) {
               DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
             | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
             | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
+        dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
     }
 }
 
@@ -411,12 +398,8 @@ static inline RRDSET *rrdset_index_add(RRDHOST *host, const char *id, struct rrd
 }
 
 static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID)) {
-        if(likely(dictionary_del(host->rrdset_root_index, rrdset_id(st)) == 0))
-            rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
-        else
-            error("RRDSET: %s() attempted to delete non-indexed object with key '%s'", __FUNCTION__, rrdset_id(st));
-    }
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID))
+        dictionary_del(host->rrdset_root_index, rrdset_id(st));
 }
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {

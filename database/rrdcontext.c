@@ -8,6 +8,8 @@
 
 int rrdcontext_enabled = CONFIG_BOOLEAN_YES;
 
+// #define LOG_POST_PROCESSING_QUEUE_INSERTIONS 1
+
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
 #define RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC             (1000 * USEC_PER_MS)
@@ -2714,7 +2716,7 @@ static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *fun
                        rc,
                        sizeof(*rc));
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#if(defined(NETDATA_INTERNAL_CHECKS) && defined(LOG_POST_PROCESSING_QUEUE_INSERTIONS))
         {
             BUFFER *wb_flags = buffer_create(1000);
             rrd_flags_to_buffer(flags, wb_flags);

@@ -518,8 +518,6 @@ struct rrdset {
 
     RRDSET_TYPE chart_type;                         // line, area, stacked
 
-    RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
-
     long priority;                                  // the sorting priority of this chart
 
     int update_every;                               // data collection frequency
@@ -532,6 +530,8 @@ struct rrdset {
 
     // ------------------------------------------------------------------------
     // operational state members
+
+    RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
 
     uuid_t hash_uuid;                               // hash_id for syncing with cloud
                                                     // TODO - obsolete now - cleanup
