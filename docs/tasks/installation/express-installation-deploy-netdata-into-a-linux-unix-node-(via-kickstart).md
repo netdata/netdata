@@ -8,6 +8,9 @@ learn_docs_purpose: "Instructions on running the kickstart script on Unix system
 -->
 
 import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Admonition from '@theme/Admonition';
 
 This page will guide you through installation using the automatic one-line installation script named `kickstart.sh`.
 
@@ -33,66 +36,28 @@ The installation script does the following after being downloaded and run using 
 ## Prerequisites
 
 - Connection to the internet
-- A Linux based node
-- Either `wget` or `curl` installed on the node  
+- A Linux/UNIX based node
+- Either `wget` or `curl` installed on the node
 
 ## Steps
 
-To install Netdata, run the following:
+Install Netdata by running one of the following options:
+
+<Tabs>
+<TabItem value="wget" label=<code>wget</code>>
 
 <OneLineInstallWget/>
 
-Or, if you have cURL but not wget:
+</TabItem>
+<TabItem value="curl" label=<code>curl</code>>
 
 <OneLineInstallCurl/>
 
-### Optional parameters to alter your installation
+</TabItem>
+</Tabs>
 
-The `kickstart.sh` script accepts a number of optional parameters to control how the installation process works:
-
-- `--non-interactive`: Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run.
-- `--interactive`: Act as if running interactively, even if automatic detection indicates a run is non-interactive.
-- `--dont-wait`: Synonym for `--non-interactive`
-- `--dry-run`: Show what the installer would do, but don’t actually do any of it.
-- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
-- `--release-channel`: Specify a particular release channel to install from. Currently supported release channels are:
-  - `nightly`: Installs a nightly build (this is currently the default).
-  - `stable`: Installs a stable release.
-  - `default`: Explicitly request whatever the current default is.
-- `--nightly-channel`: Synonym for `--release-channel nightly`.
-- `--stable-channel`: Synonym for `--release-channel stable`.
-- `--auto-update`: Enable automatic updates (this is the default).
-- `--no-updates`: Disable automatic updates.
-- `--disable-telemetry`: Disable anonymous statistics.
-- `--repositories-only`: Only install appropriate repository configuration packages (only for native install).
-- `--native-only`: Only install if native binary packages are available.
-- `--static-only`: Only install if a static build is available.
-- `--build-only`: Only install using a local build.
-- `--reinstall`: If an existing install is found, reinstall instead of trying to update it in place.
-- `--reinstall-even-if-unsafe`: Even try to reinstall if we don't think we can do so safely (implies `--reinstall`).
-- `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
-    use runtime configuration to disable cloud support.
-- `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
-- `--install`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system), this option is deprecated and will be removed in a future version, please use `--install-prefix` instead.
-- `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
-- `--install-version`: Specify the version of Netdata to install.
-- `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
-- `--uninstall`: Uninstall an existing installation of Netdata.
-- `--reinstall-clean`: Performs an uninstall of Netdata and clean installation.
-- `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
-- `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
-- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
-
-Additionally, the following environment variables may be used to further customize how the script runs (most users
-should not need to use special values for any of these):
-
-- `TMPDIR`: Used to specify where to put temporary files. On most systems, the default we select automatically
-  should be fine. The user running the script needs to both be able to write files to the temporary directory,
-  and run files from that location.
-- `ROOTCMD`: Used to specify a command to use to run another command with root privileges if needed. By default
-  we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
-  those to work, or have a different tool to do the same thing on your system, you can specify it here.
-- `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
+If you want to see all the optional parameters to further alter your installation, check
+the [kickstart script reference](/packaging/installer/methods/kickstart.md).
 
 ### Native packages
 
@@ -139,8 +104,9 @@ If the script is valid, this command will return `OK, VALID`.
 ## Expected result
 
 The script should exit with a success message.  
-To ensure that your installation is working, open up your web browser of choice and navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your node.  
-If you're interacting with the node locally and you are unsure of it's IP address, try `http://localhost:19999` first.
+To ensure that your installation is working, open up your web browser of choice and navigate to `http://NODE:19999`,
+replacing `NODE` with the IP address or hostname of your node.  
+If you're interacting with the node locally, and you are unsure of its IP address, try `http://localhost:19999` first.
 
 If the installation was successful, you will be led to the Agent's local dashboard. Enjoy!
 
@@ -154,5 +120,4 @@ root@netdata~ # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstar
 
 ## Related topics
 
-1. [Claim an Agent to the Hub](/docs/tasks/general-configuration/claim-an-agent-to-the-hub.md)
-2. [Configure the Agent](/docs/tasks/general-configuration/configure-the-agent.md)
+1. [Kickstart script reference](/packaging/installer/methods/kickstart.md)
