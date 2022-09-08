@@ -1,5 +1,5 @@
 <!--
-Title: "Start, stop and restart Agent"
+title: "Start, stop and restart Agent"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -7,86 +7,197 @@ learn_rel_path: "general-configuration"
 learn_docs_purpose: "Instructions on how to Start, Stop and Restart the Netdata Agent"
 -->
 
-**********************************************************************
-Template:
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Admonition from '@theme/Admonition';
 
-Small intro, give some context to the user
+Upon installing the Netdata Agent, the [daemon](/daemon/README.md) is configured to start at boot and stop and
+restart/shutdown.
 
-## Prerequisite
+Keep in mind that you will most often need to _restart_ the Agent to load new or edited configuration files. Health
+configuration files are the only exception, as they can be reloaded without restarting the entire Agent.
 
-Unordered list of what you will need. 
+:::caution
+Stopping or restarting the Agent will cause gaps in stored metrics until the `netdata` process initiates collectors and
+the database engine.
+:::
+
+## Prerequisites
+
+- A node with the Agent installed
 
 ## Steps
 
-Exact list of steps the user must follow
+:::tip
+`systemctl` is the recommended way to start, stop, or restart the Netdata daemon.  
+If `systemctl` fails, or you know that you're using a non-systemd system, try using the `service` command.
+Lastly, you can also use the `init.d` command for this operation.
+:::
 
-## Expected result
+### Starting the Agent
 
-What you expect to see when you complete the steps above
+You can start the Agent with one of the following options:
 
-## Example
+<Tabs groupId="choice">
+<TabItem value="systemctl" label=<code>systemctl</code> default>
 
-Example configuration/actions of the task
+```bash
+sudo systemctl start netdata
+```
 
-## Related topics
+</TabItem>
+<TabItem value="service" label=<code>service</code>>
 
-List of reference docs user needs to be aware of.
+```bash
+sudo service netdata start
+```
 
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Start, stop, or restart the Netdata Agent"
-description: "Manage the Netdata Agent daemon, load configuration changes, and troubleshoot stuck processes on systemd and non-systemd nodes."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/start-stop-restart.md
--->
+</TabItem>
+<TabItem value="init.d" label=<code>init.d</code>>
 
-# Start, stop, or restart the Netdata Agent
+```bash
+sudo /etc/init.d/netdata start
+```
 
-When you install the Netdata Agent, the [daemon](/daemon/README.md) is configured to start at boot and stop and
-restart/shutdown.
+</TabItem>
+</Tabs>
 
-You will most often need to _restart_ the Agent to load new or editing configuration files. [Health
-configuration](#reload-health-configuration) files are the only exception, as they can be reloaded without restarting
-the entire Agent.
 
-Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates
-collectors and the database engine.
-
-## Using `systemctl`, `service`, or `init.d`
-
-This is the recommended way to start, stop, or restart the Netdata daemon.
-
-- To **start** Netdata, run `sudo systemctl start netdata`.
-- To **stop** Netdata, run `sudo systemctl stop netdata`.
-- To **restart** Netdata, run `sudo systemctl restart netdata`.
-
-If the above commands fail, or you know that you're using a non-systemd system, try using the `service` command:
-
-- **service**: `sudo service netdata start`, `sudo service netdata stop`, `sudo service netdata restart`
-
-## Using `netdata`
-
-Use the `netdata` command, typically located at `/usr/sbin/netdata`, to start the Netdata daemon. 
+You can also use the `netdata` command, typically located at `/usr/sbin/netdata`, to start the Netdata daemon.
 
 ```bash
 sudo netdata
 ```
 
-If you start the daemon this way, close it with `sudo killall netdata`.
+:::tip
+If you start the daemon with the `netdata` command, close it with:
 
-## Using `netdatacli`
+```bash
+sudo killall netdata
+```
 
-The Netdata Agent also comes with a [CLI tool](/cli/README.md) capable of performing shutdowns. Start the Agent back up
-using your preferred method listed above.
+:::
+
+#### Expected result
+
+After you start the Agent, you will be able to see its status by running one of the commands below:
+
+<Tabs groupId="choice">
+<TabItem value="systemctl" label=<code>systemctl</code> default>
+
+```bash
+systemctl status netdata
+```
+
+</TabItem>
+<TabItem value="service" label=<code>service</code>>
+
+```bash
+service netdata status
+```
+
+</TabItem>
+<TabItem value="init.d" label=<code>init.d</code>>
+
+```bash
+/etc/init.d/netdata status
+```
+
+</TabItem>
+</Tabs>
+
+
+If you successfully started the Agent, the status is going to report:
+
+```bash
+...
+Active: active (running)
+...
+```
+
+### Stopping the Agent
+
+You can stop the Agent with one of the following options:
+
+<Tabs groupId="choice">
+<TabItem value="systemctl" label=<code>systemctl</code> default>
+
+```bash
+sudo systemctl stop netdata
+```
+
+</TabItem>
+<TabItem value="service" label=<code>service</code>>
+
+```bash
+sudo service netdata stop
+```
+
+</TabItem>
+<TabItem value="init.d" label=<code>init.d</code>>
+
+```bash
+sudo /etc/init.d/netdata stop
+```
+
+</TabItem>
+</Tabs>
+
+
+If you used the `netdata` command to start the daemon, you can close it with:
+
+```bash
+sudo killall netdata
+```
+
+Last but not least the Agent also comes with a [CLI tool](/cli/README.md) capable of performing shutdowns:
 
 ```bash
 sudo netdatacli shutdown-agent
 ```
 
-## Reload health configuration
+#### Expected result
 
-You do not need to restart the Netdata Agent between changes to health configuration files, such as specific health
-entities. Instead, use [`netdatacli`](#using-netdatacli) and the `reload-health` option to prevent gaps in metrics
-collection.
+After you stop the Agent, you will be able to see its status by running one of the commands below:
+
+<Tabs groupId="choice">
+<TabItem value="systemctl" label=<code>systemctl</code> default>
+
+```bash
+systemctl status netdata
+```
+
+</TabItem>
+<TabItem value="service" label=<code>service</code>>
+
+```bash
+service netdata status
+```
+
+</TabItem>
+<TabItem value="init.d" label=<code>init.d</code>>
+
+```bash
+/etc/init.d/netdata status
+```
+
+</TabItem>
+</Tabs>
+
+
+If you successfully stopped the Agent, the status is going to report:
+
+```bash
+...
+Active: inactive (dead)
+...
+```
+
+### Reload health configuration
+
+You do not need to restart the Agent between changes to health configuration files, such as specific health entities.
+
+Instead, use `netdatacli` and the `reload-health` option to prevent gaps in metrics collection:
 
 ```bash
 sudo netdatacli reload-health
@@ -99,10 +210,79 @@ without restarting the entire process.
 killall -USR2 netdata
 ```
 
-## Force stop stalled or unresponsive `netdata` processes
+### Restarting the Agent
 
-In rare cases, the Netdata Agent may stall or not properly close sockets, preventing a new process from starting. In
-these cases, try the following three commands:
+You can restart the Agent with one of the following options:
+
+<Tabs groupId="choice">
+<TabItem value="systemctl" label=<code>systemctl</code> default>
+
+```bash
+sudo systemctl restart netdata
+```
+
+</TabItem>
+<TabItem value="service" label=<code>service</code>>
+
+```bash
+sudo service netdata restart
+```
+
+</TabItem>
+<TabItem value="init.d" label=<code>init.d</code>>
+
+```bash
+sudo /etc/init.d/netdata restart
+```
+
+</TabItem>
+</Tabs>
+
+
+#### Expected result
+
+After you restart the Agent, you will be able to see its status by running one of the commands below:
+
+<Tabs groupId="choice">
+<TabItem value="systemctl" label=<code>systemctl</code> default>
+
+```bash
+systemctl status netdata
+```
+
+</TabItem>
+<TabItem value="service" label=<code>service</code>>
+
+```bash
+service netdata status
+```
+
+</TabItem>
+<TabItem value="init.d" label=<code>init.d</code>>
+
+```bash
+/etc/init.d/netdata status
+```
+
+</TabItem>
+</Tabs>
+
+
+If you successfully restarted the Agent, the status is going to report:
+
+```bash
+...
+Active: active (running)
+...
+```
+
+## Further actions
+
+### Force stop stalled or unresponsive `netdata` processes
+
+In rare cases, the Agent may stall or not properly close sockets, preventing a new process from starting. In these
+cases, try the following three commands _(you can replace the `systemctl` command with your preferred command to stop
+the Agent)_:
 
 ```bash
 sudo systemctl stop netdata
@@ -110,25 +290,9 @@ sudo killall netdata
 ps aux| grep netdata
 ```
 
-The output of `ps aux` should show no `netdata` or associated processes running. You can now start the Netdata Agent
-again with `service netdata start`, or the appropriate method for your system.
+The output of `ps aux` should show no `netdata` or associated processes running. You can now start the Agent again
+with `service netdata start`, or the appropriate method for your system.
 
-## What's next?
+## Related topics
 
-Learn more about [securing the Netdata Agent](/docs/configure/secure-nodes.md).
-
-You can also use the restart/reload methods described above to enable new features:
-
-- [Enable new collectors](/docs/collect/enable-configure.md) or tweak their behavior.
-- [Configure existing health alarms](/docs/monitor/configure-alarms.md) or create new ones.
-- [Enable notifications](/docs/monitor/enable-notifications.md) to receive updates about the health of your
-  infrastructure.
-- Change [the long-term metrics retention period](/docs/store/change-metrics-storage.md) using the database engine.
-
-### Related reference documentation
-
-- [Netdata Agent · Daemon](/daemon/README.md)
-- [Netdata Agent · Netdata CLI](/cli/README.md)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fstart-stop-restart&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
-*******************************************************************************
+1. [Daemon Reference](/daemon/README.md)
