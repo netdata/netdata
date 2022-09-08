@@ -39,7 +39,7 @@ static inline void rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
 }
 
 static inline void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID))
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME))
         dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
 }
 
@@ -165,11 +165,7 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     else
         update_chart_metadata(st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
 
-    st->rrddim_root_index = dictionary_create(
-          DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-    );
+    rrdset_init_rrddim_index(st);
 
     st->rrdvar_root_index = dictionary_create(
           DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
@@ -239,9 +235,9 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
 
     // free directly allocated members
     rrdset_memory_file_free(st);
-    rrdlabels_destroy(st->rrdlabels);
-    dictionary_destroy(st->rrddim_root_index);
+    rrdset_free_rrddim_index(st);
     dictionary_destroy(st->rrdvar_root_index);
+    rrdlabels_destroy(st->rrdlabels);
 
     string_freez(st->id);
     string_freez(st->name);
@@ -386,11 +382,13 @@ void rrdhost_init_rrdset_index(RRDHOST *host) {
 }
 
 void rrdhost_free_rrdset_index(RRDHOST *host) {
-    dictionary_destroy(host->rrdset_root_index);
+    // destroy the name index first
     dictionary_destroy(host->rrdset_root_index_name);
-
-    host->rrdset_root_index = NULL;
     host->rrdset_root_index_name = NULL;
+
+    // destroy the id index last
+    dictionary_destroy(host->rrdset_root_index);
+    host->rrdset_root_index = NULL;
 }
 
 static inline RRDSET *rrdset_index_add(RRDHOST *host, const char *id, struct rrdset_constructor *st_ctr) {

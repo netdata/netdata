@@ -244,13 +244,12 @@ struct rrddim {
     uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
 
     // ------------------------------------------------------------------------
-    // the dimension definition
+    // dimension definition
 
     STRING *id;                                     // the id of this dimension (for internal identification)
     STRING *name;                                   // the name of this dimension (as presented to user)
+
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
-    RRDDIM_FLAGS flags;                             // configuration flags for the dimension
 
     bool updated;                                   // 1 when the dimension has been updated since the last processing
     bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
@@ -258,19 +257,42 @@ struct rrddim {
     collected_number multiplier;                    // the multiplier of the collected values
     collected_number divisor;                       // the divider of the collected values
 
-    // ------------------------------------------------------------------------
-    // members for temporary data we need for calculations
+    int update_every;                               // every how many seconds is this updated
+                                                    // TODO - remove update_every from rrddim
+                                                    //        it is always the same in rrdset
 
-    struct timeval last_collected_time;             // when was this dimension last updated
-                                                    // this is actual date time we updated the last_collected_value
-                                                    // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
+    RRDDIMVAR *variables;                           // dimension variables - linked list (one RRDDIMVAR, many RRDVARs)
+
+    // ------------------------------------------------------------------------
+    // operational state members
+
+    RRDDIM_FLAGS flags;                             // flags
+    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
+
+    ml_dimension_t ml_dimension;                    // machine learning data about this dimension
 
 #ifdef ENABLE_ACLK
     int aclk_live_status;
 #endif
-    ml_dimension_t ml_dimension;
+
+    // ------------------------------------------------------------------------
+    // linking to siblings and parents
+
+    struct rrddim *next;                            // linking of dimensions within the same data set
+    struct rrddim *prev;                            // linking of dimensions within the same data set
+
+    struct rrdset *rrdset;
+
+    RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
+
+    // ------------------------------------------------------------------------
+    // data collection members
 
     struct rrddim_tier *tiers[RRD_STORAGE_TIERS];   // our tiers of databases
+
+    struct timeval last_collected_time;             // when was this dimension last updated
+                                                    // this is actual date time we updated the last_collected_value
+                                                    // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
     size_t collections_counter;                     // the number of times we added values to this rrddim
     collected_number collected_value_max;           // the absolute maximum of the collected value
@@ -282,33 +304,12 @@ struct rrddim {
     collected_number collected_value;               // the current value, as collected - resets to 0 after being used
     collected_number last_collected_value;          // the last value that was collected, after being processed
 
-    // the *_volume members are used to calculate the accuracy of the rounding done by the
-    // storage number - they are printed to debug.log when debug is enabled for a set.
-    NETDATA_DOUBLE collected_volume;                // the sum of all collected values so far
-    NETDATA_DOUBLE stored_volume;                   // the sum of all stored values so far
-
-    struct rrddim *next;                            // linking of dimensions within the same data set
-    struct rrddim *prev;                            // linking of dimensions within the same data set
-
-    struct rrdset *rrdset;
-    RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
-
     // ------------------------------------------------------------------------
-    // members for checking the data when loading from disk
-
-    long entries;                                   // how many entries this dimension has in ram
-                                                    // this is the same to the entries of the data set
-                                                    // we set it here, to check the data when we load it from disk.
-
-    int update_every;                               // every how many seconds is this updated
+    // db mode RAM, SAVE, MAP, ALLOC, NONE specifics
+    // TODO - they should be managed by storage engine
+    //        (RRDDIM_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
     size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
-
-    struct rrddimvar *variables;
-
-    // ------------------------------------------------------------------------
-    // the values stored in this dimension, using our floating point numbers
-
     void *rd_on_file;                               // pointer to the header written on disk
     storage_number *db;                             // the array of values
 };
@@ -531,14 +532,13 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // operational state members
 
+    RRDSET_FLAGS flags;                             // flags
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
 
     uuid_t hash_uuid;                               // hash_id for syncing with cloud
                                                     // TODO - obsolete now - cleanup
 
     netdata_rwlock_t rrdset_rwlock;                 // protects linked lists
-
-    RRDSET_FLAGS flags;                             // configuration flags
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
@@ -1011,6 +1011,9 @@ extern netdata_rwlock_t rrd_rwlock;
 extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
 extern void rrdhost_init_rrdset_index(RRDHOST *host);
 extern void rrdhost_free_rrdset_index(RRDHOST *host);
+
+extern void rrdset_init_rrddim_index(RRDSET *st);
+extern void rrdset_free_rrddim_index(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 

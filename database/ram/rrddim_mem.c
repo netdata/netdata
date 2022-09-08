@@ -42,7 +42,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
     RRDDIM *rd = ch->rd;
-    memset(rd->db, 0, rd->entries * sizeof(storage_number));
+    memset(rd->db, 0, rd->rrdset->entries * sizeof(storage_number));
 }
 
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
