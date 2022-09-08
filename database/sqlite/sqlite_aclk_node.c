@@ -3,9 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_node.h"
 
-#ifdef ENABLE_ACLK
-#include "../../aclk/aclk_charts_api.h"
-#endif
+#include "../../aclk/aclk_contexts_api.h"
 
 #ifdef ENABLE_ACLK
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
