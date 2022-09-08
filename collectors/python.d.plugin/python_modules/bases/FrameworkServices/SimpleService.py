@@ -7,11 +7,10 @@
 
 from time import sleep, time
 
-from third_party.monotonic import monotonic
-
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import safe_print
 from bases.loggers import PythonDLimitedLogger
+from third_party.monotonic import monotonic
 
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
@@ -79,11 +78,13 @@ class SimpleService(PythonDLimitedLogger, object):
 
         self.module_name = clean_module_name(self.__module__)
         self.job_name = configuration.pop('job_name')
+        self.actual_job_name = self.job_name or self.module_name
         self.override_name = configuration.pop('override_name')
         self.fake_name = None
 
         self._runtime_counters = RuntimeCounters(configuration=configuration)
         self.charts = Charts(job_name=self.actual_name,
+                             actual_job_name=self.actual_job_name,
                              priority=configuration.pop('priority'),
                              cleanup=configuration.pop('chart_cleanup'),
                              get_update_every=self.get_update_every,
