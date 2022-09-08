@@ -6,9 +6,17 @@
 
 **Merged pull requests:**
 
+- fix rrdcontexts left in the post-processing queue from the garbage collector [\#13645](https://github.com/netdata/netdata/pull/13645) ([ktsaou](https://github.com/ktsaou))
+- apps.plugin: Re-add `chrome` to the `webbrowser` group. [\#13642](https://github.com/netdata/netdata/pull/13642) ([Ferroin](https://github.com/Ferroin))
+- Fix a memory leak on archived host creation [\#13641](https://github.com/netdata/netdata/pull/13641) ([stelfrag](https://github.com/stelfrag))
+- fix compile issues [\#13640](https://github.com/netdata/netdata/pull/13640) ([ktsaou](https://github.com/ktsaou))
+- Obsolete RRDSET state [\#13635](https://github.com/netdata/netdata/pull/13635) ([ktsaou](https://github.com/ktsaou))
+- Updated tc.plugin \(linux bandwidth QoS\) [\#13634](https://github.com/netdata/netdata/pull/13634) ([ktsaou](https://github.com/ktsaou))
 - Fix worker utilization cleanup [\#13633](https://github.com/netdata/netdata/pull/13633) ([stelfrag](https://github.com/stelfrag))
 - remove forgotten avl structure from rrdcalc [\#13632](https://github.com/netdata/netdata/pull/13632) ([ktsaou](https://github.com/ktsaou))
+- Deaggregate the `gui` and `email` app groupx and improve GUI coverage. [\#13631](https://github.com/netdata/netdata/pull/13631) ([Ferroin](https://github.com/Ferroin))
 - Faster rrdcontext [\#13629](https://github.com/netdata/netdata/pull/13629) ([ktsaou](https://github.com/ktsaou))
+- eBPF different improvements [\#13624](https://github.com/netdata/netdata/pull/13624) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix apps plugin users charts descriptipon [\#13621](https://github.com/netdata/netdata/pull/13621) ([ilyam8](https://github.com/ilyam8))
 - add Postgres total connection utilization alarm [\#13620](https://github.com/netdata/netdata/pull/13620) ([ilyam8](https://github.com/ilyam8))
 - update Postgres "connections" dashboard info [\#13619](https://github.com/netdata/netdata/pull/13619) ([ilyam8](https://github.com/ilyam8))
@@ -341,14 +349,6 @@
 - Fix nanosleep on platforms other than Linux [\#12991](https://github.com/netdata/netdata/pull/12991) ([vlvkobal](https://github.com/vlvkobal))
 - Don't expose the chart definition to streaming if there is no metadata change [\#12990](https://github.com/netdata/netdata/pull/12990) ([stelfrag](https://github.com/stelfrag))
 - Faster queries [\#12988](https://github.com/netdata/netdata/pull/12988) ([ktsaou](https://github.com/ktsaou))
-- Improve reconnect node instructions [\#12987](https://github.com/netdata/netdata/pull/12987) ([cakrit](https://github.com/cakrit))
-- Make heartbeat a static chart [\#12986](https://github.com/netdata/netdata/pull/12986) ([MrZammler](https://github.com/MrZammler))
-- chore\(apps.plugin\): change cpu\_guest chart context [\#12983](https://github.com/netdata/netdata/pull/12983) ([ilyam8](https://github.com/ilyam8))
-- fix: don't kill Netdata PIDs if successfully stopped Netdata [\#12982](https://github.com/netdata/netdata/pull/12982) ([ilyam8](https://github.com/ilyam8))
-- add dictionary support to statsd [\#12980](https://github.com/netdata/netdata/pull/12980) ([ktsaou](https://github.com/ktsaou))
-- fix\(kickstart.sh\): handle the case when `tput colors` doesn't return a number [\#12979](https://github.com/netdata/netdata/pull/12979) ([ilyam8](https://github.com/ilyam8))
-- query engine optimizations and cleanup [\#12978](https://github.com/netdata/netdata/pull/12978) ([ktsaou](https://github.com/ktsaou))
-- optimize poll\_events\(\) to spread the work over the threads more evenly [\#12975](https://github.com/netdata/netdata/pull/12975) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
