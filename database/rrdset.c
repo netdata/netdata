@@ -214,7 +214,7 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
     {
         RRDDIM *rd;
         rrddim_foreach_reentrant(rd, st) {
-            rrddim_free(st, st->dimensions);
+            rrddim_free(st, rd);
         }
         rrddim_foreach_done(rd);
     }
