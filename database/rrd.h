@@ -655,6 +655,7 @@ extern void rrdset_memory_file_free(RRDSET *st);
 extern void rrdset_memory_file_update(RRDSET *st);
 extern const char *rrdset_cache_filename(RRDSET *st);
 extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
+extern void rrdset_archive(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags

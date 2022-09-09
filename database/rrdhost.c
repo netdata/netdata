@@ -1501,12 +1501,10 @@ void rrdhost_cleanup_all(void) {
 // ----------------------------------------------------------------------------
 // RRDHOST - save or delete all the host charts from disk
 
-void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
+void rrdhost_cleanup_obsolete_charts_unsafe(RRDHOST *host) {
     time_t now = now_realtime_sec();
 
     RRDSET *st;
-
-    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
     rrdset_foreach_reentrant(st, host) {
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
@@ -1516,94 +1514,7 @@ void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
         )) {
 
             __atomic_sub_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
-
-            // TODO - why is this ifdef ENABLE_DBENGINE?
-#ifdef ENABLE_DBENGINE
-            if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                RRDDIM *rd, *last;
-
-                rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-                while (st->variables) rrdsetvar_free(st->variables);
-                while (st->alarms)    rrdsetcalc_unlink(st->alarms);
-
-                rrdset_wrlock(st);
-                for (rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-                        last = rd;
-                        rd = rd->next;
-                        continue;
-                    }
-
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)) {
-                        last = rd;
-                        rd = rd->next;
-                        continue;
-                    }
-
-                    rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-                    while (rd->variables)
-                        rrddimvar_free(rd->variables);
-
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-                        rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-
-                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
-
-                        size_t tiers_available = 0, tiers_said_yes = 0;
-                        for(int tier = 0; tier < storage_tiers ;tier++) {
-                            if(rd->tiers[tier]) {
-                                tiers_available++;
-
-                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
-                                    tiers_said_yes++;
-
-                                rd->tiers[tier]->db_collection_handle = NULL;
-                            }
-                        }
-
-                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
-                            /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->metric_uuid);
-                            rrddim_free(st, rd);
-                            if (unlikely(!last)) {
-                                rd = st->dimensions;
-                            }
-                            else {
-                                rd = last->next;
-                            }
-                            continue;
-                        }
-#ifdef ENABLE_ACLK
-                        else
-                            queue_dimension_to_aclk(rd, rd->last_collected_time.tv_sec);
-#endif
-                    }
-                    last = rd;
-                    rd = rd->next;
-                }
-                rrdset_unlock(st);
-
-                debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
-                rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
-
-                rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-                
-                if (st->dimensions) {
-                    /* If the chart still has dimensions don't delete it from the metadata log */
-                    continue;
-                }
-            }
-#endif
-            rrdset_rdlock(st);
-
-            if(rrdhost_delete_obsolete_charts)
-                rrdset_delete_files(st);
-            else
-                rrdset_save(st);
-
-            rrdset_unlock(st);
-
-            rrdset_free(st);
+            rrdset_archive(st);
         }
 #ifdef ENABLE_ACLK
         else
@@ -1634,7 +1545,7 @@ void rrd_cleanup_obsolete_charts()
     {
         if (__atomic_load_n(&host->obsolete_charts_count, __ATOMIC_SEQ_CST)) {
             rrdhost_wrlock(host);
-            rrdhost_cleanup_obsolete_charts(host);
+            rrdhost_cleanup_obsolete_charts_unsafe(host);
             rrdhost_unlock(host);
         }
 
