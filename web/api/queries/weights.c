@@ -605,7 +605,9 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     // for each dimension
     RRDDIM *d;
     int i;
-    for(i = 0, d = base_rrdr->st->dimensions; d && i < base_rrdr->d; i++, d = d->next) {
+    rrddim_foreach_read(d, base_rrdr->st) {
+        if(unlikely((int)d_counter >= base_rrdr->d)) break;
+        i = (int)d_counter; // d_counter is provided by the dictionary
 
         // skip the not evaluated ones
         if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))
@@ -650,6 +652,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
             register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
         }
     }
+    rrddim_foreach_done(d);
 
 cleanup:
     rrdr_free(owa, high_rrdr);
@@ -676,7 +679,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
     usec_t started_usec = now_realtime_usec();
 
     RRDDIM *d;
-    for(d = st->dimensions; d ; d = d->next) {
+    rrddim_foreach_read(d, st) {
         usec_t now_usec = now_realtime_usec();
         if(now_usec - started_usec > timeout * USEC_PER_MS)
             return examined_dimensions;
@@ -766,6 +769,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
         register_result(results, st, d, pcent, flags, stats, register_zero);
     }
+    rrddim_foreach_done(d);
 
     return examined_dimensions;
 }
@@ -787,7 +791,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
     usec_t started_usec = now_realtime_usec();
 
     RRDDIM *d;
-    for(d = st->dimensions; d ; d = d->next) {
+    rrddim_foreach_read(d, st) {
         usec_t now_usec = now_realtime_usec();
         if(now_usec - started_usec > timeout * USEC_PER_MS)
             return examined_dimensions;
@@ -814,6 +818,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
         if(ret == HTTP_RESP_OK || !value_is_null || netdata_double_isnumber(average))
             register_result(results, st, d, average, 0, stats, register_zero);
     }
+    rrddim_foreach_done(d);
 
     return examined_dimensions;
 }

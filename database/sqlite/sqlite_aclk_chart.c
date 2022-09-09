@@ -1271,7 +1271,7 @@ void sql_check_chart_liveness(RRDSET *st) {
         return;
 
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
+        if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
             debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", rrdset_name(st));
             rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }

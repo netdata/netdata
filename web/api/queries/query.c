@@ -837,35 +837,37 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
 static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
     int ret = st->update_every;
 
-    if(unlikely(!st->dimensions))
+    if(unlikely(!rrdset_number_of_dimensions(st)))
         return ret;
 
-    rrdset_rdlock(st);
-    int best_tier;
+    RRDDIM *first_rd = NULL;
+    rrddim_foreach_read(first_rd, st) break; rrddim_foreach_done(first_rd);
+    if(!first_rd)
+        return ret;
 
+    int best_tier;
     if(options & RRDR_OPTION_SELECTED_TIER && tier >= 0 && tier < storage_tiers)
         best_tier = tier;
-    else
-        best_tier = rrddim_find_best_tier_for_timeframe(st->dimensions, after_wanted, before_wanted, points_wanted);
+    else {
+        best_tier = rrddim_find_best_tier_for_timeframe(first_rd, after_wanted, before_wanted, points_wanted);
+    }
 
-    if(!st->dimensions->tiers[best_tier]) {
+    if(!first_rd->tiers[best_tier]) {
         internal_error(
             true,
             "QUERY: tier %d on chart '%s', is not initialized", best_tier, rrdset_name(st));
     }
     else {
-        ret = (int)st->dimensions->tiers[best_tier]->tier_grouping * (int)st->update_every;
+        ret = (int)first_rd->tiers[best_tier]->tier_grouping * (int)st->update_every;
         if(unlikely(!ret)) {
             internal_error(
                 true,
                 "QUERY: update_every calculated to be zero on chart '%s', tier_grouping %d, update_every %d",
-                rrdset_name(st), st->dimensions->tiers[best_tier]->tier_grouping, st->update_every);
+                rrdset_name(st), first_rd->tiers[best_tier]->tier_grouping, st->update_every);
 
             ret = st->update_every;
         }
     }
-
-    rrdset_unlock(st);
 
     return ret;
 }

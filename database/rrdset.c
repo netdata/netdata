@@ -210,7 +210,14 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
      * created by a template. This leads to an effective memory leak, which cannot be detected since the
      * alarms will still be connected to the host, and freed during shutdown. */
     while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
-    while(st->dimensions) rrddim_free(st, st->dimensions);
+
+    {
+        RRDDIM *rd;
+        rrddim_foreach_reentrant(rd, st) {
+            rrddim_free(st, st->dimensions);
+        }
+        rrddim_foreach_done(rd);
+    }
 
     rrdfamily_free(host, st->rrdfamily);
     rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
@@ -567,11 +574,20 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
 
     rrdset_flag_clear(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
 
-    RRD_ALGORITHM algorithm = st->dimensions->algorithm;
-    collected_number multiplier = ABS(st->dimensions->multiplier);
-    collected_number divisor = ABS(st->dimensions->divisor);
+    bool init = false, is_heterogeneous = false;
+    RRD_ALGORITHM algorithm;
+    collected_number multiplier;
+    collected_number divisor;
 
     rrddim_foreach_read(rd, st) {
+        if(!init) {
+            algorithm = rd->algorithm;
+            multiplier = rd->multiplier;
+            divisor = ABS(rd->divisor);
+            init = true;
+            continue;
+        }
+
         if(algorithm != rd->algorithm || multiplier != ABS(rd->multiplier) || divisor != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
@@ -586,13 +602,17 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
                 #endif
                 rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
             }
-            return;
+
+            is_heterogeneous = true;
+            break;
         }
     }
     rrddim_foreach_done(rd);
 
-    rrdset_flag_clear(st, RRDSET_FLAG_HETEROGENEOUS);
-    rrdcontext_updated_rrdset_flags(st);
+    if(!is_heterogeneous) {
+        rrdset_flag_clear(st, RRDSET_FLAG_HETEROGENEOUS);
+        rrdcontext_updated_rrdset_flags(st);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1425,7 +1445,7 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_ACLK
     if (likely(!rrdset_is_ar_chart(st))) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-            if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
+            if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
             }
         }

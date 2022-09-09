@@ -446,6 +446,9 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 #define rrddim_foreach_write(rd, st) \
     dfe_start_write((st)->rrddim_root_index, rd)
 
+#define rrddim_foreach_reentrant(rd, st) \
+    dfe_start_reentrant((st)->rrddim_root_index, rd)
+
 #define rrddim_foreach_done(rd) \
     dfe_done(rd)
 
