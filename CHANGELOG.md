@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Do not free AR dimensions from within ML. [\#13651](https://github.com/netdata/netdata/pull/13651) ([vkalintiris](https://github.com/vkalintiris))
+- Improve agent shutdown time [\#13649](https://github.com/netdata/netdata/pull/13649) ([stelfrag](https://github.com/stelfrag))
+- add \_collect\_job label to python.d/\* charts [\#13648](https://github.com/netdata/netdata/pull/13648) ([ilyam8](https://github.com/ilyam8))
 - fix rrdcontexts left in the post-processing queue from the garbage collector [\#13645](https://github.com/netdata/netdata/pull/13645) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin: Re-add `chrome` to the `webbrowser` group. [\#13642](https://github.com/netdata/netdata/pull/13642) ([Ferroin](https://github.com/Ferroin))
 - Fix a memory leak on archived host creation [\#13641](https://github.com/netdata/netdata/pull/13641) ([stelfrag](https://github.com/stelfrag))
@@ -346,9 +349,6 @@
 - Autodetect coverity install path to increase robustness [\#12995](https://github.com/netdata/netdata/pull/12995) ([maneamarius](https://github.com/maneamarius))
 - Fix compilation warnings [\#12993](https://github.com/netdata/netdata/pull/12993) ([vlvkobal](https://github.com/vlvkobal))
 - Delay children chart obsoletion check [\#12992](https://github.com/netdata/netdata/pull/12992) ([MrZammler](https://github.com/MrZammler))
-- Fix nanosleep on platforms other than Linux [\#12991](https://github.com/netdata/netdata/pull/12991) ([vlvkobal](https://github.com/vlvkobal))
-- Don't expose the chart definition to streaming if there is no metadata change [\#12990](https://github.com/netdata/netdata/pull/12990) ([stelfrag](https://github.com/stelfrag))
-- Faster queries [\#12988](https://github.com/netdata/netdata/pull/12988) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
