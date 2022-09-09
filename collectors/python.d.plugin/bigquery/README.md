@@ -20,7 +20,7 @@ $ sudo pip install google-auth pandas-gbq
 
 The collector expects to read the credentials for a 
 [service account](https://cloud.google.com/iam/docs/service-accounts) from a file defined in the collector 
-configuration (see `credentials` configuration parameter). If this is not defined then auth will fallback 
+configuration (see `credentials` configuration parameter). If this is not defined, then auth will fall back 
 to the `pandas-gbq` [approach](https://pandas-gbq.readthedocs.io/en/latest/howto/authentication.html). 
 
 ## Configuration
