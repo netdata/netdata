@@ -170,11 +170,9 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
         }
     }
 
-    st->chart_uuid = find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name));
-    if(unlikely(!st->chart_uuid))
-        st->chart_uuid = create_chart_uuid(st, string2str(st->parts.id), string2str(st->parts.name));
-    else
-        update_chart_metadata(st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
+    if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), &st->chart_uuid))
+        uuid_generate(st->chart_uuid);
+    update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
 
     rrdset_init_rrddim_index(st);
 
@@ -243,7 +241,6 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
 
     freez(st->exporting_flags);
     freez(st->cache_dir);
-    freez(st->chart_uuid);
 }
 
 // the item to be inserted, is already in the dictionary
@@ -355,12 +352,12 @@ static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void
     }
 
     if(ctr->react_action & RRDSET_REACT_NEW) {
-        store_active_chart(st->chart_uuid);
+        store_active_chart(&st->chart_uuid);
         compute_chart_hash(st);
     }
     else if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
-        if(unlikely(update_chart_metadata(st->chart_uuid, st, ctr->id, ctr->name)))
+        if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");
     }
 

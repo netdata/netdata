@@ -489,7 +489,7 @@ typedef enum rrdset_flags {
 #define rrdset_is_ar_chart(st) rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_RATE_CHART)
 
 struct rrdset {
-    uuid_t *chart_uuid;                             // the global UUID for this chart
+    uuid_t chart_uuid;                             // the global UUID for this chart
 
     // ------------------------------------------------------------------------
     // chart configuration

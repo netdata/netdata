@@ -623,7 +623,7 @@ int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, &st->chart_uuid, sizeof(st->chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -642,7 +642,7 @@ int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
     }
     else {
         uuid_generate(*store_uuid);
-        status = sql_store_dimension(store_uuid, st->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
+        status = sql_store_dimension(store_uuid, &st->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
         if (unlikely(status))
             error_report("Failed to store dimension metadata in the database");
     }
@@ -697,20 +697,21 @@ bind_fail:
  * Do a database lookup to find the UUID of a chart
  *
  */
-uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name)
+int find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name, uuid_t *store_uuid)
 {
     static __thread sqlite3_stmt *res = NULL;
     uuid_t *uuid = NULL;
     int rc;
+    int status = 1;
 
     if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
-        return NULL;
+        return 1;
 
     if (unlikely(!res)) {
         rc = prepare_statement(db_meta, SQL_FIND_CHART_UUID, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to lookup chart UUID in the database");
-            return NULL;
+            return 1;
         }
     }
 
@@ -731,32 +732,23 @@ uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const c
         goto bind_fail;
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
-        uuid = mallocz(sizeof(uuid_t));
-        uuid_copy(*uuid, sqlite3_column_blob(res, 0));
+    if (likely(rc == SQLITE_ROW && sqlite3_column_bytes(res,0) == sizeof(*store_uuid))) {
+        uuid_copy(*store_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
+        status = 0;
     }
 
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    char  uuid_str[GUID_LEN + 1];
-    if (likely(uuid)) {
-        uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_METADATALOG, "Found UUID %s for chart %s.%s", uuid_str, type, name ? name : id);
-    }
-    else
-        debug(D_METADATALOG, "UUID not found for chart %s.%s", type, name ? name : id);
-#endif
-    return uuid;
+    return status;
 
 bind_fail:
     error_report("Failed to bind input parameter to perform chart UUID database lookup, rc = %d", rc);
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
-    return NULL;
+    return 1;
 }
 
 int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const char *name)
@@ -775,28 +767,6 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
         st->rrd_memory_mode, st->entries);
 
     return rc;
-}
-
-uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
-{
-    uuid_t *uuid = NULL;
-    int rc;
-
-    uuid = mallocz(sizeof(uuid_t));
-    uuid_generate(*uuid);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(*uuid, uuid_str);
-    debug(D_METADATALOG,"Generating uuid [%s] for chart %s under host %s", uuid_str, rrdset_id(st), rrdhost_hostname(st->rrdhost));
-#endif
-
-    rc = update_chart_metadata(uuid, st, id, name);
-
-    if (unlikely(rc))
-        error_report("Failed to store chart metadata in the database");
-
-    return uuid;
 }
 
 static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
@@ -1696,34 +1666,6 @@ skip_store:
     return rc != SQLITE_DONE;
 }
 
-#define SQL_INS_CHART_LABEL "insert or replace into chart_label " \
-    "(chart_id, source_type, label_key, label_value, date_created) " \
-    "values (@chart, @source, @label, @value, unixepoch());"
-
-void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
-{
-    static __thread sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_INS_CHART_LABEL, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement store chart labels");
-            return;
-        }
-    }
-
-    sql_store_label(res, chart_uuid, source_type, label, value);
-
-    return;
-}
-
 #define SQL_INS_HOST_LABEL "INSERT OR REPLACE INTO host_label " \
     "(host_id, source_type, label_key, label_value, date_created) " \
     "values (@chart, @source, @label, @value, unixepoch());"
@@ -2127,7 +2069,7 @@ void compute_chart_hash(RRDSET *st)
 
     (void)sql_store_chart_hash(
         (uuid_t *)&hash_value,
-        st->chart_uuid,
+        &st->chart_uuid,
         rrdset_parts_type(st),
         rrdset_id(st),
         rrdset_name(st),

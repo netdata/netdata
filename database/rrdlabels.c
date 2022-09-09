@@ -966,7 +966,7 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
     BUFFER  *sql_buf = buffer_create(1024);
     struct label_str tmp = {.sql = sql_buf, .count = 0 };
-    uuid_unparse_lower(*st->chart_uuid, tmp.uuid_str);
+    uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
     db_execute(buffer_tostring(sql_buf));
     buffer_free(sql_buf);

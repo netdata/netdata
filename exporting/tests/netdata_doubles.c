@@ -242,14 +242,6 @@ void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
     function_called();
 }
 
-void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
-{
-    (void)chart_uuid;
-    (void)source_type;
-    (void)label;
-    (void)value;
-}
-
 void rrdcalc_update_rrdlabels(RRDSET *st)
 {
     (void)st;

@@ -267,7 +267,7 @@ static void rrddim_conflict_callback(const char *id __maybe_unused, void *rrddim
 
     if(unlikely(rc)) {
         debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
-        (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
+        (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
 #ifdef ENABLE_ACLK
         queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
 #endif

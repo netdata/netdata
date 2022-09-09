@@ -138,7 +138,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_insta
         uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
 
         if (unlikely(need_to_store && !ctx->tier))
-            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
+            (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
     }
 
     struct rrdeng_metric_handle *mh = mallocz(sizeof(struct rrdeng_metric_handle));

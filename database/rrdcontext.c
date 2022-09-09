@@ -741,10 +741,10 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
-    if(ri->rrdset && ri->rrdset->chart_uuid && uuid_compare(ri->uuid, *ri->rrdset->chart_uuid) != 0) {
+    if(ri->rrdset && uuid_compare(ri->uuid, ri->rrdset->chart_uuid) != 0) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
-        uuid_unparse(*ri->rrdset->chart_uuid, uuid2);
+        uuid_unparse(ri->rrdset->chart_uuid, uuid2);
         internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), rrdset_id(ri->rrdset), uuid1, uuid2);
     }
 
@@ -909,7 +909,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         .flags = RRD_FLAG_NONE, // no need for atomics
         .rrdset = st,
     };
-    uuid_copy(tri.uuid, *st->chart_uuid);
+    uuid_copy(tri.uuid, st->chart_uuid);
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, string2str(tri.id), &tri, sizeof(tri));
 
