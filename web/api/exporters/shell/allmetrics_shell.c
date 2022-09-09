@@ -66,6 +66,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
             rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
@@ -166,6 +167,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
             rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n}");
     rrdhost_unlock(host);

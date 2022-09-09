@@ -717,6 +717,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->rrdlabels, chart_labels_filter_pattern, ':')))
                     build_context_param_list(owa, &context_param_list, st1);
         }
+        rrdset_foreach_done(st1);
         rrdhost_unlock(host);
         string_freez(context_string);
 

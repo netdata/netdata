@@ -82,6 +82,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
             st->last_accessed_time = now;
         }
     }
+    rrdset_foreach_done(st);
 
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost(host, rc) {
@@ -184,6 +185,7 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             st->last_accessed_time = now;
         }
     }
+    rrdset_foreach_done(st);
     rrdhost_unlock(host);
     struct array_printer ap = {
             .c = 0,

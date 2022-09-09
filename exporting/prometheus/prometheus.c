@@ -569,8 +569,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     // for each chart
     RRDSET *st;
-    rrdset_foreach_read(st, host)
-    {
+    rrdset_foreach_read(st, host) {
 
         if (likely(can_send_rrdset(instance, st, filter))) {
             rrdset_rdlock(st);
@@ -615,8 +614,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
             // for each dimension
             RRDDIM *rd;
-            rrddim_foreach_read(rd, st)
-            {
+            rrddim_foreach_read(rd, st) {
                 if (rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     char *suffix = "";
@@ -665,7 +663,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
 
                             generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector);
-                        } else {
+                        }
+                        else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
 
@@ -683,7 +682,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector);
                         }
-                    } else {
+                    }
+                    else {
                         // we need average or sum of the data
 
                         time_t first_time = instance->after;
@@ -754,6 +754,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     rrdhost_unlock(host);
     simple_pattern_free(filter);

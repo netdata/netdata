@@ -986,7 +986,7 @@ void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
         // we need to call the react callback with a reference counter on nv
         reference_counter_acquire(dict, nv);
-        dict->react_callback(item_get_name(nv), nv->value, dict->react_callback_data);
+        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
         reference_counter_release(dict, nv, false);
     }
 
@@ -1009,7 +1009,7 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
         // we got the reference counter we need, above
-        dict->react_callback(item_get_name(nv), nv->value, dict->react_callback_data);
+        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
         reference_counter_release(dict, nv, false);
     }
 
@@ -1025,7 +1025,7 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dic
     reference_counter_acquire(dict, nv);
 
     if(unlikely(dict->react_callback && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
-        dict->react_callback(item_get_name(nv), nv->value, dict->react_callback_data);
+        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
     }
 
     return (DICTIONARY_ITEM *)nv;
@@ -1042,7 +1042,7 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, cons
 
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
         // we already have a reference counter, for the caller, no need for another one
-        dict->react_callback(item_get_name(nv), nv->value, dict->react_callback_data);
+        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
     }
 
     return (DICTIONARY_ITEM *)nv;

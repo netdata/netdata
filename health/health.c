@@ -184,6 +184,7 @@ static void health_reload_host(RRDHOST *host) {
         st->green = NAN;
         st->red = NAN;
     }
+    rrdset_foreach_done(st);
     rrdhost_unlock(host);
 
     // load the new alarms
@@ -198,6 +199,7 @@ static void health_reload_host(RRDHOST *host) {
     rrdset_foreach_write(st, host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
+
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
 
@@ -208,6 +210,7 @@ static void health_reload_host(RRDHOST *host) {
         }
         rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
 
     rrdhost_unlock(host);
 }
@@ -710,6 +713,7 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
         rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
     rrdhost_unlock(host);

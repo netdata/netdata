@@ -189,7 +189,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
         rrdset_unlock(st);
     }
-
+    rrdset_foreach_done(st);
     rrdhost_unlock(host);
 }
 

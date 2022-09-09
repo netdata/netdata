@@ -104,6 +104,15 @@ struct rrdset_constructor {
     RRDSET_TYPE chart_type;
     RRD_MEMORY_MODE memory_mode;
     long history_entries;
+
+    enum {
+        RRDSET_REACT_NONE                   = 0,
+        RRDSET_REACT_NEW                    = (1 << 0),
+        RRDSET_REACT_CHART_ARCHIVED_TO_LIVE = (1 << 1),
+        RRDSET_REACT_PLUGIN_UPDATED         = (1 << 2),
+        RRDSET_REACT_MODULE_UPDATED         = (1 << 3),
+        RRDSET_REACT_CHART_ACTIVATED        = (1 << 4),
+    } react_action;
 };
 
 static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void *constructor_data) {
@@ -121,6 +130,7 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
     if(!st->name)
         st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
+    rrdset_index_add_name(host, st);
 
     st->parts.id = string_strdupz(ctr->id);
     st->parts.type = string_strdupz(ctr->type);
@@ -176,29 +186,9 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
-    if(host->health_enabled) {
-        st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
-
-        rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
-
-        rrdsetcalc_link_matching(st);
-        rrdcalctemplate_link_matching(st);
-    }
-
-    store_active_chart(st->chart_uuid);
-    compute_chart_hash(st);
-
-    // add it to the host linked list
-    rrdhost_check_wrlock(host);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->rrdset_root, st, prev, next);
-
-    // add it to the name index
-    rrdset_index_add_name(host, st);
     rrdcontext_updated_rrdset(st);
+
+    ctr->react_action = RRDSET_REACT_NEW;
 }
 
 static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *rrdhost) {
@@ -207,13 +197,10 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
-    // remove it from the host linked list
-    rrdhost_check_wrlock(host);
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->rrdset_root, st, prev, next);
-
     // remove it from the name index
     rrdset_index_del_name(host, st);
 
+    rrdhost_wrlock(host);
     while(st->variables)  rrdsetvar_free(st->variables);
     //  while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
@@ -224,6 +211,7 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
 
     rrdfamily_free(host, st->rrdfamily);
     rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
+    rrdhost_unlock(host);
 
     // this has to be after the dimensions are freed
     rrdcontext_removed_rrdset(st);
@@ -260,36 +248,34 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
     (void)new_rrdset; // it is NULL
 
     struct rrdset_constructor *ctr = constructor_data;
-    RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
 
     rrdset_isnot_obsolete(st);
 
-    int changed_from_archived_to_active = 0, mark_rebuild = 0;
+    ctr->react_action = RRDSET_REACT_NONE;
 
     if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
         rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-        changed_from_archived_to_active = 1;
-        mark_rebuild |= META_CHART_ACTIVATED;
+        ctr->react_action |= RRDSET_REACT_CHART_ACTIVATED;
     }
 
     if (rrdset_reset_name(st, (ctr->name && *ctr->name) ? ctr->name : ctr->id) == 2)
-        mark_rebuild |= META_CHART_UPDATED;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
 
     if (unlikely(st->priority != ctr->priority)) {
         st->priority = ctr->priority;
-        mark_rebuild |= META_CHART_UPDATED;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
     }
     if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != ctr->update_every)) {
         st->update_every = ctr->update_every;
-        mark_rebuild |= META_CHART_UPDATED;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
     }
 
     if(ctr->plugin && *ctr->plugin) {
         STRING *old_plugin = st->plugin_name;
         st->plugin_name = rrd_string_strdupz(ctr->plugin);
         if (old_plugin != st->plugin_name)
-            mark_rebuild |= META_PLUGIN_UPDATED;
+            ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
         string_freez(old_plugin);
     }
 
@@ -297,7 +283,7 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
         STRING *old_module = st->module_name;
         st->module_name = rrd_string_strdupz(ctr->module);
         if (old_module != st->module_name)
-            mark_rebuild |= META_MODULE_UPDATED;
+            ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
         string_freez(old_module);
     }
 
@@ -305,7 +291,7 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
         STRING *old_title = st->title;
         st->title = rrd_string_strdupz(ctr->title);
         if(old_title != st->title)
-            mark_rebuild |= META_CHART_UPDATED;
+            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
         string_freez(old_title);
     }
 
@@ -313,7 +299,7 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
         STRING *old_units = st->units;
         st->units = rrd_string_strdupz(ctr->units);
         if(old_units != st->units)
-            mark_rebuild |= META_CHART_UPDATED;
+            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
         string_freez(old_units);
     }
 
@@ -321,44 +307,57 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
         STRING *old_context = st->context;
         st->context = rrd_string_strdupz(ctr->context);
         if(old_context != st->context)
-            mark_rebuild |= META_CHART_UPDATED;
+            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
         string_freez(old_context);
     }
 
     if(st->chart_type != ctr->chart_type) {
         st->chart_type = ctr->chart_type;
-        mark_rebuild |= META_CHART_UPDATED;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
     }
 
-    if(mark_rebuild) {
+    if(ctr->react_action)
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-        if (mark_rebuild != META_CHART_ACTIVATED)
-            info("Collector updated metadata for chart %s", rrdset_id(st));
-    }
-
-    /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
 
     rrdset_update_permanent_labels(st);
     rrdcontext_updated_rrdset(st);
 
-    if(host->health_enabled && changed_from_archived_to_active) {
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+}
+
+static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *constructor_data) {
+    struct rrdset_constructor *ctr = constructor_data;
+    RRDSET *st = rrdset;
+    RRDHOST *host = st->rrdhost;
+
+    rrdhost_wrlock(host);
+    if(host->health_enabled && (ctr->react_action & RRDSET_REACT_NEW || ctr->react_action & RRDSET_REACT_CHART_ACTIVATED)) {
+
+        if(!st->rrdfamily)
+            st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
+
         rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
+
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
     }
 
-    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-
-    if(mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
+    if(ctr->react_action & RRDSET_REACT_NEW) {
+        store_active_chart(st->chart_uuid);
+        compute_chart_hash(st);
+    }
+    else if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
         if(unlikely(update_chart_metadata(st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");
     }
+
+    rrdhost_unlock(host);
 }
 
 void rrdhost_init_rrdset_index(RRDHOST *host) {
@@ -368,6 +367,7 @@ void rrdhost_init_rrdset_index(RRDHOST *host) {
         dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, host);
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, host);
         dictionary_register_delete_callback(host->rrdset_root_index, rrdset_delete_callback, host);
+        dictionary_register_react_callback(host->rrdset_root_index, rrdset_react_callback, host);
     }
 
     if(!host->rrdset_root_index_name) {
@@ -401,6 +401,7 @@ static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
 }
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
+    // TODO - the name index should have an acquired dictionary item, not just a pointer to RRDSET
     return dictionary_get(host->rrdset_root_index, id);
 }
 
@@ -496,7 +497,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time = now_realtime_sec();
-        st->rrdhost->obsolete_charts_count++;
+        __atomic_add_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -511,7 +512,7 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time = now_realtime_sec();
-        st->rrdhost->obsolete_charts_count--;
+        __atomic_sub_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -753,8 +754,6 @@ RRDSET *rrdset_create_custom(
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    rrdhost_wrlock(host);
-
     struct rrdset_constructor tmp = {
         .host = host,
         .type = type,
@@ -774,8 +773,6 @@ RRDSET *rrdset_create_custom(
     };
 
     RRDSET *st = rrdset_index_add(host, full_id, &tmp);
-
-    rrdhost_unlock(host);
     return(st);
 }
 

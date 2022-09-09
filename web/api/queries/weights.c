@@ -1010,6 +1010,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                 dictionary_set(charts, rrdset_name(st), NULL, 0);
         }
     }
+    rrdset_foreach_done(st);
     rrdhost_unlock(host);
 
     size_t examined_dimensions = 0;

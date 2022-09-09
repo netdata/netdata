@@ -23,6 +23,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
             dictionary_set(dict, name, &col, sizeof(struct collector_info));
         }
     }
+    rrdset_foreach_done(st);
     rrdhost_unlock(host);
 
     return dict;
