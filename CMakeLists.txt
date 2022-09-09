@@ -330,6 +330,7 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
         list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${ELF_INCLUDE_DIRS})
         include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include/uapi)
         set(ENABLE_PLUGIN_EBPF True)
+        set(HAVE_LIBBPF True)
     ELSE(ELF_LIBRARIES)
         set(ENABLE_PLUGIN_EBPF False)
         message(STATUS "ebpf plugin: disabled (requires libelf)")
@@ -1671,3 +1672,79 @@ endif()
 
 endif()
 endif()
+
+
+# generate config.h so that CMake becomes independent of automake
+
+## netdata version
+set(GIT_EXECUTABLE "git")
+execute_process(COMMAND ${GIT_EXECUTABLE} describe OUTPUT_VARIABLE NETDATA_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF("${NETDATA_VERSION}" STREQUAL "")
+    file(STRINGS "packaging/version" NETDATA_VERSION LIMIT_COUNT 1)
+ENDIF()
+
+set(NETDATA_USER "netdata" CACHE STRING "use this user to drop privileges")
+
+if(MAC_OS)
+    set(ENABLE_APPS_PLUGIN False)
+else()
+    set(ENABLE_APPS_PLUGIN True)
+endif()
+
+check_include_file(time.h HAVE_TIME_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+if (HAVE_TIME_H)
+    include(CheckStructHasMember)
+    check_struct_has_member("struct timespec" tv_sec "time.h" HAVE_STRUCT_TIMESPEC)
+endif ()
+
+check_include_file(sys/statfs.h HAVE_SYS_STATFS_H)
+check_include_file(sys/statvfs.h HAVE_SYS_STATVFS_H)
+check_include_file(inttypes.h HAVE_INTTYPES_H)
+check_include_file(stdint.h HAVE_STDINT_H)
+
+include(CheckSymbolExists)
+check_include_file(sys/mkdev.h HAVE_SYS_MKDEV_H)
+if (HAVE_SYS_MKDEV_H)
+    check_symbol_exists(major "sys/mkdev.h" MAJOR_IN_MKDEV)
+endif()
+check_include_file(sys/sysmacros.h HAVE_SYS_SYSMACROS_H)
+if (HAVE_SYS_SYSMACROS_H)
+    check_symbol_exists(major "sys/sysmacros.h" MAJOR_IN_SYSMACROS)
+endif()
+
+if (CRYPTO_FOUND)
+    include(CheckLibraryExists)
+    set(HAVE_CRYPTO True)
+    FIND_LIBRARY(CRYPTO_LIBRARY_LOCATION NAMES crypto)
+    check_library_exists(crypto X509_VERIFY_PARAM_set1_host ${CRYPTO_LIBRARY_LOCATION} HAVE_X509_VERIFY_PARAM_set1_host)
+    if (HAVE_X509_VERIFY_PARAM_set1_host)
+        set(HAVE_X509_VERIFY_PARAM_set1_host True)
+    endif()
+endif()
+
+include(CheckCSourceCompiles)
+check_c_source_compiles("
+  #define _GNU_SOURCE
+  #include <string.h>
+  int main() { char x = *strerror_r(0, &x, sizeof(x)); return 0; }
+  " STRERROR_R_CHAR_P)
+
+IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    SET(LIKELY_MACRO "__builtin_expect(!!(x), 1)")
+    SET(UNLIKELY_MACRO "__builtin_expect(!!(x), 0)")
+ELSE()
+    SET(LIKELY_MACRO "(x)")
+    SET(UNLIKELY_MACRO "(x)")
+ENDIF()
+
+IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    SET(ALWAYS_UNUSED_MACRO "__attribute__((unused))")
+    SET(MAYBE_UNUSED_MACRO "__attribute__((unused))")
+ELSE()
+    SET(ALWAYS_UNUSED_MACRO "")
+    SET(MAYBE_UNUSED_MACRO "")
+ENDIF()
+
+configure_file(config.cmake.h.in config.h)
