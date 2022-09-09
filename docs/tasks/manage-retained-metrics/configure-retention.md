@@ -1,5 +1,5 @@
 <!--
-Title: "Configure retention"
+title: "Configure retention"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-retention.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

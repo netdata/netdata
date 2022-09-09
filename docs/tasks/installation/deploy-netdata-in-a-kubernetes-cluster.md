@@ -1,5 +1,5 @@
 <!--
-Title: "Deploy Netdata in a Kubernetes Cluster"
+title: "Deploy Netdata in a Kubernetes Cluster"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-kubernetes-cluster.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

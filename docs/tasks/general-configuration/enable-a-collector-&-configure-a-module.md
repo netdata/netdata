@@ -1,5 +1,5 @@
 <!--
-Title: "Enable a collector & configure a module"
+title: "Enable a collector & configure a module"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/enable-a-collector-&-configure-a-module.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

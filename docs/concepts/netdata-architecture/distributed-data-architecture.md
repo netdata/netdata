@@ -1,5 +1,5 @@
 <!--
-Title: "Distributed data architecture"
+title: "Distributed data architecture"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/distributed-data-architecture.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"

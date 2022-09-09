@@ -1,5 +1,5 @@
 <!--
-Title: "Configure the Agent"
+title: "Configure the Agent"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

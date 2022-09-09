@@ -1,5 +1,5 @@
 <!--
-Title: "Express installation, deploy Netdata into a linux/unix node (via kickstart)"
+title: "Express installation, deploy Netdata into a linux/unix node (via kickstart)"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

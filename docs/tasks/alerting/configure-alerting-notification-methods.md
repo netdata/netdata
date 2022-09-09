@@ -1,5 +1,5 @@
 <!--
-Title: "Configure alerting notification methods"
+title: "Configure alerting notification methods"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-alerting-notification-methods.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

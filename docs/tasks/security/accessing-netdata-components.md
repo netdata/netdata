@@ -1,5 +1,5 @@
 <!--
-Title: "Accessing Netdata components"
+title: "Accessing Netdata components"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/accessing-netdata-components.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

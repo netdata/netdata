@@ -1,5 +1,5 @@
 <!--
-Title: "Machine learning powered Anomaly Advisor"
+title: "Machine learning powered Anomaly Advisor"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/machine-learning-powered-anomaly-advisor.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"
