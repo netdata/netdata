@@ -710,7 +710,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
         STRING *context_string = string_strdupz(context);
-        rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
             if (st1->context == context_string &&
                 (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->rrdlabels, chart_label_key_pattern, ':')) &&
@@ -718,7 +717,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                     build_context_param_list(owa, &context_param_list, st1);
         }
         rrdset_foreach_done(st1);
-        rrdhost_unlock(host);
         string_freez(context_string);
 
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
