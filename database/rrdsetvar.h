@@ -34,6 +34,10 @@ struct rrdsetvar {
     struct rrdsetvar *prev;
 };
 
+extern void rrdsetvar_index_init(RRDSET *st);
+extern void rrdsetvar_index_destroy(RRDSET *st);
+extern void rrdsetvar_free_all(RRDSET *st);
+
 extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);
 extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, NETDATA_DOUBLE value);
 

@@ -179,6 +179,8 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
 
     rrdset_init_rrddim_index(st);
 
+    rrdsetvar_index_init(st);
+
     st->rrdvar_root_index = dictionary_create(
           DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
         | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
@@ -187,8 +189,6 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
 
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
-
-    rrdcontext_updated_rrdset(st);
 
     ctr->react_action = RRDSET_REACT_NEW;
 }
@@ -204,7 +204,6 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
     rrdset_index_del_name(host, st);
 
     rrdhost_wrlock(host);
-    while(st->variables)  rrdsetvar_free(st->variables);
     //  while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
      * created by a template. This leads to an effective memory leak, which cannot be detected since the
@@ -222,6 +221,8 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
     rrdfamily_free(host, st->rrdfamily);
     rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
     rrdhost_unlock(host);
+
+    rrdsetvar_index_destroy(st);
 
     // this has to be after the dimensions are freed
     rrdcontext_removed_rrdset(st);
@@ -332,7 +333,6 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 
     rrdset_update_permanent_labels(st);
-    rrdcontext_updated_rrdset(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -359,7 +359,6 @@ static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void
     }
 
     rrdhost_wrlock(host);
-
     if(ctr->react_action & RRDSET_REACT_NEW) {
         store_active_chart(&st->chart_uuid);
         compute_chart_hash(st);
@@ -369,8 +368,9 @@ static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void
         if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");
     }
-
     rrdhost_unlock(host);
+
+    rrdcontext_updated_rrdset(st);
 }
 
 void rrdhost_init_rrdset_index(RRDHOST *host) {
@@ -838,7 +838,7 @@ void rrdset_archive(RRDSET *st) {
     rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
-    while (st->variables) rrdsetvar_free(st->variables);
+    rrdsetvar_free_all(st);
     while (st->alarms)    rrdsetcalc_unlink(st->alarms);
 
     rrdset_archive_obsolete_dimensions(st, true);

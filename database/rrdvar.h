@@ -22,6 +22,11 @@ typedef enum rrdvar_options {
     RRDVAR_OPTION_RRDCALC_FAMILY_VAR         = (1 << 4), // this is a an alarm variable, attached to a family
     RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR   = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
     RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
+
+    // add more options here
+
+    RRDVAR_OPTION_INTERNAL_JUST_CREATED      = (1 << 14), // used by the constructor - it is never set after initialization
+    RRDVAR_OPTION_INTERNAL_JUST_UPDATED      = (1 << 15), // used by the constructor - it is never set after initialization
 } RRDVAR_OPTIONS;
 
 // the variables as stored in the variables indexes

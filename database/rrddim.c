@@ -18,6 +18,13 @@ struct rrddim_constructor {
     collected_number divisor;
     RRD_ALGORITHM algorithm;
     RRD_MEMORY_MODE memory_mode;
+
+    enum {
+        RRDDIM_REACT_NONE    = 0,
+        RRDDIM_REACT_NEW     = (1 << 0),
+        RRDDIM_REACT_UPDATED = (1 << 2),
+    } react_action;
+
 };
 
 static void rrddim_insert_callback(const char *id __maybe_unused, void *rrddim, void *constructor_data) {
@@ -159,7 +166,8 @@ static void rrddim_insert_callback(const char *id __maybe_unused, void *rrddim, 
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     ml_new_dimension(rd);
-    rrdcontext_updated_rrddim(rd);
+
+    ctr->react_action = RRDDIM_REACT_NEW;
 }
 
 static void rrddim_delete_callback(const char *id __maybe_unused, void *rrddim, void *rrdset) {
@@ -238,6 +246,8 @@ static void rrddim_conflict_callback(const char *id __maybe_unused, void *rrddim
     RRDSET *st = ctr->st;
     RRDHOST *host = st->rrdhost;
 
+    ctr->react_action = RRDDIM_REACT_NONE;
+
     int rc = rrddim_set_name(st, rd, ctr->name);
     rc += rrddim_set_algorithm(st, rd, ctr->algorithm);
     rc += rrddim_set_multiplier(st, rd, ctr->multiplier);
@@ -264,7 +274,16 @@ static void rrddim_conflict_callback(const char *id __maybe_unused, void *rrddim
         }
     }
 
-    if(unlikely(rc)) {
+    if(unlikely(rc))
+        ctr->react_action = RRDDIM_REACT_UPDATED;
+}
+
+static void rrddim_react_callback(const char *chart_full_id __maybe_unused, void *rrddim, void *constructor_data) {
+    struct rrddim_constructor *ctr = constructor_data;
+    RRDDIM *rd = rrddim;
+    RRDSET *st = ctr->st;
+
+    if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
         (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
 #ifdef ENABLE_ACLK
@@ -286,6 +305,7 @@ void rrdset_init_rrddim_index(RRDSET *st) {
         dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, st);
         dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, st);
         dictionary_register_delete_callback(st->rrddim_root_index, rrddim_delete_callback, st);
+        dictionary_register_react_callback(st->rrddim_root_index, rrddim_react_callback, st);
     }
 }
 

@@ -3,10 +3,6 @@
 #define NETDATA_HEALTH_INTERNALS
 #include "rrd.h"
 
-// ----------------------------------------------------------------------------
-// RRDSETVAR management
-// CHART VARIABLES
-
 static inline void rrdsetvar_free_variables(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
     RRDHOST *host = st->rrdhost;
@@ -79,84 +75,156 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
     rs->var_host_name   = rrdvar_create_and_index("host",   host->rrdvar_root_index, rs->key_fullname, rs->type, options, rs->value);
 }
 
-RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
-    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", rrdset_id(st), rrdset_name(st), variable);
-    RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
+static void rrdsetvar_free_value(RRDSETVAR *rs) {
+    if(rs->options & RRDVAR_OPTION_ALLOCATED) {
+        freez(rs->value);
+        rs->value = NULL;
+    }
+}
 
-    rs->variable = string_strdupz(variable);
-    rs->type = type;
-    rs->value = value;
-    rs->options = options;
-    rs->rrdset = st;
+static void rrdsetvar_set_value(RRDSETVAR *rs, void *new_value) {
+    rrdsetvar_free_value(rs);
 
-    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(st->variables, rs, prev, next);
+    if(new_value)
+        rs->value = new_value;
+    else {
+        NETDATA_DOUBLE *n = mallocz(sizeof(NETDATA_DOUBLE));
+        *n = NAN;
+        rs->value = n;
+        rs->options |= RRDVAR_OPTION_ALLOCATED;
+    }
+}
+
+struct rrdsetvar_constructor {
+    RRDSET *st;
+    const char *variable;
+    RRDVAR_TYPE type;
+    void *value;
+    RRDVAR_OPTIONS options;
+
+    enum {
+        RRDSETVAR_REACT_NONE    = 0,
+        RRDSETVAR_REACT_NEW     = (1 << 0),
+        RRDSETVAR_REACT_UPDATED = (1 << 1),
+    } react_action;
+};
+
+static void rrdsetvar_insert_callback(const char *name __maybe_unused, void *rrdsetvar, void *constructor_data) {
+    RRDSETVAR *rs = rrdsetvar;
+    struct rrdsetvar_constructor *ctr = constructor_data;
+
+    rs->variable = string_strdupz(ctr->variable);
+    rs->type = ctr->type;
+    rs->options = ctr->options | RRDVAR_OPTION_INTERNAL_JUST_CREATED;
+    rs->rrdset = ctr->st;
+    rrdsetvar_set_value(rs, ctr->value);
+
+    ctr->react_action = RRDSETVAR_REACT_NEW;
 
     rrdsetvar_create_variables(rs);
+}
+
+static void rrdsetvar_conflict_callback(const char *name __maybe_unused, void *rrdsetvar, void *new_rrdsetvar __maybe_unused, void *constructor_data) {
+    RRDSETVAR *rs = rrdsetvar;
+    struct rrdsetvar_constructor *ctr = constructor_data;
+
+    ctr->react_action = RRDSETVAR_REACT_NONE;
+
+    if(rs->type != ctr->type) {
+        rs->type = ctr->type;
+        ctr->react_action = RRDSETVAR_REACT_UPDATED;
+    }
+
+    if(rs->value != ctr->value) {
+        rrdsetvar_set_value(rs, ctr->value);
+        ctr->react_action = RRDSETVAR_REACT_UPDATED;
+    }
+
+    if(rs->options != ctr->options) {
+        rs->options = ctr->options;
+        ctr->react_action = RRDSETVAR_REACT_UPDATED;
+    }
+
+    if(ctr->react_action == RRDSETVAR_REACT_UPDATED)
+        rs->options |= RRDVAR_OPTION_INTERNAL_JUST_UPDATED;
+}
+
+static void rrdsetvar_react_callback(const char *name __maybe_unused, void *rrdsetvar, void *constructor_data) {
+    RRDSETVAR *rs = rrdsetvar;
+    struct rrdsetvar_constructor *ctr = constructor_data;
+
+    if(ctr->react_action & (RRDSETVAR_REACT_NEW|RRDSETVAR_REACT_UPDATED))
+        rrdsetvar_create_variables(rs);
+}
+
+static void rrdsetvar_delete_callback(const char *name __maybe_unused, void *rrdsetvar, void *rrdset __maybe_unused) {
+    RRDSETVAR *rs = rrdsetvar;
+
+    rrdsetvar_free_variables(rs);
+
+    string_freez(rs->variable);
+    rs->variable = NULL;
+
+    rrdsetvar_free_value(rs);
+}
+
+void rrdsetvar_index_init(RRDSET *st) {
+    if(!st->rrdsetvar_root_index) {
+        st->rrdsetvar_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(st->rrdsetvar_root_index, rrdsetvar_insert_callback, st);
+        dictionary_register_conflict_callback(st->rrdsetvar_root_index, rrdsetvar_conflict_callback, st);
+        dictionary_register_delete_callback(st->rrdsetvar_root_index, rrdsetvar_delete_callback, st);
+        dictionary_register_react_callback(st->rrdsetvar_root_index, rrdsetvar_react_callback, st);
+    }
+}
+
+void rrdsetvar_index_destroy(RRDSET *st) {
+    dictionary_destroy(st->rrdsetvar_root_index);
+}
+
+RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
+    struct rrdsetvar_constructor tmp = {
+        .variable = variable,
+        .type = type,
+        .value = value,
+        .options = options,
+    };
+
+    RRDSETVAR *rs = dictionary_set_advanced(st->rrdsetvar_root_index, variable, -1, NULL, sizeof(RRDSETVAR), &tmp);
+    rs->options &= ~(RRDVAR_OPTION_INTERNAL_JUST_CREATED | RRDVAR_OPTION_INTERNAL_JUST_UPDATED);
 
     return rs;
+}
+
+void rrdsetvar_free(RRDSETVAR *rs) {
+    dictionary_del(rs->rrdset->rrdsetvar_root_index, string2str(rs->variable));
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
     debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
 
     RRDSETVAR *rs;
-    for(rs = st->variables; rs ; rs = rs->next)
+    dfe_start_read(st->rrdsetvar_root_index, rs)
         rrdsetvar_create_variables(rs);
+    dfe_done(rs);
 
     rrdsetcalc_link_matching(st);
 }
 
-void rrdsetvar_free(RRDSETVAR *rs) {
-    RRDSET *st = rs->rrdset;
-    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", rrdset_id(st), rrdset_name(st), string2str(rs->variable));
-
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->variables, rs, prev, next);
-
-    rrdsetvar_free_variables(rs);
-
-    string_freez(rs->variable);
-
-    if(rs->options & RRDVAR_OPTION_ALLOCATED)
-        freez(rs->value);
-
-    freez(rs);
+void rrdsetvar_free_all(RRDSET *st) {
+    RRDSETVAR *rs;
+    dfe_start_write(st->rrdsetvar_root_index, rs)
+        dictionary_del_having_write_lock(st->rrdsetvar_root_index, string2str(rs->variable));
+    dfe_done(rs);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // custom chart variables
 
 RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) {
-    RRDHOST *host = st->rrdhost;
-
     STRING *n = rrdvar_name_to_string(name);
-
-    rrdset_wrlock(st);
-
-    // find it
-    RRDSETVAR *rs;
-    for(rs = st->variables; rs ; rs = rs->next) {
-        if(rs->variable == n) {
-            rrdset_unlock(st);
-            if(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) {
-                string_freez(n);
-                return rs;
-            }
-            else {
-                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", string2str(n), rrdset_id(st), rrdhost_hostname(host));
-                string_freez(n);
-                return NULL;
-            }
-        }
-    }
-
-    // not found, allocate one
-
-    NETDATA_DOUBLE *v = mallocz(sizeof(NETDATA_DOUBLE));
-    *v = NAN;
-
-    rs = rrdsetvar_create(st, string2str(n), RRDVAR_TYPE_CALCULATED, v, RRDVAR_OPTION_ALLOCATED|RRDVAR_OPTION_CUSTOM_CHART_VAR);
-    rrdset_unlock(st);
-
+    RRDSETVAR *rs = rrdsetvar_create(st, string2str(n), RRDVAR_TYPE_CALCULATED, NULL, RRDVAR_OPTION_CUSTOM_CHART_VAR);
     string_freez(n);
     return rs;
 }
@@ -164,7 +232,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
 void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one.", string2str(rs->variable), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value);
+            " but the variable is not a custom chart one. Ignoring request.", string2str(rs->variable), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;

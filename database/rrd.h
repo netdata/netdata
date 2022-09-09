@@ -521,8 +521,7 @@ struct rrdset {
     int update_every;                               // data collection frequency
 
     DICTIONARY *rrdlabels;                          // chart labels
-
-    RRDSETVAR *variables;                           // chart variables - linked list (one RRDSETVAR, many RRDVARs)
+    DICTIONARY *rrdsetvar_root_index;               // chart variables
 
     RRDDIM *dimensions;                             // chart metrics
 
