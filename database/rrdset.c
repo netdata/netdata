@@ -115,6 +115,7 @@ struct rrdset_constructor {
     } react_action;
 };
 
+// the constructor - the dictionary is write locked while this runs
 static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void *constructor_data) {
     static STRING *anomaly_rates_chart = NULL;
 
@@ -191,6 +192,7 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     ctr->react_action = RRDSET_REACT_NEW;
 }
 
+// the destructor - the dictionary is write locked while this runs
 static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *rrdhost) {
     RRDHOST *host = rrdhost;
     RRDSET *st = rrdset;
@@ -244,6 +246,9 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
     freez(st->chart_uuid);
 }
 
+// the item to be inserted, is already in the dictionary
+// this callback deals with the situation, migrating the existing object to the new values
+// the dictionary is write locked while this runs
 static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
     (void)new_rrdset; // it is NULL
 
@@ -326,6 +331,8 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 }
 
+// this is called after all insertions/conflicts, with the dictionary unlocked
+// so, any actions requiring locks on other objects, should be placed here
 static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *constructor_data) {
     struct rrdset_constructor *ctr = constructor_data;
     RRDSET *st = rrdset;
