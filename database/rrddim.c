@@ -170,8 +170,7 @@ static void rrddim_delete_callback(const char *id __maybe_unused, void *rrddim, 
 
     rrdcontext_removed_rrddim(rd);
 
-    // TODO - this crashes netdata on exit - fix it and enable it again
-    // ml_delete_dimension(rd);
+    ml_delete_dimension(rd);
 
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
