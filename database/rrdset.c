@@ -480,6 +480,7 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     RRDDIM *rd;
     rrddim_foreach_write(rd, st)
         rrddimvar_rename_all(rd);
+    rrddim_foreach_done(rd);
     rrdset_unlock(st);
 
     rrdset_index_add_name(host, st);
@@ -492,6 +493,36 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     rrdcontext_updated_rrdset_name(st);
     return 2;
+}
+
+// get the timestamp of the last entry in the round-robin database
+time_t rrdset_last_entry_t(RRDSET *st) {
+    RRDDIM *rd;
+    time_t last_entry_t  = 0;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_last_entry_t(rd);
+        if(t > last_entry_t) last_entry_t = t;
+    }
+    rrddim_foreach_done(rd);
+
+    return last_entry_t;
+}
+
+// get the timestamp of first entry in the round-robin database
+time_t rrdset_first_entry_t(RRDSET *st) {
+    RRDDIM *rd;
+    time_t first_entry_t = LONG_MAX;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_first_entry_t(rd);
+        if(t < first_entry_t)
+            first_entry_t = t;
+    }
+    rrddim_foreach_done(rd);
+
+    if (unlikely(LONG_MAX == first_entry_t)) return 0;
+    return first_entry_t;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
@@ -558,6 +589,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
             return;
         }
     }
+    rrddim_foreach_done(rd);
 
     rrdset_flag_clear(st, RRDSET_FLAG_HETEROGENEOUS);
     rrdcontext_updated_rrdset_flags(st);
@@ -591,6 +623,7 @@ void rrdset_reset(RRDSET *st) {
             }
         }
     }
+    rrddim_foreach_done(rd);
 }
 
 // ----------------------------------------------------------------------------
@@ -653,6 +686,7 @@ void rrdset_save(RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st)
         rrddim_memory_file_save(rd);
+    rrddim_foreach_done(rd);
 }
 
 void rrdset_delete_files(RRDSET *st) {
@@ -680,6 +714,7 @@ void rrdset_delete_files(RRDSET *st) {
         if(unlikely(unlink(cache_filename) == -1))
             error("Cannot delete dimension file '%s'", cache_filename);
     }
+    rrddim_foreach_done(rd);
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
 }
@@ -700,6 +735,7 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
                 error("Cannot delete dimension file '%s'", cache_filename);
         }
     }
+    rrddim_foreach_done(rd);
 }
 
 void rrddim_obsolete_to_archive(RRDDIM *rd) {
@@ -1304,6 +1340,7 @@ static inline size_t rrdset_done_interpolate(
 
             stored_entries++;
         }
+        rrddim_foreach_done(rd);
 
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;
@@ -1349,6 +1386,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
             #endif
         }
     }
+    rrddim_foreach_done(rd);
 
     if(c > 0) {
         c--;
@@ -1559,6 +1597,7 @@ after_first_database_work:
         if(likely(rd->updated))
             st->collected_total += rd->collected_value;
     }
+    rrddim_foreach_done(rd);
 
     uint32_t has_reset_value = 0;
 
@@ -1780,6 +1819,7 @@ after_first_database_work:
         #endif
 
     }
+    rrddim_foreach_done(rd);
 
     // at this point we have all the calculated values ready
     // it is now time to interpolate values on a second boundary
@@ -1875,6 +1915,7 @@ after_second_database_work:
         #endif
 
     }
+    rrddim_foreach_done(rd);
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
@@ -1886,6 +1927,7 @@ after_second_database_work:
         rrddim_foreach_read(rd, st) {
             rrddim_memory_file_update(rd);
         }
+        rrddim_foreach_done(rd);
     }
 
     rrdset_unlock(st);

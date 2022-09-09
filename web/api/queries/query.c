@@ -1510,7 +1510,10 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
         //, size_t before_slot
         , const char *msg
         ) {
-    netdata_rwlock_rdlock(&r->st->rrdset_rwlock);
+
+    time_t first_entry_t = rrdset_first_entry_t(r->st);
+    time_t last_entry_t = rrdset_last_entry_t(r->st);
+
     info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %ld, db: %zu), "
          "before (got: %zu, want: %zu, req: %ld, db: %zu), "
@@ -1532,19 +1535,19 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , (size_t)r->after
          , (size_t)after_wanted
          , after_requested
-         , (size_t)rrdset_first_entry_t_nolock(r->st)
+         , (size_t)first_entry_t
 
          // before
          , (size_t)r->before
          , (size_t)before_wanted
          , before_requested
-         , (size_t)rrdset_last_entry_t_nolock(r->st)
+         , (size_t)last_entry_t
 
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
          , before_requested - after_requested
-         , (size_t)((rrdset_last_entry_t_nolock(r->st) - rrdset_first_entry_t_nolock(r->st)) + r->st->update_every)
+         , (size_t)((last_entry_t - first_entry_t) + r->st->update_every)
 
          // slot
          /*
@@ -1562,7 +1565,6 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          // message
          , msg
     );
-    netdata_rwlock_unlock(&r->st->rrdset_rwlock);
 }
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -1727,10 +1729,8 @@ RRDR *rrd2rrdr(
         if(!context_param_list) {
             relative_period_requested = true;
 
-            rrdset_rdlock(st);
-            time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-            time_t last_entry_t = rrdset_last_entry_t_nolock(st);
-            rrdset_unlock(st);
+            time_t first_entry_t = rrdset_first_entry_t(st);
+            time_t last_entry_t = rrdset_last_entry_t(st);
 
             if(first_entry_t == 0 || last_entry_t == 0) {
                 internal_error(true, "QUERY: chart without data detected on '%s'", rrdset_name(st));

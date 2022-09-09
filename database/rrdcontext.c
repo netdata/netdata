@@ -936,7 +936,6 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
         RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
 
         // migrate all dimensions to the new metrics
-        rrdset_rdlock(st);
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
             if (!rd->rrdmetric) continue;
@@ -952,7 +951,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
             rrdmetric_from_rrddim(rd);
         }
-        rrdset_unlock(st);
+        rrddim_foreach_done(rd);
 
         // mark the old instance, ready to be deleted
         if(!rrd_flag_check(ri_old, RRD_FLAG_OWN_LABELS))

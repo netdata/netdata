@@ -419,6 +419,35 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     }
 }
 
+// get the timestamp of the last entry in the round-robin database
+time_t rrddim_last_entry_t(RRDDIM *rd) {
+    time_t latest = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
+
+    for(int tier = 1; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
+
+        time_t t = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
+        if(t > latest)
+            latest = t;
+    }
+
+    return latest;
+}
+
+time_t rrddim_first_entry_t(RRDDIM *rd) {
+    time_t oldest = 0;
+
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
+
+        time_t t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
+        if(t != 0 && (oldest == 0 || t < oldest))
+            oldest = t;
+    }
+
+    return oldest;
+}
+
 // Return either
 //   0 : Dimension is live
 //   last collected time : Dimension is not live

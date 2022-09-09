@@ -265,6 +265,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         );
         rd->exposed = 1;
     }
+    rrddim_foreach_done(rd);
 
     // send the chart local custom variables
     RRDSETVAR *rs;
@@ -301,6 +302,7 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
             count_of_dimensions_written++;
         }
     }
+    rrddim_foreach_done(rd);
     buffer_strcat(host->sender->build, "END\n");
 
     return count_of_dimensions_written != 0;

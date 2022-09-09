@@ -415,19 +415,16 @@ void analytics_metrics(void)
 {
     RRDSET *st;
     long int dimensions = 0;
-    RRDDIM *rd;
     rrdset_foreach_read(st, localhost) {
-        rrdset_rdlock(st);
-
         if (rrdset_is_available_for_viewers(st)) {
+            RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
                 if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
                     continue;
                 dimensions++;
             }
+            rrddim_foreach_done(rd);
         }
-
-        rrdset_unlock(st);
     }
     rrdset_foreach_done(st);
 

@@ -27,8 +27,8 @@ void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
     rrdset_rdlock(st);
 
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-    time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
+    time_t first_entry_t = rrdset_first_entry_t(st);
+    time_t last_entry_t  = rrdset_last_entry_t(st);
 
     buffer_sprintf(
         wb,
@@ -105,6 +105,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
         dimensions++;
     }
+    rrddim_foreach_done(rd);
 
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;

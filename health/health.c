@@ -208,6 +208,7 @@ static void health_reload_host(RRDHOST *host) {
         rrddim_foreach_read(rd, st) {
             rrdcalc_link_to_rrddim(rd, st, host);
         }
+        rrddim_foreach_done(rd);
         rrdset_unlock(st);
     }
     rrdset_foreach_done(st);
@@ -557,10 +558,8 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     }
 
     int update_every = rc->rrdset->update_every;
-    rrdset_rdlock(rc->rrdset);
-    time_t first = rrdset_first_entry_t_nolock(rc->rrdset);
-    time_t last = rrdset_last_entry_t_nolock(rc->rrdset);
-    rrdset_unlock(rc->rrdset);
+    time_t first = rrdset_first_entry_t(rc->rrdset);
+    time_t last = rrdset_last_entry_t(rc->rrdset);
 
     if(unlikely(now + update_every < first /* || now - update_every > last */)) {
         debug(D_HEALTH
@@ -709,6 +708,7 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
 
             rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
         }
+        rrddim_foreach_done(rd);
 
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
         rrdset_unlock(st);

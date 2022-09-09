@@ -588,20 +588,17 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
 
         RRDHOST *host = wc->host;
         if (likely(host)) {
-            rrdhost_rdlock(host);
             RRDSET *st;
             rrdset_foreach_read(st, host) {
-                rrdset_rdlock(st);
                 rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
                 RRDDIM *rd;
                 rrddim_foreach_read(rd, st) {
                     rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
                     rd->aclk_live_status = (rd->aclk_live_status == 0);
                 }
-                rrdset_unlock(st);
+                rrddim_foreach_done(rd);
             }
             rrdset_foreach_done(st);
-            rrdhost_unlock(host);
         }
         else
             error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
@@ -1270,12 +1267,8 @@ void sql_check_chart_liveness(RRDSET *st) {
     if (unlikely(rrdset_is_ar_chart(st)))
         return;
 
-    rrdset_rdlock(st);
-
-    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        rrdset_unlock(st);
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
         return;
-    }
 
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
@@ -1285,6 +1278,7 @@ void sql_check_chart_liveness(RRDSET *st) {
     }
     else
         debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", rrdset_name(st));
+
     time_t mark = now_realtime_sec();
 
     debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", rrdset_name(st));
@@ -1292,6 +1286,7 @@ void sql_check_chart_liveness(RRDSET *st) {
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN))
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
     }
+    rrddim_foreach_done(rd);
     rrdset_unlock(st);
 }
 

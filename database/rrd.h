@@ -441,11 +441,13 @@ extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t n
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrddim_foreach_read(rd, st) \
-    for((rd) = (st)->dimensions, rrdset_check_rdlock(st); (rd) ; (rd) = (rd)->next)
+    dfe_start_read((st)->rrddim_root_index, rd)
 
 #define rrddim_foreach_write(rd, st) \
-    for((rd) = (st)->dimensions, rrdset_check_wrlock(st); (rd) ; (rd) = (rd)->next)
+    dfe_start_write((st)->rrddim_root_index, rd)
 
+#define rrddim_foreach_done(rd) \
+    dfe_done(rd)
 
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
@@ -649,6 +651,9 @@ extern STRING *rrd_string_strdupz(const char *s);
 
 #define rrdset_foreach_done(st) \
     dfe_done(st)
+
+#define rrdset_number_of_dimensions(st) \
+    dictionary_stats_entries((st)->rrddim_root_index)
 
 extern void rrdset_memory_file_save(RRDSET *st);
 extern void rrdset_memory_file_free(RRDSET *st);
@@ -1178,85 +1183,11 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 
-// get the timestamp of the last entry in the round-robin database
-static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
-    time_t latest = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
-
-    for(int tier = 1; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
-
-        time_t t = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
-        if(t > latest)
-            latest = t;
-    }
-
-    return latest;
-}
-
-static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
-    time_t oldest = 0;
-
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
-
-        time_t t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
-        if(t != 0 && (oldest == 0 || t < oldest))
-            oldest = t;
-    }
-
-    return oldest;
-}
-
-// get the timestamp of the last entry in the round-robin database
-static inline time_t rrdset_last_entry_t_nolock(RRDSET *st) {
-    RRDDIM *rd;
-    time_t last_entry_t  = 0;
-
-    rrddim_foreach_read(rd, st) {
-        time_t t = rrddim_last_entry_t(rd);
-        if(t > last_entry_t) last_entry_t = t;
-    }
-
-    return last_entry_t;
-}
-
-static inline time_t rrdset_last_entry_t(RRDSET *st) {
-    time_t last_entry_t;
-
-    netdata_rwlock_rdlock(&st->rrdset_rwlock);
-    last_entry_t = rrdset_last_entry_t_nolock(st);
-    netdata_rwlock_unlock(&st->rrdset_rwlock);
-
-    return last_entry_t;
-}
-
-// get the timestamp of first entry in the round-robin database
-static inline time_t rrdset_first_entry_t_nolock(RRDSET *st) {
-    RRDDIM *rd;
-    time_t first_entry_t = LONG_MAX;
-
-    rrddim_foreach_read(rd, st) {
-        time_t t = rrddim_first_entry_t(rd);
-        if(t < first_entry_t)
-            first_entry_t = t;
-    }
-
-    if (unlikely(LONG_MAX == first_entry_t)) return 0;
-    return first_entry_t;
-}
-
-static inline time_t rrdset_first_entry_t(RRDSET *st)
-{
-    time_t first_entry_t;
-
-    netdata_rwlock_rdlock(&st->rrdset_rwlock);
-    first_entry_t = rrdset_first_entry_t_nolock(st);
-    netdata_rwlock_unlock(&st->rrdset_rwlock);
-
-    return first_entry_t;
-}
-
-time_t rrdhost_last_entry_t(RRDHOST *h);
+extern time_t rrddim_first_entry_t(RRDDIM *rd);
+extern time_t rrddim_last_entry_t(RRDDIM *rd);
+extern time_t rrdset_last_entry_t(RRDSET *st);
+extern time_t rrdset_first_entry_t(RRDSET *st);
+extern time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions

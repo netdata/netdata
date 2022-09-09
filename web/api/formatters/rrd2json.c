@@ -104,13 +104,11 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
         (*param_list)->rd = NULL;
     }
 
-    RRDDIM *rd1;
     st->last_accessed_time = now_realtime_sec();
-    rrdset_rdlock(st);
+    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
+    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
 
-    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t_nolock(st));
-    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t_nolock(st));
-
+    RRDDIM *rd1;
     rrddim_foreach_read(rd1, st) {
         RRDDIM *rd = onewayalloc_memdupz(owa, rd1, sizeof(RRDDIM));
         rd->id = string_dup(rd1->id);
@@ -124,8 +122,7 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
-
-    rrdset_unlock(st);
+    rrddim_foreach_done(rd1);
 }
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {

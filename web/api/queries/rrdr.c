@@ -111,7 +111,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
             t = t->next;
         }
     } else
-        rrddim_foreach_read(rd, st) dimensions++;
+        dimensions = rrdset_number_of_dimensions(st);
 
     // create the rrdr
     RRDR *r = rrdr_create_for_x_dimensions(owa, dimensions, n);

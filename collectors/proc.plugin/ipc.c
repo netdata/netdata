@@ -483,11 +483,7 @@ int do_ipc(int update_every, usec_t dt) {
             rrdset_done(st_msq_messages);
             rrdset_done(st_msq_bytes);
 
-            long long dimensions_num = 0;
-            RRDDIM *rd;
-            rrdset_rdlock(st_msq_messages);
-            rrddim_foreach_read(rd, st_msq_messages) dimensions_num++;
-            rrdset_unlock(st_msq_messages);
+            long long dimensions_num = rrdset_number_of_dimensions(st_msq_messages);
 
             if(unlikely(dimensions_num > dimensions_limit)) {
                 info("Message queue statistics has been disabled");
