@@ -161,6 +161,9 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     if(unlikely(st->id == anomaly_rates_chart))
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
 
+    if(!st->rrdfamily)
+        st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
+
     netdata_rwlock_init(&st->rrdset_rwlock);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
@@ -337,9 +340,6 @@ static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void
 
     if(host->health_enabled && (ctr->react_action & RRDSET_REACT_NEW || ctr->react_action & RRDSET_REACT_CHART_ACTIVATED)) {
         rrdset_wrlock(st);
-        if(!st->rrdfamily)
-            st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
-
         rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
