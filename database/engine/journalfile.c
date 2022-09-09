@@ -442,27 +442,30 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     //data_file_size = journalfile->datafile->pos; TODO: utilize this?
 
     max_id = 1;
-    ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
-    if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+    bool journal_is_mmapped = journalfile->data;
+    if (unlikely(!journal_is_mmapped)) {
+        ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
+        if (unlikely(ret))
+            fatal("posix_memalign:%s", strerror(ret));
     }
-
+    else
+        buf = journalfile->data +  sizeof(struct rrdeng_jf_sb);
     for (pos = sizeof(struct rrdeng_jf_sb) ; pos < file_size ; pos += READAHEAD_BYTES) {
         size_bytes = MIN(READAHEAD_BYTES, file_size - pos);
-        iov = uv_buf_init(buf, size_bytes);
-        ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
-        if (ret < 0) {
-            error("uv_fs_read: pos=%"PRIu64", %s", pos, uv_strerror(ret));
+        if (unlikely(!journal_is_mmapped)) {
+            iov = uv_buf_init(buf, size_bytes);
+            ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
+            if (ret < 0) {
+                error("uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
+                uv_fs_req_cleanup(&req);
+                goto skip_file;
+            }
+            fatal_assert(req.result >= 0);
             uv_fs_req_cleanup(&req);
-            goto skip_file;
+            ++ctx->stats.io_read_requests;
+            ctx->stats.io_read_bytes += size_bytes;
         }
-        fatal_assert(req.result >= 0);
-        uv_fs_req_cleanup(&req);
-        ctx->stats.io_read_bytes += size_bytes;
-        ++ctx->stats.io_read_requests;
 
-        //pos_i = pos;
-        //while (pos_i < pos + size_bytes) {
         for (pos_i = 0 ; pos_i < size_bytes ; ) {
             unsigned max_size;
 
@@ -475,9 +478,12 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
                 pos_i += ret;
             max_id = MAX(max_id, id);
         }
+        if (likely(journal_is_mmapped))
+            buf = journalfile->data + size_bytes;
     }
 skip_file:
-    free(buf);
+    if (unlikely(!journal_is_mmapped))
+        free(buf);
     return max_id;
 }
 
@@ -512,12 +518,16 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 
     journalfile->file = file;
     journalfile->pos = file_size;
+    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0);
+    info("Loading journal file \"%s\" using %s.", path, journalfile->data?"using MMAP":"using uv_fs_read");
 
     max_id = iterate_transactions(ctx, journalfile);
 
     ctx->commit_log.transaction_id = MAX(ctx->commit_log.transaction_id, max_id + 1);
 
     info("Journal file \"%s\" loaded (size:%"PRIu64").", path, file_size);
+    if (likely(journalfile->data))
+        munmap(journalfile->data, file_size);
     return 0;
 
     error:
