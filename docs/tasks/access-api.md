@@ -1,5 +1,6 @@
 <!--
 title: "Access API"
+sidebar_label: "Access API"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/access-api.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

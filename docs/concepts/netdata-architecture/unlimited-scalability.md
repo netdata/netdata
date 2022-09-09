@@ -1,5 +1,6 @@
 <!--
 title: "Unlimited scalability"
+sidebar_label: "Unlimited scalability"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/unlimited-scalability.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"

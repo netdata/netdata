@@ -1,5 +1,6 @@
 <!--
 title: "Claim an Agent to the Hub"
+sidebar_label: "Claim an Agent to the Hub"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/claim-an-agent-to-the-hub.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

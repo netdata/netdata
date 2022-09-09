@@ -1,5 +1,6 @@
 <!--
-Title: "IoT"
+title: "IoT"
+sidebar_label: "IoT"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/deployment-options/iot.md"
 learn_status: "Published"
 learn_topic_type: "Getting started"

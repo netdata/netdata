@@ -1,5 +1,6 @@
 <!--
 title: "Notifications"
+sidebar_label: "Notifications"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"

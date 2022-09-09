@@ -1,5 +1,6 @@
 <!--
-Title: "Netdata Agent with parent"
+title: "Netdata Agent with parent"
+sidebar_label: "Netdata Agent with parent"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/deployment-options/netdata-agent-with-parent.md"
 learn_status: "Published"
 learn_topic_type: "Getting started"

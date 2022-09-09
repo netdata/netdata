@@ -1,5 +1,6 @@
 <!--
 title: "Change database mode"
+sidebar_label: "Change database mode"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/change-database-mode.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

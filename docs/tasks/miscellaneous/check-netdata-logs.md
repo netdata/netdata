@@ -1,5 +1,6 @@
 <!--
 title: "Check netdata logs"
+sidebar_label: "Check netdata logs"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"

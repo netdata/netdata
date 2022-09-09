@@ -1,5 +1,6 @@
 <!--
-Title: "Netdata Platform support"
+title: "Netdata Platform support"
+sidebar_label: "Netdata Platform support"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/deployment-options/netdata-platform-support.md"
 learn_status: "Published"
 learn_topic_type: "Getting started"
