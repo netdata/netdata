@@ -1189,15 +1189,16 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
+        dfe->counter = 0;
         dfe->item = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
         return NULL;
     }
 
+    dfe->counter = 0;
     dfe->dict = dict;
     dfe->rw = rw;
-    dfe->started_ut = now_realtime_usec();
 
     dictionary_lock(dict, dfe->rw);
 
@@ -1261,6 +1262,7 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->name = (char *)item_get_name(nv);
         dfe->value = nv->value;
         reference_counter_acquire(dfe->dict, nv);
+        dfe->counter++;
     }
     else {
         dfe->item = NULL;
@@ -1274,12 +1276,12 @@ void *dictionary_foreach_next(DICTFE *dfe) {
     return dfe->value;
 }
 
-usec_t dictionary_foreach_done(DICTFE *dfe) {
-    if(unlikely(!dfe || !dfe->dict)) return 0;
+void dictionary_foreach_done(DICTFE *dfe) {
+    if(unlikely(!dfe || !dfe->dict)) return;
 
     if(unlikely(dfe->dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_next() on a destroyed dictionary");
-        return 0;
+        return;
     }
 
     // the item we just did
@@ -1296,11 +1298,7 @@ usec_t dictionary_foreach_done(DICTFE *dfe) {
     dfe->item = NULL;
     dfe->name = NULL;
     dfe->value = NULL;
-
-    usec_t usec = now_realtime_usec() - dfe->started_ut;
-    dfe->started_ut = 0;
-
-    return usec;
+    dfe->counter = 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -2055,7 +2053,7 @@ static size_t dictionary_unittest_foreach_delete_this(DICTIONARY *dict, char **n
     size_t count = 0;
     char *item;
     dfe_start_write(dict, item)
-        if(dictionary_del_having_write_lock(dict, item_name) != -1) count++;
+        if(dictionary_del_having_write_lock(dict, item_dfe.name) != -1) count++;
     dfe_done(item);
 
     if(count > entries) return count - entries;

@@ -1776,7 +1776,7 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
 
     STATSD_METRIC_DICTIONARY_ITEM *t;
     dfe_start_read(m->dictionary.dict, t) {
-        if (!t->rd) t->rd = rrddim_add(m->st, t_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if (!t->rd) t->rd = rrddim_add(m->st, t_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rrddim_set_by_pointer(m->st, t->rd, (collected_number)t->count);
     }
     dfe_done(t);

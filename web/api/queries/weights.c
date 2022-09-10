@@ -601,8 +601,8 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     RRDDIM *d;
     int i;
     rrddim_foreach_read(d, base_rrdr->st) {
-        if(unlikely((int)d_counter >= base_rrdr->d)) break;
-        i = (int)d_counter; // d_counter is provided by the dictionary
+        if(unlikely((int)d_dfe.counter >= base_rrdr->d)) break;
+        i = (int)d_dfe.counter; // d_counter is provided by the dictionary
 
         // skip the not evaluated ones
         if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))
@@ -1031,7 +1031,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
             goto cleanup;
         }
 
-        st = rrdset_find_byname(host, ptr_name);
+        st = rrdset_find_byname(host, ptr_dfe.name); // ptr_dfe.name is provided by dictionary
         if(!st) continue;
 
         rrdset_rdlock(st);

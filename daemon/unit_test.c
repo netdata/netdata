@@ -1970,9 +1970,9 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 
                 // for each dimension
                 rrddim_foreach_read(d, r->st) {
-                    if(unlikely((int)d_counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+                    if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
 
-                    j = (int)d_counter;
+                    j = (int)d_dfe.counter;
 
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
@@ -2111,9 +2111,9 @@ int test_dbengine(void)
 
                 // for each dimension
                 rrddim_foreach_read(d, r->st) {
-                    if(unlikely((int)d_counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+                    if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
 
-                    j = (int)d_counter;
+                    j = (int)d_dfe.counter;
 
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     NETDATA_DOUBLE value = cn[j];

@@ -192,42 +192,43 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTIONARY_LOCK_NONE      'u'
 
 typedef DICTFE_CONST struct dictionary_foreach {
-    DICTFE_CONST char *name;    // the dictionary name of the last item used
-    void *value;                // the dictionary value of the last item used
-                                // same as the return value of dictfe_start() and dictfe_next()
+    DICTIONARY *dict;           // the dictionary upon we work
 
     DICTIONARY_ITEM *item;      // the item we work on, to remember the position we are at
                                 // this can be used with dictionary_acquired_item_dup() to
                                 // acquire the currently working item.
 
-    // the following are for internal use only - to keep track of the point we are
+    DICTFE_CONST char *name;    // the dictionary name of the last item used
+    void *value;                // the dictionary value of the last item used
+                                // same as the return value of dictfe_start() and dictfe_next()
+
+    size_t counter;             // counts the number of iterations made, starting from zero
+
     char rw;                    // the lock mode 'r' or 'w'
-    usec_t started_ut;          // the time the caller started iterating (now_realtime_usec())
-    DICTIONARY *dict;           // the dictionary upon we work
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
 #define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_reentrant(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_REENTRANT)
 #define dfe_start_unsafe(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_NONE)
-#define dfe_start_rw(dict, value, mode) \
-        do { \
-            DICTFE value ## _dfe = {};  \
-            size_t value ## _counter = 0; \
-            const char *value ## _name; (void)(value ## _name); (void)(value); \
-            for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode)), ( value ## _name ) = value ## _dfe.name; \
-                (value ## _dfe.name) ;\
-                (value) = dictionary_foreach_next(&value ## _dfe), ( value ## _name ) = value ## _dfe.name, value ## _counter++) \
+
+#define dfe_start_rw(dict, value, mode)                                                             \
+        do {                                                                                        \
+            DICTFE value ## _dfe = {};                                                              \
+            (void)(value); /* needed to avoid warning when looping without using this */            \
+            for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode));              \
+                (value ## _dfe.item) ;                                                              \
+                (value) = dictionary_foreach_next(&value ## _dfe))                                  \
             {
 
-#define dfe_done(value) \
-            }           \
-            dictionary_foreach_done(&value ## _dfe); \
+#define dfe_done(value)                                                                             \
+            }                                                                                       \
+            dictionary_foreach_done(&value ## _dfe);                                                \
         } while(0)
 
-extern void * dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
-extern void * dictionary_foreach_next(DICTFE *dfe);
-extern usec_t dictionary_foreach_done(DICTFE *dfe);
+extern void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
+extern void *dictionary_foreach_next(DICTFE *dfe);
+extern void  dictionary_foreach_done(DICTFE *dfe);
 
 // Get statistics about the dictionary
 extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
