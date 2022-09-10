@@ -29,6 +29,12 @@ typedef enum rrdvar_options {
     RRDVAR_OPTION_INTERNAL_JUST_UPDATED      = (1 << 15), // used by the constructor - it is never set after initialization
 } RRDVAR_OPTIONS;
 
+#define RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS \
+    (RRDVAR_OPTION_ALLOCATED | RRDVAR_OPTION_INTERNAL_JUST_CREATED | RRDVAR_OPTION_INTERNAL_JUST_UPDATED)
+
+#define RRDVAR_OPTIONS_REMOVED_WHEN_PROPAGATING_TO_RRDVAR \
+    (RRDVAR_OPTION_ALLOCATED | RRDVAR_OPTION_INTERNAL_JUST_CREATED | RRDVAR_OPTION_INTERNAL_JUST_UPDATED)
+
 // the variables as stored in the variables indexes
 // there are 3 indexes:
 // 1. at each chart   (RRDSET.rrdvar_root_index)

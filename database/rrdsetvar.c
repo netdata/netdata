@@ -42,8 +42,7 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
     RRDHOST *host = st->rrdhost;
 
     RRDVAR_OPTIONS options = rs->options;
-    if(rs->options & RRDVAR_OPTION_ALLOCATED)
-        options &= ~ RRDVAR_OPTION_ALLOCATED;
+    options &= ~RRDVAR_OPTIONS_REMOVED_WHEN_PROPAGATING_TO_RRDVAR;
 
     // ------------------------------------------------------------------------
     // free the old ones (if any)
@@ -79,6 +78,7 @@ static void rrdsetvar_free_value(RRDSETVAR *rs) {
     if(rs->options & RRDVAR_OPTION_ALLOCATED) {
         freez(rs->value);
         rs->value = NULL;
+        rs->options &= ~RRDVAR_OPTION_ALLOCATED;
     }
 }
 
@@ -98,9 +98,9 @@ static void rrdsetvar_set_value(RRDSETVAR *rs, void *new_value) {
 struct rrdsetvar_constructor {
     RRDSET *rrdset;
     const char *variable;
-    RRDVAR_TYPE type;
     void *value;
-    RRDVAR_OPTIONS options;
+    RRDVAR_OPTIONS options:16;
+    RRDVAR_TYPE type:8;
 
     enum {
         RRDSETVAR_REACT_NONE    = 0,
@@ -112,6 +112,8 @@ struct rrdsetvar_constructor {
 static void rrdsetvar_insert_callback(const char *name __maybe_unused, void *rrdsetvar, void *constructor_data) {
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
+
+    ctr->options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
 
     rs->variable = string_strdupz(ctr->variable);
     rs->type = ctr->type;
@@ -128,25 +130,29 @@ static void rrdsetvar_conflict_callback(const char *name __maybe_unused, void *r
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
+    ctr->options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
+
+    RRDVAR_OPTIONS options = rs->options;
+    options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
+
     ctr->react_action = RRDSETVAR_REACT_NONE;
 
-    if(rs->type != ctr->type) {
-        rs->type = ctr->type;
-        ctr->react_action = RRDSETVAR_REACT_UPDATED;
+    if(((ctr->value == NULL && rs->value != NULL && rs->options & RRDVAR_OPTION_ALLOCATED) || (rs->value == ctr->value))
+        && ctr->options == options && rs->type == ctr->type) {
+        // don't reset it - everything is the same, or as it should...
+        ;
     }
+    else {
+        internal_error(true, "RRDSETVAR: resetting variable '%s' of chart '%s' of host '%s', options from 0x%x to 0x%x, type from %d to %d",
+                       string2str(rs->variable), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost),
+                       options, ctr->options, rs->type, ctr->type);
 
-    if(rs->value != ctr->value) {
+        rrdsetvar_free_value(rs); // we are going to change the options, so free it before setting it
+        rs->options = ctr->options | RRDVAR_OPTION_INTERNAL_JUST_UPDATED;
+        rs->type = ctr->type;
         rrdsetvar_set_value(rs, ctr->value);
         ctr->react_action = RRDSETVAR_REACT_UPDATED;
     }
-
-    if(rs->options != ctr->options) {
-        rs->options = ctr->options;
-        ctr->react_action = RRDSETVAR_REACT_UPDATED;
-    }
-
-    if(ctr->react_action == RRDSETVAR_REACT_UPDATED)
-        rs->options |= RRDVAR_OPTION_INTERNAL_JUST_UPDATED;
 }
 
 static void rrdsetvar_react_callback(const char *name __maybe_unused, void *rrdsetvar, void *constructor_data) {
@@ -233,7 +239,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
 void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one. Ignoring request.", string2str(rs->variable), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value);
+            " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->variable), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value, rs->options, rs->value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;

@@ -17,10 +17,10 @@ struct rrdsetvar {
     STRING *key_fullid;             // chart type.chart id.variable
     STRING *key_fullname;           // chart type.chart name.variable
 
-    RRDVAR_TYPE type;
-    void *value;
+    RRDVAR_OPTIONS options:16;
+    RRDVAR_TYPE type:8;
 
-    RRDVAR_OPTIONS options;
+    void *value;
 
     RRDVAR *var_local;
     RRDVAR *var_family;
@@ -29,9 +29,6 @@ struct rrdsetvar {
     RRDVAR *var_host_name;
 
     struct rrdset *rrdset;
-
-    struct rrdsetvar *next;
-    struct rrdsetvar *prev;
 };
 
 extern void rrdsetvar_index_init(RRDSET *st);
