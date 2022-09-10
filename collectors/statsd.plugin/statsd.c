@@ -371,9 +371,10 @@ static struct statsd {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd index management - add/find metrics
 
-static void dictionary_metric_insert_callback(const char *name, void *value, void *data) {
+static void dictionary_metric_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     STATSD_INDEX *index = (STATSD_INDEX *)data;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
+    const char *name = dictionary_acquired_item_name(item);
 
     debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
 
@@ -390,9 +391,9 @@ static void dictionary_metric_insert_callback(const char *name, void *value, voi
     __atomic_fetch_add(&index->metrics, 1, __ATOMIC_RELAXED);
 }
 
-static void dictionary_metric_delete_callback(const char *name, void *value, void *data) {
+static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     (void)data; // STATSD_INDEX *index = (STATSD_INDEX *)data;
-    (void)name;
+    (void)item;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
 
     if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
@@ -572,8 +573,8 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
 #define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
 #define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
-static void dictionary_metric_set_value_insert_callback(const char *name, void *value, void *data) {
-    (void)name;
+static void dictionary_metric_set_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    (void)item;
     (void)value;
     STATSD_METRIC *m = (STATSD_METRIC *)data;
     m->set.unique++;
@@ -617,8 +618,8 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     }
 }
 
-static void dictionary_metric_dict_value_insert_callback(const char *name, void *value, void *data) {
-    (void)name;
+static void dictionary_metric_dict_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    (void)item;
     (void)value;
     STATSD_METRIC *m = (STATSD_METRIC *)data;
     m->dictionary.unique++;

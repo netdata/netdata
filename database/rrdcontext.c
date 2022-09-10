@@ -434,11 +434,11 @@ static void rrdmetric_free(RRDMETRIC *rm) {
 
 // called when this rrdmetric is inserted to the rrdmetrics dictionary of a rrdinstance
 // the constructor of the rrdmetric object
-static void rrdmetric_insert_callback(const char *id __maybe_unused, void *value, void *data) {
+static void rrdmetric_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdinstance) {
     RRDMETRIC *rm = value;
 
     // link it to its parent
-    rm->ri = data;
+    rm->ri = rrdinstance;
 
     // remove flags that we need to figure out at runtime
     rm->flags = rm->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS; // no need for atomics
@@ -449,7 +449,7 @@ static void rrdmetric_insert_callback(const char *id __maybe_unused, void *value
 
 // called when this rrdmetric is deleted from the rrdmetrics dictionary of a rrdinstance
 // the destructor of the rrdmetric object
-static void rrdmetric_delete_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
+static void rrdmetric_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdinstance __maybe_unused) {
     RRDMETRIC *rm = value;
 
     internal_error(rm->rrddim, "RRDMETRIC: '%s' is freed but there is a RRDDIM linked to it.", string2str(rm->id));
@@ -460,7 +460,7 @@ static void rrdmetric_delete_callback(const char *id __maybe_unused, void *value
 
 // called when the same rrdmetric is inserted again to the rrdmetrics dictionary of a rrdinstance
 // while this is called, the dictionary is write locked, but there may be other users of the object
-static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *oldv, void *newv, void *data __maybe_unused) {
+static void rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdinstance __maybe_unused) {
     RRDMETRIC *rm     = oldv;
     RRDMETRIC *rm_new = newv;
 
@@ -524,7 +524,7 @@ static void rrdmetric_conflict_callback(const char *id __maybe_unused, void *old
 
 // this is called after the insert or the conflict callbacks,
 // but the dictionary is now unlocked
-static void rrdmetric_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
+static void rrdmetric_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdinstance __maybe_unused) {
     RRDMETRIC *rm = value;
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
@@ -534,10 +534,10 @@ static void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
     if(likely(ri->rrdmetrics)) return;
 
     ri->rrdmetrics = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(ri->rrdmetrics, rrdmetric_insert_callback, (void *)ri);
-    dictionary_register_delete_callback(ri->rrdmetrics, rrdmetric_delete_callback, (void *)ri);
-    dictionary_register_conflict_callback(ri->rrdmetrics, rrdmetric_conflict_callback, (void *)ri);
-    dictionary_register_react_callback(ri->rrdmetrics, rrdmetric_react_callback, (void *)ri);
+    dictionary_register_insert_callback(ri->rrdmetrics, rrdmetric_insert_callback, ri);
+    dictionary_register_delete_callback(ri->rrdmetrics, rrdmetric_delete_callback, ri);
+    dictionary_register_conflict_callback(ri->rrdmetrics, rrdmetric_conflict_callback, ri);
+    dictionary_register_react_callback(ri->rrdmetrics, rrdmetric_react_callback, ri);
 }
 
 static void rrdmetrics_destroy_from_rrdinstance(RRDINSTANCE *ri) {
@@ -671,7 +671,7 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
     ri->rrdset = NULL;
 }
 
-static void rrdinstance_insert_callback(const char *id __maybe_unused, void *value, void *data) {
+static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext) {
     static STRING *ml_anomaly_rates_id = NULL;
 
     if(unlikely(!ml_anomaly_rates_id))
@@ -680,7 +680,7 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     RRDINSTANCE *ri = value;
 
     // link it to its parent
-    ri->rc = data;
+    ri->rc = rrdcontext;
 
     ri->flags = ri->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS; // no need for atomics
 
@@ -713,9 +713,7 @@ static void rrdinstance_insert_callback(const char *id __maybe_unused, void *val
     rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
 }
 
-static void rrdinstance_delete_callback(const char *id, void *value, void *data) {
-    (void)id;
-    RRDCONTEXT *rc = data; (void)rc;
+static void rrdinstance_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext __maybe_unused) {
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
 
     internal_error(ri->rrdset, "RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
@@ -723,7 +721,7 @@ static void rrdinstance_delete_callback(const char *id, void *value, void *data)
     rrdinstance_free(ri);
 }
 
-static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *oldv, void *newv, void *data __maybe_unused) {
+static void rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdcontext __maybe_unused) {
     RRDINSTANCE *ri     = (RRDINSTANCE *)oldv;
     RRDINSTANCE *ri_new = (RRDINSTANCE *)newv;
 
@@ -827,7 +825,7 @@ static void rrdinstance_conflict_callback(const char *id __maybe_unused, void *o
     // the react callback will continue from here
 }
 
-static void rrdinstance_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
+static void rrdinstance_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext __maybe_unused) {
     RRDINSTANCE *ri = value;
 
     rrdinstance_trigger_updates(ri, __FUNCTION__ );
@@ -840,10 +838,10 @@ void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
     if(unlikely(!rc || rc->rrdinstances)) return;
 
     rc->rrdinstances = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(rc->rrdinstances, rrdinstance_insert_callback, (void *)rc);
-    dictionary_register_delete_callback(rc->rrdinstances, rrdinstance_delete_callback, (void *)rc);
-    dictionary_register_conflict_callback(rc->rrdinstances, rrdinstance_conflict_callback, (void *)rc);
-    dictionary_register_react_callback(rc->rrdinstances, rrdinstance_react_callback, (void *)rc);
+    dictionary_register_insert_callback(rc->rrdinstances, rrdinstance_insert_callback, rc);
+    dictionary_register_delete_callback(rc->rrdinstances, rrdinstance_delete_callback, rc);
+    dictionary_register_conflict_callback(rc->rrdinstances, rrdinstance_conflict_callback, rc);
+    dictionary_register_react_callback(rc->rrdinstances, rrdinstance_react_callback, rc);
 }
 
 void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
@@ -1103,9 +1101,8 @@ static void rrdcontext_freez(RRDCONTEXT *rc) {
     string_freez(rc->family);
 }
 
-static void rrdcontext_insert_callback(const char *id, void *value, void *data) {
-    (void)id;
-    RRDHOST *host = (RRDHOST *)data;
+static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost) {
+    RRDHOST *host = (RRDHOST *)rrdhost;
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
     rc->rrdhost = host;
@@ -1168,10 +1165,7 @@ static void rrdcontext_insert_callback(const char *id, void *value, void *data) 
     rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
 }
 
-static void rrdcontext_delete_callback(const char *id, void *value, void *data) {
-    (void)id;
-    RRDHOST *host = (RRDHOST *)data;
-    (void)host;
+static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost __maybe_unused) {
 
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
 
@@ -1180,11 +1174,7 @@ static void rrdcontext_delete_callback(const char *id, void *value, void *data) 
     rrdcontext_freez(rc);
 }
 
-static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv, void *data) {
-    (void)id;
-    RRDHOST *host = (RRDHOST *)data;
-    (void)host;
-
+static void rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdhost __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)oldv;
     RRDCONTEXT *rc_new = (RRDCONTEXT *)newv;
 
@@ -1249,9 +1239,8 @@ static void rrdcontext_conflict_callback(const char *id, void *oldv, void *newv,
     // the react callback will continue from here
 }
 
-static void rrdcontext_react_callback(const char *id __maybe_unused, void *value, void *data __maybe_unused) {
+static void rrdcontext_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
-
     rrdcontext_trigger_updates(rc, __FUNCTION__ );
 }
 
@@ -1260,19 +1249,19 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function) {
         rrdcontext_queue_for_post_processing(rc, function, rc->flags);
 }
 
-static void rrdcontext_hub_queue_insert_callback(const char *name __maybe_unused, void *context, void *data __maybe_unused) {
+static void rrdcontext_hub_queue_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
     rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_HUB);
     rc->queue.queued_ut = now_realtime_usec();
     rc->queue.queued_flags = rrd_flags_get(rc);
 }
 
-static void rrdcontext_hub_queue_delete_callback(const char *name __maybe_unused, void *context, void *data __maybe_unused) {
+static void rrdcontext_hub_queue_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
     rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_HUB);
 }
 
-static void rrdcontext_hub_queue_conflict_callback(const char *name __maybe_unused, void *context, void *new_context __maybe_unused, void *data __maybe_unused) {
+static void rrdcontext_hub_queue_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *new_context __maybe_unused, void *nothing __maybe_unused) {
     // context and new_context are the same
     // we just need to update the timings
     RRDCONTEXT *rc = context;
@@ -1281,12 +1270,12 @@ static void rrdcontext_hub_queue_conflict_callback(const char *name __maybe_unus
     rc->queue.queued_flags |= rrd_flags_get(rc);
 }
 
-static void rrdcontext_post_processing_queue_insert_callback(const char *name __maybe_unused, void *context, void *data __maybe_unused) {
+static void rrdcontext_post_processing_queue_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
     rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
 }
 
-static void rrdcontext_post_processing_queue_delete_callback(const char *name __maybe_unused, void *context, void *data __maybe_unused) {
+static void rrdcontext_post_processing_queue_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
     rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
 }
@@ -1299,10 +1288,10 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
     if(likely(host->rrdctx)) return;
 
     host->rrdctx = (RRDCONTEXTS *)dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback((DICTIONARY *)host->rrdctx, rrdcontext_insert_callback, (void *)host);
-    dictionary_register_delete_callback((DICTIONARY *)host->rrdctx, rrdcontext_delete_callback, (void *)host);
-    dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx, rrdcontext_conflict_callback, (void *)host);
-    dictionary_register_react_callback((DICTIONARY *)host->rrdctx, rrdcontext_react_callback, (void *)host);
+    dictionary_register_insert_callback((DICTIONARY *)host->rrdctx, rrdcontext_insert_callback, host);
+    dictionary_register_delete_callback((DICTIONARY *)host->rrdctx, rrdcontext_delete_callback, host);
+    dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx, rrdcontext_conflict_callback, host);
+    dictionary_register_react_callback((DICTIONARY *)host->rrdctx, rrdcontext_react_callback, host);
 
     host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create(
          DICTIONARY_FLAG_DONT_OVERWRITE_VALUE

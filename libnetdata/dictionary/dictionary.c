@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // NOT TO BE USED BY USERS
-#define DICTIONARY_FLAG_EXCLUSIVE_ACCESS    (1 << 28) // there is only one thread accessing the dictionary
-#define DICTIONARY_FLAG_DESTROYED           (1 << 29) // this dictionary has been destroyed
-#define DICTIONARY_FLAG_DEFER_ALL_DELETIONS (1 << 30) // defer all deletions of items in the dictionary
+#define DICTIONARY_FLAG_EXCLUSIVE_ACCESS    DICTIONARY_FLAG_RESERVED1 // there is only one thread accessing the dictionary
+#define DICTIONARY_FLAG_DESTROYED           DICTIONARY_FLAG_RESERVED2 // this dictionary has been destroyed
+#define DICTIONARY_FLAG_DEFER_ALL_DELETIONS DICTIONARY_FLAG_RESERVED3 // defer all deletions of items in the dictionary
 
 // our reserved flags that cannot be set by users
 #define DICTIONARY_FLAGS_RESERVED (DICTIONARY_FLAG_EXCLUSIVE_ACCESS|DICTIONARY_FLAG_DESTROYED|DICTIONARY_FLAG_DEFER_ALL_DELETIONS)
@@ -19,7 +19,7 @@ typedef enum item_flags {
     ITEM_FLAG_DELETED           = (1 << 1), // this item is deleted, so it is not available for traversal
     ITEM_FLAG_NEW_OR_UPDATED    = (1 << 2), // this item is new or just updated (used by the react callback)
 
-    // IMPORTANT: IF YOU ADD ANOTHER FLAG, YOU NEED TO ALLOCATE ANOTHER BIT TO FLAGS IN NAME_VALUE !!!
+    // IMPORTANT: IF YOU ADD ANOTHER FLAG, YOU NEED TO ALLOCATE ANOTHER BIT TO FLAGS IN struct dictionary_item !!!
 } ITEM_FLAGS;
 
 /*
@@ -61,16 +61,16 @@ struct dictionary {
 
     netdata_rwlock_t rwlock;            // the r/w lock when DICTIONARY_FLAG_SINGLE_THREADED is not set
 
-    void (*ins_callback)(const char *name, void *value, void *data);
+    void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *ins_callback_data;
 
-    void (*react_callback)(const char *name, void *value, void *data);
+    void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *react_callback_data;
 
-    void (*del_callback)(const char *name, void *value, void *data);
+    void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *del_callback_data;
 
-    void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data);
+    void (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data);
     void *conflict_callback_data;
 
     size_t version;                   // the current version of the dictionary
@@ -92,27 +92,27 @@ struct dictionary {
 
 static inline void item_linked_list_unlink_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv);
 static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv);
-static inline const char *item_get_name(DICTIONARY_ITEM *nv);
+static inline const char *item_get_name(const DICTIONARY_ITEM *nv);
 
 // ----------------------------------------------------------------------------
 // callbacks registration
 
-void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const char *name, void *value, void *data), void *data) {
+void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
     dict->ins_callback = ins_callback;
     dict->ins_callback_data = data;
 }
 
-void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data) {
+void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
     dict->del_callback = del_callback;
     dict->del_callback_data = data;
 }
 
-void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data) {
+void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data) {
     dict->conflict_callback = conflict_callback;
     dict->conflict_callback_data = data;
 }
 
-void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const char *name, void *value, void *data), void *data) {
+void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
     dict->react_callback = react_callback;
     dict->react_callback_data = data;
 }
@@ -625,7 +625,7 @@ static inline size_t item_free_name(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
     return 0;
 }
 
-static inline const char *item_get_name(DICTIONARY_ITEM *nv) {
+static inline const char *item_get_name(const DICTIONARY_ITEM *nv) {
     if(nv->flags & ITEM_FLAG_NAME_IS_ALLOCATED)
         return string2str(nv->string_name);
     else
@@ -676,8 +676,7 @@ static DICTIONARY_ITEM *item_create_unsafe(DICTIONARY *dict, const char *name, s
     DICTIONARY_STATS_ENTRIES_PLUS1(dict, allocated);
 
     if(dict->ins_callback)
-        dict->ins_callback(item_get_name(nv), nv->value,
-                           constructor_data?constructor_data:dict->ins_callback_data);
+        dict->ins_callback(nv, nv->value, constructor_data?constructor_data:dict->ins_callback_data);
 
     return nv;
 }
@@ -688,7 +687,7 @@ static void item_reset_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv, void *value
     DICTIONARY_STATS_VALUE_RESETS_PLUS1(dict, nv->value_len, value_len);
 
     if(dict->del_callback)
-        dict->del_callback(item_get_name(nv), nv->value, dict->del_callback_data);
+        dict->del_callback(nv, nv->value, dict->del_callback_data);
 
     if(likely(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
         debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(nv));
@@ -713,14 +712,14 @@ static void item_reset_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv, void *value
     }
 
     if(dict->ins_callback)
-        dict->ins_callback(item_get_name(nv), nv->value, dict->ins_callback_data);
+        dict->ins_callback(nv, nv->value, dict->ins_callback_data);
 }
 
 static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(nv));
 
     if(dict->del_callback)
-        dict->del_callback(item_get_name(nv), nv->value, dict->del_callback_data);
+        dict->del_callback(nv, nv->value, dict->del_callback_data);
 
     size_t freed = 0;
 
@@ -785,7 +784,7 @@ DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad
     dict->creation_line = line;
 #endif
 
-    return (DICTIONARY *)dict;
+    return dict;
 }
 
 void *dictionary_scratchpad(DICTIONARY *dict) {
@@ -935,8 +934,7 @@ static DICTIONARY_ITEM *dictionary_set_item_unsafe(DICTIONARY *dict, const char 
         }
 
         else if(dict->conflict_callback) {
-            dict->conflict_callback(
-                item_get_name(nv), nv->value, value,
+            dict->conflict_callback(nv, nv->value, value,
                                     constructor_data?constructor_data:dict->conflict_callback_data);
 
             nv->flags |= ITEM_FLAG_NEW_OR_UPDATED;
@@ -986,7 +984,7 @@ void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
         // we need to call the react callback with a reference counter on nv
         reference_counter_acquire(dict, nv);
-        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
+        dict->react_callback(nv, nv->value, constructor_data?constructor_data:dict->react_callback_data);
         reference_counter_release(dict, nv, false);
     }
 
@@ -1009,14 +1007,14 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
         // we got the reference counter we need, above
-        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
+        dict->react_callback(nv, nv->value, constructor_data?constructor_data:dict->react_callback_data);
         reference_counter_release(dict, nv, false);
     }
 
     return nv ? nv->value : NULL;
 }
 
-DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     if(unlikely(!nv))
@@ -1025,13 +1023,13 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dic
     reference_counter_acquire(dict, nv);
 
     if(unlikely(dict->react_callback && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
-        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
+        dict->react_callback(nv, nv->value, constructor_data?constructor_data:dict->react_callback_data);
     }
 
-    return (DICTIONARY_ITEM *)nv;
+    return nv;
 }
 
-DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
@@ -1042,10 +1040,10 @@ DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, cons
 
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
         // we already have a reference counter, for the caller, no need for another one
-        dict->react_callback(item_get_name(nv), nv->value, constructor_data?constructor_data:dict->react_callback_data);
+        dict->react_callback(nv, nv->value, constructor_data?constructor_data:dict->react_callback_data);
     }
 
-    return (DICTIONARY_ITEM *)nv;
+    return nv;
 }
 
 void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
@@ -1064,65 +1062,65 @@ void *dictionary_get(DICTIONARY *dict, const char *name) {
     return ret;
 }
 
-DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
+const DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
     DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name);
 
     if(unlikely(!nv))
         return NULL;
 
     reference_counter_acquire(dict, nv);
-    return (DICTIONARY_ITEM *)nv;
+    return nv;
 }
 
-DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name) {
+const DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name) {
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
-    void *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
+    const DICTIONARY_ITEM *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
     dictionary_unlock(dict, DICTIONARY_LOCK_READ);
     return ret;
 }
 
-DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM *item) {
+const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
-    reference_counter_dup((DICTIONARY_ITEM *)item);
+    reference_counter_dup(item);
     return item;
 }
 
-const char *dictionary_acquired_item_name(DICTIONARY_ITEM *item) {
+const char *dictionary_acquired_item_name(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
-    return item_get_name((DICTIONARY_ITEM *)item);
+    return item_get_name(item);
 }
 
-void *dictionary_acquired_item_value(DICTIONARY_ITEM *item) {
+void *dictionary_acquired_item_value(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
-    return ((DICTIONARY_ITEM *)item)->value;
+    return item->value;
 }
 
-void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(((DICTIONARY_ITEM *)item)->dict != dict)
+    if(item->dict != dict)
         fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__,
-            item_get_name((DICTIONARY_ITEM *)item));
+            item_get_name(item));
 #endif
 
-    reference_counter_release(dict, (DICTIONARY_ITEM *)item, false);
+    reference_counter_release(dict, item, false);
 }
 
-void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(((DICTIONARY_ITEM *)item)->dict != dict)
+    if(item->dict != dict)
         fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__,
-            item_get_name((DICTIONARY_ITEM *)item));
+            item_get_name(item));
 #endif
 
     // no need to get a lock here
     // we pass the last parameter to reference_counter_release() as true
     // so that the release may get a write-lock if required to clean up
 
-    reference_counter_release(dict, (DICTIONARY_ITEM *)item, true);
+    reference_counter_release(dict, item, true);
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED))
         dictionary_destroy(dict);

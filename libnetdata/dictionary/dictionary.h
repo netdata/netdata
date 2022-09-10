@@ -35,6 +35,14 @@
  *
  */
 
+#ifdef DICTIONARY_INTERNALS
+#define DICTFE_CONST
+#define DICTIONARY_ITEM_CONST
+#else
+#define DICTFE_CONST const
+#define DICTIONARY_ITEM_CONST const
+#endif
+
 typedef struct dictionary DICTIONARY;
 typedef struct dictionary_item DICTIONARY_ITEM;
 
@@ -66,21 +74,21 @@ extern void *dictionary_scratchpad(DICTIONARY *dict);
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
-extern void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const char *name, void *value, void *data), void *data);
+extern void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
 // a delete callback to be called just before an item is deleted forever
 // this callback is called while the dictionary is write locked!
-extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const char *name, void *value, void *data), void *data);
+extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
 // a merge callback to be called when DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
-extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const char *name, void *old_value, void *new_value, void *data), void *data);
+extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data);
 
 // a reaction callback to be called after every item insertion or conflict
 // after the constructors have finished and the items are fully available for use
 // and the dictionary is not write locked anymore
-extern void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const char *name, void *value, void *data), void *data);
+extern void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
 // Destroy a dictionary
 // returns the number of bytes freed
@@ -113,21 +121,21 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 // returns -1 if the item was not found in the index
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name);
-extern DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name);
+extern const DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name);
+extern const DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name);
 
 #define dictionary_set_and_acquire_item_unsafe(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced_unsafe(dict, name, -1, value, value_len, NULL)
-extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
+extern const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
 #define dictionary_set_and_acquire_item(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced(dict, name, -1, value, value_len, NULL)
-extern DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
+extern const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
-extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *item);
-extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
+extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
+extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 
-extern DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM *item);
-extern const char *dictionary_acquired_item_name(DICTIONARY_ITEM *item);
-extern void *dictionary_acquired_item_value(DICTIONARY_ITEM *item);
+extern const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
+extern const char *dictionary_acquired_item_name(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
+extern void *dictionary_acquired_item_value(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 
 // UNSAFE functions, without locks
 // to be used when the user is traversing with the right lock type
@@ -177,12 +185,6 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 // You cannot alter the dictionary from within a dfe_read_start() - deadlock!
 // You can only delete the current item from inside a dfe_start_write() - you can add as many as you want.
 //
-
-#ifdef DICTIONARY_INTERNALS
-#define DICTFE_CONST
-#else
-#define DICTFE_CONST const
-#endif
 
 #define DICTIONARY_LOCK_READ      'r'
 #define DICTIONARY_LOCK_WRITE     'w'

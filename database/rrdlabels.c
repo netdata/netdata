@@ -478,9 +478,7 @@ typedef struct rrdlabel {
     RRDLABEL_SRC label_source;
 } RRDLABEL;
 
-static void rrdlabel_insert_callback(const char *name, void *value, void *data) {
-    (void)name;
-    DICTIONARY *dict = (DICTIONARY *)data; (void)dict;
+static void rrdlabel_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *dict_ptr __maybe_unused) {
     RRDLABEL *lb = (RRDLABEL *)value;
 
     // label_value is already allocated by the STRING
@@ -488,18 +486,14 @@ static void rrdlabel_insert_callback(const char *name, void *value, void *data) 
     lb->label_source &= ~RRDLABEL_FLAG_OLD;
 }
 
-static void rrdlabel_delete_callback(const char *name, void *value, void *data) {
-    (void)name;
-    DICTIONARY *dict = (DICTIONARY *)data; (void)dict;
+static void rrdlabel_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *dict_ptr __maybe_unused) {
     RRDLABEL *lb = (RRDLABEL *)value;
 
     string_freez(lb->label_value);
     lb->label_value = NULL;
 }
 
-static void rrdlabel_conflict_callback(const char *name, void *oldvalue, void *newvalue, void *data) {
-    (void)name;
-    DICTIONARY *dict = (DICTIONARY *)data; (void)dict;
+static void rrdlabel_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldvalue, void *newvalue, void *dict_ptr __maybe_unused) {
     RRDLABEL *lbold = (RRDLABEL *)oldvalue;
     RRDLABEL *lbnew = (RRDLABEL *)newvalue;
 
@@ -623,7 +617,7 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 // rrdlabels_get_value_to_buffer_or_null()
 
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
-    DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
     RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
 
     if(lb && lb->label_value)
@@ -638,7 +632,7 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
 // rrdlabels_get_value_to_char_or_null()
 
 void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key) {
-    DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
     RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
 
     *value = (lb && lb->label_value) ? strdupz(string2str(lb->label_value)) : NULL;

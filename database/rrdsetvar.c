@@ -109,7 +109,7 @@ struct rrdsetvar_constructor {
     } react_action;
 };
 
-static void rrdsetvar_insert_callback(const char *name __maybe_unused, void *rrdsetvar, void *constructor_data) {
+static void rrdsetvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *constructor_data) {
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
@@ -126,7 +126,7 @@ static void rrdsetvar_insert_callback(const char *name __maybe_unused, void *rrd
     rrdsetvar_create_variables(rs);
 }
 
-static void rrdsetvar_conflict_callback(const char *name __maybe_unused, void *rrdsetvar, void *new_rrdsetvar __maybe_unused, void *constructor_data) {
+static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *new_rrdsetvar __maybe_unused, void *constructor_data) {
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
@@ -155,7 +155,7 @@ static void rrdsetvar_conflict_callback(const char *name __maybe_unused, void *r
     }
 }
 
-static void rrdsetvar_react_callback(const char *name __maybe_unused, void *rrdsetvar, void *constructor_data) {
+static void rrdsetvar_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *constructor_data) {
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
@@ -163,7 +163,7 @@ static void rrdsetvar_react_callback(const char *name __maybe_unused, void *rrds
         rrdsetvar_create_variables(rs);
 }
 
-static void rrdsetvar_delete_callback(const char *name __maybe_unused, void *rrdsetvar, void *rrdset __maybe_unused) {
+static void rrdsetvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *rrdset __maybe_unused) {
     RRDSETVAR *rs = rrdsetvar;
 
     rrdsetvar_free_variables(rs);
@@ -178,10 +178,10 @@ void rrdsetvar_index_init(RRDSET *st) {
     if(!st->rrdsetvar_root_index) {
         st->rrdsetvar_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
-        dictionary_register_insert_callback(st->rrdsetvar_root_index, rrdsetvar_insert_callback, st);
-        dictionary_register_conflict_callback(st->rrdsetvar_root_index, rrdsetvar_conflict_callback, st);
+        dictionary_register_insert_callback(st->rrdsetvar_root_index, rrdsetvar_insert_callback, NULL);
+        dictionary_register_conflict_callback(st->rrdsetvar_root_index, rrdsetvar_conflict_callback, NULL);
+        dictionary_register_react_callback(st->rrdsetvar_root_index, rrdsetvar_react_callback, NULL);
         dictionary_register_delete_callback(st->rrdsetvar_root_index, rrdsetvar_delete_callback, st);
-        dictionary_register_react_callback(st->rrdsetvar_root_index, rrdsetvar_react_callback, st);
     }
 }
 

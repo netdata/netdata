@@ -27,7 +27,7 @@ struct rrddim_constructor {
 
 };
 
-static void rrddim_insert_callback(const char *id __maybe_unused, void *rrddim, void *constructor_data) {
+static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
     struct rrddim_constructor *ctr = constructor_data;
     RRDDIM *rd = rrddim;
     RRDSET *st = ctr->st;
@@ -170,7 +170,7 @@ static void rrddim_insert_callback(const char *id __maybe_unused, void *rrddim, 
     ctr->react_action = RRDDIM_REACT_NEW;
 }
 
-static void rrddim_delete_callback(const char *id __maybe_unused, void *rrddim, void *rrdset) {
+static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *rrdset) {
     RRDDIM *rd = rrddim;
     RRDSET *st = rrdset;
 
@@ -238,7 +238,7 @@ static void rrddim_delete_callback(const char *id __maybe_unused, void *rrddim, 
     string_freez(rd->name);
 }
 
-static void rrddim_conflict_callback(const char *id __maybe_unused, void *rrddim, void *new_rrddim, void *constructor_data) {
+static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *new_rrddim, void *constructor_data) {
     (void)new_rrddim; // it is NULL
 
     struct rrddim_constructor *ctr = constructor_data;
@@ -278,7 +278,7 @@ static void rrddim_conflict_callback(const char *id __maybe_unused, void *rrddim
         ctr->react_action = RRDDIM_REACT_UPDATED;
 }
 
-static void rrddim_react_callback(const char *chart_full_id __maybe_unused, void *rrddim, void *constructor_data) {
+static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
     struct rrddim_constructor *ctr = constructor_data;
     RRDDIM *rd = rrddim;
     RRDSET *st = ctr->st;
@@ -302,8 +302,8 @@ void rrdset_init_rrddim_index(RRDSET *st) {
     if(!st->rrddim_root_index) {
         st->rrddim_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
-        dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, st);
-        dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, st);
+        dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
+        dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);
         dictionary_register_delete_callback(st->rrddim_root_index, rrddim_delete_callback, st);
         dictionary_register_react_callback(st->rrddim_root_index, rrddim_react_callback, st);
     }

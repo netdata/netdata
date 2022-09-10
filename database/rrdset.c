@@ -24,11 +24,11 @@ void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, c
 // ----------------------------------------------------------------------------
 // RRDSET name index
 
-static void rrdset_name_insert_callback(const char *name __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
     rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
 }
-static void rrdset_name_delete_callback(const char *name __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+static void rrdset_name_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
 }
@@ -116,7 +116,7 @@ struct rrdset_constructor {
 };
 
 // the constructor - the dictionary is write locked while this runs
-static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void *constructor_data) {
+static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
     static STRING *anomaly_rates_chart = NULL;
 
     if(!unlikely(!anomaly_rates_chart))
@@ -125,6 +125,8 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
     struct rrdset_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
+
+    const char *chart_full_id = dictionary_acquired_item_name(item);
 
     st->id = string_strdupz(chart_full_id);
 
@@ -194,7 +196,7 @@ static void rrdset_insert_callback(const char *chart_full_id, void *rrdset, void
 }
 
 // the destructor - the dictionary is write locked while this runs
-static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *rrdhost) {
+static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
     RRDHOST *host = rrdhost;
     RRDSET *st = rrdset;
 
@@ -257,7 +259,7 @@ static void rrdset_delete_callback(const char *chart_full_id __maybe_unused, voi
 // the item to be inserted, is already in the dictionary
 // this callback deals with the situation, migrating the existing object to the new values
 // the dictionary is write locked while this runs
-static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
+static void rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
     (void)new_rrdset; // it is NULL
 
     struct rrdset_constructor *ctr = constructor_data;
@@ -340,7 +342,7 @@ static void rrdset_conflict_callback(const char *chart_full_id __maybe_unused, v
 
 // this is called after all insertions/conflicts, with the dictionary unlocked, with a reference to RRDSET
 // so, any actions requiring locks on other objects, should be placed here
-static void rrdset_react_callback(const char *chart_full_id __maybe_unused, void *rrdset, void *constructor_data) {
+static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
     struct rrdset_constructor *ctr = constructor_data;
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
@@ -377,10 +379,10 @@ void rrdhost_init_rrdset_index(RRDHOST *host) {
     if(!host->rrdset_root_index) {
         host->rrdset_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
-        dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, host);
-        dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, host);
+        dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, NULL);
+        dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
+        dictionary_register_react_callback(host->rrdset_root_index, rrdset_react_callback, NULL);
         dictionary_register_delete_callback(host->rrdset_root_index, rrdset_delete_callback, host);
-        dictionary_register_react_callback(host->rrdset_root_index, rrdset_react_callback, host);
     }
 
     if(!host->rrdset_root_index_name) {

@@ -65,10 +65,7 @@ struct register_result {
     struct register_result *next; // used to link contexts together
 };
 
-static void register_result_insert_callback(const char *name, void *value, void *data) {
-    (void)name;
-    (void)data;
-
+static void register_result_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct register_result *t = (struct register_result *)value;
 
     if(t->chart_id) t->chart_id = strdupz(t->chart_id);
@@ -76,9 +73,7 @@ static void register_result_insert_callback(const char *name, void *value, void 
     if(t->dim_name) t->dim_name = strdupz(t->dim_name);
 }
 
-static void register_result_delete_callback(const char *name, void *value, void *data) {
-    (void)name;
-    (void)data;
+static void register_result_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct register_result *t = (struct register_result *)value;
 
     freez((void *)t->chart_id);

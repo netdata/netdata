@@ -74,7 +74,7 @@ struct tc_device {
 // ----------------------------------------------------------------------------
 // tc_class index
 
-static void tc_class_free_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+static void tc_class_free_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     // struct tc_device *d = data;
     struct tc_class *c = value;
 
@@ -84,14 +84,14 @@ static void tc_class_free_callback(const char *name __maybe_unused, void *value,
     string_freez(c->parentid);
 }
 
-static void tc_class_conflict_callback(const char *name __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+static void tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     struct tc_device *d = data; (void)d;
     struct tc_class *c = old_value; (void)c;
     struct tc_class *new_c = new_value; (void)new_c;
 
-    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", name, string2str(d->id));
+    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
 
-    tc_class_free_callback(name, new_value, data);
+    tc_class_free_callback(item, new_value, data);
 }
 
 static void tc_class_index_init(struct tc_device *d) {
@@ -128,12 +128,12 @@ static inline struct tc_class *tc_class_index_find(struct tc_device *d, const ch
 
 static DICTIONARY *tc_device_root_index = NULL;
 
-static void tc_device_add_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+static void tc_device_add_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct tc_device *d = value;
     tc_class_index_init(d);
 }
 
-static void tc_device_free_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+static void tc_device_free_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct tc_device *d = value;
 
     tc_class_index_destroy(d);
