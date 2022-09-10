@@ -108,7 +108,7 @@ void rrdvar_free_remaining_variables(RRDHOST *host, DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // CUSTOM HOST VARIABLES
 
-inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const char *name, void *rrdvar, void *data), void *data) {
+inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data) {
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
@@ -225,7 +225,7 @@ struct variable2json_helper {
     RRDVAR_OPTIONS options;
 };
 
-static int single_variable2json(const char *name __maybe_unused, void *entry, void *data) {
+static int single_variable2json(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     struct variable2json_helper *helper = (struct variable2json_helper *)data;
     RRDVAR *rv = (RRDVAR *)entry;
     NETDATA_DOUBLE value = rrdvar2number(rv);

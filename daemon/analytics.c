@@ -249,8 +249,7 @@ void analytics_exporters(void)
     buffer_free(bi);
 }
 
-int collector_counter_callb(const char *name, void *entry, void *data) {
-    (void)name;
+int collector_counter_callb(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
 
     struct array_printer *ap = (struct array_printer *)data;
     struct collector *col = (struct collector *)entry;

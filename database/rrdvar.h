@@ -64,7 +64,7 @@ extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *nam
 extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value);
 extern void rrdvar_free_remaining_variables(RRDHOST *host, DICTIONARY *dict);
 
-extern int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const char *name, void *rrdvar, void *data), void *data);
+extern int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data);
 
 extern NETDATA_DOUBLE rrdvar2number(RRDVAR *rv);
 

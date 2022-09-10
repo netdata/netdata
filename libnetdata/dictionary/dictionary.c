@@ -1306,7 +1306,7 @@ void dictionary_foreach_done(DICTFE *dfe) {
 // the dictionary is locked for reading while this happens
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
-int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
+int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
     if(unlikely(!dict)) return 0;
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
@@ -1337,7 +1337,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const c
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             dictionary_unlock(dict, rw);
 
-        int r = callback(item_get_name(nv), nv->value, data);
+        int r = callback(nv, nv->value, data);
 
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             dictionary_lock(dict, rw);
@@ -1369,7 +1369,7 @@ static int dictionary_sort_compar(const void *nv1, const void *nv2) {
     return strcmp(item_get_name((*(DICTIONARY_ITEM **)nv1)), item_get_name((*(DICTIONARY_ITEM **)nv2)));
 }
 
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const char *name, void *entry, void *data), void *data) {
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
     if(unlikely(!dict || !dict->entries)) return 0;
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
@@ -1410,7 +1410,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
             if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
                 dictionary_unlock(dict, rw);
 
-            int r = callback(item_get_name(nv), nv->value, data);
+            int r = callback(nv, nv->value, data);
 
             if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
                 dictionary_lock(dict, rw);
@@ -1984,10 +1984,7 @@ static size_t dictionary_unittest_reset_dont_overwrite_nonclone(DICTIONARY *dict
     return errors;
 }
 
-static int dictionary_unittest_walkthrough_callback(const char *name, void *value, void *data) {
-    (void)name;
-    (void)value;
-    (void)data;
+static int dictionary_unittest_walkthrough_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
     return 1;
 }
 
@@ -1999,8 +1996,8 @@ static size_t dictionary_unittest_walkthrough(DICTIONARY *dict, char **names, ch
     else return sum - entries;
 }
 
-static int dictionary_unittest_walkthrough_delete_this_callback(const char *name, void *value, void *data) {
-    (void)value;
+static int dictionary_unittest_walkthrough_delete_this_callback(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
+    const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
     if(dictionary_del_having_write_lock((DICTIONARY *)data, name) == -1)
         return 0;
@@ -2016,10 +2013,7 @@ static size_t dictionary_unittest_walkthrough_delete_this(DICTIONARY *dict, char
     else return sum - entries;
 }
 
-static int dictionary_unittest_walkthrough_stop_callback(const char *name, void *value, void *data) {
-    (void)name;
-    (void)value;
-    (void)data;
+static int dictionary_unittest_walkthrough_stop_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
     return -1;
 }
 
@@ -2120,7 +2114,8 @@ struct dictionary_unittest_sorting {
     size_t count;
 };
 
-static int dictionary_unittest_sorting_callback(const char *name, void *value, void *data) {
+static int dictionary_unittest_sorting_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     struct dictionary_unittest_sorting *t = (struct dictionary_unittest_sorting *)data;
     const char *v = (const char *)value;
 
@@ -2161,10 +2156,7 @@ static void dictionary_unittest_null_dfe(DICTIONARY *dict, char **names, char **
 }
 
 
-static int check_dictionary_callback(const char *name, void *value, void *data) {
-    (void)name;
-    (void)value;
-    (void)data;
+static int check_dictionary_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
     return 1;
 }
 
@@ -2226,8 +2218,7 @@ static size_t check_dictionary(DICTIONARY *dict, size_t entries, size_t linked_l
     return errors;
 }
 
-static int check_item_callback(const char *name, void *value, void *data) {
-    (void)name;
+static int check_item_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     return value == data;
 }
 

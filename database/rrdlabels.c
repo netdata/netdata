@@ -644,10 +644,7 @@ void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const
 // rrdlabels_unmark_all()
 // remove labels RRDLABEL_FLAG_OLD and RRDLABEL_FLAG_NEW from all dictionary items
 
-static int remove_flags_old_new(const char *name, void *value, void *data) {
-    (void)name;
-    (void)data;
-
+static int remove_flags_old_new(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     RRDLABEL *lb = (RRDLABEL *)value;
 
     if(lb->label_source & RRDLABEL_FLAG_OLD) lb->label_source &= ~RRDLABEL_FLAG_OLD;
@@ -665,7 +662,8 @@ void rrdlabels_unmark_all(DICTIONARY *labels) {
 // rrdlabels_remove_all_unmarked()
 // remove dictionary items that are neither old, nor new
 
-static int remove_not_old_not_new_callback(const char *name, void *value, void *data) {
+static int remove_not_old_not_new_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
     DICTIONARY *dict = (DICTIONARY *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 
@@ -690,7 +688,8 @@ struct labels_walkthrough {
     void *data;
 };
 
-static int labels_walkthrough_callback(const char *name, void *value, void *data) {
+static int labels_walkthrough_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
     struct labels_walkthrough *d = (struct labels_walkthrough *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 
@@ -722,7 +721,8 @@ int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const 
 // rrdlabels_migrate_to_these()
 // migrate an existing label list to a new list, INPLACE
 
-static int copy_label_to_dictionary_callback(const char *name, void *value, void *data) {
+static int copy_label_to_dictionary_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
     DICTIONARY *dst = (DICTIONARY *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
     labels_add_already_sanitized(dst, name, string2str(lb->label_value), lb->label_source);
@@ -759,7 +759,8 @@ struct simple_pattern_match_name_value {
     char equal;
 };
 
-static int simple_pattern_match_name_only_callback(const char *name, void *value, void *data) {
+static int simple_pattern_match_name_only_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
     struct simple_pattern_match_name_value *t = (struct simple_pattern_match_name_value *)data;
     (void)value;
 
@@ -769,7 +770,8 @@ static int simple_pattern_match_name_only_callback(const char *name, void *value
     return 0;
 }
 
-static int simple_pattern_match_name_and_value_callback(const char *name, void *value, void *data) {
+static int simple_pattern_match_name_and_value_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
     struct simple_pattern_match_name_value *t = (struct simple_pattern_match_name_value *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 
@@ -835,7 +837,9 @@ bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_patte
 // ----------------------------------------------------------------------------
 // Log all labels
 
-static int rrdlabels_log_label_to_buffer_callback(const char *name, void *value, void *data) {
+static int rrdlabels_log_label_to_buffer_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
+
     BUFFER *wb = (BUFFER *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 
@@ -885,7 +889,8 @@ struct labels_to_buffer {
     size_t count;
 };
 
-static int label_to_buffer_callback(const char *name, void *value, void *data) {
+static int label_to_buffer_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
     struct labels_to_buffer *t = (struct labels_to_buffer *)data;
     RRDLABEL *lb = (RRDLABEL *)value;
 

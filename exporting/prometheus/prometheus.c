@@ -349,7 +349,7 @@ struct host_variables_callback_options {
  * @param data callback options.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
-static int print_host_variables(const char *name __maybe_unused, void *rv_ptr, void *data) {
+static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rv_ptr, void *data) {
     RRDVAR *rv = rv_ptr;
 
     struct host_variables_callback_options *opts = data;
@@ -564,7 +564,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             .host_header_printed = 0
         };
 
-        rrdvar_walkthrough_read(host->rrdvar_root_index, print_host_variables, &opts);
+        rrdvar_walkthrough_read(host->rrdvar_root_index, print_host_variables_callback, &opts);
     }
 
     // for each chart

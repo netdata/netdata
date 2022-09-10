@@ -151,9 +151,7 @@ struct array_printer {
     BUFFER *wb;
 };
 
-static int print_collector_callback(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int print_collector_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     struct array_printer *ap = (struct array_printer *)data;
     BUFFER *wb = ap->wb;
     struct collector *col=(struct collector *) entry;

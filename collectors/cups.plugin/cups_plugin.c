@@ -137,10 +137,7 @@ getIntegerOption(
   return ((int)intvalue);
 }
 
-static int reset_job_metrics(const char *name, void *entry, void *data) {
-    (void)name;
-    (void)data;
-
+static int reset_job_metrics(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     struct job_metrics *jm = (struct job_metrics *)entry;
 
     jm->is_collected = 0;
@@ -175,8 +172,8 @@ struct job_metrics *get_job_metrics(char *dest) {
     return jm;
 }
 
-int collect_job_metrics(const char *name, void *entry, void *data) {
-    (void)data;
+int collect_job_metrics(const DICTIONARY_ITEM *item, void *entry, void *data __maybe_unused) {
+    const char *name = dictionary_acquired_item_name(item);
 
     struct job_metrics *jm = (struct job_metrics *)entry;
 

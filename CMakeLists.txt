@@ -220,7 +220,11 @@ pkg_check_modules(CURL libcurl)
 # -----------------------------------------------------------------------------
 # Detect libcups
 
-pkg_check_modules(CURL libcups)
+pkg_check_modules(CUPS libcups)
+IF(NOT CUPS_LIBRARIES)
+    pkg_check_modules(CUPS cups)
+ENDIF()
+
 # later we use:
 # ${CUPS_LIBRARIES}
 # ${CUPS_CFLAGS_OTHER}

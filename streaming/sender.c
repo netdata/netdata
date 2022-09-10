@@ -146,7 +146,7 @@ void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
 }
 
 
-static int rrdpush_sender_thread_custom_host_variables_callback(const char *name __maybe_unused, void *rrdvar_ptr, void *host_ptr) {
+static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr, void *host_ptr) {
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 

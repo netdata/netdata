@@ -1591,7 +1591,8 @@ struct rrdcontext_to_json {
     RRD_FLAGS combined_flags;
 };
 
-static inline int rrdmetric_to_json_callback(const char *id, void *value, void *data) {
+static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *id = dictionary_acquired_item_name(item);
     struct rrdcontext_to_json * t = data;
     RRDMETRIC *rm = value;
     BUFFER *wb = t->wb;
@@ -1663,7 +1664,9 @@ static inline int rrdmetric_to_json_callback(const char *id, void *value, void *
     return 1;
 }
 
-static inline int rrdinstance_to_json_callback(const char *id, void *value, void *data) {
+static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *id = dictionary_acquired_item_name(item);
+
     struct rrdcontext_to_json *t_parent = data;
     RRDINSTANCE *ri = value;
     BUFFER *wb = t_parent->wb;
@@ -1797,7 +1800,8 @@ static inline int rrdinstance_to_json_callback(const char *id, void *value, void
     return 1;
 }
 
-static inline int rrdcontext_to_json_callback(const char *id, void *value, void *data) {
+static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    const char *id = dictionary_acquired_item_name(item);
     struct rrdcontext_to_json *t_parent = data;
     RRDCONTEXT *rc = value;
     BUFFER *wb = t_parent->wb;
@@ -1964,7 +1968,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
         .written = 0,
         .now = now_realtime_sec(),
     };
-    rrdcontext_to_json_callback(context, rc, &t_contexts);
+    rrdcontext_to_json_callback((DICTIONARY_ITEM *)rca, rc, &t_contexts);
 
     rrdcontext_release(rca);
 

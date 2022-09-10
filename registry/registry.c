@@ -108,9 +108,7 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;

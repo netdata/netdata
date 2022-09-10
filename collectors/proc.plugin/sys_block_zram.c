@@ -239,13 +239,16 @@ static inline int _collect_zram_metrics(const char* name, ZRAM_DEVICE *d, int ad
     return 0;
 }
 
-static int collect_first_zram_metrics(const char *name, void *entry, void *data) {
+static int collect_first_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
+
     // collect without calling rrdset_next (init only)
     return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 0, (DICTIONARY *)data);
 }
 
-static int collect_zram_metrics(const char *name, void *entry, void *data) {
-    (void)name;
+static int collect_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
+
     // collect with calling rrdset_next
     return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 1, (DICTIONARY *)data);
 }

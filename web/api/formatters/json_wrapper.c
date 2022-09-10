@@ -7,9 +7,7 @@ struct value_output {
     BUFFER *wb;
 };
 
-static int value_list_output(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int value_list_output_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     struct value_output *ap = (struct value_output *)data;
     BUFFER *wb = ap->wb;
     char *output = (char *) entry;
@@ -153,7 +151,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrddim_id(rd), rrddim_name(rd));
             dictionary_set(dict, name, output, len+1);
         }
-        dictionary_walkthrough_read(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
         co.c = 0;
@@ -165,7 +163,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             dictionary_set(dict, name, output, len + 1);
         }
 
-        dictionary_walkthrough_read(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
         RRDSET *st;
@@ -177,7 +175,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if (st->rrdlabels)
                 rrdlabels_walkthrough_read(st->rrdlabels, fill_formatted_callback, dict);
         }
-        dictionary_walkthrough_read(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
         buffer_strcat(wb, "],\n");
     }

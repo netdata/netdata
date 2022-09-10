@@ -321,7 +321,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
     return 0;
 }
 
-static int format_variable_prometheus_remote_write_callback(const char *name_txt __maybe_unused, void *rv_ptr, void *data) {
+static int format_variable_prometheus_remote_write_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rv_ptr, void *data) {
     RRDVAR *rv = rv_ptr;
 
     struct prometheus_remote_write_variables_callback_options *opts = data;
