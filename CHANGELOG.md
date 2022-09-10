@@ -40,6 +40,7 @@
 - feat\(python.d/nvidia\_smi\): collect power state [\#13580](https://github.com/netdata/netdata/pull/13580) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d/nvidia\_smi\): repsect update\_every for polling [\#13579](https://github.com/netdata/netdata/pull/13579) ([ilyam8](https://github.com/ilyam8))
 - prevent crash on rrdcontext apis when rrdcontexts is not initialized [\#13578](https://github.com/netdata/netdata/pull/13578) ([ktsaou](https://github.com/ktsaou))
+- CMake improvements part 1 [\#13575](https://github.com/netdata/netdata/pull/13575) ([underhood](https://github.com/underhood))
 - bump go.d.plugin to v0.37.2 [\#13574](https://github.com/netdata/netdata/pull/13574) ([ilyam8](https://github.com/ilyam8))
 - Updating info for postgreqsql metrics [\#13573](https://github.com/netdata/netdata/pull/13573) ([shyamvalsan](https://github.com/shyamvalsan))
 - add `apt` to `apps_groups.conf` [\#13571](https://github.com/netdata/netdata/pull/13571) ([andrewm4894](https://github.com/andrewm4894))
@@ -348,7 +349,6 @@
 - Run the /net/dev module of the proc plugin in a separate thread [\#12996](https://github.com/netdata/netdata/pull/12996) ([vlvkobal](https://github.com/vlvkobal))
 - Autodetect coverity install path to increase robustness [\#12995](https://github.com/netdata/netdata/pull/12995) ([maneamarius](https://github.com/maneamarius))
 - Fix compilation warnings [\#12993](https://github.com/netdata/netdata/pull/12993) ([vlvkobal](https://github.com/vlvkobal))
-- Delay children chart obsoletion check [\#12992](https://github.com/netdata/netdata/pull/12992) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
