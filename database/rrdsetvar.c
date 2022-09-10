@@ -96,7 +96,7 @@ static void rrdsetvar_set_value(RRDSETVAR *rs, void *new_value) {
 }
 
 struct rrdsetvar_constructor {
-    RRDSET *st;
+    RRDSET *rrdset;
     const char *variable;
     RRDVAR_TYPE type;
     void *value;
@@ -116,7 +116,7 @@ static void rrdsetvar_insert_callback(const char *name __maybe_unused, void *rrd
     rs->variable = string_strdupz(ctr->variable);
     rs->type = ctr->type;
     rs->options = ctr->options | RRDVAR_OPTION_INTERNAL_JUST_CREATED;
-    rs->rrdset = ctr->st;
+    rs->rrdset = ctr->rrdset;
     rrdsetvar_set_value(rs, ctr->value);
 
     ctr->react_action = RRDSETVAR_REACT_NEW;
@@ -189,6 +189,7 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, 
         .type = type,
         .value = value,
         .options = options,
+        .rrdset = st,
     };
 
     RRDSETVAR *rs = dictionary_set_advanced(st->rrdsetvar_root_index, variable, -1, NULL, sizeof(RRDSETVAR), &tmp);
