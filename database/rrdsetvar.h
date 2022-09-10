@@ -40,6 +40,5 @@ extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, NETDATA_DOUBLE va
 
 extern void rrdsetvar_rename_all(RRDSET *st);
 extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options);
-extern void rrdsetvar_free(RRDSETVAR *rs);
 
 #endif //NETDATA_RRDSETVAR_H

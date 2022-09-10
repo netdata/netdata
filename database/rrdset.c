@@ -347,14 +347,14 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
-    if(host->health_enabled && (ctr->react_action & RRDSET_REACT_NEW || ctr->react_action & RRDSET_REACT_CHART_ACTIVATED)) {
-        rrdset_wrlock(st);
+    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
         rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
 
+        rrdset_wrlock(st);
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
         rrdset_unlock(st);

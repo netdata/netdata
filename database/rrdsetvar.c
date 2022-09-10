@@ -204,10 +204,6 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, 
     return rs;
 }
 
-void rrdsetvar_free(RRDSETVAR *rs) {
-    dictionary_del(rs->rrdset->rrdsetvar_root_index, string2str(rs->variable));
-}
-
 void rrdsetvar_rename_all(RRDSET *st) {
     debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
 

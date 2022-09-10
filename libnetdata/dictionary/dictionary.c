@@ -34,7 +34,7 @@ struct dictionary_item {
     struct dictionary_item *next;    // a double linked list to allow fast insertions and deletions
     struct dictionary_item *prev;
 
-    uint32_t refcount;          // the reference counter
+    int32_t refcount;           // the reference counter
     uint32_t value_len:29;      // the size of the value (assumed binary)
     uint8_t flags:3;            // the flags for this item
 
@@ -93,6 +93,7 @@ struct dictionary {
 static inline void item_linked_list_unlink_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv);
 static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv);
 static inline const char *item_get_name(const DICTIONARY_ITEM *nv);
+static bool item_can_be_deleted(DICTIONARY *dict, DICTIONARY_ITEM *nv);
 
 // ----------------------------------------------------------------------------
 // callbacks registration
@@ -258,7 +259,7 @@ static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
 
     DICTIONARY_ITEM *nv = dict->first_item;
     while(nv) {
-        if((nv->flags & ITEM_FLAG_DELETED) && DICTIONARY_ITEM_REFCOUNT_GET(nv) == 0) {
+        if((nv->flags & ITEM_FLAG_DELETED) && item_can_be_deleted(dict, nv)) {
             DICTIONARY_ITEM *nv_next = nv->next;
 
             item_linked_list_unlink_unsafe(dict, nv);
@@ -399,20 +400,16 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
     return 0;
 }
 
-static void reference_counter_dup(DICTIONARY_ITEM *nv) {
-    uint32_t refcount = __atomic_fetch_add(&nv->refcount, 1, __ATOMIC_SEQ_CST);
-
-    if(refcount == 0)
-        fatal("DICTIONARY: request to dup item '%s' but its reference counter was zero", item_get_name(nv));
-}
-
 static void reference_counter_acquire(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
-    uint32_t refcount;
+    int32_t refcount;
 
     if(likely(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))
         refcount = ++nv->refcount;
     else
         refcount = __atomic_add_fetch(&nv->refcount, 1, __ATOMIC_SEQ_CST);
+
+    if(refcount <= 0)
+        fatal("DICTIONARY: request to acquire item '%s', which is deleted!", item_get_name(nv));
 
     if(refcount == 1) {
         // referenced items counts number of unique items referenced
@@ -431,7 +428,7 @@ static void reference_counter_release(DICTIONARY *dict, DICTIONARY_ITEM *nv, boo
     // or even when someone else has a write lock on the dictionary
     // so, we cannot check for EXCLUSIVE ACCESS
 
-    uint32_t refcount;
+    int32_t refcount;
     if(likely(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))
         refcount = nv->refcount--;
     else
@@ -465,6 +462,24 @@ static void reference_counter_release(DICTIONARY *dict, DICTIONARY_ITEM *nv, boo
         dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
     }
 }
+
+// if a dictionary item can be deleted, return true, otherwise return false
+static bool item_can_be_deleted(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
+    if(unlikely(dict->flags & DICTIONARY_FLAG_DEFER_ALL_DELETIONS))
+        return false;
+
+    int32_t expected = DICTIONARY_ITEM_REFCOUNT_GET(nv);
+
+    if(expected == 0 && __atomic_compare_exchange_n(&nv->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
+        return true;
+
+    return false;
+}
+
+static bool item_found_in_hashtable_can_be_used(DICTIONARY_ITEM *nv) {
+    return nv && DICTIONARY_ITEM_REFCOUNT_GET(nv) >= 0;
+}
+
 
 // ----------------------------------------------------------------------------
 // hash table
@@ -742,17 +757,6 @@ static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
     return freed;
 }
 
-// if a dictionary item can be deleted, return true, otherwise return false
-static bool item_can_be_deleted(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
-    if(unlikely(dict->flags & DICTIONARY_FLAG_DEFER_ALL_DELETIONS))
-        return false;
-
-    if(unlikely(DICTIONARY_ITEM_REFCOUNT_GET(nv) > 0))
-        return false;
-
-    return true;
-}
-
 // ----------------------------------------------------------------------------
 // API - dictionary management
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -810,7 +814,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
             DICTIONARY_ITEM *nv_next;
             for (nv = dict->first_item; nv; nv = nv_next) {
                 nv_next = nv->next;
-                size_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(nv);
+                int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(nv);
                 if (!refcount && !(nv->flags & ITEM_FLAG_DELETED))
                     dictionary_del_unsafe(dict, item_get_name(nv));
             }
@@ -966,7 +970,7 @@ static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char 
     debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     DICTIONARY_ITEM *nv = hashtable_get_unsafe(dict, name, name_len);
-    if(unlikely(!nv)) {
+    if(unlikely(!item_found_in_hashtable_can_be_used(nv))) {
         debug(D_DICTIONARY, "Not found dictionary entry with name '%s'.", name);
         return NULL;
     }
@@ -1079,9 +1083,9 @@ const DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const c
     return ret;
 }
 
-const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
+const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
-    reference_counter_dup(item);
+    reference_counter_acquire(dict, item);
     return item;
 }
 
@@ -2223,7 +2227,7 @@ static int check_item_callback(const DICTIONARY_ITEM *item __maybe_unused, void 
 }
 
 static size_t check_item_deleted_flag(DICTIONARY *dict,
-    DICTIONARY_ITEM *nv, const char *name, const char *value, unsigned refcount,
+    DICTIONARY_ITEM *nv, const char *name, const char *value, int refcount,
     ITEM_FLAGS deleted_flags, bool searchable, bool browsable, bool linked) {
     size_t errors = 0;
 

@@ -133,7 +133,7 @@ extern const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONAR
 extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 
-extern const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
+extern const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 extern const char *dictionary_acquired_item_name(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 extern void *dictionary_acquired_item_value(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
 
