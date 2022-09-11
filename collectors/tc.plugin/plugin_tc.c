@@ -445,7 +445,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->rd_bytes))
                 c->rd_bytes = rrddim_add(d->st_bytes, string2str(c->id), string2str(c->name?c->name:c->id), 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_bytes, c->rd_bytes, string2str(c->name));
+                rrddim_reset_name(d->st_bytes, c->rd_bytes, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
         }
@@ -511,7 +511,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->rd_packets))
                 c->rd_packets = rrddim_add(d->st_packets, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_packets, c->rd_packets, string2str(c->name));
+                rrddim_reset_name(d->st_packets, c->rd_packets, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
         }
@@ -577,7 +577,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->rd_dropped))
                 c->rd_dropped = rrddim_add(d->st_dropped, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_dropped, c->rd_dropped, string2str(c->name));
+                rrddim_reset_name(d->st_dropped, c->rd_dropped, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
         }
@@ -644,7 +644,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 c->rd_tokens = rrddim_add(d->st_tokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_tokens, c->rd_tokens, string2str(c->name));
+                rrddim_reset_name(d->st_tokens, c->rd_tokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_tokens, c->rd_tokens, c->tokens);
         }
@@ -711,7 +711,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->rd_ctokens))
                 c->rd_ctokens = rrddim_add(d->st_ctokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_ctokens, c->rd_ctokens, string2str(c->name));
+                rrddim_reset_name(d->st_ctokens, c->rd_ctokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_ctokens, c->rd_ctokens, c->ctokens);
         }

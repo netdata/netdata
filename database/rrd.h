@@ -155,7 +155,7 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 struct rrdfamily {
     STRING *family;
-    DICTIONARY *rrdvariables;
+    DICTIONARY *rrdvars;
 
     size_t use_count;
 };
@@ -618,7 +618,7 @@ struct rrdset {
     NETDATA_DOUBLE green;                           // green threshold for this chart
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
-    DICTIONARY *rrdvariables;                       // RRDVAR index for this chart
+    DICTIONARY *rrdvars;                       // RRDVAR index for this chart
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
     RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
 };
@@ -945,7 +945,7 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
     DICTIONARY *rrdfamily_root_index;               // the host's chart families index
-    DICTIONARY *rrdvariables_index;                 // the host's chart variables index
+    DICTIONARY *rrdvars;                 // the host's chart variables index
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
@@ -1208,7 +1208,7 @@ extern RRDDIM *rrddim_add_custom(RRDSET *st
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
     rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
-extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
+extern int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
 extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
 extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);

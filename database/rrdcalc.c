@@ -125,10 +125,10 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 
     rc->local  = rrdvar_add(
-        "local", st->rrdvariables, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+        "local", st->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
     rc->family = rrdvar_add(
         "family",
-        st->rrdfamily->rrdvariables,
+        st->rrdfamily->rrdvars,
         rc->name,
         RRDVAR_TYPE_CALCULATED,
         RRDVAR_OPTION_RRDCALC_FAMILY_VAR,
@@ -139,7 +139,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     STRING *fullname_string = string_strdupz(fullname);
     rc->hostid   = rrdvar_add(
         "host",
-        host->rrdvariables_index,
+        host->rrdvars,
         fullname_string,
         RRDVAR_TYPE_CALCULATED,
         RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR,
@@ -148,7 +148,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
     rc->hostname = rrdvar_add(
         "host",
-        host->rrdvariables_index,
+        host->rrdvars,
         fullname_string,
         RRDVAR_TYPE_CALCULATED,
         RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR,
@@ -278,16 +278,16 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     // unlink it
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alarms, rc, rrdset_prev, rrdset_next);
 
-    rrdvar_delete(st->rrdvariables, rc->local);
+    rrdvar_delete(st->rrdvars, rc->local);
     rc->local = NULL;
 
-    rrdvar_delete(st->rrdfamily->rrdvariables, rc->family);
+    rrdvar_delete(st->rrdfamily->rrdvars, rc->family);
     rc->family = NULL;
 
-    rrdvar_delete(host->rrdvariables_index, rc->hostid);
+    rrdvar_delete(host->rrdvars, rc->hostid);
     rc->hostid = NULL;
 
-    rrdvar_delete(host->rrdvariables_index, rc->hostname);
+    rrdvar_delete(host->rrdvars, rc->hostname);
     rc->hostname = NULL;
 
     rc->rrdset = NULL;

@@ -564,7 +564,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             .host_header_printed = 0
         };
 
-        rrdvar_walkthrough_read(host->rrdvariables_index, print_host_variables_callback, &opts);
+        rrdvar_walkthrough_read(host->rrdvars, print_host_variables_callback, &opts);
     }
 
     // for each chart

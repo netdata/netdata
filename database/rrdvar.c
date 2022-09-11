@@ -91,7 +91,7 @@ static inline RRDVAR *rrdvar_get(DICTIONARY *dict, STRING *name) {
 }
 
 inline void rrdvar_delete(DICTIONARY *dict, RRDVAR *rv) {
-    if(!dict || !rv) return;
+    if(unlikely(!dict || !rv)) return;
 
     if(dictionary_del(dict, rrdvar_name(rv)) != 0)
         error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
@@ -123,7 +123,7 @@ inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTI
 }
 
 RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
-    DICTIONARY *dict = host->rrdvariables_index;
+    DICTIONARY *dict = host->rrdvars;
 
     STRING *name_string = rrdvar_name_to_string(name);
 
@@ -199,19 +199,19 @@ int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result
     RRDHOST *host = st->rrdhost;
     RRDVAR *rv;
 
-    rv = rrdvar_get(st->rrdvariables, variable);
+    rv = rrdvar_get(st->rrdvars, variable);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
     }
 
-    rv = rrdvar_get(st->rrdfamily->rrdvariables, variable);
+    rv = rrdvar_get(st->rrdfamily->rrdvars, variable);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
     }
 
-    rv = rrdvar_get(host->rrdvariables_index, variable);
+    rv = rrdvar_get(host->rrdvars, variable);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
@@ -254,7 +254,7 @@ void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
     };
 
     buffer_sprintf(buf, "{");
-    rrdvar_walkthrough_read(st->rrdvariables, single_variable2json, &helper);
+    rrdvar_walkthrough_read(st->rrdvars, single_variable2json, &helper);
     buffer_strcat(buf, "\n\t\t\t}");
 }
 
@@ -268,15 +268,15 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     };
 
     buffer_sprintf(buf, "{\n\t\"chart\": \"%s\",\n\t\"chart_name\": \"%s\",\n\t\"chart_context\": \"%s\",\n\t\"chart_variables\": {", rrdset_id(st), rrdset_name(st), rrdset_context(st));
-    rrdvar_walkthrough_read(st->rrdvariables, single_variable2json, &helper);
+    rrdvar_walkthrough_read(st->rrdvars, single_variable2json, &helper);
 
     buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", rrdset_family(st));
     helper.counter = 0;
-    rrdvar_walkthrough_read(st->rrdfamily->rrdvariables, single_variable2json, &helper);
+    rrdvar_walkthrough_read(st->rrdfamily->rrdvars, single_variable2json, &helper);
 
     buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", rrdhost_hostname(host));
     helper.counter = 0;
-    rrdvar_walkthrough_read(host->rrdvariables_index, single_variable2json, &helper);
+    rrdvar_walkthrough_read(host->rrdvars, single_variable2json, &helper);
 
     buffer_strcat(buf, "\n\t}\n}\n");
 }

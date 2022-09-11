@@ -1277,19 +1277,19 @@ static int test_variable_renames(void) {
     fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");
-    rrddim_set_name(st, rd1, "DIM1NAME1");
+    rrddim_reset_name(st, rd1, "DIM1NAME1");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME2\n");
-    rrddim_set_name(st, rd1, "DIM1NAME2");
+    rrddim_reset_name(st, rd1, "DIM1NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME1\n");
-    rrddim_set_name(st, rd2, "DIM2NAME1");
+    rrddim_reset_name(st, rd2, "DIM2NAME1");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME2\n");
-    rrddim_set_name(st, rd2, "DIM2NAME2");
+    rrddim_reset_name(st, rd2, "DIM2NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     BUFFER *buf = buffer_create(1);

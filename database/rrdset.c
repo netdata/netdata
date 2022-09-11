@@ -183,7 +183,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdsetvar_index_init(st);
 
-    st->rrdvariables = rrdvariables_create();
+    st->rrdvars = rrdvariables_create();
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
@@ -231,7 +231,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // free directly allocated members
     rrdset_memory_file_free(st);
     rrdset_free_rrddim_index(st);
-    rrdvariables_destroy(st->rrdvariables);
+    rrdvariables_destroy(st->rrdvars);
     rrdlabels_destroy(st->rrdlabels);
 
     string_freez(st->id);

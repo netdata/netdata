@@ -248,7 +248,7 @@ static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     ctr->react_action = RRDDIM_REACT_NONE;
 
-    int rc = rrddim_set_name(st, rd, ctr->name);
+    int rc = rrddim_reset_name(st, rd, ctr->name);
     rc += rrddim_set_algorithm(st, rd, ctr->algorithm);
     rc += rrddim_set_multiplier(st, rd, ctr->multiplier);
     rc += rrddim_set_divisor(st, rd, ctr->divisor);
@@ -349,14 +349,15 @@ RRDDIM *rrddim_find_active(RRDSET *st, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDDIM rename a dimension
 
-inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
+inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
     if(unlikely(!name || !*name || !strcmp(rrddim_name(rd), name)))
         return 0;
 
-    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
+    debug(D_RRD_CALLS, "rrddim_reset_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
 
-    string_freez(rd->name);
+    STRING *old = rd->name;
     rd->name = rrd_string_strdupz(name);
+    string_freez(old);
 
     if (!rrdset_is_ar_chart(st))
         rrddimvar_rename_all(rd);
