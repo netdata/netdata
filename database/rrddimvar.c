@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_HEALTH_INTERNALS
 #include "rrd.h"
 
 // ----------------------------------------------------------------------------
@@ -16,65 +15,39 @@ static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
 
     // CHART VARIABLES FOR THIS DIMENSION
 
-    rrdvar_del(st->rrdvars, rs->var_local_id);
-    rs->var_local_id = NULL;
+    rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local_dim_id);
+    rs->rrdvar_local_dim_id = NULL;
 
-    rrdvar_del(st->rrdvars, rs->var_local_name);
-    rs->var_local_name = NULL;
+    rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local_dim_name);
+    rs->rrdvar_local_dim_name = NULL;
 
     // FAMILY VARIABLES FOR THIS DIMENSION
 
-    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_id);
-    rs->var_family_id = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_id);
+    rs->rrdvar_family_id = NULL;
 
-    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_name);
-    rs->var_family_name = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_name);
+    rs->rrdvar_family_name = NULL;
 
-    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_contextid);
-    rs->var_family_contextid = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_id);
+    rs->rrdvar_family_context_dim_id = NULL;
 
-    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_contextname);
-    rs->var_family_contextname = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_name);
+    rs->rrdvar_family_context_dim_name = NULL;
 
     // HOST VARIABLES FOR THIS DIMENSION
 
-    rrdvar_del(host->rrdvars, rs->var_host_chartidid);
-    rs->var_host_chartidid = NULL;
+    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_id);
+    rs->rrdvar_host_chart_id_dim_id = NULL;
 
-    rrdvar_del(host->rrdvars, rs->var_host_chartidname);
-    rs->var_host_chartidname = NULL;
+    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_name);
+    rs->rrdvar_host_chart_id_dim_name = NULL;
 
-    rrdvar_del(host->rrdvars, rs->var_host_chartnameid);
-    rs->var_host_chartnameid = NULL;
+    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name_dim_id);
+    rs->rrdvar_host_chart_name_dim_id = NULL;
 
-    rrdvar_del(host->rrdvars, rs->var_host_chartnamename);
-    rs->var_host_chartnamename = NULL;
-
-    // KEYS
-
-    string_freez(rs->key_id);
-    rs->key_id = NULL;
-
-    string_freez(rs->key_name);
-    rs->key_name = NULL;
-
-    string_freez(rs->key_fullidid);
-    rs->key_fullidid = NULL;
-
-    string_freez(rs->key_fullidname);
-    rs->key_fullidname = NULL;
-
-    string_freez(rs->key_contextid);
-    rs->key_contextid = NULL;
-
-    string_freez(rs->key_contextname);
-    rs->key_contextname = NULL;
-
-    string_freez(rs->key_fullnameid);
-    rs->key_fullnameid = NULL;
-
-    string_freez(rs->key_fullnamename);
-    rs->key_fullnamename = NULL;
+    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name_dim_name);
+    rs->rrdvar_host_chart_name_dim_name = NULL;
 }
 
 static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
@@ -89,28 +62,28 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // KEYS
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", string2str(rs->prefix), rrddim_id(rd), string2str(rs->suffix));
-    rs->key_id = string_strdupz(buffer);
+    STRING *key_dim_id = string_strdupz(buffer);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", string2str(rs->prefix), rrddim_name(rd), string2str(rs->suffix));
-    rs->key_name = string_strdupz(buffer);
+    STRING *key_dim_name = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), string2str(rs->key_id));
-    rs->key_fullidid = string_strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), string2str(key_dim_id));
+    STRING *key_chart_id_dim_id = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), string2str(rs->key_name));
-    rs->key_fullidname = string_strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_id(st), string2str(key_dim_name));
+    STRING *key_chart_id_dim_name = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), string2str(rs->key_id));
-    rs->key_contextid = string_strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), string2str(key_dim_id));
+    STRING *key_context_dim_id = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), string2str(rs->key_name));
-    rs->key_contextname = string_strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_context(st), string2str(key_dim_name));
+    STRING *key_context_dim_name = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), string2str(rs->key_id));
-    rs->key_fullnameid = string_strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), string2str(key_dim_id));
+    STRING *key_chart_name_dim_id = string_strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), string2str(rs->key_name));
-    rs->key_fullnamename = string_strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rrdset_name(st), string2str(key_dim_name));
+    STRING *key_chart_name_dim_name = string_strdupz(buffer);
 
     // CHART VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -119,8 +92,8 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $id
     // - $name
 
-    rs->var_local_id           = rrdvar_add("local", st->rrdvars, rs->key_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_local_name         = rrdvar_add("local", st->rrdvars, rs->key_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_local_dim_id = rrdvar_add_and_acquire("local", st->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_local_dim_name = rrdvar_add_and_acquire("local", st->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
 
     // FAMILY VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -131,10 +104,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-context.id
     // - $chart-context.name
 
-    rs->var_family_id          = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_family_name        = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_family_contextid   = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_contextid, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_family_contextname = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_contextname, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_family_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_family_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_family_context_dim_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_family_context_dim_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
 
     // HOST VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -145,10 +118,21 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    rs->var_host_chartidid      = rrdvar_add("host", host->rrdvars, rs->key_fullidid, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_host_chartidname    = rrdvar_add("host", host->rrdvars, rs->key_fullidname, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_host_chartnameid    = rrdvar_add("host", host->rrdvars, rs->key_fullnameid, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->var_host_chartnamename  = rrdvar_add("host", host->rrdvars, rs->key_fullnamename, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_host_chart_id_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_host_chart_id_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_host_chart_name_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->rrdvar_host_chart_name_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+
+    // free the keys
+
+    string_freez(key_dim_id);
+    string_freez(key_dim_name);
+    string_freez(key_chart_id_dim_id);
+    string_freez(key_chart_id_dim_name);
+    string_freez(key_context_dim_id);
+    string_freez(key_context_dim_name);
+    string_freez(key_chart_name_dim_id);
+    string_freez(key_chart_name_dim_name);
 }
 
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS options) {
@@ -167,7 +151,7 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, co
 
     rs->type = type;
     rs->value = value;
-    rs->options = options;
+    rs->flags = options;
     rs->rrddim = rd;
 
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(rd->variables, rs, prev, next);

@@ -124,45 +124,33 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         st->red = rc->red;
     }
 
-    rc->local  = rrdvar_add(
-        "local",
-        st->rrdvars,
-        rc->name,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_FLAG_RRDCALC_LOCAL_VAR,
-        &rc->value);
-
-    rc->family = rrdvar_add(
-        "family",
-        st->rrdfamily->rrdvars,
-        rc->name,
-        RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_FAMILY_VAR,
-        &rc->value);
+    rc->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_LOCAL_VAR, &rc->value);
+    rc->rrdvar_family = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_FAMILY_VAR, &rc->value);
 
     char buf[RRDVAR_MAX_LENGTH + 1];
 
     snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
-    STRING *hostname_string = string_strdupz(buf);
-    rc->hostname = rrdvar_add(
+    STRING *rrdset_name_rrdcalc_name = string_strdupz(buf);
+    rc->rrdvar_host_chart_name = rrdvar_add_and_acquire(
         "host",
         host->rrdvars,
-        hostname_string,
+        rrdset_name_rrdcalc_name,
         RRDVAR_TYPE_CALCULATED,
         RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR,
         &rc->value);
 
     snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
-    STRING *hostid_string = string_strdupz(buf);
-    rc->hostid   = rrdvar_add(
+    STRING *rrdset_id_rrdcalc_name = string_strdupz(buf);
+    rc->rrdvar_host_chart_id = rrdvar_add_and_acquire(
         "host",
         host->rrdvars,
-        hostid_string,
+        rrdset_id_rrdcalc_name,
         RRDVAR_TYPE_CALCULATED,
-        RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR | ((rc->hostname)?0:RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR),
+        RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR | ((rc->rrdvar_host_chart_name) ? 0 : RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR),
         &rc->value);
 
-    string_freez(hostid_string);
-    string_freez(hostname_string);
+    string_freez(rrdset_id_rrdcalc_name);
+    string_freez(rrdset_name_rrdcalc_name);
 
     if(!rc->units) rc->units = string_dup(st->units);
 
@@ -283,17 +271,17 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     // unlink it
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alarms, rc, rrdset_prev, rrdset_next);
 
-    rrdvar_del(st->rrdvars, rc->local);
-    rc->local = NULL;
+    rrdvar_release_and_del(st->rrdvars, rc->rrdvar_local);
+    rc->rrdvar_local = NULL;
 
-    rrdvar_del(st->rrdfamily->rrdvars, rc->family);
-    rc->family = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rc->rrdvar_family);
+    rc->rrdvar_family = NULL;
 
-    rrdvar_del(host->rrdvars, rc->hostid);
-    rc->hostid = NULL;
+    rrdvar_release_and_del(host->rrdvars, rc->rrdvar_host_chart_id);
+    rc->rrdvar_host_chart_id = NULL;
 
-    rrdvar_del(host->rrdvars, rc->hostname);
-    rc->hostname = NULL;
+    rrdvar_release_and_del(host->rrdvars, rc->rrdvar_host_chart_name);
+    rc->rrdvar_host_chart_name = NULL;
 
     rc->rrdset = NULL;
 
@@ -639,6 +627,14 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
 
+    if(rc->rrdset) {
+        rrdvar_release_and_del(rc->rrdset->rrdvars, rc->rrdvar_local);
+        rrdvar_release_and_del(rc->rrdset->rrdfamily->rrdvars, rc->rrdvar_family);
+        rrdvar_release_and_del(rc->rrdset->rrdhost->rrdvars, rc->rrdvar_host_chart_id);
+        rrdvar_release_and_del(rc->rrdset->rrdhost->rrdvars, rc->rrdvar_host_chart_name);
+        rc->rrdvar_local = rc->rrdvar_family = rc->rrdvar_host_chart_id = rc->rrdvar_host_chart_name = NULL;
+    }
+
     expression_free(rc->calculation);
     expression_free(rc->warning);
     expression_free(rc->critical);
@@ -665,7 +661,6 @@ void rrdcalc_free(RRDCALC *rc) {
     simple_pattern_free(rc->module_pattern);
     simple_pattern_free(rc->plugin_pattern);
 
-    freez(rc->family);
     freez(rc);
 }
 

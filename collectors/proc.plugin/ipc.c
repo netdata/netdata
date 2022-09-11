@@ -281,7 +281,7 @@ int do_ipc(int update_every, usec_t dt) {
     static int read_limits_next = -1;
     static struct ipc_limits limits;
     static struct ipc_status status;
-    static RRDVAR *arrays_max = NULL, *semaphores_max = NULL;
+    static const RRDVAR_ACQUIRED *arrays_max = NULL, *semaphores_max = NULL;
     static RRDSET *st_semaphores = NULL, *st_arrays = NULL;
     static RRDDIM *rd_semaphores = NULL, *rd_arrays = NULL;
     static char *msg_filename = NULL;
@@ -352,8 +352,8 @@ int do_ipc(int update_every, usec_t dt) {
             }
 
             // variables
-            semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc_semaphores_max");
-            arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc_semaphores_arrays_max");
+            semaphores_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "ipc_semaphores_max");
+            arrays_max     = rrdvar_custom_host_variable_add_and_acquire(localhost, "ipc_semaphores_arrays_max");
         }
 
         struct stat stbuf;

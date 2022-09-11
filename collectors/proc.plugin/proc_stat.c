@@ -481,7 +481,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL,
            *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
-    static RRDVAR *cpus_var = NULL;
+    static const RRDVAR_ACQUIRED *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)processors;
 
@@ -713,7 +713,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                     rrddim_hide(cpu_chart->st, "idle");
 
                     if(unlikely(core == 0 && cpus_var == NULL))
-                        cpus_var = rrdvar_custom_host_variable_create(localhost, "active_processors");
+                        cpus_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "active_processors");
                 }
                 else rrdset_next(cpu_chart->st);
 

@@ -7,12 +7,12 @@
 // 1. at each chart   (RRDSET.rrdvar_root_index)
 // 2. at each context (RRDFAMILY.rrdvar_root_index)
 // 3. at each host    (RRDHOST.rrdvar_root_index)
-struct rrdvar {
+typedef struct rrdvar {
     STRING *name;
     void *value;
     RRDVAR_FLAGS flags:16;
     RRDVAR_TYPE type:8;
-};
+} RRDVAR;
 
 // ----------------------------------------------------------------------------
 // RRDVAR management
@@ -96,18 +96,22 @@ void rrdvariables_destroy(DICTIONARY *dict) {
     dictionary_destroy(dict);
 }
 
-static inline RRDVAR *rrdvar_get(DICTIONARY *dict, STRING *name) {
-    return dictionary_get_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1);
+static inline const RRDVAR_ACQUIRED *rrdvar_get_and_acquire(DICTIONARY *dict, STRING *name) {
+    return dictionary_get_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1);
 }
 
-inline void rrdvar_del(DICTIONARY *dict, RRDVAR *rv) {
-    if(unlikely(!dict || !rv)) return;
+inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
+    if(unlikely(!dict || !rva)) return;
+
+    RRDVAR *rv = dictionary_acquired_item_value(rva);
+
+    dictionary_acquired_item_release(dict, rva);
 
     if(dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1) != 0)
-        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
+        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rva));
 }
 
-inline RRDVAR *rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type,
+inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type,
     RRDVAR_FLAGS options, void *value) {
 
     struct rrdvar_constructor tmp = {
@@ -117,12 +121,12 @@ inline RRDVAR *rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, ST
         .options = options,
         .react_action = RRDVAR_REACT_NONE,
     };
-    RRDVAR *rv = dictionary_set_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
+    const RRDVAR_ACQUIRED *rva = dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
 
     if(!(tmp.react_action & RRDVAR_REACT_NEW))
-        rv = NULL;
+        rva = NULL;
 
-    return rv;
+    return rva;
 }
 
 void rrdvar_free_all(DICTIONARY *dict) {
@@ -141,42 +145,50 @@ inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTI
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
-RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
+const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host, const char *name) {
     DICTIONARY *dict = host->rrdvars;
 
     STRING *name_string = rrdvar_name_to_string(name);
 
-    RRDVAR *rv = rrdvar_add("host", dict, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_CUSTOM_HOST_VAR, NULL);
+    const RRDVAR_ACQUIRED *rva = rrdvar_add_and_acquire("host", dict, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_CUSTOM_HOST_VAR, NULL);
 
-    if(unlikely(!rv)) {
+    if(unlikely(!rva)) {
         debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", string2str(name_string));
 
         // find the existing one to return it
-        rv = rrdvar_get(dict, name_string);
+        rva = rrdvar_get_and_acquire(dict, name_string);
     }
 
     string_freez(name_string);
-    return rv;
+    return rva;
 }
 
-void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value) {
-    if(rv->type != RRDVAR_TYPE_CALCULATED || !(rv->flags & RRDVAR_FLAG_CUSTOM_HOST_VAR) || !(rv->flags & RRDVAR_FLAG_ALLOCATED))
-        error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rv), value);
+void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA_DOUBLE value) {
+
+    if(rrdvar_type(rva) != RRDVAR_TYPE_CALCULATED || !(rrdvar_flags(rva) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_ALLOCATED)))
+        error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rva), value);
     else {
+        RRDVAR *rv = dictionary_acquired_item_value(rva);
         NETDATA_DOUBLE *v = rv->value;
         if(*v != value) {
             *v = value;
 
             // if the host is streaming, send this variable upstream immediately
-            rrdpush_sender_send_this_host_variable_now(host, rv);
+            rrdpush_sender_send_this_host_variable_now(host, rva);
         }
     }
+}
+
+void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
+    dictionary_acquired_item_release(dict, rva);
 }
 
 // ----------------------------------------------------------------------------
 // RRDVAR lookup
 
-NETDATA_DOUBLE rrdvar2number(RRDVAR *rv) {
+NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
+    RRDVAR *rv = dictionary_acquired_item_value(rva);
+
     switch(rv->type) {
         case RRDVAR_TYPE_CALCULATED: {
             NETDATA_DOUBLE *n = (NETDATA_DOUBLE *)rv->value;
@@ -214,23 +226,26 @@ int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result
     if(!st) return 0;
 
     RRDHOST *host = st->rrdhost;
-    RRDVAR *rv;
+    const RRDVAR_ACQUIRED *rva;
 
-    rv = rrdvar_get(st->rrdvars, variable);
-    if(rv) {
-        *result = rrdvar2number(rv);
+    rva = rrdvar_get_and_acquire(st->rrdvars, variable);
+    if(rva) {
+        *result = rrdvar2number(rva);
+        dictionary_acquired_item_release(st->rrdvars, rva);
         return 1;
     }
 
-    rv = rrdvar_get(st->rrdfamily->rrdvars, variable);
-    if(rv) {
-        *result = rrdvar2number(rv);
+    rva = rrdvar_get_and_acquire(st->rrdfamily->rrdvars, variable);
+    if(rva) {
+        *result = rrdvar2number(rva);
+        dictionary_acquired_item_release(st->rrdfamily->rrdvars, rva);
         return 1;
     }
 
-    rv = rrdvar_get(host->rrdvars, variable);
-    if(rv) {
-        *result = rrdvar2number(rv);
+    rva = rrdvar_get_and_acquire(host->rrdvars, variable);
+    if(rva) {
+        *result = rrdvar2number(rva);
+        dictionary_acquired_item_release(host->rrdvars, rva);
         return 1;
     }
 
@@ -246,16 +261,16 @@ struct variable2json_helper {
     RRDVAR_FLAGS options;
 };
 
-static int single_variable2json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *helper_data) {
+static int single_variable2json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry __maybe_unused, void *helper_data) {
     struct variable2json_helper *helper = (struct variable2json_helper *)helper_data;
-    RRDVAR *rv = (RRDVAR *)entry;
-    NETDATA_DOUBLE value = rrdvar2number(rv);
+    const RRDVAR_ACQUIRED *rva = item;
+    NETDATA_DOUBLE value = rrdvar2number(rva);
 
-    if (helper->options == RRDVAR_FLAG_NONE || rv->flags & helper->options) {
+    if (helper->options == RRDVAR_FLAG_NONE || rrdvar_flags(rva) & helper->options) {
         if(unlikely(isnan(value) || isinf(value)))
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rrdvar_name(rv));
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rrdvar_name(rva));
         else
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rrdvar_name(rv), (NETDATA_DOUBLE)value);
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rrdvar_name(rva), (NETDATA_DOUBLE)value);
 
         helper->counter++;
     }
@@ -296,13 +311,15 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     buffer_strcat(buf, "\n\t}\n}\n");
 }
 
-const char *rrdvar_name(RRDVAR *rv) {
-    return string2str(rv->name);
+const char *rrdvar_name(const RRDVAR_ACQUIRED *rva) {
+    return dictionary_acquired_item_name(rva);
 }
 
-RRDVAR_FLAGS rrdvar_flags(RRDVAR *rv) {
+RRDVAR_FLAGS rrdvar_flags(const RRDVAR_ACQUIRED *rva) {
+    RRDVAR *rv = dictionary_acquired_item_value(rva);
     return rv->flags;
 }
-RRDVAR_TYPE rrdvar_type(RRDVAR *rv) {
+RRDVAR_TYPE rrdvar_type(const RRDVAR_ACQUIRED *rva) {
+    RRDVAR *rv = dictionary_acquired_item_value(rva);
     return rv->type;
 }

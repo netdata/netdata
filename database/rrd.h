@@ -16,7 +16,7 @@ typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
-typedef struct rrdvar RRDVAR;
+typedef struct dictionary_item RRDVAR_ACQUIRED;
 typedef struct rrdsetvar RRDSETVAR;
 typedef struct rrddimvar RRDDIMVAR;
 typedef struct rrdcalc RRDCALC;

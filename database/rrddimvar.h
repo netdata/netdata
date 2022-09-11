@@ -13,33 +13,23 @@
 struct rrddimvar {
     STRING *prefix;
     STRING *suffix;
-
-    STRING *key_id;                   // dimension id
-    STRING *key_name;                 // dimension name
-    STRING *key_contextid;            // context + dimension id
-    STRING *key_contextname;          // context + dimension name
-    STRING *key_fullidid;             // chart type.chart id + dimension id
-    STRING *key_fullidname;           // chart type.chart id + dimension name
-    STRING *key_fullnameid;           // chart type.chart name + dimension id
-    STRING *key_fullnamename;         // chart type.chart name + dimension name
-
-    RRDVAR_TYPE type;
     void *value;
 
-    RRDVAR_FLAGS options;
+    RRDVAR_FLAGS flags:16;
+    RRDVAR_TYPE type:8;
 
-    RRDVAR *var_local_id;
-    RRDVAR *var_local_name;
+    const RRDVAR_ACQUIRED *rrdvar_local_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_local_dim_name;
 
-    RRDVAR *var_family_id;
-    RRDVAR *var_family_name;
-    RRDVAR *var_family_contextid;
-    RRDVAR *var_family_contextname;
+    const RRDVAR_ACQUIRED *rrdvar_family_id;
+    const RRDVAR_ACQUIRED *rrdvar_family_name;
+    const RRDVAR_ACQUIRED *rrdvar_family_context_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_family_context_dim_name;
 
-    RRDVAR *var_host_chartidid;
-    RRDVAR *var_host_chartidname;
-    RRDVAR *var_host_chartnameid;
-    RRDVAR *var_host_chartnamename;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_id_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_id_dim_name;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_name_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_name_dim_name;
 
     struct rrddim *rrddim;
 

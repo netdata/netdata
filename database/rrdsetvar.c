@@ -11,32 +11,24 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSETVAR *rs) {
 
     // ------------------------------------------------------------------------
     // CHART
-    rrdvar_del(st->rrdvars, rs->var_local);
-    rs->var_local = NULL;
+    rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local);
+    rs->rrdvar_local = NULL;
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family);
-    rs->var_family = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_id);
+    rs->rrdvar_family_chart_id = NULL;
 
-    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_name);
-    rs->var_family_name = NULL;
+    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_name);
+    rs->rrdvar_family_chart_name = NULL;
 
     // ------------------------------------------------------------------------
     // HOST
-    rrdvar_del(host->rrdvars, rs->var_host);
-    rs->var_host = NULL;
+    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id);
+    rs->rrdvar_host_chart_id = NULL;
 
-    rrdvar_del(host->rrdvars, rs->var_host_name);
-    rs->var_host_name = NULL;
-
-    // ------------------------------------------------------------------------
-    // KEYS
-    string_freez(rs->key_fullid);
-    rs->key_fullid = NULL;
-
-    string_freez(rs->key_fullname);
-    rs->key_fullname = NULL;
+    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name);
+    rs->rrdvar_host_chart_name = NULL;
 }
 
 // should only be called while the rrdsetvar dict is write locked
@@ -58,24 +50,28 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSETVAR *rs) {
 
     char buffer[RRDVAR_MAX_LENGTH + 1];
     snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), string2str(rs->name));
-    rs->key_fullid = string_strdupz(buffer);
+    STRING *key_chart_id = string_strdupz(buffer);
 
     snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), string2str(rs->name));
-    rs->key_fullname = string_strdupz(buffer);
+    STRING *key_chart_name = string_strdupz(buffer);
 
     // ------------------------------------------------------------------------
     // CHART
-    rs->var_local       = rrdvar_add("local", st->rrdvars, rs->name, rs->type, options, rs->value);
+    rs->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rs->name, rs->type, options, rs->value);
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rs->var_family      = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_fullid, rs->type, options, rs->value);
-    rs->var_family_name = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_fullname, rs->type, options, rs->value);
+    rs->rrdvar_family_chart_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_id, rs->type, options, rs->value);
+    rs->rrdvar_family_chart_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_name, rs->type, options, rs->value);
 
     // ------------------------------------------------------------------------
     // HOST
-    rs->var_host        = rrdvar_add("host", host->rrdvars, rs->key_fullid, rs->type, options, rs->value);
-    rs->var_host_name   = rrdvar_add("host", host->rrdvars, rs->key_fullname, rs->type, options, rs->value);
+    rs->rrdvar_host_chart_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id, rs->type, options, rs->value);
+    rs->rrdvar_host_chart_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name, rs->type, options, rs->value);
+
+    // free the keys
+    string_freez(key_chart_id);
+    string_freez(key_chart_name);
 }
 
 static void rrdsetvar_free_value_unsafe(RRDSETVAR *rs) {

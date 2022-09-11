@@ -101,9 +101,11 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
     UNUSED(user);
 
     if (global) {
-        RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
-        if (rv)
-            rrdvar_custom_host_variable_set(host, rv, value);
+        const RRDVAR_ACQUIRED *rva = rrdvar_custom_host_variable_add_and_acquire(host, name);
+        if (rva) {
+            rrdvar_custom_host_variable_set(host, rva, value);
+            rrdvar_custom_host_variable_release(host, rva);
+        }
         else
             error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, rrdhost_hostname(host));
     } else {

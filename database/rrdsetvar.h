@@ -13,20 +13,16 @@
 
 struct rrdsetvar {
     STRING *name;               // variable name
-
-    STRING *key_fullid;             // chart type.chart id.variable
-    STRING *key_fullname;           // chart type.chart name.variable
+    void *value;
 
     RRDVAR_FLAGS flags :16;
     RRDVAR_TYPE type:8;
 
-    void *value;
-
-    RRDVAR *var_local;
-    RRDVAR *var_family;
-    RRDVAR *var_host;
-    RRDVAR *var_family_name;
-    RRDVAR *var_host_name;
+    const RRDVAR_ACQUIRED *rrdvar_local;
+    const RRDVAR_ACQUIRED *rrdvar_family_chart_id;
+    const RRDVAR_ACQUIRED *rrdvar_family_chart_name;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
 
     struct rrdset *rrdset;
 };

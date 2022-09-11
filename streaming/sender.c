@@ -124,28 +124,28 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
-static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
+static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
     buffer_sprintf(
             host->sender->build
             , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
-            , rrdvar_name(rv)
-            , rrdvar2number(rv)
+            , rrdvar_name(rva)
+            , rrdvar2number(rva)
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rv), rrdvar2number(rv));
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rva), rrdvar2number(rva));
 }
 
-void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
     if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && __atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)) {
         sender_start(host->sender);
-        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
+        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rva);
         sender_commit(host->sender);
     }
 }
 
 
-static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr, void *host_ptr) {
-    RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
+static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr __maybe_unused, void *host_ptr) {
+    const RRDVAR_ACQUIRED *rv = item;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
     if(unlikely(rrdvar_flags(rv) & RRDVAR_FLAG_CUSTOM_HOST_VAR && rrdvar_type(rv) == RRDVAR_TYPE_CALCULATED)) {

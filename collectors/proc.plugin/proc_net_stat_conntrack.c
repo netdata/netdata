@@ -12,7 +12,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     static usec_t get_max_every = 10 * USEC_PER_SEC, usec_since_last_max = 0;
     static int read_full = 1;
     static char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
-    static RRDVAR *rrdvar_max = NULL;
+    static const RRDVAR_ACQUIRED *rrdvar_max = NULL;
 
     unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
             ainsert = 0, ainsert_failed = 0, adrop = 0, aearly_drop = 0, aicmp_error = 0, aexpect_new = 0, aexpect_create = 0, aexpect_delete = 0, asearch_restart = 0;
@@ -50,7 +50,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         if(!do_sockets && !read_full)
             return 1;
 
-        rrdvar_max = rrdvar_custom_host_variable_create(localhost, "netfilter_conntrack_max");
+        rrdvar_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "netfilter_conntrack_max");
     }
 
     if(likely(read_full)) {

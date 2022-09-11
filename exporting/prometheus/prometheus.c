@@ -349,8 +349,8 @@ struct host_variables_callback_options {
  * @param data callback options.
  * @return Returns 1 if the chart can be sent, 0 otherwise.
  */
-static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rv_ptr, void *data) {
-    RRDVAR *rv = rv_ptr;
+static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rv_ptr __maybe_unused, void *data) {
+    const RRDVAR_ACQUIRED *rv = item;
 
     struct host_variables_callback_options *opts = data;
 
