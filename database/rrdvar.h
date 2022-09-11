@@ -62,13 +62,15 @@ extern STRING *rrdvar_name_to_string(const char *name);
 
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value);
-extern void rrdvar_free_remaining_variables(RRDHOST *host, DICTIONARY *dict);
 
 extern int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data);
 
 extern NETDATA_DOUBLE rrdvar2number(RRDVAR *rv);
 
-extern RRDVAR *rrdvar_create_and_index(const char *scope, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value);
-extern void rrdvar_free(RRDHOST *host, DICTIONARY *dict, RRDVAR *rv);
+extern RRDVAR *rrdvar_add(const char *scope, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value);
+extern void rrdvar_delete(DICTIONARY *dict, RRDVAR *rv);
+
+extern DICTIONARY *rrdvariables_create(void);
+extern void rrdvariables_destroy(DICTIONARY *dict);
 
 #endif //NETDATA_RRDVAR_H

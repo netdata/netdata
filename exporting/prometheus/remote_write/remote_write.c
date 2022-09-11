@@ -363,7 +363,7 @@ int format_variables_prometheus_remote_write(struct instance *instance, RRDHOST 
         .now = now_realtime_usec(),
     };
 
-    return rrdvar_walkthrough_read(host->rrdvar_root_index, format_variable_prometheus_remote_write_callback, &opt);
+    return rrdvar_walkthrough_read(host->rrdvariables_index, format_variable_prometheus_remote_write_callback, &opt);
 }
 
 /**

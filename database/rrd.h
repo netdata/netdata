@@ -155,7 +155,7 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 struct rrdfamily {
     STRING *family;
-    DICTIONARY *rrdvar_root_index;
+    DICTIONARY *rrdvariables;
 
     size_t use_count;
 };
@@ -618,7 +618,7 @@ struct rrdset {
     NETDATA_DOUBLE green;                           // green threshold for this chart
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
-    DICTIONARY *rrdvar_root_index;                  // RRDVAR index for this chart
+    DICTIONARY *rrdvariables;                       // RRDVAR index for this chart
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
     RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
 };
@@ -945,7 +945,7 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
     DICTIONARY *rrdfamily_root_index;               // the host's chart families index
-    DICTIONARY *rrdvar_root_index;                  // the host's chart variables index
+    DICTIONARY *rrdvariables_index;                 // the host's chart variables index
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
@@ -1244,7 +1244,7 @@ extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
-extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
+extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rf);
 
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);

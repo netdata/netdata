@@ -23,40 +23,34 @@ static inline RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id) {
 // RRDFAMILY management
 
 RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
-    RRDFAMILY *rc = rrdfamily_index_find(host, id);
-    if(!rc) {
-        rc = callocz(1, sizeof(RRDFAMILY));
+    RRDFAMILY *rf = rrdfamily_index_find(host, id);
+    if(!rf) {
+        rf = callocz(1, sizeof(RRDFAMILY));
 
-        rc->family = string_strdupz(id);
+        rf->family = string_strdupz(id);
 
-        rc->rrdvar_root_index = dictionary_create(
-             DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            );
+        rf->rrdvariables = rrdvariables_create();
 
-        RRDFAMILY *ret = rrdfamily_index_add(host, rc);
-        if(ret != rc)
-            error("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
+        RRDFAMILY *ret = rrdfamily_index_add(host, rf);
+        if(ret != rf)
+            error("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", string2str(rf->family), (ret)?string2str(ret->family):"NONE");
     }
 
-    rc->use_count++;
-    return rc;
+    rf->use_count++;
+    return rf;
 }
 
-void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
-    rc->use_count--;
-    if(!rc->use_count) {
-        RRDFAMILY *ret = rrdfamily_index_del(host, rc);
-        if(ret != rc)
-            error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
+void rrdfamily_free(RRDHOST *host, RRDFAMILY *rf) {
+    rf->use_count--;
+    if(!rf->use_count) {
+        RRDFAMILY *ret = rrdfamily_index_del(host, rf);
+        if(ret != rf)
+            error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", string2str(rf->family), (ret)?string2str(ret->family):"NONE");
         else {
-            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", rrdhost_hostname(host), string2str(rc->family));
-            rrdvar_free_remaining_variables(host, rc->rrdvar_root_index);
-
-            dictionary_destroy(rc->rrdvar_root_index);
-            string_freez(rc->family);
-            freez(rc);
+            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", rrdhost_hostname(host), string2str(rf->family));
+            rrdvariables_destroy(rf->rrdvariables);
+            string_freez(rf->family);
+            freez(rf);
         }
     }
 }

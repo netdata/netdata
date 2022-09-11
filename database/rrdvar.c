@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_HEALTH_INTERNALS
 #include "rrd.h"
 
 // ----------------------------------------------------------------------------
@@ -20,41 +19,6 @@ inline int rrdvar_fix_name(char *variable) {
     return fixed;
 }
 
-static inline RRDVAR *rrdvar_index_add(DICTIONARY *dict, RRDVAR *rv) {
-    return dictionary_set(dict, rrdvar_name(rv), rv, sizeof(RRDVAR));
-}
-
-static inline RRDVAR *rrdvar_index_del(DICTIONARY *dict, RRDVAR *rv) {
-    if(dictionary_del(dict, rrdvar_name(rv)) != 0) {
-        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
-        return NULL;
-    }
-
-    return rv;
-}
-
-static inline RRDVAR *rrdvar_index_find(DICTIONARY *dict, STRING *name) {
-    return dictionary_get(dict, string2str(name));
-}
-
-inline void rrdvar_free(RRDHOST *host, DICTIONARY *dict, RRDVAR *rv) {
-    (void)host;
-
-    if(!rv) return;
-
-    if(dict) {
-        debug(D_VARIABLES, "Deleting variable '%s'", rrdvar_name(rv));
-        if(unlikely(!rrdvar_index_del(dict, rv)))
-            error("RRDVAR: Attempted to delete variable '%s' from host '%s', but it is not found.", rrdvar_name(rv), rrdhost_hostname(host));
-    }
-
-    if(rv->options & RRDVAR_OPTION_ALLOCATED)
-        freez(rv->value);
-
-    string_freez(rv->name);
-    freez(rv);
-}
-
 inline STRING *rrdvar_name_to_string(const char *name) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);
@@ -63,46 +27,92 @@ inline STRING *rrdvar_name_to_string(const char *name) {
     return name_string;
 }
 
-inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name,
-                                       RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
+struct rrdvar_constructor {
+    const char *name;
+    void *value;
+    RRDVAR_OPTIONS options:16;
+    RRDVAR_TYPE type:8;
 
-    RRDVAR *rv = rrdvar_index_find(dict, name);
-    if(unlikely(!rv)) {
-        debug(D_VARIABLES, "Variable '%s' not found in scope '%s'. Creating a new one.", string2str(name), scope);
+    enum {
+        RRDVAR_REACT_NONE    = 0,
+        RRDVAR_REACT_NEW     = (1 << 0),
+    } react_action;
+};
 
-        rv = callocz(1, sizeof(RRDVAR));
-        rv->name = string_dup(name);
-        rv->type = type;
-        rv->options = options;
-        rv->value = value;
-        rv->last_updated = now_realtime_sec();
+static void rrdvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar, void *constructor_data) {
+    RRDVAR *rv = rrdvar;
+    struct rrdvar_constructor *ctr = constructor_data;
 
-        RRDVAR *ret = rrdvar_index_add(dict, rv);
-        if(unlikely(ret != rv)) {
-            debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", string2str(name), scope);
-            freez(rv);
-            rv = NULL;
-        }
-        else
-            debug(D_VARIABLES, "Variable '%s' created in scope '%s'", string2str(name), scope);
+    ctr->options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
+
+    rv->name = string_strdupz(ctr->name);
+    rv->type = ctr->type;
+    rv->options = ctr->options;
+
+    if(!ctr->value) {
+        NETDATA_DOUBLE *v = mallocz(sizeof(NETDATA_DOUBLE));
+        *v = NAN;
+        rv->value = v;
+        rv->options |= RRDVAR_OPTION_ALLOCATED;
     }
-    else {
-        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", string2str(name), scope);
+    else
+        rv->value = ctr->value;
 
-        // this is important
-        // it must return NULL - not the existing variable - or double-free will happen
-        rv = NULL;
-    }
+    rv->last_updated = now_realtime_sec();
 
-    return rv;
+    ctr->react_action = RRDVAR_REACT_NEW;
 }
 
-void rrdvar_free_remaining_variables(RRDHOST *host, DICTIONARY *dict) {
-    RRDVAR *rv;
-    dfe_start_reentrant(dict, rv) {
-        rrdvar_free(host, dict, rv);
-    }
-    dfe_done(rv);
+static void rrdvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar, void *nothing __maybe_unused) {
+    RRDVAR *rv = rrdvar;
+
+    if(rv->options & RRDVAR_OPTION_ALLOCATED)
+        freez(rv->value);
+
+    string_freez(rv->name);
+    rv->name = NULL;
+}
+
+DICTIONARY *rrdvariables_create(void) {
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+
+    dictionary_register_insert_callback(dict, rrdvar_insert_callback, NULL);
+    dictionary_register_delete_callback(dict, rrdvar_delete_callback, NULL);
+
+    return dict;
+}
+
+void rrdvariables_destroy(DICTIONARY *dict) {
+    dictionary_destroy(dict);
+}
+
+static inline RRDVAR *rrdvar_get(DICTIONARY *dict, STRING *name) {
+    return dictionary_get_advanced(dict, string2str(name), (ssize_t)string_strlen(name));
+}
+
+inline void rrdvar_delete(DICTIONARY *dict, RRDVAR *rv) {
+    if(!dict || !rv) return;
+
+    if(dictionary_del(dict, rrdvar_name(rv)) != 0)
+        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
+}
+
+inline RRDVAR *rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name,
+                          RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
+
+    struct rrdvar_constructor tmp = {
+        .name = string2str(name),
+        .value = value,
+        .type = type,
+        .options = options,
+        .react_action = RRDVAR_REACT_NONE,
+    };
+    RRDVAR *rv = dictionary_set_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
+
+    if(!(tmp.react_action & RRDVAR_REACT_NEW))
+        rv = NULL;
+
+    return rv;
 }
 
 // ----------------------------------------------------------------------------
@@ -112,28 +122,22 @@ inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTI
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
-static RRDVAR *rrdvar_custom_variable_create(const char *scope, DICTIONARY *dict, const char *name) {
-    NETDATA_DOUBLE *v = callocz(1, sizeof(NETDATA_DOUBLE));
-    *v = NAN;
+RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
+    DICTIONARY *dict = host->rrdvariables_index;
 
     STRING *name_string = rrdvar_name_to_string(name);
 
-    RRDVAR *rv = rrdvar_create_and_index(scope, dict, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_ALLOCATED, v);
+    RRDVAR *rv = rrdvar_add("host", dict, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR, NULL);
+
     if(unlikely(!rv)) {
-        freez(v);
         debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", string2str(name_string));
 
         // find the existing one to return it
-        rv = rrdvar_index_find(dict, name_string);
+        rv = rrdvar_get(dict, name_string);
     }
 
     string_freez(name_string);
-
     return rv;
-}
-
-RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
-    return rrdvar_custom_variable_create("host", host->rrdvar_root_index, name);
 }
 
 void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, NETDATA_DOUBLE value) {
@@ -164,17 +168,17 @@ NETDATA_DOUBLE rrdvar2number(RRDVAR *rv) {
 
         case RRDVAR_TYPE_TIME_T: {
             time_t *n = (time_t *)rv->value;
-            return *n;
+            return (NETDATA_DOUBLE)*n;
         }
 
         case RRDVAR_TYPE_COLLECTED: {
             collected_number *n = (collected_number *)rv->value;
-            return *n;
+            return (NETDATA_DOUBLE)*n;
         }
 
         case RRDVAR_TYPE_TOTAL: {
             total_number *n = (total_number *)rv->value;
-            return *n;
+            return (NETDATA_DOUBLE)*n;
         }
 
         case RRDVAR_TYPE_INT: {
@@ -195,19 +199,19 @@ int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result
     RRDHOST *host = st->rrdhost;
     RRDVAR *rv;
 
-    rv = rrdvar_index_find(st->rrdvar_root_index, variable);
+    rv = rrdvar_get(st->rrdvariables, variable);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
     }
 
-    rv = rrdvar_index_find(st->rrdfamily->rrdvar_root_index, variable);
+    rv = rrdvar_get(st->rrdfamily->rrdvariables, variable);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
     }
 
-    rv = rrdvar_index_find(host->rrdvar_root_index, variable);
+    rv = rrdvar_get(host->rrdvariables_index, variable);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
@@ -250,7 +254,7 @@ void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
     };
 
     buffer_sprintf(buf, "{");
-    rrdvar_walkthrough_read(st->rrdvar_root_index, single_variable2json, &helper);
+    rrdvar_walkthrough_read(st->rrdvariables, single_variable2json, &helper);
     buffer_strcat(buf, "\n\t\t\t}");
 }
 
@@ -264,15 +268,15 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     };
 
     buffer_sprintf(buf, "{\n\t\"chart\": \"%s\",\n\t\"chart_name\": \"%s\",\n\t\"chart_context\": \"%s\",\n\t\"chart_variables\": {", rrdset_id(st), rrdset_name(st), rrdset_context(st));
-    rrdvar_walkthrough_read(st->rrdvar_root_index, single_variable2json, &helper);
+    rrdvar_walkthrough_read(st->rrdvariables, single_variable2json, &helper);
 
     buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", rrdset_family(st));
     helper.counter = 0;
-    rrdvar_walkthrough_read(st->rrdfamily->rrdvar_root_index, single_variable2json, &helper);
+    rrdvar_walkthrough_read(st->rrdfamily->rrdvariables, single_variable2json, &helper);
 
     buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", rrdhost_hostname(host));
     helper.counter = 0;
-    rrdvar_walkthrough_read(host->rrdvar_root_index, single_variable2json, &helper);
+    rrdvar_walkthrough_read(host->rrdvariables_index, single_variable2json, &helper);
 
     buffer_strcat(buf, "\n\t}\n}\n");
 }

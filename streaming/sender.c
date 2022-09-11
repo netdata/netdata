@@ -163,7 +163,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
     sender_start(host->sender);
-    int ret = rrdvar_walkthrough_read(host->rrdvar_root_index, rrdpush_sender_thread_custom_host_variables_callback, host);
+    int ret = rrdvar_walkthrough_read(host->rrdvariables_index, rrdpush_sender_thread_custom_host_variables_callback, host);
     (void)ret;
     sender_commit(host->sender);
 

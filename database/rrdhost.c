@@ -283,7 +283,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrdhost_init_rrdset_index(host);
     host->rrdfamily_root_index   = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    host->rrdvar_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    host->rrdvariables_index = rrdvariables_create();
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -1126,9 +1126,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
     while(host->alarms_templates)
         rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
 
-    debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", rrdhost_hostname(host));
-    rrdvar_free_remaining_variables(host, host->rrdvar_root_index);
-
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE
@@ -1208,7 +1205,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->node_id);
 
     dictionary_destroy(host->rrdfamily_root_index);
-    dictionary_destroy(host->rrdvar_root_index);
+    rrdvariables_destroy(host->rrdvariables_index);
 
     rrdhost_destroy_rrdcontexts(host);
 

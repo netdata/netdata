@@ -183,12 +183,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdsetvar_index_init(st);
 
-    st->rrdvar_root_index = dictionary_create(
-          DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-    );
-
+    st->rrdvariables = rrdvariables_create();
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
@@ -221,7 +216,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     rrdfamily_free(host, st->rrdfamily);
-    rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
     rrdhost_unlock(host);
 
     rrdsetvar_index_destroy(st);
@@ -237,7 +231,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // free directly allocated members
     rrdset_memory_file_free(st);
     rrdset_free_rrddim_index(st);
-    dictionary_destroy(st->rrdvar_root_index);
+    rrdvariables_destroy(st->rrdvariables);
     rrdlabels_destroy(st->rrdlabels);
 
     string_freez(st->id);
@@ -844,9 +838,6 @@ void rrdset_archive(RRDSET *st) {
     while (st->alarms)    rrdsetcalc_unlink(st->alarms);
 
     rrdset_archive_obsolete_dimensions(st, true);
-
-    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(st->rrdhost), rrdset_id(st));
-    rrdvar_free_remaining_variables(st->rrdhost, st->rrdvar_root_index);
 
     if(st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
         rrdset_rdlock(st);
