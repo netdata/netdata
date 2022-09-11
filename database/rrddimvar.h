@@ -10,39 +10,12 @@
 // calculated / processed by the normal data collection process
 // This means, there will be no speed penalty for using
 // these variables
-struct rrddimvar {
-    STRING *prefix;
-    STRING *suffix;
-    void *value;
-
-    RRDVAR_FLAGS flags:16;
-    RRDVAR_TYPE type:8;
-
-    const RRDVAR_ACQUIRED *rrdvar_local_dim_id;
-    const RRDVAR_ACQUIRED *rrdvar_local_dim_name;
-
-    const RRDVAR_ACQUIRED *rrdvar_family_id;
-    const RRDVAR_ACQUIRED *rrdvar_family_name;
-    const RRDVAR_ACQUIRED *rrdvar_family_context_dim_id;
-    const RRDVAR_ACQUIRED *rrdvar_family_context_dim_name;
-
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_id_dim_id;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_id_dim_name;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_name_dim_id;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_name_dim_name;
-
-    struct rrddim *rrddim;
-
-    struct rrddimvar *next;
-    struct rrddimvar *prev;
-};
-
 
 extern void rrddimvar_rename_all(RRDDIM *rd);
-extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value,
-    RRDVAR_FLAGS options);
-extern void rrddimvar_free(RRDDIMVAR *rs);
+extern void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS flags);
+extern void rrddimvar_delete_all(RRDDIM *rd);
 
-
+extern void rrddimvar_index_init(RRDSET *st);
+extern void rrddimvar_index_destroy(RRDSET *st);
 
 #endif //NETDATA_RRDDIMVAR_H

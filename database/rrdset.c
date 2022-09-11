@@ -182,6 +182,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_init_rrddim_index(st);
 
     rrdsetvar_index_init(st);
+    rrddimvar_index_init(st);
 
     st->rrdvars = rrdvariables_create();
     st->rrdlabels = rrdlabels_create();
@@ -218,6 +219,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdfamily_free(host, st->rrdfamily);
     rrdhost_unlock(host);
 
+    rrddimvar_index_destroy(st);
     rrdsetvar_index_destroy(st);
 
     // this has to be after the dimensions are freed
@@ -771,8 +773,7 @@ void rrddim_obsolete_to_archive(RRDDIM *rd) {
     }
 
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        while(rd->variables)
-            rrddimvar_free(rd->variables);
+        rrddimvar_delete_all(rd);
 
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 

@@ -6,14 +6,14 @@ typedef struct rrdsetvar {
     STRING *name;               // variable name
     void *value;                // we need this to maintain the allocation for custom chart variables
 
-    RRDVAR_FLAGS flags:16;
-    RRDVAR_TYPE type:8;
-
     const RRDVAR_ACQUIRED *rrdvar_local;
     const RRDVAR_ACQUIRED *rrdvar_family_chart_id;
     const RRDVAR_ACQUIRED *rrdvar_family_chart_name;
     const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
     const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
+
+    RRDVAR_FLAGS flags:24;
+    RRDVAR_TYPE type:8;
 } RRDSETVAR;
 
 // should only be called while the rrdsetvar dict is write locked
@@ -113,12 +113,6 @@ struct rrdsetvar_constructor {
     void *value;
     RRDVAR_FLAGS flags :16;
     RRDVAR_TYPE type:8;
-
-    enum {
-        RRDSETVAR_REACT_NONE    = 0,
-        RRDSETVAR_REACT_NEW     = (1 << 0),
-        RRDSETVAR_REACT_UPDATED = (1 << 1),
-    } react_action;
 };
 
 static void rrdsetvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *constructor_data) {
@@ -132,8 +126,6 @@ static void rrdsetvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     rs->flags = ctr->flags;
     rrdsetvar_set_value_unsafe(rs, ctr->value);
 
-    ctr->react_action = RRDSETVAR_REACT_NEW;
-
     // create the rrdvariables while we are having a write lock to the dictionary
     rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
 }
@@ -146,8 +138,6 @@ static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     RRDVAR_FLAGS options = rs->flags;
     options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
-
-    ctr->react_action = RRDSETVAR_REACT_NONE;
 
     if(((ctr->value == NULL && rs->value != NULL && rs->flags & RRDVAR_FLAG_ALLOCATED) || (rs->value == ctr->value))
         && ctr->flags == options && rs->type == ctr->type) {
@@ -166,8 +156,6 @@ static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
         // recreate the rrdvariables while we are having a write lock to the dictionary
         rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
-
-        ctr->react_action = RRDSETVAR_REACT_UPDATED;
     }
 }
 

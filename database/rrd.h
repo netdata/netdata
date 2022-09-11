@@ -18,7 +18,6 @@ typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
 typedef struct dictionary_item RRDVAR_ACQUIRED;
 typedef struct dictionary_item RRDSETVAR_ACQUIRED;
-typedef struct rrddimvar RRDDIMVAR;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
@@ -254,8 +253,6 @@ struct rrddim {
     int update_every;                               // every how many seconds is this updated
                                                     // TODO - remove update_every from rrddim
                                                     //        it is always the same in rrdset
-
-    RRDDIMVAR *variables;                           // dimension variables - linked list (one RRDDIMVAR, many RRDVARs)
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -522,6 +519,8 @@ struct rrdset {
 
     DICTIONARY *rrdlabels;                          // chart labels
     DICTIONARY *rrdsetvar_root_index;               // chart variables
+    DICTIONARY *rrddimvar_root_index;               // dimension variables
+                                                    // we use this dictionary to manage their allocation
 
     RRDDIM *dimensions;                             // chart metrics
 

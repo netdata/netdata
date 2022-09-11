@@ -11,17 +11,25 @@ typedef enum rrdvar_type {
     RRDVAR_TYPE_COLLECTED               = 3,
     RRDVAR_TYPE_TOTAL                   = 4,
     RRDVAR_TYPE_INT                     = 5
+
+    // this is 8 bit
+    // to increase it you have to set change the bitfield in
+    // rrdvar, rrdsetvar, rrddimvar
 } RRDVAR_TYPE;
 
 typedef enum rrdvar_options {
-    RRDVAR_FLAG_NONE = 0,
-    RRDVAR_FLAG_ALLOCATED = (1 << 0), // the value ptr is allocated (not a reference)
-    RRDVAR_FLAG_CUSTOM_HOST_VAR = (1 << 1), // this is a custom host variable, not associated with a dimension
-    RRDVAR_FLAG_CUSTOM_CHART_VAR = (1 << 2), // this is a custom chart variable, not associated with a dimension
-    RRDVAR_FLAG_RRDCALC_LOCAL_VAR = (1 << 3), // this is a an alarm variable, attached to a chart
-    RRDVAR_FLAG_RRDCALC_FAMILY_VAR = (1 << 4), // this is a an alarm variable, attached to a family
-    RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
-    RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
+    RRDVAR_FLAG_NONE                        = 0,
+    RRDVAR_FLAG_ALLOCATED                   = (1 << 0), // the value ptr is allocated (not a reference)
+    RRDVAR_FLAG_CUSTOM_HOST_VAR             = (1 << 1), // this is a custom host variable, not associated with a dimension
+    RRDVAR_FLAG_CUSTOM_CHART_VAR            = (1 << 2), // this is a custom chart variable, not associated with a dimension
+    RRDVAR_FLAG_RRDCALC_LOCAL_VAR           = (1 << 3), // this is a an alarm variable, attached to a chart
+    RRDVAR_FLAG_RRDCALC_FAMILY_VAR          = (1 << 4), // this is a an alarm variable, attached to a family
+    RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR    = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
+    RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR  = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
+
+    // this is 24 bit
+    // to increase it you have to set change the bitfield in
+    // rrdvar, rrdsetvar, rrddimvar
 } RRDVAR_FLAGS;
 
 #define RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS \

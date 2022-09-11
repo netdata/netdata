@@ -2,13 +2,37 @@
 
 #include "rrd.h"
 
+typedef struct rrddimvar {
+    struct rrddim *rrddim;
+
+    STRING *prefix;
+    STRING *suffix;
+    void *value;
+
+    const RRDVAR_ACQUIRED *rrdvar_local_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_local_dim_name;
+
+    const RRDVAR_ACQUIRED *rrdvar_family_id;
+    const RRDVAR_ACQUIRED *rrdvar_family_name;
+    const RRDVAR_ACQUIRED *rrdvar_family_context_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_family_context_dim_name;
+
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_id_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_id_dim_name;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_name_dim_id;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_name_dim_name;
+
+    RRDVAR_FLAGS flags:24;
+    RRDVAR_TYPE type:8;
+} RRDDIMVAR;
+
 // ----------------------------------------------------------------------------
 // RRDDIMVAR management
 // DIMENSION VARIABLES
 
 #define RRDDIMVAR_ID_MAX 1024
 
-static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
+static inline void rrddimvar_free_variables_unsafe(RRDDIMVAR *rs) {
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
@@ -50,8 +74,8 @@ static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
     rs->rrdvar_host_chart_name_dim_name = NULL;
 }
 
-static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
-    rrddimvar_free_variables(rs);
+static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
+    rrddimvar_free_variables_unsafe(rs);
 
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
@@ -135,54 +159,100 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     string_freez(key_chart_name_dim_name);
 }
 
-RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS options) {
-    RRDSET *st = rd->rrdset;
-    (void)st;
+struct rrddimvar_constructor {
+    RRDDIM *rrddim;
+    const char *prefix;
+    const char *suffix;
+    void *value;
+    RRDVAR_FLAGS flags :16;
+    RRDVAR_TYPE type:8;
+};
 
-    debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), (prefix)?prefix:"", rrddim_name(rd), (suffix)?suffix:"");
+static void rrddimvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddimvar, void *constructor_data) {
+    RRDDIMVAR *rs = rrddimvar;
+    struct rrddimvar_constructor *ctr = constructor_data;
 
+    if(!ctr->prefix) ctr->prefix = "";
+    if(!ctr->suffix) ctr->suffix = "";
+
+    rs->prefix = string_strdupz(ctr->prefix);
+    rs->suffix = string_strdupz(ctr->suffix);
+
+    rs->type = ctr->type;
+    rs->value = ctr->value;
+    rs->flags = ctr->flags;
+    rs->rrddim = ctr->rrddim;
+
+    rrddimvar_update_variables_unsafe(rs);
+}
+
+static void rrddimvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddimvar, void *new_rrddimvar __maybe_unused, void *constructor_data __maybe_unused) {
+    RRDDIMVAR *rs = rrddimvar;
+    rrddimvar_update_variables_unsafe(rs);
+}
+
+static void rrddimvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddimvar, void *rrdset __maybe_unused) {
+    RRDDIMVAR *rs = rrddimvar;
+    rrddimvar_free_variables_unsafe(rs);
+    string_freez(rs->prefix);
+    string_freez(rs->suffix);
+}
+
+void rrddimvar_index_init(RRDSET *st) {
+    if(!st->rrddimvar_root_index) {
+        st->rrddimvar_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(st->rrddimvar_root_index, rrddimvar_insert_callback, NULL);
+        dictionary_register_conflict_callback(st->rrddimvar_root_index, rrddimvar_conflict_callback, NULL);
+        dictionary_register_delete_callback(st->rrddimvar_root_index, rrddimvar_delete_callback, st);
+    }
+}
+
+void rrddimvar_index_destroy(RRDSET *st) {
+    dictionary_destroy(st->rrdsetvar_root_index);
+    st->rrddimvar_root_index = NULL;
+}
+
+void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS flags) {
     if(!prefix) prefix = "";
     if(!suffix) suffix = "";
 
-    RRDDIMVAR *rs = (RRDDIMVAR *)callocz(1, sizeof(RRDDIMVAR));
+    char key[RRDDIMVAR_ID_MAX + 1];
+    size_t key_len = snprintfz(key, RRDDIMVAR_ID_MAX, "%s_%s_%s", prefix, rrddim_id(rd), suffix);
 
-    rs->prefix = string_strdupz(prefix);
-    rs->suffix = string_strdupz(suffix);
-
-    rs->type = type;
-    rs->value = value;
-    rs->flags = options;
-    rs->rrddim = rd;
-
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rd->variables, rs, prev, next);
-
-    rrddimvar_create_variables(rs);
-
-    return rs;
+    struct rrddimvar_constructor tmp = {
+        .suffix = suffix,
+        .prefix = prefix,
+        .type = type,
+        .flags = flags,
+        .value = value,
+        .rrddim = rd
+    };
+    dictionary_set_and_acquire_item_advanced(rd->rrdset->rrddimvar_root_index, key, (ssize_t)(key_len + 1), NULL, sizeof(RRDDIMVAR), &tmp);
 }
 
 void rrddimvar_rename_all(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
-    (void)st;
 
-    debug(D_VARIABLES, "RRDDIMSET rename for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
+    debug(D_VARIABLES, "RRDDIMVAR rename for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
 
-    RRDDIMVAR *rs, *next = rd->variables;
-    while((rs = next)) {
-        next = rs->next;
-        rrddimvar_create_variables(rs);
+    RRDDIMVAR *rs;
+    dfe_start_write(st->rrddimvar_root_index, rs) {
+        if(unlikely(rs->rrddim == rd))
+            rrddimvar_update_variables_unsafe(rs);
     }
+    dfe_done(rs);
 }
 
-void rrddimvar_free(RRDDIMVAR *rs) {
-    RRDDIM *rd = rs->rrddim;
-    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset), rrddim_id(rd), rrddim_name(rd), string2str(rs->prefix), string2str(rs->suffix));
+void rrddimvar_delete_all(RRDDIM *rd) {
+    RRDSET *st = rd->rrdset;
 
-    rrddimvar_free_variables(rs);
+    debug(D_VARIABLES, "RRDDIMVAR delete for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rd->variables, rs, prev, next);
-
-    string_freez(rs->prefix);
-    string_freez(rs->suffix);
-    freez(rs);
+    RRDDIMVAR *rs;
+    dfe_start_write(st->rrddimvar_root_index, rs) {
+        if(unlikely(rs->rrddim == rd))
+            dictionary_del(st->rrddimvar_root_index, rs_dfe.name);
+    }
+    dfe_done(rs);
 }

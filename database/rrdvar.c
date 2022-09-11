@@ -10,7 +10,7 @@
 typedef struct rrdvar {
     STRING *name;
     void *value;
-    RRDVAR_FLAGS flags:16;
+    RRDVAR_FLAGS flags:24;
     RRDVAR_TYPE type:8;
 } RRDVAR;
 

@@ -27,6 +27,20 @@ struct rrddim_constructor {
 
 };
 
+static void rrddim_update_rrddimvars_unsafe(RRDDIM *rd) {
+    RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
+
+    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
+    }
+}
+
 static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
     struct rrddim_constructor *ctr = constructor_data;
     RRDDIM *rd = rrddim;
@@ -151,15 +165,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // append this dimension
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
 
-    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
-        rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
-        rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
-        rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-        rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-    }
+    rrddim_update_rrddimvars_unsafe(rd);
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -204,8 +210,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
 
-    while(rd->variables)
-        rrddimvar_free(rd->variables);
+    rrddimvar_delete_all(rd);
 
     // free(rd->annotations);
     //#ifdef ENABLE_ACLK
@@ -244,7 +249,6 @@ static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     struct rrddim_constructor *ctr = constructor_data;
     RRDDIM *rd = rrddim;
     RRDSET *st = ctr->st;
-    RRDHOST *host = st->rrdhost;
 
     ctr->react_action = RRDDIM_REACT_NONE;
 
@@ -263,15 +267,7 @@ static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         }
 
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-
-        if(host->health_enabled) {
-            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
-            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
-            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-            rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-        }
+        rrddim_update_rrddimvars_unsafe(rd);
     }
 
     if(unlikely(rc))
