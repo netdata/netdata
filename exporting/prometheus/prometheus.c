@@ -354,7 +354,7 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
 
     struct host_variables_callback_options *opts = data;
 
-    if (rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR | RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
+    if (rrdvar_flags(rv) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
         if (!opts->host_header_printed) {
             opts->host_header_printed = 1;
 

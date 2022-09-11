@@ -14,43 +14,21 @@ typedef enum rrdvar_type {
 } RRDVAR_TYPE;
 
 typedef enum rrdvar_options {
-    RRDVAR_OPTION_DEFAULT                    = 0,
-    RRDVAR_OPTION_ALLOCATED                  = (1 << 0), // the value ptr is allocated (not a reference)
-    RRDVAR_OPTION_CUSTOM_HOST_VAR            = (1 << 1), // this is a custom host variable, not associated with a dimension
-    RRDVAR_OPTION_CUSTOM_CHART_VAR           = (1 << 2), // this is a custom chart variable, not associated with a dimension
-    RRDVAR_OPTION_RRDCALC_LOCAL_VAR          = (1 << 3), // this is a an alarm variable, attached to a chart
-    RRDVAR_OPTION_RRDCALC_FAMILY_VAR         = (1 << 4), // this is a an alarm variable, attached to a family
-    RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR   = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
-    RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
-
-    // add more options here
-
-    RRDVAR_OPTION_INTERNAL_JUST_CREATED      = (1 << 14), // used by the constructor - it is never set after initialization
-    RRDVAR_OPTION_INTERNAL_JUST_UPDATED      = (1 << 15), // used by the constructor - it is never set after initialization
-} RRDVAR_OPTIONS;
+    RRDVAR_FLAG_NONE = 0,
+    RRDVAR_FLAG_ALLOCATED = (1 << 0), // the value ptr is allocated (not a reference)
+    RRDVAR_FLAG_CUSTOM_HOST_VAR = (1 << 1), // this is a custom host variable, not associated with a dimension
+    RRDVAR_FLAG_CUSTOM_CHART_VAR = (1 << 2), // this is a custom chart variable, not associated with a dimension
+    RRDVAR_FLAG_RRDCALC_LOCAL_VAR = (1 << 3), // this is a an alarm variable, attached to a chart
+    RRDVAR_FLAG_RRDCALC_FAMILY_VAR = (1 << 4), // this is a an alarm variable, attached to a family
+    RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
+    RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
+} RRDVAR_FLAGS;
 
 #define RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS \
-    (RRDVAR_OPTION_ALLOCATED | RRDVAR_OPTION_INTERNAL_JUST_CREATED | RRDVAR_OPTION_INTERNAL_JUST_UPDATED)
+    (RRDVAR_FLAG_ALLOCATED)
 
 #define RRDVAR_OPTIONS_REMOVED_WHEN_PROPAGATING_TO_RRDVAR \
-    (RRDVAR_OPTION_ALLOCATED | RRDVAR_OPTION_INTERNAL_JUST_CREATED | RRDVAR_OPTION_INTERNAL_JUST_UPDATED)
-
-// the variables as stored in the variables indexes
-// there are 3 indexes:
-// 1. at each chart   (RRDSET.rrdvar_root_index)
-// 2. at each context (RRDFAMILY.rrdvar_root_index)
-// 3. at each host    (RRDHOST.rrdvar_root_index)
-struct rrdvar {
-    STRING *name;
-
-    void *value;
-    time_t last_updated;
-
-    RRDVAR_OPTIONS options:16;
-    RRDVAR_TYPE type:8;
-};
-
-#define rrdvar_name(rv) string2str((rv)->name)
+    (RRDVAR_FLAG_ALLOCATED)
 
 #define RRDVAR_MAX_LENGTH 1024
 
@@ -67,10 +45,16 @@ extern int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTI
 
 extern NETDATA_DOUBLE rrdvar2number(RRDVAR *rv);
 
-extern RRDVAR *rrdvar_add(const char *scope, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value);
+extern RRDVAR *rrdvar_add(const char *scope, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value);
 extern void rrdvar_del(DICTIONARY *dict, RRDVAR *rv);
 
 extern DICTIONARY *rrdvariables_create(void);
 extern void rrdvariables_destroy(DICTIONARY *dict);
+
+extern void rrdvar_free_all(DICTIONARY *dict);
+
+extern const char *rrdvar_name(RRDVAR *rv);
+extern RRDVAR_FLAGS rrdvar_flags(RRDVAR *rv);
+extern RRDVAR_TYPE rrdvar_type(RRDVAR *rv);
 
 #endif //NETDATA_RRDVAR_H

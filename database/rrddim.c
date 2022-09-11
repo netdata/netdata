@@ -152,9 +152,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
 
     if(host->health_enabled && !rrdset_is_ar_chart(st)) {
-        rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-        rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-        rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+        rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+        rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+        rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
 
         rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
@@ -265,9 +265,9 @@ static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
 
         if(host->health_enabled) {
-            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
             rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
             rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
             rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);

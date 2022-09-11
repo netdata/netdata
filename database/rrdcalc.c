@@ -125,39 +125,44 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 
     rc->local  = rrdvar_add(
-        "local", st->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+        "local",
+        st->rrdvars,
+        rc->name,
+        RRDVAR_TYPE_CALCULATED,
+        RRDVAR_FLAG_RRDCALC_LOCAL_VAR,
+        &rc->value);
+
     rc->family = rrdvar_add(
         "family",
         st->rrdfamily->rrdvars,
         rc->name,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_OPTION_RRDCALC_FAMILY_VAR,
+        RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_FAMILY_VAR,
         &rc->value);
 
-    char fullname[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
-    STRING *fullname_string = string_strdupz(fullname);
-    rc->hostid   = rrdvar_add(
-        "host",
-        host->rrdvars,
-        fullname_string,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR,
-        &rc->value);
+    char buf[RRDVAR_MAX_LENGTH + 1];
 
-    snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
+    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
+    STRING *hostname_string = string_strdupz(buf);
     rc->hostname = rrdvar_add(
         "host",
         host->rrdvars,
-        fullname_string,
+        hostname_string,
         RRDVAR_TYPE_CALCULATED,
-        RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR,
+        RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR,
         &rc->value);
 
-    string_freez(fullname_string);
+    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
+    STRING *hostid_string = string_strdupz(buf);
+    rc->hostid   = rrdvar_add(
+        "host",
+        host->rrdvars,
+        hostid_string,
+        RRDVAR_TYPE_CALCULATED,
+        RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR | ((rc->hostname)?0:RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR),
+        &rc->value);
 
-    if(rc->hostid && !rc->hostname)
-        rc->hostid->options |= RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR;
+    string_freez(hostid_string);
+    string_freez(hostname_string);
 
     if(!rc->units) rc->units = string_dup(st->units);
 

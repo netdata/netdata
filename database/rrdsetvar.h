@@ -17,7 +17,7 @@ struct rrdsetvar {
     STRING *key_fullid;             // chart type.chart id.variable
     STRING *key_fullname;           // chart type.chart name.variable
 
-    RRDVAR_OPTIONS options:16;
+    RRDVAR_FLAGS flags :16;
     RRDVAR_TYPE type:8;
 
     void *value;
@@ -39,6 +39,6 @@ extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char 
 extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, NETDATA_DOUBLE value);
 
 extern void rrdsetvar_rename_all(RRDSET *st);
-extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options);
+extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS options);
 
 #endif //NETDATA_RRDSETVAR_H

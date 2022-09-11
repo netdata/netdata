@@ -45,7 +45,7 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
     RRDHOST *host = st->rrdhost;
 
-    RRDVAR_OPTIONS options = rs->options;
+    RRDVAR_FLAGS options = rs->flags;
     options &= ~RRDVAR_OPTIONS_REMOVED_WHEN_PROPAGATING_TO_RRDVAR;
 
     // ------------------------------------------------------------------------
@@ -79,10 +79,10 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSETVAR *rs) {
 }
 
 static void rrdsetvar_free_value_unsafe(RRDSETVAR *rs) {
-    if(rs->options & RRDVAR_OPTION_ALLOCATED) {
+    if(rs->flags & RRDVAR_FLAG_ALLOCATED) {
         void *old = rs->value;
         rs->value = NULL;
-        rs->options &= ~RRDVAR_OPTION_ALLOCATED;
+        rs->flags &= ~RRDVAR_FLAG_ALLOCATED;
         freez(old);
     }
 }
@@ -96,7 +96,7 @@ static void rrdsetvar_set_value_unsafe(RRDSETVAR *rs, void *new_value) {
         NETDATA_DOUBLE *n = mallocz(sizeof(NETDATA_DOUBLE));
         *n = NAN;
         rs->value = n;
-        rs->options |= RRDVAR_OPTION_ALLOCATED;
+        rs->flags |= RRDVAR_FLAG_ALLOCATED;
     }
 }
 
@@ -104,7 +104,7 @@ struct rrdsetvar_constructor {
     RRDSET *rrdset;
     const char *name;
     void *value;
-    RRDVAR_OPTIONS options:16;
+    RRDVAR_FLAGS flags :16;
     RRDVAR_TYPE type:8;
 
     enum {
@@ -118,11 +118,11 @@ static void rrdsetvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
-    ctr->options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
+    ctr->flags &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
 
     rs->name = string_strdupz(ctr->name);
     rs->type = ctr->type;
-    rs->options = ctr->options | RRDVAR_OPTION_INTERNAL_JUST_CREATED;
+    rs->flags = ctr->flags;
     rs->rrdset = ctr->rrdset;
     rrdsetvar_set_value_unsafe(rs, ctr->value);
 
@@ -136,25 +136,25 @@ static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
-    ctr->options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
+    ctr->flags &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
 
-    RRDVAR_OPTIONS options = rs->options;
+    RRDVAR_FLAGS options = rs->flags;
     options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
 
     ctr->react_action = RRDSETVAR_REACT_NONE;
 
-    if(((ctr->value == NULL && rs->value != NULL && rs->options & RRDVAR_OPTION_ALLOCATED) || (rs->value == ctr->value))
-        && ctr->options == options && rs->type == ctr->type) {
+    if(((ctr->value == NULL && rs->value != NULL && rs->flags & RRDVAR_FLAG_ALLOCATED) || (rs->value == ctr->value))
+        && ctr->flags == options && rs->type == ctr->type) {
         // don't reset it - everything is the same, or as it should...
         ;
     }
     else {
         internal_error(true, "RRDSETVAR: resetting variable '%s' of chart '%s' of host '%s', options from 0x%x to 0x%x, type from %d to %d",
                        string2str(rs->name), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost),
-                       options, ctr->options, rs->type, ctr->type);
+                       options, ctr->flags, rs->type, ctr->type);
 
         rrdsetvar_free_value_unsafe(rs); // we are going to change the options, so free it before setting it
-        rs->options = ctr->options | RRDVAR_OPTION_INTERNAL_JUST_UPDATED;
+        rs->flags = ctr->flags;
         rs->type = ctr->type;
         rrdsetvar_set_value_unsafe(rs, ctr->value);
 
@@ -188,18 +188,16 @@ void rrdsetvar_index_destroy(RRDSET *st) {
     dictionary_destroy(st->rrdsetvar_root_index);
 }
 
-RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
+RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS options) {
     struct rrdsetvar_constructor tmp = {
         .name = name,
         .type = type,
         .value = value,
-        .options = options,
+        .flags = options,
         .rrdset = st,
     };
 
     RRDSETVAR *rs = dictionary_set_advanced(st->rrdsetvar_root_index, name, -1, NULL, sizeof(RRDSETVAR), &tmp);
-    rs->options &= ~(RRDVAR_OPTION_INTERNAL_JUST_CREATED | RRDVAR_OPTION_INTERNAL_JUST_UPDATED);
-
     return rs;
 }
 
@@ -228,15 +226,15 @@ void rrdsetvar_free_all(RRDSET *st) {
 
 RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) {
     STRING *name_string = rrdvar_name_to_string(name);
-    RRDSETVAR *rs = rrdsetvar_create(st, string2str(name_string), RRDVAR_TYPE_CALCULATED, NULL, RRDVAR_OPTION_CUSTOM_CHART_VAR);
+    RRDSETVAR *rs = rrdsetvar_create(st, string2str(name_string), RRDVAR_TYPE_CALCULATED, NULL, RRDVAR_FLAG_CUSTOM_CHART_VAR);
     string_freez(name_string);
     return rs;
 }
 
 void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
-    if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
+    if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) || !(rs->flags & RRDVAR_FLAG_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->name), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value, rs->options, rs->value);
+            " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->name), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value, rs->flags, rs->value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;

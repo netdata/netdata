@@ -125,16 +125,14 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
-    NETDATA_DOUBLE *value = (NETDATA_DOUBLE *)rv->value;
-
     buffer_sprintf(
             host->sender->build
             , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
             , rrdvar_name(rv)
-            , *value
+            , rrdvar2number(rv)
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rv), *value);
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rv), rrdvar2number(rv));
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
@@ -150,7 +148,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
-    if(unlikely(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR && rv->type == RRDVAR_TYPE_CALCULATED)) {
+    if(unlikely(rrdvar_flags(rv) & RRDVAR_FLAG_CUSTOM_HOST_VAR && rrdvar_type(rv) == RRDVAR_TYPE_CALCULATED)) {
         rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
 
         // return 1, so that the traversal will return the number of variables sent

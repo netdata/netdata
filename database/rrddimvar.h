@@ -26,7 +26,7 @@ struct rrddimvar {
     RRDVAR_TYPE type;
     void *value;
 
-    RRDVAR_OPTIONS options;
+    RRDVAR_FLAGS options;
 
     RRDVAR *var_local_id;
     RRDVAR *var_local_name;
@@ -49,7 +49,8 @@ struct rrddimvar {
 
 
 extern void rrddimvar_rename_all(RRDDIM *rd);
-extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options);
+extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value,
+    RRDVAR_FLAGS options);
 extern void rrddimvar_free(RRDDIMVAR *rs);
 
 

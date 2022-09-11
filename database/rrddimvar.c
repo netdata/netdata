@@ -119,8 +119,8 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $id
     // - $name
 
-    rs->var_local_id           = rrdvar_add("local", st->rrdvars, rs->key_id, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_local_name         = rrdvar_add("local", st->rrdvars, rs->key_name, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_local_id           = rrdvar_add("local", st->rrdvars, rs->key_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_local_name         = rrdvar_add("local", st->rrdvars, rs->key_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
 
     // FAMILY VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -131,10 +131,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-context.id
     // - $chart-context.name
 
-    rs->var_family_id          = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_id, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_family_name        = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_name, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_family_contextid   = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_contextid, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_family_contextname = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_contextname, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_family_id          = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_family_name        = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_family_contextid   = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_contextid, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_family_contextname = rrdvar_add("family", st->rrdfamily->rrdvars, rs->key_contextname, rs->type, RRDVAR_FLAG_NONE, rs->value);
 
     // HOST VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -145,13 +145,13 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    rs->var_host_chartidid      = rrdvar_add("host", host->rrdvars, rs->key_fullidid, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_host_chartidname    = rrdvar_add("host", host->rrdvars, rs->key_fullidname, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_host_chartnameid    = rrdvar_add("host", host->rrdvars, rs->key_fullnameid, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    rs->var_host_chartnamename  = rrdvar_add("host", host->rrdvars, rs->key_fullnamename, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_host_chartidid      = rrdvar_add("host", host->rrdvars, rs->key_fullidid, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_host_chartidname    = rrdvar_add("host", host->rrdvars, rs->key_fullidname, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_host_chartnameid    = rrdvar_add("host", host->rrdvars, rs->key_fullnameid, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    rs->var_host_chartnamename  = rrdvar_add("host", host->rrdvars, rs->key_fullnamename, rs->type, RRDVAR_FLAG_NONE, rs->value);
 }
 
-RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options) {
+RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS options) {
     RRDSET *st = rd->rrdset;
     (void)st;
 

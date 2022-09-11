@@ -270,7 +270,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // send the chart local custom variables
     RRDSETVAR *rs;
     dfe_start_read(st->rrdsetvar_root_index, rs) {
-        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
+        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
             NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
 
             buffer_sprintf(
