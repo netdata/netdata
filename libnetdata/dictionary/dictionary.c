@@ -954,7 +954,7 @@ static DICTIONARY_ITEM *dictionary_set_item_unsafe(DICTIONARY *dict, const char 
     return nv;
 }
 
-static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char *name) {
+static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!name)) {
         internal_error(true, "attempted to dictionary_get() without a name");
         return NULL;
@@ -965,7 +965,8 @@ static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char 
         return NULL;
     }
 
-    size_t name_len = strlen(name) + 1; // we need the terminating null too
+    if(name_len == -1)
+        name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
@@ -1050,8 +1051,8 @@ const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict
     return nv;
 }
 
-void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
-    DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name);
+void *dictionary_get_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name, name_len);
 
     if(unlikely(!nv))
         return NULL;
@@ -1059,15 +1060,15 @@ void *dictionary_get_unsafe(DICTIONARY *dict, const char *name) {
     return nv->value;
 }
 
-void *dictionary_get(DICTIONARY *dict, const char *name) {
+void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
-    void *ret = dictionary_get_unsafe(dict, name);
+    void *ret = dictionary_get_advanced_unsafe(dict, name, name_len);
     dictionary_unlock(dict, DICTIONARY_LOCK_READ);
     return ret;
 }
 
-const DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, const char *name) {
-    DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name);
+const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name, name_len);
 
     if(unlikely(!nv))
         return NULL;
@@ -1076,9 +1077,9 @@ const DICTIONARY_ITEM *dictionary_get_and_acquire_item_unsafe(DICTIONARY *dict, 
     return nv;
 }
 
-const DICTIONARY_ITEM *dictionary_get_and_acquire_item(DICTIONARY *dict, const char *name) {
+const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
-    const DICTIONARY_ITEM *ret = dictionary_get_and_acquire_item_unsafe(dict, name);
+    const DICTIONARY_ITEM *ret = dictionary_get_and_acquire_item_advanced_unsafe(dict, name, name_len);
     dictionary_unlock(dict, DICTIONARY_LOCK_READ);
     return ret;
 }
@@ -1130,7 +1131,7 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DI
         dictionary_destroy(dict);
 }
 
-int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
+int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_del() on a destroyed dictionary");
         return -1;
@@ -1143,7 +1144,8 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
 
     internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: INTERNAL ERROR: deleting dictionary item '%s' without exclusive access to dictionary", name);
 
-    size_t name_len = strlen(name) + 1; // we need the terminating null too
+    if(name_len == -1)
+        name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
     debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
 
@@ -1178,9 +1180,9 @@ int dictionary_del_unsafe(DICTIONARY *dict, const char *name) {
     return ret;
 }
 
-int dictionary_del(DICTIONARY *dict, const char *name) {
+int dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
-    int ret = dictionary_del_unsafe(dict, name);
+    int ret = dictionary_del_advanced_unsafe(dict, name, name_len);
     dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
     return ret;
 }
