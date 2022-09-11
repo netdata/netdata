@@ -28,7 +28,7 @@ inline STRING *rrdvar_name_to_string(const char *name) {
 }
 
 struct rrdvar_constructor {
-    const char *name;
+    STRING *name;
     void *value;
     RRDVAR_OPTIONS options:16;
     RRDVAR_TYPE type:8;
@@ -45,7 +45,7 @@ static void rrdvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     ctr->options &= ~RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS;
 
-    rv->name = string_strdupz(ctr->name);
+    rv->name = string_dup(ctr->name);
     rv->type = ctr->type;
     rv->options = ctr->options;
 
@@ -97,11 +97,10 @@ inline void rrdvar_delete(DICTIONARY *dict, RRDVAR *rv) {
         error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
 }
 
-inline RRDVAR *rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name,
-                          RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
+inline RRDVAR *rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
 
     struct rrdvar_constructor tmp = {
-        .name = string2str(name),
+        .name = name,
         .value = value,
         .type = type,
         .options = options,
