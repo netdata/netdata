@@ -77,17 +77,26 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
 
     // ------------------------------------------------------------------------
     // CHART
-    rs->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rs->name, rs->type, options, rs->value);
+
+    if(st->rrdvars) {
+        rs->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rs->name, rs->type, options, rs->value);
+    }
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rs->rrdvar_family_chart_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_id, rs->type, options, rs->value);
-    rs->rrdvar_family_chart_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_name, rs->type, options, rs->value);
+
+    if(st->rrdfamily && st->rrdfamily->rrdvars) {
+        rs->rrdvar_family_chart_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_id, rs->type, options, rs->value);
+        rs->rrdvar_family_chart_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_name, rs->type, options, rs->value);
+    }
 
     // ------------------------------------------------------------------------
     // HOST
-    rs->rrdvar_host_chart_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id, rs->type, options, rs->value);
-    rs->rrdvar_host_chart_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name, rs->type, options, rs->value);
+
+    if(host->rrdvars) {
+        rs->rrdvar_host_chart_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id, rs->type, options, rs->value);
+        rs->rrdvar_host_chart_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name, rs->type, options, rs->value);
+    }
 
     // free the keys
     string_freez(key_chart_id);

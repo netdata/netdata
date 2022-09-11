@@ -122,8 +122,10 @@ static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
     // - $id
     // - $name
 
-    rs->rrdvar_local_dim_id = rrdvar_add_and_acquire("local", st->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_local_dim_name = rrdvar_add_and_acquire("local", st->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    if(st->rrdvars) {
+        rs->rrdvar_local_dim_id = rrdvar_add_and_acquire("local", st->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_local_dim_name = rrdvar_add_and_acquire("local", st->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    }
 
     // FAMILY VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -134,10 +136,12 @@ static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
     // - $chart-context.id
     // - $chart-context.name
 
-    rs->rrdvar_family_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_family_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_family_context_dim_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_family_context_dim_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    if(st->rrdfamily && st->rrdfamily->rrdvars) {
+        rs->rrdvar_family_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_family_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_family_context_dim_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_family_context_dim_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    }
 
     // HOST VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -148,10 +152,12 @@ static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    rs->rrdvar_host_chart_id_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_host_chart_id_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_host_chart_name_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-    rs->rrdvar_host_chart_name_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    if(host->rrdvars) {
+        rs->rrdvar_host_chart_id_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_host_chart_id_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_host_chart_name_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_host_chart_name_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    }
 
     // free the keys
 
