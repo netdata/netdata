@@ -23,24 +23,33 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
 
     // ------------------------------------------------------------------------
     // CHART
-    rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local);
-    rs->rrdvar_local = NULL;
+
+    if(st->rrdvars) {
+        rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local);
+        rs->rrdvar_local = NULL;
+    }
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_id);
-    rs->rrdvar_family_chart_id = NULL;
 
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_name);
-    rs->rrdvar_family_chart_name = NULL;
+    if(st->rrdfamily && st->rrdfamily->rrdvars) {
+        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_id);
+        rs->rrdvar_family_chart_id = NULL;
+
+        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_name);
+        rs->rrdvar_family_chart_name = NULL;
+    }
 
     // ------------------------------------------------------------------------
     // HOST
-    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id);
-    rs->rrdvar_host_chart_id = NULL;
 
-    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name);
-    rs->rrdvar_host_chart_name = NULL;
+    if(host->rrdvars) {
+        rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id);
+        rs->rrdvar_host_chart_id = NULL;
+
+        rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name);
+        rs->rrdvar_host_chart_name = NULL;
+    }
 }
 
 // should only be called while the rrdsetvar dict is write locked

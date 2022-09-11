@@ -39,39 +39,45 @@ static inline void rrddimvar_free_variables_unsafe(RRDDIMVAR *rs) {
 
     // CHART VARIABLES FOR THIS DIMENSION
 
-    rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local_dim_id);
-    rs->rrdvar_local_dim_id = NULL;
+    if(st->rrdvars) {
+        rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local_dim_id);
+        rs->rrdvar_local_dim_id = NULL;
 
-    rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local_dim_name);
-    rs->rrdvar_local_dim_name = NULL;
+        rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local_dim_name);
+        rs->rrdvar_local_dim_name = NULL;
+    }
 
     // FAMILY VARIABLES FOR THIS DIMENSION
 
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_id);
-    rs->rrdvar_family_id = NULL;
+    if(st->rrdfamily && st->rrdfamily->rrdvars) {
+        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_id);
+        rs->rrdvar_family_id = NULL;
 
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_name);
-    rs->rrdvar_family_name = NULL;
+        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_name);
+        rs->rrdvar_family_name = NULL;
 
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_id);
-    rs->rrdvar_family_context_dim_id = NULL;
+        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_id);
+        rs->rrdvar_family_context_dim_id = NULL;
 
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_name);
-    rs->rrdvar_family_context_dim_name = NULL;
+        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_name);
+        rs->rrdvar_family_context_dim_name = NULL;
+    }
 
     // HOST VARIABLES FOR THIS DIMENSION
 
-    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_id);
-    rs->rrdvar_host_chart_id_dim_id = NULL;
+    if(host->rrdvars) {
+        rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_id);
+        rs->rrdvar_host_chart_id_dim_id = NULL;
 
-    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_name);
-    rs->rrdvar_host_chart_id_dim_name = NULL;
+        rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_name);
+        rs->rrdvar_host_chart_id_dim_name = NULL;
 
-    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name_dim_id);
-    rs->rrdvar_host_chart_name_dim_id = NULL;
+        rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name_dim_id);
+        rs->rrdvar_host_chart_name_dim_id = NULL;
 
-    rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name_dim_name);
-    rs->rrdvar_host_chart_name_dim_name = NULL;
+        rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_name_dim_name);
+        rs->rrdvar_host_chart_name_dim_name = NULL;
+    }
 }
 
 static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
