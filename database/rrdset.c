@@ -154,17 +154,12 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->rrd_memory_mode = ctr->memory_mode;
 
     st->chart_type = ctr->chart_type;
-    st->green = NAN;
-    st->red = NAN;
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
     st->rrdhost = host;
 
     st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
     if(unlikely(st->id == anomaly_rates_chart))
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
-
-    if(!st->rrdfamily)
-        st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
@@ -181,10 +176,17 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_init_rrddim_index(st);
 
+    // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
-    rrddimvar_index_init(st);
 
-    st->rrdvars = rrdvariables_create();
+    if(host->health_enabled) {
+        st->green = NAN;
+        st->red = NAN;
+        st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
+        st->rrdvars = rrdvariables_create();
+        rrddimvar_index_init(st);
+    }
+
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 

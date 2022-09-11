@@ -617,7 +617,7 @@ struct rrdset {
     NETDATA_DOUBLE green;                           // green threshold for this chart
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
-    DICTIONARY *rrdvars;                       // RRDVAR index for this chart
+    DICTIONARY *rrdvars;                            // RRDVAR index for this chart
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
     RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
 };

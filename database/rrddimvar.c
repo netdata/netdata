@@ -220,6 +220,9 @@ void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *
     char key[RRDDIMVAR_ID_MAX + 1];
     size_t key_len = snprintfz(key, RRDDIMVAR_ID_MAX, "%s_%s_%s", prefix, rrddim_id(rd), suffix);
 
+    if(key_len != strlen(key))
+        fatal("RRDDIMVAR: key_len does not match! Fix the code!");
+
     struct rrddimvar_constructor tmp = {
         .suffix = suffix,
         .prefix = prefix,

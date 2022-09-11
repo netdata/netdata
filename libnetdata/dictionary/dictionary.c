@@ -984,6 +984,8 @@ static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char 
 // API - items management
 
 void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(!dict || !name)) return NULL;
+
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     if(unlikely(dict->react_callback && nv && (nv->flags & ITEM_FLAG_NEW_OR_UPDATED))) {
@@ -997,6 +999,8 @@ void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t
 }
 
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(!dict || !name)) return NULL;
+
     if(name_len == -1)
         name_len = (ssize_t)strlen((const char *)name) + 1;
 
@@ -1020,6 +1024,8 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 }
 
 const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(!dict || !name)) return NULL;
+
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
     if(unlikely(!nv))
@@ -1035,6 +1041,8 @@ const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONAR
 }
 
 const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(!dict || !name)) return NULL;
+
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
@@ -1052,6 +1060,8 @@ const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict
 }
 
 void *dictionary_get_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict || !name)) return NULL;
+
     DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name, name_len);
 
     if(unlikely(!nv))
@@ -1061,6 +1071,8 @@ void *dictionary_get_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t
 }
 
 void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict || !name)) return NULL;
+
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
     void *ret = dictionary_get_advanced_unsafe(dict, name, name_len);
     dictionary_unlock(dict, DICTIONARY_LOCK_READ);
@@ -1068,6 +1080,8 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 }
 
 const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict || !name)) return NULL;
+
     DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name, name_len);
 
     if(unlikely(!nv))
@@ -1078,6 +1092,8 @@ const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DICTIONAR
 }
 
 const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict)) return NULL;
+
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
     const DICTIONARY_ITEM *ret = dictionary_get_and_acquire_item_advanced_unsafe(dict, name, name_len);
     dictionary_unlock(dict, DICTIONARY_LOCK_READ);
@@ -1085,7 +1101,7 @@ const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict
 }
 
 const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return NULL;
+    if(unlikely(!dict || !item)) return NULL;
     reference_counter_acquire(dict, item);
     return item;
 }
@@ -1101,7 +1117,7 @@ void *dictionary_acquired_item_value(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item
 }
 
 void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return;
+    if(unlikely(!dict || !item)) return;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item->dict != dict)
@@ -1113,7 +1129,7 @@ void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_C
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return;
+    if(unlikely(!dict || !item)) return;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item->dict != dict)
@@ -1132,6 +1148,8 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DI
 }
 
 int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict || !name)) return -1;
+
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_del() on a destroyed dictionary");
         return -1;
@@ -1181,6 +1199,8 @@ int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t n
 }
 
 int dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict || !name)) return -1;
+
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     int ret = dictionary_del_advanced_unsafe(dict, name, name_len);
     dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -1313,7 +1333,7 @@ void dictionary_foreach_done(DICTFE *dfe) {
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
-    if(unlikely(!dict)) return 0;
+    if(unlikely(!dict || !callback)) return 0;
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_walkthrough_rw() on a destroyed dictionary");
@@ -1376,7 +1396,7 @@ static int dictionary_sort_compar(const void *nv1, const void *nv2) {
 }
 
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
-    if(unlikely(!dict || !dict->entries)) return 0;
+    if(unlikely(!dict || !callback || !dict->entries)) return 0;
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_sorted_walkthrough_rw() on a destroyed dictionary");

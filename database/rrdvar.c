@@ -111,8 +111,8 @@ inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva)
         error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rva));
 }
 
-inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type,
-    RRDVAR_FLAGS options, void *value) {
+inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
+    if(unlikely(!dict || !name)) return NULL;
 
     struct rrdvar_constructor tmp = {
         .name = name,
@@ -130,6 +130,8 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
 }
 
 void rrdvar_delete_all(DICTIONARY *dict) {
+    if(unlikely(!dict)) return;
+
     RRDVAR *rv;
     dfe_start_write(dict, rv) {
         dictionary_del_advanced_unsafe(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1);
@@ -142,11 +144,14 @@ void rrdvar_delete_all(DICTIONARY *dict) {
 // CUSTOM HOST VARIABLES
 
 inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data) {
+    if(unlikely(!dict)) return 0;
+
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
 const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host, const char *name) {
     DICTIONARY *dict = host->rrdvars;
+    if(unlikely(!dict)) return NULL;
 
     STRING *name_string = rrdvar_name_to_string(name);
 
@@ -180,6 +185,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, 
 }
 
 void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
+    if(unlikely(!dict || !rva)) return;
     dictionary_acquired_item_release(dict, rva);
 }
 
@@ -187,6 +193,8 @@ void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
 // RRDVAR lookup
 
 NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
+    if(unlikely(!rva)) return NAN;
+
     RRDVAR *rv = dictionary_acquired_item_value(rva);
 
     switch(rv->type) {
