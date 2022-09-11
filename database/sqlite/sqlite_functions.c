@@ -700,7 +700,6 @@ bind_fail:
 int find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name, uuid_t *store_uuid)
 {
     static __thread sqlite3_stmt *res = NULL;
-    uuid_t *uuid = NULL;
     int rc;
     int status = 1;
 
