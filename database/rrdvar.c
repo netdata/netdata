@@ -311,6 +311,9 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     buffer_strcat(buf, "\n\t}\n}\n");
 }
 
+// ----------------------------------------------------------------------------
+// RRDVAR private members examination
+
 const char *rrdvar_name(const RRDVAR_ACQUIRED *rva) {
     return dictionary_acquired_item_name(rva);
 }

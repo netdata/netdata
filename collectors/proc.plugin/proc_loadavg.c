@@ -123,7 +123,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
         else rrdset_next(processes_chart);
 
         rrddim_set_by_pointer(processes_chart, rd_active, active_processes);
-        rrdsetvar_custom_chart_variable_set(rd_pidmax, max_processes);
+        rrdsetvar_custom_chart_variable_set(processes_chart, rd_pidmax, max_processes);
         rrdset_done(processes_chart);
     }
 

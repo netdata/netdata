@@ -11,30 +11,16 @@
 // This means, there will be no speed penalty for using
 // these variables
 
-struct rrdsetvar {
-    STRING *name;               // variable name
-    void *value;
-
-    RRDVAR_FLAGS flags :16;
-    RRDVAR_TYPE type:8;
-
-    const RRDVAR_ACQUIRED *rrdvar_local;
-    const RRDVAR_ACQUIRED *rrdvar_family_chart_id;
-    const RRDVAR_ACQUIRED *rrdvar_family_chart_name;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
-
-    struct rrdset *rrdset;
-};
-
 extern void rrdsetvar_index_init(RRDSET *st);
 extern void rrdsetvar_index_destroy(RRDSET *st);
 extern void rrdsetvar_free_all(RRDSET *st);
 
 extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);
-extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, NETDATA_DOUBLE value);
+extern void rrdsetvar_custom_chart_variable_set(RRDSET *st, RRDSETVAR *rv, NETDATA_DOUBLE value);
 
 extern void rrdsetvar_rename_all(RRDSET *st);
 extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS options);
+
+extern void rrdsetvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb);
 
 #endif //NETDATA_RRDSETVAR_H

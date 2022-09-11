@@ -268,20 +268,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     rrddim_foreach_done(rd);
 
     // send the chart local custom variables
-    RRDSETVAR *rs;
-    dfe_start_read(st->rrdsetvar_root_index, rs) {
-        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
-            NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
-
-            buffer_sprintf(
-                    host->sender->build
-                    , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
-                    , string2str(rs->name)
-                    , *value
-            );
-        }
-    }
-    dfe_done(rs);
+    rrdsetvar_print_to_streaming_custom_chart_variables(st, host->sender->build);
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }

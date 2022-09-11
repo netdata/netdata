@@ -111,7 +111,7 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
     } else {
         RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
         if (rs)
-            rrdsetvar_custom_chart_variable_set(rs, value);
+            rrdsetvar_custom_chart_variable_set(st, rs, value);
         else
             error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }

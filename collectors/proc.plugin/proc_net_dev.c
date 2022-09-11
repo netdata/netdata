@@ -990,8 +990,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         d->filename_speed = NULL;
                     }
                     else {
-                        rrdsetvar_custom_chart_variable_set(d->chart_var_speed, (NETDATA_DOUBLE) d->speed * KILOBITS_IN_A_MEGABIT);
-
                         if(d->do_speed != CONFIG_BOOLEAN_NO) {
                             if(unlikely(!d->st_speed)) {
                                 d->st_speed = rrdset_create_localhost(
@@ -1018,6 +1016,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                             else rrdset_next(d->st_speed);
 
                             rrddim_set_by_pointer(d->st_speed, d->rd_speed, (collected_number)d->speed * KILOBITS_IN_A_MEGABIT);
+                            rrdsetvar_custom_chart_variable_set(d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE) d->speed * KILOBITS_IN_A_MEGABIT);
                             rrdset_done(d->st_speed);
                         }
                     }

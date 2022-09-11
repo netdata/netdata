@@ -3727,7 +3727,7 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                     *filename = NULL;
                 }
                 else {
-                    rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
+                    rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
             } else {
@@ -3742,11 +3742,11 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                 char *s = "max\n\0";
                 if(strcmp(s, buffer) == 0){
                     *value = UINT64_MAX;
-                    rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
+                    rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
                 *value = str2ull(buffer);
-                rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
+                rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                 return 1;
             }
         }
@@ -3868,8 +3868,6 @@ void update_cgroup_charts(int update_every) {
                             value = (NETDATA_DOUBLE)cg->cpuset_cpus * 100;
                     }
                     if(likely(value)) {
-                        rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, value);
-
                         if(unlikely(!cg->st_cpu_limit)) {
                             snprintfz(title, CHART_TITLE_MAX, "CPU Usage within the limits");
 
@@ -3909,14 +3907,15 @@ void update_cgroup_charts(int update_every) {
 
                         cg->prev_cpu_usage = cpu_usage;
 
+                        rrdsetvar_custom_chart_variable_set(cg->st_cpu_limit, cg->chart_var_cpu_limit, value);
                         rrdset_done(cg->st_cpu_limit);
                     }
                     else {
-                        rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, NAN);
                         if(unlikely(cg->st_cpu_limit)) {
                             rrdset_is_obsolete(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
+                        rrdsetvar_custom_chart_variable_set(cg->st_cpu_limit, cg->chart_var_cpu_limit, NAN);
                     }
                 }
             }

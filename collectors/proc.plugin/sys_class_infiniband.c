@@ -551,7 +551,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             FOREACH_COUNTER_BYTES(GEN_RRD_DIM_SETP, port)
 
             // For link speed set only variable
-            rrdsetvar_custom_chart_variable_set(port->stv_speed, port->speed);
+            rrdsetvar_custom_chart_variable_set(port->st_bytes, port->stv_speed, port->speed);
 
             rrdset_done(port->st_bytes);
         }

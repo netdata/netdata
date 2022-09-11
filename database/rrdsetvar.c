@@ -1,12 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_HEALTH_INTERNALS
 #include "rrd.h"
+
+struct rrdsetvar {
+    STRING *name;               // variable name
+    void *value;                // we need this to maintain the allocation for custom chart variables
+
+    RRDVAR_FLAGS flags :16;
+    RRDVAR_TYPE type:8;
+
+    const RRDVAR_ACQUIRED *rrdvar_local;
+    const RRDVAR_ACQUIRED *rrdvar_family_chart_id;
+    const RRDVAR_ACQUIRED *rrdvar_family_chart_name;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
+    const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
+};
 
 // should only be called while the rrdsetvar dict is write locked
 // otherwise, 2+ threads may be setting the same variables at the same time
-static inline void rrdsetvar_free_rrdvars_unsafe(RRDSETVAR *rs) {
-    RRDSET *st = rs->rrdset;
+static inline void rrdsetvar_free_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     RRDHOST *host = st->rrdhost;
 
     // ------------------------------------------------------------------------
@@ -33,8 +45,7 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSETVAR *rs) {
 
 // should only be called while the rrdsetvar dict is write locked
 // otherwise, 2+ threads may be setting the same variables at the same time
-static inline void rrdsetvar_update_rrdvars_unsafe(RRDSETVAR *rs) {
-    RRDSET *st = rs->rrdset;
+static inline void rrdsetvar_update_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     RRDHOST *host = st->rrdhost;
 
     RRDVAR_FLAGS options = rs->flags;
@@ -43,7 +54,7 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // free the old ones (if any)
 
-    rrdsetvar_free_rrdvars_unsafe(rs);
+    rrdsetvar_free_rrdvars_unsafe(st, rs);
 
     // ------------------------------------------------------------------------
     // KEYS
@@ -119,13 +130,12 @@ static void rrdsetvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     rs->name = string_strdupz(ctr->name);
     rs->type = ctr->type;
     rs->flags = ctr->flags;
-    rs->rrdset = ctr->rrdset;
     rrdsetvar_set_value_unsafe(rs, ctr->value);
 
     ctr->react_action = RRDSETVAR_REACT_NEW;
 
     // create the rrdvariables while we are having a write lock to the dictionary
-    rrdsetvar_update_rrdvars_unsafe(rs);
+    rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
 }
 
 static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *new_rrdsetvar __maybe_unused, void *constructor_data) {
@@ -146,7 +156,7 @@ static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     }
     else {
         internal_error(true, "RRDSETVAR: resetting variable '%s' of chart '%s' of host '%s', options from 0x%x to 0x%x, type from %d to %d",
-                       string2str(rs->name), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost),
+                       string2str(rs->name), rrdset_id(ctr->rrdset), rrdhost_hostname(ctr->rrdset->rrdhost),
                        options, ctr->flags, rs->type, ctr->type);
 
         rrdsetvar_free_value_unsafe(rs); // we are going to change the options, so free it before setting it
@@ -155,16 +165,17 @@ static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rrdsetvar_set_value_unsafe(rs, ctr->value);
 
         // recreate the rrdvariables while we are having a write lock to the dictionary
-        rrdsetvar_update_rrdvars_unsafe(rs);
+        rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
 
         ctr->react_action = RRDSETVAR_REACT_UPDATED;
     }
 }
 
 static void rrdsetvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *rrdset __maybe_unused) {
+    RRDSET *st = rrdset;
     RRDSETVAR *rs = rrdsetvar;
 
-    rrdsetvar_free_rrdvars_unsafe(rs);
+    rrdsetvar_free_rrdvars_unsafe(st, rs);
     rrdsetvar_free_value_unsafe(rs);
     string_freez(rs->name);
     rs->name = NULL;
@@ -203,7 +214,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
     RRDSETVAR *rs;
     dfe_start_write(st->rrdsetvar_root_index, rs) {
         // should only be called while the rrdsetvar dict is write locked
-        rrdsetvar_update_rrdvars_unsafe(rs);
+        rrdsetvar_update_rrdvars_unsafe(st, rs);
     }
     dfe_done(rs);
 
@@ -227,10 +238,10 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
     return rs;
 }
 
-void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
+void rrdsetvar_custom_chart_variable_set(RRDSET *st, RRDSETVAR *rs, NETDATA_DOUBLE value) {
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) || !(rs->flags & RRDVAR_FLAG_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->name), rrdset_id(rs->rrdset), rrdhost_hostname(rs->rrdset->rrdhost), value, rs->flags, rs->value);
+            " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->name), rrdset_id(st), rrdhost_hostname(st->rrdhost), value, rs->flags, rs->value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;
@@ -238,7 +249,24 @@ void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value) {
             *v = value;
 
             // mark the chart to be sent upstream
-            rrdset_flag_clear(rs->rrdset, RRDSET_FLAG_UPSTREAM_EXPOSED);
+            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
     }
+}
+
+void rrdsetvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb) {
+    // send the chart local custom variables
+    RRDSETVAR *rs;
+    dfe_start_read(st->rrdsetvar_root_index, rs) {
+        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
+            NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
+
+            buffer_sprintf(wb
+                , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
+                , string2str(rs->name)
+                , *value
+            );
+        }
+    }
+    dfe_done(rs);
 }
