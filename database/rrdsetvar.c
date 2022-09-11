@@ -4,29 +4,30 @@
 #include "rrd.h"
 
 // should only be called while the rrdsetvar dict is write locked
+// otherwise, 2+ threads may be setting the same variables at the same time
 static inline void rrdsetvar_free_rrdvars_unsafe(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
     RRDHOST *host = st->rrdhost;
 
     // ------------------------------------------------------------------------
     // CHART
-    rrdvar_delete(st->rrdvars, rs->var_local);
+    rrdvar_del(st->rrdvars, rs->var_local);
     rs->var_local = NULL;
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rrdvar_delete(st->rrdfamily->rrdvars, rs->var_family);
+    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family);
     rs->var_family = NULL;
 
-    rrdvar_delete(st->rrdfamily->rrdvars, rs->var_family_name);
+    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_name);
     rs->var_family_name = NULL;
 
     // ------------------------------------------------------------------------
     // HOST
-    rrdvar_delete(host->rrdvars, rs->var_host);
+    rrdvar_del(host->rrdvars, rs->var_host);
     rs->var_host = NULL;
 
-    rrdvar_delete(host->rrdvars, rs->var_host_name);
+    rrdvar_del(host->rrdvars, rs->var_host_name);
     rs->var_host_name = NULL;
 
     // ------------------------------------------------------------------------
@@ -39,6 +40,7 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSETVAR *rs) {
 }
 
 // should only be called while the rrdsetvar dict is write locked
+// otherwise, 2+ threads may be setting the same variables at the same time
 static inline void rrdsetvar_update_rrdvars_unsafe(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
     RRDHOST *host = st->rrdhost;

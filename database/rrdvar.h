@@ -68,7 +68,7 @@ extern int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTI
 extern NETDATA_DOUBLE rrdvar2number(RRDVAR *rv);
 
 extern RRDVAR *rrdvar_add(const char *scope, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value);
-extern void rrdvar_delete(DICTIONARY *dict, RRDVAR *rv);
+extern void rrdvar_del(DICTIONARY *dict, RRDVAR *rv);
 
 extern DICTIONARY *rrdvariables_create(void);
 extern void rrdvariables_destroy(DICTIONARY *dict);

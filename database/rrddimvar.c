@@ -16,38 +16,38 @@ static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
 
     // CHART VARIABLES FOR THIS DIMENSION
 
-    rrdvar_delete(st->rrdvars, rs->var_local_id);
+    rrdvar_del(st->rrdvars, rs->var_local_id);
     rs->var_local_id = NULL;
 
-    rrdvar_delete(st->rrdvars, rs->var_local_name);
+    rrdvar_del(st->rrdvars, rs->var_local_name);
     rs->var_local_name = NULL;
 
     // FAMILY VARIABLES FOR THIS DIMENSION
 
-    rrdvar_delete(st->rrdfamily->rrdvars, rs->var_family_id);
+    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_id);
     rs->var_family_id = NULL;
 
-    rrdvar_delete(st->rrdfamily->rrdvars, rs->var_family_name);
+    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_name);
     rs->var_family_name = NULL;
 
-    rrdvar_delete(st->rrdfamily->rrdvars, rs->var_family_contextid);
+    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_contextid);
     rs->var_family_contextid = NULL;
 
-    rrdvar_delete(st->rrdfamily->rrdvars, rs->var_family_contextname);
+    rrdvar_del(st->rrdfamily->rrdvars, rs->var_family_contextname);
     rs->var_family_contextname = NULL;
 
     // HOST VARIABLES FOR THIS DIMENSION
 
-    rrdvar_delete(host->rrdvars, rs->var_host_chartidid);
+    rrdvar_del(host->rrdvars, rs->var_host_chartidid);
     rs->var_host_chartidid = NULL;
 
-    rrdvar_delete(host->rrdvars, rs->var_host_chartidname);
+    rrdvar_del(host->rrdvars, rs->var_host_chartidname);
     rs->var_host_chartidname = NULL;
 
-    rrdvar_delete(host->rrdvars, rs->var_host_chartnameid);
+    rrdvar_del(host->rrdvars, rs->var_host_chartnameid);
     rs->var_host_chartnameid = NULL;
 
-    rrdvar_delete(host->rrdvars, rs->var_host_chartnamename);
+    rrdvar_del(host->rrdvars, rs->var_host_chartnamename);
     rs->var_host_chartnamename = NULL;
 
     // KEYS

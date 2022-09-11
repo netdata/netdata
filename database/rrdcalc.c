@@ -278,16 +278,16 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     // unlink it
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alarms, rc, rrdset_prev, rrdset_next);
 
-    rrdvar_delete(st->rrdvars, rc->local);
+    rrdvar_del(st->rrdvars, rc->local);
     rc->local = NULL;
 
-    rrdvar_delete(st->rrdfamily->rrdvars, rc->family);
+    rrdvar_del(st->rrdfamily->rrdvars, rc->family);
     rc->family = NULL;
 
-    rrdvar_delete(host->rrdvars, rc->hostid);
+    rrdvar_del(host->rrdvars, rc->hostid);
     rc->hostid = NULL;
 
-    rrdvar_delete(host->rrdvars, rc->hostname);
+    rrdvar_del(host->rrdvars, rc->hostname);
     rc->hostname = NULL;
 
     rc->rrdset = NULL;

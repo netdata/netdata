@@ -87,13 +87,13 @@ void rrdvariables_destroy(DICTIONARY *dict) {
 }
 
 static inline RRDVAR *rrdvar_get(DICTIONARY *dict, STRING *name) {
-    return dictionary_get_advanced(dict, string2str(name), (ssize_t)string_strlen(name));
+    return dictionary_get_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1);
 }
 
-inline void rrdvar_delete(DICTIONARY *dict, RRDVAR *rv) {
+inline void rrdvar_del(DICTIONARY *dict, RRDVAR *rv) {
     if(unlikely(!dict || !rv)) return;
 
-    if(dictionary_del(dict, rrdvar_name(rv)) != 0)
+    if(dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1) != 0)
         error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rv));
 }
 
