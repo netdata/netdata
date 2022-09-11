@@ -17,7 +17,7 @@ typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
 typedef struct dictionary_item RRDVAR_ACQUIRED;
-typedef struct rrdsetvar RRDSETVAR;
+typedef struct dictionary_item RRDSETVAR_ACQUIRED;
 typedef struct rrddimvar RRDDIMVAR;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;

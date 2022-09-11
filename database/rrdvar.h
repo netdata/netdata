@@ -54,7 +54,7 @@ extern void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva)
 extern DICTIONARY *rrdvariables_create(void);
 extern void rrdvariables_destroy(DICTIONARY *dict);
 
-extern void rrdvar_free_all(DICTIONARY *dict);
+extern void rrdvar_delete_all(DICTIONARY *dict);
 
 extern const char *rrdvar_name(const RRDVAR_ACQUIRED *rva);
 extern RRDVAR_FLAGS rrdvar_flags(const RRDVAR_ACQUIRED *rva);

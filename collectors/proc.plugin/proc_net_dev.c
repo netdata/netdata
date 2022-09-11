@@ -188,7 +188,7 @@ static struct netdev {
     RRDDIM *rd_mtu;
 
     char *filename_speed;
-    RRDSETVAR *chart_var_speed;
+    const RRDSETVAR_ACQUIRED *chart_var_speed;
 
     char *filename_duplex;
     char *filename_operstate;
@@ -967,7 +967,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             // update the interface speed
             if(d->filename_speed) {
                 if(unlikely(!d->chart_var_speed)) {
-                    d->chart_var_speed = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "nic_speed_max");
+                    d->chart_var_speed =
+                        rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
                     if(!d->chart_var_speed) {
                         error("Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.", d->name);
                         freez(d->filename_speed);

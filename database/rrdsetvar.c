@@ -2,11 +2,11 @@
 
 #include "rrd.h"
 
-struct rrdsetvar {
+typedef struct rrdsetvar {
     STRING *name;               // variable name
     void *value;                // we need this to maintain the allocation for custom chart variables
 
-    RRDVAR_FLAGS flags :16;
+    RRDVAR_FLAGS flags:16;
     RRDVAR_TYPE type:8;
 
     const RRDVAR_ACQUIRED *rrdvar_local;
@@ -14,7 +14,7 @@ struct rrdsetvar {
     const RRDVAR_ACQUIRED *rrdvar_family_chart_name;
     const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
     const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
-};
+} RRDSETVAR;
 
 // should only be called while the rrdsetvar dict is write locked
 // otherwise, 2+ threads may be setting the same variables at the same time
@@ -195,17 +195,22 @@ void rrdsetvar_index_destroy(RRDSET *st) {
     dictionary_destroy(st->rrdsetvar_root_index);
 }
 
-RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS options) {
+const RRDSETVAR_ACQUIRED *rrdsetvar_add_and_acquire(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags) {
     struct rrdsetvar_constructor tmp = {
         .name = name,
         .type = type,
         .value = value,
-        .flags = options,
+        .flags = flags,
         .rrdset = st,
     };
 
-    RRDSETVAR *rs = dictionary_set_advanced(st->rrdsetvar_root_index, name, -1, NULL, sizeof(RRDSETVAR), &tmp);
-    return rs;
+    const RRDSETVAR_ACQUIRED *rsa = dictionary_set_and_acquire_item_advanced(st->rrdsetvar_root_index, name, -1, NULL, sizeof(RRDSETVAR), &tmp);
+    return rsa;
+}
+
+void rrdsetvar_add_and_leave_released(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags) {
+    const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_add_and_acquire(st, name, type, value, flags);
+    dictionary_acquired_item_release(st->rrdsetvar_root_index, rsa);
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
@@ -221,24 +226,33 @@ void rrdsetvar_rename_all(RRDSET *st) {
     rrdsetcalc_link_matching(st);
 }
 
-void rrdsetvar_free_all(RRDSET *st) {
+void rrdsetvar_release_and_delete_all(RRDSET *st) {
     RRDSETVAR *rs;
-    dfe_start_write(st->rrdsetvar_root_index, rs)
-        dictionary_del_having_write_lock(st->rrdsetvar_root_index, string2str(rs->name));
+    dfe_start_write(st->rrdsetvar_root_index, rs) {
+        dictionary_del_advanced_unsafe(st->rrdsetvar_root_index, string2str(rs->name), (ssize_t)string_strlen(rs->name) + 1);
+    }
     dfe_done(rs);
+}
+
+void rrdsetvar_release(DICTIONARY *dict, const RRDSETVAR_ACQUIRED *rsa) {
+    dictionary_acquired_item_release(dict, rsa);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // custom chart variables
 
-RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) {
+const RRDSETVAR_ACQUIRED *rrdsetvar_custom_chart_variable_add_and_acquire(RRDSET *st, const char *name) {
     STRING *name_string = rrdvar_name_to_string(name);
-    RRDSETVAR *rs = rrdsetvar_create(st, string2str(name_string), RRDVAR_TYPE_CALCULATED, NULL, RRDVAR_FLAG_CUSTOM_CHART_VAR);
+    const RRDSETVAR_ACQUIRED *rs = rrdsetvar_add_and_acquire(st, string2str(name_string), RRDVAR_TYPE_CALCULATED, NULL, RRDVAR_FLAG_CUSTOM_CHART_VAR);
     string_freez(name_string);
     return rs;
 }
 
-void rrdsetvar_custom_chart_variable_set(RRDSET *st, RRDSETVAR *rs, NETDATA_DOUBLE value) {
+void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *rsa, NETDATA_DOUBLE value) {
+    if(!rsa) return;
+
+    RRDSETVAR *rs = dictionary_acquired_item_value(rsa);
+
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) || !(rs->flags & RRDVAR_FLAG_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
             " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->name), rrdset_id(st), rrdhost_hostname(st->rrdhost), value, rs->flags, rs->value);

@@ -109,9 +109,11 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
         else
             error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, rrdhost_hostname(host));
     } else {
-        RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
-        if (rs)
-            rrdsetvar_custom_chart_variable_set(st, rs, value);
+        const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_custom_chart_variable_add_and_acquire(st, name);
+        if (rsa) {
+            rrdsetvar_custom_chart_variable_set(st, rsa, value);
+            rrdsetvar_custom_chart_variable_release(st, rsa);
+        }
         else
             error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }

@@ -99,7 +99,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     if(likely(do_all_processes)) {
         static RRDSET *processes_chart = NULL;
         static RRDDIM *rd_active = NULL;
-        static RRDSETVAR *rd_pidmax;
+        static const RRDSETVAR_ACQUIRED *rd_pidmax;
 
         if(unlikely(!processes_chart)) {
             processes_chart = rrdset_create_localhost(
@@ -118,7 +118,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
             );
 
             rd_active = rrddim_add(processes_chart, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pidmax = rrdsetvar_custom_chart_variable_create(processes_chart, "pidmax");
+            rd_pidmax = rrdsetvar_custom_chart_variable_add_and_acquire(processes_chart, "pidmax");
         }
         else rrdset_next(processes_chart);
 

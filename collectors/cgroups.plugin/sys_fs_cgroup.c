@@ -857,16 +857,16 @@ struct cgroup {
     char *filename_cpu_cfs_quota;
     unsigned long long cpu_cfs_quota;
 
-    RRDSETVAR *chart_var_cpu_limit;
+    const RRDSETVAR_ACQUIRED *chart_var_cpu_limit;
     NETDATA_DOUBLE prev_cpu_usage;
 
     char *filename_memory_limit;
     unsigned long long memory_limit;
-    RRDSETVAR *chart_var_memory_limit;
+    const RRDSETVAR_ACQUIRED *chart_var_memory_limit;
 
     char *filename_memoryswap_limit;
     unsigned long long memoryswap_limit;
-    RRDSETVAR *chart_var_memoryswap_limit;
+    const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
     RRDDIM *rd_cpu;
@@ -3708,10 +3708,10 @@ cpu_limits2_err:
     }
 }
 
-static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
+static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
     if(*filename) {
         if(unlikely(!*chart_var)) {
-            *chart_var = rrdsetvar_custom_chart_variable_create(cg->st_mem_usage, chart_var_name);
+            *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, chart_var_name);
             if(!*chart_var) {
                 error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, chart_var_name);
                 freez(*filename);
@@ -3843,7 +3843,7 @@ void update_cgroup_charts(int update_every) {
                 }
 
                 if(unlikely(!cg->chart_var_cpu_limit)) {
-                    cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_create(cg->st_cpu, "cpu_limit");
+                    cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
                         error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
                         if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);

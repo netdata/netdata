@@ -129,7 +129,7 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
     return rva;
 }
 
-void rrdvar_free_all(DICTIONARY *dict) {
+void rrdvar_delete_all(DICTIONARY *dict) {
     RRDVAR *rv;
     dfe_start_write(dict, rv) {
         dictionary_del_advanced_unsafe(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1);
