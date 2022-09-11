@@ -32,11 +32,11 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // FAMILY
 
-    if(st->rrdfamily && st->rrdfamily->rrdvars) {
-        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_id);
+    if(st->rrdfamily) {
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_chart_id);
         rs->rrdvar_family_chart_id = NULL;
 
-        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_chart_name);
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_chart_name);
         rs->rrdvar_family_chart_name = NULL;
     }
 
@@ -85,9 +85,9 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // FAMILY
 
-    if(st->rrdfamily && st->rrdfamily->rrdvars) {
-        rs->rrdvar_family_chart_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_id, rs->type, options, rs->value);
-        rs->rrdvar_family_chart_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_chart_name, rs->type, options, rs->value);
+    if(st->rrdfamily) {
+        rs->rrdvar_family_chart_id = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_chart_id, rs->type, options, rs->value);
+        rs->rrdvar_family_chart_name = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_chart_name, rs->type, options, rs->value);
     }
 
     // ------------------------------------------------------------------------

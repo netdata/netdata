@@ -282,8 +282,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->system_info = system_info;
 
     rrdhost_init_rrdset_index(host);
-    host->rrdfamily_root_index   = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    host->rrdvars = rrdvariables_create();
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -291,11 +289,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_DB, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
-    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-
     // ------------------------------------------------------------------------
     // initialize health variables
+
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
 
     host->health_log.next_log_id = 1;
     host->health_log.next_alarm_id = 1;
@@ -312,6 +310,11 @@ RRDHOST *rrdhost_create(const char *hostname,
         host->health_log.max = (unsigned int)n;
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
+
+    if(host->health_enabled) {
+        rrdfamily_index_init(host);
+        host->rrdvars = rrdvariables_create();
+    }
 
     char filename[FILENAME_MAX + 1];
 
@@ -1204,7 +1207,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host->node_id);
 
-    dictionary_destroy(host->rrdfamily_root_index);
+    rrdfamily_index_destroy(host);
     rrdvariables_destroy(host->rrdvars);
 
     rrdhost_destroy_rrdcontexts(host);

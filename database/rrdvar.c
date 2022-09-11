@@ -243,10 +243,10 @@ int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result
         return 1;
     }
 
-    rva = rrdvar_get_and_acquire(st->rrdfamily->rrdvars, variable);
+    rva = rrdvar_get_and_acquire(rrdfamily_rrdvars_dict(st->rrdfamily), variable);
     if(rva) {
         *result = rrdvar2number(rva);
-        dictionary_acquired_item_release(st->rrdfamily->rrdvars, rva);
+        dictionary_acquired_item_release(rrdfamily_rrdvars_dict(st->rrdfamily), rva);
         return 1;
     }
 
@@ -310,7 +310,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
 
     buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", rrdset_family(st));
     helper.counter = 0;
-    rrdvar_walkthrough_read(st->rrdfamily->rrdvars, single_variable2json_callback, &helper);
+    rrdvar_walkthrough_read(rrdfamily_rrdvars_dict(st->rrdfamily), single_variable2json_callback, &helper);
 
     buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", rrdhost_hostname(host));
     helper.counter = 0;

@@ -152,13 +152,13 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 // ----------------------------------------------------------------------------
 // RRD FAMILY
 
-struct rrdfamily {
-    STRING *family;
-    DICTIONARY *rrdvars;
+typedef struct dictionary_item RRDFAMILY_ACQUIRED;
 
-    size_t use_count;
-};
-typedef struct rrdfamily RRDFAMILY;
+extern const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
+extern void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
+extern void rrdfamily_index_init(RRDHOST *host);
+extern void rrdfamily_index_destroy(RRDHOST *host);
+extern DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 
 
 // ----------------------------------------------------------------------------
@@ -619,7 +619,7 @@ struct rrdset {
 
     DICTIONARY *rrdvars;                            // RRDVAR index for this chart
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
-    RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
+    const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
@@ -1241,9 +1241,6 @@ extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
-
-extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
-extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rf);
 
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);

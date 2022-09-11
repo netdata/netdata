@@ -125,7 +125,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 
     rc->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_LOCAL_VAR, &rc->value);
-    rc->rrdvar_family = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_FAMILY_VAR, &rc->value);
+    rc->rrdvar_family = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_FAMILY_VAR, &rc->value);
 
     char buf[RRDVAR_MAX_LENGTH + 1];
 
@@ -274,7 +274,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     rrdvar_release_and_del(st->rrdvars, rc->rrdvar_local);
     rc->rrdvar_local = NULL;
 
-    rrdvar_release_and_del(st->rrdfamily->rrdvars, rc->rrdvar_family);
+    rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rc->rrdvar_family);
     rc->rrdvar_family = NULL;
 
     rrdvar_release_and_del(host->rrdvars, rc->rrdvar_host_chart_id);
@@ -629,7 +629,7 @@ void rrdcalc_free(RRDCALC *rc) {
 
     if(rc->rrdset) {
         rrdvar_release_and_del(rc->rrdset->rrdvars, rc->rrdvar_local);
-        rrdvar_release_and_del(rc->rrdset->rrdfamily->rrdvars, rc->rrdvar_family);
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(rc->rrdset->rrdfamily), rc->rrdvar_family);
         rrdvar_release_and_del(rc->rrdset->rrdhost->rrdvars, rc->rrdvar_host_chart_id);
         rrdvar_release_and_del(rc->rrdset->rrdhost->rrdvars, rc->rrdvar_host_chart_name);
         rc->rrdvar_local = rc->rrdvar_family = rc->rrdvar_host_chart_id = rc->rrdvar_host_chart_name = NULL;

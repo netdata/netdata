@@ -49,17 +49,17 @@ static inline void rrddimvar_free_variables_unsafe(RRDDIMVAR *rs) {
 
     // FAMILY VARIABLES FOR THIS DIMENSION
 
-    if(st->rrdfamily && st->rrdfamily->rrdvars) {
-        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_id);
+    if(st->rrdfamily) {
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_id);
         rs->rrdvar_family_id = NULL;
 
-        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_name);
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_name);
         rs->rrdvar_family_name = NULL;
 
-        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_id);
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_context_dim_id);
         rs->rrdvar_family_context_dim_id = NULL;
 
-        rrdvar_release_and_del(st->rrdfamily->rrdvars, rs->rrdvar_family_context_dim_name);
+        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_context_dim_name);
         rs->rrdvar_family_context_dim_name = NULL;
     }
 
@@ -136,11 +136,11 @@ static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
     // - $chart-context.id
     // - $chart-context.name
 
-    if(st->rrdfamily && st->rrdfamily->rrdvars) {
-        rs->rrdvar_family_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-        rs->rrdvar_family_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
-        rs->rrdvar_family_context_dim_id = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
-        rs->rrdvar_family_context_dim_name = rrdvar_add_and_acquire("family", st->rrdfamily->rrdvars, key_context_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+    if(st->rrdfamily) {
+        rs->rrdvar_family_id = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_family_name = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_family_context_dim_id = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_context_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
+        rs->rrdvar_family_context_dim_name = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_context_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
     }
 
     // HOST VARIABLES FOR THIS DIMENSION

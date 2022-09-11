@@ -182,7 +182,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(host->health_enabled) {
         st->green = NAN;
         st->red = NAN;
-        st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
+        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
         st->rrdvars = rrdvariables_create();
         rrddimvar_index_init(st);
     }
@@ -218,7 +218,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         rrddim_foreach_done(rd);
     }
 
-    rrdfamily_free(host, st->rrdfamily);
+    rrdfamily_release(host, st->rrdfamily);
     rrdhost_unlock(host);
 
     rrddimvar_index_destroy(st);
