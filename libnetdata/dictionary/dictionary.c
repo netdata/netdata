@@ -759,13 +759,24 @@ static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
     return freed;
 }
 
+static inline void item_delete_or_mark_deleted_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
+    if(item_can_be_deleted(dict, nv)) {
+        item_linked_list_unlink_unsafe(dict, nv);
+        item_destroy_unsafe(dict, nv);
+    }
+    else
+        nv->flags |= ITEM_FLAG_DELETED;
+
+    DICTIONARY_STATS_ENTRIES_MINUS1(dict);
+}
+
 // ----------------------------------------------------------------------------
 // delayed destruction of dictionaries
 
 static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
     if(mem)
         *mem = 0;
-    
+
     if(dictionary_stats_referenced_items(dict))
         return false;
 
@@ -773,7 +784,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
 
     size_t freed = 0;
 
-    // destroy the dictionary
+    // destroy the index
     freed += hashtable_destroy_unsafe(dict);
 
     DICTIONARY_ITEM *nv = dict->first_item;
@@ -805,7 +816,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
 netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex = NETDATA_MUTEX_INITIALIZER;
 static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
 
-void queue_dictionary_destruction_unsafe(DICTIONARY *dict) {
+void dictionary_queue_for_destruction_unsafe(DICTIONARY *dict) {
     if(dict->flags & DICTIONARY_FLAG_DESTROYED)
         return;
 
@@ -888,6 +899,26 @@ void *dictionary_scratchpad(DICTIONARY *dict) {
     return &dict->scratchpad;
 }
 
+static void dictionary_flush_unsafe(DICTIONARY *dict) {
+    // delete the index
+    hashtable_destroy_unsafe(dict);
+
+    // delete all items
+    DICTIONARY_ITEM *nv, *nv_next;
+    for (nv = dict->first_item; nv; nv = nv_next) {
+        nv_next = nv->next;
+
+        if(!(nv->flags & ITEM_FLAG_DELETED))
+            item_delete_or_mark_deleted_unsafe(dict, nv);
+    }
+}
+
+void dictionary_flush(DICTIONARY *dict) {
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+    dictionary_flush_unsafe(dict);
+    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
+}
+
 size_t dictionary_destroy(DICTIONARY *dict) {
     cleanup_destroyed_dictionaries();
 
@@ -899,18 +930,8 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     if(referenced_items) {
         dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
 
-        // there are referenced items
-        // delete all items individually,
-        // so that only the referenced will remain
-        DICTIONARY_ITEM *nv, *nv_next;
-        for (nv = dict->first_item; nv; nv = nv_next) {
-            nv_next = nv->next;
-            int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(nv);
-            if (!refcount && !(nv->flags & ITEM_FLAG_DELETED))
-                dictionary_del_unsafe(dict, item_get_name(nv));
-        }
-
-        queue_dictionary_destruction_unsafe(dict);
+        dictionary_flush_unsafe(dict);
+        dictionary_queue_for_destruction_unsafe(dict);
 
         internal_error(
             true,
@@ -918,7 +939,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
             dict->creation_function,
             dict->creation_line,
             dict->creation_file,
-            referenced_items,
+            dictionary_stats_referenced_items(dict),
             dictionary_stats_entries(dict));
 
         dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -1356,17 +1377,9 @@ int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t n
         if(hashtable_delete_unsafe(dict, name, name_len, nv) == 0)
             error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s' that is not in the index", name);
 
-        if(item_can_be_deleted(dict, nv)) {
-            item_linked_list_unlink_unsafe(dict, nv);
-            item_destroy_unsafe(dict, nv);
-        }
-        else
-            nv->flags |= ITEM_FLAG_DELETED;
+        item_delete_or_mark_deleted_unsafe(dict, nv);
 
         ret = 0;
-
-        DICTIONARY_STATS_ENTRIES_MINUS1(dict);
-
     }
     return ret;
 }

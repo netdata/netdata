@@ -91,9 +91,15 @@ extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*confl
 extern void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
 // Destroy a dictionary
-// returns the number of bytes freed
-// the returned value will not include name and value sizes if DICTIONARY_FLAG_WITH_STATISTICS is not set
+// Returns the number of bytes freed
+// The returned value will not include name/key sizes
+// Registered delete callbacks will be run for each item in the dictionary.
 extern size_t dictionary_destroy(DICTIONARY *dict);
+
+// Empties a dictionary
+// Referenced items will survive, but are not offered anymore.
+// Registered delete callbacks will be run for each item in the dictionary.
+extern void dictionary_flush(DICTIONARY *dict);
 
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary
