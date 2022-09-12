@@ -91,12 +91,11 @@ static STRING *rrdcalc_replace_variables(const char *line, RRDCALC *rc) {
 void rrdcalc_update_rrdlabels(RRDSET *st) {
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdset_read(st, rc) {
-        if (rc->original_info) {
-            if (rc->info)
-                string_freez(rc->info);
+        if(!rc->original_info) continue;
 
-            rc->info = rrdcalc_replace_variables(rrdcalc_original_info(rc), rc);
-        }
+        STRING *old = rc->info;
+        rc->info = rrdcalc_replace_variables(rrdcalc_original_info(rc), rc);
+        string_freez(old);
     }
     foreach_rrdcalc_in_rrdset_done(rc);
 }
@@ -500,7 +499,10 @@ static void rrdcalc_rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_u
 
 void rrdcalc_rrdset_index_init(RRDSET *st) {
     if(!st->rrdcalc_root_index) {
-        st->rrdcalc_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+        st->rrdcalc_root_index = dictionary_create(
+             DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
+            |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
+            |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
         dictionary_register_insert_callback(st->rrdcalc_root_index, rrdcalc_rrdset_insert_callback, st);
         dictionary_register_delete_callback(st->rrdcalc_root_index, rrdcalc_rrdset_delete_callback, st);
@@ -514,14 +516,12 @@ void rrdcalc_rrdset_index_destroy(RRDSET *st) {
 }
 
 static void rrdcalc_rrdset_index_add(RRDSET *st, RRDCALC *rc) {
-    dictionary_set_advanced(st->rrdcalc_root_index, string2str(rc->key), string_strlen(rc->key) + 1, rc, sizeof(RRDCALC_ACQUIRED *), NULL);
+    dictionary_set_advanced(st->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key) + 1, rc, sizeof(RRDCALC *), NULL);
 }
 
 static void rrdcalc_rrdset_index_del(RRDSET *st, RRDCALC *rc) {
-    dictionary_del_advanced(st->rrdcalc_root_index, string2str(rc->key), string_strlen(rc->key) + 1);
+    dictionary_del_advanced(st->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key) + 1);
 }
-
-
 
 // ----------------------------------------------------------------------------
 // RRDCALC rrdhost index management
