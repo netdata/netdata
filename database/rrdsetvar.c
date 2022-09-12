@@ -199,6 +199,7 @@ void rrdsetvar_index_init(RRDSET *st) {
 
 void rrdsetvar_index_destroy(RRDSET *st) {
     dictionary_destroy(st->rrdsetvar_root_index);
+    st->rrdsetvar_root_index = NULL;
 }
 
 const RRDSETVAR_ACQUIRED *rrdsetvar_add_and_acquire(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags) {
