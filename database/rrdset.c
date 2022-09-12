@@ -347,7 +347,6 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdhost_unlock(host);
     }
 
-    rrdhost_wrlock(host);
     if(ctr->react_action & RRDSET_REACT_NEW) {
         store_active_chart(&st->chart_uuid);
         compute_chart_hash(st);
@@ -357,7 +356,6 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");
     }
-    rrdhost_unlock(host);
 
     rrdcontext_updated_rrdset(st);
 }

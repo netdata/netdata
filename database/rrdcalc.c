@@ -683,25 +683,12 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
     struct rrdcalc_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->rrdhost;
 
-    if(ctr->rrdset)
-        rrdcalc_link_to_rrdset(ctr->rrdset, rc);
+    if(ctr->react_action == RRDCALC_REACT_NEW) {
+        if(ctr->rrdset)
+            rrdcalc_link_to_rrdset(ctr->rrdset, rc);
 
-    else {
-        if(ctr->from_rrdcalctemplate) {
-            rrdcontext_foreach_instance_with_rrdset_in_context(
-                host,
-                string2str(ctr->from_rrdcalctemplate->context),
-                rrdcalc_check_and_link_rrdset_callback,
-                rc);
-        }
-        else {
-            RRDSET *st;
-            rrdset_foreach_read(st, host) {
-                if(unlikely(rrdcalc_check_and_link_rrdset_callback(st, rc) == -1))
-                    break;
-            }
-            rrdset_foreach_done(st);
-        }
+        else if (ctr->from_rrdcalctemplate)
+            rrdcontext_foreach_instance_with_rrdset_in_context(host, string2str(ctr->from_rrdcalctemplate->context), rrdcalc_check_and_link_rrdset_callback, rc);
     }
 }
 
@@ -783,8 +770,21 @@ int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc) {
     };
 
     int ret = 1;
-    dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), rc, sizeof(RRDCALC), &tmp);
-    if(tmp.react_action != RRDCALC_REACT_NEW) {
+    RRDCALC *t = dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), rc, sizeof(RRDCALC), &tmp);
+    if(tmp.react_action == RRDCALC_REACT_NEW) {
+        // we copied rc into the dictionary, so we have to free the base here
+        freez(rc);
+        rc = t;
+
+        // since we loaded this config from configuration, we need to check if we can link it to alarms
+        RRDSET *st;
+        rrdset_foreach_read(st, host) {
+            if (unlikely(rrdcalc_check_and_link_rrdset_callback(st, rc) == -1))
+                break;
+        }
+        rrdset_foreach_done(st);
+    }
+    else {
         error(
             "RRDCALC: from config '%s' on chart '%s' failed to be added to host '%s'. It already exists.",
             string2str(rc->name),
@@ -793,10 +793,6 @@ int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc) {
 
         ret = 0;
         rrdcalc_free(rc);
-    }
-    else {
-        // we copied rc into the dictionary, so we have to free the base here
-        freez(rc);
     }
 
     return ret;
