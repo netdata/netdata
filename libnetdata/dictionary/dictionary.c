@@ -763,6 +763,9 @@ static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
 // delayed destruction of dictionaries
 
 static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
+    if(mem)
+        *mem = 0;
+    
     if(dictionary_stats_referenced_items(dict))
         return false;
 
@@ -890,56 +893,33 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     if(!dict) return 0;
 
-    DICTIONARY_ITEM *nv;
-
     debug(D_DICTIONARY, "Destroying dictionary.");
 
-    size_t referenced_items = 0;
-    size_t retries = 0;
-    do {
-        referenced_items = dictionary_stats_referenced_items(dict);
-        if (referenced_items) {
-            dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
-
-            // there are referenced items
-            // delete all items individually, so that only the referenced will remain
-            DICTIONARY_ITEM *nv_next;
-            for (nv = dict->first_item; nv; nv = nv_next) {
-                nv_next = nv->next;
-                int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(nv);
-                if (!refcount && !(nv->flags & ITEM_FLAG_DELETED))
-                    dictionary_del_unsafe(dict, item_get_name(nv));
-            }
-
-            internal_error(
-                retries == 0,
-                "DICTIONARY: waiting (try %zu) for destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
-                retries + 1,
-                dict->creation_function,
-                dict->creation_line,
-                dict->creation_file,
-                referenced_items,
-                dict->entries);
-
-            dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
-            sleep_usec(10000);
-        }
-    } while(referenced_items > 0 && ++retries < 10);
-
-    if(dictionary_stats_referenced_items(dict)) {
+    size_t referenced_items = dictionary_stats_referenced_items(dict);
+    if(referenced_items) {
         dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+
+        // there are referenced items
+        // delete all items individually,
+        // so that only the referenced will remain
+        DICTIONARY_ITEM *nv, *nv_next;
+        for (nv = dict->first_item; nv; nv = nv_next) {
+            nv_next = nv->next;
+            int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(nv);
+            if (!refcount && !(nv->flags & ITEM_FLAG_DELETED))
+                dictionary_del_unsafe(dict, item_get_name(nv));
+        }
 
         queue_dictionary_destruction_unsafe(dict);
 
         internal_error(
             true,
-            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s after %zu retries, because it has %ld referenced items in it (%ld total).",
+            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
             dict->creation_function,
             dict->creation_line,
             dict->creation_file,
-            retries,
             referenced_items,
-            dict->entries);
+            dictionary_stats_entries(dict));
 
         dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;
