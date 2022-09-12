@@ -221,7 +221,7 @@ void rrddimvar_index_init(RRDSET *st) {
 }
 
 void rrddimvar_index_destroy(RRDSET *st) {
-    dictionary_destroy(st->rrdsetvar_root_index);
+    dictionary_destroy(st->rrddimvar_root_index);
     st->rrddimvar_root_index = NULL;
 }
 
