@@ -160,11 +160,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    // append this dimension
-    rrdset_wrlock(st);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
-    rrdset_unlock(st);
-
     rrddim_update_rrddimvars_unsafe(rd);
 
     // let the chart resync
@@ -207,10 +202,6 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             delete_dimension_uuid(&rd->metric_uuid);
         }
     }
-
-    rrdset_wrlock(st);
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
-    rrdset_unlock(st);
 
     rrddimvar_delete_all(rd);
 
@@ -280,6 +271,13 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDDIM *rd = rrddim;
     RRDSET *st = ctr->st;
 
+    if(ctr->react_action == RRDDIM_REACT_NEW) {
+        // append this dimension
+        rrdset_wrlock(st);
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
+        rrdset_unlock(st);
+    }
+
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
         (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
@@ -316,6 +314,10 @@ static inline RRDDIM *rrddim_index_add(RRDSET *st, struct rrddim_constructor *rd
 }
 
 static inline void rrddim_index_del(RRDSET *st, RRDDIM *rd) {
+    rrdset_wrlock(st);
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
+    rrdset_unlock(st);
+
     if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID))
         dictionary_del(st->rrddim_root_index, string2str(rd->id));
 }

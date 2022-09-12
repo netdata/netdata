@@ -676,8 +676,7 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
         return;
 
     rrdhost_rdlock(host);
-
-    rrdset_foreach_write(st, host) {
+    rrdset_foreach_read(st, host) {
         if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
             continue;
 
@@ -691,20 +690,15 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
                 if(!rt->spdim)
                     break; // rrdcalctemplates with spdim are first in the linked list
 
-                if(!rrdcalctemplate_check_rrdset_conditions(rt, st, host))
-                    continue;
-
-                rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
+                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
+                    rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
             }
-
             rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
         }
         rrddim_foreach_done(rd);
-
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
     }
     rrdset_foreach_done(st);
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
     rrdhost_unlock(host);
 }
