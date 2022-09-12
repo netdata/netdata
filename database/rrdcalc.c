@@ -322,15 +322,20 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name
         }
     }
 
-    if(ae)
-        return ae->alarm_id;
+    uint32_t alarm_id;
 
-    if (unlikely(!host->health_log.next_alarm_id))
-        host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+    if(ae)
+        alarm_id = ae->alarm_id;
+
+    else {
+        if (unlikely(!host->health_log.next_alarm_id))
+            host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+
+        alarm_id = host->health_log.next_alarm_id++;
+    }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
-
-    return host->health_log.next_alarm_id++;
+    return alarm_id;
 }
 
 /**
