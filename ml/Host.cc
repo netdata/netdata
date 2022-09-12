@@ -80,9 +80,8 @@ void TrainableHost::getModelsAsJson(nlohmann::json &Json) {
             KM.toJson(J);
             JsonArray.push_back(J);
         }
-        Json[D->getID()] = JsonArray;
+        Json[getMLDimensionID(D->getRD())] = JsonArray;
     }
-
 
     return;
 }

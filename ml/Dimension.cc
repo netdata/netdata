@@ -6,14 +6,6 @@
 
 using namespace ml;
 
-std::string Dimension::getID() const {
-    RRDSET *RS = RD->rrdset;
-
-    std::stringstream SS;
-    SS << RS->context << "|" << RS->id << "|" << RD->name;
-    return SS.str();
-}
-
 bool Dimension::isActive() const {
     bool SetObsolete = rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE);
     bool DimObsolete = rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE);
