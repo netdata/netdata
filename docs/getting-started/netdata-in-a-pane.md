@@ -1,5 +1,6 @@
 <!--
-Title: "Netdata in a pane"
+title: "Netdata in a pane"
+sidebar_label: "Netdata in a pane"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/netdata-in-a-pane.md"
 learn_status: "Published"
 learn_topic_type: "Getting started"
