@@ -190,60 +190,6 @@ int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement)
     return rc;
 }
 
-/*
- * Store a chart or dimension UUID in  chart_active or dimension_active
- * The statement that will be prepared determines that
- */
-
-static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t *uuid)
-{
-    int rc;
-
-    // Check if we should need to prepare the statement
-    if (!*res) {
-        rc = prepare_statement(db_meta, statement, res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to store active object, rc = %d", rc);
-            return rc;
-        }
-    }
-
-    rc = sqlite3_bind_blob(*res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to bind input parameter to store active object, rc = %d", rc);
-    else
-        rc = execute_insert(*res);
-    return rc;
-}
-
-/*
- * Marks a dimension with UUID as active
- * Input: UUID
- */
-void store_active_dimension(uuid_t *dimension_uuid)
-{
-    static __thread sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    if (unlikely(!dimension_uuid))
-        return;
-
-    rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_DIMENSION, dimension_uuid);
-    if (rc != SQLITE_DONE)
-        error_report("Failed to store active dimension, rc = %d", rc);
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement in store active dimension, rc = %d", rc);
-    return;
-}
-
 static int check_table_integrity_cb(void *data, int argc, char **argv, char **column)
 {
     int *status = data;

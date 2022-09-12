@@ -126,8 +126,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
-    store_active_dimension(&rd->metric_uuid);
-
     // initialize data collection for all tiers
     {
         size_t initialized = 0;
@@ -262,7 +260,6 @@ static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rc += rrddim_set_divisor(st, rd, ctr->divisor);
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-        store_active_dimension(&rd->metric_uuid);
 
         for(int tier = 0; tier < storage_tiers ;tier++) {
             if (rd->tiers[tier])

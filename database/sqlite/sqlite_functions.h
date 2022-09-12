@@ -46,9 +46,6 @@ typedef enum db_check_action_type {
 #define SQL_FIND_DIMENSION_UUID \
     "select dim_id from dimension where chart_id=@chart and id=@id and name=@name and length(dim_id)=16;"
 
-#define SQL_STORE_ACTIVE_DIMENSION \
-    "insert or replace into dimension_active (dim_id, date_created) values (@id, unixepoch());"
-
 #define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
     if (unlikely(!db_meta)) {                                                                                          \
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
@@ -83,7 +80,6 @@ extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char 
                                collected_number divisor, int algorithm);
 
 extern int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid);
-extern void store_active_dimension(uuid_t *dimension_uuid);
 
 extern int find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name, uuid_t *store_uuid);
 extern int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const char *name);
