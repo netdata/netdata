@@ -1106,10 +1106,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up alarms
 
-    rrdcalc_unlink_and_free_all_rrdhost_alarms(host); // manages required locks
-
-
-
+    rrdcalc_delete_all_rrdhost_alerts(host);
 
 
     rrdhost_wrlock(host);   // lock this RRDHOST

@@ -203,7 +203,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // remove it from the name index
     rrdset_index_del_name(host, st);
 
-    rrdcalc_unlink_and_free_all_rrdset_alarms(host, st);
+    rrdcalc_unlink_all_rrdset_alerts(st);
     rrdcalc_rrdset_index_destroy(st);
 
     rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily
@@ -340,7 +340,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
 
-        rrdcalc_link_matching_host_alarms_to_rrdset(st);
+        rrdcalc_link_matching_host_alerts_to_rrdset(st);
 
         rrdhost_rdlock(host);
         rrdcalctemplate_link_matching(st);
@@ -816,7 +816,7 @@ void rrdset_archive(RRDSET *st) {
     rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
-    rrdcalc_unlink_and_free_all_rrdset_alarms(st->rrdhost, st); // safe
+    rrdcalc_unlink_all_rrdset_alerts(st);
 
     rrdset_archive_obsolete_dimensions(st, true);
 

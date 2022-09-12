@@ -57,7 +57,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         }
     }
 
-    if(rt->foreachdim)
+    if(rt->foreach_dimension)
         DOUBLE_LINKED_LIST_PREPEND_UNSAFE(host->alarms_templates, rt, prev, next);
     else
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->alarms_templates, rt, prev, next);
@@ -76,7 +76,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
           rt->before,
           rt->options,
           (rt->dimensions)?rrdcalctemplate_dimensions(rt):"NONE",
-          (rt->foreachdim)?rrdcalctemplate_foreachdim(rt):"NONE",
+          (rt->foreach_dimension)?rrdcalctemplate_foreachdim(rt):"NONE",
           rt->update_every,
           (rt->calculation)?rt->calculation->parsed_as:"NONE",
           (rt->warning)?rt->warning->parsed_as:"NONE",
@@ -194,7 +194,7 @@ static inline uint32_t health_parse_options(const char *s) {
             buf[count] = '\0';
 
             if(!strcasecmp(buf, "no-clear-notification") || !strcasecmp(buf, "no-clear"))
-                options |= RRDCALC_FLAG_NO_CLEAR_NOTIFICATION;
+                options |= RRDCALC_OPTION_NO_CLEAR_NOTIFICATION;
             else
                 error("Ignoring unknown alarm option '%s'", buf);
         }
@@ -253,13 +253,21 @@ static inline int health_parse_repeat(
  *
  * @param s the string that will be used to create the simple pattern.
  */
-SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
+
+static void dimension_remove_pipe_comma(char *str) {
+    while(*str) {
+        if(*str == '|' || *str == ',') *str = ' ';
+        str++;
+    }
+}
+
+static SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
     char *convert= strdupz(s);
     SIMPLE_PATTERN *val = NULL;
+
     if(convert) {
         dimension_remove_pipe_comma(convert);
         val = simple_pattern_create(convert, NULL, SIMPLE_PATTERN_EXACT);
-
         freez(convert);
     }
 
@@ -269,7 +277,7 @@ SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_GROUPING *group_method, int *after, int *before, int *every,
-        uint32_t *options, STRING **dimensions, STRING **foreachdim
+        RRDCALC_OPTIONS *options, STRING **dimensions, STRING **foreachdim
 ) {
     debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 
@@ -280,7 +288,7 @@ static inline int health_parse_db_lookup(
     *after = 0;
     *before = 0;
     *every = 0;
-    *options = 0;
+    *options = (*options) & RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES; // preserve rrdcalc options
 
     char *s = string, *key;
 
@@ -590,7 +598,7 @@ static int health_readfile(const char *filename, void *data) {
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
                 if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
-                    rrdcalc_free(rc);
+                    rrdcalc_free_unused_rrdcalc_loaded_from_config(rc);
                 else
                     rrdcalc_add_from_config_rrdcalc(host, rc);
 
@@ -636,7 +644,7 @@ static int health_readfile(const char *filename, void *data) {
             if(rc) {
 //                health_add_alarms_loop(host, rc, ignore_this) ;
                 if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
-                    rrdcalc_free(rc);
+                    rrdcalc_free_unused_rrdcalc_loaded_from_config(rc);
                 else
                     rrdcalc_add_from_config_rrdcalc(host, rc);
 
@@ -760,10 +768,10 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 alert_cfg->lookup = string_strdupz(value);
                 health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
-                        &rc->update_every, &rc->options, &rc->dimensions, &rc->foreachdim);
+                        &rc->update_every, &rc->options, &rc->dimensions, &rc->foreach_dimension);
 
-                if(rc->foreachdim)
-                    rc->spdim = health_pattern_from_foreach(rrdcalc_foreachdim(rc));
+                if(rc->foreach_dimension)
+                    rc->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalc_foreachdim(rc));
 
                 if (rc->after) {
                     if (rc->dimensions)
@@ -1020,10 +1028,10 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 alert_cfg->lookup = string_strdupz(value);
                 health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
-                        &rt->update_every, &rt->options, &rt->dimensions, &rt->foreachdim);
+                        &rt->update_every, &rt->options, &rt->dimensions, &rt->foreach_dimension);
 
-                if(rt->foreachdim)
-                    rt->spdim = health_pattern_from_foreach(rrdcalctemplate_foreachdim(rt));
+                if(rt->foreach_dimension)
+                    rt->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalctemplate_foreachdim(rt));
 
                 if (rt->after) {
                     if (rt->dimensions)
@@ -1187,7 +1195,7 @@ static int health_readfile(const char *filename, void *data) {
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
         if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
-            rrdcalc_free(rc);
+            rrdcalc_free_unused_rrdcalc_loaded_from_config(rc);
         else
             rrdcalc_add_from_config_rrdcalc(host, rc);
     }

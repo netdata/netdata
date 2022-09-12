@@ -960,7 +960,7 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
-    rrdcalc_update_rrdlabels(st);
+    rrdcalc_update_info_using_rrdset_labels(st);
 
     // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
     BUFFER  *sql_buf = buffer_create(1024);

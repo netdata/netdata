@@ -12,11 +12,27 @@
  * @param st is the chart where the alarm will be attached.
  */
 
+static char *rrdcalc_alert_name_with_dimension(const char *name, size_t namelen, const char *dim, size_t dimlen) {
+    char *newname,*move;
+
+    newname = mallocz(namelen + dimlen + 2);
+    move = newname;
+    memcpy(move, name, namelen);
+    move += namelen;
+
+    *move++ = '_';
+    memcpy(move, dim, dimlen);
+    move += dimlen;
+    *move = '\0';
+
+    return newname;
+}
+
 bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
     if(rt->context != st->context)
         return false;
 
-    if(rt->spdim && !rrdset_number_of_dimensions(st))
+    if(rt->foreach_dimension_pattern && !rrdset_number_of_dimensions(st))
         return false;
 
     if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, rrdset_name(st)) && !simple_pattern_matches(rt->charts_pattern, rrdset_id(st)))
@@ -38,8 +54,9 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
 }
 
 void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host) {
-    if (simple_pattern_matches(rt->spdim, rrddim_id(rd)) || simple_pattern_matches(rt->spdim, rrddim_name(rd))) {
-        char *overwrite_alert_name = alarm_name_with_dim(rrdcalctemplate_name(rt), string_strlen(rt->name), rrddim_name(rd), string_strlen(rd->name));
+    if (simple_pattern_matches(rt->foreach_dimension_pattern, rrddim_id(rd)) || simple_pattern_matches(rt->foreach_dimension_pattern, rrddim_name(rd))) {
+        char *overwrite_alert_name = rrdcalc_alert_name_with_dimension(
+            rrdcalctemplate_name(rt), string_strlen(rt->name), rrddim_name(rd), string_strlen(rd->name));
         rrdcalc_add_from_rrdcalctemplate(host, rt, st, overwrite_alert_name, rrddim_name(rd));
         freez(overwrite_alert_name);
     }
@@ -49,7 +66,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if(!rrdcalctemplate_check_rrdset_conditions(rt, st, host))
         return;
 
-    if(!rt->spdim) {
+    if(!rt->foreach_dimension_pattern) {
         rrdcalc_add_from_rrdcalctemplate(host, rt, st, NULL, NULL);
         return;
     }
@@ -99,9 +116,9 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     string_freez(rt->units);
     string_freez(rt->info);
     string_freez(rt->dimensions);
-    string_freez(rt->foreachdim);
+    string_freez(rt->foreach_dimension);
     string_freez(rt->host_labels);
-    simple_pattern_free(rt->spdim);
+    simple_pattern_free(rt->foreach_dimension_pattern);
     simple_pattern_free(rt->host_labels_pattern);
     freez(rt);
 }

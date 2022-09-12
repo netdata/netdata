@@ -10,26 +10,30 @@
 // (defined in their update_every member below)
 // They increase the overhead of netdata.
 //
-// These calculations are allocated and linked (->next)
-// under RRDHOST.
-// Then are also linked to RRDSET (of course only when the
-// chart is found, via ->rrdset_next and ->rrdset_prev).
-// This double-linked list is maintained sorted at all times
-// having as RRDSET.calculations the RRDCALC to be processed
-// next.
+// These calculations are stored under RRDHOST.
+// Then are also linked to RRDSET (of course only when a
+// matching chart is found).
 
-#define RRDCALC_FLAG_DB_ERROR              0x00000001
-#define RRDCALC_FLAG_DB_NAN                0x00000002
-/* #define RRDCALC_FLAG_DB_STALE           0x00000004 */
-#define RRDCALC_FLAG_CALC_ERROR            0x00000008
-#define RRDCALC_FLAG_WARN_ERROR            0x00000010
-#define RRDCALC_FLAG_CRIT_ERROR            0x00000020
-#define RRDCALC_FLAG_RUNNABLE              0x00000040
-#define RRDCALC_FLAG_DISABLED              0x00000080
-#define RRDCALC_FLAG_SILENCED              0x00000100
-#define RRDCALC_FLAG_RUN_ONCE              0x00000200
-#define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
+typedef enum {
+    RRDCALC_FLAG_DB_ERROR                   = (1 << 0),
+    RRDCALC_FLAG_DB_NAN                     = (1 << 1),
+    // RRDCALC_FLAG_DB_STALE                   = (1 << 2),
+    RRDCALC_FLAG_CALC_ERROR                 = (1 << 3),
+    RRDCALC_FLAG_WARN_ERROR                 = (1 << 4),
+    RRDCALC_FLAG_CRIT_ERROR                 = (1 << 5),
+    RRDCALC_FLAG_RUNNABLE                   = (1 << 6),
+    RRDCALC_FLAG_DISABLED                   = (1 << 7),
+    RRDCALC_FLAG_SILENCED                   = (1 << 8),
+    RRDCALC_FLAG_RUN_ONCE                   = (1 << 9),
+} RRDCALC_FLAGS;
 
+typedef enum {
+    // This list uses several other options from RRDR_OPTIONS for db lookups.
+    // To add an item here, you need to reserve a bit in RRDR_OPTIONS.
+    RRDCALC_OPTION_NO_CLEAR_NOTIFICATION    = 0x80000000,
+} RRDCALC_OPTIONS;
+
+#define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
 struct rrdcalc {
     STRING *key;                    // the unique key in the host's rrdcalc_root_index
@@ -70,14 +74,12 @@ struct rrdcalc {
     // database lookup settings
 
     STRING *dimensions;             // the chart dimensions
-    STRING *foreachdim;             // the group of dimensions that the `foreach` will be applied.
-    SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
-    int foreachcounter;             // the number of alarms created with foreachdim, this also works as an id of the
-                                    // children
+    STRING *foreach_dimension;      // the group of dimensions that the `foreach` will be applied.
+    SIMPLE_PATTERN *foreach_dimension_pattern; // used if and only if there is a simple pattern for the chart.
     RRDR_GROUPING group;            // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
-    uint32_t options;               // calculation options
+    RRDCALC_OPTIONS options;        // configuration options
 
     // ------------------------------------------------------------------------
     // expressions related to the alarm
@@ -115,7 +117,7 @@ struct rrdcalc {
     NETDATA_DOUBLE value;           // the current value of the alarm
     NETDATA_DOUBLE old_value;       // the previous value of the alarm
 
-    uint32_t rrdcalc_flags;         // check RRDCALC_FLAG_*
+    RRDCALC_FLAGS rrdcalc_flags;    // check RRDCALC_FLAG_*
 
     time_t last_updated;            // the last update timestamp of the alarm
     time_t next_update;             // the next update timestamp of the alarm
@@ -143,13 +145,6 @@ struct rrdcalc {
     // the chart this alarm it is linked to
 
     struct rrdset *rrdset;
-
-    // linking of this alarm on its chart
-    struct rrdcalc *rrdset_next;
-    struct rrdcalc *rrdset_prev;
-
-    struct rrdcalc *next;
-    struct rrdcalc *prev;
 };
 
 #define rrdcalc_name(rc) string2str((rc)->name)
@@ -166,7 +161,7 @@ struct rrdcalc {
 #define rrdcalc_original_info(rc) string2str((rc)->original_info)
 #define rrdcalc_info(rc) string2str((rc)->info)
 #define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
-#define rrdcalc_foreachdim(rc) string2str((rc)->foreachdim)
+#define rrdcalc_foreachdim(rc) string2str((rc)->foreach_dimension)
 #define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
 
 #define foreach_rrdcalc_in_rrdset_read(st, rc) \
@@ -177,6 +172,9 @@ struct rrdcalc {
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
+
+#define foreach_rrdcalc_in_rrdhost_reentrant(host, rc) \
+    dfe_start_reentrant((host)->rrdcalc_root_index, rc)
 
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
@@ -221,22 +219,20 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-extern void rrdcalc_link_matching_host_alarms_to_rrdset(RRDSET *st);
-extern RRDCALC *rrdcalc_find_in_rrdset(RRDSET *st, const char *name);
+extern void rrdcalc_link_matching_host_alerts_to_rrdset(RRDSET *st);
+extern RRDCALC *rrdcalc_get_from_rrdset(RRDSET *st, const char *alert_name);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
-extern void rrdcalc_free(RRDCALC *rc);
+extern void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
 extern void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
 extern int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc);
-extern void dimension_remove_pipe_comma(char *str);
-extern char *alarm_name_with_dim(const char *name, size_t namelen, const char *dim, size_t dimlen);
-extern void rrdcalc_update_rrdlabels(RRDSET *st);
+extern void rrdcalc_update_info_using_rrdset_labels(RRDSET *st);
 
-extern void rrdcalc_remove_alarms_not_matching_host_labels();
-extern void rrdcalc_unlink_and_free_alarms_not_matching_labels_from_host(RRDHOST *host);
+extern void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
+extern void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
@@ -245,8 +241,8 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     return 0;
 }
 
-extern void rrdcalc_unlink_and_free_all_rrdset_alarms(RRDHOST *host, RRDSET *st);
-extern void rrdcalc_unlink_and_free_all_rrdhost_alarms(RRDHOST *host);
+extern void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st);
+extern void rrdcalc_delete_all_rrdhost_alerts(RRDHOST *host);
 
 extern void rrdcalc_rrdhost_index_init(RRDHOST *host);
 extern void rrdcalc_rrdhost_index_destroy(RRDHOST *host);

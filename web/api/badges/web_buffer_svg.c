@@ -969,7 +969,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
     RRDCALC *rc = NULL;
     if(alarm) {
-        rc = rrdcalc_find_in_rrdset(st, alarm);
+        rc = rrdcalc_get_from_rrdset(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
             buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1, NULL, NULL);

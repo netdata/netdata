@@ -90,6 +90,4 @@ extern void health_label_log_save(RRDHOST *host);
 extern char *health_edit_command_from_source(const char *source);
 extern void sql_refresh_hashes(void);
 
-extern SIMPLE_PATTERN *health_pattern_from_foreach(const char *s);
-
 #endif //NETDATA_HEALTH_H

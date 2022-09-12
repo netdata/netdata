@@ -230,7 +230,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
     }
     dfe_done(rs);
 
-    rrdcalc_link_matching_host_alarms_to_rrdset(st);
+    rrdcalc_link_matching_host_alerts_to_rrdset(st);
 }
 
 void rrdsetvar_release_and_delete_all(RRDSET *st) {

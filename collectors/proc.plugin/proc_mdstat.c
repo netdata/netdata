@@ -80,7 +80,7 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier)
 static void add_labels_to_mdstat(struct raid *raid, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device", raid->name, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "raid_level", raid->level, RRDLABEL_SRC_AUTO);
-    rrdcalc_update_rrdlabels(st);
+    rrdcalc_update_info_using_rrdset_labels(st);
 }
 
 int do_proc_mdstat(int update_every, usec_t dt)

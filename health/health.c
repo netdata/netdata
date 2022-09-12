@@ -152,7 +152,7 @@ static void health_reload_host(RRDHOST *host) {
     char *user_path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
 
-    rrdcalc_unlink_and_free_all_rrdhost_alarms(host); // manages its locks
+    rrdcalc_delete_all_rrdhost_alerts(host);
 
     // free all running alarms
     rrdhost_wrlock(host);
@@ -184,14 +184,14 @@ static void health_reload_host(RRDHOST *host) {
     health_readdir(host, user_path, stock_path, NULL);
 
     //Discard alarms with labels that do not apply to host
-    rrdcalc_unlink_and_free_alarms_not_matching_labels_from_host(host);
+    rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
 
     // link the loaded alarms to their charts
     rrdset_foreach_write(st, host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
 
-        rrdcalc_link_matching_host_alarms_to_rrdset(st);
+        rrdcalc_link_matching_host_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching(st);
     }
     rrdset_foreach_done(st);
@@ -687,8 +687,8 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
 
             RRDCALCTEMPLATE *rt;
             for(rt = host->alarms_templates; rt ; rt = rt->next) {
-                if(!rt->spdim)
-                    break; // rrdcalctemplates with spdim are first in the linked list
+                if(!rt->foreach_dimension_pattern)
+                    continue;
 
                 if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
                     rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
@@ -747,7 +747,7 @@ void *health_main(void *ptr) {
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
-    rrdcalc_remove_alarms_not_matching_host_labels();
+    rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 
     unsigned int loop = 0;
 #ifdef ENABLE_ACLK
@@ -1135,7 +1135,7 @@ void *health_main(void *ptr) {
                             rc->info,
                             rc->delay_last,
                             (
-                                ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                 ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                 (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                 )
@@ -1209,7 +1209,7 @@ void *health_main(void *ptr) {
                             rc->info,
                             rc->delay_last,
                             (
-                                ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                 ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                 (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                 )

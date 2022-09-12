@@ -875,7 +875,7 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
             break;
     }
 
-    rrdcalc_update_rrdlabels(st);
+    rrdcalc_update_info_using_rrdset_labels(st);
 }
 
 int do_proc_diskstats(int update_every, usec_t dt) {
