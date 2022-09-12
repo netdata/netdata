@@ -311,10 +311,11 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
-    if(host->health_enabled) {
+    if(host->health_enabled)
         rrdfamily_index_init(host);
-        host->rrdvars = rrdvariables_create();
-    }
+
+    // this is needed for custom host variables set by collectors, not just for health
+    host->rrdvars = rrdvariables_create();
 
     char filename[FILENAME_MAX + 1];
 
