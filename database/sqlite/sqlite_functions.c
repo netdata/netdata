@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 4
+#define DB_METADATA_VERSION 5
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -21,11 +21,6 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
     "multiplier int, divisor int , algorithm int, options text);",
 
-    "DROP TABLE IF EXISTS chart_active;",
-    "DROP TABLE IF EXISTS dimension_active;",
-
-    "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
-    "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_d1 on dimension (chart_id, id, name);",
     "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
@@ -46,26 +41,8 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host_label(host_id blob, source_type int, label_key text NOT NULL, "
     "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key));",
 
-    "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
-
-    "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
-    "family text, context text, title text, unit text, plugin text, "
-    "module text, priority integer, chart_type, last_used);",
-
-    "CREATE VIEW IF NOT EXISTS v_chart_hash as SELECT ch.*, chm.chart_id FROM chart_hash ch, chart_hash_map chm "
-    "WHERE ch.hash_id = chm.hash_id;",
-
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
       " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
-
-    "CREATE TRIGGER IF NOT EXISTS tr_v_chart_hash INSTEAD OF INSERT on v_chart_hash BEGIN "
-    "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, "
-    "module, priority, chart_type, last_used) "
-    "values (new.hash_id, new.type, new.id, new.name, new.family, new.context, new.title, new.unit, new.plugin, "
-    "new.module, new.priority, new.chart_type, unixepoch()) "
-    "ON CONFLICT (hash_id) DO UPDATE SET last_used = unixepoch(); "
-    "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
-    "on conflict (chart_id, hash_id) do nothing; END; ",
 
     NULL
 };
@@ -74,8 +51,6 @@ const char *database_cleanup[] = {
     "delete from chart where chart_id not in (select chart_id from dimension);",
     "delete from host where host_id not in (select host_id from chart);",
     "delete from chart_label where chart_id not in (select chart_id from chart);",
-    "DELETE FROM chart_hash_map WHERE chart_id NOT IN (SELECT chart_id FROM chart);",
-    "DELETE FROM chart_hash WHERE hash_id NOT IN (SELECT hash_id FROM chart_hash_map);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
