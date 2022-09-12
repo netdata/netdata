@@ -152,14 +152,13 @@ static void health_reload_host(RRDHOST *host) {
     char *user_path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
 
+    rrdcalc_unlink_and_free_all_rrdhost_alarms(host); // manages its locks
+
     // free all running alarms
     rrdhost_wrlock(host);
 
     while(host->alarms_templates)
         rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
-
-    while(host->host_alarms)
-        rrdcalc_unlink_and_free(host, host->host_alarms);
 
     RRDCALC *rc,*nc;
     for(rc = host->alarms_with_foreach; rc ; rc = nc) {
@@ -192,7 +191,7 @@ static void health_reload_host(RRDHOST *host) {
     health_readdir(host, user_path, stock_path, NULL);
 
     //Discard alarms with labels that do not apply to host
-    rrdcalc_labels_unlink_alarm_from_host(host);
+    rrdcalc_labels_unlink_alarm_from_host_having_rrdhost_wrlock(host);
 
     // link the loaded alarms to their charts
     RRDDIM *rd;
@@ -200,13 +199,13 @@ static void health_reload_host(RRDHOST *host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
 
-        rrdsetcalc_link_matching(st);
+        rrdcalc_link_matching_host_alarms_to_rrdset_unsafe(st);
         rrdcalctemplate_link_matching(st);
 
         //This loop must be the last, because ` rrdcalctemplate_link_matching` will create alarms related to it.
         rrdset_rdlock(st);
         rrddim_foreach_read(rd, st) {
-            rrdcalc_link_to_rrddim(rd, st, host);
+            rrdcalc_link_matching_rrdcalc_with_foreach_unsafe(rd, st, host);
         }
         rrddim_foreach_done(rd);
         rrdset_unlock(st);
@@ -704,7 +703,7 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
             if (!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM))
                 continue;
 
-            rrdcalc_link_to_rrddim(rd, st, host);
+            rrdcalc_link_matching_rrdcalc_with_foreach_unsafe(rd, st, host);
 
             rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
         }
@@ -763,7 +762,7 @@ void *health_main(void *ptr) {
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
-    rrdcalc_labels_unlink();
+    rrdcalc_remove_alarms_not_matching_host_labels();
 
     unsigned int loop = 0;
 #ifdef ENABLE_ACLK

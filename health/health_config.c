@@ -49,7 +49,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
         return 0;
     }
 
-    if (rrdcalc_exists(host, rrdcalc_chart_name(rc), rrdcalc_name(rc)))
+    if (rrdcalc_exists_in_host_unsafe(host, rrdcalc_chart_name(rc), rrdcalc_name(rc)))
         return 0;
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
@@ -83,7 +83,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
             rc->crit_repeat_every
     );
 
-    rrdcalc_add_to_host(host, rc);
+    rrdcalc_add_to_host_unsafe(host, rc);
 
     return 1;
 }

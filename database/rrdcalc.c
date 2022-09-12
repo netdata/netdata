@@ -97,7 +97,7 @@ void rrdcalc_update_rrdlabels(RRDSET *st) {
     }
 }
 
-static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
+static void rrdcalc_link_to_rrdset_unsafe(RRDSET *st, RRDCALC *rc) {
     RRDHOST *host = st->rrdhost;
 
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
@@ -210,7 +210,7 @@ static inline int rrdcalc_is_matching_rrdset(RRDCALC *rc, RRDSET *st) {
 }
 
 // this has to be called while the RRDHOST is locked
-inline void rrdsetcalc_link_matching(RRDSET *st) {
+inline void rrdcalc_link_matching_host_alarms_to_rrdset_unsafe(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
@@ -220,12 +220,12 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
             continue;
 
         if(unlikely(rrdcalc_is_matching_rrdset(rc, st)))
-            rrdsetcalc_link(st, rc);
+            rrdcalc_link_to_rrdset_unsafe(st, rc);
     }
 }
 
 // this has to be called while the RRDHOST is locked
-inline void rrdsetcalc_unlink(RRDCALC *rc) {
+static inline void rrdcalc_unlink_from_rrdset_unsafe(RRDCALC *rc) {
     RRDSET *st = rc->rrdset;
 
     if(!st) {
@@ -290,7 +290,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     // it will be applied automatically
 }
 
-RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
+RRDCALC *rrdcalc_find_in_rrdset_unsafe(RRDSET *st, const char *name) {
     RRDCALC *rc = NULL;
 
     STRING *name_string = string_strdupz(name);
@@ -305,7 +305,7 @@ RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
     return rc;
 }
 
-inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name) {
+inline int rrdcalc_exists_in_host_unsafe(RRDHOST *host, const char *chart, const char *name) {
     RRDCALC *rc;
 
     if(unlikely(!chart)) {
@@ -395,7 +395,7 @@ void dimension_remove_pipe_comma(char *str) {
     }
 }
 
-inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
+inline void rrdcalc_add_to_host_unsafe(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
     if(rc->calculation) {
@@ -430,7 +430,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
         RRDSET *st;
         rrdset_foreach_read(st, host) {
             if(rrdcalc_is_matching_rrdset(rc, st)) {
-                rrdsetcalc_link(st, rc);
+                rrdcalc_link_to_rrdset_unsafe(st, rc);
                 break;
             }
         }
@@ -443,10 +443,10 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
-inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
+inline RRDCALC *rrdcalc_create_from_template_unsafe(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
     debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rrdcalctemplate_name(rt));
 
-    if(rrdcalc_exists(host, chart, rrdcalctemplate_name(rt)))
+    if(rrdcalc_exists_in_host_unsafe(host, chart, rrdcalctemplate_name(rt)))
         return NULL;
 
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
@@ -540,7 +540,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->crit_repeat_every
     );
 
-    rrdcalc_add_to_host(host, rc);
+    rrdcalc_add_to_host_unsafe(host, rc);
     return rc;
 }
 
@@ -664,13 +664,14 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc);
 }
 
-void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
+void rrdcalc_unlink_and_free_unsafe(RRDHOST *host, RRDCALC *rc) {
     if(unlikely(!rc)) return;
 
     debug(D_HEALTH, "Health removing alarm '%s.%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdhost_hostname(host));
 
     // unlink it from RRDSET
-    if(rc->rrdset) rrdsetcalc_unlink(rc);
+    if(rc->rrdset)
+        rrdcalc_unlink_from_rrdset_unsafe(rc);
 
     // unlink it from RRDHOST
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->host_alarms, rc, prev, next);
@@ -678,7 +679,47 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     rrdcalc_free(rc);
 }
 
-void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
+void rrdcalc_unlink_and_free_all_rrdset_alarms(RRDHOST *host, RRDSET *st) {
+    rrdhost_wrlock(host);
+    rrdset_wrlock(st);
+    while(st->alarms) {
+        RRDCALC *rc = st->alarms;
+
+        // unlink it from rddset
+        rrdcalc_unlink_from_rrdset_unsafe(rc);
+
+        // unlink it from rrdhost
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->host_alarms, rc, prev, next);
+
+        // free it
+        rrdcalc_free(rc);
+    }
+    rrdset_unlock(st);
+    rrdhost_unlock(host);
+}
+
+void rrdcalc_unlink_and_free_all_rrdhost_alarms(RRDHOST *host) {
+    rrdhost_wrlock(host);
+    while(host->host_alarms) {
+        RRDCALC *rc = host->host_alarms;
+        RRDSET *st = rc->rrdset;
+
+        if(st) {
+            rrdset_wrlock(st);
+            rrdcalc_unlink_from_rrdset_unsafe(rc);
+            rrdset_unlock(st);
+        }
+
+        // unlink it from rrdhost
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->host_alarms, rc, prev, next);
+
+        // free it
+        rrdcalc_free(rc);
+    }
+    rrdhost_unlock(host);
+}
+
+void rrdcalc_foreach_unlink_and_free_unsafe(RRDHOST *host, RRDCALC *rc) {
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->alarms_with_foreach, rc, prev, next);
     rrdcalc_free(rc);
 }
@@ -699,20 +740,20 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
                  rrdcalc_host_labels(rc));
 
             if(host->host_alarms == alarms)
-                rrdcalc_unlink_and_free(host, rc);
+                rrdcalc_unlink_and_free_unsafe(host, rc);
             else
-                rrdcalc_foreach_unlink_and_free(host, rc);
+                rrdcalc_foreach_unlink_and_free_unsafe(host, rc);
         }
         rc = rc_next;
     }
 }
 
-void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
+void rrdcalc_labels_unlink_alarm_from_host_having_rrdhost_wrlock(RRDHOST *host) {
     rrdcalc_labels_unlink_alarm_loop(host, host->host_alarms);
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms_with_foreach);
 }
 
-void rrdcalc_labels_unlink() {
+void rrdcalc_remove_alarms_not_matching_host_labels() {
     rrd_rdlock();
 
     RRDHOST *host;
@@ -722,9 +763,7 @@ void rrdcalc_labels_unlink() {
 
         if (host->rrdlabels) {
             rrdhost_wrlock(host);
-
-            rrdcalc_labels_unlink_alarm_from_host(host);
-
+            rrdcalc_labels_unlink_alarm_from_host_having_rrdhost_wrlock(host);
             rrdhost_unlock(host);
         }
     }

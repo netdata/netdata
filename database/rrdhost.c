@@ -281,7 +281,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->system_info = system_info;
 
-    rrdhost_init_rrdset_index(host);
+    rrdset_index_init(host);
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -1093,12 +1093,24 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     // ------------------------------------------------------------------------
     // clean up streaming
+
     stop_streaming_sender(host);
 
     if (netdata_exit || force)
         stop_streaming_receiver(host);
 
+
+    // ------------------------------------------------------------------------
+    // clean up alarms
+
+    rrdcalc_unlink_and_free_all_rrdhost_alarms(host); // manages required locks
+
+
+
+
+
     rrdhost_wrlock(host);   // lock this RRDHOST
+
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -1112,12 +1124,9 @@ void rrdhost_free(RRDHOST *host, bool force) {
 #endif
 
     // delete all the RRDSETs of the host
-    rrdhost_free_rrdset_index(host);
+    rrdset_index_destroy(host);
 
     freez(host->exporting_flags);
-
-    while(host->host_alarms)
-        rrdcalc_unlink_and_free(host, host->host_alarms);
 
     RRDCALC *rc,*nc;
     for(rc = host->alarms_with_foreach; rc ; rc = nc) {

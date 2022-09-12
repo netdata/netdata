@@ -213,26 +213,25 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-extern void rrdsetcalc_link_matching(RRDSET *st);
-extern void rrdsetcalc_unlink(RRDCALC *rc);
-extern RRDCALC *rrdcalc_find(RRDSET *st, const char *name);
+extern void rrdcalc_link_matching_host_alarms_to_rrdset_unsafe(RRDSET *st);
+extern RRDCALC *rrdcalc_find_in_rrdset_unsafe(RRDSET *st, const char *name);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
 extern void rrdcalc_free(RRDCALC *rc);
-extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
+extern void rrdcalc_unlink_and_free_unsafe(RRDHOST *host, RRDCALC *rc);
 
-extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name);
+extern int rrdcalc_exists_in_host_unsafe(RRDHOST *host, const char *chart, const char *name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
-extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
+extern RRDCALC *rrdcalc_create_from_template_unsafe(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
 extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension);
-extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
+extern void rrdcalc_add_to_host_unsafe(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe_comma(char *str);
 extern char *alarm_name_with_dim(const char *name, size_t namelen, const char *dim, size_t dimlen);
 extern void rrdcalc_update_rrdlabels(RRDSET *st);
 
-extern void rrdcalc_labels_unlink();
-extern void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host);
+extern void rrdcalc_remove_alarms_not_matching_host_labels();
+extern void rrdcalc_labels_unlink_alarm_from_host_having_rrdhost_wrlock(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
@@ -240,6 +239,9 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     }
     return 0;
 }
+
+extern void rrdcalc_unlink_and_free_all_rrdset_alarms(RRDHOST *host, RRDSET *st);
+extern void rrdcalc_unlink_and_free_all_rrdhost_alarms(RRDHOST *host);
 
 #define RRDCALC_VAR_MAX 100
 #define RRDCALC_VAR_FAMILY "$family"

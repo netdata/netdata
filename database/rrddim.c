@@ -163,7 +163,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     // append this dimension
+    rrdset_wrlock(st);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
+    rrdset_unlock(st);
 
     rrddim_update_rrddimvars_unsafe(rd);
 
@@ -208,7 +210,9 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
+    rrdset_wrlock(st);
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
+    rrdset_unlock(st);
 
     rrddimvar_delete_all(rd);
 
@@ -294,7 +298,7 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     rrdcontext_updated_rrddim(rd);
 }
 
-void rrdset_init_rrddim_index(RRDSET *st) {
+void rrddim_index_init(RRDSET *st) {
     if(!st->rrddim_root_index) {
         st->rrddim_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
@@ -305,7 +309,7 @@ void rrdset_init_rrddim_index(RRDSET *st) {
     }
 }
 
-void rrdset_free_rrddim_index(RRDSET *st) {
+void rrddim_index_destroy(RRDSET *st) {
     dictionary_destroy(st->rrddim_root_index);
     st->rrddim_root_index = NULL;
 }
@@ -406,16 +410,15 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 }
 
 // ----------------------------------------------------------------------------
-// RRDDIM create a dimension
 
-void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
+void rrdcalc_link_matching_rrdcalc_with_foreach_unsafe(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     RRDCALC *rc;
     
     for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
         if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
             if (rc->chart == st->name || rc->chart == st->id) {
                 char *name = alarm_name_with_dim(rrdcalc_name(rc), string_strlen(rc->name), rrddim_name(rd), string_strlen(rd->name));
-                if(rrdcalc_exists(host, rrdset_name(st), name)) {
+                if(rrdcalc_exists_in_host_unsafe(host, rrdset_name(st), name)) {
                     freez(name);
                     continue;
                 }
@@ -425,7 +428,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
                 netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
                 if (child)
-                    rrdcalc_add_to_host(host, child);
+                    rrdcalc_add_to_host_unsafe(host, child);
 
                 else {
                     error("Cannot allocate a new alarm.");
@@ -494,8 +497,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st
                           , RRD_ALGORITHM algorithm
                           , RRD_MEMORY_MODE memory_mode
                           ) {
-    rrdset_wrlock(st);
-
     struct rrddim_constructor tmp = {
         .st = st,
         .id = id,
@@ -508,7 +509,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
     RRDDIM *rd = rrddim_index_add(st, &tmp);
 
-    rrdset_unlock(st);
     rrdcontext_updated_rrddim(rd);
     return(rd);
 }

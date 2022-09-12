@@ -1010,11 +1010,11 @@ extern netdata_rwlock_t rrd_rwlock;
 // ----------------------------------------------------------------------------
 
 extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
-extern void rrdhost_init_rrdset_index(RRDHOST *host);
-extern void rrdhost_free_rrdset_index(RRDHOST *host);
+extern void rrdset_index_init(RRDHOST *host);
+extern void rrdset_index_destroy(RRDHOST *host);
 
-extern void rrdset_init_rrddim_index(RRDSET *st);
-extern void rrdset_free_rrddim_index(RRDSET *st);
+extern void rrddim_index_init(RRDSET *st);
+extern void rrddim_index_destroy(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 
@@ -1195,7 +1195,7 @@ extern time_t rrdhost_last_entry_t(RRDHOST *h);
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
+extern void rrdcalc_link_matching_rrdcalc_with_foreach_unsafe(RRDDIM *rd, RRDSET *st, RRDHOST *host);
 
 extern RRDDIM *rrddim_add_custom(RRDSET *st
                                  , const char *id

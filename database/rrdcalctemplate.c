@@ -30,7 +30,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rt->host_labels_pattern, '='))
         return;
 
-    RRDCALC *rc = rrdcalc_create_from_template(host, rt, rrdset_id(st));
+    RRDCALC *rc = rrdcalc_create_from_template_unsafe(host, rt, rrdset_id(st));
     if (unlikely(!rc))
         info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rrdcalctemplate_name(rt), rrdset_id(st), rrdhost_hostname(host));
 #ifdef NETDATA_INTERNAL_CHECKS

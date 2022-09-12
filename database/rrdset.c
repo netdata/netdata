@@ -174,7 +174,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         uuid_generate(st->chart_uuid);
     update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
 
-    rrdset_init_rrddim_index(st);
+    rrddim_index_init(st);
 
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
@@ -203,40 +203,25 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // remove it from the name index
     rrdset_index_del_name(host, st);
 
-    rrdhost_wrlock(host);
-    //  while(st->alarms)     rrdsetcalc_unlink(st->alarms);
-    /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
-     * created by a template. This leads to an effective memory leak, which cannot be detected since the
-     * alarms will still be connected to the host, and freed during shutdown. */
-    while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
+    rrdcalc_unlink_and_free_all_rrdset_alarms(host, st);
 
-    {
-        RRDDIM *rd;
-        rrddim_foreach_reentrant(rd, st) {
-            rrddim_free(st, rd);
-        }
-        rrddim_foreach_done(rd);
-    }
+    rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily
+    rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
+    rrddimvar_index_destroy(st);                // destroy the rrddimvar index
+    rrdsetvar_index_destroy(st);                // destroy the rrdsetvar index
+    rrdvariables_destroy(st->rrdvars);      // free all variables and destroy the rrdvar dictionary
 
-    rrdfamily_release(host, st->rrdfamily);
-    rrdhost_unlock(host);
+    // this has to be after the dimensions are freed, but before labels are freed
+    rrdcontext_removed_rrdset(st);              // let contexts know
 
-    rrddimvar_index_destroy(st);
-    rrdsetvar_index_destroy(st);
+    rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
 
-    // this has to be after the dimensions are freed
-    rrdcontext_removed_rrdset(st);
+    rrdset_memory_file_free(st);                // remove files of db mode save and map
 
     // ------------------------------------------------------------------------
     // free it
 
     netdata_rwlock_destroy(&st->rrdset_rwlock);
-
-    // free directly allocated members
-    rrdset_memory_file_free(st);
-    rrdset_free_rrddim_index(st);
-    rrdvariables_destroy(st->rrdvars);
-    rrdlabels_destroy(st->rrdlabels);
 
     string_freez(st->id);
     string_freez(st->name);
@@ -352,10 +337,12 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
 
+        rrdhost_wrlock(host);
         rrdset_wrlock(st);
-        rrdsetcalc_link_matching(st);
+        rrdcalc_link_matching_host_alarms_to_rrdset_unsafe(st);
         rrdcalctemplate_link_matching(st);
         rrdset_unlock(st);
+        rrdhost_unlock(host);
     }
 
     rrdhost_wrlock(host);
@@ -373,7 +360,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     rrdcontext_updated_rrdset(st);
 }
 
-void rrdhost_init_rrdset_index(RRDHOST *host) {
+void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index) {
         host->rrdset_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
@@ -394,7 +381,7 @@ void rrdhost_init_rrdset_index(RRDHOST *host) {
     }
 }
 
-void rrdhost_free_rrdset_index(RRDHOST *host) {
+void rrdset_index_destroy(RRDHOST *host) {
     // destroy the name index first
     dictionary_destroy(host->rrdset_root_index_name);
     host->rrdset_root_index_name = NULL;
@@ -483,12 +470,10 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     else
         st->name = name_string;
 
-    rrdset_wrlock(st);
     RRDDIM *rd;
-    rrddim_foreach_write(rd, st)
+    rrddim_foreach_read(rd, st)
         rrddimvar_rename_all(rd);
     rrddim_foreach_done(rd);
-    rrdset_unlock(st);
 
     rrdset_index_add_name(host, st);
 
@@ -804,9 +789,7 @@ void rrddim_obsolete_to_archive(RRDDIM *rd) {
         }
     }
 
-    rrdset_wrlock(st);
     rrddim_free(st, rd);
-    rrdset_unlock(st);
 }
 
 void rrdset_archive_obsolete_dimensions(RRDSET *st, bool all) {
@@ -837,7 +820,7 @@ void rrdset_archive(RRDSET *st) {
     rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
-    while (st->alarms)    rrdsetcalc_unlink(st->alarms);
+    rrdcalc_unlink_and_free_all_rrdset_alarms(st->rrdhost, st); // safe
 
     rrdset_archive_obsolete_dimensions(st, true);
 
