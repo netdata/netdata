@@ -792,10 +792,13 @@ int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc) {
             rrdhost_hostname(host));
 
         ret = 0;
+        rrdcalc_free(rc);
+    }
+    else {
+        // we copied rc into the dictionary, so we have to free the base here
+        freez(rc);
     }
 
-    // we copied rc into the dictionary, so we have to free it here
-    rrdcalc_free(rc);
     return ret;
 }
 
