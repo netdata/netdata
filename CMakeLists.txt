@@ -1193,6 +1193,11 @@ ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
+# -----------------------------------------------------------------------------
+# ACLK
+
+IF(ENABLE_ACLK)
+
 find_package(Protobuf REQUIRED)
 
 function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
@@ -1252,16 +1257,19 @@ PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PR
 list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
 list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
-list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
+ENDIF()
+
 # -----------------------------------------------------------------------------
 # netdata
+
+list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
+list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 
 IF(LINUX)
     list(APPEND NETDATA_FILES daemon/static_threads_linux.c)
