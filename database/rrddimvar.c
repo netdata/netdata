@@ -267,7 +267,7 @@ void rrddimvar_delete_all(RRDDIM *rd) {
     RRDDIMVAR *rs;
     dfe_start_write(st->rrddimvar_root_index, rs) {
         if(unlikely(rs->rrddim == rd))
-            dictionary_del(st->rrddimvar_root_index, rs_dfe.name);
+            dictionary_del_having_write_lock(st->rrddimvar_root_index, rs_dfe.name);
     }
     dfe_done(rs);
 }
