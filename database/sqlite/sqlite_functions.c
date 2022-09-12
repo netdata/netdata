@@ -217,34 +217,6 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
 }
 
 /*
- * Marks a chart with UUID as active
- * Input: UUID
- */
-void store_active_chart(uuid_t *chart_uuid)
-{
-    static __thread sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    if (unlikely(!chart_uuid))
-        return;
-
-    rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_CHART, chart_uuid);
-    if (rc != SQLITE_DONE)
-        error_report("Failed to store active chart, rc = %d", rc);
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement in store active chart, rc = %d", rc);
-    return;
-}
-
-/*
  * Marks a dimension with UUID as active
  * Input: UUID
  */

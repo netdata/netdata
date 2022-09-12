@@ -87,7 +87,6 @@ extern void store_active_dimension(uuid_t *dimension_uuid);
 
 extern int find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name, uuid_t *store_uuid);
 extern int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const char *name);
-extern void store_active_chart(uuid_t *dimension_uuid);
 
 extern int find_uuid_type(uuid_t *uuid);
 
