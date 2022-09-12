@@ -16,8 +16,8 @@ typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
-typedef struct dictionary_item RRDVAR_ACQUIRED;
-typedef struct dictionary_item RRDSETVAR_ACQUIRED;
+typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
+typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
@@ -906,7 +906,6 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *host_alarms;
-    RRDCALC *alarms_with_foreach;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
@@ -917,6 +916,9 @@ struct rrdhost {
     // these are used to create alarms when charts
     // are created or renamed, that match them
     RRDCALCTEMPLATE *alarms_templates;
+
+    // a special kind of alarms that apply to individual dimensions
+    RRDCALC *alarms_with_foreach;
 
     // ------------------------------------------------------------------------
     // the charts of the host

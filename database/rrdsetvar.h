@@ -15,7 +15,7 @@ extern void rrdsetvar_index_init(RRDSET *st);
 extern void rrdsetvar_index_destroy(RRDSET *st);
 extern void rrdsetvar_release_and_delete_all(RRDSET *st);
 
-#define rrdsetvar_custom_chart_variable_release(st, rsa) rrdvar_release((st)->rrdsetvar_root_index, rsa)
+#define rrdsetvar_custom_chart_variable_release(st, rsa) rrdsetvar_release((st)->rrdsetvar_root_index, rsa)
 extern void rrdsetvar_release(DICTIONARY *dict, const RRDSETVAR_ACQUIRED *rsa);
 
 extern const RRDSETVAR_ACQUIRED *rrdsetvar_custom_chart_variable_add_and_acquire(RRDSET *st, const char *name);

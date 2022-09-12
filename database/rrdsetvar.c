@@ -210,13 +210,13 @@ const RRDSETVAR_ACQUIRED *rrdsetvar_add_and_acquire(RRDSET *st, const char *name
         .rrdset = st,
     };
 
-    const RRDSETVAR_ACQUIRED *rsa = dictionary_set_and_acquire_item_advanced(st->rrdsetvar_root_index, name, -1, NULL, sizeof(RRDSETVAR), &tmp);
+    const RRDSETVAR_ACQUIRED *rsa = (const RRDSETVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(st->rrdsetvar_root_index, name, -1, NULL, sizeof(RRDSETVAR), &tmp);
     return rsa;
 }
 
 void rrdsetvar_add_and_leave_released(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags) {
     const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_add_and_acquire(st, name, type, value, flags);
-    dictionary_acquired_item_release(st->rrdsetvar_root_index, rsa);
+    dictionary_acquired_item_release(st->rrdsetvar_root_index, (const DICTIONARY_ITEM *)rsa);
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
@@ -241,7 +241,7 @@ void rrdsetvar_release_and_delete_all(RRDSET *st) {
 }
 
 void rrdsetvar_release(DICTIONARY *dict, const RRDSETVAR_ACQUIRED *rsa) {
-    dictionary_acquired_item_release(dict, rsa);
+    dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rsa);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -257,7 +257,7 @@ const RRDSETVAR_ACQUIRED *rrdsetvar_custom_chart_variable_add_and_acquire(RRDSET
 void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *rsa, NETDATA_DOUBLE value) {
     if(!rsa) return;
 
-    RRDSETVAR *rs = dictionary_acquired_item_value(rsa);
+    RRDSETVAR *rs = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rsa);
 
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) || !(rs->flags & RRDVAR_FLAG_ALLOCATED)) {
         error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT

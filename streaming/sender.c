@@ -145,7 +145,7 @@ void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQU
 
 
 static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr __maybe_unused, void *host_ptr) {
-    const RRDVAR_ACQUIRED *rv = item;
+    const RRDVAR_ACQUIRED *rv = (const RRDVAR_ACQUIRED *)item;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
     if(unlikely(rrdvar_flags(rv) & RRDVAR_FLAG_CUSTOM_HOST_VAR && rrdvar_type(rv) == RRDVAR_TYPE_CALCULATED)) {
