@@ -724,7 +724,7 @@ void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
 }
 
 static size_t rrdcalc_key(char *dst, size_t dst_len, const char *chart, const char *alert) {
-    return snprintf(dst, dst_len, "%s/%s", chart, alert);
+    return snprintfz(dst, dst_len, "%s/%s", chart, alert);
 }
 
 void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions) {
