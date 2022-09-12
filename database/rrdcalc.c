@@ -613,10 +613,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     struct rrdcalc_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->rrdhost;
 
-    rc->key = string_strdupz(dictionary_acquired_item_value(item));
-
-    if(!rc->key)
-        fatal("RRDCALC: no key in RRDCAL.");
+    rc->key = string_strdupz(dictionary_acquired_item_name(item));
 
     if(ctr->from_rrdcalctemplate) {
         rrdcalc_constructor_from_rrdcalctemplate(rc, ctr->from_rrdcalctemplate, ctr->rrdset, ctr->overwrite_alert_name, ctr->overwrite_dimensions);
