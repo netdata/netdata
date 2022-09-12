@@ -54,7 +54,7 @@ struct dictionary {
 
     DICTIONARY_FLAGS flags;             // the flags of the dictionary
 
-    DICTIONARY_ITEM *first_item;             // the double linked list base pointers
+    DICTIONARY_ITEM *first_item;        // the double linked list base pointers
     DICTIONARY_ITEM *last_item;
 
     Pvoid_t JudyHSArray;                // the hash table
@@ -85,6 +85,8 @@ struct dictionary {
     long int pending_deletion_items;  // how many items of the dictionary have been deleted, but have not been removed yet
     int readers;                      // how many readers are currently using the dictionary
     int writers;                      // how many writers are currently using the dictionary
+
+    DICTIONARY *next;
 
     size_t scratchpad_size;           // the size of the scratchpad in bytes
     uint8_t scratchpad[];             // variable size scratchpad requested by the caller
@@ -758,12 +760,93 @@ static size_t item_destroy_unsafe(DICTIONARY *dict, DICTIONARY_ITEM *nv) {
 }
 
 // ----------------------------------------------------------------------------
+// delayed destruction of dictionaries
+
+static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
+    if(dictionary_stats_referenced_items(dict))
+        return false;
+
+    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
+
+    size_t freed = 0;
+
+    // destroy the dictionary
+    freed += hashtable_destroy_unsafe(dict);
+
+    DICTIONARY_ITEM *nv = dict->first_item;
+    while (nv) {
+        // cache nv->next
+        // because we are going to free nv
+        DICTIONARY_ITEM *nv_next = nv->next;
+        freed += item_destroy_unsafe(dict, nv);
+        nv = nv_next;
+        // to speed up destruction, we don't
+        // unlink nv from the linked-list here
+    }
+
+    dict->first_item = NULL;
+    dict->last_item = NULL;
+
+    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    freed += dictionary_lock_free(dict);
+    freed += reference_counter_free(dict);
+    freed += sizeof(DICTIONARY) + dict->scratchpad_size;
+    freez(dict);
+
+    if(mem) *mem = freed;
+
+    return true;
+}
+
+netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex = NETDATA_MUTEX_INITIALIZER;
+static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
+
+void queue_dictionary_destruction_unsafe(DICTIONARY *dict) {
+    if(dict->flags & DICTIONARY_FLAG_DESTROYED)
+        return;
+
+    dict->flags |= DICTIONARY_FLAG_DESTROYED;
+
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    dict->next = dictionaries_waiting_to_be_destroyed;
+    dictionaries_waiting_to_be_destroyed = dict;
+
+    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+}
+
+void cleanup_destroyed_dictionaries(void) {
+    if(!dictionaries_waiting_to_be_destroyed)
+        return;
+
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    DICTIONARY *dict, *last = NULL, *next = NULL;
+    for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
+        next = dict->next;
+
+        if(dictionary_free_all_resources(dict, NULL)) {
+            if(last) last->next = next;
+            else dictionaries_waiting_to_be_destroyed = next;
+        }
+        else
+            last = dict;
+    }
+
+    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+}
+
+// ----------------------------------------------------------------------------
 // API - dictionary management
+
 #ifdef NETDATA_INTERNAL_CHECKS
 DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, size_t scratchpad_size, const char *function, size_t line, const char *file) {
 #else
 DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size) {
 #endif
+    cleanup_destroyed_dictionaries();
+
     debug(D_DICTIONARY, "Creating dictionary.");
 
     if(unlikely(flags & DICTIONARY_FLAGS_RESERVED))
@@ -796,16 +879,18 @@ void *dictionary_scratchpad(DICTIONARY *dict) {
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
+    cleanup_destroyed_dictionaries();
+
     if(!dict) return 0;
 
     DICTIONARY_ITEM *nv;
 
     debug(D_DICTIONARY, "Destroying dictionary.");
 
-    long referenced_items = 0;
+    size_t referenced_items = 0;
     size_t retries = 0;
     do {
-        referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
+        referenced_items = dictionary_stats_referenced_items(dict);
         if (referenced_items) {
             dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
 
@@ -834,10 +919,11 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         }
     } while(referenced_items > 0 && ++retries < 10);
 
-    if(referenced_items) {
+    if(dictionary_stats_referenced_items(dict)) {
         dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
 
-        dict->flags |= DICTIONARY_FLAG_DESTROYED;
+        queue_dictionary_destruction_unsafe(dict);
+
         internal_error(
             true,
             "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s after %zu retries, because it has %ld referenced items in it (%ld total).",
@@ -852,31 +938,8 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         return 0;
     }
 
-    dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
-
-    size_t freed = 0;
-    nv = dict->first_item;
-    while (nv) {
-        // cache nv->next
-        // because we are going to free nv
-        DICTIONARY_ITEM *nv_next = nv->next;
-        freed += item_destroy_unsafe(dict, nv);
-        nv = nv_next;
-        // to speed up destruction, we don't
-        // unlink nv from the linked-list here
-    }
-
-    dict->first_item = NULL;
-    dict->last_item = NULL;
-
-    // destroy the dictionary
-    freed += hashtable_destroy_unsafe(dict);
-
-    dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);
-    freed += dictionary_lock_free(dict);
-    freed += reference_counter_free(dict);
-    freed += sizeof(DICTIONARY) + dict->scratchpad_size;
-    freez(dict);
+    size_t freed;
+    dictionary_free_all_resources(dict, &freed);
 
     return freed;
 }
@@ -1142,9 +1205,6 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DI
     // so that the release may get a write-lock if required to clean up
 
     reference_counter_release(dict, item, true);
-
-    if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED))
-        dictionary_destroy(dict);
 }
 
 int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
