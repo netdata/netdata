@@ -81,7 +81,7 @@ public:
 
     std::pair<bool, double> detect(size_t WindowLength, bool Reset);
 
-    std::deque<KMeans> getModels();
+    std::array<KMeans, 1> getModels();
 
 private:
     std::pair<CalculatedNumber *, size_t> getCalculatedNumbers();
@@ -99,7 +99,7 @@ public:
     unsigned AnomalyBitCounter;
 
     std::vector<CalculatedNumber> CNs;
-    std::deque<KMeans> Models;
+    std::array<KMeans, 1> Models;
     std::mutex Mutex;
 };
 

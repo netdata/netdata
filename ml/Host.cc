@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <dlib/statistics.h>
-
 #include "Config.h"
 #include "Host.h"
 #include "ADCharts.h"

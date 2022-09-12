@@ -93,12 +93,7 @@ MLResult Dimension::trainModel() {
 
     {
         std::lock_guard<std::mutex> Lock(Mutex);
-
-
-        if (Models.size() >= Cfg.NumModelsToUse)
-            Models.pop_back();
-
-        Models.push_front(KM);
+        Models[0] = KM;
     }
 
     Trained = true;
@@ -182,7 +177,7 @@ void Dimension::updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAno
     }
 }
 
-std::deque<KMeans> Dimension::getModels() {
+std::array<KMeans, 1> Dimension::getModels() {
     std::unique_lock<std::mutex> Lock(Mutex);
     return Models;
 }
