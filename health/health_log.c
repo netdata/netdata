@@ -186,8 +186,10 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
     DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc)
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
@@ -510,7 +512,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log(
+inline void health_alarm_log_add_entry(
         RRDHOST *host,
         ALARM_ENTRY *ae
 ) {

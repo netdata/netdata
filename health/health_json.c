@@ -306,8 +306,6 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     char *tok = NULL;
     char *p = NULL;
 
-    rrdhost_rdlock(host);
-
     if (contexts) {
         p = (char*)buffer_tostring(contexts);
         while(p && *p && (tok = mystrsep(&p, ", |"))) {
@@ -315,7 +313,7 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
 
             STRING *tok_string = string_strdupz(tok);
 
-            foreach_rrdcalc_in_rrdhost(host, rc) {
+            foreach_rrdcalc_in_rrdhost_read(host, rc) {
                 if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                     continue;
                 if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
@@ -325,12 +323,13 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
                              && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
                     numberOfAlarms++;
             }
+            foreach_rrdcalc_in_rrdhost_done(rc);
 
             string_freez(tok_string);
         }
     }
     else {
-        foreach_rrdcalc_in_rrdhost(host, rc) {
+        foreach_rrdcalc_in_rrdhost_read(host, rc) {
             if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                 continue;
             if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
@@ -338,16 +337,16 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
             if(unlikely((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
                 numberOfAlarms++;
         }
+        foreach_rrdcalc_in_rrdhost_done(rc);
     }
 
     buffer_sprintf(wb, "%d", numberOfAlarms);
-    rrdhost_unlock(host);
 }
 
 static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *)) {
     RRDCALC *rc;
     int i = 0;
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -361,6 +360,7 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
         fp(host, wb, rc);
         i++;
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 }
 
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {

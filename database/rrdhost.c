@@ -370,6 +370,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     // load health configuration
 
     if(host->health_enabled) {
+        rrdcalc_rrdhost_index_init(host);
+
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
@@ -1125,15 +1127,9 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     // delete all the RRDSETs of the host
     rrdset_index_destroy(host);
+    rrdcalc_rrdhost_index_destroy(host);
 
     freez(host->exporting_flags);
-
-    RRDCALC *rc,*nc;
-    for(rc = host->alarms_with_foreach; rc ; rc = nc) {
-        nc = rc->next;
-        rrdcalc_free(rc);
-    }
-    host->alarms_with_foreach = NULL;
 
     while(host->alarms_templates)
         rrdcalctemplate_unlink_and_free(host, host->alarms_templates);

@@ -114,4 +114,10 @@ extern void rrdcalctemplate_link_matching(RRDSET *st);
 extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
 extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
 extern void rrdcalctemplate_create_alarms(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st);
+
+extern void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
+
+extern bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
+extern void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host);
+
 #endif //NETDATA_RRDCALCTEMPLATE_H

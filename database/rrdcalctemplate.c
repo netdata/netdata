@@ -11,32 +11,54 @@
  * @param rt is the template used to create the chart.
  * @param st is the chart where the alarm will be attached.
  */
-void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
-    if(rt->context != st->context)
-        return;
 
-    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, rrdset_name(st)))
-        return;
+bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
+    if(rt->context != st->context)
+        return false;
+
+    if(rt->spdim && !rrdset_number_of_dimensions(st))
+        return false;
+
+    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, rrdset_name(st)) && !simple_pattern_matches(rt->charts_pattern, rrdset_id(st)))
+        return false;
 
     if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, rrdset_family(st)))
-        return;
+        return false;
 
     if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, rrdset_module_name(st)))
-        return;
+        return false;
 
     if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, rrdset_plugin_name(st)))
-        return;
+        return false;
 
     if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rt->host_labels_pattern, '='))
+        return false;
+
+    return true;
+}
+
+void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host) {
+    if (simple_pattern_matches(rt->spdim, rrddim_id(rd)) || simple_pattern_matches(rt->spdim, rrddim_name(rd))) {
+        char *overwrite_alert_name = alarm_name_with_dim(rrdcalctemplate_name(rt), string_strlen(rt->name), rrddim_name(rd), string_strlen(rd->name));
+        rrdcalc_add_from_rrdcalctemplate(host, rt, st, overwrite_alert_name, rrddim_name(rd));
+        freez(overwrite_alert_name);
+    }
+}
+
+void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
+    if(!rrdcalctemplate_check_rrdset_conditions(rt, st, host))
         return;
 
-    RRDCALC *rc = rrdcalc_create_from_template_unsafe(host, rt, rrdset_id(st));
-    if (unlikely(!rc))
-        info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rrdcalctemplate_name(rt), rrdset_id(st), rrdhost_hostname(host));
-#ifdef NETDATA_INTERNAL_CHECKS
-    else if (rc->rrdset != st && !rc->foreachdim) //When we have a template with foreachdim, the child will be added to the index late
-        error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st));
-#endif
+    if(!rt->spdim) {
+        rrdcalc_add_from_rrdcalctemplate(host, rt, st, NULL, NULL);
+        return;
+    }
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
+    }
+    rrddim_foreach_done(rd);
 }
 
 void rrdcalctemplate_link_matching(RRDSET *st) {

@@ -74,7 +74,7 @@ extern ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     uint32_t flags);
 
-extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
+extern void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);

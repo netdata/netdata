@@ -1454,6 +1454,35 @@ void rrdcontext_db_rotation(void) {
     rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
 }
 
+int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char *context, int (*callback)(RRDSET *st, void *data), void *data) {
+    if(unlikely(!host || !context || !*context || !callback))
+        return -1;
+
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, context);
+    if(unlikely(!rca)) return -1;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    if(unlikely(!rc)) return -1;
+
+    int ret = 0;
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+        if(ri->rrdset) {
+            int r = callback(ri->rrdset, data);
+            if(r >= 0) ret += r;
+            else {
+                ret = r;
+                break;
+            }
+        }
+    }
+    dfe_done(ri);
+
+    rrdcontext_release(rca);
+
+    return ret;
+}
+
 // ----------------------------------------------------------------------------
 // ACLK interface
 

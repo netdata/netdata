@@ -122,7 +122,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
         size_t alarms = 0;
         RRDCALC *rc;
-        foreach_rrdcalc_in_rrdset(st, rc) {
+        foreach_rrdcalc_in_rrdset_read(st, rc) {
             buffer_sprintf(
                 wb,
                 "%s"
@@ -137,6 +137,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
             alarms++;
         }
+        foreach_rrdcalc_in_rrdset_done(rc);
         buffer_sprintf(wb,
                        "\n\t\t\t}"
         );

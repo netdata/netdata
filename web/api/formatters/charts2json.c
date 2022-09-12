@@ -69,7 +69,6 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     );
 
     c = 0;
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             if(c) buffer_strcat(wb, ",");
@@ -85,11 +84,11 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     rrdset_foreach_done(st);
 
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(rc->rrdset)
             alarms++;
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     buffer_sprintf(wb
                    , "\n\t}"

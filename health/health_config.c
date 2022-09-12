@@ -33,61 +33,6 @@
 #define HEALTH_HOST_LABEL_KEY "host labels"
 #define HEALTH_FOREACH_KEY "foreach"
 
-static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
-    if(!rc->chart) {
-        error("Health configuration for alarm '%s' does not have a chart", rrdcalc_name(rc));
-        return 0;
-    }
-
-    if(!rc->update_every) {
-        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
-        return 0;
-    }
-
-    if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->calculation && !rc->warning && !rc->critical) {
-        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rrdcalc_chart_name(rc), rrdcalc_name(rc));
-        return 0;
-    }
-
-    if (rrdcalc_exists_in_host_unsafe(host, rrdcalc_chart_name(rc), rrdcalc_name(rc)))
-        return 0;
-
-    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
-
-    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " NETDATA_DOUBLE_FORMAT_AUTO
-        ", red " NETDATA_DOUBLE_FORMAT_AUTO
-        ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
-            rrdcalc_chart_name(rc),
-            rrdcalc_name(rc),
-            rc->id,
-            (rc->exec)?rrdcalc_exec(rc):"DEFAULT",
-            (rc->recipient)?rrdcalc_recipient(rc):"DEFAULT",
-            rc->green,
-            rc->red,
-            (int)rc->group,
-            rc->after,
-            rc->before,
-            rc->options,
-            (rc->dimensions)?rrdcalc_dimensions(rc):"NONE",
-            (rc->foreachdim)?rrdcalc_foreachdim(rc):"NONE",
-            rc->update_every,
-            (rc->calculation)?rc->calculation->parsed_as:"NONE",
-            (rc->warning)?rc->warning->parsed_as:"NONE",
-            (rc->critical)?rc->critical->parsed_as:"NONE",
-            rrdcalc_source(rc),
-            rc->delay_up_duration,
-            rc->delay_down_duration,
-            rc->delay_max_duration,
-            rc->delay_multiplier,
-            rc->warn_repeat_every,
-            rc->crit_repeat_every
-    );
-
-    rrdcalc_add_to_host_unsafe(host, rc);
-
-    return 1;
-}
-
 static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt->context)) {
         error("Health configuration for template '%s' does not have a context", rrdcalctemplate_name(rt));
@@ -644,9 +589,11 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
                     rrdcalc_free(rc);
-                }
+                else
+                    rrdcalc_add_from_config_rrdcalc(host, rc);
+
                // health_add_alarms_loop(host, rc, ignore_this) ;
             }
 
@@ -688,8 +635,10 @@ static int health_readfile(const char *filename, void *data) {
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
 //                health_add_alarms_loop(host, rc, ignore_this) ;
-                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
+                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
                     rrdcalc_free(rc);
+                else
+                    rrdcalc_add_from_config_rrdcalc(host, rc);
 
                 rc = NULL;
             }
@@ -1237,9 +1186,10 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
-        if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+        if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
             rrdcalc_free(rc);
-        }
+        else
+            rrdcalc_add_from_config_rrdcalc(host, rc);
     }
 
     if(rt) {

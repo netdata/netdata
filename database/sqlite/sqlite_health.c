@@ -636,8 +636,10 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc)
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;

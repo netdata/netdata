@@ -32,6 +32,8 @@
 
 
 struct rrdcalc {
+    STRING *key;                    // the unique key in the host's rrdcalc_root_index
+
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 
@@ -167,11 +169,17 @@ struct rrdcalc {
 #define rrdcalc_foreachdim(rc) string2str((rc)->foreachdim)
 #define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
 
-#define foreach_rrdcalc_in_rrdset(st, rc) \
-    DOUBLE_LINKED_LIST_FOREACH_FORWARD((st)->alarms, rc, rrdset_prev, rrdset_next)
+#define foreach_rrdcalc_in_rrdset_read(st, rc) \
+    dfe_start_read((st)->rrdcalc_root_index, rc) \
 
-#define foreach_rrdcalc_in_rrdhost(host, rc) \
-    DOUBLE_LINKED_LIST_FOREACH_FORWARD((host)->host_alarms, rc, prev, next)
+#define foreach_rrdcalc_in_rrdset_done(rc) \
+    dfe_done(rc)
+
+#define foreach_rrdcalc_in_rrdhost_read(host, rc) \
+    dfe_start_read((host)->rrdcalc_root_index, rc) \
+
+#define foreach_rrdcalc_in_rrdhost_done(rc) \
+    dfe_done(rc)
 
 struct alert_config {
     STRING *alarm;
@@ -213,25 +221,22 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-extern void rrdcalc_link_matching_host_alarms_to_rrdset_unsafe(RRDSET *st);
+extern void rrdcalc_link_matching_host_alarms_to_rrdset(RRDSET *st);
 extern RRDCALC *rrdcalc_find_in_rrdset_unsafe(RRDSET *st, const char *name);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
 extern void rrdcalc_free(RRDCALC *rc);
-extern void rrdcalc_unlink_and_free_unsafe(RRDHOST *host, RRDCALC *rc);
 
-extern int rrdcalc_exists_in_host_unsafe(RRDHOST *host, const char *chart, const char *name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
-extern RRDCALC *rrdcalc_create_from_template_unsafe(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
-extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension);
-extern void rrdcalc_add_to_host_unsafe(RRDHOST *host, RRDCALC *rc);
+extern void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
+extern int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe_comma(char *str);
 extern char *alarm_name_with_dim(const char *name, size_t namelen, const char *dim, size_t dimlen);
 extern void rrdcalc_update_rrdlabels(RRDSET *st);
 
 extern void rrdcalc_remove_alarms_not_matching_host_labels();
-extern void rrdcalc_labels_unlink_alarm_from_host_having_rrdhost_wrlock(RRDHOST *host);
+extern void rrdcalc_labels_unlink_and_free_alarms_from_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
@@ -242,6 +247,12 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
 
 extern void rrdcalc_unlink_and_free_all_rrdset_alarms(RRDHOST *host, RRDSET *st);
 extern void rrdcalc_unlink_and_free_all_rrdhost_alarms(RRDHOST *host);
+
+extern void rrdcalc_rrdhost_index_init(RRDHOST *host);
+extern void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
+
+extern void rrdcalc_rrdset_index_init(RRDSET *st);
+extern void rrdcalc_rrdset_index_destroy(RRDSET *st);
 
 #define RRDCALC_VAR_MAX 100
 #define RRDCALC_VAR_FAMILY "$family"

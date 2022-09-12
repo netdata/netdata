@@ -439,7 +439,7 @@ void analytics_alarms(void)
     int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[10];
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(localhost, rc) {
+    foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -454,6 +454,7 @@ void analytics_alarms(void)
                 alarm_normal++;
         }
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     snprintfz(b, 9, "%d", alarm_normal);
     analytics_set_data(&analytics_data.netdata_alarms_normal, b);

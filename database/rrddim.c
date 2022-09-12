@@ -35,7 +35,7 @@ static void rrddim_update_rrddimvars_unsafe(RRDDIM *rd) {
         rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
         rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
         rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
     }
@@ -410,34 +410,6 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 }
 
 // ----------------------------------------------------------------------------
-
-void rrdcalc_link_matching_rrdcalc_with_foreach_unsafe(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
-    RRDCALC *rc;
-    
-    for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
-        if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
-            if (rc->chart == st->name || rc->chart == st->id) {
-                char *name = alarm_name_with_dim(rrdcalc_name(rc), string_strlen(rc->name), rrddim_name(rd), string_strlen(rd->name));
-                if(rrdcalc_exists_in_host_unsafe(host, rrdset_name(st), name)) {
-                    freez(name);
-                    continue;
-                }
-
-                netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-                RRDCALC *child = rrdcalc_create_from_rrdcalc(rc, host, name, rrddim_name(rd));
-                netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
-
-                if (child)
-                    rrdcalc_add_to_host_unsafe(host, child);
-
-                else {
-                    error("Cannot allocate a new alarm.");
-                    rc->foreachcounter--;
-                }
-            }
-        }
-    }
-}
 
 // get the timestamp of the last entry in the round-robin database
 time_t rrddim_last_entry_t(RRDDIM *rd) {

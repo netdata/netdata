@@ -204,6 +204,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_index_del_name(host, st);
 
     rrdcalc_unlink_and_free_all_rrdset_alarms(host, st);
+    rrdcalc_rrdset_index_destroy(st);
 
     rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily
     rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
@@ -331,17 +332,18 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDHOST *host = st->rrdhost;
 
     if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
+        rrdcalc_rrdset_index_init(st);
+
         rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
 
-        rrdhost_wrlock(host);
-        rrdset_wrlock(st);
-        rrdcalc_link_matching_host_alarms_to_rrdset_unsafe(st);
+        rrdcalc_link_matching_host_alarms_to_rrdset(st);
+
+        rrdhost_rdlock(host);
         rrdcalctemplate_link_matching(st);
-        rrdset_unlock(st);
         rrdhost_unlock(host);
     }
 

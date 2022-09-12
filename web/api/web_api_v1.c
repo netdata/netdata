@@ -1053,8 +1053,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
-    rrdhost_rdlock(host);
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -1069,7 +1068,7 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
                 alarm_normal++;
         }
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
     buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
     buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
     buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);

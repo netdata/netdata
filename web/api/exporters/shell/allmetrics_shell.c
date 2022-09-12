@@ -25,7 +25,6 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_shell();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     // for each chart
     RRDSET *st;
@@ -69,7 +68,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
@@ -89,8 +88,8 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 

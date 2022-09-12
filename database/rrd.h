@@ -24,6 +24,7 @@ typedef struct context_param CONTEXT_PARAM;
 typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
+typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
@@ -177,7 +178,7 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
-    RRDDIM_FLAG_PENDING_FOREACH_ALARM           = (1 << 5), // set when foreach alarm has not been initialized yet
+    RRDDIM_FLAG_PENDING_FOREACH_ALARMS = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
     RRDDIM_FLAG_INDEXED_ID                      = (1 << 7),
 } RRDDIM_FLAGS;
@@ -618,7 +619,7 @@ struct rrdset {
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
     DICTIONARY *rrdvars;                            // RRDVAR index for this chart
-    RRDCALC *alarms;                                // RRDCALC linked list for this chart
+    DICTIONARY *rrdcalc_root_index;                 // RRDCALC list of this chart
     const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 };
 
@@ -905,6 +906,7 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
+    DICTIONARY *rrdcalc_root_index;
     RRDCALC *host_alarms;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
@@ -916,9 +918,6 @@ struct rrdhost {
     // these are used to create alarms when charts
     // are created or renamed, that match them
     RRDCALCTEMPLATE *alarms_templates;
-
-    // a special kind of alarms that apply to individual dimensions
-    RRDCALC *alarms_with_foreach;
 
     // ------------------------------------------------------------------------
     // the charts of the host
@@ -1194,8 +1193,6 @@ extern time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
-
-extern void rrdcalc_link_matching_rrdcalc_with_foreach_unsafe(RRDDIM *rd, RRDSET *st, RRDHOST *host);
 
 extern RRDDIM *rrddim_add_custom(RRDSET *st
                                  , const char *id
