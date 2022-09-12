@@ -8,7 +8,7 @@ learn_rel_path: ""
 learn_docs_purpose: "Present netdata in a nutshell"
 -->
 
-<h2 align="center">Netdata is an ecosystem that provides monitoring, visualization, and troubleshooting solution for systems, containers, services, and applications.</h3>
+<h2 align="center">Netdata is an ecosystem that provides monitoring, visualization, and troubleshooting solution for systems, containers, services, and applications.</h2>
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
