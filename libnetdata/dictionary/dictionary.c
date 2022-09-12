@@ -827,6 +827,13 @@ void cleanup_destroyed_dictionaries(void) {
         next = dict->next;
 
         if(dictionary_free_all_resources(dict, NULL)) {
+            internal_error(
+                true,
+                "DICTIONARY: cleaned up dictionary with delayed destruction, created from %s() %zu@%s.",
+                dict->creation_function,
+                dict->creation_line,
+                dict->creation_file);
+
             if(last) last->next = next;
             else dictionaries_waiting_to_be_destroyed = next;
         }
