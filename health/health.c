@@ -465,12 +465,12 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         }
     }
 
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
     bool cleanup_excess_log_entries = host->health_log.count > host->health_log.max;
-
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     if (!cleanup_excess_log_entries)
         return;

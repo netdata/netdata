@@ -116,7 +116,6 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
 }
 
 void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     buffer_strcat(wb, "[");
 
@@ -124,6 +123,8 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
     unsigned int count = 0;
 
     STRING *chart_string = string_strdupz(chart);
+
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;
     for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
@@ -135,11 +136,11 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
         }
     }
 
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
     string_freez(chart_string);
 
     buffer_strcat(wb, "\n]\n");
-
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
 static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {

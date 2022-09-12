@@ -636,9 +636,6 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->critical->rrdcalc = rc;
     }
 
-    if(ctr->rrdset)
-        rrdcalc_link_to_rrdset(ctr->rrdset, rc);
-
     debug(D_HEALTH, "Health added alarm '%s.%s': exec '%s', recipient '%s', green " NETDATA_DOUBLE_FORMAT_AUTO
                     ", red " NETDATA_DOUBLE_FORMAT_AUTO
                     ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
@@ -686,7 +683,10 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
     struct rrdcalc_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->rrdhost;
 
-    if(!rc->rrdset) {
+    if(ctr->rrdset)
+        rrdcalc_link_to_rrdset(ctr->rrdset, rc);
+
+    else {
         if(ctr->from_rrdcalctemplate) {
             rrdcontext_foreach_instance_with_rrdset_in_context(
                 host,
@@ -709,8 +709,8 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     RRDCALC *rc = rrdcalc;
     //RRDHOST *host = rrdhost;
 
-    // TODO - unlink it
-    // TODO - free its variables
+    // any desctuction actions that require other locks
+    // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
 
     rrdcalc_free(rc);
 }

@@ -182,14 +182,14 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
     size_t line = 0, len = 0;
     ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
-
     DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
+
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
@@ -396,10 +396,10 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         }
     }
 
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
     dictionary_destroy(all_rrdcalcs);
     all_rrdcalcs = NULL;
-
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     freez(buf);
 
