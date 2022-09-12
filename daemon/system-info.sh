@@ -33,7 +33,8 @@ if [ -z "${VIRTUALIZATION}" ]; then
   if command -v systemd-detect-virt >/dev/null 2>&1; then
     VIRTUALIZATION="$(systemd-detect-virt -v)"
     VIRT_DETECTION="systemd-detect-virt"
-    CONTAINER=${CONTAINER:-$(systemd-detect-virt -c)}
+    CONTAINER_DETECT_TMP="$(systemd-detect-virt -c)"
+    [ -n "$CONTAINER_DETECT_TMP" ] && CONTAINER="$CONTAINER_DETECT_TMP"
     CONT_DETECTION="systemd-detect-virt"
   elif command -v lscpu >/dev/null 2>&1; then
     VIRTUALIZATION=$(lscpu | grep "Hypervisor vendor:" | cut -d: -f 2 | awk '{$1=$1};1')
