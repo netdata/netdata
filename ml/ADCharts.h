@@ -12,7 +12,7 @@ void updateDimensionsChart(RRDHOST *RH,
                            collected_number NumNormalDimensions,
                            collected_number NumAnomalousDimensions);
 
-void updateRateChart(RRDHOST *RH, collected_number AnomalyRate);
+void updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyRate);
 
 void updateDetectionChart(RRDHOST *RH);
 

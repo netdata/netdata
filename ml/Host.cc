@@ -211,7 +211,7 @@ void DetectableHost::detectOnce() {
 
     worker_is_busy(WORKER_JOB_UPDATE_CHARTS);
     updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
-    updateRateChart(getRH(), HostAnomalyRate * 10000.0);
+    updateHostAndDetectionRateCharts(getRH(), HostAnomalyRate * 10000.0);
 
     struct rusage TRU;
     getResourceUsage(&TRU);
