@@ -448,7 +448,7 @@ void rrdcalc_unlink_and_free_all_rrdhost_alarms(RRDHOST *host) {
     dfe_done(rc);
 }
 
-static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host) {
+void rrdcalc_unlink_and_free_alarms_not_matching_labels_from_host(RRDHOST *host) {
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         RRDCALC *rc_next = rc->next;
@@ -471,10 +471,6 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host) {
     foreach_rrdcalc_in_rrdhost_done(rc);
 }
 
-void rrdcalc_labels_unlink_and_free_alarms_from_host(RRDHOST *host) {
-    rrdcalc_labels_unlink_alarm_loop(host);
-}
-
 void rrdcalc_remove_alarms_not_matching_host_labels() {
     rrd_rdlock();
 
@@ -485,7 +481,7 @@ void rrdcalc_remove_alarms_not_matching_host_labels() {
 
         if (host->rrdlabels) {
             rrdhost_wrlock(host);
-            rrdcalc_labels_unlink_and_free_alarms_from_host(host);
+            rrdcalc_unlink_and_free_alarms_not_matching_labels_from_host(host);
             rrdhost_unlock(host);
         }
     }
@@ -618,6 +614,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     RRDHOST *host = ctr->rrdhost;
 
     rc->key = string_strdupz(dictionary_acquired_item_value(item));
+
+    if(!rc->key)
+        fatal("RRDCALC: no key in RRDCAL.");
 
     if(ctr->from_rrdcalctemplate) {
         rrdcalc_constructor_from_rrdcalctemplate(rc, ctr->from_rrdcalctemplate, ctr->rrdset, ctr->overwrite_alert_name, ctr->overwrite_dimensions);

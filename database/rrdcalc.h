@@ -236,7 +236,7 @@ extern char *alarm_name_with_dim(const char *name, size_t namelen, const char *d
 extern void rrdcalc_update_rrdlabels(RRDSET *st);
 
 extern void rrdcalc_remove_alarms_not_matching_host_labels();
-extern void rrdcalc_labels_unlink_and_free_alarms_from_host(RRDHOST *host);
+extern void rrdcalc_unlink_and_free_alarms_not_matching_labels_from_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {

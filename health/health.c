@@ -184,7 +184,7 @@ static void health_reload_host(RRDHOST *host) {
     health_readdir(host, user_path, stock_path, NULL);
 
     //Discard alarms with labels that do not apply to host
-    rrdcalc_labels_unlink_and_free_alarms_from_host(host);
+    rrdcalc_unlink_and_free_alarms_not_matching_labels_from_host(host);
 
     // link the loaded alarms to their charts
     rrdset_foreach_write(st, host) {
