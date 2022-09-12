@@ -1995,69 +1995,6 @@ int sql_store_chart_hash(
     return 1;
 }
 
-/*
-  chart hashes are used for cloud communication.
-  if cloud is disabled or openssl is not available (which will prevent cloud connectivity)
-  skip hash calculations
-*/
-void compute_chart_hash(RRDSET *st)
-{
-#if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
-    EVP_MD_CTX *evpctx;
-    unsigned char hash_value[EVP_MAX_MD_SIZE];
-    unsigned int hash_len;
-    char  priority_str[32];
-
-    if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        internal_error(true, "Skipping compute_chart_hash for host %s because context streaming is enabled", rrdhost_hostname(st->rrdhost));
-        return;
-    }
-
-    sprintf(priority_str, "%ld", st->priority);
-
-    evpctx = EVP_MD_CTX_create();
-    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
-    //EVP_DigestUpdate(evpctx, st->type, strlen(st->type));
-    EVP_DigestUpdate(evpctx, rrdset_id(st), string_strlen(st->id));
-    EVP_DigestUpdate(evpctx, rrdset_name(st), string_strlen(st->name));
-    EVP_DigestUpdate(evpctx, rrdset_family(st), string_strlen(st->family));
-    EVP_DigestUpdate(evpctx, rrdset_context(st), string_strlen(st->context));
-    EVP_DigestUpdate(evpctx, rrdset_title(st), string_strlen(st->title));
-    EVP_DigestUpdate(evpctx, rrdset_units(st), string_strlen(st->units));
-    EVP_DigestUpdate(evpctx, rrdset_plugin_name(st), string_strlen(st->plugin_name));
-    EVP_DigestUpdate(evpctx, rrdset_module_name(st), string_strlen(st->module_name));
-//    EVP_DigestUpdate(evpctx, priority_str, strlen(priority_str));
-    EVP_DigestUpdate(evpctx, &st->priority, sizeof(st->priority));
-    EVP_DigestUpdate(evpctx, &st->chart_type, sizeof(st->chart_type));
-    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
-    EVP_MD_CTX_destroy(evpctx);
-    fatal_assert(hash_len > sizeof(uuid_t));
-
-    char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(*((uuid_t *) &hash_value), uuid_str);
-    //info("Calculating HASH %s for chart %s", uuid_str, st->name);
-    uuid_copy(st->hash_uuid, *((uuid_t *) &hash_value));
-
-    (void)sql_store_chart_hash(
-        (uuid_t *)&hash_value,
-        &st->chart_uuid,
-        rrdset_parts_type(st),
-        rrdset_id(st),
-        rrdset_name(st),
-        rrdset_family(st),
-        rrdset_context(st),
-        rrdset_title(st),
-        rrdset_units(st),
-        rrdset_plugin_name(st),
-        rrdset_module_name(st),
-        st->priority,
-        st->chart_type);
-#else
-    UNUSED(st);
-#endif
-    return;
-}
-
 #define SQL_STORE_CLAIM_ID  "insert into node_instance " \
     "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
     "on conflict(host_id) do update set claim_id = excluded.claim_id;"

@@ -109,7 +109,6 @@ extern int get_host_id(uuid_t *node_id, uuid_t *host_id);
 extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
-extern void compute_chart_hash(RRDSET *st);
 extern int sql_set_dimension_option(uuid_t *dim_uuid, char *option);
 char *get_hostname_by_node_id(char *node_id);
 void free_temporary_host(RRDHOST *host);
