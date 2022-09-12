@@ -127,13 +127,28 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         st->red = rc->red;
     }
 
-    rc->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_LOCAL_VAR, &rc->value);
-    rc->rrdvar_family = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_FAMILY_VAR, &rc->value);
-
     char buf[RRDVAR_MAX_LENGTH + 1];
-
     snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
     STRING *rrdset_name_rrdcalc_name = string_strdupz(buf);
+    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
+    STRING *rrdset_id_rrdcalc_name = string_strdupz(buf);
+
+    rc->rrdvar_local = rrdvar_add_and_acquire(
+        "local",
+        st->rrdvars,
+        rc->name,
+        RRDVAR_TYPE_CALCULATED,
+        RRDVAR_FLAG_RRDCALC_LOCAL_VAR,
+        &rc->value);
+
+    rc->rrdvar_family = rrdvar_add_and_acquire(
+        "family",
+        rrdfamily_rrdvars_dict(st->rrdfamily),
+        rc->name,
+        RRDVAR_TYPE_CALCULATED,
+        RRDVAR_FLAG_RRDCALC_FAMILY_VAR,
+        &rc->value);
+
     rc->rrdvar_host_chart_name = rrdvar_add_and_acquire(
         "host",
         host->rrdvars,
@@ -142,8 +157,6 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR,
         &rc->value);
 
-    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
-    STRING *rrdset_id_rrdcalc_name = string_strdupz(buf);
     rc->rrdvar_host_chart_id = rrdvar_add_and_acquire(
         "host",
         host->rrdvars,
@@ -155,13 +168,13 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     string_freez(rrdset_id_rrdcalc_name);
     string_freez(rrdset_name_rrdcalc_name);
 
-    if(!rc->units) rc->units = string_dup(st->units);
+    if(!rc->units)
+        rc->units = string_dup(st->units);
 
     if (rc->original_info) {
-        if (rc->info)
-            string_freez(rc->info);
-
+        STRING *old = rc->info;
         rc->info = rrdcalc_replace_variables(rrdcalc_original_info(rc), rc);
+        string_freez(old);
     }
 
     time_t now = now_realtime_sec();
@@ -272,6 +285,8 @@ static inline void rrdcalc_unlink_from_rrdset(RRDCALC *rc) {
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
     // unlink it
+    rc->rrdset = NULL;
+
     rrdcalc_rrdset_index_del(st, rc);
 
     rrdvar_release_and_del(st->rrdvars, rc->rrdvar_local);
@@ -286,14 +301,12 @@ static inline void rrdcalc_unlink_from_rrdset(RRDCALC *rc) {
     rrdvar_release_and_del(host->rrdvars, rc->rrdvar_host_chart_name);
     rc->rrdvar_host_chart_name = NULL;
 
-    rc->rrdset = NULL;
-
     // RRDCALC will remain in RRDHOST
     // so that if the matching chart is found in the future
     // it will be applied automatically
 }
 
-RRDCALC *rrdcalc_find_in_rrdset_unsafe(RRDSET *st, const char *name) {
+RRDCALC *rrdcalc_find_in_rrdset(RRDSET *st, const char *name) {
     RRDCALC *rc = NULL;
 
     STRING *name_string = string_strdupz(name);
@@ -380,16 +393,8 @@ void dimension_remove_pipe_comma(char *str) {
     }
 }
 
-void rrdcalc_free(RRDCALC *rc) {
+static void rrdcalc_free_internals(RRDCALC *rc) {
     if(unlikely(!rc)) return;
-
-    if(rc->rrdset) {
-        rrdvar_release_and_del(rc->rrdset->rrdvars, rc->rrdvar_local);
-        rrdvar_release_and_del(rrdfamily_rrdvars_dict(rc->rrdset->rrdfamily), rc->rrdvar_family);
-        rrdvar_release_and_del(rc->rrdset->rrdhost->rrdvars, rc->rrdvar_host_chart_id);
-        rrdvar_release_and_del(rc->rrdset->rrdhost->rrdvars, rc->rrdvar_host_chart_name);
-        rc->rrdvar_local = rc->rrdvar_family = rc->rrdvar_host_chart_id = rc->rrdvar_host_chart_name = NULL;
-    }
 
     expression_free(rc->calculation);
     expression_free(rc->warning);
@@ -417,7 +422,13 @@ void rrdcalc_free(RRDCALC *rc) {
     simple_pattern_free(rc->host_labels_pattern);
     simple_pattern_free(rc->module_pattern);
     simple_pattern_free(rc->plugin_pattern);
+}
 
+void rrdcalc_free(RRDCALC *rc) {
+    if(rc->rrdset)
+        rrdcalc_unlink_from_rrdset(rc);
+
+    rrdcalc_free_internals(rc);
     freez(rc);
 }
 
@@ -704,7 +715,7 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     // any desctuction actions that require other locks
     // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
 
-    rrdcalc_free(rc);
+    rrdcalc_free_internals(rc);
 }
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host) {
@@ -777,7 +788,7 @@ int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc) {
     int ret = 1;
     RRDCALC *t = dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), rc, sizeof(RRDCALC), &tmp);
     if(tmp.react_action == RRDCALC_REACT_NEW) {
-        // we copied rc into the dictionary, so we have to free the base here
+        // we copied rc into the dictionary, so we have to free the container here
         freez(rc);
         rc = t;
 
@@ -797,6 +808,8 @@ int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc) {
             rrdhost_hostname(host));
 
         ret = 0;
+
+        // free all of it, internals and the container
         rrdcalc_free(rc);
     }
 

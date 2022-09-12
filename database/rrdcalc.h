@@ -222,7 +222,7 @@ struct alert_config {
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
 extern void rrdcalc_link_matching_host_alarms_to_rrdset(RRDSET *st);
-extern RRDCALC *rrdcalc_find_in_rrdset_unsafe(RRDSET *st, const char *name);
+extern RRDCALC *rrdcalc_find_in_rrdset(RRDSET *st, const char *name);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
