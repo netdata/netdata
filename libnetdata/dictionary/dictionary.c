@@ -955,8 +955,14 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // helpers
 
 static DICTIONARY_ITEM *dictionary_set_item_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!name)) {
-        internal_error(true, "DICTIONARY: attempted to dictionary_set() a dictionary item without a name");
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
         return NULL;
     }
 
@@ -1025,8 +1031,14 @@ static DICTIONARY_ITEM *dictionary_set_item_unsafe(DICTIONARY *dict, const char 
 }
 
 static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!name)) {
-        internal_error(true, "attempted to dictionary_get() without a name");
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
         return NULL;
     }
 
@@ -1054,7 +1066,16 @@ static DICTIONARY_ITEM *dictionary_get_item_unsafe(DICTIONARY *dict, const char 
 // API - items management
 
 void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
@@ -1069,7 +1090,16 @@ void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t
 }
 
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     if(name_len == -1)
         name_len = (ssize_t)strlen((const char *)name) + 1;
@@ -1094,7 +1124,16 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 }
 
 const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
 
@@ -1111,7 +1150,16 @@ const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONAR
 }
 
 const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *nv = dictionary_set_item_unsafe(dict, name, name_len, value, value_len, constructor_data);
@@ -1130,7 +1178,16 @@ const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict
 }
 
 void *dictionary_get_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name, name_len);
 
@@ -1141,7 +1198,16 @@ void *dictionary_get_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t
 }
 
 void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
     void *ret = dictionary_get_advanced_unsafe(dict, name, name_len);
@@ -1150,7 +1216,16 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 }
 
 const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     DICTIONARY_ITEM *nv = dictionary_get_item_unsafe(dict, name, name_len);
 
@@ -1162,7 +1237,16 @@ const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DICTIONAR
 }
 
 const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!dict)) return NULL;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
 
     dictionary_lock(dict, DICTIONARY_LOCK_READ);
     const DICTIONARY_ITEM *ret = dictionary_get_and_acquire_item_advanced_unsafe(dict, name, name_len);
@@ -1171,40 +1255,77 @@ const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict
 }
 
 const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!dict || !item)) return NULL;
+    if(unlikely(!item)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return NULL;
+    }
     reference_counter_acquire(dict, item);
     return item;
 }
 
 const char *dictionary_acquired_item_name(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return NULL;
+    if(unlikely(!item)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without an item on a dictionary.",
+            __FUNCTION__);
+        return NULL;
+    }
     return item_get_name(item);
 }
 
 void *dictionary_acquired_item_value(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return NULL;
+    if(unlikely(!item)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without an item on a dictionary.",
+            __FUNCTION__);
+        return NULL;
+    }
     return item->value;
 }
 
 void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!dict || !item)) return;
+    if(unlikely(!item)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return;
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item->dict != dict)
-        fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__,
-            item_get_name(item));
+        fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__, item_get_name(item));
 #endif
 
     reference_counter_release(dict, item, false);
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!dict || !item)) return;
+    if(unlikely(!item)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return;
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item->dict != dict)
-        fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__,
-            item_get_name(item));
+        fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__, item_get_name(item));
 #endif
 
     // no need to get a lock here
@@ -1215,19 +1336,24 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DI
 }
 
 int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!dict || !name)) return -1;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return -1;
+    }
 
     if(unlikely(dict->flags & DICTIONARY_FLAG_DESTROYED)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_del() on a destroyed dictionary");
         return -1;
     }
 
-    if(unlikely(!name || !*name)) {
-        internal_error(true, "DICTIONARY: attempted to dictionary_del() without a name");
-        return -1;
-    }
-
-    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS), "DICTIONARY: INTERNAL ERROR: deleting dictionary item '%s' without exclusive access to dictionary", name);
+    internal_error(!(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS),
+                   "DICTIONARY: INTERNAL ERROR: deleting dictionary item '%s' without exclusive access to dictionary", name);
 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
@@ -1266,7 +1392,16 @@ int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t n
 }
 
 int dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!dict || !name)) return -1;
+    if(unlikely(!name || !*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
+            __FUNCTION__,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+        return -1;
+    }
 
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     int ret = dictionary_del_advanced_unsafe(dict, name, name_len);
