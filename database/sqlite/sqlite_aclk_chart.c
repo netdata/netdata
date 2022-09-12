@@ -1287,7 +1287,6 @@ void sql_check_chart_liveness(RRDSET *st) {
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
     }
     rrddim_foreach_done(rd);
-    rrdset_unlock(st);
 }
 
 // ST is read locked
