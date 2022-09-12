@@ -22,10 +22,6 @@ virtualization_normalize_name() {
   echo "$vname" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g'
 }
 
-CONTAINER="unknown"
-CONT_DETECTION="none"
-CONTAINER_IS_OFFICIAL_IMAGE="${NETDATA_OFFICIAL_IMAGE:-false}"
-
 if [ -z "${VIRTUALIZATION}" ]; then
   VIRTUALIZATION="unknown"
   VIRT_DETECTION="none"
@@ -65,6 +61,10 @@ fi
 
 # -------------------------------------------------------------------------------------------------
 # detect containers with heuristics
+
+CONTAINER=${CONTAINER:-"unknown"}
+CONT_DETECTION=${CONT_DETECTION:-"none"}
+CONTAINER_IS_OFFICIAL_IMAGE=${NETDATA_OFFICIAL_IMAGE:-"false"}
 
 if [ "${CONTAINER}" = "unknown" ]; then
   if [ -f /proc/1/sched ]; then
