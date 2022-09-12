@@ -26,13 +26,6 @@ public:
     unsigned MaxKMeansIters;
 
     double DimensionAnomalyScoreThreshold;
-    double HostAnomalyRateThreshold;
-
-    double ADMinWindowSize;
-    double ADMaxWindowSize;
-    double ADIdleWindowSize;
-    double ADWindowRateThreshold;
-    double ADDimensionRateThreshold;
 
     bool StreamADCharts;
 
@@ -42,7 +35,6 @@ public:
     std::string ChartsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
-    std::string AnomalyDBPath;
     std::vector<uint32_t> RandomNums;
 
     void readMLConfig();

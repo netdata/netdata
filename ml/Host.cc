@@ -54,13 +54,6 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["max-kmeans-iters"] = Cfg.MaxKMeansIters;
 
     Json["dimension-anomaly-score-threshold"] = Cfg.DimensionAnomalyScoreThreshold;
-    Json["host-anomaly-rate-threshold"] = Cfg.HostAnomalyRateThreshold;
-
-    Json["min-window-size"] = Cfg.ADMinWindowSize;
-    Json["max-window-size"] = Cfg.ADMaxWindowSize;
-    Json["idle-window-size"] = Cfg.ADIdleWindowSize;
-    Json["window-rate-threshold"] = Cfg.ADWindowRateThreshold;
-    Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
 
     Json["hosts-to-skip"] = Cfg.HostsToSkip;
     Json["charts-to-skip"] = Cfg.ChartsToSkip;

@@ -43,17 +43,6 @@ void Config::readMLConfig(void) {
     unsigned MaxKMeansIters = config_get_number(ConfigSectionML, "maximum number of k-means iterations", 1000);
 
     double DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
-    double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 0.01);
-
-    double ADMinWindowSize = config_get_float(ConfigSectionML, "minimum window size", 30);
-    double ADMaxWindowSize = config_get_float(ConfigSectionML, "maximum window size", 600);
-    double ADIdleWindowSize = config_get_float(ConfigSectionML, "idle window size", 30);
-    double ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
-    double ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.05);
-
-    std::stringstream SS;
-    SS << netdata_configured_cache_dir << "/anomaly-detection.db";
-    Cfg.AnomalyDBPath = SS.str();
 
     /*
      * Clamp
@@ -74,13 +63,6 @@ void Config::readMLConfig(void) {
     MaxKMeansIters = clamp(MaxKMeansIters, 500u, 1000u);
 
     DimensionAnomalyScoreThreshold = clamp(DimensionAnomalyScoreThreshold, 0.01, 5.00);
-    HostAnomalyRateThreshold = clamp(HostAnomalyRateThreshold, 0.01, 1.0);
-
-    ADMinWindowSize = clamp(ADMinWindowSize, 30.0, 300.0);
-    ADMaxWindowSize = clamp(ADMaxWindowSize, 60.0, 900.0);
-    ADIdleWindowSize = clamp(ADIdleWindowSize, 30.0, 900.0);
-    ADWindowRateThreshold = clamp(ADWindowRateThreshold, 0.01, 0.99);
-    ADDimensionRateThreshold = clamp(ADDimensionRateThreshold, 0.01, 0.99);
 
     /*
      * Validate
@@ -91,13 +73,6 @@ void Config::readMLConfig(void) {
 
         MinTrainSamples = 1 * 3600;
         MaxTrainSamples = 4 * 3600;
-    }
-
-    if (ADMinWindowSize >= ADMaxWindowSize) {
-        error("invalid min/max anomaly window size found (%lf >= %lf)", ADMinWindowSize, ADMaxWindowSize);
-
-        ADMinWindowSize = 30.0;
-        ADMaxWindowSize = 600.0;
     }
 
     /*
@@ -121,13 +96,6 @@ void Config::readMLConfig(void) {
     Cfg.MaxKMeansIters = MaxKMeansIters;
 
     Cfg.DimensionAnomalyScoreThreshold = DimensionAnomalyScoreThreshold;
-    Cfg.HostAnomalyRateThreshold = HostAnomalyRateThreshold;
-
-    Cfg.ADMinWindowSize = ADMinWindowSize;
-    Cfg.ADMaxWindowSize = ADMaxWindowSize;
-    Cfg.ADIdleWindowSize = ADIdleWindowSize;
-    Cfg.ADWindowRateThreshold = ADWindowRateThreshold;
-    Cfg.ADDimensionRateThreshold = ADDimensionRateThreshold;
 
     Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
