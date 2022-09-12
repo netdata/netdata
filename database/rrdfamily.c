@@ -53,15 +53,15 @@ const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *i
     struct rrdfamily_constructor tmp = {
         .family = id,
     };
-    return dictionary_set_and_acquire_item_advanced(host->rrdfamily_root_index, id, -1, NULL, sizeof(RRDFAMILY), &tmp);
+    return (const RRDFAMILY_ACQUIRED *)dictionary_set_and_acquire_item_advanced(host->rrdfamily_root_index, id, -1, NULL, sizeof(RRDFAMILY), &tmp);
 }
 
 void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa) {
-    dictionary_acquired_item_release(host->rrdfamily_root_index, rfa);
+    dictionary_acquired_item_release(host->rrdfamily_root_index, (const DICTIONARY_ITEM *)rfa);
 }
 
 DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rfa) {
     if(unlikely(!rfa)) return NULL;
-    RRDFAMILY *rf = dictionary_acquired_item_value(rfa);
+    RRDFAMILY *rf = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rfa);
     return(rf->rrdvars);
 }

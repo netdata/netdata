@@ -16,12 +16,14 @@ typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
-typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
-typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 typedef struct context_param CONTEXT_PARAM;
+
+typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
+typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
+typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
@@ -151,8 +153,6 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 // ----------------------------------------------------------------------------
 // RRD FAMILY
-
-typedef struct dictionary_item RRDFAMILY_ACQUIRED;
 
 extern const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
 extern void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
