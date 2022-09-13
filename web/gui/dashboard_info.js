@@ -3829,40 +3829,40 @@ netdataDashboard.context = {
     'postgres.connections_usage': {
         info: '<p><b>Connections usage</b> across all databases. The maximum number of concurrent connections to the database server is (<i>max_connections</i> - <i>superuser_reserved_connections</i>). As a general rule, if you need more than 200 connections it is advisable to use connection pooling.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
     },
-    'postgres.checkpoints': {
+    'postgres.checkpoints_rate': {
         info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it’s been caching in memory has been synchronized with the disk. Ideally checkpoints should be time-driven (scheduled) as opposed to load-driven (requested).</p><p><b>Scheduled</b> - checkpoints triggered as per schedule when time elapsed from the previous checkpoint is greater than <a href="https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-CHECKPOINT-TIMEOUT" target="_blank"><i>checkpoint_timeout</i></a>. <b>Requested</b> - checkpoints triggered due to WAL updates reaching the <a href="https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-MAX-WAL-SIZE" target="_blank"><i>max_wal_size</i></a> before the <i>checkpoint_timeout</i> is reached.</p>'
     },
-    'postgres.checkpoint_time': {
+    'postgres.checkpoints_time': {
         info: '<p>Checkpoint timing information. An important indicator of how well checkpoint I/O is performing is the amount of time taken to sync files to disk.</p><p><b>Write</b> - amount of time spent writing files to disk during checkpoint processing. <b>Sync</b> - amount of time spent synchronizing files to disk during checkpoint processing.</p>'
     },
-    'postgres.bgwriter_buffers_alloc': {
+    'postgres.buffers_allocated_rate': {
         info: 'Allocated and re-allocated buffers. If a backend process requests data it is either found in a block in shared buffer cache or the block has to be allocated (read from disk). The latter is counted as <b>Allocated</b>.'
     },
-    'postgres.bgwriter_buffers_written': {
-        info: '<p>Amount of data flushed from memory to disk.</p><p><b>Checkpoint</b> - buffers written during checkpoints. <b>Backend</b> -  buffers written directly by a backend. It may happen that a dirty page is requested by a backend process. In this case the page is synched to disk before the page is returned to the client. <b>Clean</b> - buffers written by the background writer. PostgreSQL may clear pages with a low usage count in advance. The process scans for dirty pages with a low usage count so that they could be cleared if necessay. Buffers written by this process increment the counter.</p>'
+    'postgres.buffers_io_rate': {
+        info: '<p>Amount of data flushed from memory to disk.</p><p><b>Checkpoint</b> - buffers written during checkpoints. <b>Backend</b> -  buffers written directly by a backend. It may happen that a dirty page is requested by a backend process. In this case the page is synched to disk before the page is returned to the client. <b>BgWriter</b> - buffers written by the background writer. PostgreSQL may clear pages with a low usage count in advance. The process scans for dirty pages with a low usage count so that they could be cleared if necessay. Buffers written by this process increment the counter.</p>'
     },
-    'postgres.bgwriter_maxwritten_clean': {
-        info: 'Number of times the background writer stopped a cleaning scan because it had written too many buffers (exceeding the value of <i>bgwriter_lru_maxpages</i>).'
+    'postgres.bgwriter_halts_rate': {
+        info: 'Number of times the background writer stopped a cleaning scan because it had written too many buffers (exceeding the value of <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-BACKGROUND-WRITER" target="_blank"><i>bgwriter_lru_maxpages</i></a>).'
     },
-    'postgres.bgwriter_buffers_backend_fsync': {
+    'postgres.buffers_backend_fsync_rate': {
         info: 'Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write). Any values above zero can indicate problems with storage when fsync queue is completely filled. '
     },
-    'postgres.wal_writes': {
+    'postgres.wal_io_rate': {
         info: 'Write-Ahead Logging (WAL) ensures data integrity by ensuring that changes to data files (where tables and indexes reside) are written only after log records describing the changes have been flushed to permanent storage.'
     },
-    'postgres.wal_archive_files': {
-        info: '<p>WAL archiving.</p><p><b>Ready</b> - WAL files waiting to be archived. A non-zero value can indicate <i>archive_command</i> is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a> <b>Done</b> - WAL files successfully archived.'
+    'postgres.wal_archiving_files_count': {
+        info: '<p>WAL archiving.</p><p><b>Ready</b> - WAL files waiting to be archived. A non-zero value can indicate <i>archive_command</i> is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a>. <b>Done</b> - WAL files successfully archived.'
     },
-    'postgres.autovacuum_workers': {
+    'postgres.autovacuum_workers_count': {
         info: 'PostgreSQL databases require periodic maintenance known as vacuuming. For many installations, it is sufficient to let vacuuming be performed by the autovacuum daemon. For more information see <a href="https://www.postgresql.org/docs/current/static/routine-vacuuming.html#AUTOVACUUM" target="_blank">The Autovacuum Daemon</a>.'
     },
-    'postgres.percent_towards_emergency_autovacuum': {
+    'postgres.txid_exhaustion_towards_autovacuum_perc': {
         info: 'Percentage towards emergency autovacuum for one or more tables. A forced autovacuum will run once this value reaches 100%. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
-    'postgres.percent_towards_txid_wraparound': {
+    'postgres.txid_exhaustion_perc': {
         info: 'Percentage towards transaction wraparound. A transaction wraparound may occur when this value reaches 100%. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
-    'postgres.oldest_transaction_xid': {
+    'postgres.txid_exhaustion_oldest_txid_num': {
         info: 'The oldest current transaction ID (XID). If for some reason autovacuum fails to clear old XIDs from a table, the system will begin to emit warning messages when the database\'s oldest XIDs reach eleven million transactions from the wraparound point. For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
     'postgres.uptime': {
@@ -3886,29 +3886,29 @@ netdataDashboard.context = {
         info: 'The time elapsed since the Postgres process was started.'
     },
 
-    'postgres.replication_standby_app_wal_delta': {
+    'postgres.replication_app_wal_lag_size': {
         info: '<p>Replication WAL delta.</p><p><b>SentDelta</b> - sent over the network. <b>WriteDelta</b> - written to disk. <b>FlushDelta</b> - flushed to disk. <b>ReplayDelta</b> - replayed into the database.</p>'
     },
-    'postgres.replication_standby_app_wal_lag': {
+    'postgres.replication_app_wal_lag_time': {
         info: '<p>Replication WAL lag.</p><p><b>WriteLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written it, but not yet flushed it or applied it. <b>FlushLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written and flushed it, but not yet applied it. <b>ReplayLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written, flushed and applied it.</p>'
     },
-    'postgres.replication_slot_files': {
+    'postgres.replication_slot_files_count': {
         info: '<p>Replication slot files. For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.</p><p><b>WalKeep</b> - WAL files retained by the replication slot. <b>PgReplslotFiles</b> - files present in pg_replslot.</p>'
     },
 
     'postgres.db_transactions_ratio': {
         info: 'Percentage of commited/rollback transactions.'
     },
-    'postgres.db_transactions': {
+    'postgres.db_transactions_rate': {
         info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded. Single queries that have failed outside the transactions are also accounted as rollbacks.</p>'
     },
     'postgres.db_connections_utilization': {
         info: 'Connection utilization per database. Utilization is measured as a percentage of <i>CONNECTION LIMIT</i> per database (if set) or <i>max_connections</i> (if <i>CONNECTION LIMIT</i> is not set).'
     },
-    'postgres.db_connections': {
+    'postgres.db_connections_count': {
         info: 'Number of current connections per database.'
     },    
-    'postgres.db_buffer_cache_hit_ratio': {
+    'postgres.db_cache_io_ratio': {
         /*
         room: { 
             mainheads: [
@@ -3933,10 +3933,10 @@ netdataDashboard.context = {
         */        
         info: 'PostgreSQL uses a <b>shared buffer cache</b> to store frequently accessed data in memory, and avoid slower disk reads. If you are seeing performance issues, consider increasing the <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS" target="_blank"><i>shared_buffers</i></a> size or tuning <a href="https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE" target="_blank"><i>effective_cache_size</i></a>.'
     },
-    'postgres.db_blocks_read': {
+    'postgres.db_io_rate': {
         info: '<p>Number of blocks read from shared buffer cache or from disk.</p><p><b>disk</b> - number of disk blocks read. <b>memory</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
     },
-    'postgres.db_rows_read_ratio': {
+    'postgres.db_ops_fetched_rows_ratio': {
         /*
         room: {
             mainheads: [
@@ -3961,31 +3961,31 @@ netdataDashboard.context = {
         */        
         info: 'The percentage of rows that contain data needed to execute the query, out of the total number of rows scanned. A high value indicates that the database is executing queries efficiently, while a low value indicates that the database is performing extra work by scanning a large number of rows that aren\'t required to process the query. Low values may be caused by missing indexes or inefficient queries.'
     },
-    'postgres.db_rows_read': {
+    'postgres.db_ops_read_rows_rate': {
         info: '<p>Read queries throughput.</p><p><b>Returned</b> - Total number of rows scanned by queries. This value indicates rows returned by the storage layer to be scanned, not rows returned to the client. <b>Fetched</b> - Subset of scanned rows (<b>Returned</b>) that contained data needed to execute the query.</p>'
     },
-    'postgres.db_rows_written': {
+    'postgres.db_ops_write_rows_rate': {
         info: '<p>Write queries throughput.</p><p><b>Inserted</b> - number of rows inserted by queries. <b>Deleted</b> - number of rows deleted by queries. <b>Updated</b> - number of rows updated by queries.</p>'
     },
-    'postgres.db_conflicts': {
+    'postgres.db_conflicts_rate': {
         info: 'Number of queries canceled due to conflict with recovery on standby servers. To minimize query cancels caused by cleanup records consider configuring <a href="https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-HOT-STANDBY-FEEDBACK" target="_blank"><i>hot_standby_feedback</i></a>.'
     },
-    'postgres.db_conflicts_stat': {
+    'postgres.db_conflicts_reason_rate': {
         info: '<p>Statistics about queries canceled due to various types of conflicts on standby servers.</p><p><b>Tablespace</b> - queries that have been canceled due to dropped tablespaces. <b>Lock</b> - queries that have been canceled due to lock timeouts. <b>Snapshot</b> - queries that have been canceled due to old snapshots. <b>Bufferpin</b> - queries that have been canceled due to pinned buffers. <b>Deadlock</b> - queries that have been canceled due to deadlocks.</p>'
     },
-    'postgres.db_deadlocks': {
+    'postgres.db_deadlocks_rate': {
         info: 'Number of detected deadlocks. When a transaction cannot acquire the requested lock within a certain amount of time (configured by <b>deadlock_timeout</b>), it begins deadlock detection.'
     },
-    'postgres.db_locks_held': {
+    'postgres.db_locks_held_count': {
         info: 'Number of held locks. Some of these lock modes are acquired by PostgreSQL automatically before statement execution, while others are provided to be used by applications. All lock modes acquired in a transaction are held for the duration of the transaction. For lock modes details, see <a href="https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-TABLES" target="_blank">table-level locks</a>.'
     },
-    'postgres.db_locks_awaited': {
+    'postgres.db_locks_awaited_count': {
         info: 'Number of awaited locks. It indicates that some transaction is currently waiting to acquire a lock, which implies that some other transaction is holding a conflicting lock mode on the same lockable object. For lock modes details, see <a href="https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-TABLES" target="_blank">table-level locks</a>.'
     },
-    'postgres.db_temp_files': {
+    'postgres.db_temp_files_created_rate': {
         info: 'Number of temporary files created by queries. Complex queries may require more memory than is available (specified by <b>work_mem</b>). When this happens, Postgres reverts to using temporary files - they are actually stored on disk, but only exist for the duration of the request. After the request returns, the temporary files are deleted.'
     },
-    'postgres.db_temp_files_data': {
+    'postgres.db_temp_files_io_rate': {
         info: 'Amount of data written temporarily to disk to execute queries.'
     },
     'postgres.db_size': {
