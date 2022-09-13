@@ -4030,7 +4030,7 @@ netdataDashboard.context = {
         info: 'Write queries throughput. If you see a large number of updated and deleted rows, keep an eye on the number of dead rows, as a high percentage of dead rows can slow down your queries.'
     },
     'postgres.table_ops_rows_hot_ratio': {
-        info: 'Percentage of HOT (Heap Only Tuple) updated rows. HOT updates are much more efficient than ordinary updates:  less write operations, less WAL writes, vacuum operation has less work to do, increased read efficiency (help to limit table and index bloat).'
+        info: 'Percentage of HOT (Heap Only Tuple) updated rows. HOT updates are much more efficient than ordinary updates: less write operations, less WAL writes, vacuum operation has less work to do, increased read efficiency (help to limit table and index bloat).'
     },
     'postgres.table_ops_rows_hot_rate': {
         info: 'Number of HOT (Heap Only Tuple) updated rows.'
