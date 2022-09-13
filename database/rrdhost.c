@@ -373,10 +373,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(host->health_enabled) {
         rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
-
-        rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-        rrdhost_unlock(host);
     }
 
     RRDHOST *t = rrdhost_index_add_by_guid(host);
@@ -635,9 +632,7 @@ void rrdhost_update(RRDHOST *host
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
 
-            rrdhost_wrlock(host);
             health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-            rrdhost_unlock(host);
 
             if (!file_is_migrated(host->health_log_filename)) {
                 int rc = sql_create_health_log_table(host);

@@ -174,9 +174,7 @@ static void health_reload_host(RRDHOST *host) {
     rrdset_foreach_done(st);
 
     // load the new alarms
-    rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
-    rrdhost_unlock(host);
 
     //Discard alarms with labels that do not apply to host
     rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
@@ -669,8 +667,7 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS))
         return;
 
-    rrdhost_rdlock(host);
-    rrdset_foreach_read(st, host) {
+    rrdset_foreach_reentrant(st, host) {
         if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
             continue;
 
@@ -696,7 +693,6 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-    rrdhost_unlock(host);
 }
 
 /**
