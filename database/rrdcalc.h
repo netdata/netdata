@@ -145,7 +145,11 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // the chart this alarm it is linked to
 
+    size_t labels_version;
     struct rrdset *rrdset;
+
+    struct rrdcalc *next;
+    struct rrdcalc *prev;
 };
 
 #define rrdcalc_name(rc) string2str((rc)->name)
@@ -164,12 +168,6 @@ struct rrdcalc {
 #define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
 #define rrdcalc_foreachdim(rc) string2str((rc)->foreach_dimension)
 #define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
-
-#define foreach_rrdcalc_in_rrdset_read(st, rc) \
-    dfe_start_read((st)->rrdcalc_root_index, rc) \
-
-#define foreach_rrdcalc_in_rrdset_done(rc) \
-    dfe_done(rc)
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
@@ -220,8 +218,13 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
+extern void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
+
 extern void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
-extern RRDCALC *rrdcalc_get_from_rrdset(RRDSET *st, const char *alert_name);
+
+extern const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name);
+extern void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);
+extern RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
@@ -230,7 +233,6 @@ extern void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
 extern void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
 extern int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
-extern void rrdcalc_update_info_using_rrdset_labels(RRDSET *st);
 
 extern void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 extern void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
@@ -247,9 +249,6 @@ extern void rrdcalc_delete_all(RRDHOST *host);
 
 extern void rrdcalc_rrdhost_index_init(RRDHOST *host);
 extern void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
-
-extern void rrdcalc_rrdset_index_init(RRDSET *st);
-extern void rrdcalc_rrdset_index_destroy(RRDSET *st);
 
 #define RRDCALC_VAR_MAX 100
 #define RRDCALC_VAR_FAMILY "$family"

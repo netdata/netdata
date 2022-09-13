@@ -160,6 +160,13 @@ size_t dictionary_stats_referenced_items(DICTIONARY *dict) {
     return __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
 }
 
+void dictionary_version_increment(DICTIONARY *dict) {
+    if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS)
+        dict->version++;
+    else
+        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
+}
+
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
     if(dict->flags & DICTIONARY_FLAG_EXCLUSIVE_ACCESS) {
         dict->searches++;

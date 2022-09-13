@@ -162,6 +162,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
 
     netdata_rwlock_init(&st->rrdset_rwlock);
+    netdata_rwlock_init(&st->alerts.rwlock);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         if(!rrdset_memory_load_or_create_map_save(st, st->rrd_memory_mode)) {
@@ -204,7 +205,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_index_del_name(host, st);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
-    rrdcalc_rrdset_index_destroy(st);
 
     rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily
     rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
@@ -223,6 +223,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // free it
 
     netdata_rwlock_destroy(&st->rrdset_rwlock);
+    netdata_rwlock_destroy(&st->alerts.rwlock);
 
     string_freez(st->id);
     string_freez(st->name);
@@ -332,8 +333,6 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDHOST *host = st->rrdhost;
 
     if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
-        rrdcalc_rrdset_index_init(st);
-
         rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);

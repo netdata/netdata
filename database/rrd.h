@@ -225,6 +225,7 @@ extern void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 
 void reload_host_labels(void);
 extern void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
+extern void rrdset_save_rrdlabels_to_sql(RRDSET *st);
 
 extern int rrdlabels_unittest(void);
 
@@ -566,6 +567,8 @@ struct rrdset {
     total_number collected_total;                   // used internally to calculate percentages
     total_number last_collected_total;              // used internally to calculate percentages
 
+    size_t rrdlabels_last_saved_version;
+
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
 
@@ -619,8 +622,12 @@ struct rrdset {
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
     DICTIONARY *rrdvars;                            // RRDVAR index for this chart
-    DICTIONARY *rrdcalc_root_index;                 // RRDCALC list of this chart
     const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
+
+    struct {
+        netdata_rwlock_t rwlock;                    // protection for RRDCALC *base
+        RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
+    } alerts;
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)

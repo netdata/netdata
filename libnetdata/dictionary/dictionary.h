@@ -101,6 +101,8 @@ extern size_t dictionary_destroy(DICTIONARY *dict);
 // Registered delete callbacks will be run for each item in the dictionary.
 extern void dictionary_flush(DICTIONARY *dict);
 
+extern void dictionary_version_increment(DICTIONARY *dict);
+
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary
 //

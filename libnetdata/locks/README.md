@@ -49,7 +49,7 @@ The library maintains a linked-list of all the lock holders (one entry per threa
 If any call is expected to pause the caller (ie the caller is attempting a read lock while there is a write lock in place and vice versa), the library will log something like this:
 
 ```
-RW_LOCK ON LOCK 0x0x5651c9fcce20: 4190039 'HEALTH' (function init_pending_foreach_alarms() 661@health/health.c) WANTS a 'W' lock (while holding 1 rwlocks and 1 mutexes).
+RW_LOCK ON LOCK 0x0x5651c9fcce20: 4190039 'HEALTH' (function health_execute_pending_updates() 661@health/health.c) WANTS a 'W' lock (while holding 1 rwlocks and 1 mutexes).
 There are 7 readers and 0 writers are holding the lock:
      => 1: RW_LOCK: process 4190091 'WEB_SERVER[static14]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709847 usec.
      => 2: RW_LOCK: process 4190079 'WEB_SERVER[static6]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709869 usec.
@@ -63,9 +63,9 @@ There are 7 readers and 0 writers are holding the lock:
 And each of the above is paired with a `GOT` log, like this:
 
 ```
-RW_LOCK ON LOCK 0x0x5651c9fcce20: 4190039 'HEALTH' (function init_pending_foreach_alarms() 661@health/health.c) GOT a 'W' lock (while holding 2 rwlocks and 1 mutexes).
+RW_LOCK ON LOCK 0x0x5651c9fcce20: 4190039 'HEALTH' (function health_execute_pending_updates() 661@health/health.c) GOT a 'W' lock (while holding 2 rwlocks and 1 mutexes).
 There are 0 readers and 1 writers are holding the lock:
-     => 1: RW_LOCK: process 4190039 'HEALTH' (function init_pending_foreach_alarms() 661@health/health.c) is having 1 'W' lock for 36 usec.
+     => 1: RW_LOCK: process 4190039 'HEALTH' (function health_execute_pending_updates() 661@health/health.c) is having 1 'W' lock for 36 usec.
 ```
 
 Keep in mind that the lock and log are not atomic. The list of callers is indicative (and sometimes just empty because the original holders of the lock, unlocked it until we had the chance to print their names).

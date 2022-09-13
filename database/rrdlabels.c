@@ -513,6 +513,8 @@ static void rrdlabel_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
         lbold->label_source =   lbnew->label_source;
         lbold->label_source |=  RRDLABEL_FLAG_NEW;
         lbold->label_source &= ~RRDLABEL_FLAG_OLD;
+
+        dictionary_version_increment((DICTIONARY *)dict_ptr);
     }
 }
 
@@ -960,16 +962,29 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
-    rrdcalc_update_info_using_rrdset_labels(st);
-
-    // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
-    BUFFER  *sql_buf = buffer_create(1024);
-    struct label_str tmp = {.sql = sql_buf, .count = 0 };
-    uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
-    rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-    db_execute(buffer_tostring(sql_buf));
-    buffer_free(sql_buf);
+    rrdset_save_rrdlabels_to_sql(st);
 }
+
+void rrdset_save_rrdlabels_to_sql(RRDSET *st) {
+    if(!st->rrdlabels) return;
+
+    size_t old_version = st->rrdlabels_last_saved_version;
+    size_t new_version = dictionary_stats_version(st->rrdlabels);
+
+    if(new_version != old_version) {
+        // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
+
+        BUFFER *sql_buf = buffer_create(1024);
+        struct label_str tmp = {.sql = sql_buf, .count = 0};
+        uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
+        rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
+        db_execute(buffer_tostring(sql_buf));
+        buffer_free(sql_buf);
+
+        st->rrdlabels_last_saved_version = new_version;
+    }
+}
+
 
 // ----------------------------------------------------------------------------
 // rrdlabels unit test

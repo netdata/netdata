@@ -115,18 +115,19 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
     return ret;
 }
 
-void rrdcalc_update_info_using_rrdset_labels(RRDSET *st) {
-    RRDCALC *rc;
-    foreach_rrdcalc_in_rrdset_read(st, rc) {
-        if(!rc->original_info) continue;
+void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
+    if(!rc->rrdset || !rc->original_info || !rc->rrdset->rrdlabels) return;
+
+    size_t labels_version = dictionary_stats_version(rc->rrdset->rrdlabels);
+    if(rc->labels_version != labels_version) {
 
         STRING *old = rc->info;
         rc->info = rrdcalc_replace_variables_with_rrdset_labels(rrdcalc_original_info(rc), rc);
         string_freez(old);
-    }
-    foreach_rrdcalc_in_rrdset_done(rc);
-}
 
+        rc->labels_version = labels_version;
+    }
+}
 
 // ----------------------------------------------------------------------------
 // RRDCALC index management for RRDSET
@@ -139,49 +140,24 @@ static size_t rrdcalc_key(char *dst, size_t dst_len, const char *chart, const ch
     return snprintfz(dst, dst_len, "%s/%s", chart, alert);
 }
 
-static void rrdcalc_rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc __maybe_unused, void *rrdset __maybe_unused) {
-    //    RRDSET *st = rrdset;
-    //    dictionary_acquired_item_dup(st->rrdhost->rrdcalc_root_index, (const DICTIONARY_ITEM *)rrdcalc);
-    ;
-}
-
-static void rrdcalc_rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc __maybe_unused, void *rrdset __maybe_unused) {
-    //    RRDSET *st = rrdset;
-    //    dictionary_acquired_item_release(st->rrdhost->rrdcalc_root_index, (const DICTIONARY_ITEM *)rrdcalc);
-    ;
-}
-
-void rrdcalc_rrdset_index_init(RRDSET *st) {
-    if(!st->rrdcalc_root_index) {
-        st->rrdcalc_root_index = dictionary_create(
-            DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-
-        dictionary_register_insert_callback(st->rrdcalc_root_index, rrdcalc_rrdset_insert_callback, st);
-        dictionary_register_delete_callback(st->rrdcalc_root_index, rrdcalc_rrdset_delete_callback, st);
-    }
-}
-
-void rrdcalc_rrdset_index_destroy(RRDSET *st) {
-    // destroy the id index last
-    dictionary_destroy(st->rrdcalc_root_index);
-    st->rrdcalc_root_index = NULL;
-}
-
-static void rrdcalc_rrdset_index_add(RRDSET *st, RRDCALC *rc) {
-    dictionary_set_advanced(st->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key) + 1, rc, sizeof(RRDCALC *), NULL);
-}
-
-static void rrdcalc_rrdset_index_del(RRDSET *st, RRDCALC *rc) {
-    dictionary_del_advanced(st->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key) + 1);
-}
-
-RRDCALC *rrdcalc_get_from_rrdset(RRDSET *st, const char *alert_name) {
+const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name) {
     char key[RRDCALC_MAX_KEY_SIZE + 1];
     size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, rrdset_id(st), alert_name);
 
-    return dictionary_get_advanced(st->rrdcalc_root_index, key, (ssize_t)(key_len + 1));
+    return (const RRDCALC_ACQUIRED *)dictionary_get_and_acquire_item_advanced(st->rrdhost->rrdcalc_root_index, key, (ssize_t)(key_len + 1));
+}
+
+void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca) {
+    if(!rca) return;
+
+    dictionary_acquired_item_release(st->rrdhost->rrdcalc_root_index, (const DICTIONARY_ITEM *)rca);
+}
+
+RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca) {
+    if(rca)
+        return dictionary_acquired_item_value((const DICTIONARY_ITEM *)rca);
+
+    return NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -195,7 +171,9 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
 
-    rrdcalc_rrdset_index_add(st, rc);
+    netdata_rwlock_wrlock(&st->alerts.rwlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->alerts.base, rc, prev, next);
+    netdata_rwlock_unlock(&st->alerts.rwlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
         error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
@@ -258,11 +236,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     if(!rc->units)
         rc->units = string_dup(st->units);
 
-    if (rc->original_info) {
-        STRING *old = rc->info;
-        rc->info = rrdcalc_replace_variables_with_rrdset_labels(rrdcalc_original_info(rc), rc);
-        string_freez(old);
-    }
+    rrdcalc_update_info_using_rrdset_labels(rc);
 
     time_t now = now_realtime_sec();
 
@@ -295,7 +269,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     health_alarm_log_add_entry(host, ae);
 }
 
-static void rrdcalc_unlink_from_rrdset(RRDCALC *rc) {
+static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     RRDSET *st = rc->rrdset;
 
     if(!st) {
@@ -339,9 +313,16 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc) {
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
     // unlink it
-    rc->rrdset = NULL;
 
-    rrdcalc_rrdset_index_del(st, rc);
+    if(!having_ll_wrlock)
+        netdata_rwlock_wrlock(&st->alerts.rwlock);
+
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alerts.base, rc, prev, next);
+
+    if(!having_ll_wrlock)
+        netdata_rwlock_unlock(&st->alerts.rwlock);
+
+    rc->rrdset = NULL;
 
     rrdvar_release_and_del(st->rrdvars, rc->rrdvar_local);
     rc->rrdvar_local = NULL;
@@ -605,7 +586,10 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     RRDCALC *rc = rrdcalc;
     //RRDHOST *host = rrdhost;
 
-    // any desctuction actions that require other locks
+    if(unlikely(rc->rrdset))
+        rrdcalc_unlink_from_rrdset(rc, false);
+
+    // any destruction actions that require other locks
     // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
 
     rrdcalc_free_internals(rc);
@@ -707,9 +691,9 @@ int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
     return ret;
 }
 
-static void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc) {
+static void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
     if(rc->rrdset)
-        rrdcalc_unlink_from_rrdset(rc);
+        rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
 
     dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key) + 1);
 }
@@ -730,7 +714,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
                  rrdhost_hostname(host),
                  rrdcalc_host_labels(rc));
 
-            rrdcalc_unlink_and_delete(host, rc);
+            rrdcalc_unlink_and_delete(host, rc, false);
         }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
@@ -752,32 +736,36 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
 }
 
 void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
-    RRDCALC *rc;
-    dfe_start_reentrant(st->rrdcalc_root_index, rc) {
+    RRDCALC *rc, *last = NULL;
+    netdata_rwlock_wrlock(&st->alerts.rwlock);
+    while((rc = st->alerts.base)) {
+        if(last == rc) {
+            error("RRDCALC: malformed list of alerts linked to chart - cannot cleanup - giving up.");
+            break;
+        }
+        last = rc;
+
         if(rc->run_flags & RRDCALC_FLAG_FROM_TEMPLATE) {
             // if the alert comes from a template we can just delete it
-            rrdcalc_unlink_and_delete(st->rrdhost, rc);
+            rrdcalc_unlink_and_delete(st->rrdhost, rc, true);
         }
         else {
             // this is a configuration for a specific chart
             // it should stay in the list
-            rrdcalc_unlink_from_rrdset(rc);
+            rrdcalc_unlink_from_rrdset(rc, true);
         }
+
     }
-    dfe_done(rc);
+    netdata_rwlock_unlock(&st->alerts.rwlock);
 }
 
 void rrdcalc_delete_all(RRDHOST *host) {
-    RRDCALC *rc;
-    dfe_start_reentrant(host->rrdcalc_root_index, rc) {
-        rrdcalc_unlink_and_delete(host, rc);
-    }
-    dfe_done(rc);
+    dictionary_flush(host->rrdcalc_root_index);
 }
 
 void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc) {
     if(rc->rrdset)
-        rrdcalc_unlink_from_rrdset(rc);
+        rrdcalc_unlink_from_rrdset(rc, false);
 
     rrdcalc_free_internals(rc);
     freez(rc);

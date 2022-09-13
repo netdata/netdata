@@ -661,7 +661,7 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 
 // Create alarms for dimensions that have been added to charts
 // since the previous iteration.
-static void init_pending_foreach_alarms(RRDHOST *host) {
+static void health_execute_pending_updates(RRDHOST *host) {
     RRDSET *st;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS))
@@ -809,12 +809,14 @@ void *health_main(void *ptr) {
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
 
-            init_pending_foreach_alarms(host);
+            health_execute_pending_updates(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
 
             // the first loop is to lookup values from the db
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
+
+                rrdcalc_update_info_using_rrdset_labels(rc);
 
                 if (update_disabled_silenced(host, rc))
                     continue;
