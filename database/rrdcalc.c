@@ -438,6 +438,8 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     rc->key = string_strdupz(dictionary_acquired_item_name(item));
 
     if(ctr->from_rrdcalctemplate) {
+        rc->run_flags |= RRDCALC_FLAG_FROM_TEMPLATE;
+
         RRDCALCTEMPLATE *rt = ctr->from_rrdcalctemplate;
         RRDSET *st = ctr->rrdset;
 
@@ -766,7 +768,15 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
 void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
     RRDCALC *rc;
     dfe_start_reentrant(st->rrdcalc_root_index, rc) {
-        rrdcalc_unlink_from_rrdset(rc);
+        if(rc->run_flags & RRDCALC_FLAG_FROM_TEMPLATE) {
+            // if the alert comes from a template we can just delete it
+            rrdcalc_unlink_and_delete(st->rrdhost, rc);
+        }
+        else {
+            // this is a configuration for a specific chart
+            // it should stay in the list
+            rrdcalc_unlink_from_rrdset(rc);
+        }
     }
     dfe_done(rc);
 }

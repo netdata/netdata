@@ -25,6 +25,7 @@ typedef enum {
     RRDCALC_FLAG_DISABLED                   = (1 << 7),
     RRDCALC_FLAG_SILENCED                   = (1 << 8),
     RRDCALC_FLAG_RUN_ONCE                   = (1 << 9),
+    RRDCALC_FLAG_FROM_TEMPLATE              = (1 << 10), // the rrdcalc has been created from a template
 } RRDCALC_FLAGS;
 
 typedef enum {
@@ -117,7 +118,7 @@ struct rrdcalc {
     NETDATA_DOUBLE value;           // the current value of the alarm
     NETDATA_DOUBLE old_value;       // the previous value of the alarm
 
-    RRDCALC_FLAGS rrdcalc_flags;    // check RRDCALC_FLAG_*
+    RRDCALC_FLAGS run_flags;        // check RRDCALC_FLAG_*
 
     time_t last_updated;            // the last update timestamp of the alarm
     time_t next_update;             // the next update timestamp of the alarm

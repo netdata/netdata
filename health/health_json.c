@@ -217,8 +217,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->component?rrdcalc_component(rc):"Unknown"
                    , rc->type?rrdcalc_type(rc):"Unknown"
                    , (rc->rrdset)?"true":"false"
-                   , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
-                   , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
+                   , (rc->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
+                   , (rc->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
                    , rc->exec?rrdcalc_exec(rc):string2str(host->health_default_exec)
                    , rc->recipient?rrdcalc_recipient(rc):string2str(host->health_default_recipient)
                    , rrdcalc_source(rc)
