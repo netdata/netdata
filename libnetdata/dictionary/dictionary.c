@@ -914,6 +914,7 @@ static void dictionary_flush_unsafe(DICTIONARY *dict) {
 }
 
 void dictionary_flush(DICTIONARY *dict) {
+    if(unlikely(!dict)) return;
     dictionary_lock(dict, DICTIONARY_LOCK_WRITE);
     dictionary_flush_unsafe(dict);
     dictionary_unlock(dict, DICTIONARY_LOCK_WRITE);

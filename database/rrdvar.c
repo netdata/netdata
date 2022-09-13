@@ -105,8 +105,7 @@ inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva)
 
     RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
 
-    if(dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1) != 0)
-        error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rva));
+    dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1);
 
     dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
 }
@@ -121,22 +120,11 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
         .options = options,
         .react_action = RRDVAR_REACT_NONE,
     };
-    const RRDVAR_ACQUIRED *rva = (const RRDVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
-
-    if(!(tmp.react_action & RRDVAR_REACT_NEW))
-        rva = NULL;
-
-    return rva;
+    return (const RRDVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
 }
 
 void rrdvar_delete_all(DICTIONARY *dict) {
-    if(unlikely(!dict)) return;
-
-    RRDVAR *rv;
-    dfe_start_write(dict, rv) {
-        dictionary_del_advanced_unsafe(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1);
-    }
-    dfe_done(rv);
+    dictionary_flush(dict);
 }
 
 
@@ -145,7 +133,6 @@ void rrdvar_delete_all(DICTIONARY *dict) {
 
 inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data) {
     if(unlikely(!dict)) return 0;
-
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
@@ -156,13 +143,6 @@ const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host
     STRING *name_string = rrdvar_name_to_string(name);
 
     const RRDVAR_ACQUIRED *rva = rrdvar_add_and_acquire("host", dict, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_CUSTOM_HOST_VAR, NULL);
-
-    if(unlikely(!rva)) {
-        debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", string2str(name_string));
-
-        // find the existing one to return it
-        rva = rrdvar_get_and_acquire(dict, name_string);
-    }
 
     string_freez(name_string);
     return rva;
