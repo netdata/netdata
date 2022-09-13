@@ -365,7 +365,6 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
 }
 
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
-    rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                     "\n\t\"latest_alarm_log_unique_id\": %u,"
                     "\n\t\"status\": %s,"
@@ -378,17 +377,17 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
 
     health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc2json_nolock);
 
+//    rrdhost_rdlock(host);
 //    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
 //    RRDCALCTEMPLATE *rt;
 //    for(rt = host->templates; rt ; rt = rt->next)
 //        health_rrdcalctemplate2json_nolock(wb, rt);
+//    rrdhost_unlock(host);
 
     buffer_strcat(wb, "\n\t}\n}\n");
-    rrdhost_unlock(host);
 }
 
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
-    rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                        "\n\t\"alarms\": {\n",
                    rrdhost_hostname(host));
@@ -396,7 +395,6 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
     health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc_values2json_nolock);
 
     buffer_strcat(wb, "\n\t}\n}\n");
-    rrdhost_unlock(host);
 }
 
 static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)

@@ -570,8 +570,6 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
-    rrdhost_check_wrlock(host);
-
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;

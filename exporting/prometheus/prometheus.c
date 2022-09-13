@@ -519,7 +519,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, rrdhost_hostname(host), PROMETHEUS_ELEMENT_MAX);
@@ -572,8 +571,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdset_foreach_read(st, host) {
 
         if (likely(can_send_rrdset(instance, st, filter))) {
-            rrdset_rdlock(st);
-
             char chart[PROMETHEUS_ELEMENT_MAX + 1];
             char context[PROMETHEUS_ELEMENT_MAX + 1];
             char family[PROMETHEUS_ELEMENT_MAX + 1];
@@ -751,12 +748,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                 }
             }
             rrddim_foreach_done(rd);
-            rrdset_unlock(st);
         }
     }
     rrdset_foreach_done(st);
 
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 

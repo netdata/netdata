@@ -12,7 +12,6 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
 
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector_info col = {
@@ -24,7 +23,6 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
         }
     }
     rrdset_foreach_done(st);
-    rrdhost_unlock(host);
 
     return dict;
 }

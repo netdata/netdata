@@ -755,11 +755,8 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
         if (unlikely(!host->health_enabled))
             continue;
 
-        if (host->rrdlabels) {
-            rrdhost_wrlock(host);
+        if (host->rrdlabels)
             rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
-            rrdhost_unlock(host);
-        }
     }
 
     rrd_unlock();

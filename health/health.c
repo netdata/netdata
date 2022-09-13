@@ -154,22 +154,15 @@ static void health_reload_host(RRDHOST *host) {
 
     rrdcalc_delete_all_rrdhost_alerts(host);
 
-    // free all running alarms
-    rrdhost_wrlock(host);
-
-    while(host->alarms_templates)
-        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
-
-    rrdhost_unlock(host);
-
     // invalidate all previous entries in the alarm log
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
             t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-    rrdhost_rdlock(host);
     // reset all thresholds to all charts
     RRDSET *st;
     rrdset_foreach_read(st, host) {
@@ -177,10 +170,14 @@ static void health_reload_host(RRDHOST *host) {
         st->red = NAN;
     }
     rrdset_foreach_done(st);
-    rrdhost_unlock(host);
+
+    rrdhost_wrlock(host);
+
+    // free all running alarms
+    while(host->alarms_templates)
+        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
 
     // load the new alarms
-    rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
 
     //Discard alarms with labels that do not apply to host

@@ -170,7 +170,6 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
     char name[500];
 
     time_t now = now_realtime_sec();
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
@@ -183,7 +182,6 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
         }
     }
     rrdset_foreach_done(st);
-    rrdhost_unlock(host);
     struct array_printer ap = {
             .c = 0,
             .wb = wb

@@ -205,7 +205,7 @@ void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
+static inline void rrdpush_send_chart_definition(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -305,11 +305,9 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     if(unlikely(!host->rrdpush_send_enabled || !should_send_chart_matching(st)))
         return false;
 
-    rrdset_rdlock(st);
     sender_start(host->sender);
-    rrdpush_send_chart_definition_nolock(st);
+    rrdpush_send_chart_definition(st);
     sender_commit(host->sender);
-    rrdset_unlock(st);
 
     return true;
 }
@@ -376,7 +374,7 @@ void rrdset_done_push(RRDSET *st) {
     sender_start(host->sender);
 
     if(need_to_send_chart_definition(st))
-        rrdpush_send_chart_definition_nolock(st);
+        rrdpush_send_chart_definition(st);
 
     if(rrdpush_send_chart_metrics_nolock(st, host->sender)) {
         // signal the sender there are more data

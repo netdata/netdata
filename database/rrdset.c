@@ -680,8 +680,6 @@ void rrdset_free(RRDSET *st) {
 }
 
 void rrdset_save(RRDSET *st) {
-    rrdset_check_rdlock(st);
-
     rrdset_memory_file_save(st);
 
     RRDDIM *rd;
@@ -692,7 +690,6 @@ void rrdset_save(RRDSET *st) {
 
 void rrdset_delete_files(RRDSET *st) {
     RRDDIM *rd;
-    rrdset_check_rdlock(st);
 
     info("Deleting chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
@@ -722,8 +719,6 @@ void rrdset_delete_files(RRDSET *st) {
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
     RRDDIM *rd;
-
-    rrdset_check_rdlock(st);
 
     info("Deleting dimensions of chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
@@ -826,12 +821,10 @@ void rrdset_archive(RRDSET *st) {
     rrdvar_delete_all(st->rrdvars);
 
     if(st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-        rrdset_rdlock(st);
         if(rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS))
             rrdset_delete_files(st);
         else
             rrdset_save(st);
-        rrdset_unlock(st);
 
         rrdset_free(st);
     }
@@ -1418,9 +1411,6 @@ void rrdset_done(RRDSET *st) {
 
     netdata_thread_disable_cancelability();
 
-    // a read lock is OK here
-    rrdset_rdlock(st);
-
 #ifdef ENABLE_ACLK
     if (likely(!rrdset_is_ar_chart(st))) {
         if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
@@ -1928,8 +1918,6 @@ after_second_database_work:
         }
         rrddim_foreach_done(rd);
     }
-
-    rrdset_unlock(st);
 
     rrdset_archive_obsolete_dimensions(st, false);
     rrdcontext_collected_rrdset(st);

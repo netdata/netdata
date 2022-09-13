@@ -524,16 +524,11 @@ void analytics_gather_immutable_meta_data(void)
  */
 void analytics_gather_mutable_meta_data(void)
 {
-    rrdhost_rdlock(localhost);
-
     analytics_collectors();
     analytics_alarms();
     analytics_charts();
     analytics_metrics();
     analytics_aclk();
-
-    rrdhost_unlock(localhost);
-
     analytics_mirrored_hosts();
     analytics_alarms_notifications();
 

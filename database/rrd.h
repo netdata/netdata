@@ -523,6 +523,8 @@ struct rrdset {
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
+    // TODO - dimensions linked list and lock to be removed
+    netdata_rwlock_t rrdset_rwlock;                 // protects the  dimensions linked list
     RRDDIM *dimensions;                             // chart metrics
 
     // ------------------------------------------------------------------------
@@ -533,8 +535,6 @@ struct rrdset {
 
     uuid_t hash_uuid;                               // hash_id for syncing with cloud
                                                     // TODO - obsolete now - cleanup
-
-    netdata_rwlock_t rrdset_rwlock;                 // protects linked lists
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
@@ -907,7 +907,6 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     DICTIONARY *rrdcalc_root_index;
-    RRDCALC *host_alarms;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log

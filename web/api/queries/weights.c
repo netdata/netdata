@@ -1003,7 +1003,6 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     // dont lock here and wait for results
     // get the charts and run mc after
     RRDSET *st;
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             if(!contexts || simple_pattern_matches(contexts, rrdset_context(st)))
@@ -1011,7 +1010,6 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
         }
     }
     rrdset_foreach_done(st);
-    rrdhost_unlock(host);
 
     size_t examined_dimensions = 0;
     void *ptr;
@@ -1033,8 +1031,6 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
 
         st = rrdset_find_byname(host, ptr_dfe.name); // ptr_dfe.name is provided by dictionary
         if(!st) continue;
-
-        rrdset_rdlock(st);
 
         switch(method) {
             case WEIGHTS_METHOD_ANOMALY_RATE:
@@ -1067,8 +1063,6 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
                                                              &stats, register_zero);
                 break;
         }
-
-        rrdset_unlock(st);
     }
     dfe_done(ptr);
 
