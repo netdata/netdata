@@ -935,7 +935,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
         internal_error(
             true,
-            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
+            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %zu referenced items in it (%ld total).",
             dict->creation_function,
             dict->creation_line,
             dict->creation_file,
@@ -2464,7 +2464,7 @@ static size_t check_item_deleted_flag(DICTIONARY *dict,
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE refcount is %u, expected %u...\t\t\t\t\t", nv->refcount, refcount);
+    fprintf(stderr, "NAME_VALUE refcount is %d, expected %d...\t\t\t\t\t", nv->refcount, refcount);
     if (nv->refcount != refcount) {
         fprintf(stderr, "FAILED\n");
         errors++;
