@@ -3829,8 +3829,17 @@ netdataDashboard.context = {
     'postgres.connections_usage': {
         info: '<p><b>Connections usage</b> across all databases. The maximum number of concurrent connections to the database server is (<i>max_connections</i> - <i>superuser_reserved_connections</i>). As a general rule, if you need more than 200 connections it is advisable to use connection pooling.</p><p><b>Available</b> - new connections allowed. <b>Used</b> - connections currently in use.</p>'
     },
+    'postgres.connections_state_count': {
+        info: '<p>Number of connections in each state across all databases.</p><p><b>Active</b> - the backend is executing query. <b>Idle</b> - the backend is waiting for a new client command. <b>IdleInTransaction</b> - the backend is in a transaction, but is not currently executing a query. <b>IdleInTransactionAborted</b> - the backend is in a transaction, and not currently executing a query, but one of the statements in the transaction caused an error. <b>FastPathFunctionCall</b> - the backend is executing a fast-path function. <b>Disabled</b> - is reported if <a href="https://www.postgresql.org/docs/current/runtime-config-statistics.html#GUC-TRACK-ACTIVITIES" target="_blank"><i>track_activities</i></a> is disabled in this backend.</p>'
+    },
+    'postgres.transactions_duration': {
+        info: 'Running transactions duration histogram. The bins are specified as consecutive, non-overlapping intervals. The value is the number of observed transactions that fall into each interval.'
+    },
+    'postgres.queries_duration': {
+        info: 'Active queries duration histogram. The bins are specified as consecutive, non-overlapping intervals. The value is the number of observed active queries that fall into each interval.'
+    },
     'postgres.checkpoints_rate': {
-        info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it’s been caching in memory has been synchronized with the disk. Ideally checkpoints should be time-driven (scheduled) as opposed to load-driven (requested).</p><p><b>Scheduled</b> - checkpoints triggered as per schedule when time elapsed from the previous checkpoint is greater than <a href="https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-CHECKPOINT-TIMEOUT" target="_blank"><i>checkpoint_timeout</i></a>. <b>Requested</b> - checkpoints triggered due to WAL updates reaching the <a href="https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-MAX-WAL-SIZE" target="_blank"><i>max_wal_size</i></a> before the <i>checkpoint_timeout</i> is reached.</p>'
+        info: '<p>Number of checkpoints that have been performed. Checkpoints are periodic maintenance operations the database performs to make sure that everything it\'s been caching in memory has been synchronized with the disk. Ideally checkpoints should be time-driven (scheduled) as opposed to load-driven (requested).</p><p><b>Scheduled</b> - checkpoints triggered as per schedule when time elapsed from the previous checkpoint is greater than <a href="https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-CHECKPOINT-TIMEOUT" target="_blank"><i>checkpoint_timeout</i></a>. <b>Requested</b> - checkpoints triggered due to WAL updates reaching the <a href="https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-MAX-WAL-SIZE" target="_blank"><i>max_wal_size</i></a> before the <i>checkpoint_timeout</i> is reached.</p>'
     },
     'postgres.checkpoints_time': {
         info: '<p>Checkpoint timing information. An important indicator of how well checkpoint I/O is performing is the amount of time taken to sync files to disk.</p><p><b>Write</b> - amount of time spent writing files to disk during checkpoint processing. <b>Sync</b> - amount of time spent synchronizing files to disk during checkpoint processing.</p>'
@@ -3845,10 +3854,13 @@ netdataDashboard.context = {
         info: 'Number of times the background writer stopped a cleaning scan because it had written too many buffers (exceeding the value of <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-BACKGROUND-WRITER" target="_blank"><i>bgwriter_lru_maxpages</i></a>).'
     },
     'postgres.buffers_backend_fsync_rate': {
-        info: 'Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write). Any values above zero can indicate problems with storage when fsync queue is completely filled. '
+        info: 'Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write). Any values above zero can indicate problems with storage when fsync queue is completely filled.'
     },
     'postgres.wal_io_rate': {
         info: 'Write-Ahead Logging (WAL) ensures data integrity by ensuring that changes to data files (where tables and indexes reside) are written only after log records describing the changes have been flushed to permanent storage.'
+    },
+    'postgres.wal_files_count': {
+        info: '<p>Number of WAL logs stored in the directory <i>pg_wal</i> under the data directory.</p><p><b>Written</b> - generated log segments files. <b>Recycled</b> - old log segment files that are no longer needed. Renamed to become future segments in the numbered sequence to avoid the need to create new ones.</p>'
     },
     'postgres.wal_archiving_files_count': {
         info: '<p>WAL archiving.</p><p><b>Ready</b> - WAL files waiting to be archived. A non-zero value can indicate <i>archive_command</i> is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a>. <b>Done</b> - WAL files successfully archived.'
@@ -3887,7 +3899,7 @@ netdataDashboard.context = {
     },
 
     'postgres.replication_app_wal_lag_size': {
-        info: '<p>Replication WAL delta.</p><p><b>SentDelta</b> - sent over the network. <b>WriteDelta</b> - written to disk. <b>FlushDelta</b> - flushed to disk. <b>ReplayDelta</b> - replayed into the database.</p>'
+        info: '<p>Replication WAL delta.</p><p><b>SentLag</b> - sent over the network. <b>WriteLag</b> - written to disk. <b>FlushLag</b> - flushed to disk. <b>ReplayLag</b> - replayed into the database.</p>'
     },
     'postgres.replication_app_wal_lag_time': {
         info: '<p>Replication WAL lag.</p><p><b>WriteLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written it, but not yet flushed it or applied it. <b>FlushLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written and flushed it, but not yet applied it. <b>ReplayLag</b> - time elapsed between flushing recent WAL locally and receiving notification that the standby server has written, flushed and applied it.</p>'
@@ -3897,10 +3909,10 @@ netdataDashboard.context = {
     },
 
     'postgres.db_transactions_ratio': {
-        info: 'Percentage of commited/rollback transactions.'
+        info: 'Percentage of committed/rollback transactions.'
     },
     'postgres.db_transactions_rate': {
-        info: '<p>Number of transactions that have been performed</p><p><b>Commited</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded. Single queries that have failed outside the transactions are also accounted as rollbacks.</p>'
+        info: '<p>Number of transactions that have been performed</p><p><b>Committed</b> - transactions that have been committed. All changes made by the committed transaction become visible to others and are guaranteed to be durable if a crash occurs. <b>Rollback</b> - transactions that have been rolled back. Rollback aborts the current transaction and causes all the updates made by the transaction to be discarded. Single queries that have failed outside the transactions are also accounted as rollbacks.</p>'
     },
     'postgres.db_connections_utilization': {
         info: 'Connection utilization per database. Utilization is measured as a percentage of <i>CONNECTION LIMIT</i> per database (if set) or <i>max_connections</i> (if <i>CONNECTION LIMIT</i> is not set).'
@@ -3934,7 +3946,7 @@ netdataDashboard.context = {
         info: 'PostgreSQL uses a <b>shared buffer cache</b> to store frequently accessed data in memory, and avoid slower disk reads. If you are seeing performance issues, consider increasing the <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS" target="_blank"><i>shared_buffers</i></a> size or tuning <a href="https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE" target="_blank"><i>effective_cache_size</i></a>.'
     },
     'postgres.db_io_rate': {
-        info: '<p>Number of blocks read from shared buffer cache or from disk.</p><p><b>disk</b> - number of disk blocks read. <b>memory</b> - number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
+        info: '<p>Amount of data read from shared buffer cache or from disk.</p><p><b>Disk</b> - data read from disk. <b>Memory</b> - data read from buffer cache (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
     },
     'postgres.db_ops_fetched_rows_ratio': {
         /*
@@ -4008,6 +4020,88 @@ netdataDashboard.context = {
         },        
         info: 'Actual on-disk usage of the database\'s data directory and any associated tablespaces.'
     },
+    'postgres.table_rows_dead_ratio': {
+        info: 'Percentage of dead rows. An increase in dead rows indicates a problem with VACUUM processes, which can slow down your queries.'
+    },
+    'postgres.table_rows_count': {
+        info: '<p>Number of rows. When you do an UPDATE or DELETE, the row is not actually physically deleted. For a DELETE, the database simply marks the row as unavailable for future transactions, and for UPDATE, under the hood it is a combined INSERT then DELETE, where the previous version of the row is marked unavailable.</p><p><b>Live</b> - rows that currently in use and can be queried. <b>Dead</b> - deleted rows that will later be reused for new rows from INSERT or UPDATE.</p>'
+    },
+    'postgres.table_ops_rows_rate': {
+        info: 'Write queries throughput. If you see a large number of updated and deleted rows, keep an eye on the number of dead rows, as a high percentage of dead rows can slow down your queries.'
+    },
+    'postgres.table_ops_rows_hot_ratio': {
+        info: 'Percentage of HOT (Heap Only Tuple) updated rows. HOT updates are much more efficient than ordinary updates:  less write operations, less WAL writes, vacuum operation has less work to do, increased read efficiency (help to limit table and index bloat).'
+    },
+    'postgres.table_ops_rows_hot_rate': {
+        info: 'Number of HOT (Heap Only Tuple) updated rows.'
+    },
+    'postgres.table_cache_io_ratio': {
+        info: 'Table cache inefficiency. Percentage of data read from disk. Lower is better.'
+    },
+    'postgres.table_io_rate': {
+        info: '<p>Amount of data read from shared buffer cache or from disk.</p><p><b>Disk</b> - data read from disk. <b>Memory</b> - data read from buffer cache (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
+    },
+    'postgres.table_index_cache_io_ratio': {
+        info: 'Table indexes cache inefficiency. Percentage of data read from disk. Lower is better.'
+    },
+    'postgres.table_index_io_rate': {
+        info: '<p>Amount of data read from all indexes from shared buffer cache or from disk.</p><p><b>Disk</b> - data read from disk. <b>Memory</b> - data read from buffer cache (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
+    },
+    'postgres.table_toast_cache_io_ratio': {
+        info: 'Table TOAST cache inefficiency. Percentage of data read from disk. Lower is better.'
+    },
+    'postgres.table_toast_io_rate': {
+        info: '<p>Amount of data read from TOAST table from shared buffer cache or from disk.</p><p><b>Disk</b> - data read from disk. <b>Memory</b> - data read from buffer cache (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
+    },
+    'postgres.table_toast_index_cache_io_ratio': {
+        info: 'Table TOAST indexes cache inefficiency. Percentage of data read from disk. Lower is better.'
+    },
+    'postgres.table_toast_index_io_rate': {
+        info: '<p>Amount of data read from this table\'s TOAST table indexes from shared buffer cache or from disk.</p><p><b>Disk</b> - data read from disk. <b>Memory</b> - data read from buffer cache (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
+    },
+    'postgres.table_scans_rate': {
+        info: '<p>Number of scans initiated on this table. If you see that your database regularly performs more sequential scans over time, you can improve its performance by creating an index on data that is frequently accessed.</p><p><b>Index</b> - relying on an index to point to the location of specific rows. <b>Sequential</b> - have to scan through each row of a table sequentially. Typically take longer than index scans.</p>'
+    },
+    'postgres.table_scans_rows_rate': {
+        info: 'Number of live rows fetched by scans.'
+    },
+    'postgres.table_autovacuum_since_time': {
+        info: 'Time elapsed since this table was vacuumed by the autovacuum daemon.'
+    },
+    'postgres.table_vacuum_since_time': {
+        info: 'Time elapsed since this table was manually vacuumed (not counting VACUUM FULL).'
+    },
+    'postgres.table_autoanalyze_since_time': {
+        info: 'Time elapsed since this table was manually analyzed.'
+    },
+    'postgres.table_analyze_since_time': {
+        info: 'Time elapsed this table was analyzed by the autovacuum daemon.'
+    },
+    'postgres.table_null_columns': {
+        info: 'Number of table columns that contain only NULLs.'
+    },
+    'postgres.table_total_size': {
+        info: 'Actual on-disk size of the table.'
+    },
+    'postgres.table_bloat_size_perc': {
+        info: 'Estimated percentage of bloat in the table. It is normal for tables that are updated frequently to have a small to moderate amount of bloat.'
+    },
+    'postgres.table_bloat_size': {
+        info: 'Disk space that was used by the table and is available for reuse by the database but has not been reclaimed. Bloated tables require more disk storage and additional I/O that can slow down query execution. Running <a href="https://www.postgresql.org/docs/current/sql-vacuum.html" target="_blank">VACUUM</a> regularly on a table that is updated frequently results in fast reuse of space occupied by expired rows, which prevents the table from growing too large.'
+    },
+    'postgres.index_size': {
+        info: 'Actual on-disk size of the index.'
+    },
+    'postgres.index_bloat_size_perc': {
+        info: 'Estimated percentage of bloat in the index.'
+    },
+    'postgres.index_bloat_size': {
+        info: 'Disk space that was used by the index and is available for reuse by the database but has not been reclaimed. Bloat slows down your database and eats up more storage than needed. To recover the space from indexes, recreate them using the <a href="https://www.postgresql.org/docs/current/sql-reindex.html" target="_blank">REINDEX</a> command.'
+    },
+    'postgres.index_usage_status': {
+        info: 'An index is considered unused if no scans have been initiated on that index.'
+    },
+
 
     // ------------------------------------------------------------------------
     // PgBouncer
