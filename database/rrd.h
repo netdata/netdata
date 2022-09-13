@@ -691,6 +691,8 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_INDEXED_MACHINE_GUID     = (1 << 11), // when set, we have indexed its machine guid
     RRDHOST_FLAG_INDEXED_HOSTNAME         = (1 << 12), // when set, we have indexed its hostname
     RRDHOST_FLAG_STREAM_COLLECTED_METRICS = (1 << 13), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_INITIALIZED_HEALTH       = (1 << 14), // the host has initialized health structures
+    RRDHOST_FLAG_INITIALIZED_RRDPUSH      = (1 << 15), // the host has initialized rrdpush structures
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

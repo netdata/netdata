@@ -206,6 +206,115 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
+static void rrdhost_initialize_rrdpush(RRDHOST *host,
+                                       unsigned int rrdpush_enabled,
+                                       char *rrdpush_destination,
+                                       char *rrdpush_api_key,
+                                       char *rrdpush_send_charts_matching
+) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH)) return;
+    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH);
+
+    sender_init(host);
+    netdata_mutex_init(&host->receiver_lock);
+
+    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
+    host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
+
+    if (host->rrdpush_send_destination)
+        host->destinations = destinations_init(host->rrdpush_send_destination);
+
+    host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
+    host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+
+    host->rrdpush_sender_pipe[0] = -1;
+    host->rrdpush_sender_pipe[1] = -1;
+    host->rrdpush_sender_socket  = -1;
+
+    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
+#ifdef ENABLE_HTTPS
+    host->ssl.conn = NULL;
+    host->ssl.flags = NETDATA_SSL_START;
+    host->stream_ssl.conn = NULL;
+    host->stream_ssl.flags = NETDATA_SSL_START;
+#endif
+}
+
+static void rrdhost_initialize_health(RRDHOST *host,
+                                      int is_localhost
+                                      ) {
+    if(!host->health_enabled || rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) return;
+    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
+
+    rrdfamily_index_init(host);
+    rrdcalctemplate_index_init(host);
+    rrdcalc_rrdhost_index_init(host);
+    host->rrdvars = rrdvariables_create();
+
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+
+    host->health_log.next_log_id = 1;
+    host->health_log.next_alarm_id = 1;
+    host->health_log.max = 1000;
+    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_alarm_id = 0;
+
+    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
+    if(n < 10) {
+        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
+        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
+    }
+    else
+        host->health_log.max = (unsigned int)n;
+
+    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
+
+    char filename[FILENAME_MAX + 1];
+
+    if(!is_localhost) {
+        int r = mkdir(host->varlib_dir, 0775);
+        if (r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
+    }
+
+    {
+        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+        int r = mkdir(filename, 0775);
+        if(r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
+    }
+
+    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
+    host->health_log_filename = strdupz(filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
+    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+    host->health_default_recipient = string_strdupz("root");
+
+    // ------------------------------------------------------------------------
+    // load health configuration
+
+    health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
+
+    if (!file_is_migrated(host->health_log_filename)) {
+        int rc = sql_create_health_log_table(host);
+        if (unlikely(rc)) {
+            error_report("Failed to create health log table in the database");
+            health_alarm_log_load(host);
+            health_alarm_log_open(host);
+        }
+        else {
+            health_alarm_log_load(host);
+            add_migrated_file(host->health_log_filename, 0);
+        }
+    } else {
+        sql_create_health_log_table(host);
+        sql_health_alarm_log_load(host);
+    }
+}
+
+
 RRDHOST *rrdhost_create(const char *hostname,
                         const char *registry_hostname,
                         const char *guid,
@@ -251,32 +360,16 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    sender_init(host);
-    netdata_mutex_init(&host->receiver_lock);
+    rrdhost_initialize_rrdpush(host,
+                               rrdpush_enabled,
+                               rrdpush_destination,
+                               rrdpush_api_key,
+                               rrdpush_send_charts_matching);
 
-    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
-    host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
-    if (host->rrdpush_send_destination)
-        host->destinations = destinations_init(host->rrdpush_send_destination);
-    host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
-    host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
-
-    host->rrdpush_sender_pipe[0] = -1;
-    host->rrdpush_sender_pipe[1] = -1;
-    host->rrdpush_sender_socket  = -1;
-
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
-#ifdef ENABLE_HTTPS
-    host->ssl.conn = NULL;
-    host->ssl.flags = NETDATA_SSL_START;
-    host->stream_ssl.conn = NULL;
-    host->stream_ssl.flags = NETDATA_SSL_START;
-#endif
-
-    netdata_rwlock_init(&host->rrdhost_rwlock);
     if (likely(!archived))
         host->rrdlabels = rrdlabels_create();
 
+    netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_mutex_init(&host->aclk_state_lock);
 
     host->system_info = system_info;
@@ -289,47 +382,17 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_DB, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
-    // ------------------------------------------------------------------------
-    // initialize health variables
-
-    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-
-    host->health_log.next_log_id = 1;
-    host->health_log.next_alarm_id = 1;
-    host->health_log.max = 1000;
-    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
-    host->health_log.next_alarm_id = 0;
-
-    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
-    if(n < 10) {
-        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
-        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
-    }
-    else
-        host->health_log.max = (unsigned int)n;
-
-    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
-
-    if(host->health_enabled)
-        rrdfamily_index_init(host);
-
-    // this is needed for custom host variables set by collectors, not just for health
-    host->rrdvars = rrdvariables_create();
-
     char filename[FILENAME_MAX + 1];
-
     if(is_localhost) {
-
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
         host->varlib_dir = strdupz(netdata_configured_varlib_dir);
-
     }
     else {
         // this is not localhost - append our GUID to localhost path
         if (is_in_multihost) { // don't append to cache dir in multihost
             host->cache_dir  = strdupz(netdata_configured_cache_dir);
-        } else {
+        }
+        else {
             snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
             host->cache_dir = strdupz(filename);
         }
@@ -343,38 +406,9 @@ RRDHOST *rrdhost_create(const char *hostname,
 
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
         host->varlib_dir = strdupz(filename);
-
-        if(host->health_enabled) {
-            int r = mkdir(host->varlib_dir, 0775);
-            if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-       }
-
     }
 
-    if(host->health_enabled) {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
-
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(filename);
-
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = string_strdupz("root");
-
-
-    // ------------------------------------------------------------------------
-    // load health configuration
-
-    if(host->health_enabled) {
-        rrdcalctemplate_index_init(host);
-        rrdcalc_rrdhost_index_init(host);
-        health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-    }
+    rrdhost_initialize_health(host, is_localhost);
 
     RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
@@ -385,28 +419,15 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
         int rc;
-        if (!archived) {
+        if(!archived) {
             rc = sql_store_host_info(host);
             if (unlikely(rc))
                 error_report("Failed to store machine GUID to the database");
         }
+
         sql_load_node_id(host);
+
         if (host->health_enabled) {
-            if (!file_is_migrated(host->health_log_filename)) {
-                rc = sql_create_health_log_table(host);
-                if (unlikely(rc)) {
-                    error_report("Failed to create health log table in the database");
-                    health_alarm_log_load(host);
-                    health_alarm_log_open(host);
-                }
-                else {
-                    health_alarm_log_load(host);
-                    add_migrated_file(host->health_log_filename, 0);
-                }
-            } else {
-                sql_create_health_log_table(host);
-                sql_health_alarm_log_load(host);
-            }
         }
     }
     else
@@ -533,6 +554,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         ml_new_host(host);
     else
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+
+
     return host;
 }
 
@@ -611,45 +634,15 @@ void rrdhost_update(RRDHOST *host
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
-        host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
-        if (host->rrdpush_send_destination)
-            host->destinations = destinations_init(host->rrdpush_send_destination);
-        host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+        rrdhost_initialize_rrdpush(host,
+                                   rrdpush_enabled,
+                                   rrdpush_destination,
+                                   rrdpush_api_key,
+                                   rrdpush_send_charts_matching);
 
-        if(host->health_enabled) {
-            int r;
-            char filename[FILENAME_MAX + 1];
+        rrdhost_initialize_health(host,
+                                  host == localhost);
 
-            if (host != localhost) {
-                r = mkdir(host->varlib_dir, 0775);
-                if (r != 0 && errno != EEXIST)
-                    error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-            }
-            snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-            r = mkdir(filename, 0775);
-            if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-
-            health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-
-            if (!file_is_migrated(host->health_log_filename)) {
-                int rc = sql_create_health_log_table(host);
-                if (unlikely(rc)) {
-                    error_report("Failed to create health log table in the database");
-
-                    health_alarm_log_load(host);
-                    health_alarm_log_open(host);
-                } else {
-                    health_alarm_log_load(host);
-                    add_migrated_file(host->health_log_filename, 0);
-                }
-            } else {
-                sql_create_health_log_table(host);
-                sql_health_alarm_log_load(host);
-            }
-        }
         rrd_hosts_available++;
         ml_new_host(host);
         rrdhost_load_rrdcontext_data(host);
