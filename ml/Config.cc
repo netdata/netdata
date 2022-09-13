@@ -46,7 +46,7 @@ void Config::readMLConfig(void) {
 
     double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 1.0);
     std::string AnomalyDetectionGroupingMethod = config_get(ConfigSectionML, "anomaly detection grouping method", "average");
-    time_t AnomalyDetectionQueryDuration = config_get_number(ConfigSectionML, "anomaly detection grouping method", 5 * 60);
+    time_t AnomalyDetectionQueryDuration = config_get_number(ConfigSectionML, "anomaly detection grouping duration", 5 * 60);
 
     /*
      * Clamp
