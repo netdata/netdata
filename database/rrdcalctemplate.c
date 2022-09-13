@@ -191,8 +191,8 @@ void rrdcalctemplate_index_init(RRDHOST *host) {
     if(!host->rrdcalctemplate_root_index) {
         host->rrdcalctemplate_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
 
-        dictionary_register_insert_callback(host->rrdcalc_root_index, rrdcalctemplate_insert_callback, NULL);
-        dictionary_register_delete_callback(host->rrdcalc_root_index, rrdcalctemplate_delete_callback, host);
+        dictionary_register_insert_callback(host->rrdcalctemplate_root_index, rrdcalctemplate_insert_callback, NULL);
+        dictionary_register_delete_callback(host->rrdcalctemplate_root_index, rrdcalctemplate_delete_callback, host);
     }
 }
 
