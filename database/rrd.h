@@ -908,15 +908,15 @@ struct rrdhost {
     // (charts may or may not exist when these are loaded)
     DICTIONARY *rrdcalc_root_index;
 
+    // templates of alarms
+    // these are used to create alarms when charts
+    // are created or renamed, that match them
+    DICTIONARY *rrdcalctemplate_root_index;
+
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
-
-    // templates of alarms
-    // these are used to create alarms when charts
-    // are created or renamed, that match them
-    RRDCALCTEMPLATE *alarms_templates;
 
     // ------------------------------------------------------------------------
     // the charts of the host

@@ -152,7 +152,9 @@ static void health_reload_host(RRDHOST *host) {
     char *user_path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
 
-    rrdcalc_delete_all_rrdhost_alerts(host);
+    // free all running alarms
+    rrdcalc_delete_all(host);
+    rrdcalctemplate_delete_all(host);
 
     // invalidate all previous entries in the alarm log
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
@@ -171,14 +173,10 @@ static void health_reload_host(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
-    rrdhost_wrlock(host);
-
-    // free all running alarms
-    while(host->alarms_templates)
-        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
-
     // load the new alarms
+    rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
+    rrdhost_unlock(host);
 
     //Discard alarms with labels that do not apply to host
     rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
@@ -189,11 +187,10 @@ static void health_reload_host(RRDHOST *host) {
             continue;
 
         rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching(st);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
     rrdset_foreach_done(st);
 
-    rrdhost_unlock(host);
 }
 
 /**
@@ -683,13 +680,15 @@ static void init_pending_foreach_alarms(RRDHOST *host) {
                 continue;
 
             RRDCALCTEMPLATE *rt;
-            for(rt = host->alarms_templates; rt ; rt = rt->next) {
+            foreach_rrdcalctemplate_read(host, rt) {
                 if(!rt->foreach_dimension_pattern)
                     continue;
 
                 if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
                     rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
             }
+            foreach_rrdcalctemplate_done(rt);
+
             rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
         }
         rrddim_foreach_done(rd);

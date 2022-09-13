@@ -128,16 +128,6 @@ void rrdcalc_update_info_using_rrdset_labels(RRDSET *st) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
 // ----------------------------------------------------------------------------
 // RRDCALC index management for RRDSET
 
@@ -635,7 +625,6 @@ void rrdcalc_rrdhost_index_init(RRDHOST *host) {
 }
 
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
-    // destroy the id index last
     dictionary_destroy(host->rrdcalc_root_index);
     host->rrdcalc_root_index = NULL;
 }
@@ -660,7 +649,7 @@ void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET
               string2str(rt->name), rrdset_id(st), key, rrdhost_hostname(host));
 }
 
-int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc) {
+int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
         error("Health configuration for alarm '%s' does not have a chart", rrdcalc_name(rc));
         return 0;
@@ -778,7 +767,7 @@ void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
     dfe_done(rc);
 }
 
-void rrdcalc_delete_all_rrdhost_alerts(RRDHOST *host) {
+void rrdcalc_delete_all(RRDHOST *host) {
     RRDCALC *rc;
     dfe_start_reentrant(host->rrdcalc_root_index, rc) {
         rrdcalc_unlink_and_delete(host, rc);

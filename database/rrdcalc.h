@@ -229,7 +229,7 @@ extern void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
 extern void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
-extern int rrdcalc_add_from_config_rrdcalc(RRDHOST *host, RRDCALC *rc);
+extern int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
 extern void rrdcalc_update_info_using_rrdset_labels(RRDSET *st);
 
 extern void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
@@ -243,7 +243,7 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
 }
 
 extern void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st);
-extern void rrdcalc_delete_all_rrdhost_alerts(RRDHOST *host);
+extern void rrdcalc_delete_all(RRDHOST *host);
 
 extern void rrdcalc_rrdhost_index_init(RRDHOST *host);
 extern void rrdcalc_rrdhost_index_destroy(RRDHOST *host);

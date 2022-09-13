@@ -371,6 +371,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     // load health configuration
 
     if(host->health_enabled) {
+        rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
         rrdhost_wrlock(host);
@@ -1106,7 +1107,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up alarms
 
-    rrdcalc_delete_all_rrdhost_alerts(host);
+    rrdcalc_delete_all(host);
 
 
     rrdhost_wrlock(host);   // lock this RRDHOST
@@ -1126,11 +1127,9 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // delete all the RRDSETs of the host
     rrdset_index_destroy(host);
     rrdcalc_rrdhost_index_destroy(host);
+    rrdcalctemplate_index_destroy(host);
 
     freez(host->exporting_flags);
-
-    while(host->alarms_templates)
-        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
 
     health_alarm_log_free(host);
 

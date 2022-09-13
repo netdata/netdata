@@ -341,10 +341,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
 
         rrdcalc_link_matching_alerts_to_rrdset(st);
-
-        rrdhost_rdlock(host);
-        rrdcalctemplate_link_matching(st);
-        rrdhost_unlock(host);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
 
     if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
