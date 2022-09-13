@@ -3807,7 +3807,6 @@ netdataDashboard.context = {
         room: { 
             mainheads: [
                 function (_, id) {
-                    cgroupMemLimitIsSet = 1;
                     return '<div data-netdata="' + id + '"'
                         + ' data-append-options="percentage"'
                         + ' data-gauge-max-value="100"'
