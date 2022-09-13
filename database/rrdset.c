@@ -340,7 +340,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
 
-        rrdcalc_link_matching_host_alerts_to_rrdset(st);
+        rrdcalc_link_matching_alerts_to_rrdset(st);
 
         rrdhost_rdlock(host);
         rrdcalctemplate_link_matching(st);

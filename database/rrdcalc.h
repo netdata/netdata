@@ -220,7 +220,7 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-extern void rrdcalc_link_matching_host_alerts_to_rrdset(RRDSET *st);
+extern void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
 extern RRDCALC *rrdcalc_get_from_rrdset(RRDSET *st, const char *alert_name);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);

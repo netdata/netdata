@@ -271,13 +271,6 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDDIM *rd = rrddim;
     RRDSET *st = ctr->st;
 
-    if(ctr->react_action == RRDDIM_REACT_NEW) {
-        // append this dimension
-        rrdset_wrlock(st);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
-        rrdset_unlock(st);
-    }
-
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
         (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
@@ -307,19 +300,6 @@ void rrddim_index_init(RRDSET *st) {
 void rrddim_index_destroy(RRDSET *st) {
     dictionary_destroy(st->rrddim_root_index);
     st->rrddim_root_index = NULL;
-}
-
-static inline RRDDIM *rrddim_index_add(RRDSET *st, struct rrddim_constructor *rd_ctr) {
-    return dictionary_set_advanced(st->rrddim_root_index, rd_ctr->id, -1, NULL, sizeof(RRDDIM), rd_ctr);
-}
-
-static inline void rrddim_index_del(RRDSET *st, RRDDIM *rd) {
-    rrdset_wrlock(st);
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
-    rrdset_unlock(st);
-
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID))
-        dictionary_del(st->rrddim_root_index, string2str(rd->id));
 }
 
 static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
@@ -478,7 +458,14 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         .memory_mode = memory_mode,
     };
 
-    RRDDIM *rd = rrddim_index_add(st, &tmp);
+    RRDDIM *rd = dictionary_set_advanced(st->rrddim_root_index, tmp.id, -1, NULL, sizeof(RRDDIM), &tmp);
+
+    if(tmp.react_action == RRDDIM_REACT_NEW) {
+        // append this dimension
+        rrdset_wrlock(st);
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
+        rrdset_unlock(st);
+    }
 
     rrdcontext_updated_rrddim(rd);
     return(rd);
@@ -488,7 +475,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 // RRDDIM remove / free a dimension
 
 void rrddim_free(RRDSET *st, RRDDIM *rd) {
-    rrddim_index_del(st, rd);
+    rrdset_wrlock(st);
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
+    rrdset_unlock(st);
+
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID))
+        dictionary_del(st->rrddim_root_index, string2str(rd->id));
 }
 
 

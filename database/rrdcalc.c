@@ -387,7 +387,7 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
     return true;
 }
 
-void rrdcalc_link_matching_host_alerts_to_rrdset(RRDSET *st) {
+void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 

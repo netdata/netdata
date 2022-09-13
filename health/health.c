@@ -191,7 +191,7 @@ static void health_reload_host(RRDHOST *host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
 
-        rrdcalc_link_matching_host_alerts_to_rrdset(st);
+        rrdcalc_link_matching_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching(st);
     }
     rrdset_foreach_done(st);
