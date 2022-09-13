@@ -1196,6 +1196,13 @@ set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_I
 # -----------------------------------------------------------------------------
 # ACLK
 
+file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ACLK REGEX "^#define ENABLE_ACLK 1$")
+IF(DEFINE_ENABLE_ACLK MATCHES ".+")
+    set(ENABLE_ACLK True)
+ELSE()
+    set(ENABLE_ACLK False)
+ENDIF()
+
 IF(ENABLE_ACLK)
 
 find_package(Protobuf REQUIRED)
