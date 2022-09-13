@@ -57,6 +57,7 @@ const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *i
 }
 
 void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa) {
+    if(unlikely(!rfa)) return;
     dictionary_acquired_item_release(host->rrdfamily_root_index, (const DICTIONARY_ITEM *)rfa);
 }
 

@@ -105,10 +105,10 @@ inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva)
 
     RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
 
-    dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
-
     if(dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1) != 0)
         error("Request to remove RRDVAR '%s' from index failed. Not Found.", rrdvar_name(rva));
+
+    dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
 }
 
 inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
