@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ADCharts.h"
+#include "Config.h"
 
 void ml::updateDimensionsChart(RRDHOST *RH,
                                collected_number NumTrainedDimensions,
@@ -129,7 +130,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
     ONEWAYALLOC *OWA = onewayalloc_create(0);
     time_t Now = now_realtime_sec();
     time_t Before = Now - RH->rrd_update_every;
-    time_t After = Before - 500 * RH->rrd_update_every;
+    time_t After = Before - Cfg.AnomalyDetectionQueryDuration;
     RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
 
     RRDR *R = rrd2rrdr(
@@ -137,7 +138,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
         1 /* points wanted */,
         After,
         Before,
-        RRDR_GROUPING_AVERAGE,
+        Cfg.AnomalyDetectionGroupingMethod,
         0 /* resampling time */,
         Options, "anomaly_rate",
         NULL /* context param list */,
@@ -148,7 +149,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
     assert(R->d == 1 && R->n == 1 && R->rows == 1);
 
     static thread_local bool PrevAboveThreshold = false;
-    bool AboveThreshold = R->v[0] >= 1.0;
+    bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
     bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
     PrevAboveThreshold = AboveThreshold;
 

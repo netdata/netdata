@@ -44,6 +44,10 @@ void Config::readMLConfig(void) {
 
     double DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
 
+    double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 1.0);
+    std::string AnomalyDetectionGroupingMethod = config_get(ConfigSectionML, "anomaly detection grouping method", "average");
+    time_t AnomalyDetectionQueryDuration = config_get_number(ConfigSectionML, "anomaly detection grouping method", 5 * 60);
+
     /*
      * Clamp
      */
@@ -63,6 +67,9 @@ void Config::readMLConfig(void) {
     MaxKMeansIters = clamp(MaxKMeansIters, 500u, 1000u);
 
     DimensionAnomalyScoreThreshold = clamp(DimensionAnomalyScoreThreshold, 0.01, 5.00);
+
+    HostAnomalyRateThreshold = clamp(HostAnomalyRateThreshold, 0.1, 10.0);
+    AnomalyDetectionQueryDuration = clamp<time_t>(AnomalyDetectionQueryDuration, 60, 15 * 60);
 
     /*
      * Validate
@@ -96,6 +103,10 @@ void Config::readMLConfig(void) {
     Cfg.MaxKMeansIters = MaxKMeansIters;
 
     Cfg.DimensionAnomalyScoreThreshold = DimensionAnomalyScoreThreshold;
+
+    Cfg.HostAnomalyRateThreshold = HostAnomalyRateThreshold;
+    Cfg.AnomalyDetectionGroupingMethod = web_client_api_request_v1_data_group(AnomalyDetectionGroupingMethod.c_str(), RRDR_GROUPING_AVERAGE);
+    Cfg.AnomalyDetectionQueryDuration = AnomalyDetectionQueryDuration;
 
     Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
