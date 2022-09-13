@@ -26,7 +26,7 @@ dist_web_DATA = \
     index.html \
     infographic.html \
     manifest.json \
-    precache-manifest.34701abea6c49bc9648f643547910052.js \
+    precache-manifest.140265f4227b85438a4cad8757738fa5.js \
     refresh-badges.js \
     robots.txt \
     service-worker.js \
@@ -147,9 +147,9 @@ webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
     static/js/10.a5cd7d0e.chunk.js \
     static/js/10.a5cd7d0e.chunk.js.map \
-    static/js/2.3fdc43e8.chunk.js \
-    static/js/2.3fdc43e8.chunk.js.LICENSE \
-    static/js/2.3fdc43e8.chunk.js.map \
+    static/js/2.92ca8446.chunk.js \
+    static/js/2.92ca8446.chunk.js.LICENSE \
+    static/js/2.92ca8446.chunk.js.map \
     static/js/3.f137faca.chunk.js \
     static/js/3.f137faca.chunk.js.map \
     static/js/4.2dbcd906.chunk.js \
@@ -165,9 +165,9 @@ dist_webstaticjs_DATA = \
     static/js/8.b4161ea2.chunk.js.map \
     static/js/9.a4363968.chunk.js \
     static/js/9.a4363968.chunk.js.map \
-    static/js/main.010e29b5.chunk.js \
-    static/js/main.010e29b5.chunk.js.LICENSE \
-    static/js/main.010e29b5.chunk.js.map \
+    static/js/main.99ea423c.chunk.js \
+    static/js/main.99ea423c.chunk.js.LICENSE \
+    static/js/main.99ea423c.chunk.js.map \
     static/js/runtime-main.08abed8f.js \
     static/js/runtime-main.08abed8f.js.map \
     $(NULL)
