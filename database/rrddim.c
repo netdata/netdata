@@ -467,7 +467,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         rrdset_unlock(st);
     }
 
-    rrdcontext_updated_rrddim(rd);
     return(rd);
 }
 
