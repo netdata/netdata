@@ -121,5 +121,6 @@ void migrate_localhost(uuid_t *host_uuid);
 extern void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info);
 extern void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
 void sql_store_host_labels(RRDHOST *host);
+extern int sql_metadata_cache_stats(int op);
 DICTIONARY *sql_load_host_labels(uuid_t *host_id);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
