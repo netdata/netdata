@@ -426,9 +426,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         }
 
         sql_load_node_id(host);
-
-        if (host->health_enabled) {
-        }
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
@@ -633,6 +630,9 @@ void rrdhost_update(RRDHOST *host
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
+
+        if(!host->rrdlabels)
+            host->rrdlabels = rrdlabels_create();
 
         rrdhost_initialize_rrdpush(host,
                                    rrdpush_enabled,
