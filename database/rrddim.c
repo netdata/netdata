@@ -173,7 +173,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
 static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *rrdset) {
     RRDDIM *rd = rrddim;
-    RRDSET *st = rrdset;
+    RRDSET *st = rrdset; (void)st;
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
 

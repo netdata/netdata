@@ -128,7 +128,7 @@ void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPL
     freez(rt);
 }
 static void rrdcalctemplate_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalctemplate, void *added_bool) {
-    RRDCALCTEMPLATE *rt = rrdcalctemplate;
+    RRDCALCTEMPLATE *rt = rrdcalctemplate; (void)rt;
 
     bool *added = added_bool;
     *added = true;
