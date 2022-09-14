@@ -37,9 +37,6 @@ typedef enum db_check_action_type {
 #define SQL_FIND_CHART_UUID                                                                                            \
     "select chart_id from chart where host_id = @host and type=@type and id=@id and (name is null or name=@name) and chart_id is not null;"
 
-#define SQL_STORE_ACTIVE_CHART                                                                                         \
-    "insert or replace into chart_active (chart_id, date_created) values (@id, unixepoch());"
-
 #define SQL_STORE_DIMENSION                                                                                           \
     "INSERT OR REPLACE into dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) values (?0001,?0002,?0003,?0004,?0005,?0006,?0007);"
 
