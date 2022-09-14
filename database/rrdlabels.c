@@ -969,7 +969,7 @@ void rrdset_save_rrdlabels_to_sql(RRDSET *st) {
     if(!st->rrdlabels) return;
 
     size_t old_version = st->rrdlabels_last_saved_version;
-    size_t new_version = dictionary_stats_version(st->rrdlabels);
+    size_t new_version = dictionary_version(st->rrdlabels);
 
     if(new_version != old_version) {
         // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed

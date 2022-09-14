@@ -853,7 +853,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     struct register_result *t;
 
     // count the dimensions
-    size_t dimensions = dictionary_stats_entries(results);
+    size_t dimensions = dictionary_entries(results);
     if(!dimensions) return 0;
 
     if(stats->max_base_high_ratio == 0.0)

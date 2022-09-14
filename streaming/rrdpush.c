@@ -368,7 +368,7 @@ void rrdset_done_push(RRDSET *st) {
         host->rrdpush_sender_error_shown = 0;
     }
 
-    if(dictionary_stats_entries(st->rrddim_root_index) == 0)
+    if(dictionary_entries(st->rrddim_root_index) == 0)
         return;
 
     sender_start(host->sender);

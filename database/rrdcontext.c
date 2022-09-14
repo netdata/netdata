@@ -965,7 +965,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
 
         /*
         // trigger updates on the old context
-        if(!dictionary_stats_entries(rc_old->rrdinstances) && !dictionary_stats_referenced_items(rc_old->rrdinstances)) {
+        if(!dictionary_entries(rc_old->rrdinstances) && !dictionary_stats_referenced_items(rc_old->rrdinstances)) {
             rrdcontext_lock(rc_old);
             rc_old->flags = ((rc_old->flags & RRD_FLAG_QUEUED)?RRD_FLAG_QUEUED:RRD_FLAG_NONE)|RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION;
             rc_old->first_time_t = 0;
@@ -1810,7 +1810,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_strcat(wb, "\"");
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && dictionary_stats_entries(ri->rrdlabels)) {
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && dictionary_entries(ri->rrdlabels)) {
         buffer_sprintf(wb, ",\n\t\t\t\t\t\"labels\": {\n");
         rrdlabels_to_buffer(ri->rrdlabels, wb, "\t\t\t\t\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
         buffer_strcat(wb, "\n\t\t\t\t\t}");
@@ -2323,10 +2323,10 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     if(likely(ri->rrdset))
         return false;
 
-    if(unlikely(dictionary_stats_referenced_items(ri->rrdmetrics) != 0))
+    if(unlikely(dictionary_referenced_items(ri->rrdmetrics) != 0))
         return false;
 
-    if(unlikely(dictionary_stats_entries(ri->rrdmetrics) != 0))
+    if(unlikely(dictionary_entries(ri->rrdmetrics) != 0))
         return false;
 
     if(ri->first_time_t || ri->last_time_t)
@@ -2342,10 +2342,10 @@ static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
     if(likely(rrd_flag_check(rc, RRD_FLAGS_PREVENTING_DELETIONS)))
         return false;
 
-    if(unlikely(dictionary_stats_referenced_items(rc->rrdinstances) != 0))
+    if(unlikely(dictionary_referenced_items(rc->rrdinstances) != 0))
         return false;
 
-    if(unlikely(dictionary_stats_entries(rc->rrdinstances) != 0))
+    if(unlikely(dictionary_entries(rc->rrdinstances) != 0))
         return false;
 
     if(unlikely(rc->first_time_t || rc->last_time_t))
@@ -2494,7 +2494,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t metrics_active = 0, metrics_deleted = 0;
     bool live_retention = true, currently_collected = false;
-    if(dictionary_stats_entries(ri->rrdmetrics) > 0) {
+    if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
             if(unlikely(netdata_exit)) break;
@@ -2597,7 +2597,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
-    if(dictionary_stats_entries(rc->rrdinstances) > 0) {
+    if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
         dfe_start_reentrant(rc->rrdinstances, ri) {
             if(unlikely(netdata_exit)) break;
@@ -2935,7 +2935,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
         return;
 
     // check if there are queued items to send
-    if(!dictionary_stats_entries((DICTIONARY *)host->rrdctx_hub_queue))
+    if(!dictionary_entries((DICTIONARY *)host->rrdctx_hub_queue))
         return;
 
     if(!host->node_id)
@@ -3088,12 +3088,13 @@ void *rrdcontext_main(void *ptr) {
             worker_is_busy(WORKER_JOB_HOSTS);
 
             if(host->rrdctx_post_processing_queue) {
-                pp_queued_contexts_for_all_hosts += dictionary_stats_entries((DICTIONARY *)host->rrdctx_post_processing_queue);
+                pp_queued_contexts_for_all_hosts +=
+                    dictionary_entries((DICTIONARY *)host->rrdctx_post_processing_queue);
                 rrdcontext_post_process_queued_contexts(host);
             }
 
             if(host->rrdctx_hub_queue) {
-                hub_queued_contexts_for_all_hosts += dictionary_stats_entries((DICTIONARY *)host->rrdctx_hub_queue);
+                hub_queued_contexts_for_all_hosts += dictionary_entries((DICTIONARY *)host->rrdctx_hub_queue);
                 rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
             }
         }

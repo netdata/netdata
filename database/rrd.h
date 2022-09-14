@@ -662,7 +662,7 @@ extern STRING *rrd_string_strdupz(const char *s);
     dfe_done(st)
 
 #define rrdset_number_of_dimensions(st) \
-    dictionary_stats_entries((st)->rrddim_root_index)
+    dictionary_entries((st)->rrddim_root_index)
 
 extern void rrdset_memory_file_save(RRDSET *st);
 extern void rrdset_memory_file_free(RRDSET *st);

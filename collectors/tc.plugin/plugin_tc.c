@@ -1147,12 +1147,12 @@ void *tc_main(void *ptr) {
                 worker_is_busy(WORKER_TC_WORKTIME);
                 worker_set_metric(WORKER_TC_PLUGIN_TIME, str2ll(words[1], NULL));
 
-                size_t number_of_devices = dictionary_stats_entries(tc_device_root_index);
+                size_t number_of_devices = dictionary_entries(tc_device_root_index);
                 size_t number_of_classes = 0;
 
                 struct tc_device *d;
                 dfe_start_unsafe(tc_device_root_index, d) {
-                    number_of_classes += dictionary_stats_entries(d->classes);
+                    number_of_classes += dictionary_entries(d->classes);
                 }
                 dfe_done(d);
 

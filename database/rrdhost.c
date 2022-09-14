@@ -70,7 +70,7 @@ static inline void rrdhost_init() {
 // RRDHOST index by UUID
 
 inline long rrdhost_hosts_available(void) {
-    return dictionary_stats_entries(rrdhost_root_index);
+    return dictionary_entries(rrdhost_root_index);
 }
 
 inline RRDHOST *rrdhost_find_by_guid(const char *guid) {

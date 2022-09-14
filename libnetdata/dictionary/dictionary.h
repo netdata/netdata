@@ -55,9 +55,10 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1               = (1 << 28), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2               = (1 << 29), // reserved for DICTIONARY_FLAG_DESTROYED
-    DICTIONARY_FLAG_RESERVED3               = (1 << 30), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
+    DICTIONARY_FLAG_RESERVED1               = (1 << 27), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
+    DICTIONARY_FLAG_RESERVED2               = (1 << 28), // reserved for DICTIONARY_FLAG_DESTROYED
+    DICTIONARY_FLAG_RESERVED3               = (1 << 29), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
+    DICTIONARY_FLAG_RESERVED4               = (1 << 30), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
 } DICTIONARY_FLAGS;
 
 // Create a dictionary
@@ -262,14 +263,14 @@ extern void  dictionary_foreach_done(DICTFE *dfe);
 // Get statistics about the dictionary
 
 extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
-extern long int dictionary_stats_entries(DICTIONARY *dict);
-extern size_t dictionary_stats_version(DICTIONARY *dict);
+extern long int dictionary_entries(DICTIONARY *dict);
+extern size_t dictionary_version(DICTIONARY *dict);
 extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
 extern size_t dictionary_stats_resets(DICTIONARY *dict);
 extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
-extern size_t dictionary_stats_referenced_items(DICTIONARY *dict);
+extern size_t dictionary_referenced_items(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 
