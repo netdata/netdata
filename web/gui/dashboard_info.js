@@ -4071,10 +4071,10 @@ netdataDashboard.context = {
         info: 'Time elapsed since this table was manually vacuumed (not counting VACUUM FULL).'
     },
     'postgres.table_autoanalyze_since_time': {
-        info: 'Time elapsed since this table was manually analyzed.'
+        info: 'Time elapsed this table was analyzed by the autovacuum daemon.'
     },
     'postgres.table_analyze_since_time': {
-        info: 'Time elapsed this table was analyzed by the autovacuum daemon.'
+        info: 'Time elapsed since this table was manually analyzed.'
     },
     'postgres.table_null_columns': {
         info: 'Number of table columns that contain only NULLs.'
