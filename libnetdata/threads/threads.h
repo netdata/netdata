@@ -28,7 +28,14 @@ extern size_t netdata_threads_init(void);
 extern void netdata_threads_init_after_fork(size_t stacksize);
 
 extern int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+#define netdata_thread_cancel(thread) netdata_thread_cancel_with_trace(thread, __LINE__, __FILE__, __FUNCTION__)
+extern int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const char *file, const char *function);
+#else
 extern int netdata_thread_cancel(netdata_thread_t thread);
+#endif
+
 extern int netdata_thread_join(netdata_thread_t thread, void **retval);
 extern int netdata_thread_detach(pthread_t thread);
 

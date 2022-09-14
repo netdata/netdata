@@ -215,11 +215,18 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
 
 // ----------------------------------------------------------------------------
 // netdata_thread_cancel
-
+#ifdef NETDATA_INTERNAL_CHECKS
+int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const char *file, const char *function) {
+#else
 int netdata_thread_cancel(netdata_thread_t thread) {
+#endif
     int ret = pthread_cancel(thread);
     if(ret != 0)
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
+#else
         error("cannot cancel thread. pthread_cancel() failed with code %d.", ret);
+#endif
 
     return ret;
 }
