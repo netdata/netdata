@@ -53,6 +53,7 @@ typedef enum dictionary_flags {
     DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
     DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICTIONARY_FLAG_STATS                   = (1 << 5), // maintain statistics for this dictionary
 
     // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
     DICTIONARY_FLAG_RESERVED1               = (1 << 27), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
@@ -63,15 +64,13 @@ typedef enum dictionary_flags {
 
 // Create a dictionary
 #ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(flags) dictionary_create_advanced_with_trace(flags, 0, __FUNCTION__, __LINE__, __FILE__);
-#define dictionary_create_advanced(flags) dictionary_create_advanced_with_trace(flags, 0, __FUNCTION__, __LINE__, __FILE__);
-extern DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, size_t scratchpad_size, const char *function, size_t line, const char *file);
+#define dictionary_create(flags) dictionary_create_advanced_with_trace(flags, __FUNCTION__, __LINE__, __FILE__);
+#define dictionary_create_advanced(flags) dictionary_create_advanced_with_trace(flags, __FUNCTION__, __LINE__, __FILE__);
+extern DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, const char *function, size_t line, const char *file);
 #else
-#define dictionary_create(flags) dictionary_create_advanced(flags, 0);
-extern DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags, size_t scratchpad_size);
+#define dictionary_create(flags) dictionary_create_advanced(flags);
+extern DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags);
 #endif
-
-extern void *dictionary_scratchpad(DICTIONARY *dict);
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
