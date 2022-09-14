@@ -137,9 +137,9 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    gs->sqlite3_cache_hit = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+    gs->sqlite3_cache_hit = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
     gs->sqlite3_cache_hit += (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-    gs->sqlite3_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    gs->sqlite3_cache_miss = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
     gs->sqlite3_cache_miss += (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
 }
 
