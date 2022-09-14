@@ -1775,6 +1775,15 @@ static inline bool string_entry_check_and_acquire(STRING *se) {
     do {
         count++;
 
+        // this is a data race
+        // but immediately after we will do an atomic_compare_exchange_n()
+        // and loop if we can't set it
+        // In our tests this loop counts just 1 over a million, which remains the same
+        // even if we do this:
+        //
+        // expected = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
+        //
+        // so, we decided to keep the data race, to benefit from the increased speed
         expected = se->refcount;
 
         if(expected <= 0) {
@@ -1817,9 +1826,6 @@ STRING *string_dup(STRING *string) {
 
 // Search the index and return an ACQUIRED string entry, or NULL
 static inline STRING *string_index_search(const char *str, size_t length) {
-    if(unlikely(!string_base.JudyHSArray))
-        return NULL;
-
     STRING *string;
 
     // Find the string in the index
@@ -2597,7 +2603,7 @@ static int string_threads_join = 0;
 static void *string_thread(void *arg __maybe_unused) {
     int dups = 1; //(gettid() % 10);
     for(; 1 ;) {
-        if(string_threads_join)
+        if(__atomic_load_n(&string_threads_join, __ATOMIC_RELAXED))
             break;
 
         STRING *s = string_strdupz("string thread checking 1234567890");
@@ -2894,7 +2900,7 @@ int dictionary_unittest(size_t entries) {
         }
         sleep_usec(seconds_to_run * USEC_PER_SEC);
 
-        string_threads_join = 1;
+        __atomic_store_n(&string_threads_join, 1, __ATOMIC_RELAXED);
         for (int i = 0; i < threads_to_create; i++) {
             void *retval;
             netdata_thread_join(threads[i], &retval);
