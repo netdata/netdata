@@ -444,6 +444,13 @@ skip_delete:
     return (rc_stored != SQLITE_DONE);
 }
 
+int sql_context_cache_stats(int op)
+{
+    int count, dummy;
+    sqlite3_db_status(db_context_meta, op, &count, &dummy, 0);
+    return count;
+}
+
 //
 // TESTING FUNCTIONS
 //

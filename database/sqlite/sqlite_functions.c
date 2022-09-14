@@ -2760,3 +2760,10 @@ int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_b
         return 1;
     return sqlite3_bind_null(res, position);
 }
+
+int sql_metadata_cache_stats(int op)
+{
+    int count, dummy;
+    sqlite3_db_status(db_meta, op, &count, &dummy, 0);
+    return count;
+}

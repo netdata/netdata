@@ -6,6 +6,7 @@
 #include "daemon/common.h"
 #include "sqlite3.h"
 
+extern int sql_context_cache_stats(int op);
 typedef struct ctx_chart {
     uuid_t chart_id;
     const char *id;
