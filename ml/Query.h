@@ -24,11 +24,11 @@ public:
     }
 
     bool isFinished() {
-        if (!Ops->is_finished(&Handle))
-            return false;
+        return Ops->is_finished(&Handle);
+    }
 
+    ~Query() {
         Ops->finalize(&Handle);
-        return true;
     }
 
     std::pair<time_t, CalculatedNumber> nextMetric() {
