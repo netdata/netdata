@@ -19,7 +19,7 @@ struct rrdengine_journalfile;
 struct rrdengine_journalfile {
     uv_file file;
     uint64_t pos;
-
+    void *data;
     struct rrdengine_datafile *datafile;
 };
 
