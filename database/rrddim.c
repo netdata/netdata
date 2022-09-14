@@ -532,6 +532,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
     rrdcontext_updated_rrddim_flags(rd);
 }
 

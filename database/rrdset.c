@@ -517,8 +517,9 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+
         st->last_accessed_time = now_realtime_sec();
-        __atomic_add_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -533,7 +534,6 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time = now_realtime_sec();
-        __atomic_sub_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -728,102 +728,6 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
         }
     }
     rrddim_foreach_done(rd);
-}
-
-void rrddim_obsolete_to_archive(RRDDIM *rd) {
-    RRDSET *st = rd->rrdset;
-
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED | RRDDIM_FLAG_ACLK) || !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
-        return;
-
-    rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-
-    const char *cache_filename = rrddim_cache_filename(rd);
-    if(cache_filename) {
-        info("Deleting dimension file '%s'.", cache_filename);
-        if (unlikely(unlink(cache_filename) == -1))
-            error("Cannot delete dimension file '%s'", cache_filename);
-    }
-
-    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        rrddimvar_delete_all(rd);
-
-        /* only a collector can mark a chart as obsolete, so we must remove the reference */
-
-        size_t tiers_available = 0, tiers_said_yes = 0;
-        for(int tier = 0; tier < storage_tiers ;tier++) {
-            if(rd->tiers[tier]) {
-                tiers_available++;
-
-                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
-                    tiers_said_yes++;
-
-                rd->tiers[tier]->db_collection_handle = NULL;
-            }
-        }
-
-        if (tiers_available == tiers_said_yes && tiers_said_yes) {
-            /* This metric has no data and no references */
-            delete_dimension_uuid(&rd->metric_uuid);
-        }
-        else {
-            /* Do not delete this dimension */
-#ifdef ENABLE_ACLK
-            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
-#endif
-            return;
-        }
-    }
-
-    rrddim_free(st, rd);
-}
-
-void rrdset_archive_obsolete_dimensions(RRDSET *st, bool all) {
-    RRDDIM *rd;
-
-    // find if there are any obsolete dimensions
-    if(unlikely(all || rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
-        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
-
-        time_t now = now_realtime_sec();
-
-        dfe_start_reentrant(st->rrddim_root_index, rd) {
-            if(unlikely(
-                all ||
-                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))
-            )) {
-
-                info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
-                rrddim_obsolete_to_archive(rd);
-
-            }
-        }
-        dfe_done(rd);
-    }
-}
-
-void rrdset_archive(RRDSET *st) {
-    rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-    rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-
-    rrdcalc_unlink_all_rrdset_alerts(st);
-
-    rrdset_archive_obsolete_dimensions(st, true);
-
-    rrdsetvar_release_and_delete_all(st);
-
-    // has to be run after all dimensions are archived - or use-after-free will occur
-    rrdvar_delete_all(st->rrdvars);
-
-    if(st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-        if(rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS))
-            rrdset_delete_files(st);
-        else
-            rrdset_save(st);
-
-        rrdset_free(st);
-    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1915,7 +1819,6 @@ after_second_database_work:
         rrddim_foreach_done(rd);
     }
 
-    rrdset_archive_obsolete_dimensions(st, false);
     rrdcontext_collected_rrdset(st);
 
     netdata_thread_enable_cancelability();

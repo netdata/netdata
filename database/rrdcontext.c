@@ -3033,7 +3033,10 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 static void rrdcontext_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
     // custom code
+    worker_unregister();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 

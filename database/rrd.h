@@ -669,7 +669,6 @@ extern void rrdset_memory_file_free(RRDSET *st);
 extern void rrdset_memory_file_update(RRDSET *st);
 extern const char *rrdset_cache_filename(RRDSET *st);
 extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
-extern void rrdset_archive(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags
@@ -678,21 +677,23 @@ extern void rrdset_archive(RRDSET *st);
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                   = (1 << 0), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS   = (1 << 1), // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST       = (1 << 2), // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND           = (1 << 3), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND      = (1 << 4), // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED                 = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS   = (1 << 7), // contains dims with uninitialized foreach alarms
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE     = (1 << 8),
-    RRDHOST_FLAG_STREAM_LABELS_STOP       = (1 << 9),
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS     = (1 << 10), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_INDEXED_MACHINE_GUID     = (1 << 11), // when set, we have indexed its machine guid
-    RRDHOST_FLAG_INDEXED_HOSTNAME         = (1 << 12), // when set, we have indexed its hostname
-    RRDHOST_FLAG_STREAM_COLLECTED_METRICS = (1 << 13), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_INITIALIZED_HEALTH       = (1 << 14), // the host has initialized health structures
-    RRDHOST_FLAG_INITIALIZED_RRDPUSH      = (1 << 15), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_ORPHAN                         = (1 << 0), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS         = (1 << 1), // delete files of obsolete charts
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST             = (1 << 2), // delete the entire host when orphan
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 3), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 4), // don't send it to external databases
+    RRDHOST_FLAG_ARCHIVED                       = (1 << 5), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_PENDING_FOREACH_ALARMS         = (1 << 7), // contains dims with uninitialized foreach alarms
+    RRDHOST_FLAG_STREAM_LABELS_UPDATE           = (1 << 8),
+    RRDHOST_FLAG_STREAM_LABELS_STOP             = (1 << 9),
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 10), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_INDEXED_MACHINE_GUID           = (1 << 11), // when set, we have indexed its machine guid
+    RRDHOST_FLAG_INDEXED_HOSTNAME               = (1 << 12), // when set, we have indexed its hostname
+    RRDHOST_FLAG_STREAM_COLLECTED_METRICS       = (1 << 13), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 14), // the host has initialized health structures
+    RRDHOST_FLAG_INITIALIZED_RRDPUSH            = (1 << 15), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
+    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 17), // the host has pending dimension obsoletions
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -928,12 +929,6 @@ struct rrdhost {
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
 
     // ------------------------------------------------------------------------
-    // the charts of the host
-
-    unsigned int obsolete_charts_count;
-
-
-    // ------------------------------------------------------------------------
     // locks
 
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
@@ -1140,7 +1135,6 @@ extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 extern void rrdhost_free(RRDHOST *host, bool force);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
-extern void rrd_cleanup_obsolete_charts();
 
 extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
 
@@ -1243,16 +1237,17 @@ extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 // ----------------------------------------------------------------------------
 // RRD internal functions
 
+extern void rrdset_delete_files(RRDSET *st);
+extern void rrdset_save(RRDSET *st);
+extern void rrdset_free(RRDSET *st);
+
 #ifdef NETDATA_RRD_INTERNALS
 
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
-extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
-extern void rrdset_save(RRDSET *st);
-extern void rrdset_delete_files(RRDSET *st);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern RRDHOST *rrdhost_create(

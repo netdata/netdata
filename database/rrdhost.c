@@ -1471,67 +1471,6 @@ void rrdhost_cleanup_all(void) {
 
 
 // ----------------------------------------------------------------------------
-// RRDHOST - save or delete all the host charts from disk
-
-void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
-    time_t now = now_realtime_sec();
-
-    RRDSET *st;
-
-    rrdset_foreach_reentrant(st, host) {
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                    && st->last_accessed_time + rrdset_free_obsolete_time < now
-                    && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
-                    && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
-        )) {
-
-            __atomic_sub_fetch(&st->rrdhost->obsolete_charts_count, 1, __ATOMIC_SEQ_CST);
-            rrdset_archive(st);
-        }
-#ifdef ENABLE_ACLK
-        else
-            sql_check_chart_liveness(st);
-#endif
-    }
-    rrdset_foreach_done(st);
-}
-
-void rrdset_check_obsoletion(RRDHOST *host)
-{
-    RRDSET *st;
-    time_t last_entry_t;
-    rrdset_foreach_read(st, host) {
-        last_entry_t = rrdset_last_entry_t(st);
-        if(last_entry_t && last_entry_t < host->senders_connect_time)
-            rrdset_is_obsolete(st);
-    }
-    rrdset_foreach_done(st);
-}
-
-void rrd_cleanup_obsolete_charts()
-{
-    rrd_rdlock();
-
-    RRDHOST *host;
-    rrdhost_foreach_read(host)
-    {
-        if (__atomic_load_n(&host->obsolete_charts_count, __ATOMIC_SEQ_CST))
-            rrdhost_cleanup_obsolete_charts(host);
-
-        if ( host != localhost &&
-             host->trigger_chart_obsoletion_check &&
-             ((host->senders_last_chart_command &&
-             host->senders_last_chart_command + host->health_delay_up_to < now_realtime_sec())
-              || (host->senders_connect_time + 300 < now_realtime_sec())) ) {
-            rrdset_check_obsoletion(host);
-            host->trigger_chart_obsoletion_check = 0;
-        }
-    }
-
-    rrd_unlock();
-}
-
-// ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
