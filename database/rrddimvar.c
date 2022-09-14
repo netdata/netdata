@@ -212,7 +212,7 @@ static void rrddimvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 void rrddimvar_index_init(RRDSET *st) {
     if(!st->rrddimvar_root_index) {
-        st->rrddimvar_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+        st->rrddimvar_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
         dictionary_register_insert_callback(st->rrddimvar_root_index, rrddimvar_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddimvar_root_index, rrddimvar_conflict_callback, NULL);
@@ -267,7 +267,7 @@ void rrddimvar_delete_all(RRDDIM *rd) {
     RRDDIMVAR *rs;
     dfe_start_write(st->rrddimvar_root_index, rs) {
         if(unlikely(rs->rrddim == rd))
-            dictionary_del_having_write_lock(st->rrddimvar_root_index, rs_dfe.name);
+            dictionary_del(st->rrddimvar_root_index, rs_dfe.name);
     }
     dfe_done(rs);
 }

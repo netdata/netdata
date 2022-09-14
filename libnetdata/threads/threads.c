@@ -29,26 +29,35 @@ const char *netdata_thread_tag(void) {
 // ----------------------------------------------------------------------------
 // compatibility library functions
 
+static __thread pid_t gettid_cached_tid = 0;
 pid_t gettid(void) {
+    pid_t tid = 0;
+
+    if(likely(gettid_cached_tid > 0))
+        return gettid_cached_tid;
+
 #ifdef __FreeBSD__
 
-    return (pid_t)pthread_getthreadid_np();
+    tid = (pid_t)pthread_getthreadid_np();
 
 #elif defined(__APPLE__)
 
     #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         uint64_t curthreadid;
         pthread_threadid_np(NULL, &curthreadid);
-        return (pid_t)curthreadid;
+        tid = (pid_t)curthreadid;
     #else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-        return (pid_t)pthread_self;
+        tid = (pid_t)pthread_self;
     #endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
 
 #else /* __APPLE__*/
 
-    return (pid_t)syscall(SYS_gettid);
+    tid = (pid_t)syscall(SYS_gettid);
 
 #endif /* __FreeBSD__, __APPLE__*/
+
+    gettid_cached_tid = tid;
+    return tid;
 }
 
 // ----------------------------------------------------------------------------

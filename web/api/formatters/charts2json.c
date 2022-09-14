@@ -165,7 +165,7 @@ static int print_collector_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 }
 
 void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     RRDSET *st;
     char name[500];
 

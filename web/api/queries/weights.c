@@ -82,7 +82,7 @@ static void register_result_delete_callback(const DICTIONARY_ITEM *item __maybe_
 }
 
 static DICTIONARY *register_result_init() {
-    DICTIONARY *results = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *results = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_insert_callback(results, register_result_insert_callback, results);
     dictionary_register_delete_callback(results, register_result_delete_callback, results);
     return results;
@@ -256,11 +256,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
 
     DICTIONARY *context_results = dictionary_create(
-         DICTIONARY_FLAG_SINGLE_THREADED
-        |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-        |DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-        |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-        );
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_NAME_LINK_DONT_CLONE |
+        DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     struct register_result *t;
     dfe_start_read(results, t) {
@@ -911,7 +908,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     WEIGHTS_STATS stats = {};
 
     DICTIONARY *results = register_result_init();
-    DICTIONARY *charts = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);;
+    DICTIONARY *charts = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE);;
     char *error = NULL;
     int resp = HTTP_RESP_OK;
 

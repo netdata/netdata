@@ -24,9 +24,9 @@
 
 #ifdef STATSD_MULTITHREADED
 // DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
-#define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DONT_OVERWRITE_VALUE|DICTIONARY_FLAG_ADD_IN_FRONT
+#define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT)
 #else
-#define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DONT_OVERWRITE_VALUE|DICTIONARY_FLAG_ADD_IN_FRONT|DICTIONARY_FLAG_SINGLE_THREADED
+#define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT | DICT_OPTION_SINGLE_THREADED)
 #endif
 
 #define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
@@ -417,7 +417,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
     // no locks here, go faster
     // this will call the dictionary_metric_insert_callback() if an item
     // is inserted, otherwise it will return the existing one.
-    // We used the flag DICTIONARY_FLAG_DONT_OVERWRITE_VALUE to support this.
+    // We used the flag DICT_OPTION_DONT_OVERWRITE_VALUE to support this.
     STATSD_METRIC *m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
 #endif
 
@@ -1324,7 +1324,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if(app) {
                 if(!strcmp(s, "dictionary")) {
                     if(!app->dict)
-                        app->dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+                        app->dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
                     dict = app->dict;
                 }

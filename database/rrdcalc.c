@@ -607,7 +607,7 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host) {
     if(!host->rrdcalc_root_index) {
-        host->rrdcalc_root_index = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+        host->rrdcalc_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
         dictionary_register_insert_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_insert_callback, NULL);
         dictionary_register_react_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_react_callback, NULL);

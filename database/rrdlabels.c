@@ -519,7 +519,7 @@ static void rrdlabel_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 }
 
 DICTIONARY *rrdlabels_create(void) {
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(dict, rrdlabel_insert_callback, dict);
     dictionary_register_delete_callback(dict, rrdlabel_delete_callback, dict);
     dictionary_register_conflict_callback(dict, rrdlabel_conflict_callback, dict);
@@ -670,7 +670,7 @@ static int remove_not_old_not_new_callback(const DICTIONARY_ITEM *item, void *va
     RRDLABEL *lb = (RRDLABEL *)value;
 
     if(!(lb->label_source & (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT))) {
-        dictionary_del_having_write_lock(dict, name);
+        dictionary_del(dict, name);
         return 1;
     }
 

@@ -19,8 +19,8 @@ void netdata_cleanup_and_exit(int ret) { exit(ret); }
 int main(int argc, char **argv) {
 	if(argc || argv) {;}
 
-//	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
-	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS);
+//	DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_WITH_STATISTICS);
+	DICTIONARY *dict = dictionary_create(DICT_OPTION_STATS);
 	if(!dict) fatal("Cannot create dictionary.");
 
 	struct rusage start, end;

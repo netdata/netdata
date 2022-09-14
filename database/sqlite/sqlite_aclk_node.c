@@ -35,7 +35,7 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
         return;
 
     struct update_node_collectors upd_node_collectors;
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     upd_node_collectors.node_id = wc->node_id;
     upd_node_collectors.claim_id = get_agent_claimid();

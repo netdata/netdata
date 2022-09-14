@@ -182,7 +182,8 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
     size_t line = 0, len = 0;
     ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
-    DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    DICTIONARY *all_rrdcalcs = dictionary_create(
+        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));

@@ -330,7 +330,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 , SIMPLE_PATTERN_EXACT
         );
 
-        dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict_mountpoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     }
 
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);

@@ -76,8 +76,8 @@ int registry_init(void) {
     netdata_mutex_init(&registry.lock);
 
     // create dictionaries
-    registry.persons = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
-    registry.machines = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
+    registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+    registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
     avl_init(&registry.registry_urls_root_index, registry_url_compare);
 
     // load the registry database

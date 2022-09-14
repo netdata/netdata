@@ -140,7 +140,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         struct value_output co = {.c = 0, .wb = wb};
 
-        DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrddim_id(rd), rrddim_name(rd));
             int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrddim_id(rd), rrddim_name(rd));
@@ -151,7 +151,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
-        dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
             snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
@@ -164,7 +164,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         RRDSET *st;
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_labels%s: [", kq, kq);
-        dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             st = rd->rrdset;
             if (st->rrdlabels)

@@ -13,19 +13,19 @@
  * Names and Values in the dictionary can be cloned or linked.
  * In clone mode, the dictionary does all the memory management.
  * The default is clone for both names and values.
- * Set DICTIONARY_FLAG_NAME_LINK_DONT_CLONE to link names.
- * Set DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE to link names.
+ * Set DICT_OPTION_NAME_LINK_DONT_CLONE to link names.
+ * Set DICT_OPTION_VALUE_LINK_DONT_CLONE to link names.
  *
  * ORDERED
  * Items are ordered in the order they are added (new items are appended at the end).
- * You may reverse the order by setting the flag DICTIONARY_FLAG_ADD_IN_FRONT.
+ * You may reverse the order by setting the flag DICT_OPTION_ADD_IN_FRONT.
  *
  * LOOKUP
  * The dictionary uses JudyHS to maintain a very fast randomly accessible hash table.
  *
  * MULTI-THREADED and SINGLE-THREADED
  * Each dictionary may be single threaded (no locks), or multi-threaded (multiple readers or one writer).
- * The default is multi-threaded. Add the flag DICTIONARY_FLAG_SINGLE_THREADED for single-threaded.
+ * The default is multi-threaded. Add the flag DICT_OPTION_SINGLE_THREADED for single-threaded.
  *
  * WALK-THROUGH and FOREACH traversal
  * The dictionary can be traversed on read or write mode, either with a callback (walkthrough) or with
@@ -37,39 +37,33 @@
 
 #ifdef DICTIONARY_INTERNALS
 #define DICTFE_CONST
-#define DICTIONARY_ITEM_CONST
+#define DICT_ITEM_CONST
 #else
 #define DICTFE_CONST const
-#define DICTIONARY_ITEM_CONST const
+#define DICT_ITEM_CONST const
 #endif
 
 typedef struct dictionary DICTIONARY;
 typedef struct dictionary_item DICTIONARY_ITEM;
 
-typedef enum dictionary_flags {
-    DICTIONARY_FLAG_NONE                    = 0,        // the default is the opposite of all below
-    DICTIONARY_FLAG_SINGLE_THREADED         = (1 << 0), // don't use any locks (default: use locks)
-    DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
-    DICTIONARY_FLAG_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
-    DICTIONARY_FLAG_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
-    DICTIONARY_FLAG_STATS                   = (1 << 5), // maintain statistics for this dictionary
-
-    // to change the value of the following, you also need to change the corresponding #defines in dictionary.c
-    DICTIONARY_FLAG_RESERVED1               = (1 << 27), // reserved for DICTIONARY_FLAG_EXCLUSIVE_ACCESS
-    DICTIONARY_FLAG_RESERVED2               = (1 << 28), // reserved for DICTIONARY_FLAG_DESTROYED
-    DICTIONARY_FLAG_RESERVED3               = (1 << 29), // reserved for DICTIONARY_FLAG_DEFER_ALL_DELETIONS
-    DICTIONARY_FLAG_RESERVED4               = (1 << 30), // reserved for DICTIONARY_FLAG_MASTER_DICT
-} DICTIONARY_FLAGS;
+typedef enum dictionary_options {
+    DICT_OPTION_NONE                    = 0,        // the default is the opposite of all below
+    DICT_OPTION_SINGLE_THREADED         = (1 << 0), // don't use any locks (default: use locks)
+    DICT_OPTION_VALUE_LINK_DONT_CLONE   = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
+    DICT_OPTION_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
+    DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
+    DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICT_OPTION_STATS                   = (1 << 5), // maintain statistics for this dictionary
+} DICT_OPTIONS;
 
 // Create a dictionary
 #ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(flags) dictionary_create_advanced_with_trace(flags, __FUNCTION__, __LINE__, __FILE__);
-#define dictionary_create_advanced(flags) dictionary_create_advanced_with_trace(flags, __FUNCTION__, __LINE__, __FILE__);
-extern DICTIONARY *dictionary_create_advanced_with_trace(DICTIONARY_FLAGS flags, const char *function, size_t line, const char *file);
+#define dictionary_create(options) dictionary_create_advanced_with_trace(options, __FUNCTION__, __LINE__, __FILE__);
+#define dictionary_create_advanced(options) dictionary_create_advanced_with_trace(options, __FUNCTION__, __LINE__, __FILE__);
+extern DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, const char *function, size_t line, const char *file);
 #else
-#define dictionary_create(flags) dictionary_create_advanced(flags);
-extern DICTIONARY *dictionary_create_advanced(DICTIONARY_FLAGS flags);
+#define dictionary_create(options) dictionary_create_advanced(options);
+extern DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options);
 #endif
 
 // an insert callback to be called just after an item is added to the dictionary
@@ -80,7 +74,7 @@ extern void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_cal
 // this callback is called while the dictionary is write locked!
 extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
-// a merge callback to be called when DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
+// a merge callback to be called when DICT_OPTION_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
 extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data);
@@ -108,13 +102,13 @@ extern void dictionary_version_increment(DICTIONARY *dict);
 //
 // - if an item with the same name does not exist, create one
 // - if an item with the same name exists, then:
-//        a) if DICTIONARY_FLAG_DONT_OVERWRITE_VALUE is set, just return the existing value (ignore the new value)
+//        a) if DICT_OPTION_DONT_OVERWRITE_VALUE is set, just return the existing value (ignore the new value)
 //   else b) reset the value to the new value passed at the call
 //
-// When DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE is set, the value is linked, otherwise it is copied
-// When DICTIONARY_FLAG_NAME_LINK_DONT_CLONE is set, the name is linked, otherwise it is copied
+// When DICT_OPTION_VALUE_LINK_DONT_CLONE is set, the value is linked, otherwise it is copied
+// When DICT_OPTION_NAME_LINK_DONT_CLONE is set, the name is linked, otherwise it is copied
 //
-// When neither DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE nor DICTIONARY_FLAG_NAME_LINK_DONT_CLONE are set, all the
+// When neither DICT_OPTION_VALUE_LINK_DONT_CLONE nor DICT_OPTION_NAME_LINK_DONT_CLONE are set, all the
 // memory management for names and values is done by the dictionary.
 //
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
@@ -122,17 +116,8 @@ extern void dictionary_version_increment(DICTIONARY *dict);
 #define dictionary_set(dict, name, value, value_len) dictionary_set_advanced(dict, name, -1, value, value_len, NULL)
 extern void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
-#define dictionary_set_having_write_lock(dict, name, value, value_len) dictionary_set_unsafe(dict, name, value, value_len)
-
-#define dictionary_set_unsafe(dict, name, value, value_len) dictionary_set_advanced_unsafe(dict, name, -1, value, value_len, NULL)
-extern void *dictionary_set_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
-
 #define dictionary_set_and_acquire_item(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced(dict, name, -1, value, value_len, NULL)
-extern const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
-
-#define dictionary_set_and_acquire_item_unsafe(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced_unsafe(dict, name, -1, value, value_len, NULL)
-extern const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
-
+extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
 // ----------------------------------------------------------------------------
 // Get an item from the dictionary
@@ -141,17 +126,8 @@ extern const DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced_unsafe(DI
 #define dictionary_get(dict, name) dictionary_get_advanced(dict, name, -1)
 extern void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_len);
 
-#define dictionary_get_having_read_lock(dict, name) dictionary_get_unsafe(dict, name)
-#define dictionary_get_having_write_lock(dict, name) dictionary_get_unsafe(dict, name)
-
-#define dictionary_get_unsafe(dict, name) dictionary_get_advanced_unsafe(dict, name, -1)
-extern void *dictionary_get_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len);
-
 #define dictionary_get_and_acquire_item(dict, name) dictionary_get_and_acquire_item_advanced(dict, name, -1)
-extern const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len);
-
-#define dictionary_get_and_acquire_item_unsafe(dict, name) dictionary_get_and_acquire_item_advanced_unsafe(dict, name, -1)
-extern const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len);
+extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len);
 
 
 // ----------------------------------------------------------------------------
@@ -162,20 +138,15 @@ extern const DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced_unsafe(DI
 #define dictionary_del(dict, name) dictionary_del_advanced(dict, name, -1)
 extern int dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len);
 
-#define dictionary_del_having_write_lock(dict, name) dictionary_del_unsafe(dict, name)
-
-#define dictionary_del_unsafe(dict, name) dictionary_del_advanced_unsafe(dict, name, -1)
-extern int dictionary_del_advanced_unsafe(DICTIONARY *dict, const char *name, ssize_t name_len);
-
 // ----------------------------------------------------------------------------
 // reference counters management
 
-extern void dictionary_acquired_item_release_unsafe(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
-extern void dictionary_acquired_item_release(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
+extern void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
-extern const DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
-extern const char *dictionary_acquired_item_name(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
-extern void *dictionary_acquired_item_value(DICTIONARY_ITEM_CONST DICTIONARY_ITEM *item);
+extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
+
+extern const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item);
+extern void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
 
 // ----------------------------------------------------------------------------
@@ -217,7 +188,6 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTIONARY_LOCK_READ      'r'
 #define DICTIONARY_LOCK_WRITE     'w'
 #define DICTIONARY_LOCK_REENTRANT 'z'
-#define DICTIONARY_LOCK_NONE      'u'
 
 typedef DICTFE_CONST struct dictionary_foreach {
     DICTIONARY *dict;           // the dictionary upon we work
@@ -238,7 +208,6 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
 #define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_reentrant(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_REENTRANT)
-#define dfe_start_unsafe(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_NONE)
 
 #define dfe_start_rw(dict, value, mode)                                                             \
         do {                                                                                        \

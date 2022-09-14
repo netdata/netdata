@@ -18,7 +18,7 @@ Dictionaries provide an interface to:
 - **Delete** an item from the dictionary (provided its `name`)
 - **Traverse** the list of items in the dictionary
 
-Dictionaries are **ordered**, meaning that the order they have been added is preserved while traversing them. The caller may reverse this order by passing the flag `DICTIONARY_FLAG_ADD_IN_FRONT` when creating the dictionary.
+Dictionaries are **ordered**, meaning that the order they have been added is preserved while traversing them. The caller may reverse this order by passing the flag `DICT_OPTION_ADD_IN_FRONT` when creating the dictionary.
 
 Dictionaries guarantee **uniqueness** of all items added to them, meaning that only one item with a given name can exist in the dictionary at any given time.
 
@@ -35,21 +35,21 @@ In **clone** mode, the dictionary guarantees that all operations on the dictiona
 
    1.`dictionary_register_insert_callback()` that will be called just after the insertion of an item to the dictionary, or after the replacement of the value of a dictionary item (but while the dictionary is write-locked - if locking is enabled).
    2. `dictionary_register_delete_callback()` that will be called just prior to the deletion of an item from the dictionary, or prior to the replacement of the value of a dictionary item (but while the dictionary is write-locked - if locking is enabled).
-   3. `dictionary_register_conflict_callback()` that will be called when `DICTIONARY_FLAG_DONT_OVERWRITE_VALUE` is set and another value is attempted to be inserted for the same key. 
+   3. `dictionary_register_conflict_callback()` that will be called when `DICT_OPTION_DONT_OVERWRITE_VALUE` is set and another value is attempted to be inserted for the same key. 
 
 In **link** mode, the name and/or the value are just linked to the dictionary item, and it is the user's responsibility to free the memory they use after an item is deleted from the dictionary or when the dictionary is destroyed.
 
 By default, **clone** mode is used for both the name and the value.
 
-To use **link** mode for names, add `DICTIONARY_FLAG_NAME_LINK_DONT_CLONE` to the flags when creating the dictionary.
+To use **link** mode for names, add `DICT_OPTION_NAME_LINK_DONT_CLONE` to the flags when creating the dictionary.
 
-To use **link** mode for values, add `DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE` to the flags when creating the dictionary.
+To use **link** mode for values, add `DICT_OPTION_VALUE_LINK_DONT_CLONE` to the flags when creating the dictionary.
 
 ## Locks
 
 The dictionary allows both **single-threaded** operation (no locks - faster) and **multi-threaded** operation utilizing a read-write lock.
 
-The default is **multi-threaded**. To enable **single-threaded** add `DICTIONARY_FLAG_SINGLE_THREADED` to the flags when creating the dictionary.
+The default is **multi-threaded**. To enable **single-threaded** add `DICT_OPTION_SINGLE_THREADED` to the flags when creating the dictionary.
 
 ## Hash table operations
 
@@ -72,7 +72,7 @@ This call is used to:
 - **add** an item to the dictionary.
 - **reset** the value of an existing item in the dictionary.
 
-If **resetting** is not desired, add `DICTIONARY_FLAG_DONT_OVERWRITE_VALUE` to the flags when creating the dictionary. In this case, `dictionary_set()` will return the value of the original item found in the dictionary instead of resetting it and the value passed to the call will be ignored. Optionally a conflict callback function can be registered, to manipulate (probably merge or extend) the original value, based on the new value attempted to be added to the dictionary.
+If **resetting** is not desired, add `DICT_OPTION_DONT_OVERWRITE_VALUE` to the flags when creating the dictionary. In this case, `dictionary_set()` will return the value of the original item found in the dictionary instead of resetting it and the value passed to the call will be ignored. Optionally a conflict callback function can be registered, to manipulate (probably merge or extend) the original value, based on the new value attempted to be added to the dictionary.
 
 For **multi-threaded** operation, the `dictionary_set()` calls get an exclusive write lock on the dictionary.
 
@@ -143,7 +143,7 @@ Example:
 
 ```c
 // create the dictionary
-DICTIONARY *dict = dictionary_create(DICTIONARY_FLAGS_NONE);
+DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
 
 // add an item to it
 dictionary_set(dict, "name", "value", 6);
@@ -189,7 +189,7 @@ There are 4 calls:
 - `dictionary_walkthrough_read()` and `dictionary_sorted_walkthrough_read()` that acquire a shared read lock, and they call a callback function for every item of the dictionary. The callback function may use the unsafe versions of the `dictionary_get()` calls to lookup other items in the dictionary, but it should not attempt to add or remove items to/from the dictionary.
 - `dictionary_walkthrough_write()` and `dictionary_sorted_walkthrough_write()` that acquire an exclusive write lock, and they call a callback function for every item of the dictionary. This is to be used when items need to be added to or removed from the dictionary. The `write` versions can be used to delete any or all the items from the dictionary, including the currently working one. For the `sorted` version, all items in the dictionary maintain a reference counter, so all deletions are deferred until the sorted walkthrough finishes.** 
 
-The non sorted versions traverse the items in the same order they have been added to the dictionary (or the reverse order if the flag `DICTIONARY_FLAG_ADD_IN_FRONT` is set during dictionary creation). The sorted versions sort alphabetically the items based on their name, and then they traverse them in the sorted order.
+The non sorted versions traverse the items in the same order they have been added to the dictionary (or the reverse order if the flag `DICT_OPTION_ADD_IN_FRONT` is set during dictionary creation). The sorted versions sort alphabetically the items based on their name, and then they traverse them in the sorted order.
 
 The callback function returns an `int`. If this value is negative, traversal of the dictionary is stopped immediately and the negative value is returned to the caller. If the returned value of all callback calls is zero or positive, the walkthrough functions return the sum of the return values of all callbacks. So, if you are just interested to know how many items fall into some condition, write a callback function that returns 1 when the item satisfies that condition and 0 when it does not and the walkthrough function will return how many tested positive.
 
@@ -241,5 +241,5 @@ Since the dictionary uses a hash table and a double linked list, if the contract
 
 This is currently used in statsd:
 
-- the data collection thread uses only `get` and `set`. It never uses `del`. New items are added at the front of the linked list (`DICTIONARY_FLAG_ADD_IN_FRONT`).
+- the data collection thread uses only `get` and `set`. It never uses `del`. New items are added at the front of the linked list (`DICT_OPTION_ADD_IN_FRONT`).
 - the flushing thread is only traversing the dictionary up to the point it last traversed it (it uses a flag for that to know where it stopped last time). It never uses `get`, `set` or `del`.

@@ -278,7 +278,7 @@ int collector_counter_callb(const DICTIONARY_ITEM *item __maybe_unused, void *en
 void analytics_collectors(void)
 {
     RRDSET *st;
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     char name[500];
     BUFFER *bt = buffer_create(1000);
 

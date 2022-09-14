@@ -533,7 +533,7 @@ static void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
     if(unlikely(!ri)) return;
     if(likely(ri->rrdmetrics)) return;
 
-    ri->rrdmetrics = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    ri->rrdmetrics = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(ri->rrdmetrics, rrdmetric_insert_callback, ri);
     dictionary_register_delete_callback(ri->rrdmetrics, rrdmetric_delete_callback, ri);
     dictionary_register_conflict_callback(ri->rrdmetrics, rrdmetric_conflict_callback, ri);
@@ -837,7 +837,7 @@ void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
 
     if(unlikely(!rc || rc->rrdinstances)) return;
 
-    rc->rrdinstances = dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    rc->rrdinstances = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(rc->rrdinstances, rrdinstance_insert_callback, rc);
     dictionary_register_delete_callback(rc->rrdinstances, rrdinstance_delete_callback, rc);
     dictionary_register_conflict_callback(rc->rrdinstances, rrdinstance_conflict_callback, rc);
@@ -1287,23 +1287,19 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(likely(host->rrdctx)) return;
 
-    host->rrdctx = (RRDCONTEXTS *)dictionary_create(DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    host->rrdctx = (RRDCONTEXTS *)dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx, rrdcontext_insert_callback, host);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx, rrdcontext_delete_callback, host);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx, rrdcontext_conflict_callback, host);
     dictionary_register_react_callback((DICTIONARY *)host->rrdctx, rrdcontext_react_callback, host);
 
-    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create(
-         DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-        |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_insert_callback, NULL);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_delete_callback, NULL);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_conflict_callback, NULL);
 
-    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create(
-         DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-        |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_post_processing_queue_insert_callback, NULL);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_post_processing_queue_delete_callback, NULL);
@@ -1321,7 +1317,7 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 
         RRDCONTEXT *rc;
         dfe_start_write(old, rc) {
-            dictionary_del_having_write_lock(old, string2str(rc->id));
+            dictionary_del(old, string2str(rc->id));
         }
         dfe_done(rc);
         dictionary_destroy(old);
@@ -1333,7 +1329,7 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 
         RRDCONTEXT *rc;
         dfe_start_write(old, rc) {
-            dictionary_del_having_write_lock(old, string2str(rc->id));
+            dictionary_del(old, string2str(rc->id));
         }
         dfe_done(rc);
         dictionary_destroy(old);
@@ -2387,7 +2383,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
             dfe_start_write(ri->rrdmetrics, rm) {
                 if(rrdmetric_should_be_deleted(rm)) {
                     if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                    if(dictionary_del_having_write_lock(ri->rrdmetrics, string2str(rm->id)) != 0)
+                    if(dictionary_del(ri->rrdmetrics, string2str(rm->id)) != 0)
                         error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                               string2str(rm->id),
                               string2str(ri->id),

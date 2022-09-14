@@ -42,7 +42,7 @@ REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t whe
     strncpyz(m->guid, machine_guid, GUID_LEN);
 
     debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating dictionary of urls", machine_guid);
-    m->machine_urls = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
+    m->machine_urls = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
 
     m->first_t = m->last_t = (uint32_t)when;
     m->usages = 0;

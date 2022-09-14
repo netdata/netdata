@@ -51,18 +51,12 @@ static DICTIONARY *rrdhost_root_index_hostname = NULL;
 static inline void rrdhost_init() {
     if(unlikely(!rrdhost_root_index)) {
         rrdhost_root_index = dictionary_create(
-              DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            );
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     }
 
     if(unlikely(!rrdhost_root_index_hostname)) {
         rrdhost_root_index_hostname = dictionary_create(
-              DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            );
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     }
 }
 

@@ -96,10 +96,7 @@ static void tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
 static void tc_class_index_init(struct tc_device *d) {
     if(!d->classes) {
-        d->classes = dictionary_create(
-             DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            |DICTIONARY_FLAG_SINGLE_THREADED
-        );
+        d->classes = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
 
         dictionary_register_delete_callback(d->classes, tc_class_free_callback, d);
         dictionary_register_conflict_callback(d->classes, tc_class_conflict_callback, d);
@@ -146,10 +143,7 @@ static void tc_device_free_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 static void tc_device_index_init() {
     if(!tc_device_root_index) {
         tc_device_root_index = dictionary_create(
-             DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            |DICTIONARY_FLAG_SINGLE_THREADED
-            |DICTIONARY_FLAG_ADD_IN_FRONT
-            );
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_ADD_IN_FRONT);
 
         dictionary_register_insert_callback(tc_device_root_index, tc_device_add_callback, NULL);
         dictionary_register_delete_callback(tc_device_root_index, tc_device_free_callback, NULL);
@@ -196,7 +190,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
     d->family_updated = false;
 
     struct tc_class *c;
-    dfe_start_unsafe(d->classes, c) {
+    dfe_start_write(d->classes, c) {
         if(unlikely(cleanup_every && c->unupdated >= cleanup_every))
             tc_class_free(d, c);
 
@@ -254,7 +248,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // prepare all classes
     // we set reasonable defaults for the rest of the code below
 
-    dfe_start_unsafe(d->classes, c) {
+    dfe_start_read(d->classes, c) {
         c->render = false;      // do not render this class
         c->isleaf = true;       // this is a leaf class
         c->hasparent = false;   // without a parent
@@ -283,7 +277,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
 
         // set all classes to !updated
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if (unlikely(!c->isqdisc && c->updated))
                 c->updated = false;
         }
@@ -307,7 +301,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // so, here we remove the isleaf flag from nodes in the middle
     // and we add the hasparent flag to leaf nodes we found their parent
     if(likely(!d->enabled_all_classes_qdiscs)) {
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->updated))
                 continue;
 
@@ -319,7 +313,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             //    c->parentid?c->parentid:"NULL");
 
             // find if c is leaf or not
-            dfe_start_unsafe(d->classes, x) {
+            dfe_start_read(d->classes, x) {
                 if(unlikely(!x->updated || c == x || !x->parentid))
                     continue;
 
@@ -339,7 +333,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         dfe_done(c);
     }
 
-    dfe_start_unsafe(d->classes, c) {
+    dfe_start_read(d->classes, c) {
         if(unlikely(!c->updated))
             continue;
 
@@ -367,7 +361,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // dump all the list to see what we know
 
     if(unlikely(debug_flags & D_TC_LOOP)) {
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(c->render) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", string2str(d->name), string2str(c->id));
             else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class '%s', IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: '%s')",
                       string2str(d->name?d->name:d->id), string2str(c->id), c->updated, c->isleaf, c->hasparent, string2str(c->parentid));
@@ -439,7 +433,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_bytes))
@@ -505,7 +499,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_packets))
@@ -571,7 +565,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_dropped))
@@ -637,7 +631,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_tokens)) {
@@ -705,7 +699,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_ctokens))
@@ -1151,7 +1145,7 @@ void *tc_main(void *ptr) {
                 size_t number_of_classes = 0;
 
                 struct tc_device *d;
-                dfe_start_unsafe(tc_device_root_index, d) {
+                dfe_start_read(tc_device_root_index, d) {
                     number_of_classes += dictionary_entries(d->classes);
                 }
                 dfe_done(d);
