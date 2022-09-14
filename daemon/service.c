@@ -70,8 +70,6 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
 
     worker_is_busy(WORKER_JOB_FREE_DIMENSION);
     rrddim_free(st, rd);
-
-    worker_is_idle();
 }
 
 static void svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
@@ -92,8 +90,6 @@ static void svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
         }
     }
     dfe_done(rd);
-
-    worker_is_idle();
 }
 
 static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
@@ -124,8 +120,6 @@ static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
         worker_is_busy(WORKER_JOB_FREE_CHART);
         rrdset_free(st);
     }
-
-    worker_is_idle();
 }
 
 static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
@@ -151,8 +145,6 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
 #endif
     }
     rrdset_foreach_done(st);
-
-    worker_is_idle();
 }
 
 static void svc_rrdset_check_obsoletion(RRDHOST *host) {
@@ -168,8 +160,6 @@ static void svc_rrdset_check_obsoletion(RRDHOST *host) {
 
     }
     rrdset_foreach_done(st);
-
-    worker_is_idle();
 }
 
 static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
@@ -202,7 +192,6 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
     }
 
     rrd_unlock();
-    worker_is_idle();
 }
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
@@ -239,7 +228,6 @@ restart_after_removal:
     }
 
     rrd_unlock();
-    worker_is_idle();
 }
 
 static void service_main_cleanup(void *ptr)
