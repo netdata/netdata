@@ -3920,11 +3920,9 @@ netdataDashboard.context = {
         info: 'Number of current connections per database.'
     },    
     'postgres.db_cache_io_ratio': {
-        /*
         room: { 
             mainheads: [
                 function (_, id) {
-                    cgroupMemLimitIsSet = 1;
                     return '<div data-netdata="' + id + '"'
                         + ' data-append-options="percentage"'
                         + ' data-gauge-max-value="100"'
@@ -3941,18 +3939,15 @@ netdataDashboard.context = {
                 }
             ],
         },
-        */        
         info: 'PostgreSQL uses a <b>shared buffer cache</b> to store frequently accessed data in memory, and avoid slower disk reads. If you are seeing performance issues, consider increasing the <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS" target="_blank"><i>shared_buffers</i></a> size or tuning <a href="https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE" target="_blank"><i>effective_cache_size</i></a>.'
     },
     'postgres.db_io_rate': {
         info: '<p>Amount of data read from shared buffer cache or from disk.</p><p><b>Disk</b> - data read from disk. <b>Memory</b> - data read from buffer cache (this only includes hits in the PostgreSQL buffer cache, not the operating system\'s file system cache).</p>'
     },
     'postgres.db_ops_fetched_rows_ratio': {
-        /*
         room: {
             mainheads: [
                 function (_, id) {
-                    cgroupMemLimitIsSet = 1;
                     return '<div data-netdata="' + id + '"'
                         + ' data-append-options="percentage"'
                         + ' data-gauge-max-value="100"'
@@ -3968,8 +3963,7 @@ netdataDashboard.context = {
                         + ' role="application"></div>';
                 }
             ],
-        },
-        */        
+        }, 
         info: 'The percentage of rows that contain data needed to execute the query, out of the total number of rows scanned. A high value indicates that the database is executing queries efficiently, while a low value indicates that the database is performing extra work by scanning a large number of rows that aren\'t required to process the query. Low values may be caused by missing indexes or inefficient queries.'
     },
     'postgres.db_ops_read_rows_rate': {
