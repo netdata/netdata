@@ -756,32 +756,6 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
     return 0;
 }
 
-void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host) {
-    time_t now = now_realtime_sec();
-
-    RRDHOST *host;
-
-restart_after_removal:
-    rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_removed(host, protected_host, now)) {
-            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
-
-            if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
-#ifdef ENABLE_DBENGINE
-                /* don't delete multi-host DB host files */
-                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
-#endif
-            )
-                rrdhost_delete_charts(host);
-            else
-                rrdhost_save_charts(host);
-
-            rrdhost_free(host, 0);
-            goto restart_after_removal;
-        }
-    }
-}
-
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
