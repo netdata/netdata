@@ -442,7 +442,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     //data_file_size = journalfile->datafile->pos; TODO: utilize this?
 
     max_id = 1;
-    bool journal_is_mmapped = journalfile->data;
+    bool journal_is_mmapped = (journalfile->data != NULL);
     if (unlikely(!journal_is_mmapped)) {
         ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
         if (unlikely(ret))
@@ -479,7 +479,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
             max_id = MAX(max_id, id);
         }
         if (likely(journal_is_mmapped))
-            buf = journalfile->data + size_bytes;
+            buf += size_bytes;
     }
 skip_file:
     if (unlikely(!journal_is_mmapped))
