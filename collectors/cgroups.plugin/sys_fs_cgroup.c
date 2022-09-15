@@ -3915,7 +3915,7 @@ void update_cgroup_charts(int update_every) {
                             rrdset_is_obsolete(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
-                        rrdsetvar_custom_chart_variable_set(cg->st_cpu_limit, cg->chart_var_cpu_limit, NAN);
+                        rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, NAN);
                     }
                 }
             }
