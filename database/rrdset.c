@@ -237,6 +237,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     string_freez(st->plugin_name);
     string_freez(st->module_name);
 
+    freez(st->cache_dir);
     freez(st->exporting_flags);
     freez(st->cache_dir);
 }
