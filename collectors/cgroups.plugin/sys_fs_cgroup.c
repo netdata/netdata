@@ -3907,7 +3907,7 @@ void update_cgroup_charts(int update_every) {
 
                         cg->prev_cpu_usage = cpu_usage;
 
-                        rrdsetvar_custom_chart_variable_set(cg->st_cpu_limit, cg->chart_var_cpu_limit, value);
+                        rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, value);
                         rrdset_done(cg->st_cpu_limit);
                     }
                     else {
