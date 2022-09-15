@@ -38,8 +38,14 @@ static struct global_statistics {
     volatile uint64_t sqlite3_queries_failed_busy;
     volatile uint64_t sqlite3_queries_failed_locked;
     volatile uint64_t sqlite3_rows;
-    volatile uint64_t sqlite3_cache_hit;
-    volatile uint64_t sqlite3_cache_miss;
+    volatile uint64_t sqlite3_metadata_cache_hit;
+    volatile uint64_t sqlite3_context_cache_hit;
+    volatile uint64_t sqlite3_metadata_cache_miss;
+    volatile uint64_t sqlite3_context_cache_miss;
+    volatile uint64_t sqlite3_metadata_cache_spill;
+    volatile uint64_t sqlite3_context_cache_spill;
+    volatile uint64_t sqlite3_metadata_cache_write;
+    volatile uint64_t sqlite3_context_cache_write;
 
 } global_statistics = {
         .connected_clients = 0,
@@ -137,10 +143,17 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    gs->sqlite3_cache_hit = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-    gs->sqlite3_cache_hit += (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-    gs->sqlite3_cache_miss = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
-    gs->sqlite3_cache_miss += (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    gs->sqlite3_metadata_cache_hit  = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+    gs->sqlite3_context_cache_hit   = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+
+    gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    gs->sqlite3_context_cache_miss  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+
+    gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+    gs->sqlite3_context_cache_spill  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+
+    gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+    gs->sqlite3_context_cache_write  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
 }
 
 static void global_statistics_charts(void) {
@@ -588,19 +601,21 @@ static void global_statistics_charts(void) {
         rrdset_done(st_sqlite3_rows);
     }
 
-    if(gs.sqlite3_cache_hit) {
+    if(gs.sqlite3_metadata_cache_hit) {
         static RRDSET *st_sqlite3_cache = NULL;
         static RRDDIM *rd_cache_hit = NULL;
         static RRDDIM *rd_cache_miss= NULL;
+        static RRDDIM *rd_cache_spill= NULL;
+        static RRDDIM *rd_cache_write= NULL;
 
         if (unlikely(!st_sqlite3_cache)) {
             st_sqlite3_cache = rrdset_create_localhost(
                 "netdata"
-                , "sqlite3_cache"
+                , "sqlite3_metatada_cache"
                 , NULL
                 , "sqlite3"
                 , NULL
-                , "Netdata SQLite3 Cache"
+                , "Netdata SQLite3 metadata cache"
                 , "ops/s"
                 , "netdata"
                 , "stats"
@@ -611,12 +626,55 @@ static void global_statistics_charts(void) {
 
             rd_cache_hit = rrddim_add(st_sqlite3_cache, "cache_hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_cache_miss = rrddim_add(st_sqlite3_cache, "cache_miss", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cache_spill = rrddim_add(st_sqlite3_cache, "cache_spill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(st_sqlite3_cache);
 
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_cache_hit);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_cache_miss);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_metadata_cache_hit);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_metadata_cache_miss);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_metadata_cache_spill);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_metadata_cache_write);
+
+        rrdset_done(st_sqlite3_cache);
+    }
+
+    if(gs.sqlite3_context_cache_hit) {
+        static RRDSET *st_sqlite3_cache = NULL;
+        static RRDDIM *rd_cache_hit = NULL;
+        static RRDDIM *rd_cache_miss= NULL;
+        static RRDDIM *rd_cache_spill= NULL;
+        static RRDDIM *rd_cache_write= NULL;
+
+        if (unlikely(!st_sqlite3_cache)) {
+            st_sqlite3_cache = rrdset_create_localhost(
+                "netdata"
+                , "sqlite3_context_cache"
+                , NULL
+                , "sqlite3"
+                , NULL
+                , "Netdata SQLite3 context cache"
+                , "ops/s"
+                , "netdata"
+                , "stats"
+                , 131104
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            rd_cache_hit = rrddim_add(st_sqlite3_cache, "cache_hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cache_miss = rrddim_add(st_sqlite3_cache, "cache_miss", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cache_spill = rrddim_add(st_sqlite3_cache, "cache_spill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_sqlite3_cache);
+
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_context_cache_hit);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_context_cache_miss);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_context_cache_spill);
+        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_context_cache_write);
 
         rrdset_done(st_sqlite3_cache);
     }
