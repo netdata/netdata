@@ -84,7 +84,7 @@ static void tc_class_free_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     string_freez(c->parentid);
 }
 
-static void tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+static bool tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     struct tc_device *d = data; (void)d;
     struct tc_class *c = old_value; (void)c;
     struct tc_class *new_c = new_value; (void)new_c;
@@ -92,6 +92,8 @@ static void tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
 
     tc_class_free_callback(item, new_value, data);
+
+    return true;
 }
 
 static void tc_class_index_init(struct tc_device *d) {

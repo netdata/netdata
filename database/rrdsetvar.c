@@ -148,7 +148,7 @@ static void rrdsetvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
 }
 
-static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *new_rrdsetvar __maybe_unused, void *constructor_data) {
+static bool rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *new_rrdsetvar __maybe_unused, void *constructor_data) {
     RRDSETVAR *rs = rrdsetvar;
     struct rrdsetvar_constructor *ctr = constructor_data;
 
@@ -160,21 +160,21 @@ static void rrdsetvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     if(((ctr->value == NULL && rs->value != NULL && rs->flags & RRDVAR_FLAG_ALLOCATED) || (rs->value == ctr->value))
         && ctr->flags == options && rs->type == ctr->type) {
         // don't reset it - everything is the same, or as it should...
-        ;
+        return false;
     }
-    else {
-        internal_error(true, "RRDSETVAR: resetting variable '%s' of chart '%s' of host '%s', options from 0x%x to 0x%x, type from %d to %d",
-                       string2str(rs->name), rrdset_id(ctr->rrdset), rrdhost_hostname(ctr->rrdset->rrdhost),
-                       options, ctr->flags, rs->type, ctr->type);
 
-        rrdsetvar_free_value_unsafe(rs); // we are going to change the options, so free it before setting it
-        rs->flags = ctr->flags;
-        rs->type = ctr->type;
-        rrdsetvar_set_value_unsafe(rs, ctr->value);
+    internal_error(true, "RRDSETVAR: resetting variable '%s' of chart '%s' of host '%s', options from 0x%x to 0x%x, type from %d to %d",
+                   string2str(rs->name), rrdset_id(ctr->rrdset), rrdhost_hostname(ctr->rrdset->rrdhost),
+                   options, ctr->flags, rs->type, ctr->type);
 
-        // recreate the rrdvariables while we are having a write lock to the dictionary
-        rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
-    }
+    rrdsetvar_free_value_unsafe(rs); // we are going to change the options, so free it before setting it
+    rs->flags = ctr->flags;
+    rs->type = ctr->type;
+    rrdsetvar_set_value_unsafe(rs, ctr->value);
+
+    // recreate the rrdvariables while we are having a write lock to the dictionary
+    rrdsetvar_update_rrdvars_unsafe(ctr->rrdset, rs);
+    return true;
 }
 
 static void rrdsetvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdsetvar, void *rrdset __maybe_unused) {

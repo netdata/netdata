@@ -244,7 +244,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 // the item to be inserted, is already in the dictionary
 // this callback deals with the situation, migrating the existing object to the new values
 // the dictionary is write locked while this runs
-static void rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
+static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
     (void)new_rrdset; // it is NULL
 
     struct rrdset_constructor *ctr = constructor_data;
@@ -323,6 +323,8 @@ static void rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
+    return ctr->react_action != RRDSET_REACT_NONE;
 }
 
 // this is called after all insertions/conflicts, with the dictionary unlocked, with a reference to RRDSET

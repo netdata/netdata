@@ -493,29 +493,32 @@ static void rrdlabel_delete_callback(const DICTIONARY_ITEM *item __maybe_unused,
     lb->label_value = NULL;
 }
 
-static void rrdlabel_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldvalue, void *newvalue, void *dict_ptr __maybe_unused) {
+static bool rrdlabel_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldvalue, void *newvalue, void *dict_ptr __maybe_unused) {
     RRDLABEL *lbold = (RRDLABEL *)oldvalue;
     RRDLABEL *lbnew = (RRDLABEL *)newvalue;
 
     if(lbold->label_value == lbnew->label_value) {
         // they are the same
+
         lbold->label_source |=  lbnew->label_source;
         lbold->label_source |=  RRDLABEL_FLAG_OLD;
         lbold->label_source &= ~RRDLABEL_FLAG_NEW;
 
         // free the new one
         string_freez(lbnew->label_value);
-    }
-    else {
-        // they are different
-        string_freez(lbold->label_value);
-        lbold->label_value  =   lbnew->label_value;
-        lbold->label_source =   lbnew->label_source;
-        lbold->label_source |=  RRDLABEL_FLAG_NEW;
-        lbold->label_source &= ~RRDLABEL_FLAG_OLD;
 
-        dictionary_version_increment((DICTIONARY *)dict_ptr);
+        return false;
     }
+
+    // they are different
+
+    string_freez(lbold->label_value);
+    lbold->label_value  =   lbnew->label_value;
+    lbold->label_source =   lbnew->label_source;
+    lbold->label_source |=  RRDLABEL_FLAG_NEW;
+    lbold->label_source &= ~RRDLABEL_FLAG_OLD;
+
+    return true;
 }
 
 DICTIONARY *rrdlabels_create(void) {

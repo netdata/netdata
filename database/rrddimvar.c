@@ -198,9 +198,11 @@ static void rrddimvar_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     rrddimvar_update_variables_unsafe(rs);
 }
 
-static void rrddimvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddimvar, void *new_rrddimvar __maybe_unused, void *constructor_data __maybe_unused) {
+static bool rrddimvar_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddimvar, void *new_rrddimvar __maybe_unused, void *constructor_data __maybe_unused) {
     RRDDIMVAR *rs = rrddimvar;
     rrddimvar_update_variables_unsafe(rs);
+
+    return true;
 }
 
 static void rrddimvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddimvar, void *rrdset __maybe_unused) {

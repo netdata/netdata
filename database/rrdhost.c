@@ -85,7 +85,7 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
 
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID)) {
-        if(dictionary_del(rrdhost_root_index, host->machine_guid) !=  0)
+        if(!dictionary_del(rrdhost_root_index, host->machine_guid))
             error("RRDHOST: %s() failed to delete machine guid '%s' from index", __FUNCTION__, host->machine_guid);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
@@ -120,7 +120,7 @@ static inline void rrdhost_index_del_hostname(RRDHOST *host) {
     if(unlikely(!host->hostname)) return;
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_HOSTNAME)) {
-        if(dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)) !=  0)
+        if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
             error("RRDHOST: %s() failed to delete hostname '%s' from index", __FUNCTION__, rrdhost_hostname(host));
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);

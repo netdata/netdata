@@ -54,6 +54,8 @@ typedef enum dictionary_options {
     DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
     DICT_OPTION_STATS                   = (1 << 5), // maintain statistics for this dictionary
+
+    DICT_OPTION_RESERVED1               = (1 << 30), // reserved for DICT_OPTION_MASTER_DICT
 } DICT_OPTIONS;
 
 // Create a dictionary
@@ -77,7 +79,7 @@ extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_cal
 // a merge callback to be called when DICT_OPTION_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
-extern void dictionary_register_conflict_callback(DICTIONARY *dict, void (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data);
+extern void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data);
 
 // a reaction callback to be called after every item insertion or conflict
 // after the constructors have finished and the items are fully available for use
@@ -132,11 +134,11 @@ extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced
 
 // ----------------------------------------------------------------------------
 // Delete an item from the dictionary
-// returns 0 if the item was found and has been deleted
-// returns -1 if the item was not found in the index
+// returns true if the item was found and has been deleted
+// returns false if the item was not found in the index
 
 #define dictionary_del(dict, name) dictionary_del_advanced(dict, name, -1)
-extern int dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len);
+extern bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len);
 
 // ----------------------------------------------------------------------------
 // reference counters management
@@ -230,15 +232,15 @@ extern void  dictionary_foreach_done(DICTFE *dfe);
 // ----------------------------------------------------------------------------
 // Get statistics about the dictionary
 
-extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
-extern long int dictionary_entries(DICTIONARY *dict);
 extern size_t dictionary_version(DICTIONARY *dict);
+extern size_t dictionary_entries(DICTIONARY *dict);
+extern size_t dictionary_referenced_items(DICTIONARY *dict);
 extern size_t dictionary_stats_inserts(DICTIONARY *dict);
 extern size_t dictionary_stats_searches(DICTIONARY *dict);
 extern size_t dictionary_stats_deletes(DICTIONARY *dict);
 extern size_t dictionary_stats_resets(DICTIONARY *dict);
 extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
-extern size_t dictionary_referenced_items(DICTIONARY *dict);
+extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
 
 extern int dictionary_unittest(size_t entries);
 

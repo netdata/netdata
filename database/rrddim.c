@@ -236,7 +236,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     string_freez(rd->name);
 }
 
-static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *new_rrddim, void *constructor_data) {
+static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *new_rrddim, void *constructor_data) {
     (void)new_rrddim; // it is NULL
 
     struct rrddim_constructor *ctr = constructor_data;
@@ -264,6 +264,8 @@ static void rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     if(unlikely(rc))
         ctr->react_action = RRDDIM_REACT_UPDATED;
+
+    return ctr->react_action == RRDDIM_REACT_UPDATED;
 }
 
 static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {

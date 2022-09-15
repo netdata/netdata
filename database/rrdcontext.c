@@ -460,7 +460,7 @@ static void rrdmetric_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 // called when the same rrdmetric is inserted again to the rrdmetrics dictionary of a rrdinstance
 // while this is called, the dictionary is write locked, but there may be other users of the object
-static void rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdinstance __maybe_unused) {
+static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdinstance __maybe_unused) {
     RRDMETRIC *rm     = oldv;
     RRDMETRIC *rm_new = newv;
 
@@ -520,6 +520,7 @@ static void rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     rrdmetric_free(rm_new);
 
     // the react callback will continue from here
+    return rrd_flag_is_updated(rm);
 }
 
 // this is called after the insert or the conflict callbacks,
@@ -721,7 +722,7 @@ static void rrdinstance_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
     rrdinstance_free(ri);
 }
 
-static void rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdcontext __maybe_unused) {
+static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdcontext __maybe_unused) {
     RRDINSTANCE *ri     = (RRDINSTANCE *)oldv;
     RRDINSTANCE *ri_new = (RRDINSTANCE *)newv;
 
@@ -823,6 +824,7 @@ static void rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     rrdinstance_free(ri_new);
 
     // the react callback will continue from here
+    return rrd_flag_is_updated(ri);
 }
 
 static void rrdinstance_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext __maybe_unused) {
@@ -1174,14 +1176,14 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
     rrdcontext_freez(rc);
 }
 
-static void rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdhost __maybe_unused) {
+static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdhost __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)oldv;
     RRDCONTEXT *rc_new = (RRDCONTEXT *)newv;
 
     //current rc is not archived, new_rc is archived, dont merge
     if (!rrd_flag_is_archived(rc) && rrd_flag_is_archived(rc_new)) {
         rrdcontext_freez(rc_new);
-        return;
+        return false;
     }
 
     rrdcontext_lock(rc);
@@ -1237,6 +1239,7 @@ static void rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unu
     rrdcontext_freez(rc_new);
 
     // the react callback will continue from here
+    return rrd_flag_is_updated(rc);
 }
 
 static void rrdcontext_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost __maybe_unused) {
@@ -1261,13 +1264,15 @@ static void rrdcontext_hub_queue_delete_callback(const DICTIONARY_ITEM *item __m
     rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_HUB);
 }
 
-static void rrdcontext_hub_queue_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *new_context __maybe_unused, void *nothing __maybe_unused) {
+static bool rrdcontext_hub_queue_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *new_context __maybe_unused, void *nothing __maybe_unused) {
     // context and new_context are the same
     // we just need to update the timings
     RRDCONTEXT *rc = context;
     rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_HUB);
     rc->queue.queued_ut = now_realtime_usec();
     rc->queue.queued_flags |= rrd_flags_get(rc);
+
+    return true;
 }
 
 static void rrdcontext_post_processing_queue_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
@@ -2383,7 +2388,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
             dfe_start_write(ri->rrdmetrics, rm) {
                 if(rrdmetric_should_be_deleted(rm)) {
                     if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                    if(dictionary_del(ri->rrdmetrics, string2str(rm->id)) != 0)
+                    if(!dictionary_del(ri->rrdmetrics, string2str(rm->id)))
                         error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                               string2str(rm->id),
                               string2str(ri->id),
@@ -2403,7 +2408,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
             if(rrdinstance_should_be_deleted(ri)) {
                 if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-                if(dictionary_del(rc->rrdinstances, string2str(ri->id)) != 0)
+                if(!dictionary_del(rc->rrdinstances, string2str(ri->id)))
                     error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                           string2str(ri->id),
                           string2str(rc->id),
@@ -2424,7 +2429,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
             rrdcontext_dequeue_from_post_processing(rc);
             rrdcontext_delete_from_sql_unsafe(rc);
 
-            if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
+            if(!dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)))
                 error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                       string2str(rc->id),
                       rrdhost_hostname(host));
@@ -2994,7 +2999,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
                 rrdcontext_unlock(rc);
 
                 // delete it from the master dictionary
-                if(dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)) != 0)
+                if(!dictionary_del((DICTIONARY *)host->rrdctx, string2str(rc->id)))
                     error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
                           string2str(id), rrdhost_hostname(host));
 
