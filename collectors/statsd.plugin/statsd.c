@@ -192,6 +192,7 @@ typedef struct statsd_app_chart_dimension {
     collected_number multiplier;    // the multiplier of the dimension
     collected_number divisor;       // the divisor of the dimension
     RRDDIM_FLAGS flags;             // the RRDDIM flags for this dimension
+    RRDDIM_OPTIONS options;         // the RRDDIM options for this dimension
 
     STATSD_APP_CHART_DIM_VALUE_TYPE value_type; // which value to use of the source metric
 
@@ -1210,6 +1211,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         , collected_number multiplier
         , collected_number divisor
         , RRDDIM_FLAGS flags
+        , RRDDIM_OPTIONS options
         , STATSD_APP_CHART_DIM_VALUE_TYPE value_type
 ) {
     STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
@@ -1222,6 +1224,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     dim->divisor = divisor;
     dim->value_type = value_type;
     dim->flags = flags;
+    dim->options = options;
 
     if(!dim->multiplier)
         dim->multiplier = 1;
@@ -1475,17 +1478,18 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     pattern = 1;
                 }
 
-                char *dim_name      = words[i++];
-                char *type          = words[i++];
-                char *multiplier    = words[i++];
-                char *divisor       = words[i++];
-                char *options       = words[i++];
+                char *dim_name   = words[i++];
+                char *type       = words[i++];
+                char *multiplier = words[i++];
+                char *divisor    = words[i++];
+                char *opts       = words[i++];
 
                 RRDDIM_FLAGS flags = RRDDIM_FLAG_NONE;
-                if(options && *options) {
-                    if(strstr(options, "hidden") != NULL) flags |= RRDDIM_FLAG_HIDDEN;
-                    if(strstr(options, "noreset") != NULL) flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
-                    if(strstr(options, "nooverflow") != NULL) flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                RRDDIM_OPTIONS options = RRDDIM_OPTION_NONE;
+                if(opts && *opts) {
+                    if(strstr(opts, "hidden") != NULL) options |= RRDDIM_OPTION_HIDDEN;
+                    if(strstr(opts, "noreset") != NULL) options |= RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                    if(strstr(opts, "nooverflow") != NULL) options |= RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS;
                 }
 
                 if(!pattern) {
@@ -1511,7 +1515,8 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                         , (multiplier && *multiplier)?str2l(multiplier):1
                         , (divisor && *divisor)?str2l(divisor):1
                         , flags
-                        , string2valuetype(type, line, filename)
+                        ,
+                    options, string2valuetype(type, line, filename)
                 );
 
                 if(pattern)
@@ -2131,6 +2136,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                                     , dim->multiplier
                                     , dim->divisor
                                     , dim->flags
+                                    , dim->options
                                     , dim->value_type
                             );
 
@@ -2187,11 +2193,13 @@ static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CH
 
         dim->rd = rrddim_add(chart->st, metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
         if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
+        if(dim->options != RRDDIM_OPTION_NONE) dim->rd->options |= dim->options;
         return dim->rd;
     }
 
     dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
     if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
+    if(dim->options != RRDDIM_OPTION_NONE) dim->rd->options |= dim->options;
     return dim->rd;
 }
 

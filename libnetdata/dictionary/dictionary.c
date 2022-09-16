@@ -1438,13 +1438,7 @@ const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item)
 }
 
 void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without an item on a dictionary.",
-            __FUNCTION__);
-        return NULL;
-    }
+    if(unlikely(!item)) return NULL;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
@@ -1458,16 +1452,7 @@ void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
 }
 
 void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
-        return;
-    }
+    if(unlikely(!item)) return;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {

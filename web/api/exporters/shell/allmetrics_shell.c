@@ -52,7 +52,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
                     else {
                         if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
                         n = roundndd(n);
-                        if(!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) total += n;
+                        if(!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)) total += n;
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, dimension, n, rrdset_units(st));
                     }
                 }

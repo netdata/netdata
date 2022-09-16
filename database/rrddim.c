@@ -47,7 +47,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     RRDSET *st = ctr->st;
     RRDHOST *host = st->rrdhost;
 
-    rd->flags = RRDDIM_FLAG_INDEXED_ID;
+    rd->flags = RRDDIM_FLAG_NONE;
 
     rd->id = string_strdupz(ctr->id);
     rd->name = (ctr->name && *ctr->name)?rrd_string_strdupz(ctr->name):string_dup(rd->id);
@@ -174,8 +174,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *rrdset) {
     RRDDIM *rd = rrddim;
     RRDSET *st = rrdset; (void)st;
-
-    rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
 
     rrdcontext_removed_rrddim(rd);
 
@@ -480,8 +478,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd) {
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
     rrdset_unlock(st);
 
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID))
-        dictionary_del(st->rrddim_root_index, string2str(rd->id));
+    dictionary_del(st->rrddim_root_index, string2str(rd->id));
 }
 
 
@@ -501,7 +498,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
         (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
 
-    rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
     rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
     rrdcontext_updated_rrddim_flags(rd);
     return 0;
@@ -519,7 +516,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
         (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
 
-    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
     rrdcontext_updated_rrddim_flags(rd);
     return 0;

@@ -260,8 +260,8 @@ static inline void rrdpush_send_chart_definition(RRDSET *st) {
                 , rd->multiplier
                 , rd->divisor
                 , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
-                , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
-                , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+                , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
+                , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
         rd->exposed = 1;
     }

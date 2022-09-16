@@ -1769,7 +1769,7 @@ void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **para
         if (unlikely(!rd))
             continue;
         if (sqlite3_column_int(res, 9) == 1)
-            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+            rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }

@@ -118,7 +118,9 @@ typedef enum rrd_memory_mode {
     RRD_MEMORY_MODE_MAP  = 2,
     RRD_MEMORY_MODE_SAVE = 3,
     RRD_MEMORY_MODE_ALLOC = 4,
-    RRD_MEMORY_MODE_DBENGINE = 5
+    RRD_MEMORY_MODE_DBENGINE = 5,
+
+    // this is 8-bit
 } RRD_MEMORY_MODE;
 
 #define RRD_MEMORY_MODE_NONE_NAME "none"
@@ -141,7 +143,9 @@ typedef enum rrd_algorithm {
     RRD_ALGORITHM_ABSOLUTE              = 0,
     RRD_ALGORITHM_INCREMENTAL           = 1,
     RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
-    RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL  = 3
+    RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL  = 3,
+
+    // this is 8-bit
 } RRD_ALGORITHM;
 
 #define RRD_ALGORITHM_ABSOLUTE_NAME                "absolute"
@@ -163,24 +167,34 @@ extern DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 
 
 // ----------------------------------------------------------------------------
-// flags
-// use this for configuration flags, not for state control
-// flags are set/unset in a manner that is not thread safe
-// and may lead to missing information.
+// flags & options
 
+// options are permanent configuration options (no atomics to alter/access them)
+typedef enum rrddim_options {
+    RRDDIM_OPTION_NONE                              = 0,
+    RRDDIM_OPTION_HIDDEN                            = (1 << 0),  // this dimension will not be offered to callers
+    RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1),  // do not offer RESET or OVERFLOW info to callers
+
+    // this is 8-bit
+} RRDDIM_OPTIONS;
+
+#define rrddim_option_check(rd, flag) ((rd)->flags & (flag))
+#define rrddim_option_set(rd, flag)   (rd)->flags |= (flag)
+#define rrddim_option_clear(rd, flag) (rd)->flags &= ~(flag)
+
+// flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
-    RRDDIM_FLAG_HIDDEN                          = (1 << 0),  // this dimension will not be offered to callers
-    RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = (1 << 1),  // do not offer RESET or OVERFLOW info to callers
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
-    RRDDIM_FLAG_PENDING_FOREACH_ALARMS = (1 << 5), // set when foreach alarm has not been initialized yet
+    RRDDIM_FLAG_PENDING_FOREACH_ALARMS          = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
-    RRDDIM_FLAG_INDEXED_ID                      = (1 << 7),
+
+    // this is 8 bit
 } RRDDIM_FLAGS;
 
 #define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -244,7 +258,10 @@ struct rrddim {
     STRING *id;                                     // the id of this dimension (for internal identification)
     STRING *name;                                   // the name of this dimension (as presented to user)
 
-    RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
+    RRD_ALGORITHM algorithm:8;                      // the algorithm that is applied to add new collected values
+    RRDDIM_OPTIONS options:8;                       // permanent configuration options
+    RRD_MEMORY_MODE rrd_memory_mode:8;              // the memory mode for this dimension
+    /*RRDDIM_FLAGS*/ uint8_t flags;                 // run time changing status flags
 
     bool updated;                                   // 1 when the dimension has been updated since the last processing
     bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
@@ -259,14 +276,11 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // operational state members
 
-    RRDDIM_FLAGS flags;                             // flags
-    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
-
-    ml_dimension_t ml_dimension;                    // machine learning data about this dimension
-
 #ifdef ENABLE_ACLK
     int aclk_live_status;
 #endif
+
+    ml_dimension_t ml_dimension;                    // machine learning data about this dimension
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents

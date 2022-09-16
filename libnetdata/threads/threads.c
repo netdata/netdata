@@ -106,6 +106,8 @@ void netdata_threads_init_after_fork(size_t stacksize) {
 // ----------------------------------------------------------------------------
 // netdata_thread_create
 
+extern void rrdset_thread_rda_free(void);
+
 static void thread_cleanup(void *ptr) {
     if(netdata_thread != ptr) {
         NETDATA_THREAD *info = (NETDATA_THREAD *)ptr;
@@ -115,6 +117,7 @@ static void thread_cleanup(void *ptr) {
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         info("thread with task id %d finished", gettid());
 
+    rrdset_thread_rda_free();
     thread_cache_destroy();
 
     freez((void *)netdata_thread->tag);

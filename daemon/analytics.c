@@ -418,7 +418,7 @@ void analytics_metrics(void)
         if (rrdset_is_available_for_viewers(st)) {
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+                if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
                     continue;
                 dimensions++;
             }

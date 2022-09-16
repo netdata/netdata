@@ -1082,8 +1082,36 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rrdcontext_collected_rrddim(rd);
 }
 
+struct rda_item {
+    const DICTIONARY_ITEM *item;
+    RRDDIM *rd;
+};
+
+static __thread struct rda_item *thread_rda = NULL;
+static __thread size_t thread_rda_entries = 0;
+
+struct rda_item *rrdset_thread_rda(size_t *dimensions) {
+
+    if(unlikely(!thread_rda || (*dimensions) > thread_rda_entries)) {
+        freez(thread_rda);
+        thread_rda = mallocz((*dimensions) * sizeof(struct rda_item));
+        thread_rda_entries = *dimensions;
+    }
+
+    *dimensions = thread_rda_entries;
+    return thread_rda;
+}
+
+void rrdset_thread_rda_free(void) {
+    freez(thread_rda);
+    thread_rda = NULL;
+    thread_rda_entries = 0;
+}
+
 static inline size_t rrdset_done_interpolate(
         RRDSET *st
+        , struct rda_item *rda_base
+        , size_t rda_slots
         , usec_t update_every_ut
         , usec_t last_stored_ut
         , usec_t next_store_ut
@@ -1120,9 +1148,11 @@ static inline size_t rrdset_done_interpolate(
 
         last_ut = next_store_ut;
 
-        rrddim_foreach_read(rd, st) {
-            if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-                continue;
+        struct rda_item *rda;
+        size_t dim_id;
+        for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+            rd = rda->rd;
+            if(unlikely(!rd)) continue;
 
             NETDATA_DOUBLE new_value;
 
@@ -1233,7 +1263,6 @@ static inline size_t rrdset_done_interpolate(
 
             stored_entries++;
         }
-        rrddim_foreach_done(rd);
 
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;
@@ -1313,8 +1342,12 @@ void rrdset_done(RRDSET *st) {
     netdata_thread_disable_cancelability();
 
 #ifdef ENABLE_ACLK
-    if (likely(!rrdset_is_ar_chart(st))) {
-        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+    time_t mark = now_realtime_sec();
+    bool rrdset_flag_aclk = rrdset_flag_check(st, RRDSET_FLAG_ACLK);
+    bool rrdset_is_ar = rrdset_is_ar_chart(st);
+
+    if (likely(!rrdset_is_ar)) {
+        if (unlikely(!rrdset_flag_aclk)) {
             if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
             }
@@ -1465,6 +1498,42 @@ after_first_database_work:
     if(unlikely(st->rrdhost->rrdpush_send_enabled))
         rrdset_done_push(st);
 
+    size_t rda_slots = dictionary_entries(st->rrddim_root_index);
+    struct rda_item *rda_base = rrdset_thread_rda(&rda_slots);
+
+    size_t dim_id;
+    size_t dimensions = 0;
+    struct rda_item *rda = rda_base;
+    st->collected_total = 0;
+    rrddim_foreach_read(rd, st) {
+        if(rd_dfe.counter >= rda_slots)
+            break;
+
+        rda = &rda_base[dimensions++];
+
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+            rda->item = NULL;
+            rda->rd = NULL;
+            continue;
+        }
+
+        // store the dimension in the array
+        rda->item = dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
+        rda->rd = dictionary_acquired_item_value(rda->item);
+
+        // calculate totals
+        if(likely(rd->updated)) {
+            st->collected_total += rd->collected_value;
+
+            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
+                error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+                rrddim_isnot_obsolete(st, rd);
+            }
+        }
+    }
+    rrddim_foreach_done(rd);
+    rda_slots = dimensions;
+
     if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE))
         goto after_second_database_work;
 
@@ -1475,37 +1544,18 @@ after_first_database_work:
     rrdset_debug(st, "next_store_ut   = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
     #endif
 
-    // calculate totals and count the dimensions
-    int dimensions = 0;
-    st->collected_total = 0;
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-            continue;
-
-        dimensions++;
-
-        if(likely(rd->updated))
-            st->collected_total += rd->collected_value;
-    }
-    rrddim_foreach_done(rd);
-
     uint32_t has_reset_value = 0;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
     // at this stage we do not interpolate anything
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-            continue;
+    for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+        rd = rda->rd;
+        if(unlikely(!rd)) continue;
 
         if(unlikely(!rd->updated)) {
             rd->calculated_value = 0;
             continue;
-        }
-
-        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
-            rrddim_isnot_obsolete(st, rd);
         }
 
         #ifdef NETDATA_INTERNAL_CHECKS
@@ -1582,7 +1632,7 @@ after_first_database_work:
                           , rd->last_collected_value
                           , rd->collected_value);
 
-                    if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                         has_reset_value = 1;
 
                     uint64_t last = (uint64_t)rd->last_collected_value;
@@ -1651,7 +1701,7 @@ after_first_database_work:
                           , rd->collected_value
                     );
 
-                    if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                         has_reset_value = 1;
 
                     rd->last_collected_value = rd->collected_value;
@@ -1709,7 +1759,6 @@ after_first_database_work:
         #endif
 
     }
-    rrddim_foreach_done(rd);
 
     // at this point we have all the calculated values ready
     // it is now time to interpolate values on a second boundary
@@ -1722,7 +1771,10 @@ after_first_database_work:
 //     }
 // #endif
 
-    rrdset_done_interpolate(st
+    rrdset_done_interpolate(
+            st
+            , rda_base
+            ,rda_slots
             , update_every_ut
             , last_stored_ut
             , next_store_ut
@@ -1735,17 +1787,13 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#ifdef ENABLE_ACLK
-    time_t mark = now_realtime_sec();
-#endif
-
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-            continue;
+    for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+        rd = rda->rd;
+        if(unlikely(!rd)) continue;
 
 #ifdef ENABLE_ACLK
-        if (likely(!rrdset_is_ar_chart(st))) {
-            if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
+        if (likely(!rrdset_is_ar)) {
+            if (!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) && likely(rrdset_flag_aclk))
                 queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
         }
 #endif
@@ -1805,7 +1853,6 @@ after_second_database_work:
         #endif
 
     }
-    rrddim_foreach_done(rd);
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
@@ -1814,10 +1861,21 @@ after_second_database_work:
         // update the memory mapped files with the latest values
 
         rrdset_memory_file_update(st);
-        rrddim_foreach_read(rd, st) {
+
+        for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+            rd = rda->rd;
+            if(unlikely(!rd)) continue;
             rrddim_memory_file_update(rd);
         }
-        rrddim_foreach_done(rd);
+    }
+
+    for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+        rd = rda->rd;
+        if(unlikely(!rd)) continue;
+
+        dictionary_acquired_item_release(st->rrddim_root_index, rda->item);
+        rda->item = NULL;
+        rda->rd = NULL;
     }
 
     rrdcontext_collected_rrdset(st);

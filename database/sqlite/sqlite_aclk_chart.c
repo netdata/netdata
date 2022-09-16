@@ -1283,7 +1283,7 @@ void sql_check_chart_liveness(RRDSET *st) {
 
     debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", rrdset_name(st));
     rrddim_foreach_read(rd, st) {
-        if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN))
+        if (!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
     }
     rrddim_foreach_done(rd);
