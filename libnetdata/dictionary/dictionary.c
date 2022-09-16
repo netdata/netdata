@@ -1022,7 +1022,7 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
 
     dictionary_index_lock_wrlock(dict);
 
-    bool added_or_updated;
+    bool added_or_updated = false;
 
     DICTIONARY_ITEM *item = NULL;
     do {
@@ -1076,7 +1076,7 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
 
             else {
                 // we did really nothing!
-                added_or_updated = false;
+                ;
             }
 
             dictionary_index_lock_unlock(dict);
