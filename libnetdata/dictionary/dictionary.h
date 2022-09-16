@@ -54,8 +54,6 @@ typedef enum dictionary_options {
     DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
     DICT_OPTION_STATS                   = (1 << 5), // maintain statistics for this dictionary
-
-    DICT_OPTION_RESERVED1               = (1 << 30), // reserved for DICT_OPTION_MASTER_DICT
 } DICT_OPTIONS;
 
 // Create a dictionary
