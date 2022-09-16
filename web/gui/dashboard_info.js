@@ -345,6 +345,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>PostgreSQL</b>, the open source object-relational database management system (ORDBMS).'
     },
 
+    'proxysql': {
+        title: 'ProxySQL',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance metrics for <b>ProxySQL</b>, a high-performance open-source MySQL proxy.'
+    },
+
     'pgbouncer': {
         title: 'PgBouncer',
         icon: '<i class="fas fa-exchange-alt"></i>',
