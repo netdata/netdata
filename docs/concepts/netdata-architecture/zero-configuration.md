@@ -8,27 +8,14 @@ learn_rel_path: "netdata-architecture"
 learn_docs_purpose: "Explain what Netdata can do out of the box"
 -->
 
-**********************************************************************
-Template:
+Your Netdata journey doesn't contain a cold start. Netdata is preconfigured and capable to autodetect and monitor any
+well known application that run in your system. You just deploy and claim Netdata Agents in your Netdata space, and 
+you monitor them in seconds. Alerts are preconfigured and fine-tuned, according to community users' observations and notification about the health of your infrastructure are enabled by default in your Netdata Space.
 
-Small intro, what we are about to cover
+:::info
 
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
+There might some cases where you might need to configure a step or two but if you specific use our express installation
+deployment there are just minor things that you need to tune (like application that need some authentication method to
+be monitored by Netdata or tailored made configurations for your case)
 
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
-
+:::

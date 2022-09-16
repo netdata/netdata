@@ -8,27 +8,8 @@ learn_rel_path: "netdata-architecture"
 learn_docs_purpose: "Explain the simplicity of scaling the Netdata Arch to an infinite number of nodes"
 -->
 
-**********************************************************************
-Template:
-
-Small intro, what we are about to cover
-
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
+Due to our [Distributed architecture approach], Netdata can seamless observe a couple, hundreds or even thousands of
+nodes. There no actual bottlenecks especially if you retain metrics locally in the Agents. You only have to deploy the
+Agent in any system that you want to monitor and claim them into the cloud. Netdata Cloud queries only slices of data
+when and if you request them on the spot. 
 
