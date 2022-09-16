@@ -5,11 +5,6 @@
 #include "../libnetdata.h"
 #include <Judy.h>
 
-// a reserved option for supporting views - the master dict is the primary one
-#define DICT_OPTION_MASTER_DICT DICT_OPTION_RESERVED1
-
-#define DICT_RESERVED_OPTIONS (DICT_OPTION_MASTER_DICT)
-
 // runtime flags of the dictionary - must be checked with atomics
 typedef enum {
     DICT_FLAG_NONE                  = 0,
@@ -25,7 +20,7 @@ typedef enum {
 
 // configuration options macros
 #define is_dictionary_single_threaded(dict) ((dict)->options & DICT_OPTION_SINGLE_THREADED)
-#define is_master_dictionary(dict) ((dict)->options & DICT_OPTION_MASTER_DICT)
+#define is_master_dictionary(dict) (!(dict)->master)
 
 typedef enum item_options {
     ITEM_OPTION_NONE            = 0,
@@ -132,6 +127,7 @@ struct dictionary {
     struct dictionary_hooks *hooks;     // pointer to external function callbacks to be called at certain points
     struct dictionary_stats *stats;     // statistics data, when DICT_OPTION_STATS is set
 
+    DICTIONARY *master;                 // the master dictionary
     DICTIONARY *next;                   // linked list for delayed destruction (garbage collection of whole dictionaries)
 
     size_t version;                     // the current version of the dictionary
@@ -456,12 +452,21 @@ static void ll_recursive_unlock(DICTIONARY *dict, char rw) {
 
 
 static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
+    if(unlikely(is_dictionary_single_threaded(dict)))
+        return;
+
     netdata_rwlock_rdlock(&dict->index.rwlock);
 }
 static inline void dictionary_index_lock_wrlock(DICTIONARY *dict) {
+    if(unlikely(is_dictionary_single_threaded(dict)))
+        return;
+
     netdata_rwlock_wrlock(&dict->index.rwlock);
 }
 static inline void dictionary_index_lock_unlock(DICTIONARY *dict) {
+    if(unlikely(is_dictionary_single_threaded(dict)))
+        return;
+
     netdata_rwlock_unlock(&dict->index.rwlock);
 }
 
@@ -743,39 +748,39 @@ static inline const char *item_get_name(const DICTIONARY_ITEM *item) {
         return item->caller_name;
 }
 
-static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict, size_t *allocated_bytes) {
+static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
+    DICTIONARY_ITEM *item;
+
     if(is_master_dictionary(dict)) {
         size_t size = sizeof(DICTIONARY_ITEM_MASTER_DICT);
-        DICTIONARY_ITEM_MASTER_DICT *item = mallocz(size);
-        item->item.shared = &item->shared;
-        *allocated_bytes = size;
-
-        return (DICTIONARY_ITEM *)item;
+        DICTIONARY_ITEM_MASTER_DICT *tmp = mallocz(size);
+        tmp->item.shared = &tmp->shared;
+        *allocated_bytes += size;
+        item = (DICTIONARY_ITEM *)tmp;
+    }
+    else if(!master_item) {
+        fatal("DICTIONARY: trying to allocate secondary item without a master item");
     }
     else {
         size_t size = sizeof(DICTIONARY_ITEM);
-        DICTIONARY_ITEM *item = mallocz(size);
-        *allocated_bytes = size;
-
-        size = sizeof(DICTIONARY_ITEM_SHARED);
-        item->shared = mallocz(size);
+        item = mallocz(size);
         *allocated_bytes += size;
-        return item;
+        item->shared = master_item->shared;
     }
-}
-
-static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data) {
-    debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
-
-    size_t allocated;
-    DICTIONARY_ITEM *item = item_allocate(dict, &allocated);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->dict = dict;
 #endif
-
     item->flags = ITEM_FLAG_NONE;
     item->options = ITEM_OPTION_NONE;
+
+    return item;
+}
+
+static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data) {
+    size_t allocated = 0;
+    DICTIONARY_ITEM *item = item_allocate(dict, &allocated, NULL);
+
     item->shared->refcount = 1;           // we return a referenced item
     item->shared->value_len = value_len;
 
@@ -1235,7 +1240,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options) {
     DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
     size_t allocated = sizeof(DICTIONARY);
 
-    dict->options = (options & ~DICT_RESERVED_OPTIONS) | DICT_OPTION_MASTER_DICT;
+    dict->options = options;
     dict->flags = DICT_FLAG_NONE;
     dict->items.list = NULL;
 
