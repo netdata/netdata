@@ -71,7 +71,7 @@ static STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const c
 
     if(rrdset_index_find_name(host, new_name)) {
         debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
-        if(!strcmp(chart_full_id, full_name) && !current_name && !*current_name) {
+        if(!strcmp(chart_full_id, full_name) && (!current_name || !*current_name)) {
             unsigned i = 1;
 
             do {

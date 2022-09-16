@@ -1406,11 +1406,9 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, 
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0))
-            fatal("DICTIONARY: got item with refcount = %d", refcount);
-    }
+    REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+    if (unlikely(refcount <= 0))
+        fatal("DICTIONARY: got item with refcount = %d", refcount);
 #endif
 
     item_acquire(dict, item);
@@ -1427,11 +1425,9 @@ const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
-        if (unlikely(refcount <= 0))
-            fatal("DICTIONARY: got item with refcount = %d", refcount);
-    }
+    REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
+    if (unlikely(refcount <= 0))
+        fatal("DICTIONARY: got item with refcount = %d", refcount);
 #endif
 
     return item_get_name(item);
@@ -1441,11 +1437,9 @@ void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(unlikely(!item)) return NULL;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
-        if (unlikely(refcount <= 0))
-            fatal("DICTIONARY: got item with refcount = %d", refcount);
-    }
+    REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
+    if (unlikely(refcount <= 0))
+        fatal("DICTIONARY: got item with refcount = %d", refcount);
 #endif
 
     return item->shared->value;
@@ -1455,11 +1449,9 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
     if(unlikely(!item)) return;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0))
-            fatal("DICTIONARY: got item with refcount = %d", refcount);
-    }
+    REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+    if (unlikely(refcount <= 0))
+        fatal("DICTIONARY: got item with refcount = %d", refcount);
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
