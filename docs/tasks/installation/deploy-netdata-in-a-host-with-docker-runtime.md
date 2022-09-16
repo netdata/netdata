@@ -16,7 +16,8 @@ See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netd
 :::note
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog
 instance within the Netdata infrastructure. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
+about the information collected, and learn how to-opt, on
+our [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
@@ -153,8 +154,8 @@ need to use a non-default configuration for health checks to work.
 ### Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you should [secure the Netdata
-instance](/docs/agent/netdata-security). This section contains an example of how to install Netdata with an SSL
-reverse proxy and basic authentication.
+instance](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md). This section contains an example of
+how to install Netdata with an SSL reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
 email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
@@ -236,8 +237,9 @@ to restart the container: `docker restart netdata`.
 
 #### Host-editable configuration
 
-> **Warning**: [edit-config](/docs/configure/nodes#the-netdata-config-directory) script doesn't work when executed on
-> the host system.
+:::caution
+The `edit-config` script doesn't work when executed on the host system.
+:::
 
 If you want to make your container's configuration directory accessible from the host system, you need to use a
 [volume](https://docs.docker.com/storage/bind-mounts/) rather than a bind mount. The following commands create a
