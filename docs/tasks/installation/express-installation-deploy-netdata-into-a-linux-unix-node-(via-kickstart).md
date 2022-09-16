@@ -19,20 +19,7 @@ This page will guide you through installation using the automatic one-line insta
 The kickstart script works on all Linux distributions and, by default, automatic nightly updates are enabled.
 :::
 
-## What does `kickstart.sh` do?
-
-The installation script does the following after being downloaded and run using `sh`:
-
-- Determines what platform you are running on.
-- Checks for an existing installation, and if found updates that instead of creating a new install.
-- Attempts to install Netdata using our [official native binary packages](#native-packages).
-- If there are no official native binary packages for your system (or installing that way failed), tries to install
-  using a [static build of Netdata](#static-builds) if one is available.
-- If no static build is available, installs required dependencies and then attempts to install by
-  [building Netdata locally](#local-builds) (by downloading the sources and building them directly).
-- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly
-  versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
-- Prints a message whether installation succeeded or failed for QA purposes.
+To read more, check out the [Kickstart script reference](/packaging/installer/methods/kickstart.md).
 
 ## Prerequisites
 
@@ -60,36 +47,7 @@ Install Netdata by running one of the following options:
 If you want to see all the optional parameters to further alter your installation, check
 the [kickstart script reference](/packaging/installer/methods/kickstart.md).
 
-### Native packages
-
-We publish official DEB/RPM packages for a number of common Linux distributions as part of our releases and nightly
-builds. These packages are available for 64-bit x86 systems. Depending on the distribution and release they may
-also be available for 32-bit x86, ARMv7, and AArch64 systems. If a native package is available, it will be used as the
-default installation method. This allows you to handle Netdata updates as part of your usual system update procedure.
-
-If you want to enforce the usage of native packages and have the installer return a failure if they are not available,
-you can do so by adding `--native-only` to the options you pass to the installer.
-
-### Static builds
-
-We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
-AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
-require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
-you are on a platform which we provide static builds for but do not provide native packages for, a static build
-will be used by default for installation.
-
-If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
-you can do so by adding `--static-only` to the options you pass to the installer.
-
-### Local builds
-
-For systems which do not have available native packages or static builds, we support building Netdata locally on
-the system it will be installed on. When using this approach, the installer will attempt to install any required
-dependencies for building Netdata, though this may not always work correctly.
-
-If you want to enforce the usage of a local build (perhaps because you require a custom installation prefix,
-which is not supported with native packages or static builds), you can do so by adding `--build-only` to the
-options you pass to the installer.
+## Further Actions
 
 ### Verify script integrity
 
