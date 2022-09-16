@@ -51,10 +51,12 @@ typedef enum item_flags {
  * Every item in the dictionary has the following structure.
  */
 
+typedef int32_t REFCOUNT;
+
 typedef struct dictionary_item_shared {
-    int32_t refcount;       // the reference counter
     void *value;            // the value of the dictionary item
     uint32_t value_len;     // the size of the value (assumed binary)
+    REFCOUNT refcount;      // the reference counter
 } DICTIONARY_ITEM_SHARED;
 
 struct dictionary_item {
@@ -72,8 +74,9 @@ struct dictionary_item {
         char *caller_name;      // the user supplied string pointer
     };
 
-    uint8_t options;            // permanent configuration options (no atomic operations on this - they never change)
+    ITEM_OPTIONS options:8;     // permanent configuration options (no atomic operations on this - they never change)
     uint8_t flags;              // runtime changing flags for this item (atomic operations on this)
+                                // cannot be a bit field because of atomics.
 };
 
 typedef struct dictionary_item_master_dict {
@@ -136,6 +139,7 @@ struct dictionary {
                                         //   - item added
                                         //   - item removed
                                         //   - item value reset
+                                        //   - conflict callback returns true
                                         //   - function dictionary_version_increment() is called
 
     long int entries;                   // how many items are currently in the index (the linked list may have more)
@@ -362,11 +366,11 @@ static inline long int DICTIONARY_STATS_PENDING_DELETES_GET(DICTIONARY *dict) {
         return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_SEQ_CST);
 }
 
-static inline int32_t DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(dict && is_dictionary_single_threaded(dict)) // this is an exception, dict can be null
         return item->shared->refcount;
     else
-        return (int32_t)__atomic_load_n(&item->shared->refcount, __ATOMIC_SEQ_CST);
+        return (REFCOUNT)__atomic_load_n(&item->shared->refcount, __ATOMIC_SEQ_CST);
 }
 
 // ----------------------------------------------------------------------------
@@ -516,7 +520,7 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 }
 
 static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    int32_t refcount;
+    REFCOUNT refcount;
 
     if(likely(is_dictionary_single_threaded(dict)))
         refcount = ++item->shared->refcount;
@@ -544,7 +548,7 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     // or even when someone else has write lock on the dictionary
 
     bool is_deleted;
-    int32_t refcount;
+    REFCOUNT refcount;
 
     if(likely(is_dictionary_single_threaded(dict))) {
         is_deleted = item->flags & ITEM_FLAG_DELETED;
@@ -577,7 +581,7 @@ static bool item_check_and_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(unlikely(!item))
         return false;
 
-    int32_t expected, desired;
+    REFCOUNT expected, desired;
     do {
 
         expected = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
@@ -886,7 +890,7 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 // if a dictionary item can be deleted, return true, otherwise return false
 static inline bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
-    int32_t expected = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+    REFCOUNT expected = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
     if(expected == 0 && __atomic_compare_exchange_n(&item->shared->refcount, &expected, REFCOUNT_DELETING, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
         return true;
 
@@ -1323,7 +1327,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIO
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
-        int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
         if (unlikely(refcount <= 0))
             fatal("DICTIONARY: got item with refcount = %d", refcount);
     }
@@ -1360,7 +1364,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIO
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
-        int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
         if (unlikely(refcount <= 0))
             fatal("DICTIONARY: got item with refcount = %d", refcount);
     }
@@ -1398,7 +1402,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, 
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
-        int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
         if (unlikely(refcount <= 0))
             fatal("DICTIONARY: got item with refcount = %d", refcount);
     }
@@ -1419,7 +1423,7 @@ const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item)
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
-        int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
         if (unlikely(refcount <= 0))
             fatal("DICTIONARY: got item with refcount = %d", refcount);
     }
@@ -1439,7 +1443,7 @@ void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
-        int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(NULL, item);
         if (unlikely(refcount <= 0))
             fatal("DICTIONARY: got item with refcount = %d", refcount);
     }
@@ -1462,7 +1466,7 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(item) {
-        int32_t refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
         if (unlikely(refcount <= 0))
             fatal("DICTIONARY: got item with refcount = %d", refcount);
     }
@@ -1746,7 +1750,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 struct netdata_string {
     uint32_t length;    // the string length including the terminating '\0'
 
-    int32_t refcount;   // how many times this string is used
+    REFCOUNT refcount;  // how many times this string is used
                         // We use a signed number to be able to detect duplicate frees of a string.
                         // If at any point this goes below zero, we have a duplicate free.
 
@@ -1805,7 +1809,7 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
 #define string_entry_release(se) __atomic_sub_fetch(&((se)->refcount), 1, __ATOMIC_SEQ_CST);
 
 static inline bool string_entry_check_and_acquire(STRING *se) {
-    int32_t expected, desired, count = 0;
+    REFCOUNT expected, desired, count = 0;
     do {
         count++;
 
@@ -2004,7 +2008,7 @@ STRING *string_strdupz(const char *str) {
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
 
-    int32_t refcount = string_entry_release(string);
+    REFCOUNT refcount = string_entry_release(string);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(refcount < 0))

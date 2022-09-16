@@ -79,6 +79,7 @@ extern void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_cal
 // a merge callback to be called when DICT_OPTION_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
+// The callback should return true if the value has been updated (it increases the dictionary version).
 extern void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data);
 
 // a reaction callback to be called after every item insertion or conflict

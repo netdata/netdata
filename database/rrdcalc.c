@@ -622,7 +622,8 @@ void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
 
 void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions) {
     char key[RRDCALC_MAX_KEY_SIZE + 1];
-    size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, rrdset_id(st), overwrite_alert_name?overwrite_alert_name:string2str(rt->name));
+    size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, rrdset_id(st),
+                                 overwrite_alert_name?overwrite_alert_name:string2str(rt->name));
 
     struct rrdcalc_constructor tmp = {
         .rrdhost = host,
