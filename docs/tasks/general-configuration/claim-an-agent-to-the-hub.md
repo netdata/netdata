@@ -10,7 +10,7 @@ learn_docs_purpose: "Instructions on how to claim a node on a Space in the Hub."
 
 You can securely connect a Netdata Agent, running on a distributed node, to Netdata Cloud.  
 A Space's administrator creates a **claiming token**, which is used to add an Agent to their Space via
-the [ACLK](/aclk/README.md).
+the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
 When connecting an Agent (also referred to as a node) to the Cloud, you must complete a verification process that proves
 you have some level of authorization to manage the node itself. This verification is a security feature that helps
@@ -27,10 +27,10 @@ generated.
 The connection process ensures no third party can add your node, and then view your node's metrics, in a Netdata Cloud
 account, Space, or War Room that you did not authorize.
 
-By connecting a node, you opt in to sending data from your Agent to the Cloud via the [ACLK](/aclk/README.md). This data
+By connecting a node, you opt in to sending data from your Agent to the Cloud via
+the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md). This data
 is encrypted by TLS while it is in transit. We use the RSA keypair created during the connection process to authenticate
-the
-identity of the Agent when it connects to the Cloud.
+the identity of the Agent when it connects to the Cloud.
 
 :::note
 
@@ -72,7 +72,7 @@ Kubernetes) and then you will be provided with a script to initiate the connecti
 
 To connect a node:
 
-1. Navigate to the "Nodes" tab from the sidebar, and click the "Add node"/plus (+) button
+1. Navigate to the **Nodes tab** from the sidebar, and click the **+** button
 2. From the dropdown, select which War Rooms you want to connect this node into
 3. Select the environment that the node is running on
 4. Copy and paste the script on your terminal
@@ -82,8 +82,8 @@ To connect a node:
 This tab will have predefined the War Room which settings button you clicked.  
 To connect a node:
 
-1. Navigate from the top bar "War Room" view to the "Nodes" view
-2. Click the "Add node"/plus (+) button
+1. Navigate from the top bar **War Room** view to the **Nodes** view
+2. Click the **+** button
 3. Select the environment that the node is running on
 4. Copy and paste the script on your terminal
 
@@ -92,7 +92,7 @@ To connect a node:
 From a War Room's Nodes View you can select to connect an Agent to this War Room.  
 To do so:
 
-1. Click the "+ Add nodes" button
+1. Click the **+ Add nodes** button
 2. Select the environment that the node is running on
 3. Copy and paste the script on your terminal
 
@@ -196,7 +196,8 @@ connected on startup or restart.
 
 For the connection process to work, the contents of `/var/lib/netdata` _must_ be preserved across container restarts
 using a persistent volume. You can read more at
-our [recommended `docker run` and Docker Compose deployment Task](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-host-with-docker-runtime.md#steps).
+our [recommended `docker run` and Docker Compose deployment Task](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-host-with-docker-runtime.md#steps)
+.
 
 <details>
 <summary><h4 id="known-issues-on-older-hosts-with-seccomp-enabled"> Known issues on older hosts with seccomp enabled </h4></summary>
@@ -218,10 +219,9 @@ To resolve the issue, do one of the following actions:
 
 - Update to a newer version of Docker and `libseccomp` (recommended).
 - Create a custom profile and pass it for the container.
-- Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile)
-  (unsafe, not recommended).
+- Run [without the default seccomp profile](https://docs.docker.com/engine/security/seccomp/#run-without-the-default-seccomp-profile) (unsafe, not recommended).
 
-<h5>Creating a custom profile</h5>
+<h5><i>Creating a custom profile</i></h5>
 
 1. Download the moby default seccomp profile and change `defaultAction` to `SCMP_ACT_TRACE` on line 2.
 
@@ -454,7 +454,8 @@ You'll see your nodes, containers, and pods appear in Netdata Cloud in a few sec
 
 ## Troubleshooting
 
-If you're having trouble connecting a node, this may be because the [ACLK](/aclk/README.md) cannot connect to the Cloud.
+If you're having trouble connecting a node, this may be because
+the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md) cannot connect to the Cloud.
 
 With the Netdata Agent running, visit `http://NODE:19999/api/v1/info` in your browser, replacing `NODE` with the IP
 address or hostname of your Agent. The returned JSON contains four keys that will be helpful to diagnose any issues you
@@ -490,7 +491,7 @@ installed Netdata using an unsupported package.
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using
-our [recommended express installation method](/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md#steps)
+our [recommended express installation method](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md#steps)
 .
 
 ### kickstart: Failed to write new machine GUID
@@ -514,7 +515,7 @@ Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the cl
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using
-our [recommended express installation method](/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md#steps)
+our [recommended express installation method](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md#steps)
 .
 
 ### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
@@ -524,8 +525,9 @@ If you're running an older Linux distribution or one that has reached EOL, such 
 versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
 helps securely encrypt SSL connections.
 
-We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart.md#static-builds), which
-uses an up-to-date version of OpenSSL with hostname validation enabled.
+We recommend you reinstall Netdata with
+a [static build](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#static-builds),
+which uses an up-to-date version of OpenSSL with hostname validation enabled.
 
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
 with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
@@ -543,9 +545,8 @@ Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud
 ```
 
 To fix this issue, reinstall Netdata using
-your [preferred method](/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md)
-and do not add the
-`--disable-cloud` option.
+your [preferred method](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md)
+and do not add the `--disable-cloud` option.
 
 ### cloud-available is false / ACLK Available: No
 
