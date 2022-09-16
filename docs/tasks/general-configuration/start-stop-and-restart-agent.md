@@ -12,8 +12,8 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Admonition from '@theme/Admonition';
 
-Upon installing the Netdata Agent, the [daemon](/daemon/README.md) is configured to start at boot and stop and
-restart/shutdown.
+Upon installing the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) is
+configured to start at boot and stop and restart/shutdown.
 
 Keep in mind that you will most often need to _restart_ the Agent to load new or edited configuration files. Health
 configuration files are the only exception, as they can be reloaded without restarting the entire Agent.
@@ -151,7 +151,8 @@ If you used the `netdata` command to start the daemon, you can close it with:
 sudo killall netdata
 ```
 
-Last but not least the Agent also comes with a [CLI tool](/cli/README.md) capable of performing shutdowns:
+Last but not least the Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/cli/README.md)
+capable of performing shutdowns:
 
 ```bash
 sudo netdatacli shutdown-agent
@@ -239,7 +240,6 @@ sudo /etc/init.d/netdata restart
 </TabItem>
 </Tabs>
 
-
 #### Expected result
 
 After you restart the Agent, you will be able to see its status by running one of the commands below:
@@ -296,4 +296,4 @@ with `service netdata start`, or the appropriate method for your system.
 
 ## Related topics
 
-1. [Daemon Reference](/daemon/README.md)
+1. [Netdata Daemon Reference](https://github.com/netdata/netdata/blob/master/daemon/README.md)
