@@ -19,8 +19,6 @@ This page will guide you through installation using the automatic one-line insta
 The kickstart script works on all Linux distributions and, by default, automatic nightly updates are enabled.
 :::
 
-To read more, check out the [Kickstart script reference](/packaging/installer/methods/kickstart.md).
-
 ## Prerequisites
 
 - Connection to the internet
@@ -45,7 +43,8 @@ Install Netdata by running one of the following options:
 </Tabs>
 
 If you want to see all the optional parameters to further alter your installation, check
-the [kickstart script reference](/packaging/installer/methods/kickstart.md).
+the [kickstart script reference](https://github.com/netdata/netdata/blob/rework-learn/packaging/installer/methods/kickstart.md)
+.
 
 ## Further Actions
 
@@ -79,4 +78,4 @@ root@netdata~ # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstar
 
 ## Related topics
 
-1. [Kickstart script reference](/packaging/installer/methods/kickstart.md)
+1. [Kickstart script reference](https://github.com/netdata/netdata/blob/rework-learn/packaging/installer/methods/kickstart.md)
