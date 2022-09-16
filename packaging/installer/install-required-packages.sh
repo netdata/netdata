@@ -18,11 +18,8 @@ fi
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
-PACKAGES_NETDATA_NODEJS=${PACKAGES_NETDATA_NODEJS-0}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
-PACKAGES_NETDATA_PYTHON_MYSQL=${PACKAGES_NETDATA_PYTHON_MYSQL-0}
-PACKAGES_NETDATA_PYTHON_POSTGRES=${PACKAGES_NETDATA_PYTHON_POSTGRES-0}
 PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
 PACKAGES_DEBUG=${PACKAGES_DEBUG-0}
 PACKAGES_IPRANGE=${PACKAGES_IPRANGE-0}
@@ -99,34 +96,22 @@ Supported installers (IN):
 Supported packages (you can append many of them):
 
     - netdata-all    all packages required to install netdata
-                     including mysql client, postgres client,
-                     node.js, python, sensors, etc
+                     including python, sensors, etc
 
     - netdata        minimum packages required to install netdata
-                     (no mysql client, no nodejs, includes python)
-
-    - nodejs         install nodejs
-                     (required for monitoring named and SNMP)
+                     (includes python)
 
     - python         install python
 
     - python3        install python3
 
-    - python-mysql   install MySQLdb
-                     (for monitoring mysql, will install python3 version
-                     if python3 is enabled or detected)
-
-    - python-postgres install psycopg2
-                     (for monitoring postgres, will install python3 version
-                     if python3 is enabled or detected)
-
     - python-pymongo install python-pymongo (or python3-pymongo for python3)
 
     - sensors        install lm_sensors for monitoring h/w sensors
 
-    - firehol-all    packages required for FireHOL, FireQoS, update-ipsets
+    - firehol-all    packages required for FireHOL, FireQOS, update-ipsets
     - firehol        packages required for FireHOL
-    - fireqos        packages required for FireQoS
+    - fireqos        packages required for FireQOS
     - update-ipsets  packages required for update-ipsets
 
     - demo           packages required for running a netdata demo site
@@ -198,7 +183,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | sabayon | sles | suse | ubuntu)
+      almalinux | alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -419,12 +404,12 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
-    centos* | clearos*)
+    centos* | clearos* | rocky* | almalinux*)
       package_installer=""
       tree="centos"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
-      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -433,8 +418,8 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -444,8 +429,8 @@ detect_package_manager_from_distribution() {
     ol*)
       package_installer=
       tree="ol"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
       [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -664,19 +649,14 @@ declare -A pkg_autogen=(
   # exceptions
   ['centos-6']="WARNING|"
   ['rhel-6']="WARNING|"
+  ['centos-9']="NOTREQUIRED|"
+  ['rhel-9']="NOTREQUIRED|"
 )
 
 declare -A pkg_automake=(
   ['gentoo']="sys-devel/automake"
   ['clearlinux']="c-basic"
   ['default']="automake"
-)
-
-# required to bundle libJudy
-declare -A pkg_libtool=(
-  ['gentoo']="sys-devel/libtool"
-  ['clearlinux']="c-basic"
-  ['default']="libtool"
 )
 
 # Required to build libwebsockets and libmosquitto on some systems.
@@ -695,7 +675,21 @@ declare -A pkg_json_c_dev=(
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
   ['freebsd']="json-c"
+  ['macos']="json-c"
   ['default']="json-c-devel"
+)
+
+declare -A pkg_libatomic=(
+  ['arch']="NOTREQUIRED"
+  ['clearlinux']="NOTREQUIRED"
+  ['debian']="libatomic1"
+  ['freebsd']="NOTREQUIRED"
+  ['gentoo']="NOTREQUIRED"
+  ['macos']="NOTREQUIRED"
+  ['sabayon']="NOTREQUIRED"
+  ['suse']="libatomic1"
+  ['ubuntu']="libatomic1"
+  ['default']="libatomic"
 )
 
 declare -A pkg_bridge_utils=(
@@ -703,13 +697,6 @@ declare -A pkg_bridge_utils=(
   ['clearlinux']="network-basic"
   ['macos']="WARNING|"
   ['default']="bridge-utils"
-)
-
-declare -A pkg_chrony=(
-  ['gentoo']="net-misc/chrony"
-  ['clearlinux']="time-server-basic"
-  ['macos']="WARNING|"
-  ['default']="chrony"
 )
 
 declare -A pkg_curl=(
@@ -828,7 +815,7 @@ declare -A pkg_libuuid_dev=(
   ['rhel']="libuuid-devel"
   ['ol']="libuuid-devel"
   ['suse']="libuuid-devel"
-  ['macos']="NOTREQUIRED"
+  ['macos']="ossp-uuid"
   ['freebsd']="e2fsprogs-libuuid"
   ['default']=""
 )
@@ -916,20 +903,6 @@ declare -A pkg_nginx=(
   ['default']="nginx"
 )
 
-declare -A pkg_nodejs=(
-  ['gentoo']="net-libs/nodejs"
-  ['clearlinux']="nodejs-basic"
-  ['freebsd']="node"
-  ['default']="nodejs"
-
-  # exceptions
-  ['rhel-6']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['rhel-7']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['centos-6']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['debian-6']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-  ['debian-7']="WARNING|To install nodejs check: https://nodejs.org/en/download/package-manager/"
-)
-
 declare -A pkg_postfix=(
   ['gentoo']="mail-mta/postfix"
   ['macos']="WARNING|"
@@ -960,91 +933,6 @@ declare -A pkg_python=(
   # Exceptions
   ['macos']="WARNING|"
   ['centos-8']="python2"
-)
-
-declare -A pkg_python_mysqldb=(
-  ['alpine']="py-mysqldb"
-  ['arch']="mysql-python"
-  ['centos']="MySQL-python"
-  ['debian']="python-mysqldb"
-  ['gentoo']="dev-python/mysqlclient"
-  ['sabayon']="dev-python/mysqlclient"
-  ['rhel']="MySQL-python"
-  ['suse']="python-PyMySQL"
-  ['clearlinux']="WARNING|"
-  ['default']="python-mysql"
-
-  # exceptions
-  ['fedora-24']="python2-mysql"
-  ['ol-8']="WARNING|"
-)
-
-declare -A pkg_python3_mysqldb=(
-  ['alpine']="WARNING|"
-  ['arch']="WARNING|"
-  ['centos']="WARNING|"
-  ['debian']="python3-mysqldb"
-  ['gentoo']="dev-python/mysqlclient"
-  ['sabayon']="dev-python/mysqlclient"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['suse']="WARNING|"
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="WARNING|"
-
-  # exceptions
-  ['debian-6']="WARNING|"
-  ['debian-7']="WARNING|"
-  ['debian-8']="WARNING|"
-  ['ubuntu-12.04']="WARNING|"
-  ['ubuntu-12.10']="WARNING|"
-  ['ubuntu-13.04']="WARNING|"
-  ['ubuntu-13.10']="WARNING|"
-  ['ubuntu-14.04']="WARNING|"
-  ['ubuntu-14.10']="WARNING|"
-  ['ubuntu-15.04']="WARNING|"
-  ['ubuntu-15.10']="WARNING|"
-  ['centos-7']="python36-mysql"
-  ['centos-8']="python38-mysql"
-  ['rhel-7']="python36-mysql"
-  ['rhel-8']="python38-mysql"
-)
-
-declare -A pkg_python_psycopg2=(
-  ['alpine']="py-psycopg2"
-  ['arch']="python2-psycopg2"
-  ['centos']="python-psycopg2"
-  ['debian']="python-psycopg2"
-  ['gentoo']="dev-python/psycopg"
-  ['sabayon']="dev-python/psycopg:2"
-  ['rhel']="python-psycopg2"
-  ['ol']="python-psycopg2"
-  ['suse']="python-psycopg2"
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="python-psycopg2"
-)
-
-declare -A pkg_python3_psycopg2=(
-  ['alpine']="py3-psycopg2"
-  ['arch']="python-psycopg2"
-  ['centos']="WARNING|"
-  ['debian']="WARNING|"
-  ['gentoo']="dev-python/psycopg"
-  ['sabayon']="dev-python/psycopg:2"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['suse']="WARNING|"
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="WARNING|"
-
-  ['centos-7']="python3-psycopg2"
-  ['centos-8']="python38-psycopg2"
-  ['rhel-7']="python3-psycopg2"
-  ['rhel-8']="python38-psycopg2"
-  ['ol-8']="python3-psycopg2"
 )
 
 declare -A pkg_python_pip=(
@@ -1171,19 +1059,8 @@ declare -A pkg_openssl=(
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['freebsd']="openssl"
-  ['macos']="openssl@1.1"
+  ['macos']="openssl"
   ['default']="openssl-devel"
-)
-
-declare -A pkg_judy=(
-  ['debian']="libjudy-dev"
-  ['ubuntu']="libjudy-dev"
-  ['suse']="judy-devel"
-  ['gentoo']="dev-libs/judy"
-  ['arch']="judy"
-  ['freebsd']="Judy"
-  ['fedora']="Judy-devel"
-  ['default']="NOTREQUIRED"
 )
 
 declare -A pkg_python3=(
@@ -1338,20 +1215,20 @@ packages() {
   # basic build environment
 
   suitable_package distro-sdk
+  suitable_package libatomic
 
   require_cmd git || suitable_package git
   require_cmd find || suitable_package find
 
-  require_cmd gcc ||
+  require_cmd gcc || require_cmd clang ||
     require_cmd gcc-multilib || suitable_package gcc
-  require_cmd g++ || suitable_package gxx
+  require_cmd g++ || require_cmd clang++ || suitable_package gxx
 
   require_cmd make || suitable_package make
   require_cmd autoconf || suitable_package autoconf
   suitable_package autoconf-archive
   require_cmd autogen || suitable_package autogen
   require_cmd automake || suitable_package automake
-  require_cmd libtoolize || suitable_package libtool
   require_cmd pkg-config || suitable_package pkg-config
   require_cmd cmake || suitable_package cmake
 
@@ -1423,20 +1300,12 @@ packages() {
     suitable_package libuv
     suitable_package lz4
     suitable_package openssl
-    suitable_package judy
   fi
 
   # -------------------------------------------------------------------------
   # ebpf plugin
   if [ "${PACKAGES_NETDATA_EBPF}" -ne 0 ]; then
     suitable_package libelf
-  fi
-
-  # -------------------------------------------------------------------------
-  # scripting interpreters for netdata plugins
-
-  if [ "${PACKAGES_NETDATA_NODEJS}" -ne 0 ]; then
-    require_cmd nodejs node js || suitable_package nodejs
   fi
 
   # -------------------------------------------------------------------------
@@ -1448,9 +1317,6 @@ packages() {
     [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python-pymongo
     # suitable_package python-requests
     # suitable_package python-pip
-
-    [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python-mysqldb
-    [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python-psycopg2
   fi
 
   # -------------------------------------------------------------------------
@@ -1462,9 +1328,6 @@ packages() {
     [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python3-pymongo
     # suitable_package python3-requests
     # suitable_package python3-pip
-
-    [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python3-mysqldb
-    [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python3-psycopg2
   fi
 
   # -------------------------------------------------------------------------
@@ -1599,6 +1462,13 @@ validate_tree_ol() {
 	EOF
       fi
     fi
+  elif [[ "${version}" =~ ^9(\..*)?$ ]]; then
+    echo " > Checking for CodeReady Builder ..."
+    if ! run ${sudo} dnf repolist enabled | grep -q codeready; then
+      if prompt "CodeReady Builder not enabled, shall I enable it?"; then
+        run ${sudo} dnf config-manager --set-enabled ol9_codeready_builder
+      fi
+    fi
   fi
 }
 
@@ -1611,9 +1481,23 @@ validate_tree_centos() {
 
   echo >&2 " > CentOS Version: ${version} ..."
 
-  if [[ "${version}" =~ ^8(\..*)?$ ]]; then
+  if [[ "${version}" =~ ^9(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
-    if ! run yum ${sudo} config-manager; then
+    if ! run ${sudo} dnf config-manager --help; then
+      if prompt "config-manager not found, shall I install it?"; then
+        run ${sudo} dnf ${opts} install 'dnf-command(config-manager)'
+      fi
+    fi
+
+    echo >&2 " > Checking for CRB ..."
+    if ! run dnf ${sudo} repolist | grep CRB; then
+      if prompt "CRB not found, shall I install it?"; then
+        run ${sudo} dnf ${opts} config-manager --set-enabled crb
+      fi
+    fi
+  elif [[ "${version}" =~ ^8(\..*)?$ ]]; then
+    echo >&2 " > Checking for config-manager ..."
+    if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
         run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
       fi
@@ -1628,9 +1512,6 @@ validate_tree_centos() {
 
     echo >&2 " > Updating libarchive ..."
     run ${sudo} yum ${opts} install libarchive
-
-    echo >&2 " > Installing Judy-devel directly ..."
-    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
 
   elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
     echo >&2 " > Checking for EPEL ..."
@@ -1986,7 +1867,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -2047,16 +1928,11 @@ while [ -n "${1}" ]; do
 
     netdata-all)
       PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_NETDATA_SENSORS=1
@@ -2079,26 +1955,6 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA_PYTHON3=1
       ;;
 
-    python-mysql | mysql-python | mysqldb | netdata-mysql)
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
-      fi
-      ;;
-
-    python-postgres | postgres-python | psycopg2 | netdata-postgres)
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
-      fi
-      ;;
-
     python-pymongo)
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
@@ -2107,12 +1963,6 @@ while [ -n "${1}" ]; do
         PACKAGES_NETDATA_PYTHON3=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
-      ;;
-
-    nodejs | netdata-nodejs)
-      PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
-      PACKAGES_NETDATA_DATABASE=1
       ;;
 
     sensors | netdata-sensors)
@@ -2132,16 +1982,11 @@ while [ -n "${1}" ]; do
 
     demo | all)
       PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
         PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_DEBUG=1

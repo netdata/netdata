@@ -103,4 +103,7 @@ extern int procfile_adaptive_initial_allocation;
 // return the Nth word of the current line
 #define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords((ff), (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + (word)) : "")
 
+// Open file without logging file IO error if any
+#define procfile_open_no_log(filename, separators, flags) procfile_open(filename, separators, flags | PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)
+
 #endif /* NETDATA_PROCFILE_H */

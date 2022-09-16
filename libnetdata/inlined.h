@@ -151,90 +151,6 @@ static inline long long str2ll(const char *s, char **endptr) {
         return n;
 }
 
-static inline long double str2ld(const char *s, char **endptr) {
-    int negative = 0;
-    const char *start = s;
-    unsigned long long integer_part = 0;
-    unsigned long decimal_part = 0;
-    size_t decimal_digits = 0;
-
-    switch(*s) {
-        case '-':
-            s++;
-            negative = 1;
-            break;
-
-        case '+':
-            s++;
-            break;
-
-        case 'n':
-            if(s[1] == 'a' && s[2] == 'n') {
-                if(endptr) *endptr = (char *)&s[3];
-                return NAN;
-            }
-            break;
-
-        case 'i':
-            if(s[1] == 'n' && s[2] == 'f') {
-                if(endptr) *endptr = (char *)&s[3];
-                return INFINITY;
-            }
-            break;
-
-        default:
-            break;
-    }
-
-    while (*s >= '0' && *s <= '9') {
-        integer_part = (integer_part * 10) + (*s - '0');
-        s++;
-    }
-
-    if(unlikely(*s == '.')) {
-        decimal_part = 0;
-        s++;
-
-        while (*s >= '0' && *s <= '9') {
-            decimal_part = (decimal_part * 10) + (*s - '0');
-            s++;
-            decimal_digits++;
-        }
-    }
-
-    if(unlikely(*s == 'e' || *s == 'E'))
-        return strtold(start, endptr);
-
-    if(unlikely(endptr))
-        *endptr = (char *)s;
-
-    if(unlikely(negative)) {
-        if(unlikely(decimal_digits))
-            return -((long double)integer_part + (long double)decimal_part / powl(10.0, decimal_digits));
-        else
-            return -((long double)integer_part);
-    }
-    else {
-        if(unlikely(decimal_digits))
-            return (long double)integer_part + (long double)decimal_part / powl(10.0, decimal_digits);
-        else
-            return (long double)integer_part;
-    }
-}
-
-#ifdef NETDATA_STRCMP_OVERRIDE
-#ifdef strcmp
-#undef strcmp
-#endif
-#define strcmp(a, b) strsame(a, b)
-#endif // NETDATA_STRCMP_OVERRIDE
-
-static inline int strsame(const char *a, const char *b) {
-    if(unlikely(a == b)) return 0;
-    while(*a && *a == *b) { a++; b++; }
-    return *a - *b;
-}
-
 static inline char *strncpyz(char *dst, const char *src, size_t n) {
     char *p = dst;
 
@@ -246,21 +162,21 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
     return p;
 }
 
-static inline void sanitize_json_string(char *dst, char *src, size_t len) {
-    while (*src != '\0' && len > 1) {
-        if (*src == '\\' || *src == '\"' || *src < 0x1F) {
-            if (*src < 0x1F) {
-                *dst++ = '_';
-                src++;
-                len--;
-            } else {
-                *dst++ = '\\';
-                *dst++ = *src++;
-                len -= 2;
-            }
-        } else {
+static inline void sanitize_json_string(char *dst, const char *src, size_t dst_size) {
+    while (*src != '\0' && dst_size > 1) {
+        if (*src < 0x1F) {
+            *dst++ = '_';
+            src++;
+            dst_size--;
+        }
+        else if (*src == '\\' || *src == '\"') {
+            *dst++ = '\\';
             *dst++ = *src++;
-            len--;
+            dst_size -= 2;
+        }
+        else {
+            *dst++ = *src++;
+            dst_size--;
         }
     }
     *dst = '\0';

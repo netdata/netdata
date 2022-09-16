@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        name: Version Tag
+        description: Version Tag
         default: nightly
         required: true
 env:
-  DO_NOT_TRACK: 1
+  DISABLE_TELEMETRY: 1
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -22,19 +22,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        id: checkout
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v1
+        id: prepare
+        uses: docker/setup-buildx-action@v2
       - name: Test Build
-        uses: docker/build-push-action@v2
+        id: build
+        uses: docker/build-push-action@v3
         with:
           load: true
           push: false
           tags: netdata/netdata:test
       - name: Test Image
+        id: test
         run: .github/scripts/docker-test.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker runtime testing failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Building or testing Docker image for linux/amd64 failed.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Build image: ${{ steps.build.outcome }}
+              Test image: ${{ steps.test.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}
 
   docker-ci:
     if: github.event_name != 'workflow_dispatch'
@@ -50,57 +76,111 @@ jobs:
           - linux/ppc64le
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        id: checkout
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Setup QEMU
+        id: qemu
         if: matrix.platforms != 'linux/i386'
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v1
+        id: buildx
+        uses: docker/setup-buildx-action@v2
       - name: Build
-        uses: docker/build-push-action@v2
+        id: build
+        uses: docker/build-push-action@v3
         with:
           platforms: ${{ matrix.platforms }}
           load: false
           push: false
           tags: netdata/netdata:test
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker build testing failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Building Docker image for ${{ matrix.platforms }} failed.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.buildx.outcome }}
+              Build image: ${{ steps.build.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}
+
+  normalize-tag: # Fix the release tag if needed
+    name: Normalize Release Tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Normalize Tag
+        id: tag
+        run: |
+          if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
+            echo "::set-output name=tag::v${{ github.event.inputs.version }}"
+          else
+            echo "::set-output name=tag::${{ github.event.inputs.version }}"
+          fi
 
   docker-publish:
     if: github.event_name == 'workflow_dispatch'
     name: Docker Build and Publish
-    needs: docker-test
+    needs:
+      - docker-test
+      - normalize-tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        id: checkout
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Determine which tags to use
+        id: release-tags
         if: github.event.inputs.version != 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '')" \
+              >> "${GITHUB_ENV}"
       - name: Determine which tags to use
+        id: nightly-tags
         if: github.event.inputs.version == 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> "${GITHUB_ENV}"
       - name: Mark image as official
+        id: env
         if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> $GITHUB_ENV
+        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
+        id: qemu
+        uses: docker/setup-qemu-action@v2
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v1
+        id: buildx
+        uses: docker/setup-buildx-action@v2
       - name: Docker Hub Login
-        uses: docker/login-action@v1
+        id: login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: Docker Build
-        uses: docker/build-push-action@v2
+        id: build
+        uses: docker/build-push-action@v3
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
-          push: true
+          push: ${{ github.repository == 'netdata/netdata' }}
           tags: ${{ env.tags }}
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
       - name: Failure Notification
@@ -111,20 +191,108 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: "Docker image build failed."
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to build or publish Docker images.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Generate release tags: ${{ steps.release-tags.outcome }}
+              Generate nightly tags: ${{ steps.nightly-tags.outcome }}
+              Setup environment: ${{ steps.env.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.buildx.outcome }}
+              Authenticate against DockerHub: ${{ steps.login.outcome }}
+              Build and publish images: ${{ steps.build.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
             failure()
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
           }}
       - name: Trigger Helmchart PR
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         uses: benc-uk/workflow-dispatch@v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/helmchart
           workflow: Agent Version PR
           ref: refs/heads/master
-          inputs: '{"agent_version": "${{ github.event.inputs.version }}"}'
+          inputs: '{"agent_version": "${{ needs.normalize-tag.outputs.tag }}"}'
+
+  docker-dbg-publish:
+    if: github.event_name == 'workflow_dispatch'
+    name: Docker Build and Publish (Debuging Image)
+    needs:
+      - docker-test
+      - normalize-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Determine which tags to use
+        id: release-tags
+        if: github.event.inputs.version != 'nightly'
+        run: |
+          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '-debug')" \
+              >> "${GITHUB_ENV}"
+      - name: Determine which tags to use
+        id: nightly-tags
+        if: github.event.inputs.version == 'nightly'
+        run: |
+          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:edge" >> "${GITHUB_ENV}"
+      - name: Mark image as official
+        id: env
+        if: github.repository == 'netdata/netdata'
+        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
+      - name: Setup QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v2
+      - name: Setup Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Docker Hub Login
+        id: login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Docker Build
+        id: build
+        uses: docker/build-push-action@v3
+        with:
+          platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
+          push: ${{ github.repository == 'netdata/netdata' }}
+          tags: ${{ env.tags }}
+          build-args: |
+            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            DEBUG_BUILD=1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker Debug Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to build or publish Docker debug images.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Generate release tags: ${{ steps.release-tags.outcome }}
+              Generate nightly tags: ${{ steps.nightly-tags.outcome }}
+              Setup environment: ${{ steps.env.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.buildx.outcome }}
+              Authenticate against DockerHub: ${{ steps.login.outcome }}
+              Build and publish images: ${{ steps.build.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}

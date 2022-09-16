@@ -7,7 +7,7 @@ install_debian_like() {
   apt-get update
 
   # Install Netdata
-  apt-get install -y /netdata/artifacts/netdata_"${VERSION}"_*.deb || exit 1
+  apt-get install -y /netdata/artifacts/netdata_"${VERSION}"*_*.deb || exit 1
 
   # Install testing tools
   apt-get install -y --no-install-recommends curl netcat jq || exit 1
@@ -36,6 +36,10 @@ install_centos() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
+  if [ "${PKGMGR}" = "dnf" ]; then
+    opts="--allowerasing"
+  fi
+
   # Install EPEL (needed for `jq`
   "$PKGMGR" install -y epel-release || exit 1
 
@@ -43,7 +47,7 @@ install_centos() {
   "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
-  "$PKGMGR" install -y curl nc jq || exit 1
+  "$PKGMGR" install -y ${opts} curl nc jq || exit 1
 }
 
 install_suse_like() {
@@ -101,7 +105,7 @@ case "${DISTRO}" in
   fedora | oraclelinux)
     install_fedora_like
     ;;
-  centos)
+  centos | rockylinux | almalinux)
     install_centos
     ;;
   opensuse)

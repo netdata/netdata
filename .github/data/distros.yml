@@ -1,0 +1,195 @@
+# This defines the full set of distros we run CI on.
+---
+platform_map: # map packaging architectures to docker platforms
+  aarch64: linux/arm64/v8
+  amd64: linux/amd64
+  arm64: linux/arm64/v8
+  armhf: linux/arm/v7
+  armhfp: linux/arm/v7
+  i386: linux/i386
+  x86_64: linux/amd64
+arch_order: # sort order for per-architecture jobs in CI
+  - amd64
+  - x86_64
+  - i386
+  - armhf
+  - armhfp
+  - arm64
+  - aarch64
+include:
+  - &alpine
+    distro: alpine
+    version: edge
+    env_prep: |
+      apk add -U bash
+    jsonc_removal: |
+      apk del json-c-dev
+    test:
+      ebpf-core: true
+  - <<: *alpine
+    version: "3.16"
+  - <<: *alpine
+    version: "3.15"
+  - <<: *alpine
+    version: "3.14"
+  - <<: *alpine
+    version: "3.13"
+
+  - distro: archlinux
+    version: latest
+    env_prep: |
+      pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
+    test:
+      ebpf-core: true
+
+  - &alma
+    distro: almalinux
+    version: "9"
+    base_image: almalinux
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    packages: &alma_packages
+      type: rpm
+      repo_distro: el/9
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *alma
+    version: "8"
+    packages:
+      <<: *alma_packages
+      repo_distro: el/8
+
+  - distro: centos
+    version: "7"
+    packages:
+      type: rpm
+      repo_distro: el/7
+      arches:
+        - x86_64
+    test:
+      ebpf-core: false
+
+  - &debian
+    distro: debian
+    version: "11"
+    env_prep: |
+      apt-get update
+    jsonc_removal: |
+      apt-get purge -y libjson-c-dev
+    packages: &debian_packages
+      type: deb
+      repo_distro: debian/bullseye
+      arches:
+        - i386
+        - amd64
+        - armhf
+        - arm64
+    test:
+      ebpf-core: true
+  - <<: *debian
+    version: "10"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/buster
+    test:
+      ebpf-core: false
+
+  - &fedora
+    distro: fedora
+    version: "36"
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    packages: &fedora_packages
+      type: rpm
+      repo_distro: fedora/36
+      arches:
+        - x86_64
+        - armhfp
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "35"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/35
+    test:
+      ebpf-core: true
+
+  - &opensuse
+    distro: opensuse
+    version: "15.4"
+    base_image: opensuse/leap
+    jsonc_removal: |
+      zypper rm -y libjson-c-devel
+    packages: &opensuse_packages
+      type: rpm
+      repo_distro: opensuse/15.4
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *opensuse
+    version: "15.3"
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.3
+    test:
+      ebpf-core: false
+
+  - &oracle
+    distro: oraclelinux
+    version: "8"
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    packages: &oracle_packages
+      type: rpm
+      repo_distro: ol/8
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *oracle
+    version: "9"
+    packages:
+      <<: *oracle_packages
+      repo_distro: ol/9
+
+  - &ubuntu
+    distro: ubuntu
+    version: "22.04"
+    env_prep: |
+      rm -f /etc/apt/apt.conf.d/docker && apt-get update
+    jsonc_removal: |
+      apt-get remove -y libjson-c-dev
+    packages: &ubuntu_packages
+      type: deb
+      repo_distro: ubuntu/jammy
+      arches:
+        - amd64
+        - armhf
+        - arm64
+    test:
+      ebpf-core: true
+  - <<: *ubuntu
+    version: "20.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/focal
+  - <<: *ubuntu
+    version: "18.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/bionic
+      arches:
+        - i386
+        - amd64
+        - armhf
+        - arm64
+    test:
+      ebpf-core: false

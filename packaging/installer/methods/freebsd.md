@@ -20,7 +20,7 @@ This is how to install the latest Netdata version on FreeBSD:
 Install required packages (**need root permission**):
 
 ```sh
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake gmake
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof liblz4 libuv json-c cmake gmake
 ```
 
 Download Netdata:
@@ -93,16 +93,15 @@ The `netdata-updater.sh` script will update your Agent.
 | `--disable-plugin-nfacct` | Disable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available|
 | `--enable-plugin-xenstat` | Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available|
 | `--disable-plugin-xenstat` | Disable the xenstat plugin|
-| `--enable-backend-kinesis` | Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|                           
-| `--disable-backend-kinesis` | Disable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
-| `--enable-backend-prometheus-remote-write` | Enable Prometheus remote write backend. Default: enable it when libprotobuf and libsnappy are available|
-| `--disable-backend-prometheus-remote-write` | Disable Prometheus remote write backend. Default: enable it when libprotobuf and libsnappy are available|
-| `--enable-backend-mongodb` | Enable MongoDB backend. Default: enable it when libmongoc is available|
-| `--disable-backend-mongodb` | Disable MongoDB backend|
+| `--disable-exporting-kinesis` | Disable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
+| `--enable-exporting-prometheus-remote-write` | Enable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
+| `--disable-exporting-prometheus-remote-write` | Disable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
+| `--enable-exporting-mongodb` | Enable MongoDB exporting connector. Default: enable it when libmongoc is available|
+| `--disable-exporting-mongodb` | Disable MongoDB exporting connector|
 | `--enable-lto` | Enable Link-Time-Optimization. Default: enabled|
 | `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
-|`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)|
+|`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)|
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Ffreebsd&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

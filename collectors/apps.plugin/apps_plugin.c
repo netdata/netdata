@@ -6,38 +6,9 @@
  * Released under GPL v3+
  */
 
+#include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
-
-// ----------------------------------------------------------------------------
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
-    return;
-}
-// callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
+#include "libnetdata/required_dummies.h"
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -137,6 +108,27 @@ static int
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
+// some variables for keeping track of processes count by states
+typedef enum {
+    PROC_STATUS_RUNNING = 0,
+    PROC_STATUS_SLEEPING_D, // uninterruptible sleep
+    PROC_STATUS_SLEEPING,   // interruptible sleep
+    PROC_STATUS_ZOMBIE,
+    PROC_STATUS_STOPPED,
+    PROC_STATUS_END, //place holder for ending enum fields
+} proc_state;
+
+#ifndef __FreeBSD__
+static proc_state proc_state_count[PROC_STATUS_END];
+static const char *proc_states[] = {
+    [PROC_STATUS_RUNNING] = "running",
+    [PROC_STATUS_SLEEPING] = "sleeping_interruptible",
+    [PROC_STATUS_SLEEPING_D] = "sleeping_uninterruptible",
+    [PROC_STATUS_ZOMBIE] = "zombie",
+    [PROC_STATUS_STOPPED] = "stopped",
+    };
+#endif
+
 // ----------------------------------------------------------------------------
 // internal flags
 // handled in code (automatically set)
@@ -181,7 +173,8 @@ static kernel_uint_t
         global_gtime = 0;
 
 // the normalization ratios, as calculated by normalize_utilization()
-double  utime_fix_ratio = 1.0,
+NETDATA_DOUBLE
+        utime_fix_ratio = 1.0,
         stime_fix_ratio = 1.0,
         gtime_fix_ratio = 1.0,
         minflt_fix_ratio = 1.0,
@@ -316,7 +309,7 @@ struct pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
+    char state;
     int32_t ppid;
     // int32_t pgrp;
     // int32_t session;
@@ -509,7 +502,8 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-        long double currentmaxfds = 0;
+
+long currentmaxfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -1262,6 +1256,28 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
 
     aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
+
+static void update_proc_state_count(char proc_state) {
+    switch (proc_state) {
+        case 'S':
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            break;
+        case 'R':
+            proc_state_count[PROC_STATUS_RUNNING] += 1;
+            break;
+        case 'D':
+            proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
+            break;
+        case 'Z':
+            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
+            break;
+        case 'T':
+            proc_state_count[PROC_STATUS_STOPPED] += 1;
+            break;
+        default:
+            break;
+    }
+}
 #endif // !__FreeBSD__
 
 static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
@@ -1297,6 +1313,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
         arl_expect_custom(p->status_arl, "RssShmem", arl_callback_status_rssshmem, &arl_ptr);
         arl_expect_custom(p->status_arl, "VmSwap", arl_callback_status_vmswap, &arl_ptr);
     }
+
 
     if(unlikely(!p->status_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -1343,7 +1360,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
 #ifdef __FreeBSD__
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-
     if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
         goto cleanup;
 #else
@@ -1378,7 +1394,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 #else
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
-    // p->state         = *(procfile_lineword(ff, 0, 2));
+    p->state            = *(procfile_lineword(ff, 0, 2));
     p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
     // p->pgrp          = (int32_t)str2pid_t(procfile_lineword(ff, 0, 4));
     // p->session       = (int32_t)str2pid_t(procfile_lineword(ff, 0, 5));
@@ -1386,7 +1402,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
 #endif
-
     if(strcmp(p->comm, comm) != 0) {
         if(unlikely(debug_enabled)) {
             if(p->comm[0])
@@ -1484,7 +1499,9 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         p->cstime           = 0;
         p->cgtime           = 0;
     }
-
+#ifndef __FreeBSD__
+    update_proc_state_count(p->state);
+#endif
     return 1;
 
 cleanup:
@@ -1629,7 +1646,7 @@ cleanup:
 }
 #else
 static inline int read_global_time() {
-    static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, ntime_raw = 0;
+    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
     long cp_time[CPUSTATES];
 
@@ -1947,6 +1964,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     static char *fdsbuf;
     char *bfdsbuf, *efdsbuf;
     char fdsname[FILENAME_MAX + 1];
+#define SHM_FORMAT_LEN 31 // format: 21 + size: 10
+    char shm_name[FILENAME_MAX - SHM_FORMAT_LEN + 1];
 
     // we make all pid fds negative, so that
     // we can detect unused file descriptors
@@ -1984,7 +2003,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         }
 
         // get file descriptors array index
-        int fdid = fds->kf_fd;
+        size_t fdid = fds->kf_fd;
 
         // check if the fds array is small
         if (unlikely(fdid >= p->fds_size)) {
@@ -2044,7 +2063,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 #endif
                     break;
                 case KF_TYPE_SHM:
-                    sprintf(fdsname, "other: shm: %s size: %lu", fds->kf_path, fds->kf_un.kf_file.kf_file_size);
+                    strncpyz(shm_name, fds->kf_path, FILENAME_MAX - SHM_FORMAT_LEN);
+                    sprintf(fdsname, "other: shm: %s size: %lu", shm_name, fds->kf_un.kf_file.kf_file_size);
                     break;
                 case KF_TYPE_SEM:
                     sprintf(fdsname, "other: sem: %u", fds->kf_un.kf_sem.kf_sem_value);
@@ -2564,7 +2584,10 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
 
-#ifdef __FreeBSD__
+#ifndef __FreeBSD__
+    // clear process state counter
+    memset(proc_state_count, 0, sizeof proc_state_count);
+#else
     int i, procnum;
 
     static size_t procbase_size = 0;
@@ -2638,8 +2661,9 @@ static int collect_data_for_all_processes(void) {
             // we forward read all running processes
             // collect_data_for_pid() is smart enough,
             // not to read the same pid twice per iteration
-            for(slc = 0; slc < all_pids_count; slc++)
+            for(slc = 0; slc < all_pids_count; slc++) {
                 collect_data_for_pid(all_pids_sortlist[slc], NULL);
+            }
         }
 #endif
     }
@@ -2696,7 +2720,6 @@ static int collect_data_for_all_processes(void) {
     // we do this by collecting the ownership of process
     // if we manage to get the ownership, the process still runs
     process_exited_processes();
-
     return 1;
 }
 
@@ -3000,7 +3023,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
-    long double currentfds = 0;
+    long currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -3352,7 +3375,7 @@ static void normalize_utilization(struct target *root) {
             gtime_fix_ratio  =
             cutime_fix_ratio =
             cstime_fix_ratio =
-            cgtime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
+            cgtime_fix_ratio = 1.0; //(NETDATA_DOUBLE)(global_utime + global_stime) / (NETDATA_DOUBLE)(utime + cutime + stime + cstime);
         }
         else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
             // children resources are too high
@@ -3362,7 +3385,7 @@ static void normalize_utilization(struct target *root) {
             gtime_fix_ratio  = 1.0;
             cutime_fix_ratio =
             cstime_fix_ratio =
-            cgtime_fix_ratio = (double)((global_utime + global_stime) - (utime + stime)) / (double)(cutime + cstime);
+            cgtime_fix_ratio = (NETDATA_DOUBLE)((global_utime + global_stime) - (utime + stime)) / (NETDATA_DOUBLE)(cutime + cstime);
         }
         else if(utime || stime) {
             // even running processes are unrealistic
@@ -3370,7 +3393,7 @@ static void normalize_utilization(struct target *root) {
             // lower the running processes resources
             utime_fix_ratio  =
             stime_fix_ratio  =
-            gtime_fix_ratio  = (double)(global_utime + global_stime) / (double)(utime + stime);
+            gtime_fix_ratio  = (NETDATA_DOUBLE)(global_utime + global_stime) / (NETDATA_DOUBLE)(utime + stime);
             cutime_fix_ratio =
             cstime_fix_ratio =
             cgtime_fix_ratio = 0.0;
@@ -3418,14 +3441,14 @@ static void normalize_utilization(struct target *root) {
 
     if(utime || stime || gtime)
         majflt_fix_ratio =
-        minflt_fix_ratio = (double)(utime * utime_fix_ratio + stime * stime_fix_ratio + gtime * gtime_fix_ratio) / (double)(utime + stime + gtime);
+        minflt_fix_ratio = (NETDATA_DOUBLE)(utime * utime_fix_ratio + stime * stime_fix_ratio + gtime * gtime_fix_ratio) / (NETDATA_DOUBLE)(utime + stime + gtime);
     else
         minflt_fix_ratio =
         majflt_fix_ratio = 1.0;
 
     if(cutime || cstime || cgtime)
         cmajflt_fix_ratio =
-        cminflt_fix_ratio = (double)(cutime * cutime_fix_ratio + cstime * cstime_fix_ratio + cgtime * cgtime_fix_ratio) / (double)(cutime + cstime + cgtime);
+        cminflt_fix_ratio = (NETDATA_DOUBLE)(cutime * cutime_fix_ratio + cstime * cstime_fix_ratio + cgtime * cgtime_fix_ratio) / (NETDATA_DOUBLE)(cutime + cstime + cgtime);
     else
         cminflt_fix_ratio =
         cmajflt_fix_ratio = 1.0;
@@ -3500,14 +3523,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(unlikely(w->exposed))
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(unlikely(w->exposed))
             send_SET(w->name, w->processes);
     }
     send_END();
@@ -3670,7 +3693,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
                 debug_log_int("%s just added - regenerating charts.", w->name);
         }
     }
- 
+
     // nothing more to show
     if(!newly_added && show_guest_time == show_guest_time_old) return;
 
@@ -3747,7 +3770,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
     if(show_guest_time) {
-        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_system stacked 20022 %d\n", type, title, type, update_every);
+        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_guest stacked 20022 %d\n", type, title, type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
@@ -3836,6 +3859,32 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 }
 
+
+#ifndef __FreeBSD__
+static void send_proc_states_count(usec_t dt)
+{
+    static bool chart_added = false;
+    // create chart for count of processes in different states
+    if (!chart_added) {
+        fprintf(
+                stdout,
+                "CHART system.processes_state '' 'System Processes State' 'processes' processes system.processes_state line %d %d\n",
+                NETDATA_CHART_PRIO_SYSTEM_PROCESS_STATES,
+                update_every);
+        for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
+          fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", proc_states[i]);
+        }
+        chart_added = true;
+    }
+
+    // send process state count
+    send_BEGIN("system", "processes_state", dt);
+    for (proc_state i = PROC_STATUS_RUNNING; i < PROC_STATUS_END; i++) {
+        send_SET(proc_states[i], proc_state_count[i]);
+    }
+    send_END();
+}
+#endif
 
 // ----------------------------------------------------------------------------
 // parse command line arguments
@@ -4088,6 +4137,8 @@ static int check_capabilities() {
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
 
+    clocks_init();
+
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
 
     // set the name for logging
@@ -4212,9 +4263,12 @@ int main(int argc, char **argv) {
 
         send_resource_usage_to_netdata(dt);
 
+#ifndef __FreeBSD__
+        send_proc_states_count(dt);
+#endif
+
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
-
         if(likely(enable_users_charts))
             send_charts_updates_to_netdata(users_root_target, "users", "Users");
 

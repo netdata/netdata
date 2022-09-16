@@ -6,35 +6,14 @@
 #include "aclk_stats.h"
 #include "aclk.h"
 
+#include "schema-wrappers/proto_2_json.h"
+
 #ifndef __GNUC__
 #pragma region aclk_tx_msgs helper functions
 #endif
 
 // version for aclk legacy (old cloud arch)
 #define ACLK_VERSION 2
-
-static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg, enum aclk_topics subtopic)
-{
-    uint16_t packet_id;
-    const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-    const char *topic = aclk_get_topic(subtopic);
-
-    if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting message send");
-        return;
-    }
-
-    mqtt_wss_publish_pid(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
-    json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
-#endif
-}
 
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
@@ -49,109 +28,79 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         return 0;
     }
 
-    mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
+    if (use_mqtt_5)
+        mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    else
+        mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
+
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx-%s.bin", ACLK_GET_CONV_LOG_NEXT(), msgname);
-    FILE *fptr;
-    if (fptr = fopen(filename,"w")) {
-        fwrite(msg, msg_len, 1, fptr);
-        fclose(fptr);
-    }
+    char *json = protomsg_to_json(msg, msg_len, msgname);
+    log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
+    freez(json);
 #endif
 
     return packet_id;
 }
 
-static uint16_t aclk_send_message_subtopic_pid(mqtt_wss_client client, json_object *msg, enum aclk_topics subtopic)
+// json_object_put returns int unfortunately :D
+// we need void(*fnc)(void *);
+static void json_object_put_wrapper(void *jsonobj)
 {
-    uint16_t packet_id;
-    const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-    const char *topic = aclk_get_topic(subtopic);
-
-    if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting message send");
-        return 0;
-    }
-
-    mqtt_wss_publish_pid(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
-    json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
-#endif
-    return packet_id;
+    json_object_put(jsonobj);
 }
-
-/* UNUSED now but can be used soon MVP1?
-static void aclk_send_message_topic(mqtt_wss_client client, json_object *msg, const char *topic)
-{
-    if (unlikely(!topic || topic[0] != '/')) {
-        error ("Full topic required!");
-        return;
-    }
-
-    const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-
-    mqtt_wss_publish(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1);
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published();
-#endif
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
-    json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
-#endif
-}
-*/
 
 #define TOPIC_MAX_LEN 512
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
-static void aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
+static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
 {
     uint16_t packet_id;
     const char *str;
-    char *full_msg;
-    int len;
+    char *full_msg = NULL;
+    int len, rc;
 
     if (unlikely(!topic || topic[0] != '/')) {
         error ("Full topic required!");
-        return;
+        json_object_put(msg);
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
-    full_msg = mallocz(len + strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len);
+    if (payload_len) {
+        full_msg = mallocz(len + strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len);
 
-    memcpy(full_msg, str, len);
-    memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
-    len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
-    memcpy(&full_msg[len], payload, payload_len);
-    len += payload_len;
+        memcpy(full_msg, str, len);
+        json_object_put(msg);
+        msg = NULL;
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
+        len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
+        memcpy(&full_msg[len], payload, payload_len);
+        len += payload_len;
+    }
 
-/* TODO
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 1024
-    char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
-    json_object_to_file_ext(filename, msg, JSON_C_TO_STRING_PRETTY);
-#endif */
+    if (use_mqtt_5)
+        mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
+    else {
+        rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
+        freez(full_msg);
+        json_object_put(msg);
+        if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
+            error("Timeout sending binpacked message");
+            return HTTP_RESP_BACKEND_FETCH_FAILED;
+        }
+        if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
+            error("Message is bigger than allowed maximum");
+            return HTTP_RESP_FORBIDDEN;
+        }
+    }
 
-    mqtt_wss_publish_pid(client, topic, full_msg, len,  MQTT_WSS_PUB_QOS1, &packet_id);
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
 #endif
-    freez(full_msg);
+
+    return 0;
 }
 
 /*
@@ -188,7 +137,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
 
 // TODO handle this somehow on older json-c
 //    tmp = json_object_new_uint64(ts_us);
-// probably jso->_to_json_strinf -> custom function
+// probably jso->_to_json_string -> custom function
 //          jso->o.c_uint64 -> map this with pointer to signed int
 // commit that implements json_object_new_uint64 is 3c3b592
 // between 0.14 and 0.15
@@ -209,17 +158,6 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
     return obj;
 }
 
-static char *create_uuid()
-{
-    uuid_t uuid;
-    char *uuid_str = mallocz(36 + 1);
-
-    uuid_generate(uuid);
-    uuid_unparse(uuid, uuid_str);
-
-    return uuid_str;
-}
-
 #ifndef __GNUC__
 #pragma endregion
 #endif
@@ -228,88 +166,22 @@ static char *create_uuid()
 #pragma region aclk_tx_msgs message generators
 #endif
 
-/*
- * This will send the /api/v1/info
- */
-#define BUFFER_INITIAL_SIZE (1024 * 16)
-void aclk_send_info_metadata(mqtt_wss_client client, int metadata_submitted, RRDHOST *host)
+void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
-    BUFFER *local_buffer = buffer_create(BUFFER_INITIAL_SIZE);
-    json_object *msg, *payload, *tmp;
+    json_object *tmp, *msg;
+    msg = create_hdr("http", msg_id, 0, 0, 2);
+    tmp = json_object_new_int(http_code);
+    json_object_object_add(msg, "http-code", tmp);
 
-    char *msg_id = create_uuid();
-    buffer_flush(local_buffer);
-    local_buffer->contenttype = CT_APPLICATION_JSON;
+    tmp = json_object_new_int(ec);
+    json_object_object_add(msg, "error-code", tmp);
 
-    // on_connect messages are sent on a health reload, if the on_connect message is real then we
-    // use the session time as the fake timestamp to indicate that it starts the session. If it is
-    // a fake on_connect message then use the real timestamp to indicate it is within the existing
-    // session.
-    if (metadata_submitted)
-        msg = create_hdr("update", msg_id, 0, 0, ACLK_VERSION);
-    else
-        msg = create_hdr("connect", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
+    tmp = json_object_new_string(emsg);
+    json_object_object_add(msg, "error-description", tmp);
 
-    payload = json_object_new_object();
-    json_object_object_add(msg, "payload", payload);
-
-    web_client_api_request_v1_info_fill_buffer(host, local_buffer);
-    tmp = json_tokener_parse(local_buffer->buffer);
-    json_object_object_add(payload, "info", tmp);
-
-    buffer_flush(local_buffer);
-
-    charts2json(host, local_buffer, 1, 0);
-    tmp = json_tokener_parse(local_buffer->buffer);
-    json_object_object_add(payload, "charts", tmp);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_METADATA);
-
-    json_object_put(msg);
-    freez(msg_id);
-    buffer_free(local_buffer);
-}
-
-// TODO should include header instead
-void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb);
-
-void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
-{
-    BUFFER *local_buffer = buffer_create(BUFFER_INITIAL_SIZE);
-    json_object *msg, *payload, *tmp;
-
-    char *msg_id = create_uuid();
-    buffer_flush(local_buffer);
-    local_buffer->contenttype = CT_APPLICATION_JSON;
-
-    // on_connect messages are sent on a health reload, if the on_connect message is real then we
-    // use the session time as the fake timestamp to indicate that it starts the session. If it is
-    // a fake on_connect message then use the real timestamp to indicate it is within the existing
-    // session.
-
-    if (metadata_submitted)
-        msg = create_hdr("connect_alarms", msg_id, 0, 0, ACLK_VERSION);
-    else
-        msg = create_hdr("connect_alarms", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
-
-    payload = json_object_new_object();
-    json_object_object_add(msg, "payload", payload);
-
-    health_alarms2json(localhost, local_buffer, 1);
-    tmp = json_tokener_parse(local_buffer->buffer);
-    json_object_object_add(payload, "configured-alarms", tmp);
-
-    buffer_flush(local_buffer);
-
-    health_active_log_alarms_2json(localhost, local_buffer);
-    tmp = json_tokener_parse(local_buffer->buffer);
-    json_object_object_add(payload, "alarms-active", tmp);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_ALARMS);
-
-    json_object_put(msg);
-    freez(msg_id);
-    buffer_free(local_buffer);
+    if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
+        error("Failed to send cancelation message for http reply");
+    }
 }
 
 void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
@@ -327,91 +199,41 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
 
-    aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
-    json_object_put(msg);
-}
+    int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
 
-void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)
-{
-    json_object *msg, *payload;
-    BUFFER *tmp_buffer;
-    RRDSET *st;
-    
-    st = rrdset_find(host, chart);
-    if (!st)
-        st = rrdset_find_byname(host, chart);
-    if (!st) {
-        info("FAILED to find chart %s", chart);
-        return;
+    switch (rc) {
+    case HTTP_RESP_FORBIDDEN:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, payload, payload_len);
+        break;
+    case HTTP_RESP_INTERNAL_SERVER_ERROR:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
+        break;
+    case HTTP_RESP_BACKEND_FETCH_FAILED:
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+        break;
     }
-
-    tmp_buffer = buffer_create(BUFFER_INITIAL_SIZE);
-    rrdset2json(st, tmp_buffer, NULL, NULL, 1);
-    payload = json_tokener_parse(tmp_buffer->buffer);
-    if (!payload) {
-        error("Failed to parse JSON from rrdset2json");
-        buffer_free(tmp_buffer);
-        return;
-    }
-
-    msg = create_hdr("chart", NULL, 0, 0, ACLK_VERSION);
-    json_object_object_add(msg, "payload", payload);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_CHART);
-
-    buffer_free(tmp_buffer);
-    json_object_put(msg);
 }
 
-void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg)
-{
-    // we create header here on purpose (and not send message with it already as `msg` param)
-    // timestamps etc. which in ACLK legacy would be wrong (because ACLK legacy
-    // send message with timestamps already to Query Queue they would be incorrect at time
-    // when query queue would get to send them)
-    json_object *obj = create_hdr("status-change", NULL, 0, 0, ACLK_VERSION);
-    json_object_object_add(obj, "payload", msg);
-
-    aclk_send_message_subtopic(client, obj, ACLK_TOPICID_ALARMS);
-    json_object_put(obj);
-}
-
-/*
- * Will generate disconnect message.
- * @param message if NULL it will generate LWT message (unexpected).
- *        Otherwise string pointed to by this parameter will be used as
- *        reason.
- */
-json_object *aclk_generate_disconnect(const char *message)
-{
-    json_object *tmp, *msg;
-
-    msg = create_hdr("disconnect", NULL, 0, 0, 2);
-
-    tmp = json_object_new_string(message ? message : "unexpected");
-    json_object_object_add(msg, "payload", tmp);
-
-    return msg;
-}
-
-int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
-{
-    int pid;
-    json_object *msg = aclk_generate_disconnect(message);
-    pid = aclk_send_message_subtopic_pid(client, msg, ACLK_TOPICID_METADATA);
-    json_object_put(msg);
-    return pid;
-}
-
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-// new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
     uint16_t pid;
+
+    struct capability agent_capabilities[] = {
+        { .name = "json",  .version = 2, .enabled = 0 },
+        { .name = "proto", .version = 1, .enabled = 1 },
+#ifdef ENABLE_ML
+        { .name = "ml",    .version = 1, .enabled = ml_enabled(localhost) },
+#endif
+        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
+        { .name = "ctx",   .version = 1, .enabled = rrdcontext_enabled },
+        { .name = NULL,    .version = 0, .enabled = 0 }
+    };
+
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
-        .session_id = aclk_session_newarch
+        .session_id = aclk_session_newarch,
+        .capabilities = agent_capabilities
     };
 
     rrdhost_aclk_state_lock(localhost);
@@ -420,7 +242,10 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         rrdhost_aclk_state_unlock(localhost);
         return 0;
     }
-    conn.claim_id = localhost->aclk_state.claimed_id;
+    if (localhost->aclk_state.prev_claimed_id)
+        conn.claim_id = localhost->aclk_state.prev_claimed_id;
+    else
+        conn.claim_id = localhost->aclk_state.claimed_id;
 
     char *msg = generate_update_agent_connection(&len, &conn);
     rrdhost_aclk_state_unlock(localhost);
@@ -431,7 +256,12 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     }
 
     pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
-    freez(msg);
+    if (!use_mqtt_5)
+        freez(msg);
+    if (localhost->aclk_state.prev_claimed_id) {
+        freez(localhost->aclk_state.prev_claimed_id);
+        localhost->aclk_state.prev_claimed_id = NULL;
+    }
     return pid;
 }
 
@@ -439,7 +269,8 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch
+        .session_id = aclk_session_newarch,
+        .capabilities = NULL
     };
 
     rrdhost_aclk_state_lock(localhost);
@@ -458,31 +289,6 @@ char *aclk_generate_lwt(size_t *size) {
 
     return msg;
 }
-
-void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation) {
-    size_t len;
-    char *msg = generate_node_instance_creation(&len, node_creation);
-    if (!msg) {
-        error("Error generating nodeinstance::create::v1::CreateNodeInstance");
-        return;
-    }
-
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance");
-    freez(msg);
-}
-
-void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection) {
-    size_t len;
-    char *msg = generate_node_instance_connection(&len, node_connection);
-    if (!msg) {
-        error("Error generating nodeinstance::v1::UpdateNodeInstanceConnection");
-        return;
-    }
-
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
-    freez(msg);
-}
-#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 #ifndef __GNUC__
 #pragma endregion

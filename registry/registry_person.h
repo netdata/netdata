@@ -53,7 +53,6 @@ extern REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, R
 extern REGISTRY_PERSON *registry_person_find(const char *person_guid);
 extern REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when);
 extern REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when);
-extern void registry_person_del(REGISTRY_PERSON *p);
 
 // LINKING PERSON -> PERSON_URL
 extern REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when);

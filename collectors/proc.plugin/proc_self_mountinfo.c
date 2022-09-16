@@ -182,6 +182,33 @@ static inline int is_read_only(const char *s) {
     return 0;
 }
 
+// for the full list of protected mount points look at
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L142-L149
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L180-L194
+static const char *systemd_protected_mount_points[] = {
+    "/home",
+    "/root",
+    "/usr",
+    "/boot",
+    "/efi",
+    "/etc",
+    "/run/user",
+    "/lib",
+    "/lib64",
+    "/bin",
+    "/sbin",
+    NULL
+};
+
+static inline int mount_point_is_protected(char *mount_point)
+{
+    for (size_t i = 0; systemd_protected_mount_points[i] != NULL; i++)
+        if (!strcmp(mount_point, systemd_protected_mount_points[i]))
+            return 1;
+
+    return 0;
+}
+
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
@@ -199,10 +226,20 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
     struct mountinfo *root = NULL, *last = NULL, *mi = NULL;
 
+    // create a dictionary to track uniqueness
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE);
+
     unsigned long l, lines = procfile_lines(ff);
     for(l = 0; l < lines ;l++) {
         if(unlikely(procfile_linewords(ff, l) < 5))
             continue;
+
+        // make sure we don't add the same item twice
+        char *v = (char *)dictionary_set(dict, procfile_lineword(ff, l, 4), "N", 2);
+        if(v) {
+            if(*v == 'O') continue;
+            *v = 'O';
+        }
 
         mi = mallocz(sizeof(struct mountinfo));
 
@@ -241,6 +278,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
         if(unlikely(is_read_only(mi->mount_options)))
             mi->flags |= MOUNTINFO_READONLY;
+
+        if(unlikely(mount_point_is_protected(mi->mount_point)))
+           mi->flags |= MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST;
 
         // count the optional fields
 /*
@@ -411,6 +451,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
     }
 */
 
+    dictionary_destroy(dict);
     procfile_close(ff);
     return root;
 }

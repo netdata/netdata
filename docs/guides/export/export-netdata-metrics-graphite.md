@@ -3,6 +3,7 @@ title: Export and visualize Netdata metrics in Graphite
 description: "Use Netdata to collect and export thousands of metrics to Graphite for long-term storage or further analysis."
 image: /img/seo/guides/export/export-netdata-metrics-graphite.png
 -->
+import { OneLineInstallWget } from '../../src/components/OneLineInstall/'
 
 # Export and visualize Netdata metrics in Graphite
 
@@ -31,9 +32,7 @@ Let's get started.
 If you don't have the Netdata Agent installed already, visit the [installation guide](/packaging/installer/README.md)
 for the recommended instructions for your system. In most cases, you can use the one-line installation script:
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+<OneLineInstallWget/>
 
 Once installation finishes, open your browser and navigate to `http://NODE:19999`, replacing `NODE` with the IP address
 or hostname of your system, to find the Agent dashboard.
@@ -181,4 +180,4 @@ often.
 For full details about each configuration option and what it does, see the [exporting reference
 guide](/exporting/README.md).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fexport%2Fexport-netdata-metrics-graphite.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

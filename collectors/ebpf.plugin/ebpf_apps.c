@@ -134,7 +134,7 @@ size_t zero_all_targets(struct target *root)
             while (pid_on_target) {
                 struct pid_on_target *pid_on_target_to_free = pid_on_target;
                 pid_on_target = pid_on_target->next;
-                free(pid_on_target_to_free);
+                freez(pid_on_target_to_free);
             }
 
             w->root_pid = NULL;
@@ -275,7 +275,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
 
     // ----------------------------------------
 
-    procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open_no_log(filename, " :\t", PROCFILE_FLAG_DEFAULT);
     if (!ff)
         return -1;
 
@@ -1091,6 +1091,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  */
 void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
+    if (unlikely(!all_pids))
+        return;
+
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
         if (pids->updated_twice) {
@@ -1116,7 +1119,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         key = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
-            w = mallocz(sizeof(ebpf_process_stat_t));
+            w = callocz(1, sizeof(ebpf_process_stat_t));
             global_process_stats[key] = w;
         }
 

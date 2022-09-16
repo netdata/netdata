@@ -11,12 +11,12 @@ User=netdata
 Group=netdata
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
-PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata/netdata.pid -D
+PIDFile=/run/netdata/netdata.pid
+ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
 ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
-ExecStartPre=/bin/mkdir -p @localstatedir_POST@/run/netdata
-ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/run/netdata
+ExecStartPre=/bin/mkdir -p /run/netdata
+ExecStartPre=/bin/chown -R netdata:netdata /run/netdata
 PermissionsStartOnly=true
 
 # saving a big db on slow disks may need some time
@@ -26,22 +26,16 @@ TimeoutStopSec=150
 Restart=on-failure
 RestartSec=30
 
-# The minimum netdata Out-Of-Memory (OOM) score.
-# netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
-# To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
-# Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
-OOMScoreAdjust=1000
-
 # Valid policies: other (the system default) | batch | idle | fifo | rr
 # To give netdata the max priority, set CPUSchedulingPolicy=rr and CPUSchedulingPriority=99
-CPUSchedulingPolicy=idle
+CPUSchedulingPolicy=batch
 
 # This sets the scheduling priority (for policies: rr and fifo).
 # Priority gets values 1 (lowest) to 99 (highest).
 #CPUSchedulingPriority=1
 
 # For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata (-20 highest to 19 lowest).
-#Nice=0
+Nice=0
 
 # Capabilities
 # is required for freeipmi and slabinfo plugins
@@ -49,11 +43,11 @@ CapabilityBoundingSet=CAP_DAC_OVERRIDE
 # is required for apps plugin
 CapabilityBoundingSet=CAP_DAC_READ_SEARCH
 # is required for freeipmi plugin
-CapabilityBoundingSet=CAP_FOWNER
+CapabilityBoundingSet=CAP_FOWNER CAP_SYS_RAWIO
 # is required for apps, perf and slabinfo plugins
 CapabilityBoundingSet=CAP_SETPCAP
 # is required for perf plugin
-CapabilityBoundingSet=CAP_SYS_ADMIN
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_PERFMON
 # is required for apps plugin
 CapabilityBoundingSet=CAP_SYS_PTRACE
 # is required for ebpf plugin
@@ -62,15 +56,21 @@ CapabilityBoundingSet=CAP_SYS_RESOURCE
 CapabilityBoundingSet=CAP_NET_RAW
 # is required for cgroups plugin
 CapabilityBoundingSet=CAP_SYS_CHROOT
+# is required for nfacct plugin (bandwidth accounting)
+CapabilityBoundingSet=CAP_NET_ADMIN
+# is required for plugins that use sudo
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID
 
 # Sandboxing
 ProtectSystem=full
 ProtectHome=read-only
 # PrivateTmp break netdatacli functionality. See - https://github.com/netdata/netdata/issues/7587
 #PrivateTmp=true
-ProtectControlGroups=true
+ProtectControlGroups=on
 # We whitelist this because it's the standard location to listen on a UNIX socket.
 ReadWriteDirectories=/run/netdata
+# This is needed to make email-based alert deliver work if Postfix is the email provider on the system.
+ReadWriteDirectories=-/var/spool/postfix/maildrop
 
 [Install]
 WantedBy=multi-user.target

@@ -41,7 +41,7 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
     *d = '\0';
 
     debug(
-        D_BACKEND,
+        D_EXPORTING,
         "EXPORTING: received %zu bytes from %s connector instance. Ignoring them. Sample: '%s'",
         buffer_strlen(buffer),
         instance->config.name,

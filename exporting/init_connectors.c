@@ -117,7 +117,7 @@ static size_t base64_encode(unsigned char *input, size_t input_size, char *outpu
         return 0;
     }
     size_t count = 0;
-    while (input_size > 3) {
+    while (input_size >= 3) {
         value = ((input[0] << 16) + (input[1] << 8) + input[2]) & 0xffffff;
         output[0] = lookup[value >> 18];
         output[1] = lookup[(value >> 12) & 0x3f];
@@ -138,6 +138,7 @@ static size_t base64_encode(unsigned char *input, size_t input_size, char *outpu
             output[3] = '=';
             //error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]);
             count += 4;
+            output[4] = '\0';
             break;
         case 1:
             value = input[0] << 4;
@@ -147,10 +148,13 @@ static size_t base64_encode(unsigned char *input, size_t input_size, char *outpu
             output[3] = '=';
             //error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]);
             count += 4;
+            output[4] = '\0';
             break;
         case 0:
+            output[0] = '\0';
             break;
     }
+
     return count;
 }
 
@@ -199,7 +203,7 @@ void simple_connector_init(struct instance *instance)
         char *encoded_credentials = callocz(1, encoded_size);
 
         base64_encode((unsigned char*)buffer_tostring(auth_string), buffer_strlen(auth_string), encoded_credentials, encoded_size);
-       
+
         buffer_flush(auth_string);
         buffer_sprintf(auth_string, "Authorization: Basic %s\n", encoded_credentials);
 

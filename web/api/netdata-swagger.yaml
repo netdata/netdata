@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: Netdata API
   description: Real-time performance and health monitoring.
-  version: 1.11.1_rolling
+  version: 1.33.1
 paths:
   /info:
     get:
@@ -14,6 +14,7 @@ paths:
         * list of hosts mirrored (includes itself)
         * Operating System, Virtualization, K8s nodes and Container technology information
         * List of active collector plugins and modules
+        * Streaming information
         * number of alarms in the host
           * number of alarms in normal state
           * number of alarms in warning state
@@ -42,7 +43,7 @@ paths:
   /chart:
     get:
       summary: Get info about a specific chart
-      description: The Chart endpoint returns detailed information about a chart.
+      description: The chart endpoint returns detailed information about a chart.
       parameters:
         - name: chart
           in: query
@@ -63,6 +64,159 @@ paths:
           description: No chart id was supplied in the request.
         "404":
           description: No chart with the given id is found.
+  /contexts:
+    get:
+      summary: Get a list of all contexts available at the server
+      description: The contexts endpoint returns a summary about all contexts stored in the
+        netdata server.
+      parameters:
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - full
+                - all
+                - charts
+                - dimensions
+                - labels
+                - uuids
+                - queue
+                - flags
+                - deleted
+                - deepscan
+            default:
+              - full
+        - name: after
+          in: query
+          description: limit the results on context having data after this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: before
+          in: query
+          description: limit the results on context having data before this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: chart_label_key
+          in: query
+          description: a simple pattern matching charts label keys (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: chart_labels_filter
+          in: query
+          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
+           as separator)"
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: dimensions
+          in: query
+          description: a simple pattern matching dimensions (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An array of contexts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/context_summary"
+  /context:
+    get:
+      summary: Get info about a specific context
+      description: The context endpoint returns detailed information about a given context.
+      parameters:
+        - name: context
+          in: query
+          description: The id of the context as returned by the /contexts call.
+          required: true
+          schema:
+            type: string
+            format: as returned by /contexts
+            default: system.cpu
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - full
+                - all
+                - charts
+                - dimensions
+                - labels
+                - uuids
+                - queue
+                - flags
+                - deleted
+                - deepscan
+            default:
+              - full
+        - name: after
+          in: query
+          description: limit the results on context having data after this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: before
+          in: query
+          description: limit the results on context having data before this timestamp.
+          required: false
+          schema:
+            type: number
+            format: integer
+        - name: chart_label_key
+          in: query
+          description: a simple pattern matching charts label keys (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: chart_labels_filter
+          in: query
+          description: "a simple pattern matching charts label key and values (use colon for equality, comma or pipe
+            as separator)"
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+        - name: dimensions
+          in: query
+          description: a simple pattern matching dimensions (use comma or pipe as separator)
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A javascript object with detailed information about the context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/context"
+        "400":
+          description: No context id was supplied in the request.
+        "404":
+          description: No context with the given id is found.
   /alarm_variables:
     get:
       summary: List variables available to configure alarms for a chart
@@ -169,6 +323,24 @@ paths:
             type: number
             format: integer
             default: 20
+        - name: chart_label_key
+          in: query
+          description: Specify the chart label keys that need to match for context queries as comma separated values.
+            At least one matching key is needed to match the corresponding chart.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            format: key1,key2,key3
+        - name: chart_labels_filter
+          in: query
+          description: Specify the chart label keys and values to match for context queries. All keys/values need to
+            match for the chart to be included in the query. The labels are specified as key1:value1,key2:value2
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            format: key1:value1,key2:value2,key3:value3
         - name: group
           in: query
           description: The grouping method. If multiple collected values are to be grouped
@@ -189,12 +361,62 @@ paths:
               - stddev
               - sum
               - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
             default: average
+        - name: group_options
+          in: query
+          description: When the group function supports additional parameters, this field
+            can be used to pass them to it. Currently only "countif" supports this.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
         - name: gtime
           in: query
           description: The grouping number of seconds. This is used in conjunction with
             group=average to change the units of metrics (ie when the data is
             per-second, setting gtime=60 will turn them to per-minute).
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: timeout
+          in: query
+          description: Specify a timeout value in milliseconds after which the agent will
+            abort the query and return a 503 error. A value of 0 indicates no timeout.
           required: false
           allowEmptyValue: false
           schema:
@@ -251,6 +473,7 @@ paths:
                 - match-names
                 - showcustomvars
                 - allow_past
+                - anomaly-bit
             default:
               - seconds
               - jsonwrap
@@ -380,6 +603,38 @@ paths:
               - stddev
               - sum
               - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
             default: average
         - name: options
           in: query
@@ -398,6 +653,7 @@ paths:
                 - null2zero
                 - percentage
                 - unaligned
+                - anomaly-bit
             default:
               - absolute
         - name: label
@@ -418,7 +674,9 @@ paths:
             format: any text
         - name: label_color
           in: query
-          description: A color to be used for the background of the label side(left side) of the badge. One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character). If value wrong or not given default color will be used.
+          description: "A color to be used for the background of the label side(left side) of the badge.
+            One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character).
+            If value wrong or not given default color will be used."
           required: false
           allowEmptyValue: true
           schema:
@@ -443,7 +701,8 @@ paths:
           description: "A color to be used for the background of the value *(right)* part of badge. You can set
             multiple using a pipe with a condition each, like this:
             `color<value|color:null` The following operators are
-            supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter.
+            supported: >, <, >=, <=, =, :null (to check if no value exists).
+            Each color can be specified in same manner as for `label_color` parameter.
             Currently only integers are supported as values."
           required: false
           allowEmptyValue: true
@@ -452,7 +711,9 @@ paths:
             format: any text
         - name: text_color_lbl
           in: query
-          description: Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          description: "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal
+            color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default
+            color will be used."
           required: false
           allowEmptyValue: true
           schema:
@@ -474,7 +735,9 @@ paths:
                 format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: text_color_val
           in: query
-          description: Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          description: "Font color for value *(right)* part of the badge. One of predefined colors or as HTML
+            hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value
+            given default color will be used."
           required: false
           allowEmptyValue: true
           schema:
@@ -522,7 +785,12 @@ paths:
             format: integer
         - name: fixed_width_lbl
           in: query
-          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's left side *(label/name)*. You must set this parameter together with `fixed_width_val` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          description: "This parameter overrides auto-sizing of badge and creates it with fixed width.
+            This parameter determines the size of the label's left side *(label/name)*.
+            You must set this parameter together with `fixed_width_val` otherwise it will be ignored.
+            You should set the label/value widths wide enough to provide space for all the possible values/contents of
+            the badge you're requesting. In case the text cannot fit the space given it will be clipped.
+            The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`."
           required: false
           allowEmptyValue: false
           schema:
@@ -530,7 +798,12 @@ paths:
             format: integer
         - name: fixed_width_val
           in: query
-          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's right side *(value)*. You must set this parameter together with `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          description: "This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter
+            determines the size of the label's right side *(value)*. You must set this parameter together with
+            `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to
+            provide space for all the possible values/contents of the badge you're requesting. In case the text cannot
+            fit the space given it will be clipped. The `scale` parameter still applies on the values you give to
+            `fixed_width_lbl` and `fixed_width_val`."
           required: false
           allowEmptyValue: false
           schema:
@@ -564,6 +837,13 @@ paths:
               - prometheus_all_hosts
               - json
             default: shell
+        - name: filter
+          in: query
+          description: Allows to filter charts out using simple patterns.
+          required: false
+          schema:
+            type: string
+            format: any text
         - name: variables
           in: query
           description: When enabled, netdata will expose various system
@@ -704,12 +984,12 @@ paths:
   /alarms_values:
     get:
       summary: Get a list of active or raised alarms on the server
-      description: The alarms_values endpoint returns the list of all raised or enabled alarms on
+      description: "The alarms_values endpoint returns the list of all raised or enabled alarms on
         the netdata server. Called without any parameters, the raised alarms in
-        state WARNING or CRITICAL are returned. By passing "?all", all the
+        state WARNING or CRITICAL are returned. By passing '?all', all the
         enabled alarms are returned.
         This option output differs from `/alarms` in the number of variables delivered. This endpoint gives
-        to user `id`, `value` and alarm `status`.
+        to user `id`, `value`, `last_updated` time, and alarm `status`."
       parameters:
         - name: all
           in: query
@@ -805,16 +1085,16 @@ paths:
             memory.
   /manage/health:
     get:
-      summary: Accesses the health management API to control health checks and
-        notifications at runtime.
-      description: Available from Netdata v1.12 and above, protected via bearer
+      summary: "Accesses the health management API to control health checks and
+        notifications at runtime."
+      description: "Available from Netdata v1.12 and above, protected via bearer
         authorization. Especially useful for maintenance periods, the API allows
         you to disable health checks completely, silence alarm notifications, or
         Disable/Silence specific alarms that match selectors on alarm/template
         name, chart, context, host and family. For the simple disable/silence
         all scenarios, only the cmd parameter is required. The other parameters
         are used to define alarm selectors. For more information and examples,
-        refer to the netdata documentation.
+        refer to the netdata documentation."
       parameters:
         - name: cmd
           in: query
@@ -865,6 +1145,415 @@ paths:
           description: A plain text response based on the result of the command.
         "403":
           description: Bearer authentication error.
+  /aclk:
+    get:
+      summary: Get information about current ACLK state
+      description: "ACLK endpoint returns detailed information
+        about current state of ACLK (Agent to Cloud communication)."
+      responses:
+        "200":
+          description: JSON object with ACLK information.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/aclk_state"
+  /metric_correlations:
+    get:
+      summary: "Analyze all the metrics to find their correlations"
+      description: "THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint.
+        Given two time-windows (baseline, highlight), it goes
+        through all the available metrics, querying both windows and tries to find
+        how these two windows relate to each other. It supports
+        multiple algorithms to do so. The result is a list of all
+        metrics evaluated, weighted for 0.0 (the two windows are
+        more different) to 1.0 (the two windows are similar).
+        The algorithm adjusts automatically the baseline window to be
+        a power of two multiple of the highlighted (1, 2, 4, 8, etc)."
+      parameters:
+        - name: baseline_after
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            starting point of baseline window, or a relative number of
+            seconds (negative, relative to parameter baseline_before). Netdata will
+            assume it is a relative number if it is less that 3 years (in seconds).
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: -300
+        - name: baseline_before
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            ending point of the baseline window, or a relative number of
+            seconds (negative), relative to the last collected timestamp.
+            Netdata will assume it is a relative number if it is less than 3
+            years (in seconds).
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: -60
+        - name: after
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            starting point of highlighted window, or a relative number of
+            seconds (negative, relative to parameter highlight_before). Netdata will
+            assume it is a relative number if it is less that 3 years (in seconds).
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: -60
+        - name: before
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            ending point of the highlighted window, or a relative number of
+            seconds (negative), relative to the last collected timestamp.
+            Netdata will assume it is a relative number if it is less than 3
+            years (in seconds).
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: points
+          in: query
+          description: The number of points to be evaluated for the highlighted window.
+            The baseline window will be adjusted automatically to receive a proportional
+            amount of points.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: 500
+        - name: method
+          in: query
+          description: the algorithm to run
+          required: false
+          schema:
+            type: string
+            enum:
+              - ks2
+              - volume
+            default: ks2
+        - name: timeout
+          in: query
+          description: Cancel the query if to takes more that this amount of milliseconds.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: 60000
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - min2max
+                - abs
+                - absolute
+                - absolute-sum
+                - null2zero
+                - percentage
+                - unaligned
+                - allow_past
+                - nonzero
+                - anomaly-bit
+                - raw
+            default:
+              - null2zero
+              - allow_past
+              - nonzero
+              - unaligned
+        - name: group
+          in: query
+          description: The grouping method. If multiple collected values are to be grouped
+            in order to return fewer points, this parameters defines the method
+            of grouping. methods supported "min", "max", "average", "sum",
+            "incremental-sum". "max" is actually calculated on the absolute
+            value collected (so it works for both positive and negative
+            dimensions to return the most extreme value in either direction).
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - average
+              - median
+              - stddev
+              - sum
+              - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
+            default: average
+        - name: group_options
+          in: query
+          description: When the group function supports additional parameters, this field
+            can be used to pass them to it. Currently only "countif" supports this.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: JSON object with weights for each chart and dimension.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/metric_correlations"
+        "400":
+          description: The given parameters are invalid.
+        "403":
+          description: metrics correlations are not enabled on this Netdata Agent.
+        "404":
+          description: No charts could be found, or the method
+            that correlated the metrics did not produce any result.
+        "504":
+          description: Timeout - the query took too long and has been cancelled.
+  /weights:
+    get:
+      summary: "Analyze all the metrics using an algorithm and score them accordingly"
+      description: "This endpoint goes through all metrics and scores them according to an algorithm."
+      parameters:
+        - name: baseline_after
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            starting point of baseline window, or a relative number of
+            seconds (negative, relative to parameter baseline_before). Netdata will
+            assume it is a relative number if it is less that 3 years (in seconds).
+            This parameter is used in KS2 and VOLUME algorithms.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: -300
+        - name: baseline_before
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            ending point of the baseline window, or a relative number of
+            seconds (negative), relative to the last collected timestamp.
+            Netdata will assume it is a relative number if it is less than 3
+            years (in seconds).
+            This parameter is used in KS2 and VOLUME algorithms.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: -60
+        - name: after
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            starting point of highlighted window, or a relative number of
+            seconds (negative, relative to parameter highlight_before). Netdata will
+            assume it is a relative number if it is less that 3 years (in seconds).
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: -60
+        - name: before
+          in: query
+          description: This parameter can either be an absolute timestamp specifying the
+            ending point of the highlighted window, or a relative number of
+            seconds (negative), relative to the last collected timestamp.
+            Netdata will assume it is a relative number if it is less than 3
+            years (in seconds).
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 0
+        - name: context
+          in: query
+          description: A simple pattern matching the contexts to evaluate.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+        - name: points
+          in: query
+          description: The number of points to be evaluated for the highlighted window.
+            The baseline window will be adjusted automatically to receive a proportional
+            amount of points.
+            This parameter is only used by the KS2 algorithm.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: 500
+        - name: method
+          in: query
+          description: the algorithm to run
+          required: false
+          schema:
+            type: string
+            enum:
+              - ks2
+              - volume
+              - anomaly-rate
+            default: anomaly-rate
+        - name: tier
+          in: query
+          description: Use the specified database tier
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+        - name: timeout
+          in: query
+          description: Cancel the query if to takes more that this amount of milliseconds.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+            default: 60000
+        - name: options
+          in: query
+          description: Options that affect data generation.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - min2max
+                - abs
+                - absolute
+                - absolute-sum
+                - null2zero
+                - percentage
+                - unaligned
+                - nonzero
+                - anomaly-bit
+                - raw
+            default:
+              - null2zero
+              - nonzero
+              - unaligned
+        - name: group
+          in: query
+          description: The grouping method. If multiple collected values are to be grouped
+            in order to return fewer points, this parameters defines the method
+            of grouping. methods supported "min", "max", "average", "sum",
+            "incremental-sum". "max" is actually calculated on the absolute
+            value collected (so it works for both positive and negative
+            dimensions to return the most extreme value in either direction).
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - average
+              - median
+              - stddev
+              - sum
+              - incremental-sum
+              - ses
+              - des
+              - cv
+              - countif
+              - percentile
+              - percentile25
+              - percentile50
+              - percentile75
+              - percentile80
+              - percentile90
+              - percentile95
+              - percentile97
+              - percentile98
+              - percentile99
+              - trimmed-mean
+              - trimmed-mean1
+              - trimmed-mean2
+              - trimmed-mean3
+              - trimmed-mean5
+              - trimmed-mean10
+              - trimmed-mean15
+              - trimmed-mean20
+              - trimmed-mean25
+              - trimmed-median
+              - trimmed-median1
+              - trimmed-median2
+              - trimmed-median3
+              - trimmed-median5
+              - trimmed-median10
+              - trimmed-median15
+              - trimmed-median20
+              - trimmed-median25
+            default: average
+        - name: group_options
+          in: query
+          description: When the group function supports additional parameters, this field
+            can be used to pass them to it. Currently only "countif" supports this.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: JSON object with weights for each context, chart and dimension.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/weights"
+        "400":
+          description: The given parameters are invalid.
+        "403":
+          description: metrics correlations are not enabled on this Netdata Agent.
+        "404":
+          description: No charts could be found, or the method
+            that correlated the metrics did not produce any result.
+        "504":
+          description: Timeout - the query took too long and has been cancelled.
 servers:
   - url: https://registry.my-netdata.io/api/v1
   - url: http://registry.my-netdata.io/api/v1
@@ -972,6 +1661,10 @@ components:
           type: string
           description: Container technology detection method.
           example: dockerenv
+        stream_compression:
+          type: boolean
+          description: Stream transmission compression method.
+          example: true
         labels:
           type: object
           description: List of host labels.
@@ -1146,6 +1839,75 @@ components:
           type: number
           nullable: true
           description: Chart health red threshold.
+    context_summary:
+      type: object
+      properties:
+        hostname:
+          type: string
+          description: The hostname of the netdata server.
+        machine_guid:
+          type: string
+          description: The unique installation id of this netdata server.
+        node_id:
+          type: string
+          description: The unique node id of this netdata server at the hub.
+          example: nightly
+        claim_id:
+          type: string
+          description: The unique handshake id of this netdata server and the hub.
+        host_labels:
+          type: object
+          description: The host labels associated with this netdata server.
+        context:
+          type: object
+          description: "An object containing all the context objects available at the netdata server.
+            This is used as an indexed array. The key of each context object is the id of the context."
+          additionalProperties:
+            $ref: "#/components/schemas/context"
+    context:
+      type: object
+      properties:
+        version:
+          type: string
+          description: "The version of this context.
+            The number are not sequential, but bigger numbers depict a newer object."
+        hub_version:
+          type: string
+          description: The version of this context, as known by hub.
+        family:
+          type: string
+          description: "The family of the context. When multiple charts of a context have different families,
+            the netdata server replaces the different parts with [x], so that the context can have only one family."
+        title:
+          type: string
+          description: "The title of the context. When multiple charts of a context have different titles,
+            the netdata server replaces the different parts with [x], so that the context can have only one title."
+        priority:
+          type: number
+          description: "The relative priority of the context. When multiple contexts have different priorities,
+            the minimum among them is selected as the priority of the context."
+        units:
+          type: string
+          description: "The unit of measurement for the values of all dimensions of the context. If multiple charts
+            of context have different units, the latest collected is selected."
+        chart_type:
+          type: string
+          description: The chart type.
+          enum:
+            - line
+            - area
+            - stacked
+        first_time_t:
+          type: number
+          description: The UNIX timestamp of the first entry (the oldest) in the database.
+        last_time_t:
+          type: number
+          description: The UNIX timestamp of the latest entry in the database.
+        charts:
+          type: object
+          description: "An object containing all the charts available for the chart. This is used as an indexed array.
+            For each pair in the dictionary, the key is the id of the chart and the value provides all details about
+            the chart."
     alarm_variables:
       type: object
       properties:
@@ -1598,6 +2360,9 @@ components:
                 type: integer
               value:
                 type: integer
+              last_updated:
+                type: integer
+                format: int32
               status:
                 type: string
                 enum:
@@ -1609,3 +2374,201 @@ components:
                   - WARNING
                   - CRITICAL
                   - UNKNOWN
+    aclk_state:
+      type: object
+      properties:
+        aclk-available:
+          type: string
+          description: "Describes whether this agent is capable of connection to the Cloud.
+            False means agent has been built without ACLK component either on purpose (user choice)
+            or due to missing dependency."
+        aclk-version:
+          type: integer
+          description: Describes which ACLK version is currently used.
+        protocols-supported:
+          type: array
+          description: List of supported protocols for communication with Cloud.
+          items:
+            type: string
+        agent-claimed:
+          type: boolean
+          description: Informs whether this agent has been added to a space in the cloud (User has to perform claiming).
+            If false (user didn't perform claiming) agent will never attempt any cloud connection.
+        claimed_id:
+          type: string
+          format: uuid
+          description: Unique ID this agent uses to identify when connecting to cloud
+        online:
+          type: boolean
+          description: Informs if this agent was connected to the cloud at the time this request has been processed.
+        used-cloud-protocol:
+          type: string
+          description: Informs which protocol is used to communicate with cloud
+          enum:
+            - Old
+            - New
+    metric_correlations:
+      type: object
+      properties:
+        after:
+          description: the start time of the highlighted window
+          type: integer
+        before:
+          description: the end time of the highlighted window
+          type: integer
+        duration:
+          description: the duration of the highlighted window
+          type: integer
+        points:
+          description: the points of the highlighted window
+          type: integer
+        baseline_after:
+          description: the start time of the baseline window
+          type: integer
+        baseline_before:
+          description: the end time of the baseline window
+          type: integer
+        baseline_duration:
+          description: the duration of the baseline window
+          type: integer
+        baseline_points:
+          description: the points of the baseline window
+          type: integer
+        group:
+          description: the grouping method across time
+          type: string
+        method:
+          description: the correlation method used
+          type: string
+        options:
+          description: a comma separated list of the query options set
+          type: string
+        correlated_dimensions:
+          description: the number of dimensions returned in the result
+        total_dimensions_count:
+          description: the total number of dimensions evaluated
+          type: integer
+        statistics:
+          type: object
+          properties:
+            query_time_ms:
+              type: number
+            db_queries:
+              type: integer
+            db_points_read:
+              type: integer
+            query_result_points:
+              type: integer
+            binary_searches:
+              type: integer
+        correlated_charts:
+          type: object
+          description: An object containing chart objects with their metrics correlations.
+          properties:
+            chart-id1:
+              type: object
+              properties:
+                context:
+                  type: string
+                dimensions:
+                  type: object
+                  properties:
+                    dimension1-name:
+                      type: number
+                    dimension2-name:
+                      type: number
+            chart-id2:
+              type: object
+              properties:
+                context:
+                  type: string
+                dimensions:
+                  type: object
+                  properties:
+                    dimension1-name:
+                      type: number
+                    dimension2-name:
+                      type: number
+    weights:
+      type: object
+      properties:
+        after:
+          description: the start time of the highlighted window
+          type: integer
+        before:
+          description: the end time of the highlighted window
+          type: integer
+        duration:
+          description: the duration of the highlighted window
+          type: integer
+        points:
+          description: the points of the highlighted window
+          type: integer
+        baseline_after:
+          description: the start time of the baseline window
+          type: integer
+        baseline_before:
+          description: the end time of the baseline window
+          type: integer
+        baseline_duration:
+          description: the duration of the baseline window
+          type: integer
+        baseline_points:
+          description: the points of the baseline window
+          type: integer
+        group:
+          description: the grouping method across time
+          type: string
+        method:
+          description: the correlation method used
+          type: string
+        options:
+          description: a comma separated list of the query options set
+          type: string
+        correlated_dimensions:
+          description: the number of dimensions returned in the result
+        total_dimensions_count:
+          description: the total number of dimensions evaluated
+          type: integer
+        statistics:
+          type: object
+          properties:
+            query_time_ms:
+              type: number
+            db_queries:
+              type: integer
+            db_points_read:
+              type: integer
+            query_result_points:
+              type: integer
+            binary_searches:
+              type: integer
+        contexts:
+          description: A dictionary of weighted context objects.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/weighted_context'
+    weighted_context:
+      type: object
+      properties:
+        weight:
+          description: The average weight of the context.
+          type: number
+        charts:
+          description: A dictionary of weighted chart objects.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/weighted_chart'
+    weighted_chart:
+      type: object
+      properties:
+        weight:
+          description: The average weight of the context.
+          type: number
+        dimensions:
+          description: A dictionary of weighted dimensions.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/weighted_dimension'
+    weighted_dimension:
+      type: number

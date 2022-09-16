@@ -4,51 +4,43 @@
 #define ACLK_SCHEMA_WRAPPER_NODE_INFO_H
 
 #include <stdlib.h>
+#include <stdint.h>
 
+#include "capability.h"
 #include "database/rrd.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+struct machine_learning_info {
+    bool ml_capable;
+    bool ml_enabled;
+};
+
 struct aclk_node_info {
-    char *name;
+    const char *name;
 
-    char *os;
-    char *os_name;
-    char *os_version;
-
-    char *kernel_name;
-    char *kernel_version;
-
-    char *architecture;
-
+    const char *os;
+    const char *os_name;
+    const char *os_version;
+    const char *kernel_name;
+    const char *kernel_version;
+    const char *architecture;
     uint32_t cpus;
+    const char *cpu_frequency;
+    const char *memory;
+    const char *disk_space;
+    const char *version;
+    const char *release_channel;
+    const char *timezone;
+    const char *virtualization_type;
+    const char *container_type;
+    const char *custom_info;
+    const char *machine_guid;
 
-    char *cpu_frequency;
-
-    char *memory;
-
-    char *disk_space;
-
-    char *version;
-
-    char *release_channel;
-
-    char *timezone;
-
-    char *virtualization_type;
-
-    char *container_type;
-
-    char *custom_info;
-
-    char **services;
-    size_t service_count;
-
-    char *machine_guid;
-
-    struct label *host_labels_head;
+    DICTIONARY *host_labels_ptr;
+    struct machine_learning_info ml_info;
 };
 
 struct update_node_info {
@@ -58,9 +50,27 @@ struct update_node_info {
     struct timeval updated_at;
     char *machine_guid;
     int child;
+
+    struct machine_learning_info ml_info;
+
+    struct capability *node_capabilities;
+    struct capability *node_instance_capabilities;
+};
+
+struct collector_info {
+    const char *module;
+    const char *plugin;
+};
+
+struct update_node_collectors {
+    char *claim_id;
+    char *node_id;
+    DICTIONARY *node_collectors;
 };
 
 char *generate_update_node_info_message(size_t *len, struct update_node_info *info);
+
+char *generate_update_node_collectors_message(size_t *len, struct update_node_collectors *collectors);
 
 #ifdef __cplusplus
 }

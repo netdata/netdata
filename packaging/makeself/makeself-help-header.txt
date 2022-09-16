@@ -45,5 +45,5 @@
 
   Anonymous stat collection and reporting to Netdata is enabled
   by default. To disable, pass --disable-telemetry option to the installer
-  or export the environment variable DO_NOT_TRACK to a non-zero or non-empty
-  value (e.g export DO_NOT_TRACK=1).
+  or export the environment variable DISABLE_TELEMETRY to a non-zero or non-empty
+  value (e.g export DISABLE_TELEMETRY=1).

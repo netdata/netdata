@@ -39,7 +39,7 @@ they were built in.
 
 These modules are primarily written in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/) (`go.d`) and
 [Python](/collectors/python.d.plugin/README.md), although some use [Bash](/collectors/charts.d.plugin/README.md)
-(`charts.d`) or [Node.js](/collectors/node.d.plugin/README.md) (`node.d`).
+(`charts.d`).
 
 ## Enable and disable plugins
 
@@ -58,14 +58,14 @@ Enabled:
 
 ```conf
 [plugins]
-  # node.d = yes
+  # python.d = yes
 ```
 
 Disabled:
 
 ```conf
 [plugins]
-  node.d = no
+  python.d = no
 ```
 
 When you explicitly disable a plugin this way, it won't auto-collect metrics using its collectors.
@@ -119,4 +119,4 @@ the dashboard to learn more about some of its more advanced features.
 
 [Next: Netdata's dashboard in depth &rarr;](step-07.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-06&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

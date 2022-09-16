@@ -123,7 +123,9 @@ void get_system_HZ(void) {
 // =====================================================================================================================
 // FreeBSD
 
-#if (TARGET_OS == OS_FREEBSD)
+#if __FreeBSD__
+
+const char *os_type = "freebsd";
 
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;
@@ -198,7 +200,9 @@ int getsysctl_mib(const char *name, int *mib, size_t len) {
 // =====================================================================================================================
 // MacOS
 
-#if (TARGET_OS == OS_MACOS)
+#if __APPLE__
+
+const char *os_type = "macos";
 
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;
@@ -214,4 +218,13 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     return 0;
 }
 
-#endif // (TARGET_OS == OS_MACOS)
+#endif
+
+// =====================================================================================================================
+// Linux
+
+#if __linux__
+
+const char *os_type = "linux";
+
+#endif

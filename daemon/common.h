@@ -27,6 +27,8 @@
 
 #define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
 
+#define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
+
 // ----------------------------------------------------------------------------
 // netdata include files
 
@@ -51,9 +53,7 @@
 // the registry is actually an API feature
 #include "registry/registry.h"
 
-// backends for archiving the metrics
-#include "backends/backends.h"
-// the new exporting engine for archiving the metrics
+// exporting engine for archiving the metrics
 #include "exporting/exporting_engine.h"
 
 // the netdata API
@@ -69,7 +69,7 @@
 #include "claim/claim.h"
 
 // netdata agent cloud link
-#include "aclk/aclk_api.h"
+#include "aclk/aclk.h"
 
 // global GUID map functions
 
@@ -79,8 +79,8 @@
 // the netdata daemon
 #include "daemon.h"
 #include "main.h"
+#include "static_threads.h"
 #include "signals.h"
-#include "service.h"
 #include "commands.h"
 #include "analytics.h"
 

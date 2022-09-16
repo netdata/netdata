@@ -57,22 +57,15 @@ SET(MACOS   False)
 
 # Detect the operating system
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    SET(TARGET_OS_NAME "macos")
-    SET(TARGET_OS 3)
     SET(MACOS True)
 ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    SET(TARGET_OS_NAME "freebsd")
-    SET(TARGET_OS 2)
     SET(FREEBSD True)
 ELSE()
-    SET(TARGET_OS_NAME "linux")
-    SET(TARGET_OS 1)
     SET(LINUX True)
 ENDIF()
 
 # show the operating system on the console
-message(STATUS "operating system: ${TARGET_OS_NAME} (TARGET_OS=${TARGET_OS})")
-
+message(STATUS "system name: ${CMAKE_SYSTEM_NAME}")
 
 # -----------------------------------------------------------------------------
 # Detect libuuid
@@ -109,20 +102,7 @@ set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
 
-# pkgconfig not working in Ubuntu, why? upstream package broken?
-#pkg_check_modules(JUDY REQUIRED Judy)
-#set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${JUDY_CFLAGS_OTHER})
-#set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${JUDY_LIBRARIES})
-#set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${JUDY_INCLUDE_DIRS})
-set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} "-lJudy")
-set(CMAKE_REQUIRED_LIBRARIES "Judy")
-include(CheckSymbolExists)
-check_symbol_exists("JudyLLast" "Judy.h" HAVE_JUDY)
-IF(HAVE_JUDY)
-    message(STATUS "Judy library found")
-ELSE()
-    message( FATAL_ERROR "libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'." )
-ENDIF()
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} judy)
 
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
@@ -238,6 +218,15 @@ pkg_check_modules(CURL libcurl)
 # ${CURL_INCLUDE_DIRS}
 
 # -----------------------------------------------------------------------------
+# Detect libcups
+
+pkg_check_modules(CURL libcups)
+# later we use:
+# ${CUPS_LIBRARIES}
+# ${CUPS_CFLAGS_OTHER}
+# ${CUPS_INCLUDE_DIRS}
+
+# -----------------------------------------------------------------------------
 # Detect libaws-c-common
 
 find_library(HAVE_AWS_CHECKSUMS aws-checksums)
@@ -288,7 +277,7 @@ pkg_check_modules(GRPC grpc)
 # -----------------------------------------------------------------------------
 # Detect libgoogleapis_cpp_pubsub_protos
 
-pkg_check_modules(PUBSUB googleapis_cpp_pubsub_protos)
+pkg_check_modules(PUBSUB google_cloud_cpp_pubsub_protos)
 # later we use:
 # ${PUBSUB_LIBRARIES}
 # ${PUBSUB_CFLAGS_OTHER}
@@ -317,9 +306,10 @@ pkg_check_modules(SNAPPY snappy)
 # -----------------------------------------------------------------------------
 # Detect libmongoc
 
-find_package(libmongoc-1.0)
+pkg_check_modules(MONGOC libmongoc-1.0)
 # later we use:
 # ${MONGOC_LIBRARIES}
+# ${MONGOC_CFLAGS_OTHER}
 # ${MONGOC_INCLUDE_DIRS}
 
 
@@ -338,14 +328,109 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
             ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a
             ${ELF_LIBRARIES})
         list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${ELF_INCLUDE_DIRS})
-        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include)
+        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include/uapi)
         set(ENABLE_PLUGIN_EBPF True)
+        set(HAVE_LIBBPF True)
     ELSE(ELF_LIBRARIES)
         set(ENABLE_PLUGIN_EBPF False)
         message(STATUS "ebpf plugin: disabled (requires libelf)")
     ENDIF(ELF_LIBRARIES)
 ENDIF()
 
+# -----------------------------------------------------------------------------
+# Detect ml dependencies
+file(STRINGS "${CMAKE_SOURCE_DIR}/config.h" DEFINE_ENABLE_ML REGEX "^#define ENABLE_ML 1$")
+IF(DEFINE_ENABLE_ML MATCHES ".+" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/kmeans/dlib/dlib/all/source.cpp" AND
+   EXISTS "${CMAKE_SOURCE_DIR}/ml/json/single_include/nlohmann/json.hpp")
+    set(ENABLE_ML True)
+    list(APPEND NETDATA_COMMON_CFLAGS "-DDLIB_NO_GUI_SUPPORT")
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS "ml/kmeans/dlib")
+ELSE()
+    set(ENABLE_ML False)
+ENDIF()
+
+set(LIBJUDY_SOURCES
+        libnetdata/libjudy/src/Judy.h
+        libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
+        libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
+        libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
+        libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
+        libnetdata/libjudy/src/JudyL/JudyL.h
+        libnetdata/libjudy/src/JudyL/JudyLByCount.c
+        libnetdata/libjudy/src/JudyL/JudyLCascade.c
+        libnetdata/libjudy/src/JudyL/JudyLCount.c
+        libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
+        libnetdata/libjudy/src/JudyL/JudyLDecascade.c
+        libnetdata/libjudy/src/JudyL/JudyLDel.c
+        libnetdata/libjudy/src/JudyL/JudyLFirst.c
+        libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
+        libnetdata/libjudy/src/JudyL/j__udyLGet.c
+        libnetdata/libjudy/src/JudyL/JudyLGet.c
+        libnetdata/libjudy/src/JudyL/JudyLInsArray.c
+        libnetdata/libjudy/src/JudyL/JudyLIns.c
+        libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
+        libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
+        libnetdata/libjudy/src/JudyL/JudyLMemActive.c
+        libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
+        libnetdata/libjudy/src/JudyL/JudyLNext.c
+        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
+        libnetdata/libjudy/src/JudyL/JudyLPrev.c
+        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
+        JudyLTables.c
+        libnetdata/libjudy/src/JudyHS/JudyHS.c)
+
+ADD_LIBRARY(judy STATIC
+             ${LIBJUDY_SOURCES})
+
+ADD_EXECUTABLE(judyltablesgen
+    libnetdata/libjudy/src/JudyL/JudyLTablesGen.c)
+
+target_include_directories(judyltablesgen PUBLIC
+    libnetdata/libjudy/src
+    libnetdata/libjudy/src/JudyCommon)
+
+target_compile_options(judyltablesgen PUBLIC
+    -Wno-format
+    -Wno-format-security)
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src)
+
+target_compile_definitions(judyltablesgen PUBLIC
+    JU_64BIT
+    JUDYL)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/JudyLTables.c
+  COMMAND judyltablesgen
+  DEPENDS judyltablesgen
+  )
+
+target_include_directories(judy PUBLIC
+    libnetdata/libjudy/src
+    libnetdata/libjudy/src/JudyCommon)
+
+target_compile_definitions(judy PUBLIC
+    JU_64BIT
+    JUDYL)
+
+target_compile_options(judy PUBLIC
+    -Wno-sign-compare
+    -Wno-implicit-fallthrough)
+
+set(LIBJUDY_PREV_FILES
+        libnetdata/libjudy/src/JudyL/JudyLPrev.c
+        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c)
+
+set(LIBJUDY_NEXT_FILES
+        libnetdata/libjudy/src/JudyL/JudyLNext.c
+        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c)
+
+set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYPREV")
+set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
+set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
+set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
 
 # -----------------------------------------------------------------------------
 # netdata files
@@ -355,12 +440,16 @@ set(LIBNETDATA_FILES
         libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
         libnetdata/config/appconfig.c
         libnetdata/config/appconfig.h
+        libnetdata/arrayalloc/arrayalloc.c
+        libnetdata/arrayalloc/arrayalloc.h
         libnetdata/avl/avl.c
         libnetdata/avl/avl.h
         libnetdata/buffer/buffer.c
         libnetdata/buffer/buffer.h
         libnetdata/clocks/clocks.c
         libnetdata/clocks/clocks.h
+        libnetdata/completion/completion.c
+        libnetdata/completion/completion.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
         libnetdata/eval/eval.c
@@ -375,6 +464,8 @@ set(LIBNETDATA_FILES
         libnetdata/log/log.h
         libnetdata/os.c
         libnetdata/os.h
+        libnetdata/onewayalloc/onewayalloc.c
+        libnetdata/onewayalloc/onewayalloc.h
         libnetdata/popen/popen.c
         libnetdata/popen/popen.h
         libnetdata/procfile/procfile.c
@@ -400,6 +491,8 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/socket/security.c
         libnetdata/socket/security.h
+        libnetdata/worker_utilization/worker_utilization.c
+        libnetdata/worker_utilization/worker_utilization.h
         libnetdata/circular_buffer/circular_buffer.c
         libnetdata/circular_buffer/circular_buffer.h)
 
@@ -416,7 +509,6 @@ set(APPS_PLUGIN_FILES
 
 set(CHECKS_PLUGIN_FILES
         collectors/checks.plugin/plugin_checks.c
-        collectors/checks.plugin/plugin_checks.h
         )
 
 set(FREEBSD_PLUGIN_FILES
@@ -441,7 +533,6 @@ set(HEALTH_PLUGIN_FILES
 
 set(IDLEJITTER_PLUGIN_FILES
         collectors/idlejitter.plugin/plugin_idlejitter.c
-        collectors/idlejitter.plugin/plugin_idlejitter.h
         )
 
 set(CGROUPS_PLUGIN_FILES
@@ -454,12 +545,10 @@ set(CGROUP_NETWORK_FILES
         )
 
 set(DISKSPACE_PLUGIN_FILES
-        collectors/diskspace.plugin/plugin_diskspace.h
         collectors/diskspace.plugin/plugin_diskspace.c
         )
 
 set(TIMEX_PLUGIN_FILES
-        collectors/timex.plugin/plugin_timex.h
         collectors/timex.plugin/plugin_timex.c
         )
 
@@ -481,6 +570,10 @@ set(PERF_PLUGIN_FILES
 
 set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
+        )
+
+set(CUPS_PLUGIN_FILES
+        collectors/cups.plugin/cups_plugin.c
         )
 
 set(EBPF_PROCESS_PLUGIN_FILES
@@ -571,7 +664,6 @@ set(PROC_PLUGIN_FILES
 
 set(TC_PLUGIN_FILES
         collectors/tc.plugin/plugin_tc.c
-        collectors/tc.plugin/plugin_tc.h
         )
 
 set(MACOS_PLUGIN_FILES
@@ -612,7 +704,6 @@ set(REGISTRY_PLUGIN_FILES
 
 set(STATSD_PLUGIN_FILES
         collectors/statsd.plugin/statsd.c
-        collectors/statsd.plugin/statsd.h
         )
 
 set(RRD_PLUGIN_FILES
@@ -620,6 +711,8 @@ set(RRD_PLUGIN_FILES
         database/rrdcalc.h
         database/rrdcalctemplate.c
         database/rrdcalctemplate.h
+        database/rrdcontext.c
+        database/rrdcontext.h
         database/rrddim.c
         database/rrddimvar.c
         database/rrddimvar.h
@@ -633,8 +726,16 @@ set(RRD_PLUGIN_FILES
         database/rrdsetvar.h
         database/rrdvar.c
         database/rrdvar.h
+        database/storage_engine.c
+        database/storage_engine.h
+        database/ram/rrddim_mem.c
+        database/ram/rrddim_mem.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
+		database/sqlite/sqlite_context.c
+        database/sqlite/sqlite_context.h
+        database/sqlite/sqlite_db_migration.c
+        database/sqlite/sqlite_db_migration.h
         database/sqlite/sqlite_aclk.c
         database/sqlite/sqlite_aclk.h
         database/sqlite/sqlite_health.c
@@ -672,6 +773,8 @@ set(RRD_PLUGIN_FILES
         database/engine/metadata_log/metalogpluginsd.h
         database/engine/metadata_log/compaction.c
         database/engine/metadata_log/compaction.h
+        database/KolmogorovSmirnovDist.c
+        database/KolmogorovSmirnovDist.h
         )
 
 set(WEB_PLUGIN_FILES
@@ -700,6 +803,8 @@ set(API_PLUGIN_FILES
         web/api/queries/query.h
         web/api/queries/average/average.c
         web/api/queries/average/average.h
+        web/api/queries/countif/countif.c
+        web/api/queries/countif/countif.h
         web/api/queries/incremental_sum/incremental_sum.c
         web/api/queries/incremental_sum/incremental_sum.h
         web/api/queries/max/max.c
@@ -710,12 +815,18 @@ set(API_PLUGIN_FILES
         web/api/queries/sum/sum.h
         web/api/queries/median/median.c
         web/api/queries/median/median.h
+        web/api/queries/percentile/percentile.c
+        web/api/queries/percentile/percentile.h
         web/api/queries/stddev/stddev.c
         web/api/queries/stddev/stddev.h
         web/api/queries/ses/ses.c
         web/api/queries/ses/ses.h
         web/api/queries/des/des.c
         web/api/queries/des/des.h
+        web/api/queries/trimmed_mean/trimmed_mean.c
+        web/api/queries/trimmed_mean/trimmed_mean.h
+        web/api/queries/weights.c
+        web/api/queries/weights.h
         web/api/formatters/rrd2json.c
         web/api/formatters/rrd2json.h
         web/api/formatters/csv/csv.c
@@ -738,21 +849,9 @@ set(API_PLUGIN_FILES
 set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
+        streaming/compression.c
         streaming/receiver.c
         streaming/sender.c
-        )
-
-set(BACKENDS_PLUGIN_FILES
-        backends/backends.c
-        backends/backends.h
-        backends/graphite/graphite.c
-        backends/graphite/graphite.h
-        backends/json/json.c
-        backends/json/json.h
-        backends/opentsdb/opentsdb.c
-        backends/opentsdb/opentsdb.h
-        backends/prometheus/backend_prometheus.c
-        backends/prometheus/backend_prometheus.h
         )
 
 set(CLAIM_PLUGIN_FILES
@@ -762,39 +861,13 @@ set(CLAIM_PLUGIN_FILES
 
 set(ACLK_ALWAYS_BUILD
         aclk/aclk_rrdhost_state.h
-        aclk/aclk_api.c
-        aclk/aclk_api.h
         aclk/aclk_proxy.c
         aclk/aclk_proxy.h
-        )
-
-set(ACLK_COMMON_FILES
-        aclk/aclk_collector_list.c
-        aclk/aclk_collector_list.h
-        )
-
-set(ACLK_LEGACY_FILES
-        aclk/legacy/agent_cloud_link.c
-        aclk/legacy/agent_cloud_link.h
-        aclk/legacy/aclk_query.c
-        aclk/legacy/aclk_query.h
-        aclk/legacy/aclk_lws_wss_client.c
-        aclk/legacy/aclk_lws_wss_client.h
-        aclk/legacy/aclk_lws_https_client.c
-        aclk/legacy/aclk_lws_https_client.h
-        aclk/legacy/mqtt.c
-        aclk/legacy/mqtt.h
-        aclk/legacy/aclk_stats.c
-        aclk/legacy/aclk_stats.h
-        aclk/legacy/aclk_rx_msgs.c
-        aclk/legacy/aclk_rx_msgs.h
-        aclk/legacy/aclk_common.c
-        aclk/legacy/aclk_common.h
-        )
-
-set(ACLK_NG_FILES
         aclk/aclk.c
         aclk/aclk.h
+        )
+
+set(ACLK_FILES
         aclk/aclk_util.c
         aclk/aclk_util.h
         aclk/aclk_stats.c
@@ -815,12 +888,19 @@ set(ACLK_NG_FILES
         aclk/aclk_charts_api.h
         aclk/aclk_alarm_api.c
         aclk/aclk_alarm_api.h
+        aclk/aclk_contexts_api.c
+        aclk/aclk_contexts_api.h
         mqtt_websockets/src/mqtt_wss_client.c
         mqtt_websockets/src/include/mqtt_wss_client.h
         mqtt_websockets/src/mqtt_wss_log.c
         mqtt_websockets/src/include/mqtt_wss_log.h
         mqtt_websockets/src/ws_client.c
         mqtt_websockets/src/include/ws_client.h
+        mqtt_websockets/src/mqtt_ng.c
+        mqtt_websockets/src/include/mqtt_ng.h
+        mqtt_websockets/src/common_public.c
+        mqtt_websockets/src/include/common_public.h
+        mqtt_websockets/src/include/common_internal.h
         mqtt_websockets/c-rbuf/src/ringbuffer.c
         mqtt_websockets/c-rbuf/include/ringbuffer.h
         mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
@@ -842,6 +922,14 @@ set(ACLK_NG_FILES
         aclk/schema-wrappers/alarm_config.h
         aclk/schema-wrappers/node_info.cc
         aclk/schema-wrappers/node_info.h
+        aclk/schema-wrappers/capability.cc
+        aclk/schema-wrappers/capability.h
+        aclk/schema-wrappers/proto_2_json.cc
+        aclk/schema-wrappers/proto_2_json.h
+        aclk/schema-wrappers/context_stream.cc
+        aclk/schema-wrappers/context_stream.h
+        aclk/schema-wrappers/context.cc
+        aclk/schema-wrappers/context.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
@@ -852,11 +940,6 @@ set(SPAWN_PLUGIN_FILES
         spawn/spawn_server.c
         spawn/spawn_client.c
         spawn/spawn.h
-        )
-
-set(ACLK_LEGACY_STATIC_LIBS
-        ${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a
-        ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a
         )
 
 set(EXPORTING_ENGINE_FILES
@@ -905,23 +988,6 @@ set(MONGODB_EXPORTING_FILES
         exporting/mongodb/mongodb.h
         )
 
-set(KINESIS_BACKEND_FILES
-        backends/aws_kinesis/aws_kinesis.c
-        backends/aws_kinesis/aws_kinesis.h
-        backends/aws_kinesis/aws_kinesis_put_record.cc
-        backends/aws_kinesis/aws_kinesis_put_record.h
-        )
-
-set(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES
-        backends/prometheus/remote_write/remote_write.cc
-        backends/prometheus/remote_write/remote_write.h
-        )
-
-set(MONGODB_BACKEND_FILES
-        backends/mongodb/mongodb.c
-        backends/mongodb/mongodb.h
-        )
-
 set(DAEMON_FILES
         daemon/buildinfo.c
         daemon/buildinfo.h
@@ -938,7 +1004,8 @@ set(DAEMON_FILES
         daemon/signals.c
         daemon/signals.h
         daemon/service.c
-        daemon/service.h
+        daemon/static_threads.c
+        daemon/static_threads.h
         daemon/commands.c
         daemon/commands.h
         daemon/unit_test.c
@@ -946,15 +1013,40 @@ set(DAEMON_FILES
         )
 
 set(ML_FILES
-        ml/ml.h
-        ml/ml-dummy.c
+    ml/ml.h
+    ml/ml-dummy.c
 )
+
+IF(ENABLE_ML)
+    list(APPEND ML_FILES
+            ml/BitBufferCounter.h
+            ml/BitBufferCounter.cc
+            ml/BitRateWindow.h
+            ml/BitRateWindow.cc
+            ml/Config.h
+            ml/Config.cc
+            ml/Database.h
+            ml/Database.cc
+            ml/Dimension.cc
+            ml/Dimension.h
+            ml/Host.h
+            ml/Host.cc
+            ml/Query.h
+            ml/kmeans/KMeans.h
+            ml/kmeans/KMeans.cc
+            ml/kmeans/SamplesBuffer.h
+            ml/kmeans/SamplesBuffer.cc
+            ml/kmeans/dlib/dlib/all/source.cpp
+            ml/json/single_include/nlohmann/json.hpp
+            ml/ml.cc
+            ml/ml-private.h
+    )
+ENDIF()
 
 set(NETDATA_FILES
         collectors/all.h
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
-        ${BACKENDS_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
@@ -981,7 +1073,6 @@ include_directories(AFTER .)
 
 add_definitions(
         -DHAVE_CONFIG_H
-        -DTARGET_OS=${TARGET_OS}
         -DCACHE_DIR="/var/cache/netdata"
         -DCONFIG_DIR="/etc/netdata"
         -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"
@@ -992,25 +1083,25 @@ add_definitions(
 )
 
 # -----------------------------------------------------------------------------
-# kinesis backend
+# kinesis exporting connector
 
 IF(KINESIS_LIBRARIES AND AWS_CORE_LIBRARIES AND HAVE_AWS_EVENT_STREAM AND HAVE_AWS_COMMON AND HAVE_AWS_CHECKSUMS AND
    CRYPTO_LIBRARIES AND SSL_LIBRARIES AND CURL_LIBRARIES)
-    SET(ENABLE_BACKEND_KINESIS True)
+    SET(ENABLE_EXPORTING_KINESIS True)
 ELSE()
-    SET(ENABLE_BACKEND_KINESIS False)
+    SET(ENABLE_EXPORTING_KINESIS False)
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS)
-    message(STATUS "kinesis backend: enabled")
-    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES} ${KINESIS_EXPORTING_FILES})
+IF(ENABLE_EXPORTING_KINESIS)
+    message(STATUS "kinesis exporting: enabled")
+    list(APPEND NETDATA_FILES ${KINESIS_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${KINESIS_LIBRARIES} ${AWS_CORE_LIBRARIES}
                                          ${CRYPTO_LIBRARIES} ${SSL_LIBRARIES} ${CURL_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${KINESIS_INCLUDE_DIRS} ${AWS_CORE_INCLUDE_DIRS}
                                             ${CRYPTO_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
     list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
 ELSE()
-    message(STATUS "kinesis backend: disabled (requires AWS SDK for C++)")
+    message(STATUS "kinesis exporting: disabled (requires AWS SDK for C++)")
 ENDIF()
 
 # -----------------------------------------------------------------------------
@@ -1033,67 +1124,74 @@ ELSE()
 ENDIF()
 
 # -----------------------------------------------------------------------------
-# prometheus remote write backend
+# prometheus remote write exporting connector
 
 IF(PROTOBUF_LIBRARIES AND SNAPPY_LIBRARIES)
-    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE True)
+    SET(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE True)
 ELSE()
-    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE False)
+    SET(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE False)
 ENDIF()
 
-IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
-    message(STATUS "prometheus remote write backend: enabled")
+IF(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
+    message(STATUS "prometheus remote write exporting: enabled")
 
     find_package(Protobuf REQUIRED)
-    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
 
-    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
+    function(PROTOBUF_REMOTE_WRITE_GENERATE_CPP SRCS HDRS)
+        if(NOT ARGN)
+            message(SEND_ERROR "Error: PROTOBUF_REMOTE_WRITE_GENERATE_CPP() called without any proto files")
+            return()
+        endif()
+
+        set(${SRCS})
+        set(${HDRS})
+        foreach(FIL ${ARGN})
+            get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+            get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+            get_filename_component(FIL_WE ${FIL} NAME_WE)
+            set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+            set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+            list(APPEND ${SRCS} ${GENERATED_PB_CC})
+            list(APPEND ${HDRS} ${GENERATED_PB_H})
+            add_custom_command(
+            OUTPUT ${GENERATED_PB_CC}
+                    ${GENERATED_PB_H}
+            COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+            ARGS -I=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write --cpp_out=${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write ${ABS_FIL}
+            DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+            COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+            VERBATIM )
+        endforeach()
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+    endfunction()
+
+    protobuf_remote_write_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
+
+    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
     list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER} ${SNAPPY_CFLAGS_OTHER})
 ELSE()
-    message(STATUS "prometheus remote write backend: disabled (requires protobuf and snappy libraries)")
+    message(STATUS "prometheus remote write exporting: disabled (requires protobuf and snappy libraries)")
 ENDIF()
 
 # -----------------------------------------------------------------------------
-# mongodb backend
+# mongodb exporting connector
 
-IF(libmongoc-1.0_FOUND)
-    message(STATUS "mongodb backend: enabled")
+IF(MONGOC_LIBRARIES)
+    message(STATUS "mongodb exporting: enabled")
 
-    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
+    list(APPEND NETDATA_FILES ${MONGODB_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${MONGOC_CFLAGS_OTHER})
 ELSE()
-    message(STATUS "mongodb backend: disabled (requires mongoc library)")
+    message(STATUS "mongodb exporting: disabled (requires mongoc library)")
 ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
-
-set(ACLK_LEGACY_CAN_BUILD 1)
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
-    message(WARNING "Static build of mosquitto not found. Disabling ACLK")
-    set(ACLK_LEGACY_CAN_BUILD 0)
-ENDIF()
-
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
-    message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
-    set(ACLK_LEGACY_CAN_BUILD 0)
-ENDIF()
-
-IF(ACLK_LEGACY_CAN_BUILD)
-    message(STATUS "agent-cloud-link Legacy: enabled")
-    list(APPEND NETDATA_FILES ${ACLK_LEGACY_FILES})
-    list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_LEGACY_STATIC_LIBS})
-    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
-    IF(LINUX AND CAP_FOUND)
-        list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
-        list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
-        list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
-    ENDIF()
-ELSE()
-    message(STATUS "agent-cloud-link Legacy: disabled")
-ENDIF()
 
 find_package(Protobuf REQUIRED)
 
@@ -1133,7 +1231,7 @@ function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
   set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
 
-set(ACLK_NG_PROTO_DEFS
+set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/aclk/v1/lib.proto
         aclk/aclk-schemas/proto/agent/v1/disconnect.proto
         aclk/aclk-schemas/proto/agent/v1/connection.proto
@@ -1146,15 +1244,17 @@ set(ACLK_NG_PROTO_DEFS
         aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        aclk/aclk-schemas/proto/context/v1/context.proto
+        aclk/aclk-schemas/proto/context/v1/stream.proto
         )
-PROTOBUF_ACLK_GENERATE_CPP(ACLK_NG_PROTO_BUILT_SRCS ACLK_NG_PROTO_BUILT_HDRS ${ACLK_NG_PROTO_DEFS})
+PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
 
 list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
 list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${ACLK_NG_FILES} ${ACLK_NG_PROTO_BUILT_SRCS} ${ACLK_NG_PROTO_BUILT_HDRS})
-list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
+list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
+list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
@@ -1164,10 +1264,12 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 # netdata
 
 IF(LINUX)
+    list(APPEND NETDATA_FILES daemon/static_threads_linux.c)
+    list(APPEND NETDATA_COMMON_LIBRARIES rt)
+
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
-            ${TIMEX_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
             ${TC_PLUGIN_FILES}
             )
@@ -1181,6 +1283,8 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_SLABINFO True)
 
 ELSEIF(FREEBSD)
+    list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
+
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
@@ -1192,6 +1296,8 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
+    list(APPEND NETDATA_FILES daemon/static_threads_macos.c)
+
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
@@ -1204,7 +1310,7 @@ ELSEIF(MACOS)
 
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS OR ENABLE_EXPORTING_PUBSUB OR ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+IF(ENABLE_EXPORTING_KINESIS OR ENABLE_EXPORTING_PUBSUB OR ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
     set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
     set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
@@ -1225,6 +1331,12 @@ IF(XENSTAT_LIBRARIES)
     SET(ENABLE_PLUGIN_XENSTAT True)
 ELSE()
     SET(ENABLE_PLUGIN_XENSTAT False)
+ENDIF()
+
+IF(CUPS_LIBRARIES)
+    SET(ENABLE_PLUGIN_CUPS True)
+ELSE()
+    SET(ENABLE_PLUGIN_CUPS False)
 ENDIF()
 
 
@@ -1336,6 +1448,20 @@ ENDIF()
 
 
 # -----------------------------------------------------------------------------
+# cups.plugin
+
+IF(ENABLE_PLUGIN_CUPS)
+    message(STATUS "cups.plugin: enabled")
+    add_executable(cups.plugin config.h ${CUPS_PLUGIN_FILES})
+    target_link_libraries (cups.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CUPS_LIBRARIES})
+    target_include_directories(cups.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CUPS_INCLUDE_DIRS})
+    target_compile_options(cups.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CUPS_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "cups.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
 # cgroup-network
 
 IF(ENABLE_PLUGIN_CGROUP_NETWORK)
@@ -1347,7 +1473,6 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()
-
 
 # -----------------------------------------------------------------------------
 # Unit tests
@@ -1373,13 +1498,15 @@ if(BUILD_TESTING)
         exporting/tests/exporting_doubles.c
         exporting/tests/netdata_doubles.c
         exporting/tests/system_doubles.c
+        database/rrdlabels.c
+        database/rrdvar.c
         )
     set(TEST_NAME exporting_engine)
     set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)
     set(KINESIS_LINK_OPTIONS)
     set(PUBSUB_LINK_OPTIONS)
     set(MONGODB_LINK_OPTIONS)
-if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+if(ENABLE_EXPORTING_PROMETHEUS_REMOTE_WRITE)
     list(APPEND EXPORTING_ENGINE_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(
         APPEND PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS
@@ -1389,7 +1516,7 @@ if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
         -Wl,--wrap=add_metric
     )
 endif()
-if(ENABLE_BACKEND_KINESIS)
+if(ENABLE_EXPORTING_KINESIS)
     list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
     list(
         APPEND KINESIS_LINK_OPTIONS
@@ -1530,11 +1657,6 @@ endif()
         database/rrd.h
     )
     add_executable(cgroups_testdriver ${CGROUPS_TEST_FILES} ${CGROUPS_PLUGIN_FILES})
-    target_link_options(
-        cgroups_testdriver
-        PRIVATE
-        -Wl,--wrap=add_label_to_list
-    )
     target_link_libraries(cgroups_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_cgroups COMMAND cgroups_testdriver)
 
@@ -1550,3 +1672,79 @@ endif()
 
 endif()
 endif()
+
+
+# generate config.h so that CMake becomes independent of automake
+
+## netdata version
+set(GIT_EXECUTABLE "git")
+execute_process(COMMAND ${GIT_EXECUTABLE} describe OUTPUT_VARIABLE NETDATA_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF("${NETDATA_VERSION}" STREQUAL "")
+    file(STRINGS "packaging/version" NETDATA_VERSION LIMIT_COUNT 1)
+ENDIF()
+
+set(NETDATA_USER "netdata" CACHE STRING "use this user to drop privileges")
+
+if(MAC_OS)
+    set(ENABLE_APPS_PLUGIN False)
+else()
+    set(ENABLE_APPS_PLUGIN True)
+endif()
+
+check_include_file(time.h HAVE_TIME_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+if (HAVE_TIME_H)
+    include(CheckStructHasMember)
+    check_struct_has_member("struct timespec" tv_sec "time.h" HAVE_STRUCT_TIMESPEC)
+endif ()
+
+check_include_file(sys/statfs.h HAVE_SYS_STATFS_H)
+check_include_file(sys/statvfs.h HAVE_SYS_STATVFS_H)
+check_include_file(inttypes.h HAVE_INTTYPES_H)
+check_include_file(stdint.h HAVE_STDINT_H)
+
+include(CheckSymbolExists)
+check_include_file(sys/mkdev.h HAVE_SYS_MKDEV_H)
+if (HAVE_SYS_MKDEV_H)
+    check_symbol_exists(major "sys/mkdev.h" MAJOR_IN_MKDEV)
+endif()
+check_include_file(sys/sysmacros.h HAVE_SYS_SYSMACROS_H)
+if (HAVE_SYS_SYSMACROS_H)
+    check_symbol_exists(major "sys/sysmacros.h" MAJOR_IN_SYSMACROS)
+endif()
+
+if (CRYPTO_FOUND)
+    include(CheckLibraryExists)
+    set(HAVE_CRYPTO True)
+    FIND_LIBRARY(CRYPTO_LIBRARY_LOCATION NAMES crypto)
+    check_library_exists(crypto X509_VERIFY_PARAM_set1_host ${CRYPTO_LIBRARY_LOCATION} HAVE_X509_VERIFY_PARAM_set1_host)
+    if (HAVE_X509_VERIFY_PARAM_set1_host)
+        set(HAVE_X509_VERIFY_PARAM_set1_host True)
+    endif()
+endif()
+
+include(CheckCSourceCompiles)
+check_c_source_compiles("
+  #define _GNU_SOURCE
+  #include <string.h>
+  int main() { char x = *strerror_r(0, &x, sizeof(x)); return 0; }
+  " STRERROR_R_CHAR_P)
+
+IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    SET(LIKELY_MACRO "__builtin_expect(!!(x), 1)")
+    SET(UNLIKELY_MACRO "__builtin_expect(!!(x), 0)")
+ELSE()
+    SET(LIKELY_MACRO "(x)")
+    SET(UNLIKELY_MACRO "(x)")
+ENDIF()
+
+IF(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    SET(ALWAYS_UNUSED_MACRO "__attribute__((unused))")
+    SET(MAYBE_UNUSED_MACRO "__attribute__((unused))")
+ELSE()
+    SET(ALWAYS_UNUSED_MACRO "")
+    SET(MAYBE_UNUSED_MACRO "")
+ENDIF()
+
+configure_file(config.cmake.h.in config.h)

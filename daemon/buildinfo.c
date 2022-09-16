@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "./config.h"
 #include "common.h"
+#include "buildinfo.h"
 
 // Optional features
 
@@ -17,24 +18,6 @@
 #define FEAT_CLOUD 0
 #define FEAT_CLOUD_MSG ""
 #endif
-#endif
-
-#ifdef ACLK_NG
-#define FEAT_ACLK_NG 1
-#else
-#define FEAT_ACLK_NG 0
-#endif
-
-#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-#define NEW_CLOUD_PROTO 1
-#else
-#define NEW_CLOUD_PROTO 0
-#endif
-
-#ifdef ACLK_LEGACY
-#define FEAT_ACLK_LEGACY 1
-#else
-#define FEAT_ACLK_LEGACY 0
 #endif
 
 #ifdef ENABLE_DBENGINE
@@ -61,19 +44,21 @@
 #define FEAT_ML 0
 #endif
 
+#ifdef  ENABLE_COMPRESSION
+#define  FEAT_STREAM_COMPRESSION 1
+#else
+#define  FEAT_STREAM_COMPRESSION 0
+#endif  //ENABLE_COMPRESSION
+
+
 // Optional libraries
 
 #ifdef HAVE_PROTOBUF
-#if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
 #define FEAT_PROTOBUF 1
 #ifdef BUNDLED_PROTOBUF
 #define FEAT_PROTOBUF_BUNDLED " (bundled)"
 #else
 #define FEAT_PROTOBUF_BUNDLED " (system)"
-#endif
-#else
-#define FEAT_PROTOBUF 0
-#define FEAT_PROTOBUF_BUNDLED ""
 #endif
 #else
 #define FEAT_PROTOBUF 0
@@ -103,30 +88,6 @@
 #else
 #define FEAT_LIBCAP 0
 #endif
-
-#ifndef ACLK_LEGACY_DISABLED
-    #ifdef ACLK_NO_LIBMOSQ
-        #define FEAT_MOSQUITTO 0
-    #else
-        #define FEAT_MOSQUITTO 1
-    #endif
-
-    #ifdef ACLK_NO_LWS
-        #define FEAT_LWS 0
-        #define FEAT_LWS_MSG ""
-    #else
-        #ifdef ACLK_LEGACY
-            #include <libwebsockets.h>
-        #endif
-        #ifdef BUNDLED_LWS
-            #define FEAT_LWS 1
-            #define FEAT_LWS_MSG "static"
-        #else
-            #define FEAT_LWS 1
-            #define FEAT_LWS_MSG "shared-lib"
-        #endif
-    #endif
-#endif /* ACLK_LEGACY_DISABLED */
 
 #ifdef NETDATA_WITH_ZLIB
 #define FEAT_ZLIB 1
@@ -236,18 +197,79 @@
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
+
+char *get_value_from_key(char *buffer, char *key) {
+    char *s = NULL, *t = NULL;
+    s = t = buffer + strlen(key) + 2;
+    if (s) {
+        while (*s == '\'')
+            s++;
+        while (*++t != '\0');
+        while (--t > s && *t == '\'')
+            *t = '\0';
+    }
+    return s;
+}
+
+void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt_dist) {
+    char *install_type_filename;
+
+    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
+    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
+
+    FILE *fp = fopen(install_type_filename, "r");
+    if (fp) {
+        char *s, buf[256 + 1];
+        size_t len = 0;
+
+        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
+            if (!strncmp(buf, "INSTALL_TYPE='", 14))
+                *install_type = strdupz((char *)get_value_from_key(buf, "INSTALL_TYPE"));
+            else if (!strncmp(buf, "PREBUILT_ARCH='", 15))
+                *prebuilt_arch = strdupz((char *)get_value_from_key(buf, "PREBUILT_ARCH"));
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
+                *prebuilt_dist = strdupz((char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
+        }
+        fclose(fp);
+    }
+    freez(install_type_filename);
+}
+
 void print_build_info(void) {
+    char *install_type = NULL;
+    char *prebuilt_arch = NULL;
+    char *prebuilt_distro = NULL;
+    get_install_type(&install_type, &prebuilt_arch, &prebuilt_distro);
+
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
+
+    if (install_type == NULL) {
+        printf("Install type: unknown\n");
+    } else {
+        printf("Install type: %s\n", install_type);
+    }
+
+    if (prebuilt_arch != NULL) {
+        printf("    Binary architecture: %s\n", prebuilt_arch);
+    }
+
+    if (prebuilt_distro != NULL) {
+        printf("    Packaging distro: %s\n", prebuilt_distro);
+    }
+
+    freez(install_type);
+    freez(prebuilt_arch);
+    freez(prebuilt_distro);
 
     printf("Features:\n");
     printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
     printf("    Native HTTPS:               %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
     printf("    Netdata Cloud:              %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
-    printf("    ACLK Next Generation:       %s\n", FEAT_YES_NO(FEAT_ACLK_NG));
-    printf("    ACLK-NG New Cloud Protocol: %s\n", FEAT_YES_NO(NEW_CLOUD_PROTO));
-    printf("    ACLK Legacy:                %s\n", FEAT_YES_NO(FEAT_ACLK_LEGACY));
+    printf("    ACLK:                       %s\n", FEAT_YES_NO(FEAT_CLOUD));
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
+    printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
 
     printf("Libraries:\n");
     printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
@@ -256,14 +278,6 @@ void print_build_info(void) {
     printf("    libcap:                  %s\n", FEAT_YES_NO(FEAT_LIBCAP));
     printf("    libcrypto:               %s\n", FEAT_YES_NO(FEAT_CRYPTO));
     printf("    libm:                    %s\n", FEAT_YES_NO(FEAT_LIBM));
-#ifndef ACLK_LEGACY_DISABLED
-#if defined(ACLK_LEGACY)
-    printf("    LWS:                     %s %s v%d.%d.%d\n", FEAT_YES_NO(FEAT_LWS), FEAT_LWS_MSG, LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
-#else
-    printf("    LWS:                     %s %s\n", FEAT_YES_NO(FEAT_LWS), FEAT_LWS_MSG);
-#endif
-    printf("    mosquitto:               %s\n", FEAT_YES_NO(FEAT_MOSQUITTO));
-#endif
     printf("    tcalloc:                 %s\n", FEAT_YES_NO(FEAT_TCMALLOC));
     printf("    zlib:                    %s\n", FEAT_YES_NO(FEAT_ZLIB));
 
@@ -286,7 +300,6 @@ void print_build_info(void) {
     printf("    Prometheus Remote Write: %s\n", FEAT_YES_NO(FEAT_REMOTE_WRITE));
 };
 
-
 #define FEAT_JSON_BOOL(x) ((x) ? "true" : "false")
 // This intentionally does not use JSON-C so it works even if JSON-C is not present
 // This is used for anonymous statistics reporting, so it intentionally
@@ -303,12 +316,11 @@ void print_build_info_json(void) {
 #else
     printf("    \"cloud-disabled\": false,\n");
 #endif
-    printf("    \"aclk-ng\": %s,\n", FEAT_JSON_BOOL(FEAT_ACLK_NG));
-    printf("    \"aclk-ng-new-cloud-proto\": %s,\n", FEAT_JSON_BOOL(NEW_CLOUD_PROTO));
-    printf("    \"aclk-legacy\": %s,\n", FEAT_JSON_BOOL(FEAT_ACLK_LEGACY));
+    printf("    \"aclk\": %s,\n", FEAT_JSON_BOOL(FEAT_CLOUD));
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
+    printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
@@ -319,16 +331,6 @@ void print_build_info_json(void) {
     printf("    \"libcap\": %s,\n",           FEAT_JSON_BOOL(FEAT_LIBCAP));
     printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
     printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
-#ifndef ACLK_NG
-#if defined(ENABLE_ACLK)
-    printf("    \"lws\": %s,\n", FEAT_JSON_BOOL(FEAT_LWS));
-    printf("    \"lws-version\": \"%d.%d.%d\",\n", LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
-    printf("    \"lws-type\": \"%s\",\n", FEAT_LWS_MSG);
-#else
-    printf("    \"lws\": %s,\n",              FEAT_JSON_BOOL(FEAT_LWS));
-#endif
-    printf("    \"mosquitto\": %s,\n",        FEAT_JSON_BOOL(FEAT_MOSQUITTO));
-#endif
     printf("    \"tcmalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_TCMALLOC));
     printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(FEAT_ZLIB));
     printf("  },\n");
@@ -355,53 +357,101 @@ void print_build_info_json(void) {
     printf("}\n");
 };
 
-//return a list of enabled features for use in analytics
-//find a way to have proper |
+#define add_to_bi(buffer, str)       \
+    { if(first) {                    \
+        buffer_strcat (b, str);      \
+        first = 0;                   \
+    } else                           \
+        buffer_strcat (b, "|" str); }
+
 void analytics_build_info(BUFFER *b) {
-    if(FEAT_DBENGINE)        buffer_strcat (b, "dbengine");
-    if(FEAT_NATIVE_HTTPS)    buffer_strcat (b, "|Native HTTPS");
-    if(FEAT_CLOUD)           buffer_strcat (b, "|Netdata Cloud");
-    if(FEAT_ACLK_NG)         buffer_strcat (b, "|ACLK Next Generation");
-    if(NEW_CLOUD_PROTO)      buffer_strcat (b, "|New Cloud Protocol Support");
-    if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
-    if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
-    if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
-
-    if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
-    if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
-    if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
-    if(FEAT_LIBCAP)          buffer_strcat (b, "|libcap");
-    if(FEAT_CRYPTO)          buffer_strcat (b, "|libcrypto");
-    if(FEAT_LIBM)            buffer_strcat (b, "|libm");
-
-#ifndef ACLK_LEGACY_DISABLED
-#if defined(ENABLE_ACLK) && defined(ACLK_LEGACY)
-    {
-        char buf[20];
-        snprintfz(buf, 19, "|LWS v%d.%d.%d", LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
-        if(FEAT_LWS)         buffer_strcat(b, buf);
-    }
-#else
-    if(FEAT_LWS)            buffer_strcat(b, "|LWS");
+    int first = 1;
+#ifdef ENABLE_DBENGINE
+    add_to_bi(b, "dbengine");
 #endif
-    if(FEAT_MOSQUITTO)      buffer_strcat(b, "|mosquitto");
+#ifdef ENABLE_HTTPS
+    add_to_bi(b, "Native HTTPS");
 #endif
-    if(FEAT_TCMALLOC)       buffer_strcat(b, "|tcalloc");
-    if(FEAT_ZLIB)           buffer_strcat(b, "|zlib");
+#ifdef ENABLE_ACLK
+    add_to_bi(b, "Netdata Cloud");
+#endif
+#if (FEAT_TLS_HOST_VERIFY!=0)
+    add_to_bi(b, "TLS Host Verification");
+#endif
+#ifdef ENABLE_ML
+    add_to_bi(b, "Machine Learning");
+#endif
+#ifdef ENABLE_COMPRESSION
+    add_to_bi(b, "Stream Compression");
+#endif
 
-    if(FEAT_APPS_PLUGIN)    buffer_strcat(b, "|apps");
-    if(FEAT_CGROUP_NET)     buffer_strcat(b, "|cgroup Network Tracking");
-    if(FEAT_CUPS)           buffer_strcat(b, "|CUPS");
-    if(FEAT_EBPF)           buffer_strcat(b, "|EBPF");
-    if(FEAT_IPMI)           buffer_strcat(b, "|IPMI");
-    if(FEAT_NFACCT)         buffer_strcat(b, "|NFACCT");
-    if(FEAT_PERF)           buffer_strcat(b, "|perf");
-    if(FEAT_SLABINFO)       buffer_strcat(b, "|slabinfo");
-    if(FEAT_XEN)            buffer_strcat(b, "|Xen");
-    if(FEAT_XEN_VBD_ERROR)  buffer_strcat(b, "|Xen VBD Error Tracking");
+#ifdef HAVE_PROTOBUF
+    add_to_bi(b, "protobuf");
+#endif
+#ifdef ENABLE_JEMALLOC
+    add_to_bi(b, "jemalloc");
+#endif
+#ifdef ENABLE_JSONC
+    add_to_bi(b, "JSON-C");
+#endif
+#ifdef HAVE_CAPABILITY
+    add_to_bi(b, "libcap");
+#endif
+#ifdef HAVE_CRYPTO
+    add_to_bi(b, "libcrypto");
+#endif
+#ifdef STORAGE_WITH_MATH
+    add_to_bi(b, "libm");
+#endif
 
-    if(FEAT_KINESIS)        buffer_strcat(b, "|AWS Kinesis");
-    if(FEAT_PUBSUB)         buffer_strcat(b, "|GCP PubSub");
-    if(FEAT_MONGO)          buffer_strcat(b, "|MongoDB");
-    if(FEAT_REMOTE_WRITE)   buffer_strcat(b, "|Prometheus Remote Write");
+#ifdef ENABLE_TCMALLOC
+    add_to_bi(b, "tcalloc");
+#endif
+#ifdef NETDATA_WITH_ZLIB
+    add_to_bi(b, "zlib");
+#endif
+
+#ifdef ENABLE_APPS_PLUGIN
+    add_to_bi(b, "apps");
+#endif
+#ifdef HAVE_SETNS
+    add_to_bi(b, "cgroup Network Tracking");
+#endif
+#ifdef HAVE_CUPS
+    add_to_bi(b, "CUPS");
+#endif
+#ifdef HAVE_LIBBPF
+    add_to_bi(b, "EBPF");
+#endif
+#ifdef HAVE_FREEIPMI
+    add_to_bi(b, "IPMI");
+#endif
+#ifdef HAVE_NFACCT
+    add_to_bi(b, "NFACCT");
+#endif
+#ifdef ENABLE_PERF_PLUGIN
+    add_to_bi(b, "perf");
+#endif
+#ifdef ENABLE_SLABINFO
+    add_to_bi(b, "slabinfo");
+#endif
+#ifdef HAVE_LIBXENSTAT
+    add_to_bi(b, "Xen");
+#endif
+#ifdef HAVE_XENSTAT_VBD_ERROR
+    add_to_bi(b, "Xen VBD Error Tracking");
+#endif
+
+#ifdef HAVE_KINESIS
+    add_to_bi(b, "AWS Kinesis");
+#endif
+#ifdef ENABLE_EXPORTING_PUBSUB
+    add_to_bi(b, "GCP PubSub");
+#endif
+#ifdef HAVE_MONGOC
+    add_to_bi(b, "MongoDB");
+#endif
+#ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
+    add_to_bi(b, "Prometheus Remote Write");
+#endif
 }

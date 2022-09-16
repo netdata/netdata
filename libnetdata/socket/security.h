@@ -22,12 +22,20 @@
 #define OPENSSL_VERSION_097 0x0907000L
 #define OPENSSL_VERSION_110 0x10100000L
 #define OPENSSL_VERSION_111 0x10101000L
+#define OPENSSL_VERSION_300 0x30000000L
 
 #  include <openssl/ssl.h>
 #  include <openssl/err.h>
+#  include <openssl/evp.h>
+#  include <openssl/pem.h>
 #  if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
 #   include <openssl/conf.h>
 #  endif
+
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+#include <openssl/core_names.h>
+#include <openssl/decoder.h>
+#endif
 
 struct netdata_ssl{
     SSL *conn; //SSL connection

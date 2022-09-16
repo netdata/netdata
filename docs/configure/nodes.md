@@ -19,7 +19,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended), the **Netdata config
+installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -60,6 +60,10 @@ The Netdata config directory also contains one symlink:
 - `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains stock configuration files. Stock
   versions are copied into the config directory when opened with `edit-config`. _Do not edit the files in
   `/usr/lib/netdata/conf.d`, as they are overwritten by updates to the Netdata Agent._
+
+## Configure a Netdata docker container
+
+See [configure agent containers](/packaging/docker/README.md#configure-agent-containers).
 
 ## Use `edit-config` to edit configuration files
 

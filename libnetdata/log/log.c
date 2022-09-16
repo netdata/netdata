@@ -6,7 +6,7 @@
 int web_server_is_multithreaded = 1;
 
 const char *program_name = "";
-uint64_t debug_flags = DEBUG;
+uint64_t debug_flags = 0;
 
 int access_log_syslog = 1;
 int error_log_syslog = 1;
@@ -20,14 +20,22 @@ const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
 const char *facility_log = NULL;
 
+#ifdef ENABLE_ACLK
+const char *aclklog_filename = NULL;
+int aclklog_fd = -1;
+FILE *aclklog = NULL;
+int aclklog_syslog = 1;
+int aclklog_enabled = 0;
+#endif
+
 // ----------------------------------------------------------------------------
 // Log facility(https://tools.ietf.org/html/rfc5424)
 //
 // The facilities accepted in the Netdata are in according with the following
-// header files for their respective operate system:
-// 	sys/syslog.h (Linux )
-// 	sys/sys/syslog.h (FreeBSD)
-// 	bsd/sys/syslog.h (darwin-xnu)
+// header files for their respective operating system:
+// sys/syslog.h (Linux )
+// sys/sys/syslog.h (FreeBSD)
+// bsd/sys/syslog.h (darwin-xnu)
 
 #define LOG_AUTH_KEY "auth"
 #define LOG_AUTHPRIV_KEY "authpriv"
@@ -71,229 +79,229 @@ const char *facility_log = NULL;
 
 static int log_facility_id(const char *facility_name)
 {
-	static int 
-		hash_auth = 0,
-		hash_authpriv = 0,
+    static int
+        hash_auth = 0,
+        hash_authpriv = 0,
 #ifdef __FreeBSD__
-		hash_console = 0,
+        hash_console = 0,
 #endif
-		hash_cron = 0,
-		hash_daemon = 0,
-		hash_ftp = 0,
+        hash_cron = 0,
+        hash_daemon = 0,
+        hash_ftp = 0,
 #ifdef __APPLE__
-		hash_install = 0,
+        hash_install = 0,
 #endif
-		hash_kern = 0,
-		hash_lpr = 0,
-		hash_mail = 0,
-//		hash_mark = 0,
+        hash_kern = 0,
+        hash_lpr = 0,
+        hash_mail = 0,
+//      hash_mark = 0,
 #ifdef __APPLE__
-		hash_netinfo = 0,
-		hash_ras = 0,
-		hash_remoteauth = 0,
+        hash_netinfo = 0,
+        hash_ras = 0,
+        hash_remoteauth = 0,
 #endif
-		hash_news = 0,
+        hash_news = 0,
 #ifdef __FreeBSD__
-		hash_ntp = 0,
+        hash_ntp = 0,
 #endif
-		hash_security = 0,
-		hash_syslog = 0,
-		hash_user = 0,
-		hash_uucp = 0,
+        hash_security = 0,
+        hash_syslog = 0,
+        hash_user = 0,
+        hash_uucp = 0,
 #ifdef __APPLE__
-		hash_launchd = 0,
+        hash_launchd = 0,
 #endif
-		hash_local0 = 0,
-		hash_local1 = 0,
-		hash_local2 = 0,
-		hash_local3 = 0,
-		hash_local4 = 0,
-		hash_local5 = 0,
-		hash_local6 = 0,
-		hash_local7 = 0;
+        hash_local0 = 0,
+        hash_local1 = 0,
+        hash_local2 = 0,
+        hash_local3 = 0,
+        hash_local4 = 0,
+        hash_local5 = 0,
+        hash_local6 = 0,
+        hash_local7 = 0;
 
-	if(unlikely(!hash_auth))
-	{
-		hash_auth = simple_hash(LOG_AUTH_KEY);
-		hash_authpriv = simple_hash(LOG_AUTHPRIV_KEY);
+    if(unlikely(!hash_auth))
+    {
+        hash_auth = simple_hash(LOG_AUTH_KEY);
+        hash_authpriv = simple_hash(LOG_AUTHPRIV_KEY);
 #ifdef __FreeBSD__
-		hash_console = simple_hash(LOG_CONSOLE_KEY);
+        hash_console = simple_hash(LOG_CONSOLE_KEY);
 #endif
-		hash_cron = simple_hash(LOG_CRON_KEY);
-		hash_daemon = simple_hash(LOG_DAEMON_KEY);
-		hash_ftp = simple_hash(LOG_FTP_KEY);
+        hash_cron = simple_hash(LOG_CRON_KEY);
+        hash_daemon = simple_hash(LOG_DAEMON_KEY);
+        hash_ftp = simple_hash(LOG_FTP_KEY);
 #ifdef __APPLE__
-		hash_install = simple_hash(LOG_INSTALL_KEY);
+        hash_install = simple_hash(LOG_INSTALL_KEY);
 #endif
-		hash_kern = simple_hash(LOG_KERN_KEY);
-		hash_lpr = simple_hash(LOG_LPR_KEY);
-		hash_mail = simple_hash(LOG_MAIL_KEY);
-//		hash_mark = simple_uhash();
+        hash_kern = simple_hash(LOG_KERN_KEY);
+        hash_lpr = simple_hash(LOG_LPR_KEY);
+        hash_mail = simple_hash(LOG_MAIL_KEY);
+//        hash_mark = simple_uhash();
 #ifdef __APPLE__
-		hash_netinfo = simple_hash(LOG_NETINFO_KEY);
-		hash_ras = simple_hash(LOG_RAS_KEY);
-		hash_remoteauth = simple_hash(LOG_REMOTEAUTH_KEY);
+        hash_netinfo = simple_hash(LOG_NETINFO_KEY);
+        hash_ras = simple_hash(LOG_RAS_KEY);
+        hash_remoteauth = simple_hash(LOG_REMOTEAUTH_KEY);
 #endif
-		hash_news = simple_hash(LOG_NEWS_KEY);
+        hash_news = simple_hash(LOG_NEWS_KEY);
 #ifdef __FreeBSD__
-		hash_ntp = simple_hash(LOG_NTP_KEY);
+        hash_ntp = simple_hash(LOG_NTP_KEY);
 #endif
-		hash_security = simple_hash(LOG_SECURITY_KEY);
-		hash_syslog = simple_hash(LOG_SYSLOG_KEY);
-		hash_user = simple_hash(LOG_USER_KEY);
-		hash_uucp = simple_hash(LOG_UUCP_KEY);
+        hash_security = simple_hash(LOG_SECURITY_KEY);
+        hash_syslog = simple_hash(LOG_SYSLOG_KEY);
+        hash_user = simple_hash(LOG_USER_KEY);
+        hash_uucp = simple_hash(LOG_UUCP_KEY);
 #ifdef __APPLE__
-		hash_launchd = simple_hash(LOG_LAUNCHD_KEY);
+        hash_launchd = simple_hash(LOG_LAUNCHD_KEY);
 #endif
-		hash_local0 = simple_hash(LOG_LOCAL0_KEY);
-		hash_local1 = simple_hash(LOG_LOCAL1_KEY);
-		hash_local2 = simple_hash(LOG_LOCAL2_KEY);
-		hash_local3 = simple_hash(LOG_LOCAL3_KEY);
-		hash_local4 = simple_hash(LOG_LOCAL4_KEY);
-		hash_local5 = simple_hash(LOG_LOCAL5_KEY);
-		hash_local6 = simple_hash(LOG_LOCAL6_KEY);
-		hash_local7 = simple_hash(LOG_LOCAL7_KEY);
-	}
+        hash_local0 = simple_hash(LOG_LOCAL0_KEY);
+        hash_local1 = simple_hash(LOG_LOCAL1_KEY);
+        hash_local2 = simple_hash(LOG_LOCAL2_KEY);
+        hash_local3 = simple_hash(LOG_LOCAL3_KEY);
+        hash_local4 = simple_hash(LOG_LOCAL4_KEY);
+        hash_local5 = simple_hash(LOG_LOCAL5_KEY);
+        hash_local6 = simple_hash(LOG_LOCAL6_KEY);
+        hash_local7 = simple_hash(LOG_LOCAL7_KEY);
+    }
 
-	int hash = simple_hash(facility_name);
-	if ( hash == hash_auth )
-	{
-		return LOG_AUTH;
-	}
-	else if  ( hash == hash_authpriv )
-	{
-		return LOG_AUTHPRIV;
-	}
+    int hash = simple_hash(facility_name);
+    if ( hash == hash_auth )
+    {
+        return LOG_AUTH;
+    }
+    else if  ( hash == hash_authpriv )
+    {
+        return LOG_AUTHPRIV;
+    }
 #ifdef __FreeBSD__
-	else if ( hash == hash_console )
-	{
-		return LOG_CONSOLE;
-	}
+    else if ( hash == hash_console )
+    {
+        return LOG_CONSOLE;
+    }
 #endif
-	else if ( hash == hash_cron )
-	{
-		return LOG_CRON;
-	}
-	else if ( hash == hash_daemon )
-	{
-		return LOG_DAEMON;
-	}
-	else if ( hash == hash_ftp )
-	{
-		return LOG_FTP;
-	}
+    else if ( hash == hash_cron )
+    {
+        return LOG_CRON;
+    }
+    else if ( hash == hash_daemon )
+    {
+        return LOG_DAEMON;
+    }
+    else if ( hash == hash_ftp )
+    {
+        return LOG_FTP;
+    }
 #ifdef __APPLE__
-	else if ( hash == hash_install )
-	{
-		return LOG_INSTALL;
-	}
+    else if ( hash == hash_install )
+    {
+        return LOG_INSTALL;
+    }
 #endif
-	else if ( hash == hash_kern )
-	{
-		return LOG_KERN;
-	}
-	else if ( hash == hash_lpr )
-	{
-		return LOG_LPR;
-	}
-	else if ( hash == hash_mail )
-	{
-		return LOG_MAIL;
-	}
-	/*
-	else if ( hash == hash_mark )
-	{
-		//this is internal for all OS
-		return INTERNAL_MARK;
-	}
-	*/
+    else if ( hash == hash_kern )
+    {
+        return LOG_KERN;
+    }
+    else if ( hash == hash_lpr )
+    {
+        return LOG_LPR;
+    }
+    else if ( hash == hash_mail )
+    {
+        return LOG_MAIL;
+    }
+    /*
+    else if ( hash == hash_mark )
+    {
+        //this is internal for all OS
+        return INTERNAL_MARK;
+    }
+    */
 #ifdef __APPLE__
-	else if ( hash == hash_netinfo )
-	{
-		return LOG_NETINFO;
-	}
-	else if ( hash == hash_ras )
-	{
-		return LOG_RAS;
-	}
-	else if ( hash == hash_remoteauth )
-	{
-		return LOG_REMOTEAUTH;
-	}
+    else if ( hash == hash_netinfo )
+    {
+        return LOG_NETINFO;
+    }
+    else if ( hash == hash_ras )
+    {
+        return LOG_RAS;
+    }
+    else if ( hash == hash_remoteauth )
+    {
+        return LOG_REMOTEAUTH;
+    }
 #endif
-	else if ( hash == hash_news )
-	{
-		return LOG_NEWS;
-	}
+    else if ( hash == hash_news )
+    {
+        return LOG_NEWS;
+    }
 #ifdef __FreeBSD__
-	else if ( hash == hash_ntp )
-	{
-		return LOG_NTP;
-	}
+    else if ( hash == hash_ntp )
+    {
+        return LOG_NTP;
+    }
 #endif
-	else if ( hash == hash_security )
-	{
-		//FreeBSD is the unique that does not consider
-		//this facility deprecated. We are keeping
-		//it for other OS while they are kept in their headers.
+    else if ( hash == hash_security )
+    {
+        //FreeBSD is the unique that does not consider
+        //this facility deprecated. We are keeping
+        //it for other OS while they are kept in their headers.
 #ifdef __FreeBSD__
-		return LOG_SECURITY;
+        return LOG_SECURITY;
 #else
-		return LOG_AUTH;
+        return LOG_AUTH;
 #endif
-	}
-	else if ( hash == hash_syslog )
-	{
-		return LOG_SYSLOG;
-	}
-	else if ( hash == hash_user )
-	{
-		return LOG_USER;
-	}
-	else if ( hash == hash_uucp )
-	{
-		return LOG_UUCP;
-	}
-	else if ( hash == hash_local0 )
-	{
-		return LOG_LOCAL0;
-	}
-	else if ( hash == hash_local1 )
-	{
-		return LOG_LOCAL1;
-	}
-	else if ( hash == hash_local2 )
-	{
-		return LOG_LOCAL2;
-	}
-	else if ( hash == hash_local3 )
-	{
-		return LOG_LOCAL3;
-	}
-	else if ( hash == hash_local4 )
-	{
-		return LOG_LOCAL4;
-	}
-	else if ( hash == hash_local5 )
-	{
-		return LOG_LOCAL5;
-	}
-	else if ( hash == hash_local6 )
-	{
-		return LOG_LOCAL6;
-	}
-	else if ( hash == hash_local7 )
-	{
-		return LOG_LOCAL7;
-	}
+    }
+    else if ( hash == hash_syslog )
+    {
+        return LOG_SYSLOG;
+    }
+    else if ( hash == hash_user )
+    {
+        return LOG_USER;
+    }
+    else if ( hash == hash_uucp )
+    {
+        return LOG_UUCP;
+    }
+    else if ( hash == hash_local0 )
+    {
+        return LOG_LOCAL0;
+    }
+    else if ( hash == hash_local1 )
+    {
+        return LOG_LOCAL1;
+    }
+    else if ( hash == hash_local2 )
+    {
+        return LOG_LOCAL2;
+    }
+    else if ( hash == hash_local3 )
+    {
+        return LOG_LOCAL3;
+    }
+    else if ( hash == hash_local4 )
+    {
+        return LOG_LOCAL4;
+    }
+    else if ( hash == hash_local5 )
+    {
+        return LOG_LOCAL5;
+    }
+    else if ( hash == hash_local6 )
+    {
+        return LOG_LOCAL6;
+    }
+    else if ( hash == hash_local7 )
+    {
+        return LOG_LOCAL7;
+    }
 #ifdef __APPLE__
-	else if ( hash == hash_launchd )
-	{
-		return LOG_LAUNCHD;
-	}
+    else if ( hash == hash_launchd )
+    {
+        return LOG_LAUNCHD;
+    }
 #endif
 
-	return LOG_DAEMON;
+    return LOG_DAEMON;
 }
 
 //we do not need to use this now, but I already created this function to be
@@ -301,135 +309,135 @@ static int log_facility_id(const char *facility_name)
 /*
 char *log_facility_name(int code)
 {
-	char *defvalue = { "daemon" };
-	switch(code)
-	{
-		case LOG_AUTH:
-			{
-				return "auth";
-			}
-		case LOG_AUTHPRIV:
-			{
-				return "authpriv";
-			}
+    char *defvalue = { "daemon" };
+    switch(code)
+    {
+        case LOG_AUTH:
+            {
+                return "auth";
+            }
+        case LOG_AUTHPRIV:
+            {
+                return "authpriv";
+            }
 #ifdef __FreeBSD__
-		case LOG_CONSOLE:
-			{
-				return "console";
-			}
+        case LOG_CONSOLE:
+            {
+                return "console";
+            }
 #endif
-		case LOG_CRON:
-			{
-				return "cron";
-			}
-		case LOG_DAEMON:
-			{
-				return defvalue;
-			}
-		case LOG_FTP:
-			{
-				return "ftp";
-			}
+        case LOG_CRON:
+            {
+                return "cron";
+            }
+        case LOG_DAEMON:
+            {
+                return defvalue;
+            }
+        case LOG_FTP:
+            {
+                return "ftp";
+            }
 #ifdef __APPLE__
-		case LOG_INSTALL:
-			{
-				return "install";
-			}
+        case LOG_INSTALL:
+            {
+                return "install";
+            }
 #endif
-		case LOG_KERN:
-			{
-				return "kern";
-			}
-		case LOG_LPR:
-			{
-				return "lpr";
-			}
-		case LOG_MAIL:
-			{
-				return "mail";
-			}
+        case LOG_KERN:
+            {
+                return "kern";
+            }
+        case LOG_LPR:
+            {
+                return "lpr";
+            }
+        case LOG_MAIL:
+            {
+                return "mail";
+            }
 #ifdef __APPLE__
-		case LOG_NETINFO:
-			{
-				return "netinfo" ;
-			}
-		case LOG_RAS:
-			{
-				return "ras";
-			}
-		case LOG_REMOTEAUTH:
-			{
-				return "remoteauth";
-			}
+        case LOG_NETINFO:
+            {
+                return "netinfo" ;
+            }
+        case LOG_RAS:
+            {
+                return "ras";
+            }
+        case LOG_REMOTEAUTH:
+            {
+                return "remoteauth";
+            }
 #endif
-		case LOG_NEWS:
-			{
-				return "news";
-			}
+        case LOG_NEWS:
+            {
+                return "news";
+            }
 #ifdef __FreeBSD__
-		case LOG_NTP:
-			{
-				return "ntp" ;
-			}
-		case LOG_SECURITY:
-			{
-				return "security";
-			}
+        case LOG_NTP:
+            {
+                return "ntp" ;
+            }
+        case LOG_SECURITY:
+            {
+                return "security";
+            }
 #endif
-		case LOG_SYSLOG:
-			{
-				return "syslog";
-			}
-		case LOG_USER:
-			{
-				return "user";
-			}
-		case LOG_UUCP:
-			{
-				return "uucp";
-			}
-		case LOG_LOCAL0:
-			{
-				return "local0";
-			}
-		case LOG_LOCAL1:
-			{
-				return "local1";
-			}
-		case LOG_LOCAL2:
-			{
-				return "local2";
-			}
-		case LOG_LOCAL3:
-			{
-				return "local3";
-			}
-		case LOG_LOCAL4:
-			{
-				return "local4" ;
-			}
-		case LOG_LOCAL5:
-			{
-				return "local5";
-			}
-		case LOG_LOCAL6:
-			{
-				return "local6";
-			}
-		case LOG_LOCAL7:
-			{
-				return "local7" ;
-			}
+        case LOG_SYSLOG:
+            {
+                return "syslog";
+            }
+        case LOG_USER:
+            {
+                return "user";
+            }
+        case LOG_UUCP:
+            {
+                return "uucp";
+            }
+        case LOG_LOCAL0:
+            {
+                return "local0";
+            }
+        case LOG_LOCAL1:
+            {
+                return "local1";
+            }
+        case LOG_LOCAL2:
+            {
+                return "local2";
+            }
+        case LOG_LOCAL3:
+            {
+                return "local3";
+            }
+        case LOG_LOCAL4:
+            {
+                return "local4" ;
+            }
+        case LOG_LOCAL5:
+            {
+                return "local5";
+            }
+        case LOG_LOCAL6:
+            {
+                return "local6";
+            }
+        case LOG_LOCAL7:
+            {
+                return "local7" ;
+            }
 #ifdef __APPLE__
-		case LOG_LAUNCHD:
-			{
-				return "launchd";
-			}
+        case LOG_LAUNCHD:
+            {
+                return "launchd";
+            }
 #endif
-	}
+    }
 
-	return defvalue;
-}	
+    return defvalue;
+}
 */
 
 // ----------------------------------------------------------------------------
@@ -486,7 +494,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         filename = "/dev/null";
         devnull = 1;
 
-	syslog_init();
+    syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
     }
     else if(enabled_syslog) *enabled_syslog = 0;
@@ -562,6 +570,11 @@ void reopen_all_log_files() {
     if(stderr_filename)
         open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
+#ifdef ENABLE_ACLK
+    if (aclklog_enabled)
+        aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
+#endif
+
     if(stdaccess_filename)
          stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
@@ -572,6 +585,12 @@ void open_all_log_files() {
 
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
     open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+
+#ifdef ENABLE_ACLK
+    if(aclklog_enabled)
+        aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
+#endif
+
     stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
 
@@ -607,13 +626,15 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION reset for process '%s' (prevented %lu logs in the last %ld seconds).\n"
-                    , date
-                    , program_name
-                    , program_name
-                    , prevented
-                    , now - start
-            );
+            fprintf(
+                stderr,
+                "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
+                "(prevented %lu logs in the last %"PRId64" seconds).\n",
+                date,
+                program_name,
+                program_name,
+                prevented,
+                (int64_t)(now - start));
         }
 
         start = now;
@@ -628,13 +649,15 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
-                    , date
-                    , program_name
-                    , program_name
-                    , prevented
-                    , error_log_throttle_period
-            );
+            fprintf(
+                stderr,
+                "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
+                "(prevented %lu logs in the last %"PRId64" seconds).\n",
+                date,
+                program_name,
+                program_name,
+                prevented,
+                (int64_t)error_log_throttle_period);
         }
 
         // restart the period accounting
@@ -650,15 +673,18 @@ int error_log_limit(int reset) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
-                    , date
-                    , program_name
-                    , counter
-                    , now - start
-                    , error_log_errors_per_period
-                    , error_log_throttle_period
-                    , program_name
-                    , start + error_log_throttle_period - now);
+            fprintf(
+                stderr,
+                "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
+                "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
+                date,
+                program_name,
+                counter,
+                (int64_t)(now - start),
+                error_log_errors_per_period,
+                (int64_t)error_log_throttle_period,
+                program_name,
+                (int64_t)(start + error_log_throttle_period - now));
         }
 
         prevented++;
@@ -674,6 +700,26 @@ int error_log_limit(int reset) {
     return 0;
 }
 
+void error_log_limit_reset(void) {
+    log_lock();
+
+    error_log_errors_per_period = error_log_errors_per_period_backup;
+    error_log_limit(1);
+
+    log_unlock();
+}
+
+void error_log_limit_unlimited(void) {
+    log_lock();
+
+    error_log_errors_per_period = error_log_errors_per_period_backup;
+    error_log_limit(1);
+
+    error_log_errors_per_period = ((error_log_errors_per_period_backup * 10) < 10000) ? 10000 : (error_log_errors_per_period_backup * 10);
+
+    log_unlock();
+}
+
 // ----------------------------------------------------------------------------
 // debug log
 
@@ -684,7 +730,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
     log_date(date, LOG_DATE_LENGTH);
 
     va_start( args, fmt );
-    printf("%s: %s DEBUG : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
+    printf("%s: %s DEBUG : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
     vprintf(fmt, args);
     va_end( args );
     putchar('\n');
@@ -701,12 +747,17 @@ void debug_int( const char *file, const char *function, const unsigned long line
 // ----------------------------------------------------------------------------
 // info log
 
-void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
+void info_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
     va_list args;
 
+    log_lock();
+
     // prevent logging too much
-    if(error_log_limit(0)) return;
+    if (error_log_limit(0)) {
+        log_unlock();
+        return;
+    }
 
     if(error_log_syslog) {
         va_start( args, fmt );
@@ -717,11 +768,12 @@ void info_int( const char *file, const char *function, const unsigned long line,
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH);
 
-    log_lock();
-
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s INFO  : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
-    else            fprintf(stderr, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
+#ifdef NETDATA_INTERNAL_CHECKS
+    fprintf(stderr, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
+#else
+    fprintf(stderr, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
+#endif
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -755,14 +807,19 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #error "cannot detect the format of function strerror_r()"
 #endif
 
-void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+void error_int( const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
 
     va_list args;
 
+    log_lock();
+
     // prevent logging too much
-    if(error_log_limit(0)) return;
+    if (error_log_limit(0)) {
+        log_unlock();
+        return;
+    }
 
     if(error_log_syslog) {
         va_start( args, fmt );
@@ -773,11 +830,12 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH);
 
-    log_lock();
-
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s %-5.5s : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
-    else            fprintf(stderr, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
+#ifdef NETDATA_INTERNAL_CHECKS
+    fprintf(stderr, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+#else
+    fprintf(stderr, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
+#endif
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -819,8 +877,11 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
-    else            fprintf(stderr, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
+#ifdef NETDATA_INTERNAL_CHECKS
+    fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
+#else
+    fprintf(stderr, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
+#endif
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -870,3 +931,22 @@ void log_access( const char *fmt, ... ) {
             netdata_mutex_unlock(&access_mutex);
     }
 }
+
+#ifdef ENABLE_ACLK
+void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name) {
+    if (aclklog) {
+        static netdata_mutex_t aclklog_mutex = NETDATA_MUTEX_INITIALIZER;
+        netdata_mutex_lock(&aclklog_mutex);
+
+        char date[LOG_DATE_LENGTH];
+        log_date(date, LOG_DATE_LENGTH);
+        fprintf(aclklog, "%s: %s Msg:\"%s\", MQTT-topic:\"%s\": ", date, tx ? "OUTGOING" : "INCOMING", message_name, mqtt_topic);
+
+        fwrite(data, data_len, 1, aclklog);
+
+        fputc('\n', aclklog);
+
+        netdata_mutex_unlock(&aclklog_mutex);
+    }
+}
+#endif

@@ -13,3 +13,10 @@ void set_timeval_from_google_timestamp(const google::protobuf::Timestamp &ts, st
     tv->tv_sec = ts.seconds();
     tv->tv_usec = ts.nanos()/1000;
 }
+
+int label_add_to_map_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    (void)ls;
+    auto map = (google::protobuf::Map<std::string, std::string> *)data;
+    map->insert({name, value});
+    return 1;
+}

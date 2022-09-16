@@ -33,9 +33,21 @@ NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user ru
 
 3.  Run `netdata-uninstaller.sh` as follows
 
-```sh
-${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --env <environment_file>
-```
+    3.1 **Interactive mode (Default)**
+
+    The default mode in the uninstaller script is **interactive**. This means that the script provides the user the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each Netdata asset in the filesystem.
+
+    ```sh
+    ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --env <environment_file>
+    ```
+
+    3.2 **Non-interactive mode**
+
+    If you are sure and you know what you are doing, you can speed up the removal of the Netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the Netdata assets in a **non-interactive** mode.
+
+    ```sh
+    ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env <environment_file>
+    ```
 
 Note: Existing installations may still need to download the file if it's not present. To execute uninstall in that case,
 run the following commands:
@@ -51,4 +63,4 @@ The default `environment_file` is `/etc/netdata/.environment`.
 > Note: This uninstallation method assumes previous installation with `netdata-installer.sh` or the kickstart script.
 > Currently using it when Netdata was installed by a package manager can work or cause unexpected results.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FUNINSTALL&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

@@ -25,7 +25,6 @@ pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 Then run the following commands to download various dependencies from the FreeBSD repository.
 
 ```sh
-pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/Judy-1.0.5_3.txz
 pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/json-c-0.15_1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-certifi-2021.10.8.txz
 pkg add http://pkg.freebsd.org/FreeBSD:12:amd64/latest/All/py38-asn1crypto-1.4.0.txz
@@ -81,4 +80,4 @@ workaround from <https://redmine.pfsense.org/issues/6643>
 
 **Note:** In pfSense, the Netdata configuration files are located under `/usr/local/etc/netdata`.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fpfsense&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

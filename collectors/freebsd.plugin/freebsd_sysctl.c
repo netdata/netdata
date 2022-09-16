@@ -178,15 +178,15 @@ int do_vm_loadavg(int update_every, usec_t dt){
 
 int do_vm_vmtotal(int update_every, usec_t dt) {
     (void)dt;
-    static int do_all_processes = -1, do_processes = -1, do_committed = -1;
+    static int do_all_processes = -1, do_processes = -1, do_mem_real = -1;
 
     if (unlikely(do_all_processes == -1)) {
         do_all_processes    = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
         do_processes        = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
-        do_committed        = config_get_boolean("plugin:freebsd:vm.vmtotal", "committed memory", 1);
+        do_mem_real         = config_get_boolean("plugin:freebsd:vm.vmtotal", "real memory", 1);
     }
 
-    if (likely(do_all_processes | do_processes | do_committed)) {
+    if (likely(do_all_processes | do_processes | do_mem_real)) {
         static int mib[2] = {0, 0};
         struct vmtotal vmtotal_data;
 
@@ -195,8 +195,8 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
             error("DISABLED: system.active_processes chart");
             do_processes = 0;
             error("DISABLED: system.processes chart");
-            do_committed = 0;
-            error("DISABLED: mem.committed chart");
+            do_mem_real = 0;
+            error("DISABLED: mem.real chart");
             error("DISABLED: vm.vmtotal module");
             return 1;
         } else {
@@ -264,18 +264,18 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (likely(do_committed)) {
+            if (likely(do_mem_real)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd = NULL;
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "mem",
-                            "committed",
+                            "real",
                             NULL,
                             "system",
                             NULL,
-                            "Committed (Allocated) Memory",
+                            "Total Real Memory In Use",
                             "MiB",
                             "freebsd.plugin",
                             "vm.vmtotal",
@@ -285,7 +285,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                     );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rd = rrddim_add(st, "Committed_AS", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                    rd = rrddim_add(st, "used", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -972,8 +972,14 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 
 int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
-               mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
+    static int mib_active_count[4] = {0, 0, 0, 0},
+               mib_inactive_count[4] = {0, 0, 0, 0},
+               mib_wire_count[4] = {0, 0, 0, 0},
+#if __FreeBSD_version < 1200016
+               mib_cache_count[4] = {0, 0, 0, 0},
+#endif
+               mib_vfs_bufspace[2] = {0, 0},
+               mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
     size_t vfs_bufspace_count;
 
@@ -999,9 +1005,9 @@ int do_system_ram(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        static RRDSET *st = NULL;
+        static RRDSET *st = NULL, *st_mem_available = NULL;
         static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL, *rd_wired = NULL,
-                      *rd_cache = NULL, *rd_buffers = NULL;
+                      *rd_cache = NULL, *rd_buffers = NULL, *rd_avail = NULL;
 
 #if defined(NETDATA_COLLECT_LAUNDRY)
         static RRDDIM *rd_laundry = NULL;
@@ -1026,10 +1032,8 @@ int do_system_ram(int update_every, usec_t dt) {
             rd_free     = rrddim_add(st, "free",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             rd_active   = rrddim_add(st, "active",   NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             rd_inactive = rrddim_add(st, "inactive", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-            rd_wired    = rrddim_add(st, "wired",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-#if __FreeBSD_version < 1200016
-            rd_cache    = rrddim_add(st, "cache",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-#endif
+            rd_wired    = rrddim_add(st, "wired",    NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            rd_cache    = rrddim_add(st, "cache",    NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #if defined(NETDATA_COLLECT_LAUNDRY)
             rd_laundry  = rrddim_add(st, "laundry",  NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #endif
@@ -1040,15 +1044,45 @@ int do_system_ram(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_free,     vmmeter_data.v_free_count);
         rrddim_set_by_pointer(st, rd_active,   vmmeter_data.v_active_count);
         rrddim_set_by_pointer(st, rd_inactive, vmmeter_data.v_inactive_count);
-        rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count);
+        rrddim_set_by_pointer(st, rd_wired,    (unsigned long long)vmmeter_data.v_wire_count * (unsigned long long)system_pagesize - zfs_arcstats_shrinkable_cache_size_bytes);
 #if __FreeBSD_version < 1200016
-        rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count);
+        rrddim_set_by_pointer(st, rd_cache,    (unsigned long long)vmmeter_data.v_cache_count * (unsigned long long)system_pagesize + zfs_arcstats_shrinkable_cache_size_bytes);
+#else
+        rrddim_set_by_pointer(st, rd_cache,    zfs_arcstats_shrinkable_cache_size_bytes);
 #endif
 #if defined(NETDATA_COLLECT_LAUNDRY)
         rrddim_set_by_pointer(st, rd_laundry,  vmmeter_data.v_laundry_count);
 #endif
         rrddim_set_by_pointer(st, rd_buffers,  vfs_bufspace_count);
         rrdset_done(st);
+
+        if (unlikely(!st_mem_available)) {
+            st_mem_available = rrdset_create_localhost(
+                    "mem",
+                    "available",
+                    NULL,
+                    "system",
+                    NULL,
+                    "Available RAM for applications",
+                    "MiB",
+                    "freebsd.plugin",
+                    "system.ram",
+                    NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE,
+                    update_every,
+                    RRDSET_TYPE_AREA
+            );
+
+            rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st_mem_available);
+
+#if __FreeBSD_version < 1200016
+        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + vmmeter_data.v_cache_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
+#else
+        rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
+#endif
+
+        rrdset_done(st_mem_available);
     }
 
     return 0;

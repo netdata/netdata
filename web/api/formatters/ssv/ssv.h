@@ -5,6 +5,6 @@
 
 #include "../rrd2json.h"
 
-extern void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix);
+extern void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix, RRDDIM *temp_rd);
 
 #endif //NETDATA_API_FORMATTER_SSV_H

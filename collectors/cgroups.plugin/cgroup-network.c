@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 
 #ifdef HAVE_SETNS
 #ifndef _GNU_SOURCE
@@ -16,40 +17,6 @@ char *environment[] = {
         NULL
 };
 
-
-// ----------------------------------------------------------------------------
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
-    return;
-}
-
-// callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
-// ----------------------------------------------------------------------------
-
 struct iface {
     const char *device;
     uint32_t hash;
@@ -59,6 +26,14 @@ struct iface {
 
     struct iface *next;
 };
+
+unsigned int calc_num_ifaces(struct iface *root) {
+    unsigned int num = 0;
+    for (struct iface *h = root; h; h = h->next) {
+        num++;
+    }
+    return num;
+}
 
 unsigned int read_iface_iflink(const char *prefix, const char *iface) {
     if(!prefix) prefix = "";
@@ -480,6 +455,25 @@ void detect_veth_interfaces(pid_t pid) {
         goto cleanup;
     }
 
+     unsigned int host_dev_num = calc_num_ifaces(host);
+     unsigned int cgroup_dev_num = calc_num_ifaces(cgroup);
+    // host ifaces == guest ifaces => we are still in the host namespace
+    // and we can't really identify which ifaces belong to the cgroup (e.g. Proxmox VM).
+    if (host_dev_num == cgroup_dev_num) {
+        unsigned int m = 0;
+        for (h = host; h; h = h->next) {
+            for (c = cgroup; c; c = c->next) {
+                if (h->ifindex == c->ifindex && h->iflink == c->iflink) {
+                    m++;
+                    break;
+                }
+            }
+        }
+        if (host_dev_num == m) {
+            goto cleanup;
+        }
+    }
+
     for(h = host; h ; h = h->next) {
         if(iface_is_eligible(h)) {
             for (c = cgroup; c; c = c->next) {
@@ -512,7 +506,17 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     info("running: %s", command);
 
     pid_t cgroup_pid;
-    FILE *fp = mypopene(command, &cgroup_pid, environment);
+    FILE *fp;
+
+    if(cgroup) {
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
+    }
+    else {
+        char buffer[100];
+        snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
+        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
+    }
+
     if(fp) {
         char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
         char *s;
@@ -676,8 +680,13 @@ int main(int argc, char **argv) {
     if(argc != 3)
         usage();
 
-    if(!strcmp(argv[1], "-p") || !strcmp(argv[1], "--pid")) {
-        pid = atoi(argv[2]);
+    int arg = 1;
+    int helper = 1;
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+        helper = 0;
+
+    if(!strcmp(argv[arg], "-p") || !strcmp(argv[arg], "--pid")) {
+        pid = atoi(argv[arg+1]);
 
         if(pid <= 0) {
             errno = 0;
@@ -685,17 +694,17 @@ int main(int argc, char **argv) {
             return 2;
         }
 
-        call_the_helper(pid, NULL);
+        if(helper) call_the_helper(pid, NULL);
     }
-    else if(!strcmp(argv[1], "--cgroup")) {
-        char *cgroup = argv[2];
+    else if(!strcmp(argv[arg], "--cgroup")) {
+        char *cgroup = argv[arg+1];
         if(verify_path(cgroup) == -1) {
             error("cgroup '%s' does not exist or is not valid.", cgroup);
             return 1;
         }
 
         pid = read_pid_from_cgroup(cgroup);
-        call_the_helper(pid, cgroup);
+        if(helper) call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;

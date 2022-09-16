@@ -15,7 +15,7 @@
 #define ALLMETRICS_JSON                         3
 #define ALLMETRICS_PROMETHEUS_ALL_HOSTS         4
 
-extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb);
-extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
+extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb);
+extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb);
 
 #endif //NETDATA_API_ALLMETRICS_SHELL_H

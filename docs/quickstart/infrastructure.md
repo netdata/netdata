@@ -91,7 +91,7 @@ single-node dashboards in Netdata Cloud to drill down on specific issues, scrub 
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
 Read about the process in the [infrastructure
-overview](/docs/visualize/overview-infrastructure.md#single-node-dashboards) doc, then learn about [interacting with
+overview](/docs/visualize/overview-infrastructure.md#drill-down-with-single-node-dashboards) doc, then learn about [interacting with
 dashboards and charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
@@ -182,4 +182,4 @@ To change how the Netdata Agent runs on each node, dig in to configuration files
     GitHub](https://learn.netdata.cloud/docs/cloud/manage/sign-in)
 -   [Netdata Cloud · Nodes view](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fquickstart%2Finfrastructure&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

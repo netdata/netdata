@@ -4,4 +4,4 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-"${SCRIPT_DIR}/build-static.sh" x86_64
+"${SCRIPT_DIR}/build-static.sh" x86_64 "${@}"

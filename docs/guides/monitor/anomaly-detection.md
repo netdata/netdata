@@ -1,191 +1,75 @@
 <!--
-title: "Detect anomalies in systems and applications"
+title: "Machine learning (ML) powered anomaly detection"
 description: "Detect anomalies in any system, container, or application in your infrastructure with machine learning and the open-source Netdata Agent."
 image: /img/seo/guides/monitor/anomaly-detection.png
-author: "Joel Hans"
-author_title: "Editorial Director, Technical & Educational Resources"
-author_img: "/img/authors/joel-hans.jpg"
+author: "Andrew Maguire"
+author_title: "Analytics & ML Lead"
+author_img: "/img/authors/andy-maguire.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomaly-detection.md
 -->
 
-# Detect anomalies in systems and applications
 
-Beginning with v1.27, the [open-source Netdata Agent](https://github.com/netdata/netdata) is capable of unsupervised
-[anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) with machine learning (ML). As with all things
-Netdata, the anomalies collector comes with preconfigured alarms and instant visualizations that require no query
-languages or organizing metrics. You configure the collector to look at specific charts, and it handles the rest.
 
-Netdata's implementation uses a handful of functions in the [Python Outlier Detection (PyOD)
-library](https://github.com/yzhao062/pyod/tree/master), which periodically runs a `train` function that learns what
-"normal" looks like on your node and creates an ML model for each chart, then utilizes the
-[`predict_proba()`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba) and
-[`predict()`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict) PyOD functions to
-quantify how anomalous certain charts are.
+## Overview
 
-All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud). If
-you choose to sign up for Netdata Cloud and [coonect your nodes](/claim/README.md), you will have the ability to run
-tailored anomaly detection on every node in your infrastructure, regardless of its purpose or workload.
+As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0), Netdata comes with some ML powered [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) capabilities built into it and available to use out of the box, with zero configuration required (ML was enabled by default in `v1.35.0-29-nightly` in [this PR](https://github.com/netdata/netdata/pull/13158), previously it required a one line config change).
 
-In this guide, you'll learn how to set up the anomalies collector to instantly detect anomalies in an Nginx web server
-and/or the node that hosts it, which will give you the tools to configure parallel unsupervised monitors for any
-application in your infrastructure. Let's get started.
+This means that in addition to collecting raw value metrics, the Netdata agent will also produce an [`anomaly-bit`](https://learn.netdata.cloud/docs/agent/ml#anomaly-bit---100--anomalous-0--normal) every second which will be `100` when recent raw metric values are considered anomalous by Netdata and `0` when they look normal. Once we aggregate beyond one second intervals this aggregated `anomaly-bit` becomes an ["anomaly rate"](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate---averageanomaly-bit).
 
-![Example anomaly detection with an Nginx web
-server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea2-11eb-944e-46edd3f83e3a.png)
+To be as concrete as possible, the below api call shows how to access the raw anomaly bit of the `system.cpu` chart from the [london.my-netdata.io](https://london.my-netdata.io) Netdata demo server. Passing `options=anomaly-bit` returns the anomay bit instead of the raw metric value.
 
-## Prerequisites
-
-- A node running the Netdata Agent. If you don't yet have that, [get Netdata](/docs/get-started.mdx).
-- A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
-- Familiarity with configuring the Netdata Agent with [`edit-config`](/docs/configure/nodes.md).
-- _Optional_: An Nginx web server running on the same node to follow the example configuration steps.
-
-## Install required Python packages
-
-The anomalies collector uses a few Python packages, available with `pip3`, to run ML training. It requires
-[`numba`](http://numba.pydata.org/), [`scikit-learn`](https://scikit-learn.org/stable/),
-[`pyod`](https://pyod.readthedocs.io/en/latest/), in addition to
-[`netdata-pandas`](https://github.com/netdata/netdata-pandas), which is a package built by the Netdata team to pull data
-from a Netdata Agent's API into a [Pandas](https://pandas.pydata.org/). Read more about `netdata-pandas` on its [package
-repo](https://github.com/netdata/netdata-pandas) or in Netdata's [community
-repo](https://github.com/netdata/community/tree/main/netdata-agent-api/netdata-pandas).
-
-```bash
-# Become the netdata user
-sudo su -s /bin/bash netdata
-
-# Install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.38 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+```
+https://london.my-netdata.io/api/v1/data?chart=system.cpu&options=anomaly-bit
 ```
 
-> If the `pip3` command fails, you need to install it. For example, on an Ubuntu system, use `sudo apt install
-> python3-pip`.
+If we aggregate the above to just 1 point by adding `points=1` we get an "[Anomaly Rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate---averageanomaly-bit)":
 
-Use `exit` to become your normal user again.
-
-## Enable the anomalies collector
-
-Navigate to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config`
-to open the `python.d.conf` file.
-
-```bash
-sudo ./edit-config python.d.conf
+```
+https://london.my-netdata.io/api/v1/data?chart=system.cpu&options=anomaly-bit&points=1
 ```
 
-In `python.d.conf` file, search for the `anomalies` line. If the line exists, set the value to `yes`. Add the line
-yourself if it doesn't already exist. Either way, the final result should look like:
+The fundamentals of Netdata's anomaly detection approach and implmentation are covered in lots more detail in the [agent ML documentation](https://learn.netdata.cloud/docs/agent/ml). 
 
-```conf
-anomalies: yes
-```
+This guide will explain how to get started using these ML based anomaly detection capabilities within Netdata.
 
-[Restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system, to start up the anomalies collector. By default, the
-model training process runs every 30 minutes, and uses the previous 4 hours of metrics to establish a baseline for
-health and performance across the default included charts.
+## Anomaly Advisor
 
-> 💡 The anomaly collector may need 30-60 seconds to finish its initial training and have enough data to start
-> generating anomaly scores. You may need to refresh your browser tab for the **Anomalies** section to appear in menus
-> on both the local Agent dashboard or Netdata Cloud.
+The [Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor) is the flagship anomaly detection feature within Netdata. In the "Anomalies" tab of Netdata you will see an overall "Anomaly Rate" chart that aggregates node level anomaly rate for all nodes in a space. The aim of this chart is to make it easy to quickly spot periods of time where the overall "[node anomaly rate](https://learn.netdata.cloud/docs/agent/ml#node-anomaly-rate)" is evelated in some unusual way and for what node or nodes this relates to.
 
-## Configure the anomalies collector
+![image](https://user-images.githubusercontent.com/2178292/175928290-490dd8b9-9c55-4724-927e-e145cb1cc837.png)
 
-Open `python.d/anomalies.conf` with `edit-conf`.
+Once an area on the Anomaly Rate chart is highlighted netdata will append a "heatmap" to the bottom of the screen that shows which metrics were more anomalous in the highlighted timeframe. Each row in the heatmap consists of an anomaly rate sparkline graph that can be expanded to reveal the raw underlying metric chart for that dimension.
 
-```bash
-sudo ./edit-config python.d/anomalies.conf
-```
+![image](https://user-images.githubusercontent.com/2178292/175929162-02c8fe69-cc4f-4cf4-9b3a-a5e559a6feca.png)
 
-The file contains many user-configurable settings with sane defaults. Here are some important settings that don't
-involve tweaking the behavior of the ML training itself.
+## Embedded Anomaly Rate Charts
 
-- `charts_regex`: Which charts to train models for and run anomaly detection on, with each chart getting a separate
-  model.
-- `charts_to_exclude`: Specific charts, selected by the regex in `charts_regex`, to exclude.
-- `train_every_n`: How often to train the ML models.
-- `train_n_secs`: The number of historical observations to train each model on. The default is 4 hours, but if your node
-  doesn't have historical metrics going back that far, consider [changing the metrics retention
-  policy](/docs/store/change-metrics-storage.md) or reducing this window.
-- `custom_models`: A way to define custom models that you want anomaly probabilities for, including multi-node or
-  streaming setups.
+Charts in both the [Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview) and [single node dashboard](https://learn.netdata.cloud/docs/cloud/visualize/overview#jump-to-single-node-dashboards) tabs also expose the underlying anomaly rates for each dimension so users can easily see if the raw metrics are considered anomalous or not by Netdata.
 
-> ⚠️ Setting `charts_regex` with many charts or `train_n_secs` to a very large number will have an impact on the
-> resources and time required to train a model for every chart. The actual performance implications depend on the
-> resources available on your node. If you plan on changing these settings beyond the default, or what's mentioned in
-> this guide, make incremental changes to observe the performance impact. Considering `train_max_n` to cap the number of
-> observations actually used to train on.
+Pressing the anomalies icon (next to the information icon in the chart header) will expand the anomaly rate chart to make it easy to see how the anomaly rate for any individual dimension corresponds to the raw underlying data. In the example below we can see that the spike in `system.pgpgio|in` corresponded in the anomaly rate for that dimension jumping to 100% for a small period of time until the spike passed.
 
-### Run anomaly detection on Nginx and log file metrics
+![image](https://user-images.githubusercontent.com/2178292/175933078-5dd951ff-7709-4bb9-b4be-34199afb3945.png)
 
-As mentioned above, this guide uses an Nginx web server to demonstrate how the anomalies collector works. You must
-configure the collector to monitor charts from the
-[Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) and [web
-log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog) collectors.
+## Anomaly Rate Based Alerts
 
-`charts_regex` allows for some basic regex, such as wildcards (`*`) to match all contexts with a certain pattern. For
-example, `system\..*` matches with any chart with a context that begins with `system.`, and ends in any number of other
-characters (`.*`). Note the escape character (`\`) around the first period to capture a period character exactly, and
-not any character.
+It is possible to use the `anomaly-bit` when defining traditional Alerts within netdata. The `anomaly-bit` is just another `options` parameter that can be passed as part of an [alarm line lookup](https://learn.netdata.cloud/docs/agent/health/reference#alarm-line-lookup). 
 
-Change `charts_regex` in `anomalies.conf` to the following:
+You can see some example ML based alert configurations below:
 
-```conf
-    charts_regex: 'system\..*|nginx_local\..*|web_log_nginx\..*|apps.cpu|apps.mem'
-```
+- [Anomaly rate based CPU dimensions alarm](https://learn.netdata.cloud/docs/agent/health/reference#example-8---anomaly-rate-based-cpu-dimensions-alarm)
+- [Anomaly rate based CPU chart alarm](https://learn.netdata.cloud/docs/agent/health/reference#example-9---anomaly-rate-based-cpu-chart-alarm)
+- [Anomaly rate based node level alarm](https://learn.netdata.cloud/docs/agent/health/reference#example-10---anomaly-rate-based-node-level-alarm)
+- More examples in the [`/health/health.d/ml.conf`](https://github.com/netdata/netdata/blob/master/health/health.d/ml.conf) file that ships with the agent.
 
-This value tells the anomaly collector to train against every `system.` chart, every `nginx_local` chart, every
-`web_log_nginx` chart, and specifically the `apps.cpu` and `apps.mem` charts.
+## Learn More
 
-![The anomalies collector chart with many
-dimensions](https://user-images.githubusercontent.com/1153921/102813877-db5e4880-4386-11eb-8040-d7a1d7a476bb.png)
+Check out the resources below to learn more about how Netdata is approaching ML:
 
-### Remove some metrics from anomaly detection
-
-As you can see in the above screenshot, this node is now looking for anomalies in many places. The result is a single
-`anomalies_local.probability` chart with more than twenty dimensions, some of which the dashboard hides at the bottom of
-a scroll-able area. In addition, training and analyzing the anomaly collector on many charts might require more CPU
-utilization that you're willing to give.
-
-First, explicitly declare which `system.` charts to monitor rather than of all of them using regex (`system\..*`).
-
-```conf
-    charts_regex: 'system\.cpu|system\.load|system\.io|system\.net|system\.ram|nginx_local\..*|web_log_nginx\..*|apps.cpu|apps.mem'
-```
-
-Next, remove some charts with the `charts_to_exclude` setting. For this example, using an Nginx web server, focus on the
-volume of requests/responses, not, for example, which type of 4xx response a user might receive.
-
-```conf
-    charts_to_exclude: 'web_log_nginx.excluded_requests,web_log_nginx.responses_by_status_code_class,web_log_nginx.status_code_class_2xx_responses,web_log_nginx.status_code_class_4xx_responses,web_log_nginx.current_poll_uniq_clients,web_log_nginx.requests_by_http_method,web_log_nginx.requests_by_http_version,web_log_nginx.requests_by_ip_proto'
-```
-
-![The anomalies collector with less
-dimensions](https://user-images.githubusercontent.com/1153921/102820642-d69f9180-4392-11eb-91c5-d3d166d40105.png)
-
-Apply the ideas behind the collector's regex and exclude settings to any other
-[system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), or
-[application](/docs/collect/application-metrics.md) metrics you want to detect anomalies for.
-
-## What's next?
-
-Now that you know how to set up unsupervised anomaly detection in the Netdata Agent, using an Nginx web server as an
-example, it's time to apply that knowledge to other mission-critical parts of your infrastructure. If you're not sure
-what to monitor next, check out our list of [collectors](/collectors/COLLECTORS.md) to see what kind of metrics Netdata
-can collect from your systems, containers, and applications.
-
-Keep on moving to [part 2](/docs/guides/monitor/visualize-monitor-anomalies.md), which covers the charts and alarms
-Netdata creates for unsupervised anomaly detection.
-
-For a different troubleshooting experience, try out the [Metric
-Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) feature in Netdata Cloud. Metric
-Correlations helps you perform faster root cause analysis by narrowing a dashboard to only the charts most likely to be
-related to an anomaly.
-
-### Related reference documentation
-
-- [Netdata Agent · Anomalies collector](/collectors/python.d.plugin/anomalies/README.md)
-- [Netdata Agent · Nginx collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx)
-- [Netdata Agent · web log collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog)
-- [Netdata Cloud · Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations)
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fanomaly-detectionl&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+- [Agent ML documentation](https://learn.netdata.cloud/docs/agent/ml).
+- [Anomaly Advisor documentation](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor).
+- [Metric Correlations documentation](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations).
+- Anomaly Advisor [launch blog post](https://www.netdata.cloud/blog/introducing-anomaly-advisor-unsupervised-anomaly-detection-in-netdata/).
+- Netdata Approach to ML [blog post](https://www.netdata.cloud/blog/our-approach-to-machine-learning/).
+- `areal/ml` related [GitHub Discussions](https://github.com/netdata/netdata/discussions?discussions_q=label%3Aarea%2Fml).
+- Netdata Machine Learning Meetup [deck](https://docs.google.com/presentation/d/1rfSxktg2av2k-eMwMbjN0tXeo76KC33iBaxerYinovs/edit?usp=sharing) and [YouTube recording](https://www.youtube.com/watch?v=eJGWZHVQdNU).
+- Netdata Anomaly Advisor [YouTube Playlist](https://youtube.com/playlist?list=PL-P-gAHfL2KPeUcCKmNHXC-LX-FfdO43j). 

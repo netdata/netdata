@@ -12,27 +12,48 @@ namespace ml {
 
 class RrdDimension {
 public:
-    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->state->query_ops) {
-        std::stringstream SS;
-        SS << RD->rrdset->id << "|" << RD->name;
-        ID = SS.str();
-    }
+    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->tiers[0]->query_ops) { }
 
     RRDDIM *getRD() const { return RD; }
 
-    time_t latestTime() { return Ops->latest_time(RD); }
+    time_t latestTime() { return Ops->latest_time(RD->tiers[0]->db_metric_handle); }
 
-    time_t oldestTime() { return Ops->oldest_time(RD); }
+    time_t oldestTime() { return Ops->oldest_time(RD->tiers[0]->db_metric_handle); }
 
     unsigned updateEvery() const { return RD->update_every; }
 
-    const std::string getID() const { return ID; }
+    const std::string getID() const {
+        RRDSET *RS = RD->rrdset;
+
+        std::stringstream SS;
+        SS << rrdset_context(RS) << "|" << rrdset_id(RS) << "|" << rrddim_name(RD);
+        return SS.str();
+    }
+
+    bool isActive() const {
+        if (rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE))
+            return false;
+
+        if (rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE))
+            return false;
+
+        return true;
+    }
+
+    void setAnomalyRateRD(RRDDIM *ARRD) { AnomalyRateRD = ARRD; }
+    RRDDIM *getAnomalyRateRD() const { return AnomalyRateRD; }
+
+    void setAnomalyRateRDName(const char *Name) const {
+        rrddim_set_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
+    }
 
     virtual ~RrdDimension() {}
 
 private:
     RRDDIM *RD;
-    struct rrddim_volatile::rrddim_query_ops *Ops;
+    RRDDIM *AnomalyRateRD;
+
+    struct rrddim_query_ops *Ops;
 
     std::string ID;
 };
@@ -55,14 +76,13 @@ public:
     }
 
     bool shouldTrain(const TimePoint &TP) const {
+        if (ConstantModel)
+            return false;
+
         return (LastTrainedAt + TrainEvery) < TP;
     }
 
     bool isTrained() const { return Trained; }
-
-    double updateTrainingDuration(double Duration) {
-        return TrainingDuration.exchange(Duration);
-    }
 
 private:
     std::pair<CalculatedNumber *, size_t> getCalculatedNumbers();
@@ -70,12 +90,14 @@ private:
 public:
     TimePoint LastTrainedAt{Seconds{0}};
 
+protected:
+    std::atomic<bool> ConstantModel{false};
+
 private:
     Seconds TrainEvery;
     KMeans KM;
 
     std::atomic<bool> Trained{false};
-    std::atomic<double> TrainingDuration{0.0};
 };
 
 class PredictableDimension : public TrainableDimension {
@@ -88,9 +110,20 @@ public:
 
     bool isAnomalous() { return AnomalyBit; }
 
+    void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous) {
+        AnomalyBitCounter += IsAnomalous;
+
+        if (Elapsed == Cfg.DBEngineAnomalyRateEvery) {
+            double AR = static_cast<double>(AnomalyBitCounter) / Cfg.DBEngineAnomalyRateEvery;
+            rrddim_set_by_pointer(RS, getAnomalyRateRD(), AR * 1000);
+            AnomalyBitCounter = 0;
+        }
+    }
+
 private:
     CalculatedNumber AnomalyScore{0.0};
     std::atomic<bool> AnomalyBit{false};
+    unsigned AnomalyBitCounter{0};
 
     std::vector<CalculatedNumber> CNs;
 };

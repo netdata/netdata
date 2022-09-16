@@ -68,8 +68,9 @@ link](/packaging/installer/README.md), the Netdata devs give us several one-line
 any issues with these one liners and their bootstrapping scripts so far (If you guys run into anything do share). Run
 the following command in your container.
 
+<!-- candidate for reuse -->
 ```sh
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-wait
 ```
 
 After the install completes you should be able to hit the Netdata dashboard at <http://localhost:19999/> (replace
@@ -99,7 +100,7 @@ reading to migrate this tutorial to a VM or Server of any sort.
 Let's start another container in the same fashion as we did the Netdata container. 
 
 ```sh
-docker run -it --name prometheus --hostname prometheus
+docker run -it --name prometheus --hostname prometheus \
 --network=netdata-tutorial -p 9090:9090  centos:latest '/bin/bash'
 ``` 
 
@@ -108,6 +109,12 @@ files later in this tutorial.
 
 ```sh
 yum install vim -y
+```
+
+You will also need `wget` and `curl` to download files and `sudo` if you are not root.
+
+```sh
+yum install curl sudo wget -y
 ```
 
 Prometheus provides a tarball of their latest stable versions [here](https://prometheus.io/download/).
@@ -129,7 +136,7 @@ This should get Prometheus installed into the container. Let's test that we can 
 interface.
 
 ```sh
-/opt/prometheus/prometheus
+/opt/prometheus/prometheus --config.file=/opt/prometheus/prometheus.yml
 ```
 
 Now attempt to go to <http://localhost:9090/>. You should be presented with the Prometheus homepage. This is a good
@@ -216,7 +223,7 @@ the `chart` dimension. If you'd like you can combine the `chart` and `instance` 
 Let's give this a try: `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
 This is the basics of using Prometheus to query Netdata. I'd advise everyone at this point to read [this
-page](/exporting/prometheus/#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
+page](/exporting/prometheus/README.md#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
 its internal DB or can send metrics _as-collected_ by specifying the `source=as-collected` URL parameter like so.
 <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected> If you choose to use
 this method you will need to use Prometheus's set of functions here: <https://prometheus.io/docs/querying/functions/> to
@@ -256,4 +263,4 @@ achieved you do not have to think about the monitoring system until Prometheus c
 happens there are options presented in the Prometheus documentation for solving this. Hope this was helpful, happy
 monitoring.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

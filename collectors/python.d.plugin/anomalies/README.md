@@ -7,6 +7,8 @@ sidebar_url: Anomalies
 
 # Anomaly detection with Netdata
 
+**Note**: Check out the [Netdata Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor) for a more native anomaly detection experience within Netdata.
+
 This collector uses the Python [PyOD](https://pyod.readthedocs.io/en/latest/index.html) library to perform unsupervised [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) on your Netdata charts and/or dimensions.
 
 Instead of this collector just _collecting_ data, it also does some computation on the data it collects to return an anomaly probability and anomaly flag for each chart or custom model you define. This computation consists of a **train** function that runs every `train_n_secs` to train the ML models to learn what 'normal' typically looks like on your node. At each iteration there is also a **predict** function that uses the latest trained models and most recent metrics to produce an anomaly probability and anomaly flag for each chart or custom model you define.
@@ -229,6 +231,7 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 - If you activate this collector on a fresh node, it might take a little while to build up enough data to calculate a realistic and useful model.
 - Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relatively high `update_every` maybe 10, 15 or 30 in `anomalies.conf`.
 - Setting a higher `train_every_n` and `update_every` is an easy way to devote less resources on the node to anomaly detection. Specifying less charts and a lower `train_n_secs` will also help reduce resources at the expense of covering less charts and maybe a more noisy model if you set `train_n_secs` to be too small for how your node tends to behave.
+- If you would like to enable this on a Rasberry Pi, then check out [this guide](https://learn.netdata.cloud/guides/monitor/raspberry-pi-anomaly-detection) which will guide you through first installing LLVM.
 
 ## Useful links and further reading
 
@@ -240,4 +243,3 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 - Good [blog post](https://www.anodot.com/blog/what-is-anomaly-detection/) from Anodot on time series anomaly detection. Anodot also have some great whitepapers in this space too that some may find useful.
 - Novelty and outlier detection in the [scikit-learn documentation](https://scikit-learn.org/stable/modules/outlier_detection.html).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fanomalies%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

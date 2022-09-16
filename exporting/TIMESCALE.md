@@ -20,7 +20,7 @@ What's TimescaleDB? Here's how their team defines the project on their [GitHub p
 
 To get started archiving metrics to TimescaleDB right away, check out Mahlon's [`netdata-timescale-relay`
 repository](https://github.com/mahlonsmith/netdata-timescale-relay) on GitHub. Please be aware that backends subsystem
-is deprecated and Netdata configuration should be moved to the new `exporting conf` configuration file. Use
+was removed and Netdata configuration should be moved to the new `exporting.conf` configuration file. Use
 ```conf
 [json:my_instance]
 ```
@@ -66,4 +66,4 @@ blog](https://blog.timescale.com/blog/writing-it-metrics-from-netdata-to-timesca
 Thank you to Mahlon, Rune, TimescaleDB, and the members of the Netdata community that requested and then built this
 exporting connection between Netdata and TimescaleDB!
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2FTIMESCALE&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

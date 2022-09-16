@@ -168,14 +168,6 @@ extern "C" {
 // ----------------------------------------------------------------------------
 // netdata common definitions
 
-#if (SIZEOF_VOID_P == 8)
-#define ENVIRONMENT64
-#elif (SIZEOF_VOID_P == 4)
-#define ENVIRONMENT32
-#else
-#error "Cannot detect if this is a 32 or 64 bit CPU"
-#endif
-
 #ifdef __GNUC__
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
@@ -222,6 +214,76 @@ extern "C" {
 
 #define GUID_LEN 36
 
+// ---------------------------------------------------------------------------------------------
+// double linked list management
+
+#define DOUBLE_LINKED_LIST_PREPEND_UNSAFE(head, item, prev, next)                              \
+    do {                                                                                       \
+        (item)->next = (head);                                                                 \
+                                                                                               \
+        if(likely(head)) {                                                                     \
+            (item)->prev = (head)->prev;                                                       \
+            (head)->prev = (item);                                                             \
+        }                                                                                      \
+        else                                                                                   \
+            (item)->prev = (item);                                                             \
+                                                                                               \
+        (head) = (item);                                                                       \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_APPEND_UNSAFE(head, item, prev, next)                               \
+    do {                                                                                       \
+        if(likely(head)) {                                                                     \
+            (item)->prev = (head)->prev;                                                       \
+            (head)->prev->next = (item);                                                       \
+            (head)->prev = (item);                                                             \
+            (item)->next = NULL;                                                               \
+        }                                                                                      \
+        else {                                                                                 \
+            (head) = (item);                                                                   \
+            (head)->prev = (head);                                                             \
+            (head)->next = NULL;                                                               \
+        }                                                                                      \
+                                                                                               \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_REMOVE_UNSAFE(head, item, prev, next)                               \
+    do {                                                                                       \
+        fatal_assert((head) != NULL);                                                          \
+        fatal_assert((item)->prev != NULL);                                                    \
+                                                                                               \
+        if((item)->prev == (item)) {                                                           \
+            /* it is the only item in the list */                                              \
+            (head) = NULL;                                                                     \
+        }                                                                                      \
+        else if((item) == (head)) {                                                            \
+            /* it is the first item */                                                         \
+            (item)->next->prev = (item)->prev;                                                 \
+            (head) = (item)->next;                                                             \
+        }                                                                                      \
+        else {                                                                                 \
+            (item)->prev->next = (item)->next;                                                 \
+            if ((item)->next) {                                                                \
+                (item)->next->prev = (item)->prev;                                             \
+            }                                                                                  \
+            else {                                                                             \
+                (head)->prev = (item)->prev;                                                   \
+            }                                                                                  \
+        }                                                                                      \
+                                                                                               \
+        (item)->next = NULL;                                                                   \
+        (item)->prev = NULL;                                                                   \
+    } while (0)
+
+#define DOUBLE_LINKED_LIST_FOREACH_FORWARD(head, var, prev, next)                              \
+    for ((var) = (head); (var) ; (var) = (var)->next)
+
+#define DOUBLE_LINKED_LIST_FOREACH_BACKWARD(head, var, prev, next)                             \
+    for ((var) = (head)?(head)->prev:NULL; (var) && (var) != (head)->prev ; (var) = (var)->prev)
+
+// ---------------------------------------------------------------------------------------------
+
+
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
 
@@ -241,12 +303,15 @@ extern __thread size_t log_thread_memory_allocations;
 #define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
 #define reallocz(ptr, size) reallocz_int(__FILE__, __FUNCTION__, __LINE__, ptr, size)
 #define freez(ptr) freez_int(__FILE__, __FUNCTION__, __LINE__, ptr)
+#define log_allocations() log_allocations_int(__FILE__, __FUNCTION__, __LINE__)
 
 extern char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s);
 extern void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size);
 extern void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
 extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
 extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
+extern void log_allocations_int(const char *file, const char *function, const unsigned long line);
+
 #else // NETDATA_LOG_ALLOCATIONS
 extern char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
 extern void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
@@ -258,7 +323,7 @@ extern void freez(void *ptr);
 extern void json_escape_string(char *dst, const char *src, size_t size);
 extern void json_fix_string(char *s);
 
-extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
+extern void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
 extern int memory_file_save(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
@@ -274,7 +339,6 @@ extern int verify_netdata_host_prefix();
 extern int recursively_delete_dir(const char *path, const char *reason);
 
 extern volatile sig_atomic_t netdata_exit;
-extern const char *os_type;
 
 extern const char *program_version;
 
@@ -303,8 +367,26 @@ extern char *find_and_replace(const char *src, const char *find, const char *rep
 #define KILOBITS_IN_A_MEGABIT 1000
 
 /* misc. */
+
 #define UNUSED(x) (void)(x)
+
+#ifdef __GNUC__
+#define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
+#else
+#define UNUSED_FUNCTION(x) UNUSED_##x
+#endif
+
 #define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
+
+// Taken from linux kernel
+#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
+
+typedef struct bitmap256 {
+    uint64_t data[4];
+} BITMAP256;
+
+extern bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
+extern void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
@@ -318,6 +400,7 @@ extern char *netdata_configured_host_prefix;
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"
+#include "completion/completion.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS
@@ -338,9 +421,24 @@ extern char *netdata_configured_host_prefix;
 #include "json/json.h"
 #include "health/health.h"
 #include "string/utf8.h"
+#include "arrayalloc/arrayalloc.h"
+#include "onewayalloc/onewayalloc.h"
+#include "worker_utilization/worker_utilization.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
+
+#define RRD_STORAGE_TIERS 5
+
+static inline size_t struct_natural_alignment(size_t size) __attribute__((const));
+
+#define STRUCT_NATURAL_ALIGNMENT (sizeof(uintptr_t) * 2)
+static inline size_t struct_natural_alignment(size_t size) {
+    if(unlikely(size % STRUCT_NATURAL_ALIGNMENT))
+        size = size + STRUCT_NATURAL_ALIGNMENT - (size % STRUCT_NATURAL_ALIGNMENT);
+
+    return size;
+}
 
 # ifdef __cplusplus
 }

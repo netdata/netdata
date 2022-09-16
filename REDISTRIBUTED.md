@@ -180,4 +180,9 @@ connectivity is not available.
 
     Copyright 2015, Benedikt Schmitt [Unlicense License](https://unlicense.org/)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FREDISTRIBUTED&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+-   [Kolmogorov-Smirnov distribution](http://simul.iro.umontreal.ca/ksdir/)
+
+    Copyright March 2010 by Université de Montréal, Richard Simard and Pierre L'Ecuyer
+    [GPL 3.0](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+

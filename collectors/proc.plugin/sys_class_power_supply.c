@@ -112,6 +112,11 @@ void power_supply_free(struct power_supply *ps) {
     }
 }
 
+static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
+    rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
+    rrdcalc_update_rrdlabels(st);
+}
+
 int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
     static int do_capacity = -1, do_property[3] = {-1};
@@ -358,6 +363,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
+
+                add_labels_to_power_supply(ps, ps->capacity->st);
             }
             else
                 rrdset_next(ps->capacity->st);
@@ -389,6 +396,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
+
+                add_labels_to_power_supply(ps, pr->st);
             }
             else
                 rrdset_next(pr->st);

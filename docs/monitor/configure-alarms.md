@@ -117,7 +117,7 @@ Let's look into each of the lines to see how they create a working health entity
 -   `every`: How often to perform the `lookup` calculation to decide whether or not to trigger this alarm.
 -   `warn`/`crit`: The value at which Netdata should trigger a warning or critical alarm. This example uses simple
     syntax, but most pre-configured health entities use
-    [hysteresis](/health/REFERENCE.md#special-usage-of-the-conditional-operator) to avoid superfluous notifications.
+    [hysteresis](/health/REFERENCE.md#special-use-of-the-conditional-operator) to avoid superfluous notifications.
 -   `info`: A description of the alarm, which will appear in the dashboard and notifications.
 
 In human-readable format: 
@@ -145,4 +145,4 @@ state.
 
 To build complex, dynamic alarms, read our guide on [dimension templates](/docs/guides/monitor/dimension-templates.md).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fmonitor%2Fview-active-alarms&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

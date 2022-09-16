@@ -177,12 +177,6 @@ const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
     return RRD_MEMORY_MODE_NONE_NAME;
 }
 
-calculated_number rrdvar2number(RRDVAR *rv)
-{
-    (void)rv;
-    return 0;
-}
-
 int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data)
 {
     (void)host;
@@ -196,26 +190,27 @@ void rrdset_update_heterogeneous_flag(RRDSET *st)
     (void)st;
 }
 
-time_t __mock_rrddim_query_oldest_time(RRDDIM *rd)
+time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
 {
-    (void)rd;
+    (void)db_metric_handle;
 
     function_called();
     return mock_type(time_t);
 }
 
-time_t __mock_rrddim_query_latest_time(RRDDIM *rd)
+time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
 {
-    (void)rd;
+    (void)db_metric_handle;
 
     function_called();
     return mock_type(time_t);
 }
 
-void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
 {
-    (void)rd;
+    (void)db_metric_handle;
     (void)handle;
+    (void)tier_query_fetch_type;
 
     function_called();
     check_expected(start_time);
@@ -230,13 +225,14 @@ int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
     return mock_type(int);
 }
 
-storage_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time)
+STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle)
 {
     (void)handle;
-    (void)current_time;
 
     function_called();
-    return mock_type(storage_number);
+
+    STORAGE_POINT sp = {};
+    return sp;    
 }
 
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
@@ -244,4 +240,28 @@ void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
     (void)handle;
 
     function_called();
+}
+
+void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
+{
+    (void)chart_uuid;
+    (void)source_type;
+    (void)label;
+    (void)value;
+}
+
+void rrdcalc_update_rrdlabels(RRDSET *st)
+{
+    (void)st;
+}
+
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv)
+{
+    (void)host;
+    (void)rv;
+}
+
+void db_execute(const char *cmd)
+{
+    (void)cmd;
 }

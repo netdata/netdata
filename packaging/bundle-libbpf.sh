@@ -24,3 +24,4 @@ tar -xzf "${LIBBPF_TARBALL}" -C "${1}/externaldeps/libbpf" || exit 1
 make -C "${LIBBPF_BUILD_PATH}/src" BUILD_STATIC_ONLY=1 OBJDIR=build/ DESTDIR=../ install || exit 1
 cp -a "${LIBBPF_BUILD_PATH}/usr/${lib_subdir}/libbpf.a" "${1}/externaldeps/libbpf" || exit 1
 cp -a "${LIBBPF_BUILD_PATH}/usr/include" "${1}/externaldeps/libbpf" || exit 1
+cp -a "${LIBBPF_BUILD_PATH}/include/uapi" "${1}/externaldeps/libbpf/include" || exit 1

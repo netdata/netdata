@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "spawn.h"
-#include "database/engine/rrdenginelib.h"
 
 static uv_process_t process;
 static uv_pipe_t spawn_channel;
@@ -22,7 +21,10 @@ static void after_pipe_write(uv_write_t* req, int status)
 #ifdef SPAWN_DEBUG
     info("CLIENT %s called status=%d", __func__, status);
 #endif
-    freez(req->data);
+    void **data = req->data;
+    freez(data[0]);
+    freez(data[1]);
+    freez(data);
 }
 
 static void client_parse_spawn_protocol(unsigned source_len, char *source)
@@ -136,11 +138,16 @@ static void on_read_alloc(uv_handle_t* handle,
 static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
 {
     int ret;
-    uv_buf_t writebuf[3];
+    uv_buf_t *writebuf;
     struct write_context *write_ctx;
 
+    void **data = callocz(2, sizeof(void *));
+    writebuf = callocz(3, sizeof(uv_buf_t));
     write_ctx = callocz(1, sizeof(*write_ctx));
-    write_ctx->write_req.data = write_ctx;
+
+    data[0] = write_ctx;
+    data[1] = writebuf;
+    write_ctx->write_req.data = data;
 
     uv_mutex_lock(&cmdinfo->mutex);
     cmdinfo->flags |= SPAWN_CMD_PROCESSED;
@@ -201,7 +208,7 @@ void spawn_client(void *arg)
     spawn_thread_error = 0;
     spawn_thread_shutdown = 0;
     /* wake up initialization thread */
-    complete(completion);
+    completion_mark_complete(completion);
 
     prot_buffer_len = 0;
     ret = uv_read_start((uv_stream_t *)&spawn_channel, on_read_alloc, on_pipe_read);
@@ -237,5 +244,5 @@ error_after_loop_init:
     freez(loop);
 
     /* wake up initialization thread */
-    complete(completion);
+    completion_mark_complete(completion);
 }

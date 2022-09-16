@@ -7,19 +7,39 @@
 
 #define STATE_LENGTH_MAX 32
 
-// As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
-const char *operstate_names[] = { "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up" };
+enum {
+    NETDEV_DUPLEX_UNKNOWN,
+    NETDEV_DUPLEX_HALF,
+    NETDEV_DUPLEX_FULL
+};
+
+enum {
+    NETDEV_OPERSTATE_UNKNOWN,
+    NETDEV_OPERSTATE_NOTPRESENT,
+    NETDEV_OPERSTATE_DOWN,
+    NETDEV_OPERSTATE_LOWERLAYERDOWN,
+    NETDEV_OPERSTATE_TESTING,
+    NETDEV_OPERSTATE_DORMANT,
+    NETDEV_OPERSTATE_UP
+};
 
 static inline int get_operstate(char *operstate)
 {
-    int i;
+    // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
+    if (!strcmp(operstate, "up"))
+        return NETDEV_OPERSTATE_UP;
+    if (!strcmp(operstate, "down"))
+        return NETDEV_OPERSTATE_DOWN;
+    if (!strcmp(operstate, "notpresent"))
+        return NETDEV_OPERSTATE_NOTPRESENT;
+    if (!strcmp(operstate, "lowerlayerdown"))
+        return NETDEV_OPERSTATE_LOWERLAYERDOWN;
+    if (!strcmp(operstate, "testing"))
+        return NETDEV_OPERSTATE_TESTING;
+    if (!strcmp(operstate, "dormant"))
+        return NETDEV_OPERSTATE_DORMANT;
 
-    for (i = 0; i < (int) (sizeof(operstate_names) / sizeof(char *)); i++) {
-        if (!strcmp(operstate, operstate_names[i])) {
-            return i;
-        }
-    }
-    return 0;
+    return NETDEV_OPERSTATE_UNKNOWN;
 }
 
 // ----------------------------------------------------------------------------
@@ -75,9 +95,22 @@ static struct netdev {
     const char *chart_id_net_carrier;
     const char *chart_id_net_mtu;
 
+    const char *chart_ctx_net_bytes;
+    const char *chart_ctx_net_packets;
+    const char *chart_ctx_net_errors;
+    const char *chart_ctx_net_fifo;
+    const char *chart_ctx_net_events;
+    const char *chart_ctx_net_drops;
+    const char *chart_ctx_net_compressed;
+    const char *chart_ctx_net_speed;
+    const char *chart_ctx_net_duplex;
+    const char *chart_ctx_net_operstate;
+    const char *chart_ctx_net_carrier;
+    const char *chart_ctx_net_mtu;
+
     const char *chart_family;
 
-    struct label *chart_labels;
+    DICTIONARY *chart_labels;
 
     int flipped;
     unsigned long priority;
@@ -140,9 +173,18 @@ static struct netdev {
     RRDDIM *rd_tcompressed;
 
     RRDDIM *rd_speed;
-    RRDDIM *rd_duplex;
-    RRDDIM *rd_operstate;
-    RRDDIM *rd_carrier;
+    RRDDIM *rd_duplex_full;
+    RRDDIM *rd_duplex_half;
+    RRDDIM *rd_duplex_unknown;
+    RRDDIM *rd_operstate_unknown;
+    RRDDIM *rd_operstate_notpresent;
+    RRDDIM *rd_operstate_down;
+    RRDDIM *rd_operstate_lowerlayerdown;
+    RRDDIM *rd_operstate_testing;
+    RRDDIM *rd_operstate_dormant;
+    RRDDIM *rd_operstate_up;
+    RRDDIM *rd_carrier_up;
+    RRDDIM *rd_carrier_down;
     RRDDIM *rd_mtu;
 
     char *filename_speed;
@@ -206,10 +248,20 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_tcompressed = NULL;
 
     d->rd_speed       = NULL;
-    d->rd_duplex      = NULL;
-    d->rd_operstate   = NULL;
-    d->rd_carrier     = NULL;
+    d->rd_duplex_full = NULL;
+    d->rd_duplex_half = NULL;
+    d->rd_duplex_unknown = NULL;
+    d->rd_carrier_up = NULL;
+    d->rd_carrier_down = NULL;
     d->rd_mtu         = NULL;
+
+    d->rd_operstate_unknown = NULL;
+    d->rd_operstate_notpresent = NULL;
+    d->rd_operstate_down = NULL;
+    d->rd_operstate_lowerlayerdown = NULL;
+    d->rd_operstate_testing = NULL;
+    d->rd_operstate_dormant = NULL;
+    d->rd_operstate_up = NULL;
 
     d->chart_var_speed     = NULL;
 }
@@ -241,13 +293,26 @@ static void netdev_free_chart_strings(struct netdev *d) {
     freez((void *)d->chart_id_net_carrier);
     freez((void *)d->chart_id_net_mtu);
 
+    freez((void *)d->chart_ctx_net_bytes);
+    freez((void *)d->chart_ctx_net_compressed);
+    freez((void *)d->chart_ctx_net_drops);
+    freez((void *)d->chart_ctx_net_errors);
+    freez((void *)d->chart_ctx_net_events);
+    freez((void *)d->chart_ctx_net_fifo);
+    freez((void *)d->chart_ctx_net_packets);
+    freez((void *)d->chart_ctx_net_speed);
+    freez((void *)d->chart_ctx_net_duplex);
+    freez((void *)d->chart_ctx_net_operstate);
+    freez((void *)d->chart_ctx_net_carrier);
+    freez((void *)d->chart_ctx_net_mtu);
+
     freez((void *)d->chart_family);
 }
 
 static void netdev_free(struct netdev *d) {
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
-    free_label_list(d->chart_labels);
+    rrdlabels_destroy(d->chart_labels);
 
     freez((void *)d->name);
     freez((void *)d->filename_speed);
@@ -268,8 +333,9 @@ static struct netdev_rename {
 
     const char *container_device;
     const char *container_name;
+    const char *ctx_prefix;
 
-    struct label *chart_labels;
+    DICTIONARY *chart_labels;
 
     int processed;
 
@@ -291,7 +357,11 @@ static struct netdev_rename *netdev_rename_find(const char *host_device, uint32_
 
 // other threads can call this function to register a rename to a netdev
 void netdev_rename_device_add(
-    const char *host_device, const char *container_device, const char *container_name, struct label *labels)
+    const char *host_device,
+    const char *container_device,
+    const char *container_name,
+    DICTIONARY *labels,
+    const char *ctx_prefix)
 {
     netdata_mutex_lock(&netdev_rename_mutex);
 
@@ -302,7 +372,9 @@ void netdev_rename_device_add(
         r->host_device      = strdupz(host_device);
         r->container_device = strdupz(container_device);
         r->container_name   = strdupz(container_name);
-        update_label_list(&r->chart_labels, labels);
+        r->ctx_prefix       = strdupz(ctx_prefix);
+        r->chart_labels     = rrdlabels_create();
+        rrdlabels_migrate_to_these(r->chart_labels, labels);
         r->hash             = hash;
         r->next             = netdev_rename_root;
         r->processed        = 0;
@@ -318,7 +390,7 @@ void netdev_rename_device_add(
             r->container_device = strdupz(container_device);
             r->container_name   = strdupz(container_name);
 
-            update_label_list(&r->chart_labels, labels);
+            rrdlabels_migrate_to_these(r->chart_labels, labels);
             
             r->processed        = 0;
             netdev_pending_renames++;
@@ -351,7 +423,8 @@ void netdev_rename_device_del(const char *host_device) {
             freez((void *) r->host_device);
             freez((void *) r->container_name);
             freez((void *) r->container_device);
-            free_label_list(r->chart_labels);
+            freez((void *) r->ctx_prefix);
+            rrdlabels_destroy(r->chart_labels);
             freez((void *) r);
             break;
         }
@@ -384,44 +457,58 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_%s", r->container_device);
     d->chart_id_net_bytes      = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_compressed_%s", r->container_device);
     d->chart_id_net_compressed = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_drops_%s", r->container_device);
     d->chart_id_net_drops      = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_errors_%s", r->container_device);
     d->chart_id_net_errors     = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_events_%s", r->container_device);
     d->chart_id_net_events     = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_fifo_%s", r->container_device);
     d->chart_id_net_fifo       = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_packets_%s", r->container_device);
     d->chart_id_net_packets    = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_speed_%s", r->container_device);
     d->chart_id_net_speed      = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_duplex_%s", r->container_device);
     d->chart_id_net_duplex     = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_operstate_%s", r->container_device);
     d->chart_id_net_operstate  = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_carrier_%s", r->container_device);
     d->chart_id_net_carrier    = strdupz(buffer);
-
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_mtu_%s", r->container_device);
     d->chart_id_net_mtu        = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_net", r->ctx_prefix);
+    d->chart_ctx_net_bytes      = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_compressed", r->ctx_prefix);
+    d->chart_ctx_net_compressed = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_drops", r->ctx_prefix);
+    d->chart_ctx_net_drops      = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_errors", r->ctx_prefix);
+    d->chart_ctx_net_errors     = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_events", r->ctx_prefix);
+    d->chart_ctx_net_events     = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_fifo", r->ctx_prefix);
+    d->chart_ctx_net_fifo       = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_packets", r->ctx_prefix);
+    d->chart_ctx_net_packets    = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_speed", r->ctx_prefix);
+    d->chart_ctx_net_speed      = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_duplex", r->ctx_prefix);
+    d->chart_ctx_net_duplex     = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_operstate", r->ctx_prefix);
+    d->chart_ctx_net_operstate  = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_carrier", r->ctx_prefix);
+    d->chart_ctx_net_carrier    = strdupz(buffer);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_mtu", r->ctx_prefix);
+    d->chart_ctx_net_mtu        = strdupz(buffer);
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
     d->chart_family = strdupz(buffer);
 
-    update_label_list(&d->chart_labels, r->chart_labels);
+    rrdlabels_copy(d->chart_labels, r->chart_labels);
 
     d->priority = NETDATA_CHART_PRIO_CGROUP_NET_IFACE;
     d->flipped = 1;
@@ -514,6 +601,7 @@ static struct netdev *get_netdev(const char *name) {
     d->name = strdupz(name);
     d->hash = simple_hash(d->name);
     d->len = strlen(d->name);
+    d->chart_labels = rrdlabels_create();
 
     d->chart_type_net_bytes      = strdupz("net");
     d->chart_type_net_compressed = strdupz("net_compressed");
@@ -540,6 +628,19 @@ static struct netdev *get_netdev(const char *name) {
     d->chart_id_net_operstate  = strdupz(d->name);
     d->chart_id_net_carrier    = strdupz(d->name);
     d->chart_id_net_mtu        = strdupz(d->name);
+
+    d->chart_ctx_net_bytes      = strdupz("net.net");
+    d->chart_ctx_net_compressed = strdupz("net.compressed");
+    d->chart_ctx_net_drops      = strdupz("net.drops");
+    d->chart_ctx_net_errors     = strdupz("net.errors");
+    d->chart_ctx_net_events     = strdupz("net.events");
+    d->chart_ctx_net_fifo       = strdupz("net.fifo");
+    d->chart_ctx_net_packets    = strdupz("net.packets");
+    d->chart_ctx_net_speed      = strdupz("net.speed");
+    d->chart_ctx_net_duplex     = strdupz("net.duplex");
+    d->chart_ctx_net_operstate  = strdupz("net.operstate");
+    d->chart_ctx_net_carrier    = strdupz("net.carrier");
+    d->chart_ctx_net_mtu        = strdupz("net.mtu");
 
     d->chart_family = strdupz(d->name);
     d->priority = NETDATA_CHART_PRIO_FIRST_NET_IFACE;
@@ -614,7 +715,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_carrier      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "carrier for all interfaces", CONFIG_BOOLEAN_AUTO);
         do_mtu          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "mtu for all interfaces", CONFIG_BOOLEAN_AUTO);
 
-        disabled_list = simple_pattern_create(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching", "lo fireqos* *-ifb"), NULL, SIMPLE_PATTERN_EXACT);
+        disabled_list = simple_pattern_create(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching", "lo fireqos* *-ifb fwpr* fwbr* fwln*"), NULL, SIMPLE_PATTERN_EXACT);
     }
 
     if(unlikely(!ff)) {
@@ -661,11 +762,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buffer[FILENAME_MAX + 1];
 
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
-            if(likely(access(buffer, R_OK) == 0)) {
+            if (likely(access(buffer, R_OK) == 0)) {
                 d->virtual = 1;
+                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
             }
-            else
+            else {
                 d->virtual = 0;
+                rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
+            }
+            rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed
@@ -751,7 +856,18 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
         }
 
-        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
+        if ((d->do_carrier != CONFIG_BOOLEAN_NO ||
+             d->do_duplex != CONFIG_BOOLEAN_NO ||
+             d->do_speed != CONFIG_BOOLEAN_NO) &&
+            d->filename_carrier) {
+            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
+                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
+                freez(d->filename_carrier);
+                d->filename_carrier = NULL;
+            }
+        }
+
+        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && (d->carrier || !d->filename_carrier)) {
             char buffer[STATE_LENGTH_MAX + 1];
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
@@ -761,12 +877,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             } else {
                 // values can be unknown, half or full -- just check the first letter for speed
                 if (buffer[0] == 'f')
-                    d->duplex = 2;
+                    d->duplex = NETDEV_DUPLEX_FULL;
                 else if (buffer[0] == 'h')
-                    d->duplex = 1;
+                    d->duplex = NETDEV_DUPLEX_HALF;
                 else
-                    d->duplex = 0;
+                    d->duplex = NETDEV_DUPLEX_UNKNOWN;
             }
+        } else {
+            d->duplex = 0;
         }
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
@@ -784,19 +902,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
         }
 
-        if (d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
-            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
-                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
-            }
-        }
-
         if (d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
             if (read_single_number_file(d->filename_mtu, &d->mtu)) {
-                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
+                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_mtu);
+                freez(d->filename_mtu);
+                d->filename_mtu = NULL;
             }
         }
 
@@ -825,7 +935,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_bytes
                         , NULL
                         , d->chart_family
-                        , "net.net"
+                        , d->chart_ctx_net_bytes
                         , "Bandwidth"
                         , "kilobits/s"
                         , PLUGIN_PROC_NAME
@@ -835,7 +945,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_AREA
                 );
 
-                rrdset_update_labels(d->st_bandwidth, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_bandwidth, d->chart_labels);
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -866,13 +976,21 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 }
 
                 if(d->filename_speed && d->chart_var_speed) {
-                    if(read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed)) {
+                    int ret = 0;
+
+                    if (d->carrier || !d->filename_carrier) {
+                        ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
+                    } else {
+                        d->speed = 0;
+                    }
+
+                    if(ret) {
                         error("Cannot refresh interface %s speed by reading '%s'. Will not update its speed anymore.", d->name, d->filename_speed);
                         freez(d->filename_speed);
                         d->filename_speed = NULL;
                     }
                     else {
-                        rrdsetvar_custom_chart_variable_set(d->chart_var_speed, (calculated_number) d->speed * KILOBITS_IN_A_MEGABIT);
+                        rrdsetvar_custom_chart_variable_set(d->chart_var_speed, (NETDATA_DOUBLE) d->speed * KILOBITS_IN_A_MEGABIT);
 
                         if(d->do_speed != CONFIG_BOOLEAN_NO) {
                             if(unlikely(!d->st_speed)) {
@@ -881,7 +999,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                         , d->chart_id_net_speed
                                         , NULL
                                         , d->chart_family
-                                        , "net.speed"
+                                        , d->chart_ctx_net_speed
                                         , "Interface Speed"
                                         , "kilobits/s"
                                         , PLUGIN_PROC_NAME
@@ -893,7 +1011,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                                 rrdset_flag_set(d->st_speed, RRDSET_FLAG_DETAIL);
 
-                                rrdset_update_labels(d->st_speed, d->chart_labels);
+                                rrdset_update_rrdlabels(d->st_speed, d->chart_labels);
 
                                 d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
@@ -916,7 +1034,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_duplex
                         , NULL
                         , d->chart_family
-                        , "net.duplex"
+                        , d->chart_ctx_net_duplex
                         , "Interface Duplex State"
                         , "state"
                         , PLUGIN_PROC_NAME
@@ -928,13 +1046,17 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_duplex, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_duplex, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_duplex, d->chart_labels);
 
-                d->rd_duplex = rrddim_add(d->st_duplex, "duplex",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_full = rrddim_add(d->st_duplex, "full", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_half = rrddim_add(d->st_duplex, "half", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_duplex_unknown = rrddim_add(d->st_duplex, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_duplex);
 
-            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex, (collected_number)d->duplex);
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_full, (collected_number)(d->duplex == NETDEV_DUPLEX_FULL));
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_half, (collected_number)(d->duplex == NETDEV_DUPLEX_HALF));
+            rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_unknown, (collected_number)(d->duplex == NETDEV_DUPLEX_UNKNOWN));
             rrdset_done(d->st_duplex);
         }
 
@@ -947,7 +1069,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_operstate
                         , NULL
                         , d->chart_family
-                        , "net.operstate"
+                        , d->chart_ctx_net_operstate
                         , "Interface Operational State"
                         , "state"
                         , PLUGIN_PROC_NAME
@@ -959,13 +1081,25 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_operstate, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_operstate, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_operstate, d->chart_labels);
 
-                d->rd_operstate = rrddim_add(d->st_operstate, "state",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_up = rrddim_add(d->st_operstate, "up", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_down = rrddim_add(d->st_operstate, "down", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_notpresent = rrddim_add(d->st_operstate, "notpresent", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_lowerlayerdown = rrddim_add(d->st_operstate, "lowerlayerdown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_testing = rrddim_add(d->st_operstate, "testing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_dormant = rrddim_add(d->st_operstate, "dormant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_operstate_unknown = rrddim_add(d->st_operstate, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_operstate);
 
-            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate, (collected_number)d->operstate);
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_up, (collected_number)(d->operstate == NETDEV_OPERSTATE_UP));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_down, (collected_number)(d->operstate == NETDEV_OPERSTATE_DOWN));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_notpresent, (collected_number)(d->operstate == NETDEV_OPERSTATE_NOTPRESENT));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_lowerlayerdown, (collected_number)(d->operstate == NETDEV_OPERSTATE_LOWERLAYERDOWN));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_testing, (collected_number)(d->operstate == NETDEV_OPERSTATE_TESTING));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_dormant, (collected_number)(d->operstate == NETDEV_OPERSTATE_DORMANT));
+            rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_unknown, (collected_number)(d->operstate == NETDEV_OPERSTATE_UNKNOWN));
             rrdset_done(d->st_operstate);
         }
 
@@ -978,7 +1112,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_carrier
                         , NULL
                         , d->chart_family
-                        , "net.carrier"
+                        , d->chart_ctx_net_carrier
                         , "Interface Physical Link State"
                         , "state"
                         , PLUGIN_PROC_NAME
@@ -990,13 +1124,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_carrier, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_carrier, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_carrier, d->chart_labels);
 
-                d->rd_carrier = rrddim_add(d->st_carrier, "carrier",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_carrier_up = rrddim_add(d->st_carrier, "up",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_carrier_down = rrddim_add(d->st_carrier, "down",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_carrier);
 
-            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier, (collected_number)d->carrier);
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_up, (collected_number)(d->carrier == 1));
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_down, (collected_number)(d->carrier != 1));
             rrdset_done(d->st_carrier);
         }
 
@@ -1009,7 +1145,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_mtu
                         , NULL
                         , d->chart_family
-                        , "net.mtu"
+                        , d->chart_ctx_net_mtu
                         , "Interface MTU"
                         , "octets"
                         , PLUGIN_PROC_NAME
@@ -1021,7 +1157,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_mtu, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_mtu, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_mtu, d->chart_labels);
 
                 d->rd_mtu = rrddim_add(d->st_mtu, "mtu",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -1045,7 +1181,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_packets
                         , NULL
                         , d->chart_family
-                        , "net.packets"
+                        , d->chart_ctx_net_packets
                         , "Packets"
                         , "packets/s"
                         , PLUGIN_PROC_NAME
@@ -1057,7 +1193,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_packets, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_packets, d->chart_labels);
 
                 d->rd_rpackets   = rrddim_add(d->st_packets, "received",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tpackets   = rrddim_add(d->st_packets, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1093,7 +1229,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_errors
                         , NULL
                         , d->chart_family
-                        , "net.errors"
+                        , d->chart_ctx_net_errors
                         , "Interface Errors"
                         , "errors/s"
                         , PLUGIN_PROC_NAME
@@ -1105,7 +1241,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_errors, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_errors, d->chart_labels);
 
                 d->rd_rerrors = rrddim_add(d->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1139,7 +1275,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_drops
                         , NULL
                         , d->chart_family
-                        , "net.drops"
+                        , d->chart_ctx_net_drops
                         , "Interface Drops"
                         , "drops/s"
                         , PLUGIN_PROC_NAME
@@ -1151,7 +1287,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_drops, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_drops, d->chart_labels);
 
                 d->rd_rdrops = rrddim_add(d->st_drops, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1185,7 +1321,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_fifo
                         , NULL
                         , d->chart_family
-                        , "net.fifo"
+                        , d->chart_ctx_net_fifo
                         , "Interface FIFO Buffer Errors"
                         , "errors"
                         , PLUGIN_PROC_NAME
@@ -1197,7 +1333,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_fifo, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_fifo, d->chart_labels);
 
                 d->rd_rfifo = rrddim_add(d->st_fifo, "receive",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1231,7 +1367,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_compressed
                         , NULL
                         , d->chart_family
-                        , "net.compressed"
+                        , d->chart_ctx_net_compressed
                         , "Compressed Packets"
                         , "packets/s"
                         , PLUGIN_PROC_NAME
@@ -1243,7 +1379,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_compressed, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_compressed, d->chart_labels);
 
                 d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcompressed = rrddim_add(d->st_compressed, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1277,7 +1413,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_id_net_events
                         , NULL
                         , d->chart_family
-                        , "net.events"
+                        , d->chart_ctx_net_events
                         , "Network Interface Events"
                         , "events/s"
                         , PLUGIN_PROC_NAME
@@ -1289,7 +1425,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
-                rrdset_update_labels(d->st_events, d->chart_labels);
+                rrdset_update_rrdlabels(d->st_events, d->chart_labels);
 
                 d->rd_rframe      = rrddim_add(d->st_events, "frames",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1342,4 +1478,40 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     netdev_cleanup();
 
     return 0;
+}
+
+static void netdev_main_cleanup(void *ptr)
+{
+    UNUSED(ptr);
+
+    info("cleaning up...");
+
+    worker_unregister();
+}
+
+void *netdev_main(void *ptr)
+{
+    worker_register("NETDEV");
+    worker_register_job_name(0, "netdev");
+
+    netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
+
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    while (!netdata_exit) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
+
+        if (unlikely(netdata_exit))
+            break;
+
+        worker_is_busy(0);
+        if(do_proc_net_dev(localhost->rrd_update_every, hb_dt))
+            break;
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
 }

@@ -3,6 +3,50 @@
 
 #include "rrdengine.h"
 
+ARAL page_descr_aral = {
+    .element_size = sizeof(struct rrdeng_page_descr),
+    .elements = 20000,
+    .filename = "page_descriptors",
+    .cache_dir = &netdata_configured_cache_dir,
+    .use_mmap = false,
+    .internal.initialized = false
+};
+
+void rrdeng_page_descr_aral_go_singlethreaded(void) {
+    page_descr_aral.internal.lockless = true;
+}
+void rrdeng_page_descr_aral_go_multithreaded(void) {
+    page_descr_aral.internal.lockless = false;
+}
+
+struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void) {
+    struct rrdeng_page_descr *descr;
+    descr = arrayalloc_mallocz(&page_descr_aral);
+    return descr;
+}
+
+void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr) {
+    arrayalloc_freez(&page_descr_aral, descr);
+}
+
+void rrdeng_page_descr_use_malloc(void) {
+    if(page_descr_aral.internal.initialized)
+        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
+    else
+        page_descr_aral.use_mmap = false;
+}
+
+void rrdeng_page_descr_use_mmap(void) {
+    if(page_descr_aral.internal.initialized)
+        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
+    else
+        page_descr_aral.use_mmap = true;
+}
+
+bool rrdeng_page_descr_is_mmap(void) {
+    return page_descr_aral.use_mmap;
+}
+
 /* Forward declarations */
 static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
@@ -81,7 +125,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
 {
     struct rrdeng_page_descr *descr;
 
-    descr = mallocz(sizeof(*descr));
+    descr = rrdeng_page_descr_mallocz();
     descr->page_length = 0;
     descr->start_time = INVALID_TIME;
     descr->end_time = INVALID_TIME;
@@ -238,8 +282,7 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
  */
 unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 {
-    /* it's twice the number of producers since we pin 2 pages per producer */
-    return ctx->max_cache_pages + 2 * (unsigned long)ctx->metric_API_max_producers;
+    return ctx->max_cache_pages + (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
@@ -248,8 +291,7 @@ unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
  */
 unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
 {
-    /* it's twice the number of producers since we pin 2 pages per producer */
-    return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->metric_API_max_producers;
+    return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
@@ -289,14 +331,14 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             ++failures;
             uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
-            init_completion(&compl);
+            completion_init(&compl);
             cmd.opcode = RRDENG_FLUSH_PAGES;
             cmd.completion = &compl;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
             /* wait for some pages to be flushed */
             debug(D_RRDENGINE, "%s: waiting for pages to be written to disk before evicting.", __func__);
-            wait_for_completion(&compl);
-            destroy_completion(&compl);
+            completion_wait_for(&compl);
+            completion_destroy(&compl);
 
             if (unlikely(failures > 1)) {
                 unsigned long slots, usecs_to_sleep;
@@ -356,7 +398,7 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
-    freez(pg_cache_descr->page);
+    dbengine_page_free(pg_cache_descr->page);
     pg_cache_descr->page = NULL;
     pg_cache_descr->flags &= ~RRD_PAGE_POPULATED;
     pg_cache_release_pages_unsafe(ctx, 1);
@@ -437,7 +479,6 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
     ret = JudyLDel(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
     if (unlikely(0 == ret)) {
         uv_rwlock_wrunlock(&page_index->lock);
-        error("Page under deletion was not in index.");
         if (unlikely(debug_flags & D_RRDENGINE)) {
             print_page_descr(descr);
         }
@@ -497,7 +538,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         (void)sleep_usec(1000); /* 1 msec */
     }
 destroy:
-    freez(descr);
+    rrdeng_page_descr_freez(descr);
     pg_cache_update_metric_times(page_index);
 
     return can_delete_metric;
@@ -1067,10 +1108,13 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
 
     page_not_in_cache = 0;
     uv_rwlock_rdlock(&page_index->lock);
+    int retry_count = 0;
     while (1) {
         descr = find_first_page_in_time_range(page_index, start_time, end_time);
-        if (NULL == descr || 0 == descr->page_length) {
+        if (NULL == descr || 0 == descr->page_length || retry_count == default_rrdeng_page_fetch_retries) {
             /* non-empty page not found */
+            if (retry_count == default_rrdeng_page_fetch_retries)
+                error_report("Page cache timeout while waiting for page %p : returning FAIL", descr);
             uv_rwlock_rdunlock(&page_index->lock);
 
             pg_cache_release_pages(ctx, 1);
@@ -1114,7 +1158,11 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             print_page_cache_descr(descr);
         if (!(flags & RRD_PAGE_POPULATED))
             page_not_in_cache = 1;
-        pg_cache_wait_event_unsafe(descr);
+
+        if (pg_cache_timedwait_event_unsafe(descr, default_rrdeng_page_fetch_timeout) == UV_ETIMEDOUT) {
+            error_report("Page cache timeout while waiting for page %p : retry count = %d", descr, retry_count);
+            ++retry_count;
+        }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
 
         /* reset scan to find again */
@@ -1193,21 +1241,30 @@ void init_page_cache(struct rrdengine_instance *ctx)
 void free_page_cache(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    Word_t ret_Judy, bytes_freed = 0;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index, *prev_page_index;
     Word_t Index;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
+    // if we are exiting, the OS will recover all memory so do not slow down the shutdown process
+    // Do the cleanup if we are compiling with NETDATA_INTERNAL_CHECKS
+    // This affects the reporting of dbengine statistics which are available in real time
+    // via the /api/v1/dbengine_stats endpoint
+#ifndef NETDATA_INTERNAL_CHECKS
+    if (netdata_exit)
+        return;
+#endif
+    Word_t metrics_index_bytes = 0, pages_index_bytes = 0, pages_dirty_index_bytes = 0;
+
     /* Free committed page index */
-    ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
+    pages_dirty_index_bytes = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
     fatal_assert(NULL == pg_cache->committed_page_index.JudyL_array);
-    bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;
          page_index != NULL ;
          page_index = prev_page_index) {
+
         prev_page_index = page_index->prev;
 
         /* Find first page in range */
@@ -1222,30 +1279,23 @@ void free_page_cache(struct rrdengine_instance *ctx)
                 /* Check rrdenglocking.c */
                 pg_cache_descr = descr->pg_cache_descr;
                 if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
-                    freez(pg_cache_descr->page);
-                    bytes_freed += RRDENG_BLOCK_SIZE;
+                    dbengine_page_free(pg_cache_descr->page);
                 }
                 rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
-                bytes_freed += sizeof(*pg_cache_descr);
             }
-            freez(descr);
-            bytes_freed += sizeof(*descr);
+            rrdeng_page_descr_freez(descr);
 
             PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
         }
 
         /* Free page index */
-        ret_Judy = JudyLFreeArray(&page_index->JudyL_array, PJE0);
+        pages_index_bytes += JudyLFreeArray(&page_index->JudyL_array, PJE0);
         fatal_assert(NULL == page_index->JudyL_array);
-        bytes_freed += ret_Judy;
         freez(page_index);
-        bytes_freed += sizeof(*page_index);
     }
     /* Free metrics index */
-    ret_Judy = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
+    metrics_index_bytes = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
     fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
-    bytes_freed += ret_Judy;
-
-    info("Freed %lu bytes of memory from page cache.", bytes_freed);
+    info("Freed %lu bytes of memory from page cache.", pages_dirty_index_bytes + pages_index_bytes + metrics_index_bytes);
 }

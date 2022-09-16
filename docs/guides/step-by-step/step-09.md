@@ -122,10 +122,6 @@ libraries to make this exporting connection exist. Since you most likely install
 script, all you have to do is run that script again. Don't worry—any configuration changes you made along the way will
 be retained!
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
-
 Now, from your Netdata config directory, initialize and edit a `exporting.conf` file to tell Netdata where to find the
 database you just created.
 
@@ -163,4 +159,4 @@ our Netdata dashboard.
 
 [Next: Set up a proxy &rarr;](/docs/guides/step-by-step/step-10.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-09&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

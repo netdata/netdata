@@ -3,25 +3,25 @@
 #include "value.h"
 
 
-inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null) {
-    if (r->st_needs_lock)
-        rrdset_check_rdlock(r->st);
-
+inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate, RRDDIM *temp_rd) {
     long c;
     RRDDIM *d;
 
-    calculated_number *cn = &r->v[ i * r->d ];
+    NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+    NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
 
-    calculated_number sum = 0, min = 0, max = 0, v;
+    NETDATA_DOUBLE sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
 
-    calculated_number total = 1;
+    NETDATA_DOUBLE total = 1;
+    NETDATA_DOUBLE total_anomaly_rate = 0;
+
     int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
-        for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
-            calculated_number n = cn[c];
+        for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
+            NETDATA_DOUBLE n = cn[c];
 
             if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                 n = -n;
@@ -34,11 +34,11 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
     }
 
     // for each dimension
-    for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+    for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
-        calculated_number n = cn[c];
+        NETDATA_DOUBLE n = cn[c];
 
         if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
             n = -n;
@@ -74,6 +74,13 @@ inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *
 
         if(n < min) min = n;
         if(n > max) max = n;
+
+        total_anomaly_rate += ar[c];
+    }
+
+    if(anomaly_rate) {
+        if(!r->d) *anomaly_rate = 0;
+        else *anomaly_rate = total_anomaly_rate / r->d;
     }
 
     if(unlikely(all_null)) {

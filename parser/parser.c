@@ -9,7 +9,7 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
     while (unlikely(custom_isspace(*s))) s++;
     keyword_start = s;
 
-    while (likely(*s && !custom_isspace(*s)) && max_size > 0) {
+    while (likely(*s && !custom_isspace(*s)) && max_size > 1) {
         *keyword++ = *s++;
         max_size--;
     }
@@ -33,38 +33,31 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
-
-    if (unlikely(!parser))
-        return NULL;
-
     parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
-    if (unlikely(!parser->plugins_action)) {
-        freez(parser);
-        return NULL;
-    }
-
     parser->user = user;
     parser->input = input;
     parser->flags = flags;
     parser->host = host;
+    parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
+
 #ifdef ENABLE_HTTPS
     parser->bytesleft = 0;
     parser->readfrom = NULL;
 #endif
 
     if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
-        int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-        rc += parser_add_keyword(parser, "CLABEL_COMMIT", pluginsd_clabel_commit);
-        rc += parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
-        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-        rc += parser_add_keyword(parser, "SET", pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
+        parser_add_keyword(parser, "CLABEL_COMMIT", pluginsd_clabel_commit);
+        parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
+        parser_add_keyword(parser, "SET", pluginsd_set);
     }
 
     return parser;
@@ -141,9 +134,12 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
 
     tmp_keyword = callocz(1, sizeof(*tmp_keyword));
 
+    tmp_keyword->worker_job_id = parser->worker_job_next_id++;
     tmp_keyword->keyword = strdupz(keyword);
     tmp_keyword->keyword_hash = keyword_hash;
     tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
+
+    worker_register_job_name(tmp_keyword->worker_job_id, tmp_keyword->keyword);
 
     tmp_keyword->next = parser->keyword;
     parser->keyword = tmp_keyword;
@@ -181,9 +177,7 @@ void parser_destroy(PARSER *parser)
     }
 
     freez(parser->plugins_action);
-
     freez(parser);
-    return;
 }
 
 
@@ -245,7 +239,7 @@ inline int parser_action(PARSER *parser, char *input)
 {
     PARSER_RC   rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    char command[PLUGINSD_LINE_MAX];
+    char command[PLUGINSD_LINE_MAX + 1];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
 
@@ -275,10 +269,12 @@ inline int parser_action(PARSER *parser, char *input)
 
     uint32_t command_hash = simple_hash(command);
 
+    size_t worker_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES + 1; // set an invalid value by default
     while(tmp_keyword) {
         if (command_hash == tmp_keyword->keyword_hash &&
                 (!strcmp(command, tmp_keyword->keyword))) {
                     action_function_list = &tmp_keyword->func[0];
+                    worker_job_id = tmp_keyword->worker_job_id;
                     break;
         }
         tmp_keyword = tmp_keyword->next;
@@ -294,12 +290,14 @@ inline int parser_action(PARSER *parser, char *input)
 #endif
     }
     else {
+        worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
                 rc = action_function(words, parser->user, parser->plugins_action);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
                     break;                
                 action_function_list++;
         }
+        worker_is_idle();
     }
 
     if (likely(input == parser->buffer))

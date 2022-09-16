@@ -257,6 +257,54 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     freez(co);
 }
 
+void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name)
+{
+    debug(D_CONFIG, "Destroying section option '%s -> %s'.", section, name);
+
+    struct section *co;
+    co = appconfig_section_find(root, section);
+    if (!co) {
+        error("Could not destroy section option '%s -> %s'. The section not found.", section, name);
+        return;
+    }
+
+    config_section_wrlock(co);
+
+    struct config_option *cv;
+
+    cv = appconfig_option_index_find(co, name, simple_hash(name));
+
+    if (cv && cv->flags & CONFIG_VALUE_LOADED) {
+        config_section_unlock(co);
+        return;
+    }
+
+    if (unlikely(!(cv && appconfig_option_index_del(co, cv)))) {
+        config_section_unlock(co);
+        error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
+        return;
+    }
+
+    if (co->values == cv) {
+        co->values = co->values->next;
+    } else {
+        struct config_option *cv_cur = co->values, *cv_prev = NULL;
+        while (cv_cur && cv_cur != cv) {
+            cv_prev = cv_cur;
+            cv_cur = cv_cur->next;
+        }
+        if (cv_cur) {
+            cv_prev->next = cv_cur->next;
+        }
+    }
+
+    freez(cv->value);
+    freez(cv->name);
+    freez(cv);
+
+    config_section_unlock(co);
+    return;
+}
 
 // ----------------------------------------------------------------------------
 // config name-value methods
@@ -414,15 +462,15 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
-LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value)
 {
     char buffer[100], *s;
-    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
+    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     s = appconfig_get(root, section, name, buffer);
     if(!s) return value;
 
-    return str2ld(s, NULL);
+    return str2ndd(s, NULL);
 }
 
 static inline int appconfig_test_boolean_value(char *s) {
@@ -540,10 +588,10 @@ long long appconfig_set_number(struct config *root, const char *section, const c
     return value;
 }
 
-LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value)
 {
     char buffer[100];
-    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
+    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     appconfig_set(root, section, name, buffer);
 
@@ -591,7 +639,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
     int line = 0;
     struct section *co = NULL;
     int is_exporter_config = 0;
-    int _backends = 0;              // number of backend sections we have
+    int _connectors = 0;              // number of exporting connector sections we have
     char working_instance[CONFIG_MAX_NAME + 1];
     char working_connector[CONFIG_MAX_NAME + 1];
     struct section *working_connector_section = NULL;
@@ -641,8 +689,8 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         strncpy(working_connector, s, CONFIG_MAX_NAME);
                         s = s + rc + 1;
                         if (unlikely(!(*s))) {
-                            _backends++;
-                            sprintf(buffer, "instance_%d", _backends);
+                            _connectors++;
+                            sprintf(buffer, "instance_%d", _connectors);
                             s = buffer;
                         }
                         strncpy(working_instance, s, CONFIG_MAX_NAME);
@@ -757,50 +805,53 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
     struct section *co;
     struct config_option *cv;
 
-    for(i = 0; i < 3 ;i++) {
-        switch(i) {
-            case 0:
-                buffer_strcat(wb,
-                    "# netdata configuration\n"
-                    "#\n"
-                    "# You can download the latest version of this file, using:\n"
-                    "#\n"
-                    "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                    "# or\n"
-                    "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                    "#\n"
-                    "# You can uncomment and change any of the options below.\n"
-                    "# The value shown in the commented settings, is the default value.\n"
-                    "#\n"
-                    "\n# global netdata configuration\n");
-                break;
+    {
+        int found_host_labels = 0;
+        for (co = root->first_section; co; co = co->next)
+            if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))
+                found_host_labels = 1;
 
-            case 1:
-                buffer_strcat(wb, "\n\n# per plugin configuration\n");
-                break;
-
-            case 2:
-                buffer_strcat(wb, "\n\n# per chart configuration\n");
-                break;
+        if(!found_host_labels) {
+            appconfig_section_create(root, CONFIG_SECTION_HOST_LABEL);
+            appconfig_get(root, CONFIG_SECTION_HOST_LABEL, "name", "value");
         }
+    }
 
+    buffer_strcat(wb,
+                  "# netdata configuration\n"
+                  "#\n"
+                  "# You can download the latest version of this file, using:\n"
+                  "#\n"
+                  "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
+                  "# or\n"
+                  "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
+                  "#\n"
+                  "# You can uncomment and change any of the options below.\n"
+                  "# The value shown in the commented settings, is the default value.\n"
+                  "#\n"
+                  "\n# global netdata configuration\n");
+
+    for(i = 0; i <= 16 ;i++) {
         appconfig_wrlock(root);
         for(co = root->first_section; co ; co = co->next) {
-            if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
-               || !strcmp(co->name, CONFIG_SECTION_WEB)
-               || !strcmp(co->name, CONFIG_SECTION_STATSD)
-               || !strcmp(co->name, CONFIG_SECTION_PLUGINS)
-               || !strcmp(co->name, CONFIG_SECTION_CLOUD)
-               || !strcmp(co->name, CONFIG_SECTION_REGISTRY)
-               || !strcmp(co->name, CONFIG_SECTION_HEALTH)
-               || !strcmp(co->name, CONFIG_SECTION_BACKEND)
-               || !strcmp(co->name, CONFIG_SECTION_STREAM)
-               || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
-               || !strcmp(co->name, CONFIG_SECTION_ML)
-                    )
-                pri = 0;
-            else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
-            else pri = 2;
+            if(!strcmp(co->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
+            else if(!strcmp(co->name, CONFIG_SECTION_DB))                pri = 1;
+            else if(!strcmp(co->name, CONFIG_SECTION_DIRECTORIES))       pri = 2;
+            else if(!strcmp(co->name, CONFIG_SECTION_LOGS))              pri = 3;
+            else if(!strcmp(co->name, CONFIG_SECTION_ENV_VARS))          pri = 4;
+            else if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 5;
+            else if(!strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 6;
+            else if(!strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 7;
+            else if(!strcmp(co->name, CONFIG_SECTION_ML))                pri = 8;
+            else if(!strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 9;
+            else if(!strcmp(co->name, CONFIG_SECTION_WEB))               pri = 10;
+            // by default, new sections will get pri = 11 (set at the end, below)
+            else if(!strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 12;
+            else if(!strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 13;
+            else if(!strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 14;
+            else if(!strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 15;
+            else if(!strncmp(co->name, "plugin:", 7))                    pri = 16; // << change the loop too if you change this
+            else pri = 11; // this is used for any new (currently unknown) sections
 
             if(i == pri) {
                 int loaded = 0;
@@ -866,7 +917,7 @@ int config_parse_duration(const char* string, int* result) {
     if(!(isdigit(*string) || *string == '+' || *string == '-')) goto fallback;
 
     char *e = NULL;
-    calculated_number n = str2ld(string, &e);
+    NETDATA_DOUBLE n = str2ndd(string, &e);
     if(e && *e) {
         switch (*e) {
             case 'Y':

@@ -4,6 +4,17 @@
 #define NETDATA_RRD2JSON_H 1
 
 #include "web/api/web_api_v1.h"
+
+typedef struct query_params {
+    struct context_param *context_param_list;
+    BUFFER *wb;
+    char *chart_label_key;
+    int max_anomaly_rates;
+    int timeout;
+    int show_dimensions;
+} QUERY_PARAMS;
+
+
 #include "web/api/exporters/allmetrics.h"
 #include "web/api/queries/rrdr.h"
 
@@ -54,39 +65,47 @@ extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 
 extern int rrdset2anything_api_v1(
-          RRDSET *st
-        , BUFFER *wb
+          ONEWAYALLOC *owa
+        , RRDSET *st
+        , QUERY_PARAMS *query_params
         , BUFFER *dimensions
         , uint32_t format
         , long points
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
-        , struct context_param *context_param_list
-        , char *chart_label_key
+        , int tier
 );
 
 extern int rrdset2value_api_v1(
           RRDSET *st
         , BUFFER *wb
-        , calculated_number *n
+        , NETDATA_DOUBLE *n
         , const char *dimensions
         , long points
         , long long after
         , long long before
         , int group_method
+        , const char *group_options
         , long group_time
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
+        , size_t *db_points_read
+        , size_t *db_points_per_tier
+        , size_t *result_points_generated
         , int *value_is_null
+        , NETDATA_DOUBLE *anomaly_rate
+        , int timeout
+        , int tier
 );
 
-extern void build_context_param_list(struct context_param **param_list, RRDSET *st);
-extern void rebuild_context_param_list(struct context_param *context_param_list, time_t after_requested);
-extern void free_context_param_list(struct context_param **param_list);
+extern void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);
+extern void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_param_list, time_t after_requested);
+extern void free_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list);
 
 #endif /* NETDATA_RRD2JSON_H */

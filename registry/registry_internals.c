@@ -198,7 +198,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
 }
 
 
-// a structure to pass to the dictionary_get_all() callback handler
+// a structure to pass to the dictionary_walkthrough_read() callback handler
 struct machine_request_callback_data {
     REGISTRY_MACHINE *find_this_machine;
     REGISTRY_PERSON_URL *result;
@@ -246,7 +246,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     // We will walk through the PERSON_URLs to find the machine
     // linking to our machine
 
-    // a structure to pass to the dictionary_get_all() callback handler
+    // a structure to pass to the dictionary_walkthrough_read() callback handler
     struct machine_request_callback_data rdata = { m, NULL };
 
     // request a walk through on the dictionary

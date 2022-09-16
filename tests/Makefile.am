@@ -15,16 +15,6 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_noinst_DATA = \
-    $(srcdir)/README.md \
-    $(srcdir)/web/lib/jasmine-jquery.js \
-    $(srcdir)/web/easypiechart.chart.spec.js \
-    $(srcdir)/web/easypiechart.percentage.spec.js \
-    $(srcdir)/web/karma.conf.js \
-    $(srcdir)/web/fixtures/easypiechart.chart.fixture1.html \
-    $(srcdir)/node.d/fronius.chart.spec.js \
-    $(srcdir)/node.d/fronius.parse.spec.js \
-    $(srcdir)/node.d/fronius.process.spec.js \
-    $(srcdir)/node.d/fronius.validation.spec.js \
     $(srcdir)/health_mgmtapi/health-cmdapi-test.sh.in \
     $(srcdir)/acls/acl.sh.in \
     $(srcdir)/urls/request.sh.in \

@@ -50,6 +50,12 @@
 #define NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT "cgroup.vfs_read_error"
 #define NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT "cgroup.vfs_write_bytes"
 #define NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT "cgroup.vfs_read_bytes"
+#define NETDATA_CGROUP_VFS_CREATE_CONTEXT "cgroup.vfs_create"
+#define NETDATA_CGROUP_VFS_CREATE_ERROR_CONTEXT "cgroup.vfs_create_error"
+#define NETDATA_CGROUP_VFS_OPEN_CONTEXT "cgroup.vfs_open"
+#define NETDATA_CGROUP_VFS_OPEN_ERROR_CONTEXT "cgroup.vfs_open_error"
+#define NETDATA_CGROUP_VFS_FSYNC_CONTEXT "cgroup.vfs_fsync"
+#define NETDATA_CGROUP_VFS_FSYNC_ERROR_CONTEXT "cgroup.vfs_fsync_error"
 
 #define NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT "services.vfs_unlink"
 #define NETDATA_SYSTEMD_VFS_WRITE_CONTEXT "services.vfs_write"
@@ -58,6 +64,12 @@
 #define NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT "services.vfs_read_error"
 #define NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT "services.vfs_write_bytes"
 #define NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT "services.vfs_read_bytes"
+#define NETDATA_SYSTEMD_VFS_CREATE_CONTEXT "services.vfs_create"
+#define NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT "services.vfs_create_error"
+#define NETDATA_SYSTEMD_VFS_OPEN_CONTEXT "services.vfs_open"
+#define NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT "services.vfs_open_error"
+#define NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT "services.vfs_fsync"
+#define NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT "services.vfs_fsync_error"
 
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
@@ -137,14 +149,28 @@ enum vfs_counters {
 
 enum netdata_vfs_tables {
     NETDATA_VFS_PID,
-    NETDATA_VFS_ALL
+    NETDATA_VFS_ALL,
+    NETDATA_VFS_CTRL
+};
+
+enum netdata_vfs_calls_name {
+    NETDATA_EBPF_VFS_WRITE,
+    NETDATA_EBPF_VFS_WRITEV,
+    NETDATA_EBPF_VFS_READ,
+    NETDATA_EBPF_VFS_READV,
+    NETDATA_EBPF_VFS_UNLINK,
+    NETDATA_EBPF_VFS_FSYNC,
+    NETDATA_EBPF_VFS_OPEN,
+    NETDATA_EBPF_VFS_CREATE,
+
+    NETDATA_VFS_END_LIST
 };
 
 extern netdata_publish_vfs_t **vfs_pid;
 
 extern void *ebpf_vfs_thread(void *ptr);
 extern void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
-extern void clean_vfs_pid_structures();
+extern netdata_ebpf_targets_t vfs_targets[];
 
 extern struct config vfs_config;
 

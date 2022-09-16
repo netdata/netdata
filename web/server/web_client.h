@@ -26,6 +26,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 // HTTP_CODES 5XX Server Errors
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
 #define HTTP_RESP_BACKEND_FETCH_FAILED 503
+#define HTTP_RESP_GATEWAY_TIMEOUT 504
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
@@ -68,15 +69,9 @@ typedef enum web_client_flags {
     WEB_CLIENT_CHUNKED_TRANSFER = 1 << 10, // chunked transfer (used with zlib compression)
 } WEB_CLIENT_FLAGS;
 
-//#ifdef HAVE_C___ATOMIC
-//#define web_client_flag_check(w, flag) (__atomic_load_n(&((w)->flags), __ATOMIC_SEQ_CST) & flag)
-//#define web_client_flag_set(w, flag)   __atomic_or_fetch(&((w)->flags), flag, __ATOMIC_SEQ_CST)
-//#define web_client_flag_clear(w, flag) __atomic_and_fetch(&((w)->flags), ~flag, __ATOMIC_SEQ_CST)
-//#else
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
 #define web_client_flag_set(w, flag) (w)->flags |= flag
 #define web_client_flag_clear(w, flag) (w)->flags &= ~flag
-//#endif
 
 #define WEB_CLIENT_IS_DEAD(w) web_client_flag_set(w, WEB_CLIENT_FLAG_DEAD)
 #define web_client_check_dead(w) web_client_flag_check(w, WEB_CLIENT_FLAG_DEAD)
@@ -193,9 +188,6 @@ struct web_client {
     struct netdata_ssl ssl;
 #endif
 };
-
-extern uid_t web_files_uid(void);
-extern uid_t web_files_gid(void);
 
 extern int web_client_permission_denied(struct web_client *w);
 

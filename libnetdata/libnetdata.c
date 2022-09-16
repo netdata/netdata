@@ -11,10 +11,14 @@
 #endif /* __FreeBSD__ || __APPLE__*/
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
+
+#ifdef MADV_MERGEABLE
 int enable_ksm = 1;
+#else
+int enable_ksm = 0;
+#endif
 
 volatile sig_atomic_t netdata_exit = 0;
-const char *os_type = NETDATA_OS_TYPE;
 const char *program_version = VERSION;
 
 // ----------------------------------------------------------------------------
@@ -27,6 +31,8 @@ const char *program_version = VERSION;
 // routines.
 
 #ifdef NETDATA_LOG_ALLOCATIONS
+#warning NETDATA_LOG_ALLOCATIONS ENABLED - set log_thread_memory_allocations=1 on any thread to log all its allocations - or use log_allocations() to log them on demand
+
 static __thread struct memory_statistics {
     volatile ssize_t malloc_calls_made;
     volatile ssize_t calloc_calls_made;
@@ -40,23 +46,14 @@ static __thread struct memory_statistics {
 
 __thread size_t log_thread_memory_allocations = 0;
 
-static inline void print_allocations(const char *file, const char *function, const unsigned long line, const char *type, size_t size) {
+inline void log_allocations_int(const char *file, const char *function, const unsigned long line) {
     static __thread struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-    fprintf(stderr, "%s iteration %zu MEMORY TRACE: %lu@%s : %s : %s : %zu\n",
+    fprintf(stderr, "%s MEMORY ALLOCATIONS: (%04lu@%s:%s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
             netdata_thread_tag(),
-            log_thread_memory_allocations,
-            line, file, function,
-            type, size
-    );
-
-    fprintf(stderr, "%s iteration %zu MEMORY ALLOCATIONS: (%04lu@%-40.40s:%-40.40s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): %s : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
-            netdata_thread_tag(),
-            log_thread_memory_allocations,
             line, file, function,
             (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
             (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
-            type,
             memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
             memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
             memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
@@ -75,12 +72,12 @@ static inline void mmap_accounting(size_t size) {
 }
 
 void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.malloc_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "malloc()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.malloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     size_t *n = (size_t *)malloc(sizeof(size_t) + size);
     if (unlikely(!n)) fatal("mallocz() cannot allocate %zu bytes of memory.", size);
@@ -91,12 +88,11 @@ void *mallocz_int(const char *file, const char *function, const unsigned long li
 void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
     size = nmemb * size;
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.calloc_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "calloc()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.calloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     size_t *n = (size_t *)calloc(1, sizeof(size_t) + size);
     if (unlikely(!n)) fatal("callocz() cannot allocate %zu bytes of memory.", size);
@@ -114,12 +110,11 @@ void *reallocz_int(const char *file, const char *function, const unsigned long l
     n = realloc(n, sizeof(size_t) + size);
     if (unlikely(!n)) fatal("reallocz() cannot allocate %zu bytes of memory (from %zu bytes).", size, old_size);
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.realloc_calls_made++;
-        memory_statistics.allocated_memory += (size - old_size);
-        print_allocations(file, function, line, "realloc()", size - old_size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.realloc_calls_made++;
+    memory_statistics.allocated_memory += (size - old_size);
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     *n = size;
     return (void *)&n[1];
@@ -128,12 +123,11 @@ void *reallocz_int(const char *file, const char *function, const unsigned long l
 char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
     size_t size = strlen(s) + 1;
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.strdup_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "strdup()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.strdup_calls_made++;
+    memory_statistics.allocated_memory += size;
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     size_t *n = (size_t *)malloc(sizeof(size_t) + size);
     if (unlikely(!n)) fatal("strdupz() cannot allocate %zu bytes of memory.", size);
@@ -151,12 +145,11 @@ void freez_int(const char *file, const char *function, const unsigned long line,
     n--;
     size_t size = *n;
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.free_calls_made++;
-        memory_statistics.allocated_memory -= size;
-        print_allocations(file, function, line, "free()", size);
-    }
+    memory_statistics.memory_calls_made++;
+    memory_statistics.free_calls_made++;
+    memory_statistics.allocated_memory -= size;
+    if(log_thread_memory_allocations)
+        log_allocations_int(file, function, line);
 
     free(n);
 }
@@ -584,7 +577,7 @@ unsigned char netdata_map_chart_ids[256] = {
         [89] = 'y', // Y
         [90] = 'z', // Z
         [91] = '_', // [
-        [92] = '/', // backslash
+        [92] = '_', // backslash
         [93] = '_', // ]
         [94] = '_', // ^
         [95] = '_', // _
@@ -940,108 +933,128 @@ static int memory_file_open(const char *filename, size_t size) {
     return fd;
 }
 
-// mmap_shared is used for memory mode = map
-static void *memory_file_mmap(const char *filename, size_t size, int flags) {
-    // info("memory_file_mmap('%s', %zu", filename, size);
-    static int log_madvise = 1;
+static inline int madvise_sequential(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
-    int fd = -1;
-    if(filename) {
-        fd = memory_file_open(filename, size);
-        if(fd == -1) return MAP_FAILED;
-    }
-
-    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
-    if (mem != MAP_FAILED) {
-#ifdef NETDATA_LOG_ALLOCATIONS
-        mmap_accounting(size);
-#endif
-        int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
-        if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
-
-        if (madvise(mem, size, advise) != 0 && log_madvise) {
-            error("Cannot advise the kernel about shared memory usage.");
-            log_madvise--;
-        }
-    }
-
-    if(fd != -1)
-        close(fd);
-
-    return mem;
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_SEQUENTIAL) failed.");
+    return ret;
 }
 
-#ifdef MADV_MERGEABLE
-static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
-    // info("memory_file_mmap_ksm('%s', %zu", filename, size);
-    static int log_madvise_2 = 1, log_madvise_3 = 1;
+static inline int madvise_dontfork(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_DONTFORK);
 
-    int fd = -1;
-    if(filename) {
-        fd = memory_file_open(filename, size);
-        if(fd == -1) return MAP_FAILED;
-    }
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTFORK) failed.");
+    return ret;
+}
 
-    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
-    if (mem != MAP_FAILED) {
-#ifdef NETDATA_LOG_ALLOCATIONS
-        mmap_accounting(size);
-#endif
-        if(fd != -1) {
-            if (lseek(fd, 0, SEEK_SET) == 0) {
-                if (read(fd, mem, size) != (ssize_t) size)
-                    error("Cannot read from file '%s'", filename);
-            }
-            else error("Cannot seek to beginning of file '%s'.", filename);
-        }
+static inline int madvise_willneed(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_WILLNEED);
 
-        // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
-        if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
-            error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
-            log_madvise_2--;
-        }
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_WILLNEED) failed.");
+    return ret;
+}
 
-        if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
-            error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
-            log_madvise_3--;
-        }
-    }
+#if __linux__
+static inline int madvise_dontdump(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_DONTDUMP);
 
-    if(fd != -1)
-        close(fd);
-
-    return mem;
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTDUMP) failed.");
+    return ret;
 }
 #else
-static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
-    // info("memory_file_mmap_ksm FALLBACK ('%s', %zu", filename, size);
+static inline int madvise_dontdump(void *mem, size_t len) {
+    UNUSED(mem);
+    UNUSED(len);
 
-    if(filename)
-        return memory_file_mmap(filename, size, flags);
-
-    // when KSM is not available and no filename is given (memory mode = ram),
-    // we just report failure
-    return MAP_FAILED;
+    return 0;
 }
 #endif
 
-void *mymmap(const char *filename, size_t size, int flags, int ksm) {
-    void *mem = NULL;
+static inline int madvise_mergeable(void *mem, size_t len) {
+#ifdef MADV_MERGEABLE
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_MERGEABLE);
 
-    if (filename && (flags & MAP_SHARED || !enable_ksm || !ksm))
-        // memory mode = map | save
-        // when KSM is not enabled
-        // MAP_SHARED is used for memory mode = map (no KSM possible)
-        mem = memory_file_mmap(filename, size, flags);
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_MERGEABLE) failed.");
+    return ret;
+#else
+    UNUSED(mem);
+    UNUSED(len);
+    
+    return 0;
+#endif
+}
 
-    else
-        // memory mode = save | ram
-        // when KSM is enabled
-        // for memory mode = ram, the filename is NULL
-        mem = memory_file_mmap_ksm(filename, size, flags);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
+    // info("netdata_mmap('%s', %zu", filename, size);
 
+    // MAP_SHARED is used in memory mode map
+    // MAP_PRIVATE is used in memory mode ram and save
+
+    if(unlikely(!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE)))
+        fatal("Neither MAP_SHARED or MAP_PRIVATE were given to netdata_mmap()");
+
+    if(unlikely((flags & MAP_SHARED) && (flags & MAP_PRIVATE)))
+        fatal("Both MAP_SHARED and MAP_PRIVATE were given to netdata_mmap()");
+
+    if(unlikely((flags & MAP_SHARED) && (!filename || !*filename)))
+        fatal("MAP_SHARED requested, without a filename to netdata_mmap()");
+
+    // don't enable ksm is the global setting is disabled
+    if(unlikely(!enable_ksm)) ksm = 0;
+
+    // KSM only merges anonymous (private) pages, never pagecache (file) pages
+    // but MAP_PRIVATE without MAP_ANONYMOUS it fails too, so we need it always
+    if((flags & MAP_PRIVATE)) flags |= MAP_ANONYMOUS;
+
+    int fd = -1;
+    void *mem = MAP_FAILED;
+
+    if(filename && *filename) {
+        // open/create the file to be used
+        fd = memory_file_open(filename, size);
+        if(fd == -1) goto cleanup;
+    }
+
+    int fd_for_mmap = fd;
+    if(fd != -1 && (flags & MAP_PRIVATE)) {
+        // this is MAP_PRIVATE allocation
+        // no need for mmap() to use our fd
+        // we will copy the file into the memory allocated
+        fd_for_mmap = -1;
+    }
+
+    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
+    if (mem != MAP_FAILED) {
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+        mmap_accounting(size);
+#endif
+
+        // if we have a file open, but we didn't give it to mmap(),
+        // we have to read the file into the memory block we allocated
+        if(fd != -1 && fd_for_mmap == -1) {
+            if (lseek(fd, 0, SEEK_SET) == 0) {
+                if (read(fd, mem, size) != (ssize_t) size)
+                    info("Cannot read from file '%s'", filename);
+            }
+            else info("Cannot seek to beginning of file '%s'.", filename);
+        }
+
+        madvise_sequential(mem, size);
+        madvise_dontfork(mem, size);
+        madvise_dontdump(mem, size);
+        if(flags & MAP_SHARED) madvise_willneed(mem, size);
+        if(ksm) madvise_mergeable(mem, size);
+    }
+
+cleanup:
+    if(fd != -1) close(fd);
     if(mem == MAP_FAILED) return NULL;
-
     errno = 0;
     return mem;
 }
@@ -1098,14 +1111,13 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 }
 
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
+    if(unlikely(!n)) return 0;
+
     int size = vsnprintf(dst, n, fmt, args);
+    dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) {
-        // truncated
-        size = (int)n;
-    }
+    if (unlikely((size_t) size > n)) size = (int)n;
 
-    dst[size] = '\0';
     return size;
 }
 
@@ -1521,4 +1533,20 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     strcpy(dst, src);
 
     return value;
+}
+
+
+bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
+    if (unlikely(!ptr))
+        return false;
+    return (ptr->data[idx / 64] & (1ULL << (idx % 64)));
+}
+
+void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
+    if (unlikely(!ptr))
+        return;
+    if (likely(value))
+        ptr->data[idx / 64] |= (1ULL << (idx % 64));
+    else
+        ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
 }

@@ -14,7 +14,25 @@ namespace ml {
 
 class RrdHost {
 public:
-    RrdHost(RRDHOST *RH) : RH(RH) {}
+    RrdHost(RRDHOST *RH) : RH(RH) {
+        AnomalyRateRS = rrdset_create(
+            RH,
+            "anomaly_detection",
+            "anomaly_rates",
+            NULL, // name
+            "anomaly_rates",
+            NULL, // ctx
+            "Average anomaly rate",
+            "anomaly rate",
+            "netdata",
+            "ml",
+            39189,
+            Cfg.DBEngineAnomalyRateEvery,
+            RRDSET_TYPE_LINE
+        );
+
+        rrdset_flag_set(AnomalyRateRS, RRDSET_FLAG_HIDDEN);
+    }
 
     RRDHOST *getRH() { return RH; }
 
@@ -35,12 +53,13 @@ public:
 
 protected:
     RRDHOST *RH;
+    RRDSET *AnomalyRateRS;
 
     // Protect dimension and lock maps
     std::mutex Mutex;
 
-    std::map<RRDDIM *, Dimension *> DimensionsMap;
-    std::map<Dimension *, std::mutex> LocksMap;
+    std::unordered_map<RRDDIM *, Dimension *> DimensionsMap;
+    std::unordered_map<Dimension *, std::mutex> LocksMap;
 };
 
 class TrainableHost : public RrdHost {
@@ -49,9 +68,22 @@ public:
 
     void train();
 
+    void updateResourceUsage() {
+        std::lock_guard<std::mutex> Lock(ResourceUsageMutex);
+        getrusage(RUSAGE_THREAD, &ResourceUsage);
+    }
+
+    void getResourceUsage(struct rusage *RU) {
+        std::lock_guard<std::mutex> Lock(ResourceUsageMutex);
+        memcpy(RU, &ResourceUsage, sizeof(struct rusage));
+    }
+
 private:
     std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
     void trainDimension(Dimension *D, const TimePoint &NowTP);
+
+    struct rusage ResourceUsage{};
+    std::mutex ResourceUsageMutex;
 };
 
 class DetectableHost : public TrainableHost {
@@ -88,11 +120,14 @@ private:
         static_cast<size_t>(Cfg.ADMinWindowSize * Cfg.ADWindowRateThreshold)
     };
 
-    CalculatedNumber AnomalyRate{0.0};
+    CalculatedNumber WindowAnomalyRate{0.0};
 
     size_t NumAnomalousDimensions{0};
     size_t NumNormalDimensions{0};
     size_t NumTrainedDimensions{0};
+    size_t NumActiveDimensions{0};
+
+    unsigned AnomalyRateTimer{0};
 
     Database DB{Cfg.AnomalyDBPath};
 };

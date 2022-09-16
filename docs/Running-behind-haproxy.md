@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-beh
 # Netdata via HAProxy
 
 > HAProxy is a free, very fast and reliable solution offering high availability, load balancing, 
-> and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites 
+> and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic websites 
 > and powers quite a number of the world's most visited ones.
 
 If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can
@@ -59,7 +59,7 @@ backend netdata_backend
 
 ## Configuration with subpath
 
-A example where the base URL is used with a subpath `/netdata/`:
+An example where the base URL is used with a subpath `/netdata/`:
 
 ### Frontend
 
@@ -290,4 +290,4 @@ backend netdata_backend
     http-request set-header Connection "keep-alive"
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-haproxy&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

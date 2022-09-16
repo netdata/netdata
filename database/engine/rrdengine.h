@@ -26,6 +26,8 @@
 
 #endif /* NETDATA_RRD_INTERNALS */
 
+extern unsigned rrdeng_pages_per_extent;
+
 /* Forward declarations */
 struct rrdengine_instance;
 
@@ -34,6 +36,31 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
+struct rrdeng_collect_handle {
+    struct rrdeng_metric_handle *metric_handle;
+    struct rrdeng_page_descr *descr;
+    unsigned long page_correlation_id;
+    struct rrdengine_instance *ctx;
+    // set to 1 when this dimension is not page aligned with the other dimensions in the chart
+    uint8_t unaligned_page;
+};
+
+struct rrdeng_query_handle {
+    struct rrdeng_metric_handle *metric_handle;
+    struct rrdeng_page_descr *descr;
+    struct rrdengine_instance *ctx;
+    struct pg_cache_page_index *page_index;
+    time_t next_page_time;
+    time_t now;
+    unsigned position;
+    unsigned entries;
+    TIER_QUERY_FETCH tier_query_fetch_type;
+    storage_number *page;
+    usec_t page_end_time;
+    uint32_t page_length;
+    usec_t dt;
+    time_t dt_sec;
+};
 
 typedef enum {
     RRDENGINE_STATUS_UNINITIALIZED = 0,
@@ -217,15 +244,20 @@ struct rrdengine_instance {
     char machine_guid[GUID_LEN + 1]; /* the unique ID of the corresponding host, or localhost for multihost DB */
     uint64_t disk_space;
     uint64_t max_disk_space;
+    int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
+    uint8_t page_type; /* Default page type for this context */
 
     struct rrdengine_statistics stats;
 };
+
+extern void *dbengine_page_alloc(void);
+extern void dbengine_page_free(void *page);
 
 extern int init_rrd_files(struct rrdengine_instance *ctx);
 extern void finalize_rrd_files(struct rrdengine_instance *ctx);

@@ -7,6 +7,7 @@
 
 #define PARSER_MAX_CALLBACKS 20
 #define PARSER_MAX_RECOVER_KEYWORDS 128
+#define WORKER_PARSER_FIRST_JOB 1
 
 // PARSER return codes
 typedef enum parser_rc {
@@ -28,11 +29,11 @@ typedef struct pluginsd_action {
 
     PARSER_RC (*flush_action)(void *user, RRDSET *st);
     PARSER_RC (*disable_action)(void *user);
-    PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, calculated_number value);
-    PARSER_RC (*label_action)(void *user, char *key, char *value, LABEL_SOURCE source);
-    PARSER_RC (*overwrite_action)(void *user, RRDHOST *host, struct label *new_labels);
-    PARSER_RC (*clabel_action)(void *user, char *key, char *value, LABEL_SOURCE source);
-    PARSER_RC (*clabel_commit_action)(void *user, RRDHOST *host, struct label *new_labels);
+    PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
+    PARSER_RC (*label_action)(void *user, char *key, char *value, RRDLABEL_SRC source);
+    PARSER_RC (*overwrite_action)(void *user, RRDHOST *host, DICTIONARY *new_labels);
+    PARSER_RC (*clabel_action)(void *user, char *key, char *value, RRDLABEL_SRC source);
+    PARSER_RC (*clabel_commit_action)(void *user, RRDHOST *host, DICTIONARY *new_labels);
 
     PARSER_RC (*guid_action)(void *user, uuid_t *uuid);
     PARSER_RC (*context_action)(void *user, uuid_t *uuid);
@@ -54,6 +55,7 @@ typedef enum parser_input_type {
 typedef PARSER_RC (*keyword_function)(char **, void *, PLUGINSD_ACTION  *plugins_action);
 
 typedef struct parser_keyword {
+    size_t      worker_job_id;
     char        *keyword;
     uint32_t    keyword_hash;
     int         func_no;
@@ -67,6 +69,7 @@ typedef struct parser_data {
 } PARSER_DATA;
 
 typedef struct parser {
+    size_t worker_job_next_id;
     uint8_t version;                // Parser version
     RRDHOST *host;
     void *input;                    // Input source e.g. stream

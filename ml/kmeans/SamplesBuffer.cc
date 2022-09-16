@@ -130,7 +130,13 @@ std::vector<DSample> SamplesBuffer::preprocess() {
     DSamples.reserve(OutN);
     Preprocessed = true;
 
+    uint32_t MaxMT = std::numeric_limits<uint32_t>::max();
+    uint32_t CutOff = static_cast<double>(MaxMT) * SamplingRatio;
+
     for (size_t Idx = NumSamples - OutN; Idx != NumSamples; Idx++) {
+        if (RandNums[Idx] > CutOff)
+            continue;
+
         DSample DS;
         DS.set_size(NumDimsPerSample * (LagN + 1));
 

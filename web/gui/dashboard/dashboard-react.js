@@ -3,7 +3,7 @@
 /**
  *  after react-dashboard refractor, this file can be renamed to 'dashboard.js'
  *  and it will:
- *  - setup global objects, so any assignements like 'NETDATA.options.current.destroy_on_hide = true'
+ *  - setup global objects, so any assignments like 'NETDATA.options.current.destroy_on_hide = true'
  *    will not break. we need to add it in places where 'dashboard.js' is
  *  - create react root DOM node
  *  - load react app

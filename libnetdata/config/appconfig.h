@@ -82,20 +82,26 @@
 
 #define CONFIG_FILENAME "netdata.conf"
 
-#define CONFIG_SECTION_GLOBAL     "global"
-#define CONFIG_SECTION_WEB        "web"
-#define CONFIG_SECTION_STATSD     "statsd"
-#define CONFIG_SECTION_PLUGINS    "plugins"
-#define CONFIG_SECTION_CLOUD      "cloud"
-#define CONFIG_SECTION_REGISTRY   "registry"
-#define CONFIG_SECTION_HEALTH     "health"
-#define CONFIG_SECTION_BACKEND    "backend"
-#define CONFIG_SECTION_STREAM     "stream"
-#define CONFIG_SECTION_ML         "ml"
-#define CONFIG_SECTION_EXPORTING  "exporting:global"
-#define CONFIG_SECTION_PROMETHEUS "prometheus:exporter"
-#define CONFIG_SECTION_HOST_LABEL "host labels"
-#define EXPORTING_CONF            "exporting.conf"
+#define CONFIG_SECTION_GLOBAL             "global"
+#define CONFIG_SECTION_DIRECTORIES        "directories"
+#define CONFIG_SECTION_LOGS               "logs"
+#define CONFIG_SECTION_ENV_VARS           "environment variables"
+#define CONFIG_SECTION_SQLITE             "sqlite"
+#define CONFIG_SECTION_WEB                "web"
+#define CONFIG_SECTION_STATSD             "statsd"
+#define CONFIG_SECTION_PLUGINS            "plugins"
+#define CONFIG_SECTION_CLOUD              "cloud"
+#define CONFIG_SECTION_REGISTRY           "registry"
+#define CONFIG_SECTION_HEALTH             "health"
+#define CONFIG_SECTION_STREAM             "stream"
+#define CONFIG_SECTION_ML                 "ml"
+#define CONFIG_SECTION_EXPORTING          "exporting:global"
+#define CONFIG_SECTION_PROMETHEUS         "prometheus:exporter"
+#define CONFIG_SECTION_HOST_LABEL         "host labels"
+#define EXPORTING_CONF                    "exporting.conf"
+#define CONFIG_SECTION_GLOBAL_STATISTICS  "global statistics"
+#define CONFIG_SECTION_DB                 "db"
+
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
@@ -164,7 +170,7 @@ extern void config_section_unlock(struct section *co);
 extern char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value);
 extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-extern LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
+extern NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
 extern int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
 extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
@@ -173,7 +179,7 @@ extern int appconfig_get_duration(struct config *root, const char *section, cons
 extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
 extern long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
-extern LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
+extern NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
 extern int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int appconfig_exists(struct config *root, const char *section, const char *name);
@@ -184,6 +190,7 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 extern int appconfig_section_compare(void *a, void *b);
 
 extern void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
+extern void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
 
 extern int config_parse_duration(const char* string, int* result);
 

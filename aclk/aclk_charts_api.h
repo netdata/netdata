@@ -17,4 +17,6 @@ void aclk_retention_updated(struct retention_updated *data);
 
 void aclk_update_node_info(struct update_node_info *info);
 
+void aclk_update_node_collectors(struct update_node_collectors *collectors);
+
 #endif /* ACLK_CHARTS_H */

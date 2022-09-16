@@ -1,17 +1,14 @@
 <!--
----
 title: "Anonymous statistics"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
----
 -->
 
 # Anonymous statistics
 
 By default, Netdata collects anonymous usage information from the open-source monitoring agent using the open-source
-product analytics platform [PostHog](https://github.com/PostHog/posthog). We self-host our PostHog instance, which means
-your data is never sent or processed by any third parties outside of the Netdata infrastructure.
+product analytics platform [PostHog](https://github.com/PostHog/posthog). We use their [cloud enterprise platform](https://posthog.com/product).
 
-We are strongly committed to your [data privacy](https://netdata.cloud/data-privacy/).
+We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
 We use the statistics gathered from this information for two purposes:
 
@@ -30,7 +27,7 @@ You can opt-out from sending anonymous statistics to Netdata through three diffe
 
 ## Agent Dashboard - PostHog JavaScript
 
-When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata will initialiszes a PostHog session and masks various event attributes.
+When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata initializes a PostHog session and masks various event attributes.
 
 _Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.  
 
@@ -86,19 +83,19 @@ installation, including manual, offline, and macOS installations. Create the fil
 
 **Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
 docs](/packaging/installer/README.md).** You can append this option during the initial installation or a manual
-update. You can also export the environment variable `DO_NOT_TRACK` with a non-zero or non-empty value
-(e.g: `export DO_NOT_TRACK=1`).
+update. You can also export the environment variable `DISABLE_TELEMETRY` with a non-zero or non-empty value
+(e.g: `export DISABLE_TELEMETRY=1`).
 
-When using Docker, **set your `DO_NOT_TRACK` environment variable to `1`.** You can set this variable with the following
-command: `export DO_NOT_TRACK=1`. When creating a container using Netdata's [Docker
-image](/packaging/docker/README.md#run-the-agent-with-the-docker-command) for the first time, this variable will disable
+When using Docker, **set your `DISABLE_TELEMETRY` environment variable to `1`.** You can set this variable with the following
+command: `export DISABLE_TELEMETRY=1`. When creating a container using Netdata's [Docker
+image](/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
 the anonymous statistics script inside of the container.
 
 Each of these opt-out processes does the following:
 
 -   Prevents the daemon from executing the anonymous statistics script.
 -   Forces the anonymous statistics script to exit immediately.
--   Stops the PostHog Javascript snippet, which remains on the dashboard, from firing and sending any data to the Netdata PostHog.
+-   Stops the PostHog JavaScript snippet, which remains on the dashboard, from firing and sending any data to the Netdata PostHog.
 
 ## Migration from Google Analytics and Google Tag Manager.
 
@@ -106,4 +103,3 @@ Prior to v1.29.4 we used Google Analytics to capture this information. This led 
 
 While we migrate fully away from Google Analytics to PostHog there maybe be a small period of time where we run both in parallel before we remove all Google Analytics related code. This is to ensure we can fully test and validate the Netdata PostHog implementation before fully defaulting to it.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fanonymous-statistics&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

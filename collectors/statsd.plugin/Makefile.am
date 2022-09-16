@@ -11,6 +11,7 @@ statsdconfigdir=$(libconfigdir)/statsd.d
 dist_statsdconfig_DATA = \
     example.conf \
     k6.conf \
+    asterisk.conf \
     $(NULL)
 
 userstatsdconfigdir=$(configdir)/statsd.d

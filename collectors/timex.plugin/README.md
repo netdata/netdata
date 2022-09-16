@@ -6,12 +6,16 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/timex
 
 # timex.plugin
 
-This plugin monitors the system clock synchronization state on Linux nodes.
+This plugin monitors the system kernel clock synchronization state.
 
-This plugin creates two charts:
+This plugin creates the following charts:
 
--   System clock synchronization state
--   Computed time offset between local system and reference clock
+- System clock synchronization state according to the system kernel
+- System clock status which gives the value of the `time_status` variable in the kernel
+- Computed time offset between local system and reference clock
+
+This is obtained from the information provided by the [ntp_adjtime()](https://man7.org/linux/man-pages/man2/adjtimex.2.html) system call.
+An unsynchronized clock may indicate a hardware clock error, or an issue with UTC synchronization.
 
 ## Configuration
 
@@ -19,11 +23,9 @@ Edit the `netdata.conf` configuration file using [`edit-config`](/docs/configure
 
 Scroll down to the `[plugin:timex]` section to find the available options:
 
-```
+```ini
 [plugin:timex]
     # update every = 1
     # clock synchronization state = yes
     # time offset = yes
 ```
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ftimex.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

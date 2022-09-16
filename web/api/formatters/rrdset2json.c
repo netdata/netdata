@@ -4,32 +4,22 @@
 
 void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 {
+    if(unlikely(!st->rrdlabels))
+        return;
+
     char tabs[11];
-    struct label_index *labels = &st->state->labels;
 
     if (indentation > 10)
         indentation = 10;
 
     tabs[0] = '\0';
     while (indentation) {
-        strcat(tabs, "\t");
+        strcat(tabs, "\t\t");
         indentation--;
     }
 
-    int count = 0;
-    netdata_rwlock_rdlock(&labels->labels_rwlock);
-    for (struct label *label = labels->head; label; label = label->next) {
-        if(count > 0) buffer_strcat(wb, ",\n");
-        buffer_strcat(wb, tabs);
-
-        char value[CONFIG_MAX_VALUE * 2 + 1];
-        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
-        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
-
-        count++;
-    }
+    rrdlabels_to_buffer(st->rrdlabels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
     buffer_strcat(wb, "\n");
-    netdata_rwlock_unlock(&labels->labels_rwlock);
 }
 
 // generate JSON for the /api/v1/chart API call
@@ -40,75 +30,77 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     time_t first_entry_t = rrdset_first_entry_t_nolock(st);
     time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
 
-    buffer_sprintf(wb,
-            "\t\t{\n"
-            "\t\t\t\"id\": \"%s\",\n"
-            "\t\t\t\"name\": \"%s\",\n"
-            "\t\t\t\"type\": \"%s\",\n"
-            "\t\t\t\"family\": \"%s\",\n"
-            "\t\t\t\"context\": \"%s\",\n"
-            "\t\t\t\"title\": \"%s (%s)\",\n"
-            "\t\t\t\"priority\": %ld,\n"
-            "\t\t\t\"plugin\": \"%s\",\n"
-            "\t\t\t\"module\": \"%s\",\n"
-            "\t\t\t\"enabled\": %s,\n"
-            "\t\t\t\"units\": \"%s\",\n"
-            "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
-            "\t\t\t\"chart_type\": \"%s\",\n"
-                    , st->id
-                    , st->name
-                    , st->type
-                    , st->family
-                    , st->context
-                    , st->title, st->name
-                    , st->priority
-                    , st->plugin_name?st->plugin_name:""
-                    , st->module_name?st->module_name:""
-                    , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?"true":"false"
-                    , st->units
-                    , st->name
-                    , rrdset_type_name(st->chart_type)
+    buffer_sprintf(
+        wb,
+        "\t\t{\n"
+        "\t\t\t\"id\": \"%s\",\n"
+        "\t\t\t\"name\": \"%s\",\n"
+        "\t\t\t\"type\": \"%s\",\n"
+        "\t\t\t\"family\": \"%s\",\n"
+        "\t\t\t\"context\": \"%s\",\n"
+        "\t\t\t\"title\": \"%s (%s)\",\n"
+        "\t\t\t\"priority\": %ld,\n"
+        "\t\t\t\"plugin\": \"%s\",\n"
+        "\t\t\t\"module\": \"%s\",\n"
+        "\t\t\t\"units\": \"%s\",\n"
+        "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
+        "\t\t\t\"chart_type\": \"%s\",\n",
+        rrdset_id(st),
+        rrdset_name(st),
+        rrdset_type(st),
+        rrdset_family(st),
+        rrdset_context(st),
+        rrdset_title(st),
+        rrdset_name(st),
+        st->priority,
+        rrdset_plugin_name(st),
+        rrdset_module_name(st),
+        rrdset_units(st),
+        rrdset_name(st),
+        rrdset_type_name(st->chart_type));
+
+    if (likely(!skip_volatile))
+        buffer_sprintf(
+            wb,
+            "\t\t\t\"duration\": %"PRId64",\n",
+            (int64_t)(last_entry_t - first_entry_t + st->update_every) //st->entries * st->update_every
+        );
+
+    buffer_sprintf(
+        wb,
+        "\t\t\t\"first_entry\": %"PRId64",\n",
+        (int64_t)first_entry_t //rrdset_first_entry_t(st)
     );
 
     if (likely(!skip_volatile))
-        buffer_sprintf(wb,
-                "\t\t\t\"duration\": %ld,\n"
-            , last_entry_t - first_entry_t + st->update_every//st->entries * st->update_every
+        buffer_sprintf(
+            wb,
+            "\t\t\t\"last_entry\": %"PRId64",\n",
+            (int64_t)last_entry_t //rrdset_last_entry_t(st)
         );
 
-    buffer_sprintf(wb,
-                "\t\t\t\"first_entry\": %ld,\n"
-        , first_entry_t //rrdset_first_entry_t(st)
-    );
+    buffer_sprintf(
+        wb,
+        "\t\t\t\"update_every\": %d,\n"
+        "\t\t\t\"dimensions\": {\n",
+        st->update_every);
 
-    if (likely(!skip_volatile))
-        buffer_sprintf(wb,
-                "\t\t\t\"last_entry\": %ld,\n"
-            , last_entry_t//rrdset_last_entry_t(st)
-        );
-
-    buffer_sprintf(wb,
-                "\t\t\t\"update_every\": %d,\n"
-                "\t\t\t\"dimensions\": {\n"
-                       , st->update_every
-        );
-
-    unsigned long memory = st->memsize;
+    unsigned long memory = sizeof(RRDSET) + st->memsize;
 
     size_t dimensions = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
 
-        memory += rd->memsize;
+        memory += sizeof(RRDDIM) + rd->memsize;
 
         if (dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
             buffer_strcat(wb, "\t\t\t\t\"");
-        buffer_strcat_jsonescape(wb, rd->id);
+        buffer_strcat_jsonescape(wb, rrddim_id(rd));
         buffer_strcat(wb, "\": { \"name\": \"");
-        buffer_strcat_jsonescape(wb, rd->name);
+        buffer_strcat_jsonescape(wb, rrddim_name(rd));
         buffer_strcat(wb, "\" }");
 
         dimensions++;
@@ -129,7 +121,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
         size_t alarms = 0;
         RRDCALC *rc;
-        for (rc = st->alarms; rc; rc = rc->rrdset_next) {
+        foreach_rrdcalc_in_rrdset(st, rc) {
             buffer_sprintf(
                 wb,
                 "%s"
@@ -139,7 +131,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                 "\t\t\t\t\t\"units\": \"%s\",\n"
                 "\t\t\t\t\t\"update_every\": %d\n"
                 "\t\t\t\t}",
-                (alarms) ? ",\n" : "", rc->name, rc->id, rrdcalc_status2string(rc->status), rc->units,
+                (alarms) ? ",\n" : "", rrdcalc_name(rc), rc->id, rrdcalc_status2string(rc->status), rrdcalc_units(rc),
                 rc->update_every);
 
             alarms++;

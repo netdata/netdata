@@ -4,6 +4,7 @@
 #define TEST_EXPORTING_ENGINE_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "database/rrdvar.h"
 
 #include "exporting/exporting_engine.h"
 #include "exporting/graphite/graphite.h"
@@ -30,7 +31,14 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <stdint.h>
+
+#ifndef UNIT_TESTING
 #include <cmocka.h>
+#else
+#undef UNIT_TESTING
+#include <cmocka.h>
+#define UNIT_TESTING
+#endif
 
 #define MAX_LOG_LINE 1024
 extern char log_line[];
@@ -50,11 +58,11 @@ int __wrap_connect_to_one_of(
 void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
 void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
-time_t __mock_rrddim_query_oldest_time(RRDDIM *rd);
-time_t __mock_rrddim_query_latest_time(RRDDIM *rd);
-void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
 int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle);
-storage_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time);
+STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle);
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle);
 
 // -----------------------------------------------------------------------
@@ -81,11 +89,11 @@ int __wrap_init_connectors(struct engine *engine);
 int __real_mark_scheduled_instances(struct engine *engine);
 int __wrap_mark_scheduled_instances(struct engine *engine);
 
-calculated_number __real_exporting_calculate_value_from_stored_data(
+NETDATA_DOUBLE __real_exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp);
-calculated_number __wrap_exporting_calculate_value_from_stored_data(
+NETDATA_DOUBLE __wrap_exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp);
@@ -113,6 +121,7 @@ int __mock_start_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_start_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_metric_formatting(struct instance *instance, RRDDIM *rd);
 int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
+int __mock_variables_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
 

@@ -45,49 +45,14 @@ static inline int _aclk_queue_query(aclk_query_t query)
 
 }
 
-// Gets a pointer to the metric associated with a particular query type.
-// NULL if the query type has no associated metric.
-static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t qtype) {
-    switch (qtype) {
-        case HTTP_API_V2:
-            return &aclk_metrics_per_sample.cloud_req_type_http;
-        case ALARM_STATE_UPDATE:
-            return &aclk_metrics_per_sample.cloud_req_type_alarm_upd;
-        case METADATA_INFO:
-            return &aclk_metrics_per_sample.cloud_req_type_metadata_info;
-        case METADATA_ALARMS:
-            return &aclk_metrics_per_sample.cloud_req_type_metadata_alarms;
-        case CHART_NEW:
-            return &aclk_metrics_per_sample.cloud_req_type_chart_new;
-        case CHART_DEL:
-            return &aclk_metrics_per_sample.cloud_req_type_chart_del;
-        case REGISTER_NODE:
-            return &aclk_metrics_per_sample.cloud_req_type_register_node;
-        case NODE_STATE_UPDATE:
-            return &aclk_metrics_per_sample.cloud_req_type_node_upd;
-        default:
-            return NULL;
-    }
-}
-
 int aclk_queue_query(aclk_query_t query)
 {
     int ret = _aclk_queue_query(query);
     if (!ret) {
-        // local cache of query type before we wake up query thread, which may
-        // free the query in a race.
-        aclk_query_type_t qtype = query->type;
         QUERY_THREAD_WAKEUP;
-
         if (aclk_stats_enabled) {
-            // get target query type metric before lock so we keep lock for
-            // minimal time.
-            volatile uint32_t *metric = aclk_stats_qmetric_for_qtype(qtype);
-
             ACLK_STATS_LOCK;
             aclk_metrics_per_sample.queries_queued++;
-            if (metric)
-                *metric += 1;
             ACLK_STATS_UNLOCK;
         }
     }
@@ -146,26 +111,8 @@ void aclk_query_free(aclk_query_t query)
             freez(query->data.http_api_v2.query);
         break;
 
-    case CHART_NEW:
-        freez(query->data.chart_add_del.chart_name);
-        break;
-    
-    case ALARM_STATE_UPDATE:
-        if (query->data.alarm_update)
-            json_object_put(query->data.alarm_update);
-        break;
-
     case NODE_STATE_UPDATE:
-        freez((void*)query->data.node_update.claim_id);
-        freez((void*)query->data.node_update.node_id);
-        break;
-
     case REGISTER_NODE:
-        freez((void*)query->data.node_creation.claim_id);
-        freez((void*)query->data.node_creation.hostname);
-        freez((void*)query->data.node_creation.machine_guid);
-        break;
-
     case CHART_DIMS_UPDATE:
     case CHART_CONFIG_UPDATED:
     case CHART_RESET:
@@ -174,7 +121,10 @@ void aclk_query_free(aclk_query_t query)
     case ALARM_LOG_HEALTH:
     case ALARM_PROVIDE_CFG:
     case ALARM_SNAPSHOT:
-        freez(query->data.bin_payload.payload);
+    case UPDATE_NODE_COLLECTORS:
+    case PROTO_BIN_MESSAGE:
+        if (!use_mqtt_5)
+            freez(query->data.bin_payload.payload);
         break;
 
     default:

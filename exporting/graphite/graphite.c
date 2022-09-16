@@ -37,6 +37,7 @@ int init_graphite_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_graphite_plaintext;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = simple_connector_end_batch;
 
@@ -71,7 +72,7 @@ int init_graphite_instance(struct instance *instance)
  * @param len the maximum number of characters copied.
  */
 
-void sanitize_graphite_label_value(char *dst, char *src, size_t len)
+void sanitize_graphite_label_value(char *dst, const char *src, size_t len)
 {
     while (*src != '\0' && len) {
         if (isspace(*src) || *src == ';' || *src == '~')
@@ -91,29 +92,18 @@ void sanitize_graphite_label_value(char *dst, char *src, size_t len)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
+
 int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host)
 {
-    if (!instance->labels)
-        instance->labels = buffer_create(1024);
+    if (!instance->labels_buffer)
+        instance->labels_buffer = buffer_create(1024);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-    for (struct label *label = host->labels.head; label; label = label->next) {
-        if (!should_send_label(instance, label))
-            continue;
-
-        char value[CONFIG_MAX_VALUE + 1];
-        sanitize_graphite_label_value(value, label->value, CONFIG_MAX_VALUE);
-
-        if (*value) {
-            buffer_strcat(instance->labels, ";");
-            buffer_sprintf(instance->labels, "%s=%s", label->key, value);
-        }
-    }
-    netdata_rwlock_unlock(&host->labels.labels_rwlock);
+    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ";", "=", "", "",
+                        exporting_labels_filter_callback, instance,
+                        NULL, sanitize_graphite_label_value);
 
     return 0;
 }
@@ -133,25 +123,25 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     buffer_sprintf(
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
-        (host->tags) ? host->tags : "",
-        (instance->labels) ? buffer_tostring(instance->labels) : "",
+        (host->tags) ? rrdhost_tags(host) : "",
+        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
         rd->last_collected_value,
         (unsigned long long)rd->last_collected_time.tv_sec);
 
@@ -173,31 +163,31 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
 
     buffer_sprintf(
         instance->buffer,
-        "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
+        "%s.%s.%s.%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
-        (host->tags) ? host->tags : "",
-        (instance->labels) ? buffer_tostring(instance->labels) : "",
+        (host->tags) ? rrdhost_tags(host) : "",
+        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
         value,
         (unsigned long long)last_t);
 

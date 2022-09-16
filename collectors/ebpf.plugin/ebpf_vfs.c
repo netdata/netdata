@@ -34,33 +34,380 @@ struct config vfs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
     .rwlock = AVL_LOCK_INITIALIZER } };
 
-static struct bpf_object *objects = NULL;
-static struct bpf_link **probe_links = NULL;
-
 struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL, NULL, 1, NULL,
                                             NULL,  NULL};
+static enum ebpf_threads_status ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
-static int read_thread_closed = 1;
+netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_writev", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_read", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_readv", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_unlink", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_fsync", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_open", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "vfs_create", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
+                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/vfs.skel.h" // BTF code
+
+static struct vfs_bpf *bpf_obj = NULL;
+
+/**
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static void ebpf_vfs_disable_probes(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_unlink_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_unlink_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_create_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_create_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_kprobe, false);
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_disable_trampoline(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_unlink_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_create_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_fentry, false);
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_set_trampoline_target(struct vfs_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_write_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_write_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_writev_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_writev_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_read_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_READ].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_read_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_READ].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_readv_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_READV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_readv_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_READV].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_unlink_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_fsync_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_fsync_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_open_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_open_fexit, 0, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_create_fentry, 0, vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_vfs_release_task_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
+}
+
+/**
+ * Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
+{
+    obj->links.netdata_vfs_write_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_write_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+    int ret = libbpf_get_error(obj->links.netdata_vfs_write_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_write_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_write_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_write_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_writev_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_writev_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_writev_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_writev_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_writev_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_writev_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_read_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_read_kprobe, false,
+                                                                    vfs_targets[NETDATA_EBPF_VFS_READ].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_read_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_read_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_read_kretprobe, true,
+                                                                       vfs_targets[NETDATA_EBPF_VFS_READ].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_read_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_readv_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_readv_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_READV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_readv_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_readv_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_readv_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_READV].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_readv_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_unlink_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_unlink_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_unlink_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_unlink_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_unlink_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_unlink_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kprobe, false,
+                                                                    vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kretprobe, true,
+                                                                       vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kprobe, false,
+                                                                     vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_fsync_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_fsync_kretprobe, true,
+                                                                        vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kprobe, false,
+                                                                    vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_open_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kretprobe, true,
+                                                                       vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_open_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kprobe, false,
+                                                                      vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_create_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_create_kretprobe, true,
+                                                                         vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
+    ret = libbpf_get_error(obj->links.netdata_vfs_create_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_vfs_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_release_task_fentry,
+                                                                            true,
+                                                                            EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_vfs_release_task_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_vfs_adjust_map_size(struct vfs_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(obj->maps.tbl_vfs_pid, &vfs_maps[NETDATA_VFS_PID],
+                         em, bpf_map__name(obj->maps.tbl_vfs_pid));
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_set_hash_tables(struct vfs_bpf *obj)
+{
+    vfs_maps[NETDATA_VFS_ALL].map_fd = bpf_map__fd(obj->maps.tbl_vfs_stats);
+    vfs_maps[NETDATA_VFS_PID].map_fd = bpf_map__fd(obj->maps.tbl_vfs_pid);
+    vfs_maps[NETDATA_VFS_CTRL].map_fd = bpf_map__fd(obj->maps.vfs_ctrl);
+}
+
+/**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_vfs_disable_release_task(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_release_task_kprobe, false);
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_EBPF_VFS_WRITE].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_vfs_disable_probes(obj);
+
+        ebpf_vfs_set_trampoline_target(obj);
+    } else {
+        ebpf_vfs_disable_trampoline(obj);
+    }
+
+    ebpf_vfs_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_vfs_disable_release_task(obj);
+
+    int ret = vfs_bpf__load(obj);
+    if (ret) {
+        return ret;
+    }
+
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? vfs_bpf__attach(obj) : ebpf_vfs_attach_probe(obj);
+    if (!ret) {
+        ebpf_vfs_set_hash_tables(obj);
+
+        ebpf_update_controller(vfs_maps[NETDATA_VFS_CTRL].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
 
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
-
 /**
- * Clean PID structures
+ * Exit
  *
- * Clean the allocated structures.
- */
-void clean_vfs_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(vfs_pid[pids->pid]);
-
-        pids = pids->next;
+ * Cancel thread and exit.
+ *
+ * @param ptr thread data.
+**/
+static void ebpf_vfs_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
     }
+
+    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
@@ -71,29 +418,20 @@ void clean_vfs_pid_structures() {
 static void ebpf_vfs_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_vfs_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 50 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     freez(vfs_hash_values);
     freez(vfs_vector);
+    freez(vfs_threads.thread);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        bpf_object__close(objects);
-    }
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        vfs_bpf__destroy(bpf_obj);
+#endif
+
+    vfs_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -526,23 +864,26 @@ static void read_update_vfs_cgroup()
  */
 void *ebpf_vfs_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_VFS_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    //This will be cancelled by its parent
+    while (ebpf_vfs_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_vfs_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_global_table();
     }
 
-    read_thread_closed = 1;
+    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPED;
 
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -670,42 +1011,42 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls for <code>vfs_fsync</code>",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NULL,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_FSYNC_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "Sync error",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NULL,
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_FSYNC_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5508,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls for <code>vfs_open</code>",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NULL,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_OPEN_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "Open error",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NULL,
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_OPEN_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5510,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls for <code>vfs_create</code>",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NULL,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_CREATE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NULL,
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_CREATE_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5512,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
@@ -763,37 +1104,37 @@ static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls for <code>vfs_fsync</code>",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_FSYNC_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "Sync error",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
-                                  NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_FSYNC_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5508, em->update_every);
     }
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls for <code>vfs_open</code>",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_OPEN_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "Open error",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
-                                  NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_OPEN_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5510, em->update_every);
     }
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls for <code>vfs_create</code>",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_CREATE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
-                                  NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_CREATE_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5512, em->update_every);
     }
 }
@@ -943,41 +1284,41 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls to <code>vfs_fsync</code>",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20072,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT,
                                   NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "Sync error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20073,
-                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
+                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT,
                                       NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
     }
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls to <code>vfs_open</code>",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20074,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_OPEN_CONTEXT,
                                   NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "Open error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20075,
-                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
+                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT,
                                       NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls to <code>vfs_create</code>",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20076,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_CREATE_CONTEXT,
                                   NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20077,
-                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
+                                      ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT,
                                       NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
     }
 }
@@ -1000,7 +1341,7 @@ static int ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_vfs.unlink_call);
-        } else
+        } else if (unlikely(ect->systemd))
             ret = 0;
     }
     write_end_chart();
@@ -1181,38 +1522,38 @@ static void vfs_collector(ebpf_module_t *em)
     vfs_threads.thread = mallocz(sizeof(netdata_thread_t));
     vfs_threads.start_routine = ebpf_vfs_read_hash;
 
-    netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_vfs_read_hash, em);
 
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
-    int update_every = em->update_every;
-    int counter = update_every - 1;
-    while (!close_ebpf_plugin) {
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = em->update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
+
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        if (apps)
+            ebpf_vfs_read_apps();
 
-        if (++counter == update_every) {
-            counter = 0;
-            if (apps)
-                ebpf_vfs_read_apps();
+        if (cgroups)
+            read_update_vfs_cgroup();
 
-            if (cgroups)
-                read_update_vfs_cgroup();
+        pthread_mutex_lock(&lock);
 
-            pthread_mutex_lock(&lock);
+        ebpf_vfs_send_data(em);
+        fflush(stdout);
 
-            ebpf_vfs_send_data(em);
-            fflush(stdout);
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_vfs_send_apps_data(em, apps_groups_root_target);
 
-            if (apps)
-                ebpf_vfs_send_apps_data(em, apps_groups_root_target);
+        if (cgroups)
+            ebpf_vfs_send_cgroup_data(em);
 
-            if (cgroups)
-                ebpf_vfs_send_cgroup_data(em);
-
-            pthread_mutex_unlock(&lock);
-        }
+        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }
@@ -1520,6 +1861,8 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
@@ -1553,6 +1896,36 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
  *
  *****************************************************************/
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_vfs_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_EBPF_VFS_WRITE].mode);
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = vfs_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_vfs_load_and_attach(bpf_obj, em);
+    }
+#endif
+
+    return ret;
+}
+
 /**
  * Process thread
  *
@@ -1564,7 +1937,7 @@ static void ebpf_vfs_allocate_global_vectors(int apps)
  */
 void *ebpf_vfs_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_vfs_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = vfs_maps;
@@ -1576,8 +1949,11 @@ void *ebpf_vfs_thread(void *ptr)
     if (!em->enabled)
         goto endvfs;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
-    if (!probe_links) {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_vfs_load_bpf(em)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endvfs;
     }
 
@@ -1591,11 +1967,15 @@ void *ebpf_vfs_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     vfs_collector(em);
 
 endvfs:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -5,7 +5,7 @@
 /* Run service jobs every X seconds */
 #define SERVICE_HEARTBEAT 10
 
-void service_main_cleanup(void *ptr)
+static void service_main_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
@@ -31,6 +31,11 @@ void *service_main(void *ptr)
         heartbeat_next(&hb, step);
 
         rrd_cleanup_obsolete_charts();
+
+        rrd_wrlock();
+        rrdhost_cleanup_orphan_hosts_nolock(localhost);
+        rrd_unlock();
+
     }
 
     netdata_thread_cleanup_pop(1);

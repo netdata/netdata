@@ -26,7 +26,7 @@ dist_web_DATA = \
     $(srcdir)/index.html \
     $(srcdir)/infographic.html \
     $(srcdir)/manifest.json \
-    $(srcdir)/precache-manifest.14a1e41ead8f8b6e26e356372042ef5a.js \
+    $(srcdir)/precache-manifest.140265f4227b85438a4cad8757738fa5.js \
     $(srcdir)/refresh-badges.js \
     $(srcdir)/robots.txt \
     $(srcdir)/service-worker.js \
@@ -61,6 +61,8 @@ dist_webimages_DATA = \
     $(srcdir)/images/alert-128-red.png \
     $(srcdir)/images/alert-multi-size-orange.ico \
     $(srcdir)/images/alert-multi-size-red.ico \
+    $(srcdir)/images/alerts.jpg \
+    $(srcdir)/images/alerts.png \
     $(srcdir)/images/android-icon-144x144.png \
     $(srcdir)/images/android-icon-192x192.png \
     $(srcdir)/images/android-icon-36x36.png \
@@ -82,12 +84,14 @@ dist_webimages_DATA = \
     $(srcdir)/images/banner-icon-144x144.png \
     $(srcdir)/images/check-mark-2-128-green.png \
     $(srcdir)/images/check-mark-2-multi-size-green.ico \
+    $(srcdir)/images/dashboards.png \
     $(srcdir)/images/favicon-128.png \
     $(srcdir)/images/favicon-16x16.png \
     $(srcdir)/images/favicon-196x196.png \
     $(srcdir)/images/favicon-32x32.png \
     $(srcdir)/images/favicon-96x96.png \
     $(srcdir)/images/favicon.ico \
+    $(srcdir)/images/home.png \
     $(srcdir)/images/ms-icon-144x144.png \
     $(srcdir)/images/ms-icon-150x150.png \
     $(srcdir)/images/ms-icon-310x150.png \
@@ -96,8 +100,12 @@ dist_webimages_DATA = \
     $(srcdir)/images/ms-icon-70x70.png \
     $(srcdir)/images/netdata-logomark.svg \
     $(srcdir)/images/netdata.svg \
+    $(srcdir)/images/nodeView.png \
+    $(srcdir)/images/nodes.jpg \
+    $(srcdir)/images/overview.png \
     $(srcdir)/images/packaging-beta-tag.svg \
     $(srcdir)/images/post.png \
+    $(srcdir)/images/pricing.png \
     $(srcdir)/images/seo-performance-128.png \
     $(NULL)
 
@@ -127,41 +135,41 @@ dist_weblib_DATA = \
 
 webstaticcssdir=$(webdir)/static/css
 dist_webstaticcss_DATA = \
-    $(srcdir)/static/css/2.20fd0a40.chunk.css \
-    $(srcdir)/static/css/2.20fd0a40.chunk.css.map \
+    $(srcdir)/static/css/2.c454aab8.chunk.css \
+    $(srcdir)/static/css/2.c454aab8.chunk.css.map \
     $(srcdir)/static/css/4.a36e3b73.chunk.css \
     $(srcdir)/static/css/4.a36e3b73.chunk.css.map \
-    $(srcdir)/static/css/main.a46a34fa.chunk.css \
-    $(srcdir)/static/css/main.a46a34fa.chunk.css.map \
+    $(srcdir)/static/css/main.53ba10f1.chunk.css \
+    $(srcdir)/static/css/main.53ba10f1.chunk.css.map \
     $(NULL)
 
 webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
-    $(srcdir)/static/js/10.a23c74b9.chunk.js \
-    $(srcdir)/static/js/10.a23c74b9.chunk.js.map \
-    $(srcdir)/static/js/2.3456bb26.chunk.js \
-    $(srcdir)/static/js/2.3456bb26.chunk.js.LICENSE \
-    $(srcdir)/static/js/2.3456bb26.chunk.js.map \
-    $(srcdir)/static/js/3.5ef4adcd.chunk.js \
-    $(srcdir)/static/js/3.5ef4adcd.chunk.js.map \
-    $(srcdir)/static/js/4.1621c1ad.chunk.js \
-    $(srcdir)/static/js/4.1621c1ad.chunk.js.map \
-    $(srcdir)/static/js/5.05b274a5.chunk.js \
-    $(srcdir)/static/js/5.05b274a5.chunk.js.LICENSE \
-    $(srcdir)/static/js/5.05b274a5.chunk.js.map \
-    $(srcdir)/static/js/6.299c0acd.chunk.js \
-    $(srcdir)/static/js/6.299c0acd.chunk.js.map \
-    $(srcdir)/static/js/7.850d6c32.chunk.js \
-    $(srcdir)/static/js/7.850d6c32.chunk.js.map \
-    $(srcdir)/static/js/8.fb328a3a.chunk.js \
-    $(srcdir)/static/js/8.fb328a3a.chunk.js.map \
-    $(srcdir)/static/js/9.f8eb4edd.chunk.js \
-    $(srcdir)/static/js/9.f8eb4edd.chunk.js.map \
-    $(srcdir)/static/js/main.fa83a16e.chunk.js \
-    $(srcdir)/static/js/main.fa83a16e.chunk.js.LICENSE \
-    $(srcdir)/static/js/main.fa83a16e.chunk.js.map \
-    $(srcdir)/static/js/runtime-main.ea592e2f.js \
-    $(srcdir)/static/js/runtime-main.ea592e2f.js.map \
+    $(srcdir)/static/js/10.a5cd7d0e.chunk.js \
+    $(srcdir)/static/js/10.a5cd7d0e.chunk.js.map \
+    $(srcdir)/static/js/2.92ca8446.chunk.js \
+    $(srcdir)/static/js/2.92ca8446.chunk.js.LICENSE \
+    $(srcdir)/static/js/2.92ca8446.chunk.js.map \
+    $(srcdir)/static/js/3.f137faca.chunk.js \
+    $(srcdir)/static/js/3.f137faca.chunk.js.map \
+    $(srcdir)/static/js/4.2dbcd906.chunk.js \
+    $(srcdir)/static/js/4.2dbcd906.chunk.js.map \
+    $(srcdir)/static/js/5.2f783a54.chunk.js \
+    $(srcdir)/static/js/5.2f783a54.chunk.js.LICENSE \
+    $(srcdir)/static/js/5.2f783a54.chunk.js.map \
+    $(srcdir)/static/js/6.e1951239.chunk.js \
+    $(srcdir)/static/js/6.e1951239.chunk.js.map \
+    $(srcdir)/static/js/7.c2417fb0.chunk.js \
+    $(srcdir)/static/js/7.c2417fb0.chunk.js.map \
+    $(srcdir)/static/js/8.b4161ea2.chunk.js \
+    $(srcdir)/static/js/8.b4161ea2.chunk.js.map \
+    $(srcdir)/static/js/9.a4363968.chunk.js \
+    $(srcdir)/static/js/9.a4363968.chunk.js.map \
+    $(srcdir)/static/js/main.99ea423c.chunk.js \
+    $(srcdir)/static/js/main.99ea423c.chunk.js.LICENSE \
+    $(srcdir)/static/js/main.99ea423c.chunk.js.map \
+    $(srcdir)/static/js/runtime-main.08abed8f.js \
+    $(srcdir)/static/js/runtime-main.08abed8f.js.map \
     $(NULL)
 
 webstaticmediadir=$(webdir)/static/media

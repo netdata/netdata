@@ -2,9 +2,16 @@
 
 #include "aclk_stats.h"
 
+#include "aclk_query.h"
+
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
-int query_thread_count;
+struct {
+    int query_thread_count;
+    unsigned int proto_hdl_cnt;
+    uint32_t *aclk_proto_rx_msgs_sample;
+    RRDDIM **rx_msg_dims;
+} aclk_stats_cfg; // there is only 1 stats thread at a time
 
 // data ACLK stats need per query thread
 struct aclk_qt_data {
@@ -13,6 +20,7 @@ struct aclk_qt_data {
 
 uint32_t *aclk_queries_per_thread = NULL;
 uint32_t *aclk_queries_per_thread_sample = NULL;
+uint32_t *aclk_proto_rx_msgs_sample = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -113,39 +121,21 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
 static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
-    static RRDDIM *rd_type_http = NULL;
-    static RRDDIM *rd_type_alarm_upd = NULL;
-    static RRDDIM *rd_type_metadata_info = NULL;
-    static RRDDIM *rd_type_metadata_alarms = NULL;
-    static RRDDIM *rd_type_chart_new = NULL;
-    static RRDDIM *rd_type_chart_del = NULL;
-    static RRDDIM *rd_type_register_node = NULL;
-    static RRDDIM *rd_type_node_upd = NULL;
+    static RRDDIM *dims[ACLK_QUERY_TYPE_COUNT];
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_cloud_req_type", NULL, "aclk", NULL, "Requests received from cloud by their type", "req/s",
+            "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rd_type_http = rrddim_add(st, "http", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_alarm_upd = rrddim_add(st, "alarm update", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_metadata_info = rrddim_add(st, "info metadata", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_metadata_alarms = rrddim_add(st, "alarms metadata", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_chart_new = rrddim_add(st, "chart new", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_chart_del = rrddim_add(st, "chart delete", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_register_node = rrddim_add(st, "register node", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_type_node_upd = rrddim_add(st, "node update", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
+            dims[i] = rrddim_add(st, aclk_query_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+
     } else
         rrdset_next(st);
 
-    rrddim_set_by_pointer(st, rd_type_http, per_sample->cloud_req_type_http);
-    rrddim_set_by_pointer(st, rd_type_alarm_upd, per_sample->cloud_req_type_alarm_upd);
-    rrddim_set_by_pointer(st, rd_type_metadata_info, per_sample->cloud_req_type_metadata_info);
-    rrddim_set_by_pointer(st, rd_type_metadata_alarms, per_sample->cloud_req_type_metadata_alarms);
-    rrddim_set_by_pointer(st, rd_type_chart_new, per_sample->cloud_req_type_chart_new);
-    rrddim_set_by_pointer(st, rd_type_chart_del, per_sample->cloud_req_type_chart_del);
-    rrddim_set_by_pointer(st, rd_type_register_node, per_sample->cloud_req_type_register_node);
-    rrddim_set_by_pointer(st, rd_type_node_upd, per_sample->cloud_req_type_node_upd);
+    for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
+        rrddim_set_by_pointer(st, dims[i], per_sample->queries_per_type[i]);
 
     rrdset_done(st);
 }
@@ -202,7 +192,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
             "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        for (int i = 0; i < query_thread_count; i++) {
+        for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
             if (snprintfz(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
                 error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -210,7 +200,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     } else
         rrdset_next(st);
 
-    for (int i = 0; i < query_thread_count; i++) {
+    for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
         rrddim_set_by_pointer(st, aclk_qt_data[i].dim, queries_per_thread[i]);
     }
 
@@ -245,8 +235,74 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
+const char *rx_handler_get_name(size_t i);
+static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
+{
+    static RRDSET *st = NULL;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_protobuf_rx_types", NULL, "aclk", NULL, "Received new cloud architecture messages by their type.", "msg/s",
+            "netdata", "stats", 200010, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++) {
+            aclk_stats_cfg.rx_msg_dims[i] = rrddim_add(st, rx_handler_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        }
+    } else
+        rrdset_next(st);
+
+    for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++)
+        rrddim_set_by_pointer(st, aclk_stats_cfg.rx_msg_dims[i], rx_msgs_sample[i]);
+
+    rrdset_done(st);
+}
+
+static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_sent = NULL;
+    static RRDDIM *rd_recvd = NULL;
+    static uint64_t sent = 0;
+    static uint64_t recvd = 0;
+
+    sent += stats->bytes_tx;
+    recvd += stats->bytes_rx;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_openssl_bytes", NULL, "aclk", NULL, "Received and Sent bytes.", "B/s",
+            "netdata", "stats", 200011, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        rd_sent  = rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    } else
+        rrdset_next(st);
+
+    rrddim_set_by_pointer(st, rd_sent, sent);
+    rrddim_set_by_pointer(st, rd_recvd, recvd);
+
+    rrdset_done(st);
+}
+
+void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt)
+{
+    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
+    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
+    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+
+    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+
+    aclk_stats_cfg.proto_hdl_cnt = proto_hdl_cnt;
+    aclk_stats_cfg.aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
+    aclk_proto_rx_msgs_sample = callocz(proto_hdl_cnt, sizeof(*aclk_proto_rx_msgs_sample));
+    aclk_stats_cfg.rx_msg_dims = callocz(proto_hdl_cnt, sizeof(RRDDIM*));
+}
+
 void aclk_stats_thread_cleanup()
 {
+    freez(aclk_stats_cfg.rx_msg_dims);
+    freez(aclk_proto_rx_msgs_sample);
+    freez(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
     freez(aclk_queries_per_thread_sample);
@@ -256,16 +312,11 @@ void *aclk_stats_main_thread(void *ptr)
 {
     struct aclk_stats_thread *args = ptr;
 
-    query_thread_count = args->query_thread_count;
-    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
-    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
-    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+    aclk_stats_cfg.query_thread_count = args->query_thread_count;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
-
-    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
     struct aclk_metrics_per_sample per_sample;
     struct aclk_metrics permanent;
@@ -282,11 +333,15 @@ void *aclk_stats_main_thread(void *ptr)
         // to not hold lock longer than necessary, especially not to hold it
         // during database rrd* operations
         memcpy(&per_sample, &aclk_metrics_per_sample, sizeof(struct aclk_metrics_per_sample));
+
+        memcpy(aclk_stats_cfg.aclk_proto_rx_msgs_sample, aclk_proto_rx_msgs_sample, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
+        memset(aclk_proto_rx_msgs_sample, 0, sizeof(*aclk_proto_rx_msgs_sample) * aclk_stats_cfg.proto_hdl_cnt);
+
         memcpy(&permanent, &aclk_metrics, sizeof(struct aclk_metrics));
         memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
 
-        memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
-        memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
+        memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * aclk_stats_cfg.query_thread_count);
+        memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * aclk_stats_cfg.query_thread_count);
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
@@ -302,6 +357,11 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
         aclk_stats_query_time(&per_sample);
+
+        struct mqtt_wss_stats mqtt_wss_stats = mqtt_wss_get_stats(args->client);
+        aclk_stats_mqtt_wss(&mqtt_wss_stats);
+
+        aclk_stats_newproto_rx(aclk_stats_cfg.aclk_proto_rx_msgs_sample);
     }
 
     return 0;
@@ -320,7 +380,7 @@ void aclk_stats_upd_online(int online) {
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-static usec_t pub_time[UINT16_MAX];
+static usec_t pub_time[UINT16_MAX + 1] = {0};
 void aclk_stats_msg_published(uint16_t id)
 {
     ACLK_STATS_LOCK;

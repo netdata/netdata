@@ -1,46 +1,63 @@
 <!--
-title: "PagerDuty"
+title: "Send alert notifications to PagerDuty"
+description: "Send alerts to your PagerDuty dashboard any time an anomaly or performance issue strikes a node in your infrastructure."
+sidebar_label: "PagerDuty"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/pagerduty/README.md
 -->
 
-# PagerDuty
+# Send alert notifications to PagerDuty
 
-[PagerDuty](https://www.pagerduty.com/company/) is the enterprise incident resolution service that integrates with ITOps and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and resolution times.
+[PagerDuty](https://www.pagerduty.com/company/) is an enterprise incident resolution service that integrates with ITOps
+and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to
+correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and
+resolution times.
 
-Here is an example of a PagerDuty dashboard with Netdata notifications:
+## What you need to get started
 
-![PagerDuty dashboard with Netdata notifications](https://cloud.githubusercontent.com/assets/19278582/21233877/b466a08a-c2a5-11e6-8d66-ee6eed43818f.png)
+- An installation of the open-source [Netdata](/docs/get-started.mdx) monitoring agent.
+- An installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node
+  running Netdata.
+- A PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`.
 
-To have Netdata send notifications to PagerDuty, you'll first need to set up a PagerDuty `Generic API` service and install the PagerDuty agent on the host running Netdata.  See the following guide for details:
+## Setup
 
-<https://www.pagerduty.com/docs/guides/agent-install-guide/>
+[Add a new service](https://support.pagerduty.com/docs/services-and-integrations#section-configuring-services-and-integrations)
+to PagerDuty. Click **Use our API directly** and select either `Events API v2` or `Events API v1`. Once you finish
+creating the service, click on the **Integrations** tab to find your **Integration Key**.
 
-During the setup of the `Generic API` PagerDuty service, you'll obtain a `pagerduty service key`.  Keep this **service key** handy.
+Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use
+[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to open
+`health_alarm_notify.conf`.
 
-Once the PagerDuty agent is installed on your host and can send notifications from your host to your `Generic API` service on PagerDuty, add the **service key** to `DEFAULT_RECIPIENT_PD` in `health_alarm_notify.conf`:
-
+```bash
+cd /etc/netdata
+sudo ./edit-config health_alarm_notify.conf
 ```
-#------------------------------------------------------------------------------
-# pagerduty.com notification options
-#
-# pagerduty.com notifications require the pagerduty agent to be installed and 
-# a "Generic API" pagerduty service.
-# https://www.pagerduty.com/docs/guides/agent-install-guide/
 
-# multiple recipients can be given like this:
-#              "<pd_service_key_1> <pd_service_key_2> ..."
+Scroll down to the `# pagerduty.com notification options` section.
 
-# enable/disable sending pagerduty notifications
+Ensure `SEND_PD` is set to `YES`, then copy your Integration Key into `DEFAULT_RECIPIENT_ID`. Change `USE_PD_VERSION` to
+`2` if you chose `Events API v2` during service setup on PagerDuty. Minus comments, the section should look like this:
+
+```conf
 SEND_PD="YES"
-
-# if a role's recipients are not configured, a notification will be sent to
-# the "General API" pagerduty.com service that uses this service key.
-# (empty = do not send a notification for unconfigured roles):
-DEFAULT_RECIPIENT_PD="<service key>"
-
-# Which PD API are we going to use? For version 2 or newer, it is necessary to do a request for Pagerduty
-# before to set the version(https://developer.pagerduty.com/docs/events-api-v2/overview/).
-USE_PD_VERSION="1"
+DEFAULT_RECIPIENT_PD="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+USE_PD_VERSION="2"
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fpagerduty%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+## Testing
+
+To test alert notifications to PagerDuty, run the following:
+
+```bash
+sudo su -s /bin/bash netdata
+/usr/libexec/netdata/plugins.d/alarm-notify.sh test
+```
+
+## Configuration
+
+Aside from the three values set in `health_alarm_notify.conf`, there is no further configuration required to send alert
+notifications to PagerDuty.
+
+To configure individual alarms, read our [alert configuration](/docs/monitor/configure-alarms.md) doc or
+the [health entity reference](/health/REFERENCE.md) doc.

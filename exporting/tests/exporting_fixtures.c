@@ -39,46 +39,37 @@ int setup_rrdhost()
 
     localhost->rrd_update_every = 1;
 
-    localhost->tags = strdupz("TAG1=VALUE1 TAG2=VALUE2");
+    localhost->tags = string_strdupz("TAG1=VALUE1 TAG2=VALUE2");
 
-    struct label *label = calloc(1, sizeof(struct label));
-    label->key = strdupz("key1");
-    label->value = strdupz("value1");
-    label->label_source = LABEL_SOURCE_NETDATA_CONF;
-    localhost->labels.head = label;
-
-    label = calloc(1, sizeof(struct label));
-    label->key = strdupz("key2");
-    label->value = strdupz("value2");
-    label->label_source = LABEL_SOURCE_AUTO;
-    localhost->labels.head->next = label;
+    localhost->rrdlabels = rrdlabels_create();
+    rrdlabels_add(localhost->rrdlabels, "key1", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(localhost->rrdlabels, "key2", "value2", RRDLABEL_SRC_CONFIG);
 
     localhost->rrdset_root = calloc(1, sizeof(RRDSET));
     RRDSET *st = localhost->rrdset_root;
     st->rrdhost = localhost;
-    strcpy(st->id, "chart_id");
-    st->name = strdupz("chart_name");
-    st->flags |= RRDSET_FLAG_ENABLED;
+    st->id = string_strdupz("chart_id");
+    st->name = string_strdupz("chart_name");
     st->rrd_memory_mode |= RRD_MEMORY_MODE_SAVE;
     st->update_every = 1;
 
     localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     rd->rrdset = st;
-    rd->id = strdupz("dimension_id");
-    rd->name = strdupz("dimension_name");
+    rd->id = string_strdupz("dimension_id");
+    rd->name = string_strdupz("dimension_name");
     rd->last_collected_value = 123000321;
     rd->last_collected_time.tv_sec = 15051;
     rd->collections_counter++;
     rd->next = NULL;
 
-    rd->state = calloc(1, sizeof(*rd->state));
-    rd->state->query_ops.oldest_time = __mock_rrddim_query_oldest_time;
-    rd->state->query_ops.latest_time = __mock_rrddim_query_latest_time;
-    rd->state->query_ops.init = __mock_rrddim_query_init;
-    rd->state->query_ops.is_finished = __mock_rrddim_query_is_finished;
-    rd->state->query_ops.next_metric = __mock_rrddim_query_next_metric;
-    rd->state->query_ops.finalize = __mock_rrddim_query_finalize;
+    rd->tiers[0] = calloc(1, sizeof(struct rrddim_tier));
+    rd->tiers[0]->query_ops.oldest_time = __mock_rrddim_query_oldest_time;
+    rd->tiers[0]->query_ops.latest_time = __mock_rrddim_query_latest_time;
+    rd->tiers[0]->query_ops.init = __mock_rrddim_query_init;
+    rd->tiers[0]->query_ops.is_finished = __mock_rrddim_query_is_finished;
+    rd->tiers[0]->query_ops.next_metric = __mock_rrddim_query_next_metric;
+    rd->tiers[0]->query_ops.finalize = __mock_rrddim_query_finalize;
 
     return 0;
 }
@@ -86,23 +77,18 @@ int setup_rrdhost()
 int teardown_rrdhost()
 {
     RRDDIM *rd = localhost->rrdset_root->dimensions;
-    free((void *)rd->name);
-    free((void *)rd->id);
-    free(rd->state);
+    string_freez(rd->name);
+    string_freez(rd->id);
+    free(rd->tiers[0]);
     free(rd);
 
     RRDSET *st = localhost->rrdset_root;
-    free((void *)st->name);
+    string_freez(st->name);
     free(st);
 
-    free(localhost->labels.head->next->key);
-    free(localhost->labels.head->next->value);
-    free(localhost->labels.head->next);
-    free(localhost->labels.head->key);
-    free(localhost->labels.head->value);
-    free(localhost->labels.head);
+    rrdlabels_destroy(localhost->rrdlabels);
 
-    free((void *)localhost->tags);
+    string_freez(localhost->tags);
     free(localhost);
 
     return 0;
@@ -125,7 +111,7 @@ int teardown_initialized_engine(void **state)
     struct engine *engine = *state;
 
     teardown_rrdhost();
-    buffer_free(engine->instance_root->labels);
+    buffer_free(engine->instance_root->labels_buffer);
     buffer_free(engine->instance_root->buffer);
     teardown_configured_engine(state);
 

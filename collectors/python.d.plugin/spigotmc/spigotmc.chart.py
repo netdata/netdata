@@ -22,6 +22,7 @@ COMMAND_ONLINE = 'online'
 
 ORDER = [
     'tps',
+    'mem',
     'users',
 ]
 
@@ -39,15 +40,27 @@ CHARTS = {
         'lines': [
             ['users', 'Users', 'absolute', 1, 1]
         ]
+    },
+    'mem': {
+        'options': [None, 'Minecraft Memory Usage', 'MiB', 'spigotmc', 'spigotmc.mem', 'line'],
+        'lines': [
+            ['mem_used', 'used', 'absolute', 1, 1],
+            ['mem_alloc', 'allocated', 'absolute', 1, 1],
+            ['mem_max', 'max', 'absolute', 1, 1]
+        ]
     }
 }
 
 _TPS_REGEX = re.compile(
+    # Examples:
+    # §6TPS from last 1m, 5m, 15m: §a*20.0, §a*20.0, §a*20.0
+    # §6Current Memory Usage: §a936/65536 mb (Max: 65536 mb)
     r'^.*: .*?'  # Message lead-in
     r'(\d{1,2}.\d+), .*?'  # 1-minute TPS value
     r'(\d{1,2}.\d+), .*?'  # 5-minute TPS value
-    r'(\d{1,2}\.\d+).*$',  # 15-minute TPS value
-    re.X
+    r'(\d{1,2}\.\d+).*?'  # 15-minute TPS value
+    r'(\s.*?(\d+)\/(\d+).*?: (\d+).*)?',  # Current Memory Usage / Total Memory (Max Memory)
+    re.MULTILINE
 )
 _LIST_REGEX = re.compile(
     # Examples:
@@ -126,6 +139,10 @@ class Service(SimpleService):
                 data['tps1'] = int(float(match.group(1)) * PRECISION)
                 data['tps5'] = int(float(match.group(2)) * PRECISION)
                 data['tps15'] = int(float(match.group(3)) * PRECISION)
+                if match.group(4):
+                    data['mem_used'] = int(match.group(5))
+                    data['mem_alloc'] = int(match.group(6))
+                    data['mem_max'] = int(match.group(7))
             else:
                 self.error('Unable to process TPS values.')
                 if not raw:

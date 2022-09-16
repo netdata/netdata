@@ -1,0 +1,36 @@
+---
+# Runs PackageCloud cleanup every day at 9pm
+name: PackageCloud Cleanup
+on:
+  schedule:
+    - cron: '0 21 * * *'
+  workflow_dispatch: null
+
+jobs:
+  cleanup:
+    name: PackageCloud Cleanup
+    runs-on: ubuntu-latest
+    if: github.repository == 'netdata/netdata'
+    strategy:
+      fail-fast: false
+      matrix:
+        repos:
+          - stable
+          - edge
+          - devel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        id: checkout
+        with:
+          submodules: recursive
+      - name: Prepare environment
+        id: prepare
+        run: |
+          pip3 install requests python-dateutil
+      - name: Run PackageCloud Cleanup
+        id: cleanup
+        env:
+          PKGCLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
+        run: |
+          python3 .github/scripts/netdata-pkgcloud-cleanup.py -r ${{ matrix.repos }}

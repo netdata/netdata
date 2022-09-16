@@ -20,8 +20,9 @@ public:
     Sample(CalculatedNumber *Buf, size_t N) : CNs(Buf), NumDims(N) {}
 
     void initDSample(DSample &DS) const {
-        for (size_t Idx = 0; Idx != NumDims; Idx++)
-            DS(Idx) = CNs[Idx];
+        for (size_t Idx = 0; Idx != NumDims; Idx++) {
+            DS(Idx) = std::abs(CNs[Idx]);
+        }
     }
 
     void add(const Sample &RHS) const {
@@ -79,9 +80,11 @@ class SamplesBuffer {
 public:
     SamplesBuffer(CalculatedNumber *CNs,
                   size_t NumSamples, size_t NumDimsPerSample,
-                  size_t DiffN = 1, size_t SmoothN = 3, size_t LagN = 3) :
+                  size_t DiffN, size_t SmoothN, size_t LagN,
+                  double SamplingRatio, std::vector<uint32_t> &RandNums) :
         CNs(CNs), NumSamples(NumSamples), NumDimsPerSample(NumDimsPerSample),
         DiffN(DiffN), SmoothN(SmoothN), LagN(LagN),
+        SamplingRatio(SamplingRatio), RandNums(RandNums),
         BytesPerSample(NumDimsPerSample * sizeof(CalculatedNumber)),
         Preprocessed(false) {};
 
@@ -128,6 +131,9 @@ private:
     size_t DiffN;
     size_t SmoothN;
     size_t LagN;
+    double SamplingRatio;
+    std::vector<uint32_t> &RandNums;
+
     size_t BytesPerSample;
     bool Preprocessed;
 };

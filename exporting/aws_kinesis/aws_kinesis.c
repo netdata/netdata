@@ -45,6 +45,7 @@ int init_aws_kinesis_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
@@ -151,7 +152,7 @@ void aws_kinesis_connector_worker(void *instance_p)
             char error_message[ERROR_LINE_MAX + 1] = "";
 
             debug(
-                D_BACKEND,
+                D_EXPORTING,
                 "EXPORTING: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
                   buffer = %zu, record = %zu",
                 instance->config.destination,
@@ -175,7 +176,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                 // oops! we couldn't send (all or some of the) data
                 error("EXPORTING: %s", error_message);
                 error(
-                    "EXPORTING: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                    "EXPORTING: failed to write data to external database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
                     instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
 
                 stats->transmission_failures++;

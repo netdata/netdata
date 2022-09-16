@@ -2,6 +2,7 @@
 #define NETDATA_RRD_INTERNALS 1
 
 #include "rrd.h"
+#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // globals
@@ -47,24 +48,19 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
             return RRD_MEMORY_MODE_DBENGINE_NAME;
     }
 
+    STORAGE_ENGINE* eng = storage_engine_get(id);
+    if (eng) {
+        return eng->name;
+    }
+
     return RRD_MEMORY_MODE_SAVE_NAME;
 }
 
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
-    if(unlikely(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME)))
-        return RRD_MEMORY_MODE_RAM;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME)))
-        return RRD_MEMORY_MODE_MAP;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_NONE_NAME)))
-        return RRD_MEMORY_MODE_NONE;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_ALLOC_NAME)))
-        return RRD_MEMORY_MODE_ALLOC;
-
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_DBENGINE_NAME)))
-        return RRD_MEMORY_MODE_DBENGINE;
+    STORAGE_ENGINE* eng = storage_engine_find(name);
+    if (eng) {
+        return eng->id;
+    }
 
     return RRD_MEMORY_MODE_SAVE;
 }
@@ -139,7 +135,7 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 // ----------------------------------------------------------------------------
 // RRD - cache directory
 
-char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section) {
+char *rrdset_cache_dir(RRDHOST *host, const char *id) {
     char *ret = NULL;
 
     char b[FILENAME_MAX + 1];
@@ -147,7 +143,7 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
     rrdset_strncpyz_name(b, id, FILENAME_MAX);
 
     snprintfz(n, FILENAME_MAX, "%s/%s", host->cache_dir, b);
-    ret = config_get(config_section, "cache directory", n);
+    ret = strdupz(n);
 
     if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
         int r = mkdir(ret, 0775);
@@ -158,3 +154,15 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
     return ret;
 }
 
+// ----------------------------------------------------------------------------
+// RRD - string management
+
+STRING *rrd_string_strdupz(const char *s) {
+    if(unlikely(!s || !*s)) return string_strdupz(s);
+
+    char *tmp = strdupz(s);
+    json_fix_string(tmp);
+    STRING *ret = string_strdupz(tmp);
+    freez(tmp);
+    return ret;
+}

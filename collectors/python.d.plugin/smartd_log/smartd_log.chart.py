@@ -630,6 +630,7 @@ class Service(SimpleService):
         self.exclude = configuration.get('exclude_disks', str()).split()
         self.disks = list()
         self.runs = 0
+        self.do_force_rescan = False
 
     def check(self):
         return self.scan() > 0
@@ -637,9 +638,10 @@ class Service(SimpleService):
     def get_data(self):
         self.runs += 1
 
-        if self.runs % DEF_RESCAN_INTERVAL == 0:
+        if self.do_force_rescan or self.runs % DEF_RESCAN_INTERVAL == 0:
             self.cleanup()
             self.scan()
+            self.do_force_rescan = False
 
         data = dict()
 
@@ -654,10 +656,12 @@ class Service(SimpleService):
 
             if changed is None:
                 disk.alive = False
+                self.do_force_rescan = True
                 continue
 
             if changed and disk.populate_attrs() is None:
                 disk.alive = False
+                self.do_force_rescan = True
                 continue
 
             data.update(disk.data())

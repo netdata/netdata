@@ -26,7 +26,6 @@ if [ -d /opt/netdata/etc/netdata.old ]; then
 fi
 
 STARTIT=1
-AUTOUPDATE=0
 REINSTALL_OPTIONS=""
 RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 
@@ -36,10 +35,7 @@ while [ "${1}" ]; do
       STARTIT=0
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
-    "--auto-update" | "-u")
-      AUTOUPDATE=1
-      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
-      ;;
+    "--auto-update" | "-u") ;;
     "--stable-channel")
       RELEASE_CHANNEL="stable"
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
@@ -58,7 +54,10 @@ while [ "${1}" ]; do
   shift 1
 done
 
-if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_DISABLE_TELEMETRY=1
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
 fi
@@ -155,15 +154,7 @@ set_netdata_updater_channel || run_failed "Cannot set netdata updater tool relea
 
 # -----------------------------------------------------------------------------
 progress "Install (but not enable) netdata updater tool"
-cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
-
-progress "Check if we must enable/disable the netdata updater tool"
-if [ "${AUTOUPDATE}" = "1" ]; then
-  enable_netdata_updater || run_failed "Cannot enable netdata updater tool"
-else
-  disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
-fi
 
 # -----------------------------------------------------------------------------
 progress "creating quick links"
@@ -212,9 +203,9 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 # -----------------------------------------------------------------------------
 
-progress "fix plugin permissions"
+progress "changing plugins ownership and setting setuid"
 
-for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin; do
+for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plugin slabinfo.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
@@ -222,6 +213,10 @@ for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin; do
     run chmod 4750 "${f}"
   fi
 done
+
+if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ] && command -v setcap 1>/dev/null 2>&1; then
+  run setcap cap_net_admin+epi "usr/libexec/netdata/plugins.d/go.d.plugin"
+fi
 
 # fix the fping binary
 if [ -f bin/fping ]; then

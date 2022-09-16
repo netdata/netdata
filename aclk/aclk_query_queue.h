@@ -10,13 +10,8 @@
 #include "aclk_util.h"
 
 typedef enum {
-    UNKNOWN,
-    METADATA_INFO,
-    METADATA_ALARMS,
+    UNKNOWN = 0,
     HTTP_API_V2,
-    CHART_NEW,
-    CHART_DEL,
-    ALARM_STATE_UPDATE,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
     CHART_DIMS_UPDATE,
@@ -26,18 +21,11 @@ typedef enum {
     UPDATE_NODE_INFO,
     ALARM_LOG_HEALTH,
     ALARM_PROVIDE_CFG,
-    ALARM_SNAPSHOT
+    ALARM_SNAPSHOT,
+    UPDATE_NODE_COLLECTORS,
+    PROTO_BIN_MESSAGE,
+    ACLK_QUERY_TYPE_COUNT // always keep this as last
 } aclk_query_type_t;
-
-struct aclk_query_metadata {
-    RRDHOST *host;
-    int initial_on_connect;
-};
-
-struct aclk_query_chart_add_del {
-    RRDHOST *host;
-    char* chart_name;
-};
 
 struct aclk_query_http_api_v2 {
     char *payload;
@@ -66,20 +54,14 @@ struct aclk_query {
 
     struct timeval created_tv;
     usec_t created;
-
+    int timeout;
     aclk_query_t next;
 
     // TODO maybe remove?
     int version;
     union {
-        struct aclk_query_metadata metadata_info;
-        struct aclk_query_metadata metadata_alarms;
         struct aclk_query_http_api_v2 http_api_v2;
-        struct aclk_query_chart_add_del chart_add_del;
-        node_instance_creation_t node_creation;
-        node_instance_connection_t node_update;
         struct aclk_bin_payload bin_payload;
-        json_object *alarm_update;
     } data;
 };
 

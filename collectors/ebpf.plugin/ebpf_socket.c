@@ -12,14 +12,18 @@
  *****************************************************************/
 
 static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "received", "sent", "close",
-                                                                   "received", "sent", "retransmitted" };
+                                                                   "received", "sent", "retransmitted",
+                                                                   "connected_V4", "connected_V6", "connected_tcp",
+                                                                   "connected_udp"};
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_cleanup_rbuf", "tcp_sendmsg",  "tcp_close",
-                                                            "udp_recvmsg", "udp_sendmsg", "tcp_retransmit_skb" };
+                                                            "udp_recvmsg", "udp_sendmsg", "tcp_retransmit_skb",
+                                                            "tcp_connect_v4", "tcp_connect_v6", "inet_csk_accept_tcp",
+                                                            "inet_csk_accept_udp" };
 
 static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
                                            .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
-                                           .type = NETDATA_EBPF_MAP_STATIC,
+                                           .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                           {.name = "tbl_global_sock",
                                            .internal_input = NETDATA_SOCKET_COUNTER,
@@ -57,10 +61,8 @@ static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VE
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
-static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
-int read_thread_closed = 1;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -68,14 +70,578 @@ netdata_socket_t *socket_values;
 
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 
-static struct bpf_object *objects = NULL;
-static struct bpf_link **probe_links = NULL;
-
 struct config socket_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
+
+netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_retransmit_skb", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_cleanup_rbuf", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_close", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "udp_recvmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "udp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_v4_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
+                                               NULL, NULL, 1, NULL,
+                                               NULL, NULL };
+static enum ebpf_threads_status ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
+
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/socket.skel.h" // BTF code
+
+static struct socket_bpf *bpf_obj = NULL;
+
+/**
+ * Disable Probe
+ *
+ * Disable probes to use trampoline.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_socket_disable_probes(struct socket_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_inet_csk_accept_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_retransmit_skb_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_cleanup_rbuf_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_close_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_socket_release_task_kprobe, false);
+}
+
+/**
+ * Disable Trampoline
+ *
+ * Disable trampoline to use probes.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_socket_disable_trampoline(struct socket_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_inet_csk_accept_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_retransmit_skb_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_cleanup_rbuf_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_close_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_recvmsg_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_socket_release_task_fentry, false);
+}
+
+/**
+ *  Set trampoline target.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_set_trampoline_target(struct socket_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_inet_csk_accept_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_v4_connect_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_v6_connect_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_retransmit_skb_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_cleanup_rbuf_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_close_fentry, 0, socket_targets[NETDATA_FCNT_TCP_CLOSE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_recvmsg_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_recvmsg_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_sendmsg_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_tcp_sendmsg_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_sendmsg_fentry, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_udp_sendmsg_fexit, 0,
+                                   socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_socket_release_task_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
+}
+
+
+/**
+ * Disable specific trampoline
+ *
+ * Disable specific trampoline to match user selection.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param sel option selected by user.
+ */
+static inline void ebpf_socket_disable_specific_trampoline(struct socket_bpf *obj, netdata_run_mode_t sel)
+{
+    if (sel == MODE_RETURN) {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fentry, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fexit, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fexit, false);
+    }
+}
+
+/**
+ * Disable specific probe
+ *
+ * Disable specific probe to match user selection.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param sel option selected by user.
+ */
+static inline void ebpf_socket_disable_specific_probe(struct socket_bpf *obj, netdata_run_mode_t sel)
+{
+    if (sel == MODE_RETURN) {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kprobe, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kretprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kretprobe, false);
+    }
+}
+
+/**
+ * Attach probes
+ *
+ * Attach probes to targets.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param sel option selected by user.
+ */
+static int ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t sel)
+{
+    obj->links.netdata_inet_csk_accept_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_inet_csk_accept_kretprobe,
+                                                                              true,
+                                                                              socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
+    int ret = libbpf_get_error(obj->links.netdata_inet_csk_accept_kretprobe);
+    if (ret)
+            return -1;
+
+    obj->links.netdata_tcp_v4_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v4_connect_kretprobe,
+                                                                             true,
+                                                                             socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_v6_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kretprobe,
+                                                                             true,
+                                                                             socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_retransmit_skb_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_retransmit_skb_kprobe,
+                                                                              false,
+                                                                              socket_targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_retransmit_skb_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_cleanup_rbuf_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_cleanup_rbuf_kprobe,
+                                                                            false,
+                                                                            socket_targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_cleanup_rbuf_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_tcp_close_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_close_kprobe,
+                                                                     false,
+                                                                     socket_targets[NETDATA_FCNT_TCP_CLOSE].name);
+    ret = libbpf_get_error(obj->links.netdata_tcp_close_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_udp_recvmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_recvmsg_kprobe,
+                                                                       false,
+                                                                       socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_udp_recvmsg_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_udp_recvmsg_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_recvmsg_kretprobe,
+                                                                          true,
+                                                                          socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_udp_recvmsg_kretprobe);
+    if (ret)
+        return -1;
+
+    if (sel == MODE_RETURN) {
+        obj->links.netdata_tcp_sendmsg_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_sendmsg_kretprobe,
+                                                                              true,
+                                                                              socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_sendmsg_kretprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_udp_sendmsg_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_sendmsg_kretprobe,
+                                                                              true,
+                                                                              socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kretprobe);
+        if (ret)
+            return -1;
+    } else {
+        obj->links.netdata_tcp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_sendmsg_kprobe,
+                                                                           false,
+                                                                           socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_sendmsg_kprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_udp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_udp_sendmsg_kprobe,
+                                                                           false,
+                                                                           socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
+        ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kprobe);
+        if (ret)
+            return -1;
+    }
+
+    obj->links.netdata_socket_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_socket_release_task_kprobe,
+                                                                               false,  EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_socket_release_task_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_socket_set_hash_tables(struct socket_bpf *obj)
+{
+    socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd = bpf_map__fd(obj->maps.tbl_bandwidth);
+    socket_maps[NETDATA_SOCKET_GLOBAL].map_fd = bpf_map__fd(obj->maps.tbl_global_sock);
+    socket_maps[NETDATA_SOCKET_LPORTS].map_fd = bpf_map__fd(obj->maps.tbl_lports);
+    socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd = bpf_map__fd(obj->maps.tbl_conn_ipv4);
+    socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd = bpf_map__fd(obj->maps.tbl_conn_ipv6);
+    socket_maps[NETDATA_SOCKET_TABLE_UDP].map_fd = bpf_map__fd(obj->maps.tbl_nv_udp);
+    socket_maps[NETDATA_SOCKET_TABLE_CTRL].map_fd = bpf_map__fd(obj->maps.socket_ctrl);
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_socket_adjust_map_size(struct socket_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH],
+                         em, bpf_map__name(obj->maps.tbl_bandwidth));
+
+    ebpf_update_map_size(obj->maps.tbl_conn_ipv4, &socket_maps[NETDATA_SOCKET_TABLE_IPV4],
+                         em, bpf_map__name(obj->maps.tbl_conn_ipv4));
+
+    ebpf_update_map_size(obj->maps.tbl_conn_ipv6, &socket_maps[NETDATA_SOCKET_TABLE_IPV6],
+                         em, bpf_map__name(obj->maps.tbl_conn_ipv6));
+
+    ebpf_update_map_size(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP],
+                         em, bpf_map__name(obj->maps.tbl_nv_udp));
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_FCNT_INET_CSK_ACCEPT].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_socket_disable_probes(obj);
+
+        ebpf_set_trampoline_target(obj);
+        ebpf_socket_disable_specific_trampoline(obj, em->mode);
+    } else { // We are not using tracepoints for this thread.
+        ebpf_socket_disable_trampoline(obj);
+
+        ebpf_socket_disable_specific_probe(obj, em->mode);
+    }
+
+    int ret = socket_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "failed to load BPF object: %d\n", ret);
+        return ret;
+    }
+
+    ebpf_socket_adjust_map_size(obj, em);
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ret = socket_bpf__attach(obj);
+    } else {
+        ret = ebpf_socket_attach_probes(obj, em->mode);
+    }
+
+    if (!ret) {
+        ebpf_socket_set_hash_tables(obj);
+
+        ebpf_update_controller(socket_maps[NETDATA_SOCKET_TABLE_CTRL].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CLOSE THE THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Clean internal socket plot
+ *
+ * Clean all structures allocated with strdupz.
+ *
+ * @param ptr the pointer with addresses to clean.
+ */
+static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
+{
+    freez(ptr->dimension_recv);
+    freez(ptr->dimension_sent);
+    freez(ptr->resolved_name);
+    freez(ptr->dimension_retransmit);
+}
+
+/**
+ * Clean socket plot
+ *
+ * Clean the allocated data for inbound and outbound vectors.
+ */
+static void clean_allocated_socket_plot()
+{
+    uint32_t i;
+    uint32_t end = inbound_vectors.last;
+    netdata_socket_plot_t *plot = inbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+
+    clean_internal_socket_plot(&plot[inbound_vectors.last]);
+
+    end = outbound_vectors.last;
+    plot = outbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+    clean_internal_socket_plot(&plot[outbound_vectors.last]);
+}
+
+/**
+ * Clean network ports allocated during initialization.
+ *
+ * @param ptr a pointer to the link list.
+ */
+static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
+{
+    if (unlikely(!ptr))
+        return;
+
+    while (ptr) {
+        ebpf_network_viewer_port_list_t *next = ptr->next;
+        freez(ptr->value);
+        freez(ptr);
+        ptr = next;
+    }
+}
+
+/**
+ * Clean service names
+ *
+ * Clean the allocated link list that stores names.
+ *
+ * @param names the link list.
+ */
+static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
+{
+    if (unlikely(!names))
+        return;
+
+    while (names) {
+        ebpf_network_viewer_dim_name_t *next = names->next;
+        freez(names->name);
+        freez(names);
+        names = next;
+    }
+}
+
+/**
+ * Clean hostnames
+ *
+ * @param hostnames the hostnames to clean
+ */
+static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
+{
+    if (unlikely(!hostnames))
+        return;
+
+    while (hostnames) {
+        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
+        freez(hostnames->value);
+        simple_pattern_free(hostnames->value_pattern);
+        freez(hostnames);
+        hostnames = next;
+    }
+}
+
+/**
+ * Cleanup publish syscall
+ *
+ * @param nps list of structures to clean
+ */
+void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
+{
+    while (nps) {
+        freez(nps->algorithm);
+        nps = nps->next;
+    }
+}
+
+/**
+ * Clean port Structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+{
+    ebpf_network_viewer_port_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Clean IP structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
+{
+    ebpf_network_viewer_ip_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_ip_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Socket exit
+ *
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_socket_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * Socket cleanup
+ *
+ * Clean up allocated addresses.
+ *
+ * @param ptr thread data.
+ */
+void ebpf_socket_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (ebpf_socket_exited != NETDATA_THREAD_EBPF_STOPPED)
+        return;
+
+    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
+    freez(socket_hash_values);
+
+    freez(bandwidth_vector);
+
+    freez(socket_values);
+    clean_allocated_socket_plot();
+    freez(inbound_vectors.plot);
+    freez(outbound_vectors.plot);
+
+    clean_port_structure(&listen_ports);
+
+    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
+
+    clean_network_ports(network_viewer_opt.included_port);
+    clean_network_ports(network_viewer_opt.excluded_port);
+    clean_service_names(network_viewer_opt.names);
+    clean_hostnames(network_viewer_opt.included_hostnames);
+    clean_hostnames(network_viewer_opt.excluded_hostnames);
+
+    pthread_mutex_destroy(&nv_mutex);
+
+    freez(socket_threads.thread);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        socket_bpf__destroy(bpf_obj);
+#endif
+    socket_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
 /*****************************************************************
  *
@@ -294,6 +860,31 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 }
 
 /**
+ * Send Global Inbound connection
+ *
+ * Send number of connections read per protocol.
+ */
+static void ebpf_socket_send_global_inbound_conn()
+{
+    uint64_t udp_conn = 0;
+    uint64_t tcp_conn = 0;
+    ebpf_network_viewer_port_list_t *move = listen_ports;
+    while (move) {
+        if (move->protocol == IPPROTO_TCP)
+            tcp_conn += move->connections;
+        else
+            udp_conn += move->connections;
+
+        move = move->next;
+    }
+
+    write_begin_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_INBOUND_CONNECTIONS);
+    write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_TCP].name, (long long) tcp_conn);
+    write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_UDP].name, (long long) udp_conn);
+    write_end_chart();
+}
+
+/**
  * Send data to Netdata calling auxiliary functions.
  *
  * @param em the structure with thread information
@@ -303,6 +894,10 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t common_tcp;
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
+
+    ebpf_socket_send_global_inbound_conn();
+    write_count_chart(NETDATA_TCP_OUTBOUND_CONNECTIONS, NETDATA_EBPF_IP_FAMILY,
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4], 2);
 
     // We read bytes from function arguments, but bandwidth is given in bits,
     // so we need to multiply by 8 to convert for the final value.
@@ -361,11 +956,29 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
 void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 {
     UNUSED(em);
-    if (!socket_apps_created)
-        return;
 
     struct target *w;
     collected_number value;
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_tcp_v4_connection));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_tcp_v6_connection));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (w = root; w; w = w->next) {
@@ -456,6 +1069,32 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
  */
 static void ebpf_create_global_charts(ebpf_module_t *em)
 {
+    int order = 21070;
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
+                      NETDATA_INBOUND_CONNECTIONS,
+                      "Inbound connections.",
+                      EBPF_COMMON_DIMENSION_CONNECTIONS,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      order++,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_TCP],
+                      2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
+                      NETDATA_TCP_OUTBOUND_CONNECTIONS,
+                      "TCP outbound connections.",
+                      EBPF_COMMON_DIMENSION_CONNECTIONS,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      order++,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4],
+                      2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
+
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_FUNCTION_COUNT,
                       "Calls to internal functions",
@@ -463,7 +1102,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21070,
+                      order++,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
                       3, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -473,7 +1112,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21071,
+                      order++,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
                       2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -486,7 +1125,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_SOCKET_KERNEL_FUNCTIONS,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
-                          21072,
+                          order++,
                           ebpf_create_global_dimension,
                           socket_publish_aggregated,
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -499,7 +1138,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21073,
+                      order++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -511,7 +1150,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21074,
+                      order++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                       2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -521,7 +1160,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21075,
+                      order++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                       2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -534,7 +1173,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_SOCKET_KERNEL_FUNCTIONS,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
-                          21076,
+                          order++,
                           ebpf_create_global_dimension,
                           &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -551,12 +1190,29 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;;
+    struct target *root = ptr;
+    int order = 20080;
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V4,
+                               "Calls to tcp_v4_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               order++,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V6,
+                               "Calls to tcp_v6_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               order++,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20080,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -564,7 +1220,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "bytes received", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20081,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -573,7 +1229,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20082,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -582,7 +1238,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20083,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -591,7 +1247,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20084,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -600,7 +1256,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20085,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
@@ -609,11 +1265,11 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20086,
+                               order++,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    socket_apps_created = 1;
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /**
@@ -1295,11 +1951,10 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
  *
  * @param values        the values used to calculate the data.
  * @param key           the key to store  data.
- * @param removesock    check if this socket must be removed .
  * @param family        the connection family
  * @param end           the values size.
  */
-static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
+static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int family, int end)
 {
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
     uint16_t retransmit = 0;
@@ -1320,8 +1975,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
 
         if (w->ct > ct)
             ct = w->ct;
-
-        *removesock += (int)w->removeme;
     }
 
     values[0].recv_packets += precv;
@@ -1329,7 +1982,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].recv_bytes   += brecv;
     values[0].sent_bytes   += bsent;
     values[0].retransmit   += retransmit;
-    values[0].removeme     += (uint8_t)*removesock;
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
     values[0].ct           = ct;
 
@@ -1357,8 +2009,6 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
 
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
-    netdata_socket_idx_t removeme;
-    int removesock = 0;
 
     netdata_socket_t *values = socket_values;
     size_t length = ebpf_nprocs*sizeof(netdata_socket_t);
@@ -1375,35 +2025,32 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
             continue;
         }
 
-        if (removesock)
-            bpf_map_delete_elem(fd, &removeme);
-
         if (network_connection) {
-            removesock = 0;
-            hash_accumulator(values, &key, &removesock, family, end);
+            hash_accumulator(values, &key, family, end);
         }
-
-        if (removesock)
-            removeme = key;
 
         key = next_key;
     }
+}
 
-    if (removesock)
-        bpf_map_delete_elem(fd, &removeme);
-
-    test = bpf_map_lookup_elem(fd, &next_key, values);
-    if (test < 0) {
-        return;
-    }
-
-    if (network_connection) {
-        removesock = 0;
-        hash_accumulator(values, &next_key, &removesock, family, end);
-    }
-
-    if (removesock)
-        bpf_map_delete_elem(fd, &next_key);
+/**
+ * Fill Network Viewer Port list
+ *
+ * Fill the strcture with values read from /proc or hash table.
+ *
+ * @param out   the structure where we will store data.
+ * @param value the ports we are listen to.
+ * @param proto the protocol used for this connection.
+ * @param in    the strcuture with values read form different sources.
+ */
+static inline void fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint16_t value, uint16_t proto,
+                                     netdata_passive_connection_t *in)
+{
+    out->first = value;
+    out->protocol = proto;
+    out->pid = in->pid;
+    out->tgid = in->tgid;
+    out->connections = in->counter;
 }
 
 /**
@@ -1413,31 +2060,33 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
  *
  * @param value the ports we are listen to.
  * @param proto the protocol used with port connection.
+ * @param in    the strcuture with values read form different sources.
  */
-void update_listen_table(uint16_t value, uint8_t proto)
+void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *in)
 {
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
         while (move) {
-            if (move->protocol == proto && move->first == value)
+            if (move->protocol == proto && move->first == value) {
+                move->pid = in->pid;
+                move->tgid = in->tgid;
+                move->connections = in->counter;
                 return;
+            }
 
             store = move;
             move = move->next;
         }
 
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-        w->first = value;
-        w->protocol = proto;
         store->next = w;
     } else {
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-        w->first = value;
-        w->protocol = proto;
 
         listen_ports = w;
     }
+    fill_nv_port_list(w, value, proto, in);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     info("The network viewer is monitoring inbound connections for port %u", ntohs(value));
@@ -1451,11 +2100,11 @@ void update_listen_table(uint16_t value, uint8_t proto)
  */
 static void read_listen_table()
 {
-    uint16_t key = 0;
-    uint16_t next_key = 0;
+    netdata_passive_connection_idx_t key = {};
+    netdata_passive_connection_idx_t next_key = {};
 
     int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
-    uint8_t value;
+    netdata_passive_connection_t value = {};
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, &value);
         if (test < 0) {
@@ -1464,14 +2113,15 @@ static void read_listen_table()
         }
 
         // The correct protocol must come from kernel
-        update_listen_table(htons(key), (key == 53)?IPPROTO_UDP:IPPROTO_TCP);
+        update_listen_table(key.port, key.protocol, &value);
 
         key = next_key;
+        memset(&value, 0, sizeof(value));
     }
 
-    if (next_key) {
+    if (next_key.port && value.pid) {
         // The correct protocol must come from kernel
-        update_listen_table(htons(next_key), (key == 53)?IPPROTO_UDP:IPPROTO_TCP);
+        update_listen_table(next_key.port, next_key.protocol, &value);
     }
 }
 
@@ -1487,18 +2137,20 @@ static void read_listen_table()
  */
 void *ebpf_socket_read_hash(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_every;
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
-    while (!close_ebpf_plugin) {
+    while (ebpf_socket_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_socket_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
@@ -1508,7 +2160,9 @@ void *ebpf_socket_read_hash(void *ptr)
         pthread_mutex_unlock(&nv_mutex);
     }
 
-    read_thread_closed = 1;
+    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1542,11 +2196,15 @@ static void read_hash_global_tables()
     socket_aggregated_data[NETDATA_IDX_UDP_RECVBUF].call = res[NETDATA_KEY_CALLS_UDP_RECVMSG];
     socket_aggregated_data[NETDATA_IDX_UDP_SENDMSG].call = res[NETDATA_KEY_CALLS_UDP_SENDMSG];
     socket_aggregated_data[NETDATA_IDX_TCP_RETRANSMIT].call = res[NETDATA_KEY_TCP_RETRANSMIT];
+    socket_aggregated_data[NETDATA_IDX_TCP_CONNECTION_V4].call = res[NETDATA_KEY_CALLS_TCP_CONNECT_IPV4];
+    socket_aggregated_data[NETDATA_IDX_TCP_CONNECTION_V6].call = res[NETDATA_KEY_CALLS_TCP_CONNECT_IPV6];
 
     socket_aggregated_data[NETDATA_IDX_TCP_SENDMSG].ecall = res[NETDATA_KEY_ERROR_TCP_SENDMSG];
     socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].ecall = res[NETDATA_KEY_ERROR_TCP_CLEANUP_RBUF];
     socket_aggregated_data[NETDATA_IDX_UDP_RECVBUF].ecall = res[NETDATA_KEY_ERROR_UDP_RECVMSG];
     socket_aggregated_data[NETDATA_IDX_UDP_SENDMSG].ecall = res[NETDATA_KEY_ERROR_UDP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_CONNECTION_V4].ecall = res[NETDATA_KEY_ERROR_TCP_CONNECT_IPV4];
+    socket_aggregated_data[NETDATA_IDX_TCP_CONNECTION_V6].ecall = res[NETDATA_KEY_ERROR_TCP_CONNECT_IPV6];
 
     socket_aggregated_data[NETDATA_IDX_TCP_SENDMSG].bytes = res[NETDATA_KEY_BYTES_TCP_SENDMSG];
     socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].bytes = res[NETDATA_KEY_BYTES_TCP_CLEANUP_RBUF];
@@ -1575,6 +2233,9 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     curr->retransmit = eb->retransmit;
     curr->call_udp_sent = eb->call_udp_sent;
     curr->call_udp_received = eb->call_udp_received;
+    curr->call_close = eb->close;
+    curr->call_tcp_v4_connection = eb->tcp_v4_connection;
+    curr->call_tcp_v6_connection = eb->tcp_v6_connection;
 }
 
 /**
@@ -1595,6 +2256,9 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
         total->retransmit += move->retransmit;
         total->call_udp_sent += move->call_udp_sent;
         total->call_udp_received += move->call_udp_received;
+        total->close += move->close;
+        total->tcp_v4_connection += move->tcp_v4_connection;
+        total->tcp_v6_connection += move->tcp_v6_connection;
     }
 }
 
@@ -1652,6 +2316,9 @@ static void ebpf_update_socket_cgroup()
                 publish->retransmit = in->retransmit;
                 publish->call_udp_sent = in->call_udp_sent;
                 publish->call_udp_received = in->call_udp_received;
+                publish->call_close = in->call_close;
+                publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
+                publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
             } else {
                 if (!bpf_map_lookup_elem(fd, &pid, eb)) {
                     ebpf_socket_bandwidth_accumulator(eb);
@@ -1665,6 +2332,9 @@ static void ebpf_update_socket_cgroup()
                     publish->retransmit = out->retransmit;
                     publish->call_udp_sent = out->call_udp_sent;
                     publish->call_udp_received = out->call_udp_received;
+                    publish->call_close = out->close;
+                    publish->call_tcp_v4_connection = out->tcp_v4_connection;
+                    publish->call_tcp_v6_connection = out->tcp_v6_connection;
                 }
             }
         }
@@ -1695,6 +2365,9 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
         accumulator.retransmit += w->retransmit;
         accumulator.call_udp_received += w->call_udp_received;
         accumulator.call_udp_sent += w->call_udp_sent;
+        accumulator.call_close += w->close;
+        accumulator.call_tcp_v4_connection += w->tcp_v4_connection;
+        accumulator.call_tcp_v6_connection += w->tcp_v6_connection;
 
         pids = pids->next;
     }
@@ -1706,6 +2379,11 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
     socket->retransmit = (accumulator.retransmit >= socket->retransmit) ? accumulator.retransmit : socket->retransmit;
     socket->call_udp_sent = (accumulator.call_udp_sent >= socket->call_udp_sent) ? accumulator.call_udp_sent : socket->call_udp_sent;
     socket->call_udp_received = (accumulator.call_udp_received >= socket->call_udp_received) ? accumulator.call_udp_received : socket->call_udp_received;
+    socket->call_close = (accumulator.call_close >= socket->call_close) ? accumulator.call_close : socket->call_close;
+    socket->call_tcp_v4_connection = (accumulator.call_tcp_v4_connection >= socket->call_tcp_v4_connection) ?
+                                     accumulator.call_tcp_v4_connection : socket->call_tcp_v4_connection;
+    socket->call_tcp_v6_connection = (accumulator.call_tcp_v6_connection >= socket->call_tcp_v6_connection) ?
+                                     accumulator.call_tcp_v6_connection : socket->call_tcp_v6_connection;
 }
 
 /**
@@ -1718,75 +2396,96 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
  */
 static void ebpf_create_specific_socket_charts(char *type, int update_every)
 {
+    int order_basis = 5300;
+    ebpf_create_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V4,
+                      "Calls to tcp_v4_connection",
+                      EBPF_COMMON_DIMENSION_CONNECTIONS, NETDATA_CGROUP_NET_GROUP,
+                      NETDATA_CGROUP_TCP_V4_CONN_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
+    ebpf_create_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V6,
+                      "Calls to tcp_v6_connection",
+                      EBPF_COMMON_DIMENSION_CONNECTIONS, NETDATA_CGROUP_NET_GROUP,
+                      NETDATA_CGROUP_TCP_V6_CONN_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V6], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_RECV,
                       "Bytes received",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5300,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT,
                       "Bytes sent",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5301,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated, 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
                       "Calls to tcp_cleanup_rbuf.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5302,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
                       "Calls to tcp_sendmsg.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5303,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated, 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
                       "Calls to tcp_retransmit.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5304,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT], 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
                       "Calls to udp_sendmsg",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5305,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_SENDMSG], 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
                       "Calls to udp_recvmsg",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5306,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF], 1,
-                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 }
 
 /**
@@ -1799,40 +2498,51 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
  */
 static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
 {
+    int order_basis = 5300;
+    ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_CONNECTION_TCP_V4, "Calls to tcp_v4_connection",
+                              EBPF_COMMON_DIMENSION_CONNECTIONS, NETDATA_APPS_NET_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
+
+    ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_CONNECTION_TCP_V6,"Calls to tcp_v6_connection",
+                              EBPF_COMMON_DIMENSION_CONNECTIONS, NETDATA_APPS_NET_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
+
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_RECV, "Bytes received",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5300, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_SENT,"Bytes sent",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5301, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS, "Calls to tcp_cleanup_rbuf.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5302, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS, "Calls to tcp_sendmsg.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5303, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT, "Calls to tcp_retransmit.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5304, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS, "Calls to udp_sendmsg",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5305, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS, "Calls to udp_recvmsg",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5306, update_every);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 }
 
 /*
@@ -1845,6 +2555,16 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
  */
 static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_t *values)
 {
+    write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V4);
+    write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4].name,
+                          (long long) values->call_tcp_v4_connection);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V6);
+    write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V6].name,
+                          (long long) values->call_tcp_v6_connection);
+    write_end_chart();
+
     write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT);
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_SENDMSG].name,
                           (long long) values->bytes_sent);
@@ -1890,11 +2610,30 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
  **/
 static void ebpf_create_systemd_socket_charts(int update_every)
 {
+    int order = 20080;
+    ebpf_create_charts_on_systemd(NETDATA_NET_APPS_CONNECTION_TCP_V4,
+                                  "Calls to tcp_v4_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  order++,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
+
+    ebpf_create_charts_on_systemd(NETDATA_NET_APPS_CONNECTION_TCP_V6,
+                                  "Calls to tcp_v6_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  order++,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
+
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_RECV,
                                   "Bytes received", EBPF_COMMON_DIMENSION_BITS,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20080,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1903,7 +2642,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20081,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1913,7 +2652,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20082,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1923,7 +2662,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20083,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1933,7 +2672,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20084,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1943,7 +2682,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20085,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1953,7 +2692,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  20086,
+                                  order++,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
@@ -1971,6 +2710,24 @@ static int ebpf_send_systemd_socket_charts()
 {
     int ret = 1;
     ebpf_cgroup_target_t *ect;
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v4_connection);
+        } else if (unlikely(ect->systemd))
+            ret = 0;
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v6_connection);
+        } else
+            ret = 0;
+    }
+    write_end_chart();
+
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
@@ -2098,10 +2855,6 @@ static void ebpf_socket_send_cgroup_data(int update_every)
  *
  *****************************************************************/
 
-struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
-                                               NULL, NULL, 1, NULL,
-                                               NULL, ebpf_socket_read_hash };
-
 /**
  * Main loop for this collector.
  *
@@ -2110,293 +2863,70 @@ struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
  */
 static void socket_collector(usec_t step, ebpf_module_t *em)
 {
-    UNUSED(step);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     socket_threads.thread = mallocz(sizeof(netdata_thread_t));
+    socket_threads.start_routine = ebpf_socket_read_hash;
 
     netdata_thread_create(socket_threads.thread, socket_threads.name,
-                          NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
+                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_read_hash, em);
 
     int cgroups = em->cgroup_charts;
     if (cgroups)
         ebpf_socket_update_cgroup_algorithm();
 
-    int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
-    int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
+    int socket_global_enabled = em->global_charts;
     int network_connection = em->optional;
     int update_every = em->update_every;
-    int counter = update_every - 1;
-    while (!close_ebpf_plugin) {
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
+
+        netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        if (socket_global_enabled)
+            read_hash_global_tables();
 
-        if (++counter == update_every) {
-            counter = 0;
-            if (socket_global_enabled)
-                read_hash_global_tables();
+        if (socket_apps_enabled)
+            ebpf_socket_update_apps_data();
 
-            if (socket_apps_enabled)
-                ebpf_socket_update_apps_data();
+        if (cgroups)
+            ebpf_update_socket_cgroup();
 
-            if (cgroups)
-                ebpf_update_socket_cgroup();
+        calculate_nv_plot();
 
-            calculate_nv_plot();
+        pthread_mutex_lock(&lock);
+        if (socket_global_enabled)
+            ebpf_socket_send_data(em);
 
-            pthread_mutex_lock(&lock);
-            if (socket_global_enabled)
-                ebpf_socket_send_data(em);
+        if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
-            if (socket_apps_enabled)
-                ebpf_socket_send_apps_data(em, apps_groups_root_target);
+        if (cgroups)
+            ebpf_socket_send_cgroup_data(update_every);
 
-            if (cgroups)
-                ebpf_socket_send_cgroup_data(update_every);
+        fflush(stdout);
 
+        if (network_connection) {
+            // We are calling fflush many times, because when we have a lot of dimensions
+            // we began to have not expected outputs and Netdata closed the plugin.
+            pthread_mutex_lock(&nv_mutex);
+            ebpf_socket_create_nv_charts(&inbound_vectors, update_every);
             fflush(stdout);
+            ebpf_socket_send_nv_data(&inbound_vectors);
 
-            if (network_connection) {
-                // We are calling fflush many times, because when we have a lot of dimensions
-                // we began to have not expected outputs and Netdata closed the plugin.
-                pthread_mutex_lock(&nv_mutex);
-                ebpf_socket_create_nv_charts(&inbound_vectors, update_every);
-                fflush(stdout);
-                ebpf_socket_send_nv_data(&inbound_vectors);
+            ebpf_socket_create_nv_charts(&outbound_vectors, update_every);
+            fflush(stdout);
+            ebpf_socket_send_nv_data(&outbound_vectors);
+            wait_to_plot = 0;
+            pthread_mutex_unlock(&nv_mutex);
 
-                ebpf_socket_create_nv_charts(&outbound_vectors, update_every);
-                fflush(stdout);
-                ebpf_socket_send_nv_data(&outbound_vectors);
-                wait_to_plot = 0;
-                pthread_mutex_unlock(&nv_mutex);
-
-            }
-            pthread_mutex_unlock(&lock);
         }
-
+        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
-}
-
-/*****************************************************************
- *
- *  FUNCTIONS TO CLOSE THE THREAD
- *
- *****************************************************************/
-
-
-/**
- * Clean internal socket plot
- *
- * Clean all structures allocated with strdupz.
- *
- * @param ptr the pointer with addresses to clean.
- */
-static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
-{
-    freez(ptr->dimension_recv);
-    freez(ptr->dimension_sent);
-    freez(ptr->resolved_name);
-    freez(ptr->dimension_retransmit);
-}
-
-/**
- * Clean socket plot
- *
- * Clean the allocated data for inbound and outbound vectors.
- */
-static void clean_allocated_socket_plot()
-{
-    uint32_t i;
-    uint32_t end = inbound_vectors.last;
-    netdata_socket_plot_t *plot = inbound_vectors.plot;
-    for (i = 0; i < end; i++) {
-        clean_internal_socket_plot(&plot[i]);
-    }
-
-    clean_internal_socket_plot(&plot[inbound_vectors.last]);
-
-    end = outbound_vectors.last;
-    plot = outbound_vectors.plot;
-    for (i = 0; i < end; i++) {
-        clean_internal_socket_plot(&plot[i]);
-    }
-    clean_internal_socket_plot(&plot[outbound_vectors.last]);
-}
-
-/**
- * Clean network ports allocated during initialization.
- *
- * @param ptr a pointer to the link list.
- */
-static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
-{
-    if (unlikely(!ptr))
-        return;
-
-    while (ptr) {
-        ebpf_network_viewer_port_list_t *next = ptr->next;
-        freez(ptr->value);
-        freez(ptr);
-        ptr = next;
-    }
-}
-
-/**
- * Clean service names
- *
- * Clean the allocated link list that stores names.
- *
- * @param names the link list.
- */
-static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
-{
-    if (unlikely(!names))
-        return;
-
-    while (names) {
-        ebpf_network_viewer_dim_name_t *next = names->next;
-        freez(names->name);
-        freez(names);
-        names = next;
-    }
-}
-
-/**
- * Clean hostnames
- *
- * @param hostnames the hostnames to clean
- */
-static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
-{
-    if (unlikely(!hostnames))
-        return;
-
-    while (hostnames) {
-        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
-        freez(hostnames->value);
-        simple_pattern_free(hostnames->value_pattern);
-        freez(hostnames);
-        hostnames = next;
-    }
-}
-
-void clean_socket_apps_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(socket_bandwidth_curr[pids->pid]);
-
-        pids = pids->next;
-    }
-}
-
-/**
- * Cleanup publish syscall
- *
- * @param nps list of structures to clean
- */
-void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
-{
-    while (nps) {
-        freez(nps->algorithm);
-        nps = nps->next;
-    }
-}
-
-/**
- * Clean port Structure
- *
- * Clean the allocated list.
- *
- * @param clean the list that will be cleaned
- */
-void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
-{
-    ebpf_network_viewer_port_list_t *move = *clean;
-    while (move) {
-        ebpf_network_viewer_port_list_t *next = move->next;
-        freez(move->value);
-        freez(move);
-
-        move = next;
-    }
-    *clean = NULL;
-}
-
-/**
- * Clean IP structure
- *
- * Clean the allocated list.
- *
- * @param clean the list that will be cleaned
- */
-static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
-{
-    ebpf_network_viewer_ip_list_t *move = *clean;
-    while (move) {
-        ebpf_network_viewer_ip_list_t *next = move->next;
-        freez(move->value);
-        freez(move);
-
-        move = next;
-    }
-    *clean = NULL;
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_socket_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
-        return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
-
-    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
-    freez(socket_hash_values);
-
-    freez(bandwidth_vector);
-
-    freez(socket_values);
-    clean_allocated_socket_plot();
-    freez(inbound_vectors.plot);
-    freez(outbound_vectors.plot);
-
-    clean_port_structure(&listen_ports);
-
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
-
-    clean_network_ports(network_viewer_opt.included_port);
-    clean_network_ports(network_viewer_opt.excluded_port);
-    clean_service_names(network_viewer_opt.names);
-    clean_hostnames(network_viewer_opt.included_hostnames);
-    clean_hostnames(network_viewer_opt.excluded_hostnames);
-
-    pthread_mutex_destroy(&nv_mutex);
-
-    freez(socket_threads.thread);
-
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        bpf_object__close(objects);
-    }
-    finalized_threads = 1;
 }
 
 /*****************************************************************
@@ -3334,6 +3864,40 @@ void parse_table_size_options(struct config *cfg)
                                                                                       EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
 }
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_socket_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = socket_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_socket_load_and_attach(bpf_obj, em);
+    }
+#endif
+
+    if (ret) {
+        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+    }
+
+    return ret;
+}
+
 /**
  * Socket thread
  *
@@ -3345,7 +3909,7 @@ void parse_table_size_options(struct config *cfg)
  */
 void *ebpf_socket_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_socket_exit, ptr);
 
     memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
     memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
@@ -3363,10 +3927,10 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
-    pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
     initialize_inbound_outbound();
@@ -3374,28 +3938,38 @@ void *ebpf_socket_thread(void *ptr)
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
-    if (!probe_links) {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_socket_load_bpf(em)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
 
     int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
-        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX,
+        NETDATA_EBPF_INCREMENTAL_IDX
     };
     ebpf_global_labels(
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
         algorithms, NETDATA_MAX_SOCKET_VECTOR);
 
+    pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
 
-    finalized_threads = 0;
+    ebpf_update_stats(&plugin_statistics, em);
+
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);
 
 endsocket:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

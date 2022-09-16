@@ -11,6 +11,8 @@
 
 extern struct arcstats arcstats;
 
+unsigned long long zfs_arcstats_shrinkable_cache_size_bytes = 0;
+
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
@@ -190,6 +192,12 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         if(unlikely(arl_check(arl_base, key, value))) break;
     }
 
+    if (arcstats.size > arcstats.c_min) {
+        zfs_arcstats_shrinkable_cache_size_bytes = arcstats.size - arcstats.c_min;
+    } else {
+        zfs_arcstats_shrinkable_cache_size_bytes = 0;
+    }
+
     if(unlikely(arcstats.l2exist == -1))
         arcstats.l2exist = 0;
 
@@ -244,7 +252,7 @@ void disable_zfs_pool_state(struct zfs_pool *pool)
     pool->disabled = 1;
 }
 
-int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
+int update_zfs_pool_state_chart(const char *name, void *pool_p, void *update_every_p)
 {
     struct zfs_pool *pool = (struct zfs_pool *)pool_p;
     int update_every = *(int *)update_every_p;
@@ -290,7 +298,7 @@ int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
         }
     } else {
         disable_zfs_pool_state(pool);
-        struct deleted_zfs_pool *new = calloc(1, sizeof(struct deleted_zfs_pool));
+        struct deleted_zfs_pool *new = callocz(1, sizeof(struct deleted_zfs_pool));
         new->name = strdupz(name);
         new->next = deleted_zfs_pools;
         deleted_zfs_pools = new;
@@ -400,7 +408,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     }
 
     if (do_zfs_pool_state)
-        dictionary_get_all_name_value(zfs_pools, update_zfs_pool_state_chart, &update_every);
+        dictionary_walkthrough_read(zfs_pools, update_zfs_pool_state_chart, &update_every);
 
     while (deleted_zfs_pools) {
         struct deleted_zfs_pool *current_pool = deleted_zfs_pools;

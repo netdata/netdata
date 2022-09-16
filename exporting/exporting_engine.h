@@ -4,7 +4,6 @@
 #define NETDATA_EXPORTING_ENGINE_H 1
 
 #include "daemon/common.h"
-
 #include <uv.h>
 
 #define exporter_get(section, name, value) expconfig_get(&exporting_config, section, name, value)
@@ -27,21 +26,27 @@ typedef enum exporting_options {
     EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
     EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
-    EXPORTING_OPTION_SEND_NAMES             = (1 << 16)
+    EXPORTING_OPTION_SEND_NAMES             = (1 << 16),
+    EXPORTING_OPTION_SEND_VARIABLES         = (1 << 17)
 } EXPORTING_OPTIONS;
 
 #define EXPORTING_OPTIONS_SOURCE_BITS                                                                                  \
     (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM)
 #define EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) (exporting_options & EXPORTING_OPTIONS_SOURCE_BITS)
 
+extern EXPORTING_OPTIONS global_exporting_options;
+extern const char *global_exporting_prefix;
+
 #define sending_labels_configured(instance)                                                                            \
     (instance->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
 
-#define should_send_label(instance, label)                                                                             \
+#define should_send_label(instance, label_source)                                                                      \
     ((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&                                            \
-      label->label_source == LABEL_SOURCE_NETDATA_CONF) ||                                                             \
+      label_source & RRDLABEL_SRC_CONFIG) ||                                                                           \
      (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
-      label->label_source != LABEL_SOURCE_NETDATA_CONF))
+      label_source & RRDLABEL_SRC_AUTO))
+
+#define should_send_variables(instance) (instance->config.options & EXPORTING_OPTION_SEND_VARIABLES)
 
 typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_UNKNOWN,                 // Invalid type
@@ -51,11 +56,11 @@ typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_JSON_HTTP,               // Send data in JSON format using HTTP API
     EXPORTING_CONNECTOR_TYPE_OPENTSDB,                // Send data to OpenTSDB using telnet API
     EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP,           // Send data to OpenTSDB using HTTP API
-    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // User selected to use Prometheus backend
+    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // Send data using Prometheus remote write protocol
     EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
     EXPORTING_CONNECTOR_TYPE_PUBSUB,                  // Send message to Google Cloud Pub/Sub
     EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
-    EXPORTING_CONNECTOR_TYPE_NUM                      // Number of backend types
+    EXPORTING_CONNECTOR_TYPE_NUM                      // Number of exporting connector types
 } EXPORTING_CONNECTOR_TYPE;
 
 struct engine;
@@ -202,7 +207,7 @@ struct instance {
     int skip_host;
     int skip_chart;
 
-    BUFFER *labels;
+    BUFFER *labels_buffer;
 
     time_t after;
     time_t before;
@@ -217,6 +222,7 @@ struct instance {
     int (*start_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*metric_formatting)(struct instance *instance, RRDDIM *rd);
     int (*end_chart_formatting)(struct instance *instance, RRDSET *st);
+    int (*variables_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
 
@@ -265,7 +271,10 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int rrdset_is_exportable(struct instance *instance, RRDSET *st);
 
-calculated_number exporting_calculate_value_from_stored_data(
+extern EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS exporting_options);
+
+NETDATA_DOUBLE
+exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp);
@@ -275,6 +284,7 @@ void start_host_formatting(struct engine *engine, RRDHOST *host);
 void start_chart_formatting(struct engine *engine, RRDSET *st);
 void metric_formatting(struct engine *engine, RRDDIM *rd);
 void end_chart_formatting(struct engine *engine, RRDSET *st);
+void variables_formatting(struct engine *engine, RRDHOST *host);
 void end_host_formatting(struct engine *engine, RRDHOST *host);
 void end_batch_formatting(struct engine *engine);
 int flush_host_labels(struct instance *instance, RRDHOST *host);

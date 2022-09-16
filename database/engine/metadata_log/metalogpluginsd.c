@@ -12,11 +12,11 @@ PARSER_RC metalog_pluginsd_host_action(
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
     if (host) {
         if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
             error("Archived host '%s' has memory mode '%s', but the archived one is '%s'. Ignoring archived state.",
-                  host->hostname, rrd_memory_mode_name(host->rrd_memory_mode),
+                  rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode),
                   rrd_memory_mode_name(RRD_MEMORY_MODE_DBENGINE));
             ((PARSER_USER_OBJECT *) user)->host = NULL; /* Ignore objects if memory mode is not dbengine */
         }
@@ -30,7 +30,7 @@ PARSER_RC metalog_pluginsd_host_action(
     }
 
     if (likely(!uuid_parse(machine_guid, state->host_uuid))) {
-        int rc = sql_store_host(&state->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        int rc = sql_store_host(&state->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags, 1);
         if (unlikely(rc)) {
             errno = 0;
             error("Failed to store host %s with UUID %s in the database", hostname, machine_guid);

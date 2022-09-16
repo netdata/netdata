@@ -32,6 +32,7 @@ build_dist() {
       --with-zlib \
       --with-math \
       --with-user=netdata \
+      --disable-dependency-tracking \
       CFLAGS=-O2
     make dist
     mv "${BASENAME}.tar.gz" artifacts/

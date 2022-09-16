@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "spawn.h"
-#include "database/engine/rrdenginelib.h"
 
 static uv_thread_t thread;
 int spawn_thread_error;
@@ -240,15 +239,15 @@ void spawn_init(void)
 
     init_spawn_cmd_queue();
 
-    init_completion(&completion);
+    completion_init(&completion);
     error = uv_thread_create(&thread, spawn_client, &completion);
     if (error) {
         error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for spawn client thread to initialize */
-    wait_for_completion(&completion);
-    destroy_completion(&completion);
+    completion_wait_for(&completion);
+    completion_destroy(&completion);
     uv_thread_set_name_np(thread, "DAEMON_SPAWN");
 
     if (spawn_thread_error) {

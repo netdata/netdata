@@ -17,7 +17,18 @@ check_successful_update() {
   ) >&2
 }
 
-steps="check_successful_update"
+check_autoupdate_enabled() {
+  progress "Check autoupdate still enabled after update"
+  (
+    if [ -f /etc/periodic/daily/netdata-updater ] || [ -f /etc/cron.daily/netdata-updater ]; then
+      echo "Update successful!"
+    else
+      exit 1
+    fi
+  ) >&2
+}
+
+steps="check_successful_update check_autoupdate_enabled"
 
 _main() {
   for step in $steps; do

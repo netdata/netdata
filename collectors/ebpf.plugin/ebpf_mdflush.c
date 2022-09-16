@@ -35,47 +35,47 @@ static avl_tree_lock mdflush_pub;
 // tmp store for mdflush values we get from a per-CPU eBPF map.
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
-static int read_thread_closed = 1;
-
 static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
+static enum ebpf_threads_status ebpf_mdflush_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
- * Clean up the main thread.
+ * MDflush exit
+ *
+ * Cancel thread and exit.
+ *
+ * @param ptr thread data.
+ */
+static void mdflush_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    ebpf_mdflush_exited = NETDATA_THREAD_EBPF_STOPPING;
+}
+
+/**
+ * CLeanup
+ *
+ * Clean allocated memory.
  *
  * @param ptr thread data.
  */
 static void mdflush_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
+    if (ebpf_mdflush_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-    }
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 1 * USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     freez(mdflush_ebpf_vals);
     freez(mdflush_threads.thread);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        bpf_object__close(objects);
-    }
+    mdflush_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /**
@@ -175,22 +175,25 @@ static void mdflush_read_count_map()
  */
 static void *mdflush_reader(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(mdflush_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_MDFLUSH_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_mdflush_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
+        if (ebpf_mdflush_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         mdflush_read_count_map();
     }
 
-    read_thread_closed = 1;
+    ebpf_mdflush_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -248,7 +251,7 @@ static void mdflush_collector(ebpf_module_t *em)
     netdata_thread_create(
         mdflush_threads.thread,
         mdflush_threads.name,
-        NETDATA_THREAD_OPTION_JOINABLE,
+        NETDATA_THREAD_OPTION_DEFAULT,
         mdflush_reader,
         em
     );
@@ -256,28 +259,24 @@ static void mdflush_collector(ebpf_module_t *em)
     // create chart and static dims.
     pthread_mutex_lock(&lock);
     mdflush_create_charts(em->update_every);
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
-    int update_every = em->update_every;
-    int counter = update_every - 1;
-    while (!close_ebpf_plugin) {
-        pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = em->update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
 
-        if (++counter == update_every) {
-            counter = 0;
-            pthread_mutex_lock(&lock);
+        // write dims now for all hitherto discovered devices.
+        write_begin_chart("mdstat", "mdstat_flush");
+        avl_traverse_lock(&mdflush_pub, mdflush_write_dims, NULL);
+        write_end_chart();
 
-            // write dims now for all hitherto discovered devices.
-            write_begin_chart("mdstat", "mdstat_flush");
-            avl_traverse_lock(&mdflush_pub, mdflush_write_dims, NULL);
-            write_end_chart();
-
-            pthread_mutex_unlock(&lock);
-        }
-
-        pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
     }
 }
 
@@ -289,23 +288,34 @@ static void mdflush_collector(ebpf_module_t *em)
  */
 void *ebpf_mdflush_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(mdflush_cleanup, ptr);
+    netdata_thread_cleanup_push(mdflush_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mdflush_maps;
+
+    char *md_flush_request = ebpf_find_symbol("md_flush_request");
+    if (!md_flush_request) {
+        em->enabled = CONFIG_BOOLEAN_NO;
+        error("Cannot monitor MD devices, because md is not loaded.");
+    }
+    freez(md_flush_request);
 
     if (!em->enabled) {
         goto endmdflush;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
-    if (!probe_links) {
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+    if (!em->probe_links) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endmdflush;
     }
 
     mdflush_collector(em);
 
 endmdflush:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
 
     return NULL;

@@ -15,10 +15,13 @@ public:
     unsigned MinTrainSamples;
     unsigned TrainEvery;
 
+    unsigned DBEngineAnomalyRateEvery;
+
     unsigned DiffN;
     unsigned SmoothN;
     unsigned LagN;
 
+    double RandomSamplingRatio;
     unsigned MaxKMeansIters;
 
     double DimensionAnomalyScoreThreshold;
@@ -30,10 +33,16 @@ public:
     double ADWindowRateThreshold;
     double ADDimensionRateThreshold;
 
+    bool StreamADCharts;
+
+    std::string HostsToSkip;
     SIMPLE_PATTERN *SP_HostsToSkip;
+
+    std::string ChartsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
     std::string AnomalyDBPath;
+    std::vector<uint32_t> RandomNums;
 
     void readMLConfig();
 };

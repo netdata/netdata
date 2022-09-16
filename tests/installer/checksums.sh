@@ -49,6 +49,5 @@ check_file() {
 }
 
 check_file kickstart.sh packaging/installer/methods/kickstart.md
-check_file kickstart-static64.sh packaging/installer/methods/kickstart-64.md
 
 echo "No problems found, exiting successfully!"

@@ -9,23 +9,35 @@ struct pressure {
     int updated;
     char *filename;
 
-    struct pressure_chart {
+    struct pressure_charts {
         int enabled;
 
-        const char *id;
-        const char *title;
+        struct pressure_share_time_chart {
+            const char *id;
+            const char *title;
 
-        double value10;
-        double value60;
-        double value300;
+            double value10;
+            double value60;
+            double value300;
 
-        RRDSET *st;
-        RRDDIM *rd10;
-        RRDDIM *rd60;
-        RRDDIM *rd300;
+            RRDSET *st;
+            RRDDIM *rd10;
+            RRDDIM *rd60;
+            RRDDIM *rd300;
+        } share_time;
+
+        struct pressure_total_time_chart {
+            const char *id;
+            const char *title;
+
+            unsigned long long value_total;
+
+            RRDSET *st;
+            RRDDIM *rdtotal;
+        } total_time;
     } some, full;
 };
 
-extern void update_pressure_chart(struct pressure_chart *chart);
+extern void update_pressure_charts(struct pressure_charts *charts);
 
 #endif //NETDATA_PROC_PRESSURE_H

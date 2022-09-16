@@ -2,17 +2,17 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# This is a simple backend database proxy, written in BASH, using the nc command.
+# This is a simple exporting proxy, written in BASH, using the nc command.
 # Run the script without any parameters for help.
 
 MODE="${1}"
 MY_PORT="${2}"
-BACKEND_HOST="${3}"
-BACKEND_PORT="${4}"
-FILE="${NETDATA_NC_BACKEND_DIR-/tmp}/netdata-nc-backend-${MY_PORT}"
+EXPORTING_HOST="${3}"
+EXPORTING_PORT="${4}"
+FILE="${NETDATA_NC_EXPORTING_DIR-/tmp}/netdata-nc-exporting-${MY_PORT}"
 
 log() {
-	logger --stderr --id=$$ --tag "netdata-nc-backend" "${*}"
+	logger --stderr --id=$$ --tag "netdata-nc-exporting" "${*}"
 }
 
 mync() {
@@ -28,7 +28,7 @@ mync() {
 }
 
 listen_save_replay_forever() {
-	local file="${1}" port="${2}" real_backend_host="${3}" real_backend_port="${4}" ret delay=1 started ended
+	local file="${1}" port="${2}" real_exporting_host="${3}" real_exporting_port="${4}" ret delay=1 started ended
 
 	while true
 	do
@@ -40,23 +40,23 @@ listen_save_replay_forever() {
 		
 		if [ -s "${file}" ]
 			then
-			if [ -n "${real_backend_host}" ] && [ -n "${real_backend_port}" ]
+			if [ -n "${real_exporting_host}" ] && [ -n "${real_exporting_port}" ]
 				then
-				log "Attempting to send the metrics to the real backend at ${real_backend_host}:${real_backend_port}"
+				log "Attempting to send the metrics to the real external database at ${real_exporting_host}:${real_exporting_port}"
 				
-				mync "${real_backend_host}" "${real_backend_port}" <"${file}"
+				mync "${real_exporting_host}" "${real_exporting_port}" <"${file}"
 				ret=$?
 
 				if [ ${ret} -eq 0 ]
 					then
-					log "Successfully sent the metrics to ${real_backend_host}:${real_backend_port}"
+					log "Successfully sent the metrics to ${real_exporting_host}:${real_exporting_port}"
 					mv "${file}" "${file}.old"
 					touch "${file}"
 				else
-					log "Failed to send the metrics to ${real_backend_host}:${real_backend_port} (nc returned ${ret}) - appending more data to ${file}"
+					log "Failed to send the metrics to ${real_exporting_host}:${real_exporting_port} (nc returned ${ret}) - appending more data to ${file}"
 				fi
 			else
-				log "No backend configured - appending more data to ${file}"
+				log "No external database configured - appending more data to ${file}"
 			fi
 		fi
 
@@ -92,7 +92,7 @@ if [ "${MODE}" = "start" ]
 		# save our PID to the lock file
 		echo "$$" >"${FILE}.lock"
 
-		listen_save_replay_forever "${FILE}" "${MY_PORT}" "${BACKEND_HOST}" "${BACKEND_PORT}"
+		listen_save_replay_forever "${FILE}" "${MY_PORT}" "${EXPORTING_HOST}" "${EXPORTING_PORT}"
 		ret=$?
 
 		log "listener exited."
@@ -131,20 +131,20 @@ else
 	cat <<EOF
 Usage:
 
-    "${0}" start|stop PORT [BACKEND_HOST BACKEND_PORT]
+    "${0}" start|stop PORT [EXPORTING_HOST EXPORTING_PORT]
 
     PORT          The port this script will listen
-                  (configure netdata to use this as a second backend)
+                  (configure netdata to use this as an external database)
 
-    BACKEND_HOST  The real backend host
-    BACKEND_PORT  The real backend port
+    EXPORTING_HOST  The real host for the external database
+    EXPORTING_PORT  The real port for the external database
 
-    This script can act as fallback backend for netdata.
+    This script can act as fallback database for netdata.
     It will receive metrics from netdata, save them to
     ${FILE}
-    and once netdata reconnects to the real-backend, this script
-    will push all metrics collected to the real-backend too and
-    wait for a failure to happen again.
+    and once netdata reconnects to the real external database,
+	this script will push all metrics collected to the real
+	external database too and wait for a failure to happen again.
 
     Only one netdata can connect to this script at a time.
     If you need fallback for multiple netdata, run this script
@@ -152,7 +152,7 @@ Usage:
 
     You can run me in the background with this:
 
-    screen -d -m "${0}" start PORT [BACKEND_HOST BACKEND_PORT]
+    screen -d -m "${0}" start PORT [EXPORTING_HOST EXPORTING_PORT]
 EOF
 	exit 1
 fi

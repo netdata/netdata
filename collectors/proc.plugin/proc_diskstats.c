@@ -25,6 +25,8 @@ static struct disk {
 
     char *mount_point;
 
+    char *chart_id;
+
     // disk options caching
     int do_io;
     int do_ops;
@@ -201,7 +203,7 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
         static int unknown_units_error = 10;
 
         char *end = NULL;
-        long double value = str2ld(buffer, &end);
+        NETDATA_DOUBLE value = str2ndd(buffer, &end);
         if(end && *end) {
             if(*end == 'k')
                 return (unsigned long long int)(value * 1024.0);
@@ -283,7 +285,7 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
         if(unlikely(!d->st_bcache_cache_allocations)) {
             d->st_bcache_cache_allocations = rrdset_create_localhost(
                     "disk_bcache_cache_alloc"
-                    , d->device
+                    , d->chart_id
                     , d->disk
                     , family
                     , "disk.bcache_cache_alloc"
@@ -609,6 +611,26 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         last->next = d;
     }
 
+    d->chart_id = strdupz(d->device);
+
+    // read device uuid if it is an LVM volume
+    if (!strncmp(d->device, "dm-", 3)) {
+        char uuid_filename[FILENAME_MAX + 1];
+        snprintfz(uuid_filename, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
+        strncat(uuid_filename, "/dm/uuid", FILENAME_MAX);
+
+        char device_uuid[RRD_ID_LENGTH_MAX + 1];
+        if (!read_file(uuid_filename, device_uuid, RRD_ID_LENGTH_MAX) && !strncmp(device_uuid, "LVM-", 4)) {
+            trim(device_uuid);
+
+            char chart_id[RRD_ID_LENGTH_MAX + 1];
+            snprintf(chart_id, RRD_ID_LENGTH_MAX, "%s-%s", d->device, device_uuid + 4);
+
+            freez(d->chart_id);
+            d->chart_id = strdupz(chart_id);
+        }
+    }
+
     char buffer[FILENAME_MAX + 1];
 
     // find if it is a physical disk
@@ -828,6 +850,32 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     get_disk_config(d);
     return d;
+}
+
+static void add_labels_to_disk(struct disk *d, RRDSET *st) {
+    rrdlabels_add(st->rrdlabels, "device", d->disk, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
+
+    switch (d->type) {
+        default:
+        case DISK_TYPE_UNKNOWN:
+            rrdlabels_add(st->rrdlabels, "device_type", "unknown", RRDLABEL_SRC_AUTO);
+            break;
+
+        case DISK_TYPE_PHYSICAL:
+            rrdlabels_add(st->rrdlabels, "device_type", "physical", RRDLABEL_SRC_AUTO);
+            break;
+
+        case DISK_TYPE_PARTITION:
+            rrdlabels_add(st->rrdlabels, "device_type", "partition", RRDLABEL_SRC_AUTO);
+            break;
+
+        case DISK_TYPE_VIRTUAL:
+            rrdlabels_add(st->rrdlabels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
+            break;
+    }
+
+    rrdcalc_update_rrdlabels(st);
 }
 
 int do_proc_diskstats(int update_every, usec_t dt) {
@@ -1052,7 +1100,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_io)) {
                 d->st_io = rrdset_create_localhost(
                         RRD_TYPE_DISK
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.io"
@@ -1067,6 +1115,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 d->rd_io_reads  = rrddim_add(d->st_io, "reads",  NULL, d->sector_size, 1024,      RRD_ALGORITHM_INCREMENTAL);
                 d->rd_io_writes = rrddim_add(d->st_io, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_io);
             }
             else rrdset_next(d->st_io);
 
@@ -1081,7 +1131,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if (unlikely(!d->st_ext_io)) {
                 d->st_ext_io = rrdset_create_localhost(
                         "disk_ext"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.io"
@@ -1094,8 +1144,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , RRDSET_TYPE_AREA
                 );
 
-                d->rd_io_discards =
-                    rrddim_add(d->st_ext_io, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_io_discards = rrddim_add(d->st_ext_io, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_ext_io);
             } else
                 rrdset_next(d->st_ext_io);
 
@@ -1113,7 +1164,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ops)) {
                 d->st_ops = rrdset_create_localhost(
                         "disk_ops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.ops"
@@ -1130,6 +1181,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 d->rd_ops_reads  = rrddim_add(d->st_ops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_ops_writes = rrddim_add(d->st_ops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_ops);
             }
             else rrdset_next(d->st_ops);
 
@@ -1144,7 +1197,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if (unlikely(!d->st_ext_ops)) {
                 d->st_ext_ops = rrdset_create_localhost(
                         "disk_ext_ops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.ops"
@@ -1162,7 +1215,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 d->rd_ops_discards = rrddim_add(d->st_ext_ops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 if (do_fl_stats)
                     d->rd_ops_flushes = rrddim_add(d->st_ext_ops, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            } else
+
+                add_labels_to_disk(d, d->st_ext_ops);
+            }
+            else
                 rrdset_next(d->st_ext_ops);
 
             last_discards = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_discards, discards);
@@ -1180,7 +1236,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_qops)) {
                 d->st_qops = rrdset_create_localhost(
                         "disk_qops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.qops"
@@ -1196,6 +1252,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_qops, RRDSET_FLAG_DETAIL);
 
                 d->rd_qops_operations = rrddim_add(d->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_disk(d, d->st_qops);
             }
             else rrdset_next(d->st_qops);
 
@@ -1212,7 +1270,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_backlog)) {
                 d->st_backlog = rrdset_create_localhost(
                         "disk_backlog"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.backlog"
@@ -1228,6 +1286,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_backlog, RRDSET_FLAG_DETAIL);
 
                 d->rd_backlog_backlog = rrddim_add(d->st_backlog, "backlog", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_backlog);
             }
             else rrdset_next(d->st_backlog);
 
@@ -1244,7 +1304,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_busy)) {
                 d->st_busy = rrdset_create_localhost(
                         "disk_busy"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.busy"
@@ -1259,8 +1319,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_busy, RRDSET_FLAG_DETAIL);
 
-                d->rd_busy_busy =
-                    rrddim_add(d->st_busy, "busy", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_busy_busy = rrddim_add(d->st_busy, "busy", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_busy);
             }
             else rrdset_next(d->st_busy);
 
@@ -1272,7 +1333,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_util)) {
                 d->st_util = rrdset_create_localhost(
                         "disk_util"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.util"
@@ -1288,6 +1349,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_util, RRDSET_FLAG_DETAIL);
 
                 d->rd_util_utilization = rrddim_add(d->st_util, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                add_labels_to_disk(d, d->st_util);
             }
             else rrdset_next(d->st_util);
 
@@ -1309,7 +1372,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_mops)) {
                 d->st_mops = rrdset_create_localhost(
                         "disk_mops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.mops"
@@ -1326,6 +1389,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 d->rd_mops_reads  = rrddim_add(d->st_mops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_mops_writes = rrddim_add(d->st_mops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_mops);
             }
             else rrdset_next(d->st_mops);
 
@@ -1342,7 +1407,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ext_mops)) {
                 d->st_ext_mops = rrdset_create_localhost(
                         "disk_ext_mops"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.mops"
@@ -1358,7 +1423,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_flag_set(d->st_ext_mops, RRDSET_FLAG_DETAIL);
 
                 d->rd_mops_discards = rrddim_add(d->st_ext_mops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            } else
+
+                add_labels_to_disk(d, d->st_ext_mops);
+            }
+            else
                 rrdset_next(d->st_ext_mops);
 
             rrddim_set_by_pointer(d->st_ext_mops, d->rd_mops_discards, mdiscards);
@@ -1374,7 +1442,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_iotime)) {
                 d->st_iotime = rrdset_create_localhost(
                         "disk_iotime"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk.iotime"
@@ -1391,6 +1459,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 d->rd_iotime_reads  = rrddim_add(d->st_iotime, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_iotime_writes = rrddim_add(d->st_iotime, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_iotime);
             }
             else rrdset_next(d->st_iotime);
 
@@ -1405,7 +1475,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ext_iotime)) {
                 d->st_ext_iotime = rrdset_create_localhost(
                         "disk_ext_iotime"
-                        , d->device
+                        , d->chart_id
                         , d->disk
                         , family
                         , "disk_ext.iotime"
@@ -1422,9 +1492,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 d->rd_iotime_discards = rrddim_add(d->st_ext_iotime, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 if (do_fl_stats)
-                    d->rd_iotime_flushes =
-                        rrddim_add(d->st_ext_iotime, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            } else
+                    d->rd_iotime_flushes = rrddim_add(d->st_ext_iotime, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                add_labels_to_disk(d, d->st_ext_iotime);
+            }
+            else
                 rrdset_next(d->st_ext_iotime);
 
             last_discardms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_discards, discardms);
@@ -1448,7 +1520,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_await)) {
                     d->st_await = rrdset_create_localhost(
                             "disk_await"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.await"
@@ -1465,6 +1537,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_await_reads  = rrddim_add(d->st_await, "reads",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                     d->rd_await_writes = rrddim_add(d->st_await, "writes", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_await);
                 }
                 else rrdset_next(d->st_await);
 
@@ -1477,7 +1551,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_ext_await)) {
                     d->st_ext_await = rrdset_create_localhost(
                             "disk_ext_await"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk_ext.await"
@@ -1494,18 +1568,22 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_await_discards = rrddim_add(d->st_ext_await, "discards", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     if (do_fl_stats)
-                        d->rd_await_flushes =
-                            rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                } else
+                        d->rd_await_flushes = rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_ext_await);
+                }
+                else
                     rrdset_next(d->st_ext_await);
 
                 rrddim_set_by_pointer(
                     d->st_ext_await, d->rd_await_discards,
                     (discards - last_discards) ? (discardms - last_discardms) / (discards - last_discards) : 0);
+
                 if (do_fl_stats)
                     rrddim_set_by_pointer(
                         d->st_ext_await, d->rd_await_flushes,
                         (flushes - last_flushes) ? (flushms - last_flushms) / (flushes - last_flushes) : 0);
+
                 rrdset_done(d->st_ext_await);
             }
 
@@ -1517,7 +1595,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_avgsz)) {
                     d->st_avgsz = rrdset_create_localhost(
                             "disk_avgsz"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.avgsz"
@@ -1534,6 +1612,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_avgsz_reads  = rrddim_add(d->st_avgsz, "reads",  NULL, d->sector_size, 1024,      RRD_ALGORITHM_ABSOLUTE);
                     d->rd_avgsz_writes = rrddim_add(d->st_avgsz, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_avgsz);
                 }
                 else rrdset_next(d->st_avgsz);
 
@@ -1546,7 +1626,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_ext_avgsz)) {
                     d->st_ext_avgsz = rrdset_create_localhost(
                             "disk_ext_avgsz"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk_ext.avgsz"
@@ -1561,9 +1641,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_ext_avgsz, RRDSET_FLAG_DETAIL);
 
-                    d->rd_avgsz_discards =
-                        rrddim_add(d->st_ext_avgsz, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_ABSOLUTE);
-                } else
+                    d->rd_avgsz_discards = rrddim_add(d->st_ext_avgsz, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_ext_avgsz);
+                }
+                else
                     rrdset_next(d->st_ext_avgsz);
 
                 rrddim_set_by_pointer(
@@ -1583,7 +1665,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_svctm)) {
                     d->st_svctm = rrdset_create_localhost(
                             "disk_svctm"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.svctm"
@@ -1599,8 +1681,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     rrdset_flag_set(d->st_svctm, RRDSET_FLAG_DETAIL);
 
                     d->rd_svctm_svctm = rrddim_add(d->st_svctm, "svctm", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_svctm);
                 }
-                else rrdset_next(d->st_svctm);
+                else
+                    rrdset_next(d->st_svctm);
 
                 rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
                 rrdset_done(d->st_svctm);
@@ -1688,7 +1773,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_hit_ratio)) {
                     d->st_bcache_hit_ratio = rrdset_create_localhost(
                             "disk_bcache_hit_ratio"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_hit_ratio"
@@ -1705,8 +1790,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     d->rd_bcache_hit_ratio_1hour = rrddim_add(d->st_bcache_hit_ratio, "1hour", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     d->rd_bcache_hit_ratio_1day  = rrddim_add(d->st_bcache_hit_ratio, "1day",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     d->rd_bcache_hit_ratio_total = rrddim_add(d->st_bcache_hit_ratio, "ever",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_bcache_hit_ratio);
                 }
-                else rrdset_next(d->st_bcache_hit_ratio);
+                else
+                    rrdset_next(d->st_bcache_hit_ratio);
 
                 rrddim_set_by_pointer(d->st_bcache_hit_ratio, d->rd_bcache_hit_ratio_5min, stats_five_minute_cache_hit_ratio);
                 rrddim_set_by_pointer(d->st_bcache_hit_ratio, d->rd_bcache_hit_ratio_1hour, stats_hour_cache_hit_ratio);
@@ -1720,7 +1808,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_rates)) {
                     d->st_bcache_rates = rrdset_create_localhost(
                             "disk_bcache_rates"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_rates"
@@ -1735,8 +1823,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_bcache_rate_congested = rrddim_add(d->st_bcache_rates, "congested", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
                     d->rd_bcache_rate_writeback = rrddim_add(d->st_bcache_rates, "writeback", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_bcache_rates);
                 }
-                else rrdset_next(d->st_bcache_rates);
+                else
+                    rrdset_next(d->st_bcache_rates);
 
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_writeback, writeback_rate);
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_congested, cache_congested);
@@ -1747,7 +1838,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_size)) {
                     d->st_bcache_size = rrdset_create_localhost(
                             "disk_bcache_size"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_size"
@@ -1761,8 +1852,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     );
 
                     d->rd_bcache_dirty_size = rrddim_add(d->st_bcache_size, "dirty", NULL,  1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_bcache_size);
                 }
-                else rrdset_next(d->st_bcache_size);
+                else
+                    rrdset_next(d->st_bcache_size);
 
                 rrddim_set_by_pointer(d->st_bcache_size, d->rd_bcache_dirty_size, dirty_data);
                 rrdset_done(d->st_bcache_size);
@@ -1772,7 +1866,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_usage)) {
                     d->st_bcache_usage = rrdset_create_localhost(
                             "disk_bcache_usage"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_usage"
@@ -1786,8 +1880,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     );
 
                     d->rd_bcache_available_percent = rrddim_add(d->st_bcache_usage, "avail", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    add_labels_to_disk(d, d->st_bcache_usage);
                 }
-                else rrdset_next(d->st_bcache_usage);
+                else
+                    rrdset_next(d->st_bcache_usage);
 
                 rrddim_set_by_pointer(d->st_bcache_usage, d->rd_bcache_available_percent, cache_available_percent);
                 rrdset_done(d->st_bcache_usage);
@@ -1798,7 +1895,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_cache_read_races)) {
                     d->st_bcache_cache_read_races = rrdset_create_localhost(
                             "disk_bcache_cache_read_races"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_cache_read_races"
@@ -1813,8 +1910,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_bcache_cache_read_races = rrddim_add(d->st_bcache_cache_read_races, "races",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_cache_io_errors  = rrddim_add(d->st_bcache_cache_read_races, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                    add_labels_to_disk(d, d->st_bcache_cache_read_races);
                 }
-                else rrdset_next(d->st_bcache_cache_read_races);
+                else
+                    rrdset_next(d->st_bcache_cache_read_races);
 
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_read_races, cache_read_races);
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_io_errors, cache_io_errors);
@@ -1830,7 +1930,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache)) {
                     d->st_bcache = rrdset_create_localhost(
                             "disk_bcache"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache"
@@ -1849,8 +1949,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     d->rd_bcache_misses          = rrddim_add(d->st_bcache, "misses",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_miss_collisions = rrddim_add(d->st_bcache, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_readaheads      = rrddim_add(d->st_bcache, "readaheads", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                    add_labels_to_disk(d, d->st_bcache);
                 }
-                else rrdset_next(d->st_bcache);
+                else
+                    rrdset_next(d->st_bcache);
 
                 rrddim_set_by_pointer(d->st_bcache, d->rd_bcache_hits, stats_total_cache_hits);
                 rrddim_set_by_pointer(d->st_bcache, d->rd_bcache_misses, stats_total_cache_misses);
@@ -1867,7 +1970,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_bcache_bypass)) {
                     d->st_bcache_bypass = rrdset_create_localhost(
                             "disk_bcache_bypass"
-                            , d->device
+                            , d->chart_id
                             , d->disk
                             , family
                             , "disk.bcache_bypass"
@@ -1884,6 +1987,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_bcache_bypass_hits   = rrddim_add(d->st_bcache_bypass, "hits",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_bypass_misses = rrddim_add(d->st_bcache_bypass, "misses", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                    add_labels_to_disk(d, d->st_bcache_bypass);
                 }
                 else rrdset_next(d->st_bcache_bypass);
 
@@ -1940,12 +2045,19 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             struct disk *t = d;
 
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
+            rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_await);
+            rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
+            rrdset_obsolete_and_pointer_null(d->st_busy);
             rrdset_obsolete_and_pointer_null(d->st_io);
+            rrdset_obsolete_and_pointer_null(d->st_ext_io);
             rrdset_obsolete_and_pointer_null(d->st_iotime);
+            rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
             rrdset_obsolete_and_pointer_null(d->st_mops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_mops);
             rrdset_obsolete_and_pointer_null(d->st_ops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_ops);
             rrdset_obsolete_and_pointer_null(d->st_qops);
             rrdset_obsolete_and_pointer_null(d->st_svctm);
             rrdset_obsolete_and_pointer_null(d->st_util);
@@ -1955,6 +2067,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_obsolete_and_pointer_null(d->st_bcache_size);
             rrdset_obsolete_and_pointer_null(d->st_bcache_usage);
             rrdset_obsolete_and_pointer_null(d->st_bcache_hit_ratio);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_allocations);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_read_races);
 
             if(d == disk_root) {
                 disk_root = d = d->next;
@@ -1985,6 +2099,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             freez(t->disk);
             freez(t->device);
             freez(t->mount_point);
+            freez(t->chart_id);
             freez(t);
         }
         else {

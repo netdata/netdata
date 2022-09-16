@@ -52,11 +52,11 @@ int __wrap_mark_scheduled_instances(struct engine *engine)
     return mock_type(int);
 }
 
-calculated_number __real_exporting_calculate_value_from_stored_data(
+NETDATA_DOUBLE __real_exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp);
-calculated_number __wrap_exporting_calculate_value_from_stored_data(
+NETDATA_DOUBLE __wrap_exporting_calculate_value_from_stored_data(
     struct instance *instance,
     RRDDIM *rd,
     time_t *last_timestamp)
@@ -67,7 +67,7 @@ calculated_number __wrap_exporting_calculate_value_from_stored_data(
     *last_timestamp = 15052;
 
     function_called();
-    return mock_type(calculated_number);
+    return mock_type(NETDATA_DOUBLE);
 }
 
 int __real_prepare_buffers(struct engine *engine);
@@ -153,6 +153,14 @@ int __mock_end_chart_formatting(struct instance *instance, RRDSET *st)
     function_called();
     check_expected_ptr(instance);
     check_expected_ptr(st);
+    return mock_type(int);
+}
+
+int __mock_variables_formatting(struct instance *instance, RRDHOST *host)
+{
+    function_called();
+    check_expected_ptr(instance);
+    check_expected_ptr(host);
     return mock_type(int);
 }
 

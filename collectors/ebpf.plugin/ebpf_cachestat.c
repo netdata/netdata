@@ -5,9 +5,6 @@
 
 netdata_publish_cachestat_t **cachestat_pid;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
 static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];
@@ -18,13 +15,11 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
-static int read_thread_closed = 1;
-
 struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
 
-static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
+ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
                                               .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                               .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                              {.name = "cstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -44,7 +39,278 @@ struct config cachestat_config = { .first_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
+static enum ebpf_threads_status ebpf_cachestat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
+netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
+                                               {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/cachestat.skel.h" // BTF code
+
+static struct cachestat_bpf *bpf_obj = NULL;
+
+/**
+ * Disable probe
+ *
+ * Disable all probes to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static void ebpf_cachestat_disable_probe(struct cachestat_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_add_to_page_cache_lru_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_page_accessed_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_buffer_dirty_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_kprobe, false);
+}
+
+/*
+ * Disable specific probe
+ *
+ * Disable probes according the kernel version
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static void ebpf_cachestat_disable_specific_probe(struct cachestat_bpf *obj)
+{
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
+    }
+}
+
+/*
+ * Disable trampoline
+ *
+ * Disable all trampoline to use exclusively another method.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_disable_trampoline(struct cachestat_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_add_to_page_cache_lru_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_page_accessed_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_mark_buffer_dirty_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
+}
+
+/*
+ * Disable specific trampoline
+ *
+ * Disable trampoline according to kernel version.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_disable_specific_trampoline(struct cachestat_bpf *obj)
+{
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
+    }
+}
+
+/**
+ * Set trampoline target
+ *
+ * Set the targets we will monitor.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_add_to_page_cache_lru_fentry, 0,
+                                   cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_mark_page_accessed_fentry, 0,
+                                   cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
+
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        bpf_program__set_attach_target(obj->progs.netdata_folio_mark_dirty_fentry, 0,
+                                       cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        bpf_program__set_attach_target(obj->progs.netdata_set_page_dirty_fentry, 0,
+                                       cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    } else {
+        bpf_program__set_attach_target(obj->progs.netdata_account_page_dirtied_fentry, 0,
+                                       cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    }
+
+    bpf_program__set_attach_target(obj->progs.netdata_mark_buffer_dirty_fentry, 0,
+                                   cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_release_task_fentry, 0,
+                                   EBPF_COMMON_FNCT_CLEAN_UP);
+}
+
+/**
+ * Mount Attach Probe
+ *
+ * Attach probes to target
+ *
+ * @param obj is the main structure for bpf objects.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
+{
+    obj->links.netdata_add_to_page_cache_lru_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_add_to_page_cache_lru_kprobe,
+                                                                                 false,
+                                                                                 cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
+    int ret = libbpf_get_error(obj->links.netdata_add_to_page_cache_lru_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_mark_page_accessed_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_mark_page_accessed_kprobe,
+                                                                              false,
+                                                                              cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
+    ret = libbpf_get_error(obj->links.netdata_mark_page_accessed_kprobe);
+    if (ret)
+        return -1;
+
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+        obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_folio_mark_dirty_kprobe,
+                                                                                false,
+                                                                                cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        ret = libbpf_get_error(obj->links.netdata_folio_mark_dirty_kprobe);
+    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+        obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_set_page_dirty_kprobe,
+                                                                              false,
+                                                                              cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        ret = libbpf_get_error(obj->links.netdata_set_page_dirty_kprobe);
+    } else {
+        obj->links.netdata_account_page_dirtied_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_account_page_dirtied_kprobe,
+                                                                                    false,
+                                                                                    cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        ret = libbpf_get_error(obj->links.netdata_account_page_dirtied_kprobe);
+    }
+
+    if (ret)
+        return -1;
+
+    obj->links.netdata_mark_buffer_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_mark_buffer_dirty_kprobe,
+                                                                             false,
+                                                                             cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
+    ret = libbpf_get_error(obj->links.netdata_mark_buffer_dirty_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_kprobe,
+                                                                        false,
+                                                                        EBPF_COMMON_FNCT_CLEAN_UP);
+    ret = libbpf_get_error(obj->links.netdata_release_task_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+/**
+ * Adjust Map Size
+ *
+ * Resize maps according input from users.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ */
+static void ebpf_cachestat_adjust_map_size(struct cachestat_bpf *obj, ebpf_module_t *em)
+{
+    ebpf_update_map_size(obj->maps.cstat_pid, &cachestat_maps[NETDATA_CACHESTAT_PID_STATS],
+                         em, bpf_map__name(obj->maps.cstat_pid));
+}
+
+/**
+ * Set hash tables
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_set_hash_tables(struct cachestat_bpf *obj)
+{
+    cachestat_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd = bpf_map__fd(obj->maps.cstat_global);
+    cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd = bpf_map__fd(obj->maps.cstat_pid);
+    cachestat_maps[NETDATA_CACHESTAT_CTRL].map_fd = bpf_map__fd(obj->maps.cstat_ctrl);
+}
+
+/**
+ *  Disable Release Task
+ *
+ *  Disable release task when apps is not enabled.
+ *
+ *  @param obj is the main structure for bpf objects.
+ */
+static void ebpf_cachestat_disable_release_task(struct cachestat_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_release_task_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
+}
+
+/**
+ * Load and attach
+ *
+ * Load and attach the eBPF code in kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ * @param em  structure with configuration
+ *
+ * @return it returns 0 on succes and -1 otherwise
+ */
+static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf_module_t *em)
+{
+    netdata_ebpf_targets_t *mt = em->targets;
+    netdata_ebpf_program_loaded_t test = mt[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].mode;
+
+    if (test == EBPF_LOAD_TRAMPOLINE) {
+        ebpf_cachestat_disable_probe(obj);
+        ebpf_cachestat_disable_specific_trampoline(obj);
+
+        netdata_set_trampoline_target(obj);
+    } else {
+        ebpf_cachestat_disable_trampoline(obj);
+        ebpf_cachestat_disable_specific_probe(obj);
+    }
+
+    ebpf_cachestat_adjust_map_size(obj, em);
+
+    if (!em->apps_charts && !em->cgroup_charts)
+        ebpf_cachestat_disable_release_task(obj);
+
+    int ret = cachestat_bpf__load(obj);
+    if (ret) {
+        return ret;
+    }
+
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? cachestat_bpf__attach(obj) : ebpf_cachestat_attach_probe(obj);
+    if (!ret) {
+        ebpf_cachestat_set_hash_tables(obj);
+
+        ebpf_update_controller(cachestat_maps[NETDATA_CACHESTAT_CTRL].map_fd, em);
+    }
+
+    return ret;
+}
+#endif
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -52,52 +318,48 @@ struct config cachestat_config = { .first_section = NULL,
  *****************************************************************/
 
 /**
- * Clean PID structures
+ * Cachestat exit.
  *
- * Clean the allocated structures.
+ * Cancel child and exit.
+ *
+ * @param ptr thread data.
  */
-void clean_cachestat_pid_structures() {
-    struct pid_stat *pids = root_of_pids;
-    while (pids) {
-        freez(cachestat_pid[pids->pid]);
-
-        pids = pids->next;
+static void ebpf_cachestat_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled) {
+        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
     }
+
+    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPING;
 }
 
 /**
- * Clean up the main thread.
+ * Cachestat cleanup
+ *
+ * Clean up allocated addresses.
  *
  * @param ptr thread data.
  */
 static void ebpf_cachestat_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled)
+    if (ebpf_cachestat_exited != NETDATA_THREAD_EBPF_STOPPED)
         return;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    uint32_t tick = 2*USEC_PER_MS;
-    while (!read_thread_closed) {
-        usec_t dt = heartbeat_next(&hb, tick);
-        UNUSED(dt);
-    }
 
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
     freez(cachestat_values);
+    freez(cachestat_threads.thread);
 
-    if (probe_links) {
-        struct bpf_program *prog;
-        size_t i = 0 ;
-        bpf_object__for_each_program(prog, objects) {
-            bpf_link__destroy(probe_links[i]);
-            i++;
-        }
-        bpf_object__close(objects);
-    }
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        cachestat_bpf__destroy(bpf_obj);
+#endif
+    cachestat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /*****************************************************************
@@ -121,23 +383,23 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
                               uint64_t apcl, uint64_t apd)
 {
     // Adapted algorithm from https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138
-    calculated_number total = (calculated_number) (((long long)mpa) - ((long long)mbd));
+    NETDATA_DOUBLE total = (NETDATA_DOUBLE) (((long long)mpa) - ((long long)mbd));
     if (total < 0)
         total = 0;
 
-    calculated_number misses = (calculated_number) ( ((long long) apcl) - ((long long) apd) );
+    NETDATA_DOUBLE misses = (NETDATA_DOUBLE) ( ((long long) apcl) - ((long long) apd) );
     if (misses < 0)
         misses = 0;
 
     // If hits are < 0, then its possible misses are overestimate due to possibly page cache read ahead adding
     // more pages than needed. In this case just assume misses as total and reset hits.
-    calculated_number hits = total - misses;
+    NETDATA_DOUBLE hits = total - misses;
     if (hits < 0 ) {
         misses = total;
         hits = 0;
     }
 
-    calculated_number ratio = (total > 0) ? hits/total : 1;
+    NETDATA_DOUBLE ratio = (total > 0) ? hits/total : 1;
 
     out->ratio = (long long )(ratio*100);
     out->hit = (long long)hits;
@@ -327,7 +589,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                               "The ratio is calculated dividing the Hit pages per total cache accesses without counting dirties.",
+                               "Hit ratio",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_LINE,
@@ -336,7 +598,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_DIRTY_CHART,
-                               "Number of pages marked as dirty. When a page is called dirty, this means that the data stored inside the page needs to be written to devices.",
+                               "Number of dirty pages",
                                EBPF_CACHESTAT_DIMENSION_PAGE,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -345,7 +607,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_CHART,
-                               "Number of cache access without counting dirty pages and page additions.",
+                               "Number of accessed files",
                                EBPF_CACHESTAT_DIMENSION_HITS,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -354,13 +616,15 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_MISSES_CHART,
-                               "Page caches added without counting dirty pages",
+                               "Files out of page cache",
                                EBPF_CACHESTAT_DIMENSION_MISSES,
                                NETDATA_CACHESTAT_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20093,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }
 
 /*****************************************************************
@@ -406,22 +670,25 @@ static void read_global_table()
  */
 void *ebpf_cachestat_read_hash(void *ptr)
 {
-    read_thread_closed = 0;
-
+    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    while (!close_ebpf_plugin) {
+    while (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_RUNNING) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
+        if (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_STOPPING)
+            break;
 
         read_global_table();
     }
-    read_thread_closed = 1;
 
+    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPED;
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -599,7 +866,7 @@ void ebpf_cachestat_calc_chart_values()
 static void ebpf_create_systemd_cachestat_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                                  "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                                  "Hit ratio",
                                   EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21100,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
@@ -607,21 +874,21 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
                                   update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_DIRTY_CHART,
-                                  "Number of dirty pages added to the page cache.",
+                                  "Number of dirty pages",
                                   EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21101,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                   NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT,
                                   update_every);
 
-    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_CHART, "Hits are function calls that Netdata counts.",
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_CHART, "Number of accessed files",
                                   EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21102,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                   NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT,
                                   update_every);
 
-    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_MISSES_CHART, "Misses are function calls that Netdata counts.",
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_MISSES_CHART, "Files out of page cache",
                                   EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21103,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
@@ -646,7 +913,7 @@ static int ebpf_send_systemd_cachestat_charts()
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_cachestat.ratio);
-        } else
+        } else if (unlikely(ect->systemd))
             ret = 0;
     }
     write_end_chart();
@@ -713,7 +980,7 @@ static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_caches
 static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
@@ -721,7 +988,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       cachestat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
-                      "Number of dirty pages added to the page cache.",
+                      "Number of dirty pages",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
@@ -730,7 +997,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
-                      "Hits are function calls that Netdata counts.",
+                      "Number of accessed files",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
@@ -739,7 +1006,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
-                      "Misses are function calls that Netdata counts.",
+                      "Files out of page cache",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_CGROUP_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
@@ -759,25 +1026,25 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_DIRTY_CHART,
-                      "Number of dirty pages added to the page cache.",
+                      "Number of dirty pages",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_CHART,
-                      "Hits are function calls that Netdata counts.",
+                      "Number of accessed files",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_MISSES_CHART,
-                      "Misses are function calls that Netdata counts.",
+                      "Files out of page cache",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203, update_every);
@@ -835,43 +1102,44 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 */
 static void cachestat_collector(ebpf_module_t *em)
 {
-    cachestat_threads.thread = mallocz(sizeof(netdata_thread_t));
+    cachestat_threads.thread = callocz(1, sizeof(netdata_thread_t));
     cachestat_threads.start_routine = ebpf_cachestat_read_hash;
 
-    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
                           ebpf_cachestat_read_hash, em);
 
     netdata_publish_cachestat_t publish;
     memset(&publish, 0, sizeof(publish));
-    int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
-    int counter = update_every - 1;
-    while (!close_ebpf_plugin) {
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = update_every * USEC_PER_SEC;
+    //This will be cancelled by its parent
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin)
+            break;
+
+        netdata_apps_integration_flags_t apps = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
-        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        if (apps)
+            read_apps_table();
 
-        if (++counter == update_every) {
-            counter = 0;
-            if (apps)
-                read_apps_table();
+        if (cgroups)
+            ebpf_update_cachestat_cgroup();
 
-            if (cgroups)
-                ebpf_update_cachestat_cgroup();
+        pthread_mutex_lock(&lock);
 
-            pthread_mutex_lock(&lock);
+        cachestat_send_global(&publish);
 
-            cachestat_send_global(&publish);
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_cache_send_apps_data(apps_groups_root_target);
 
-            if (apps)
-                ebpf_cache_send_apps_data(apps_groups_root_target);
+        if (cgroups)
+            ebpf_cachestat_send_cgroup_data(update_every);
 
-            if (cgroups)
-                ebpf_cachestat_send_cgroup_data(update_every);
-
-            pthread_mutex_unlock(&lock);
-        }
-
+        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }
@@ -892,7 +1160,7 @@ static void cachestat_collector(ebpf_module_t *em)
 static void ebpf_create_memory_charts(ebpf_module_t *em)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -901,7 +1169,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
                       cachestat_counter_publish_aggregated, 1, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
-                      "Number of dirty pages added to the page cache.",
+                      "Number of dirty pages",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -911,7 +1179,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
                       em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
-                      "Hits are function calls that Netdata counts.",
+                      "Number of accessed files",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -921,7 +1189,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
                       em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
-                      "Misses are function calls that Netdata counts.",
+                      "Files out of page cache",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -962,6 +1230,55 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  *****************************************************************/
 
 /**
+ * Update Internal value
+ *
+ * Update values used during runtime.
+ */
+static void ebpf_cachestat_set_internal_value()
+{
+    static char *account_page[] = { "account_page_dirtied", "__set_page_dirty", "__folio_mark_dirty"  };
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16)
+        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_FOLIO_DIRTY];
+    else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15)
+        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY];
+    else
+        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY];
+}
+
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ */
+static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].mode);
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        bpf_obj = cachestat_bpf__open();
+        if (!bpf_obj)
+            ret = -1;
+        else
+            ret = ebpf_cachestat_load_and_attach(bpf_obj, em);
+    }
+#endif
+
+    if (ret)
+        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+
+    return ret;
+}
+
+/**
  * Cachestat thread
  *
  * Thread used to make cachestat thread
@@ -972,7 +1289,7 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  */
 void *ebpf_cachestat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
+    netdata_thread_cleanup_push(ebpf_cachestat_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = cachestat_maps;
@@ -982,14 +1299,17 @@ void *ebpf_cachestat_thread(void *ptr)
     if (!em->enabled)
         goto endcachestat;
 
-    pthread_mutex_lock(&lock);
-    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
+    ebpf_cachestat_set_internal_value();
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
-    if (!probe_links) {
-        pthread_mutex_unlock(&lock);
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_cachestat_load_bpf(em)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endcachestat;
     }
+
+    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
@@ -999,13 +1319,17 @@ void *ebpf_cachestat_thread(void *ptr)
                        cachestat_counter_dimension_name, cachestat_counter_dimension_name,
                        algorithms, NETDATA_CACHESTAT_END);
 
+    pthread_mutex_lock(&lock);
+    ebpf_update_stats(&plugin_statistics, em);
     ebpf_create_memory_charts(em);
-
     pthread_mutex_unlock(&lock);
 
     cachestat_collector(em);
 
 endcachestat:
+    if (!em->enabled)
+        ebpf_update_disabled_plugin_stats(em);
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

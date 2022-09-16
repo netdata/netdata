@@ -106,6 +106,8 @@ static void thread_cleanup(void *ptr) {
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         info("thread with task id %d finished", gettid());
 
+    thread_cache_destroy();
+
     freez((void *)netdata_thread->tag);
     netdata_thread->tag = NULL;
 
@@ -147,6 +149,7 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
     pthread_set_name_np(ut, threadname);
 #elif defined(__APPLE__)
     // Apple can only set its own name
+    UNUSED(ut);
 #else
     ret = pthread_setname_np(ut, threadname);
 #endif

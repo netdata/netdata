@@ -11,12 +11,19 @@ struct prometheus_remote_write_specific_data {
     void *write_request;
 };
 
+struct prometheus_remote_write_variables_callback_options {
+    RRDHOST *host;
+    time_t now;
+    struct instance *instance;
+};
+
 int init_prometheus_remote_write_instance(struct instance *instance);
 extern void clean_prometheus_remote_write(struct instance *instance);
 
 int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host);
 int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st);
 int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *rd);
+int format_variables_prometheus_remote_write(struct instance *instance, RRDHOST *host);
 int format_batch_prometheus_remote_write(struct instance *instance);
 
 void prometheus_remote_write_prepare_header(struct instance *instance);

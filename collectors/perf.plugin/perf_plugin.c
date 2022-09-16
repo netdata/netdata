@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 
 #include <linux/perf_event.h>
 
@@ -28,37 +29,6 @@
 #define NETDATA_CHART_PRIO_PERF_DTLB                  8824
 #define NETDATA_CHART_PRIO_PERF_ITLB                  8825
 #define NETDATA_CHART_PRIO_PERF_PBU                   8826
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
-    return;
-}
-
-// callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
-// Variables
 
 #define RRD_TYPE_PERF "perf"
 #define RRD_FAMILY_HW "hardware"
@@ -550,8 +520,8 @@ static void perf_send_metrics() {
                , "instructions_per_cycle"
                );
 
-        calculated_number result = ((calculated_number)perf_events[EV_ID_INSTRUCTIONS].value /
-                                    (calculated_number)perf_events[EV_ID_CPU_CYCLES].value) * 100.0;
+        NETDATA_DOUBLE result = ((NETDATA_DOUBLE)perf_events[EV_ID_INSTRUCTIONS].value /
+                                    (NETDATA_DOUBLE)perf_events[EV_ID_CPU_CYCLES].value) * 100.0;
         printf("SET %s = %lld\n"
                , "ipc"
                , (collected_number) result
@@ -1313,6 +1283,7 @@ void parse_command_line(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+    clocks_init();
 
     // ------------------------------------------------------------------------
     // initialization of netdata plugin

@@ -27,7 +27,6 @@ dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
     health.d/anomalies.conf \
     health.d/apcupsd.conf \
-    health.d/backend.conf \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
@@ -46,7 +45,6 @@ dist_healthconfig_DATA = \
     health.d/fping.conf \
     health.d/geth.conf \
     health.d/ioping.conf \
-    health.d/fronius.conf \
     health.d/gearman.conf \
     health.d/go.d.plugin.conf \
     health.d/haproxy.conf \
@@ -63,10 +61,13 @@ dist_healthconfig_DATA = \
     health.d/megacli.conf \
     health.d/memcached.conf \
     health.d/memory.conf \
+    health.d/ml.conf \
     health.d/mysql.conf \
     health.d/net.conf \
     health.d/netfilter.conf \
+    health.d/nut.conf \
     health.d/pihole.conf \
+    health.d/postgres.conf \
     health.d/portcheck.conf \
     health.d/processes.conf \
     health.d/python.d.plugin.conf \
@@ -77,7 +78,6 @@ dist_healthconfig_DATA = \
     health.d/riakkv.conf \
     health.d/scaleio.conf \
     health.d/softnet.conf \
-    health.d/stiebeleltron.conf \
     health.d/synchronization.conf \
     health.d/swap.conf \
     health.d/systemdunits.conf \

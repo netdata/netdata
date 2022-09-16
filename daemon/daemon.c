@@ -102,7 +102,11 @@ int become_user(const char *username, int pid_fd) {
     gid_t *supplementary_groups = NULL;
     if(ngroups > 0) {
         supplementary_groups = mallocz(sizeof(gid_t) * ngroups);
+#ifdef __APPLE__
+        if(getgrouplist(username, gid, (int *)supplementary_groups, &ngroups) == -1) {
+#else
         if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
+#endif /* __APPLE__ */
             if(am_i_root)
                 error("Cannot get supplementary groups of user '%s'.", username);
 
@@ -173,7 +177,7 @@ int become_user(const char *username, int pid_fd) {
 
 static void oom_score_adj(void) {
     char buf[30 + 1];
-    long long int old_score, wanted_score = OOM_SCORE_ADJ_MAX, final_score = 0;
+    long long int old_score, wanted_score = 0, final_score = 0;
 
     // read the existing score
     if(read_single_signed_number_file("/proc/self/oom_score_adj", &old_score)) {
@@ -271,13 +275,17 @@ struct sched_def {
         // the available members are important too!
         // these are all the possible scheduling policies supported by netdata
 
-#ifdef SCHED_IDLE
-        { "idle", SCHED_IDLE, 0, SCHED_FLAG_NONE },
+#ifdef SCHED_BATCH
+        { "batch", SCHED_BATCH, 0, SCHED_FLAG_USE_NICE },
 #endif
 
 #ifdef SCHED_OTHER
         { "other", SCHED_OTHER, 0, SCHED_FLAG_USE_NICE },
         { "nice",  SCHED_OTHER, 0, SCHED_FLAG_USE_NICE },
+#endif
+
+#ifdef SCHED_IDLE
+        { "idle", SCHED_IDLE, 0, SCHED_FLAG_NONE },
 #endif
 
 #ifdef SCHED_RR
@@ -286,10 +294,6 @@ struct sched_def {
 
 #ifdef SCHED_FIFO
         { "fifo", SCHED_FIFO, 0, SCHED_FLAG_PRIORITY_CONFIGURABLE },
-#endif
-
-#ifdef SCHED_BATCH
-        { "batch", SCHED_BATCH, 0, SCHED_FLAG_USE_NICE },
 #endif
 
         // do not change the scheduling priority
@@ -339,13 +343,7 @@ static void sched_getscheduler_report(void) {
         }
     }
 }
-#else // !HAVE_SCHED_GETSCHEDULER
-static void sched_getscheduler_report(void) {
-#ifdef HAVE_GETPRIORITY
-    info("Running with priority %d", getpriority(PRIO_PROCESS, 0));
-#endif // HAVE_GETPRIORITY
-}
-#endif // !HAVE_SCHED_GETSCHEDULER
+#endif /* HAVE_SCHED_GETSCHEDULER */
 
 #ifdef HAVE_SCHED_SETSCHEDULER
 
@@ -418,11 +416,11 @@ fallback:
 report:
     sched_getscheduler_report();
 }
-#else // !HAVE_SCHED_SETSCHEDULER
+#else /* HAVE_SCHED_SETSCHEDULER */
 static void sched_setscheduler_set(void) {
     process_nice_level();
 }
-#endif // !HAVE_SCHED_SETSCHEDULER
+#endif /* HAVE_SCHED_SETSCHEDULER */
 
 int become_daemon(int dont_fork, const char *user)
 {

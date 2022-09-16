@@ -8,6 +8,17 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
+void free_temporary_host(RRDHOST *host)
+{
+    (void) host;
+}
+
+void *__wrap_free_temporary_host(RRDHOST *host)
+{
+    (void) host;
+    return NULL;
+}
+
 RRDHOST *sql_create_host_by_uuid(char *hostname)
 {
     (void) hostname;
@@ -75,9 +86,9 @@ void __wrap_finished_web_request_statistics(
 
 char *__wrap_config_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    if (!strcmp(section, CONFIG_SECTION_WEB) && !strcmp(name, "web files owner"))
-        return "netdata";
     (void)root;
+    (void)section;
+    (void)name;
     (void)default_value;
     return "UNKNOWN FIX ME";
 }

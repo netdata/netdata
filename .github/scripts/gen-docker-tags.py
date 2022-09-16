@@ -2,9 +2,10 @@
 
 import sys
 
-REPO = 'netdata/netdata'
-
 version = sys.argv[1].split('.')
+suffix = sys.argv[2]
+
+REPO = f'netdata/netdata{suffix}'
 
 MAJOR = ':'.join([REPO, version[0]])
 MINOR = ':'.join([REPO, '.'.join(version[0:2])])
