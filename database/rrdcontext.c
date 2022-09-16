@@ -182,7 +182,7 @@ rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditio
                                                                                                                 \
                                /* always remove these flags */                                                  \
                                , RRD_FLAG_ARCHIVED                                                              \
-                               | RRD_FLAG_DELETED                                                               \
+                               | RRD_FLAG_COLLECTED                                                             \
         )
 
 #define rrd_flag_is_collected(obj) rrd_flag_check(obj, RRD_FLAG_COLLECTED)
@@ -2447,6 +2447,11 @@ static void rrdmetric_process_updates(RRDMETRIC *rm, bool force, RRD_FLAGS reaso
 
     if(worker_jobs)
         worker_is_busy(WORKER_JOB_PP_METRIC);
+
+    if(reason == RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) {
+        rrd_flag_set_archived(rm);
+        rrd_flag_set(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD);
+    }
 
     rrdmetric_update_retention(rm);
 
