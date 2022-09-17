@@ -850,6 +850,14 @@ void error_int( const char *prefix, const char *file __maybe_unused, const char 
     log_unlock();
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+static void crash_netdata(void) {
+    // make Netdata core dump
+    int *p = NULL;
+    *p = 1;
+}
+#endif
+
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
@@ -898,9 +906,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     send_statistics("FATAL", action_result, action_data);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    // make Netdata core dump
-    int *p = NULL;
-    *p = 1;
+    crash_netdata();
 #endif
 
     netdata_cleanup_and_exit(1);

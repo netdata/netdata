@@ -53,17 +53,60 @@ typedef enum dictionary_options {
     DICT_OPTION_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
     DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
-    DICT_OPTION_STATS                   = (1 << 5), // maintain statistics for this dictionary
 } DICT_OPTIONS;
+
+struct dictionary_stats {
+    const char *name;               // the name of the category
+
+    struct {
+        long entries;               // active items in the dictionary
+        long pending_deletion;      // pending deletion items in the dictionary
+        long referenced;            // referenced items in the dictionary
+    } items;
+
+    struct {
+        size_t creations;           // dictionary creations
+        size_t destructions;        // dictionary destructions
+        size_t flushes;             // dictionary flushes
+        size_t traversals;          // dictionary foreach
+        size_t walkthroughs;        // dictionary walkthrough
+        size_t garbage_collections; // dictionary garbage collections
+        size_t searches;            // item searches
+        size_t inserts;             // item inserts
+        size_t resets;              // item resets
+        size_t deletes;             // item deletes
+    } ops;
+
+    struct {
+        size_t inserts;             // number of times the insert callback is called
+        size_t conflicts;           // number of times the insert conflict is called
+        size_t reacts;              // number of times the insert react is called
+        size_t deletes;             // number of times the insert delete is called
+    } callbacks;
+
+    // memory
+    struct {
+        long indexed;               // bytes of keys indexed (indication of the index size)
+        long values;                // bytes of caller structures
+        long dict;                  // bytes of the structures dictionary needs
+    } memory;
+
+    // spin locks
+    struct {
+        size_t use;                 // number of times a reference to item had to spin to acquire it or ignore it
+        size_t search;              // number of times a successful search result had to be thrown away
+        size_t insert;              // number of times an insertion to the hash table had to be repeated
+    } spin_locks;
+};
 
 // Create a dictionary
 #ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(options) dictionary_create_advanced_with_trace(options, __FUNCTION__, __LINE__, __FILE__);
-#define dictionary_create_advanced(options) dictionary_create_advanced_with_trace(options, __FUNCTION__, __LINE__, __FILE__);
-extern DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, const char *function, size_t line, const char *file);
+#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, __FUNCTION__, __LINE__, __FILE__);
+#define dictionary_create_advanced(options, stats) dictionary_create_advanced_with_trace(options, stats, __FUNCTION__, __LINE__, __FILE__);
+extern DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file);
 #else
-#define dictionary_create(options) dictionary_create_advanced(options);
-extern DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options);
+#define dictionary_create(options) dictionary_create_advanced(options, NULL);
+extern DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats);
 #endif
 
 // an insert callback to be called just after an item is added to the dictionary
@@ -234,12 +277,10 @@ extern void  dictionary_foreach_done(DICTFE *dfe);
 extern size_t dictionary_version(DICTIONARY *dict);
 extern size_t dictionary_entries(DICTIONARY *dict);
 extern size_t dictionary_referenced_items(DICTIONARY *dict);
-extern size_t dictionary_stats_inserts(DICTIONARY *dict);
-extern size_t dictionary_stats_searches(DICTIONARY *dict);
-extern size_t dictionary_stats_deletes(DICTIONARY *dict);
-extern size_t dictionary_stats_resets(DICTIONARY *dict);
-extern size_t dictionary_stats_walkthroughs(DICTIONARY *dict);
-extern long int dictionary_stats_allocated_memory(DICTIONARY *dict);
+extern long int dictionary_stats_for_registry(DICTIONARY *dict);
+
+// for all cases that the caller does not provide a stats structure, this is where they are accumulated.
+extern struct dictionary_stats dictionary_stats_category_other;
 
 extern int dictionary_unittest(size_t entries);
 

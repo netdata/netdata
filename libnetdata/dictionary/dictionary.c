@@ -26,7 +26,7 @@ typedef enum item_options {
     ITEM_OPTION_NONE            = 0,
     ITEM_OPTION_ALLOCATED_NAME  = (1 << 0), // the name pointer is a STRING
 
-    // IMPORTANT: This is 8-bit
+    // IMPORTANT: This is 1-bit - to add more change ITEM_OPTIONS bitfield in struct dictionary_item.
 } ITEM_OPTIONS;
 
 typedef enum item_flags {
@@ -69,10 +69,16 @@ struct dictionary_item {
     union {
         STRING *string_name;    // the name of the dictionary item
         char *caller_name;      // the user supplied string pointer
+//        void *key_ptr;          // binary key pointer
     };
 
     REFCOUNT refcount;
-    ITEM_OPTIONS options:8;     // permanent configuration options (no atomic operations on this - they never change)
+
+    uint32_t key_len:23;        // the size of key indexed (for strings, including the null terminator)
+                                // this is (2^23 - 1) = 8.388.607 bytes max key length.
+
+    ITEM_OPTIONS options:1;     // permanent configuration options (no atomic operations on this - they never change)
+
     uint8_t flags;              // runtime changing flags for this item (atomic operations on this)
                                 // cannot be a bit field because of atomics.
 };
@@ -96,17 +102,8 @@ struct dictionary_hooks {
     void *del_callback_data;
 };
 
-struct dictionary_stats {
-    size_t inserts;                     // how many index insertions have been performed
-    size_t deletes;                     // how many index deletions have been performed
-    size_t searches;                    // how many index searches have been performed
-    size_t resets;                      // how many times items have reset their values
-    long int memory;                    // how much memory the dictionary has currently allocated
-    size_t walkthroughs;                // how many walkthroughs have been done
-
-    size_t check_spins;
-    size_t insert_spins;
-    size_t search_ignores;
+struct dictionary_stats dictionary_stats_category_other = {
+    .name = "other",
 };
 
 struct dictionary {
@@ -189,69 +186,7 @@ void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(
 }
 
 // ----------------------------------------------------------------------------
-// callbacks execution
-
-static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->ins_callback))
-        return;
-
-    internal_error(false,
-        "DICTIONARY: Running insert callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
-
-    dict->hooks->ins_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
-}
-
-static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(likely(!dict->hooks || !dict->hooks->del_callback))
-        return;
-
-    internal_error(false,
-                   "DICTIONARY: Running delete callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
-
-    dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
-}
-
-static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->react_callback))
-        return;
-
-    internal_error(false,
-                   "DICTIONARY: Running react callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
-
-    dict->hooks->react_callback(item, item->shared->value,
-                                constructor_data?constructor_data:dict->hooks->react_callback_data);
-}
-
-static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->conflict_callback))
-        return false;
-
-    internal_error(false,
-                   "DICTIONARY: Running conflict callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
-
-    return dict->hooks->conflict_callback(
-        item, item->shared->value, new_value,
-        constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
-}
-
-// ----------------------------------------------------------------------------
-// dictionary statistics maintenance
+// dictionary statistics API
 
 size_t dictionary_version(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
@@ -276,201 +211,151 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
     return referenced_items;
 }
 
-long int dictionary_stats_allocated_memory(DICTIONARY *dict) {
-    if(unlikely(!dict || !dict->stats)) return 0;
-    return dict->stats->memory;
+long int dictionary_stats_for_registry(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
+    return (dict->stats->memory.indexed + dict->stats->memory.dict);
 }
-size_t dictionary_stats_searches(DICTIONARY *dict) {
-    if(unlikely(!dict || !dict->stats)) return 0;
-    return dict->stats->searches;
-}
-size_t dictionary_stats_inserts(DICTIONARY *dict) {
-    if(unlikely(!dict || !dict->stats)) return 0;
-    return dict->stats->inserts;
-}
-size_t dictionary_stats_deletes(DICTIONARY *dict) {
-    if(unlikely(!dict || !dict->stats)) return 0;
-    return dict->stats->deletes;
-}
-size_t dictionary_stats_resets(DICTIONARY *dict) {
-    if(unlikely(!dict || !dict->stats)) return 0;
-    return dict->stats->resets;
-}
-size_t dictionary_stats_walkthroughs(DICTIONARY *dict) {
-    if(unlikely(!dict || !dict->stats)) return 0;
-    return dict->stats->walkthroughs;
-}
-
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
 }
 
-static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
-    if(likely(!dict->stats)) return;
+// ----------------------------------------------------------------------------
+// internal statistics API
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->stats->searches++;
-    }
-    else {
-        __atomic_fetch_add(&dict->stats->searches, 1, __ATOMIC_RELAXED);
-    }
+static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->ops.searches, 1, __ATOMIC_RELAXED);
 }
-static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict, size_t size) {
+static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+    // statistics
+    __atomic_fetch_add(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->ops.inserts, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
         dict->entries++;
         dict->referenced_items++;
 
-        if(unlikely(dict->stats)) {
-            dict->stats->inserts++;
-            dict->stats->memory += (long)size;
-        }
     }
     else {
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
         __atomic_fetch_add(&dict->entries, 1, __ATOMIC_SEQ_CST);
         __atomic_fetch_add(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
-
-        if(unlikely(dict->stats)) {
-            __atomic_fetch_add(&dict->stats->inserts, 1, __ATOMIC_RELAXED);
-            __atomic_fetch_add(&dict->stats->memory, (long)size, __ATOMIC_RELAXED);
-        }
     }
 }
 static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
+    // statistics
+    __atomic_fetch_add(&dict->stats->ops.deletes, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_sub(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
+
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
         dict->entries--;
-
-        if(unlikely(dict->stats)) {
-            dict->stats->deletes++;
-        }
     }
     else {
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
         __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
-
-        if(unlikely(dict->stats)) {
-            __atomic_fetch_add(&dict->stats->deletes, 1, __ATOMIC_RELAXED);
-        }
     }
 }
-static inline void DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(DICTIONARY *dict, size_t size) {
-    if(likely(!dict->stats)) return;
-
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->stats->memory -= (long)size;
-    }
-    else {
-        __atomic_fetch_sub(&dict->stats->memory, (long)size, __ATOMIC_RELAXED);
-    }
+static inline void DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+    __atomic_fetch_sub(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+    __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+    __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
-static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t oldsize, size_t newsize) {
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t old_value_size, size_t new_value_size) {
+    __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->memory.values, (long)new_value_size, __ATOMIC_RELAXED);
+    __atomic_fetch_sub(&dict->stats->memory.values, (long)old_value_size, __ATOMIC_RELAXED);
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
         dict->version++;
-
-        if(unlikely(dict->stats)) {
-            dict->stats->resets++;
-            dict->stats->memory += (long)newsize;
-            dict->stats->memory -= (long)oldsize;
-        }
-    }
-    else {
+    else
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
-
-        if(unlikely(dict->stats)) {
-            __atomic_fetch_add(&dict->stats->resets, 1, __ATOMIC_RELAXED);
-            __atomic_fetch_add(&dict->stats->memory, (long)newsize, __ATOMIC_RELAXED);
-            __atomic_fetch_sub(&dict->stats->memory, (long)oldsize, __ATOMIC_RELAXED);
-        }
-    }
+}
+static inline void DICTIONARY_STATS_TRAVERSALS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->ops.traversals, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
-    if(likely(!dict->stats)) return;
-
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->stats->walkthroughs++;
-    }
-    else {
-        __atomic_fetch_add(&dict->stats->walkthroughs, 1, __ATOMIC_RELAXED);
-    }
+    __atomic_fetch_add(&dict->stats->ops.walkthroughs, 1, __ATOMIC_RELAXED);
 }
-
 static inline void DICTIONARY_STATS_CHECK_SPINS_PLUS(DICTIONARY *dict, size_t count) {
-    if(likely(!dict->stats)) return;
-
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->stats->check_spins += count;
-    }
-    else {
-        __atomic_fetch_add(&dict->stats->check_spins, count, __ATOMIC_RELAXED);
-    }
+    __atomic_fetch_add(&dict->stats->spin_locks.use, count, __ATOMIC_RELAXED);
 }
-
 static inline void DICTIONARY_STATS_INSERT_SPINS_PLUS(DICTIONARY *dict, size_t count) {
-    if(likely(!dict->stats)) return;
-
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->stats->insert_spins += count;
-    }
-    else {
-        __atomic_fetch_add(&dict->stats->insert_spins, count, __ATOMIC_RELAXED);
-    }
+    __atomic_fetch_add(&dict->stats->spin_locks.insert, count, __ATOMIC_RELAXED);
 }
-
 static inline void DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(DICTIONARY *dict) {
-    if(likely(!dict->stats)) return;
-
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->stats->search_ignores++;
-    }
-    else {
-        __atomic_fetch_add(&dict->stats->search_ignores, 1, __ATOMIC_RELAXED);
-    }
+    __atomic_fetch_add(&dict->stats->spin_locks.search, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->callbacks.inserts, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->callbacks.conflicts, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->callbacks.reacts, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->callbacks.deletes, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->ops.garbage_collections, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_DICT_CREATIONS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->ops.creations, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->ops.destructions, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->ops.flushes, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
         return ++dict->referenced_items;
-    }
-    else {
+    else
         return __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
-    }
 }
 
 static inline long int DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
         return --dict->referenced_items;
-    }
-    else {
+    else
         return __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
-    }
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
-    if (unlikely(is_dictionary_single_threaded(dict))) {
+    __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
         return ++dict->pending_deletion_items;
-    } else {
+    else
         return __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
-    }
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    __atomic_fetch_sub(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
         return --dict->pending_deletion_items;
-    }
-    else {
+    else
         return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
-    }
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_GET(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    if(unlikely(is_dictionary_single_threaded(dict)))
         return dict->pending_deletion_items;
-    }
-    else {
+    else
         return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_SEQ_CST);
-    }
 }
 
 static inline REFCOUNT DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
@@ -478,6 +363,72 @@ static inline REFCOUNT DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(DICTIONARY *dict, DI
         return item->refcount;
     else
         return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
+}
+
+// ----------------------------------------------------------------------------
+// callbacks execution
+
+static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->ins_callback))
+        return;
+
+    internal_error(false,
+                   "DICTIONARY: Running insert callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict);
+    dict->hooks->ins_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
+}
+
+static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(likely(!dict->hooks || !dict->hooks->del_callback))
+        return;
+
+    internal_error(false,
+                   "DICTIONARY: Running delete callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
+    dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+}
+
+static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->react_callback))
+        return;
+
+    internal_error(false,
+                   "DICTIONARY: Running react callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict);
+    dict->hooks->react_callback(item, item->shared->value,
+                                constructor_data?constructor_data:dict->hooks->react_callback_data);
+}
+
+static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->conflict_callback))
+        return false;
+
+    internal_error(false,
+                   "DICTIONARY: Running conflict callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict);
+    return dict->hooks->conflict_callback(
+        item, item->shared->value, new_value,
+        constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
 }
 
 // ----------------------------------------------------------------------------
@@ -587,6 +538,8 @@ static inline void dictionary_index_lock_unlock(DICTIONARY *dict) {
 static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
     if(likely(DICTIONARY_PENDING_DELETES_GET(dict) <= 0))
         return;
+
+    DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
 
     size_t deleted = 0, pending = 0, examined = 0;
     DICTIONARY_ITEM *item = dict->items.list;
@@ -869,19 +822,22 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
 static inline size_t item_set_name(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *name, size_t name_len) {
     if(likely(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE)) {
         item->caller_name = (char *)name;
-        return 0;
+        item->key_len = name_len;
+    }
+    else {
+        item->string_name = string_strdupz(name);
+        item->key_len = string_strlen(item->string_name) + 1;
+        item->options |= ITEM_OPTION_ALLOCATED_NAME;
     }
 
-    item->string_name = string_strdupz(name);
-    item->options |= ITEM_OPTION_ALLOCATED_NAME;
-    return name_len;
+    return item->key_len;
 }
 
 static inline size_t item_free_name(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(likely(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE)))
         string_freez(item->string_name);
 
-    return 0;
+    return item->key_len;
 }
 
 static inline const char *item_get_name(const DICTIONARY_ITEM *item) {
@@ -925,12 +881,12 @@ static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict, size_t *allocated_bytes,
 }
 
 static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data) {
-    size_t allocated = 0;
-    DICTIONARY_ITEM *item = item_allocate(dict, &allocated, NULL);
+    size_t item_size = 0, key_size, value_size = value_len;
+    DICTIONARY_ITEM *item = item_allocate(dict, &item_size, NULL);
 
     item->shared->value_len = value_len;
 
-    allocated += item_set_name(dict, item, name, name_len);
+    key_size = item_set_name(dict, item, name, name_len);
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
         item->shared->value = value;
@@ -952,11 +908,10 @@ static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *nam
             // the caller wants an item without any value
             item->shared->value = NULL;
         }
-
-        allocated += value_len;
     }
+    value_size += value_len;
 
-    DICTIONARY_ENTRIES_PLUS1(dict, allocated);
+    DICTIONARY_ENTRIES_PLUS1(dict, key_size, item_size, value_size);
 
     dictionary_execute_insert_callback(dict, item, constructor_data);
 
@@ -1000,34 +955,34 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
     dictionary_execute_delete_callback(dict, item);
 
-    size_t freed = 0;
+    size_t item_size = 0, key_size = 0, value_size = item->shared->value_len;
 
     if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
         debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
         freez(item->shared->value);
-        freed += item->shared->value_len;
     }
 
     if(unlikely(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE))) {
         debug(D_DICTIONARY, "Dictionary freeing name '%s'", item_get_name(item));
-        freed += item_free_name(dict, item);
+        key_size += item_free_name(dict, item);
     }
 
     if(is_master_dictionary(dict)) {
         freez(item);
-        freed += sizeof(DICTIONARY_ITEM_MASTER_DICT);
+        item_size += sizeof(DICTIONARY_ITEM_MASTER_DICT);
     }
     else {
         freez(item->shared);
-        freed += sizeof(DICTIONARY_ITEM_SHARED);
+        item_size += sizeof(DICTIONARY_ITEM_SHARED);
 
         freez(item);
-        freed += sizeof(DICTIONARY_ITEM);
+        item_size += sizeof(DICTIONARY_ITEM);
     }
 
-    DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(dict, freed);
+    DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(dict, key_size, item_size, value_size);
 
-    return freed;
+    // we return the memory we actually freed
+    return item_size + (dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)?0:value_size;
 }
 
 // ----------------------------------------------------------------------------
@@ -1297,12 +1252,6 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     freed += dictionary_locks_destroy(dict);
     freed += reference_counter_free(dict);
 
-    if(dict->stats) {
-        freed += sizeof(struct dictionary_stats);
-        freez(dict->stats);
-        dict->stats = NULL;
-    }
-
     if(dict->hooks) {
         freed += sizeof(struct dictionary_hooks);
         freez(dict->hooks);
@@ -1314,11 +1263,11 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 
     internal_error(
         true,
-        "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total memory: %zu bytes.",
+        "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total freed memory: %zu bytes (sizeof(dict) = %zu, sizeof(item) = %zu).",
         creation_function,
         creation_line,
         creation_file,
-        entries, counted_items, referenced_items, pending_deletion_items, freed);
+        entries, counted_items, referenced_items, pending_deletion_items, freed, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM_MASTER_DICT));
 
     if(mem) *mem = freed;
 
@@ -1489,9 +1438,9 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
 // API - dictionary management
 
 #ifdef NETDATA_INTERNAL_CHECKS
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, const char *function, size_t line, const char *file) {
+DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file) {
 #else
-DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options) {
+DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats) {
 #endif
     cleanup_destroyed_dictionaries();
 
@@ -1504,14 +1453,15 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options) {
     dict->flags = DICT_FLAG_NONE;
     dict->items.list = NULL;
 
-    if(dict->options & DICT_OPTION_STATS)
-        dict->stats = callocz(1, sizeof(struct dictionary_stats));
-
     allocated += dictionary_locks_init(dict);
     allocated += reference_counter_init(dict);
 
-    if(dict->stats)
-        dict->stats->memory = (long)allocated;
+    if(stats)
+        dict->stats = stats;
+    else
+        dict->stats = &dictionary_stats_category_other;
+
+    dict->stats->memory.dict = (long)allocated;
 
     hashtable_init_unsafe(dict);
 
@@ -1521,6 +1471,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options) {
     dict->creation_line = line;
 #endif
 
+    DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
     return dict;
 }
 
@@ -1543,12 +1494,16 @@ void dictionary_flush(DICTIONARY *dict) {
             item_free_or_mark_deleted(dict, item);
     }
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict);
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
     cleanup_destroyed_dictionaries();
 
     if(!dict) return 0;
+
+    DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict);
 
     size_t referenced_items = dictionary_referenced_items(dict);
     if(referenced_items) {
@@ -1700,7 +1655,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 
     ll_recursive_lock(dict, dfe->rw);
 
-    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
+    DICTIONARY_STATS_TRAVERSALS_PLUS1(dict);
 
     // get the first item from the list
     DICTIONARY_ITEM *item = dict->items.list;
@@ -2947,29 +2902,28 @@ int dictionary_unittest(size_t entries) {
     char **values = dictionary_unittest_generate_values(entries);
 
     fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
-    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_STATS);
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_unittest_clone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary multi threaded, clone, %zu items\n", entries);
-    dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_STATS);
+    dict = dictionary_create(DICT_OPTION_NONE);
     dictionary_unittest_clone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary single threaded, non-clone, add-in-front options, %zu items\n", entries);
     dict = dictionary_create(
         DICT_OPTION_SINGLE_THREADED | DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE |
-        DICT_OPTION_ADD_IN_FRONT | DICT_OPTION_STATS);
+        DICT_OPTION_ADD_IN_FRONT);
     dictionary_unittest_nonclone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary multi threaded, non-clone, add-in-front options, %zu items\n", entries);
     dict = dictionary_create(
-        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_ADD_IN_FRONT |
-        DICT_OPTION_STATS);
+        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_ADD_IN_FRONT);
     dictionary_unittest_nonclone(dict, names, values, entries, &errors);
 
     fprintf(stderr, "\nCreating dictionary single-threaded, non-clone, don't overwrite options, %zu items\n", entries);
     dict = dictionary_create(
         DICT_OPTION_SINGLE_THREADED | DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE |
-        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_STATS);
+        DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "resetting non-overwrite entries", names, values, entries, &errors, dictionary_unittest_reset_dont_overwrite_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop", names, values, entries, &errors, dictionary_unittest_foreach);
@@ -2979,16 +2933,14 @@ int dictionary_unittest(size_t entries) {
 
     fprintf(stderr, "\nCreating dictionary multi-threaded, non-clone, don't overwrite options, %zu items\n", entries);
     dict = dictionary_create(
-        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE |
-        DICT_OPTION_STATS);
+        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "walkthrough write delete this", names, values, entries, &errors, dictionary_unittest_walkthrough_delete_this);
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     fprintf(stderr, "\nCreating dictionary multi-threaded, non-clone, don't overwrite options, %zu items\n", entries);
     dict = dictionary_create(
-        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE |
-        DICT_OPTION_STATS);
+        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_unittest_run_and_measure_time(dict, "adding entries", names, values, entries, &errors, dictionary_unittest_set_nonclone);
     dictionary_unittest_run_and_measure_time(dict, "foreach write delete this", names, values, entries, &errors, dictionary_unittest_foreach_delete_this);
     dictionary_unittest_run_and_measure_time(dict, "traverse foreach read loop empty", names, values, 0, &errors, dictionary_unittest_foreach);
@@ -2996,24 +2948,24 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_run_and_measure_time(dict, "destroying empty dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
-    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_STATS);
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_unittest_sorting(dict, names, values, entries, &errors);
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     fprintf(stderr, "\nCreating dictionary single threaded, clone, %zu items\n", entries);
-    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_STATS);
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_unittest_null_dfe(dict, names, values, entries, &errors);
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     fprintf(stderr, "\nCreating dictionary single threaded, noclone, %zu items\n", entries);
-    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_STATS);
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE);
     dictionary_unittest_null_dfe(dict, names, values, entries, &errors);
     dictionary_unittest_run_and_measure_time(dict, "destroying full dictionary", names, values, entries, &errors, dictionary_unittest_destroy);
 
     // check reference counters
     {
         fprintf(stderr, "\nTesting reference counters:\n");
-        dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_STATS);
+        dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
         errors += unittest_check_dictionary(dict, 0, 0, 0, 0, 0);
 
         fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
@@ -3205,7 +3157,7 @@ int dictionary_unittest(size_t entries) {
 
     // threads testing of dictionary
     {
-        dict_test1 = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_STATS);
+        dict_test1 = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
         time_t seconds_to_run = 5;
         int threads_to_create = 2;
         fprintf(
@@ -3242,16 +3194,16 @@ int dictionary_unittest(size_t entries) {
                 ", insert spins %zu"
                 ", search ignores %zu"
                 "\n",
-                dict_test1->stats->inserts,
-                dict_test1->stats->deletes,
-                dict_test1->stats->searches,
-                dict_test1->stats->resets,
+                dict_test1->stats->ops.inserts,
+                dict_test1->stats->ops.deletes,
+                dict_test1->stats->ops.searches,
+                dict_test1->stats->ops.resets,
                 dict_test1->entries,
                 dict_test1->referenced_items,
                 dict_test1->pending_deletion_items,
-                dict_test1->stats->check_spins,
-                dict_test1->stats->insert_spins,
-                dict_test1->stats->search_ignores
+                dict_test1->stats->spin_locks.use,
+                dict_test1->stats->spin_locks.insert,
+                dict_test1->stats->spin_locks.search
                 );
         dictionary_destroy(dict_test1);
         dict_test1 = NULL;
