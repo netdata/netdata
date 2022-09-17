@@ -206,15 +206,31 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 
-    rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily
-    rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
+    // ------------------------------------------------------------------------
+    // the order of destruction is important here
+
+    // 1. delete RRDDIMVAR index - this will speed up the destruction of RRDDIMs
+    //    because each dimension loops to find its own variables in this index.
+    //    There are no references to the items on this index from the dimensions.
+    //    To find their own, they have to walk-through the dictionary.
     rrddimvar_index_destroy(st);                // destroy the rrddimvar index
+
+    // 2. delete RRDSETVAR index
     rrdsetvar_index_destroy(st);                // destroy the rrdsetvar index
+
+    // 3. delete RRDVAR index after the above, to avoid triggering its garbage collector (they have references on this)
     rrdvariables_destroy(st->rrdvars);      // free all variables and destroy the rrdvar dictionary
 
-    // this has to be after the dimensions are freed, but before labels are freed
+    // 4. delete RRDFAMILY - this has to be last, because RRDDIMVAR and RRDSETVAR need the reference counter
+    rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily -- has to be after all variables
+
+    // 5. delete RRDDIMs, now their variables are not existing, so this is fast
+    rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
+
+    // 6. this has to be after the dimensions are freed, but before labels are freed (contexts need the labels)
     rrdcontext_removed_rrdset(st);              // let contexts know
 
+    // 7. destroy the chart labels
     rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
 
     rrdset_memory_file_free(st);                // remove files of db mode save and map

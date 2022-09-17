@@ -897,6 +897,12 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     snprintfz(action_result, 60, "%s:%s", program_name, strncmp(thread_tag, "STREAM_RECEIVER", strlen("STREAM_RECEIVER")) ? thread_tag : "[x]");
     send_statistics("FATAL", action_result, action_data);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    // make Netdata core dump
+    int *p = NULL;
+    *p = 1;
+#endif
+
     netdata_cleanup_and_exit(1);
 }
 

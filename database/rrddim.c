@@ -169,11 +169,18 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_new_dimension(rd);
 
     ctr->react_action = RRDDIM_REACT_NEW;
+
+    internal_error(false, "RRDDIM: inserted dimension '%s' of chart '%s' of host '%s'",
+                   rrddim_name(rd), rrdset_name(st), rrdhost_hostname(st->rrdhost));
+
 }
 
 static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *rrdset) {
     RRDDIM *rd = rrddim;
     RRDSET *st = rrdset; (void)st;
+
+    internal_error(false, "RRDDIM: deleting dimension '%s' of chart '%s' of host '%s'",
+                   rrddim_name(rd), rrdset_name(st), rrdhost_hostname(st->rrdhost));
 
     rrdcontext_removed_rrddim(rd);
 

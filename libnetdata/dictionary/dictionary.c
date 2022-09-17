@@ -86,14 +86,14 @@ struct dictionary_hooks {
     void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *ins_callback_data;
 
+    bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data);
+    void *conflict_callback_data;
+
     void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *react_callback_data;
 
     void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *del_callback_data;
-
-    bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data);
-    void *conflict_callback_data;
 };
 
 struct dictionary_stats {
@@ -170,12 +170,6 @@ void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(
     dict->hooks->ins_callback_data = data;
 }
 
-void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    dictionary_allocate_hooks(dict);
-    dict->hooks->del_callback = del_callback;
-    dict->hooks->del_callback_data = data;
-}
-
 void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data) {
     dictionary_allocate_hooks(dict);
     dict->hooks->conflict_callback = conflict_callback;
@@ -186,6 +180,74 @@ void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)
     dictionary_allocate_hooks(dict);
     dict->hooks->react_callback = react_callback;
     dict->hooks->react_callback_data = data;
+}
+
+void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
+    dictionary_allocate_hooks(dict);
+    dict->hooks->del_callback = del_callback;
+    dict->hooks->del_callback_data = data;
+}
+
+// ----------------------------------------------------------------------------
+// callbacks execution
+
+static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->ins_callback))
+        return;
+
+    internal_error(false,
+        "DICTIONARY: Running insert callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    dict->hooks->ins_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
+}
+
+static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(likely(!dict->hooks || !dict->hooks->del_callback))
+        return;
+
+    internal_error(false,
+                   "DICTIONARY: Running delete callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+}
+
+static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->react_callback))
+        return;
+
+    internal_error(false,
+                   "DICTIONARY: Running react callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    dict->hooks->react_callback(item, item->shared->value,
+                                constructor_data?constructor_data:dict->hooks->react_callback_data);
+}
+
+static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->conflict_callback))
+        return false;
+
+    internal_error(false,
+                   "DICTIONARY: Running conflict callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   item_get_name(item),
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
+
+    return dict->hooks->conflict_callback(
+        item, item->shared->value, new_value,
+        constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
 }
 
 // ----------------------------------------------------------------------------
@@ -896,20 +958,17 @@ static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *nam
 
     DICTIONARY_ENTRIES_PLUS1(dict, allocated);
 
-    if(dict->hooks && dict->hooks->ins_callback)
-        dict->hooks->ins_callback(
-            item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
+    dictionary_execute_insert_callback(dict, item, constructor_data);
 
     return item;
 }
 
-static void item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item, void *value, size_t value_len) {
+static void item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item, void *value, size_t value_len, void *constructor_data) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
 
     DICTIONARY_VALUE_RESETS_PLUS1(dict, item->shared->value_len, value_len);
 
-    if(dict->hooks && dict->hooks->del_callback)
-        dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+    dictionary_execute_delete_callback(dict, item);
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
         debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
@@ -933,15 +992,13 @@ static void item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item,
         freez(old_value);
     }
 
-    if(dict->hooks && dict->hooks->ins_callback)
-        dict->hooks->ins_callback(item, item->shared->value, dict->hooks->ins_callback_data);
+    dictionary_execute_insert_callback(dict, item, constructor_data);
 }
 
 static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
-    if(dict->hooks && dict->hooks->del_callback)
-        dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+    dictionary_execute_delete_callback(dict, item);
 
     size_t freed = 0;
 
@@ -956,16 +1013,16 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         freed += item_free_name(dict, item);
     }
 
-    if(!is_master_dictionary(dict)) {
+    if(is_master_dictionary(dict)) {
+        freez(item);
+        freed += sizeof(DICTIONARY_ITEM_MASTER_DICT);
+    }
+    else {
         freez(item->shared);
         freed += sizeof(DICTIONARY_ITEM_SHARED);
 
         freez(item);
         freed += sizeof(DICTIONARY_ITEM);
-    }
-    else {
-        freez(item);
-        freed += sizeof(DICTIONARY_ITEM_MASTER_DICT);
     }
 
     DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(dict, freed);
@@ -1134,20 +1191,13 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
             item = *item_pptr;
 
             if (!(dict->options & DICT_OPTION_DONT_OVERWRITE_VALUE)) {
-                item_reset_value_with_hooks(dict, item, value, value_len);
+                item_reset_value_with_hooks(dict, item, value, value_len, constructor_data);
                 added_or_updated = true;
             }
 
-            else if (dict->hooks && dict->hooks->conflict_callback) {
-
-                if(dict->hooks->conflict_callback(
-                        item,
-                        item->shared->value,
-                        value,
-                        constructor_data ? constructor_data : dict->hooks->conflict_callback_data)) {
-                    dictionary_version_increment(dict);
-                    added_or_updated = true;
-                }
+            else if(dictionary_execute_conflict_callback(dict, item, value, constructor_data)) {
+                dictionary_version_increment(dict);
+                added_or_updated = true;
             }
 
             else {
@@ -1163,10 +1213,8 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
     if(unlikely(spins > 0 && dict->stats))
         DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, spins);
 
-    if(unlikely(added_or_updated && dict->hooks && dict->hooks->react_callback)) {
-        // we already have a reference counter, for the caller, no need for another one
-        dict->hooks->react_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->react_callback_data);
-    }
+    if(added_or_updated)
+        dictionary_execute_react_callback(dict, item, constructor_data);
 
     return item;
 }
@@ -1209,17 +1257,45 @@ static DICTIONARY_ITEM *item_find_and_acquire(DICTIONARY *dict, const char *name
 // ----------------------------------------------------------------------------
 // delayed destruction of dictionaries
 
-static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
+static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool force) {
     if(mem)
         *mem = 0;
 
-    if(dictionary_referenced_items(dict))
+    if(!force && dictionary_referenced_items(dict))
         return false;
 
-    size_t freed = 0;
+    size_t freed = 0, counted_items = 0;
+    (void)counted_items;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    long int entries = dict->entries;
+    long int referenced_items = dict->referenced_items;
+    long int pending_deletion_items = dict->pending_deletion_items;
+    const char *creation_function = dict->creation_function;
+    const char *creation_file = dict->creation_file;
+    size_t creation_line = dict->creation_line;
+#endif
 
     // destroy the index
     freed += hashtable_destroy_unsafe(dict);
+
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+    DICTIONARY_ITEM *item = dict->items.list;
+    while (item) {
+        // cache item->next
+        // because we are going to free item
+        DICTIONARY_ITEM *item_next = item->next;
+        freed += item_free_with_hooks(dict, item);
+        item = item_next;
+        // to speed up destruction, we don't
+        // unlink item from the linked-list here
+        counted_items++;
+    }
+    dict->items.list = NULL;
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    freed += dictionary_locks_destroy(dict);
+    freed += reference_counter_free(dict);
 
     if(dict->stats) {
         freed += sizeof(struct dictionary_stats);
@@ -1233,24 +1309,16 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem) {
         dict->hooks = NULL;
     }
 
-    DICTIONARY_ITEM *item = dict->items.list;
-    while (item) {
-        // cache item->next
-        // because we are going to free item
-        DICTIONARY_ITEM *item_next = item->next;
-        freed += item_free_with_hooks(dict, item);
-        item = item_next;
-        // to speed up destruction, we don't
-        // unlink item from the linked-list here
-    }
-
-    dict->items.list = NULL;
-
-    freed += dictionary_locks_destroy(dict);
-    freed += reference_counter_free(dict);
-
     freed += sizeof(DICTIONARY);
     freez(dict);
+
+    internal_error(
+        true,
+        "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total memory: %zu bytes.",
+        creation_function,
+        creation_line,
+        creation_file,
+        entries, counted_items, referenced_items, pending_deletion_items, freed);
 
     if(mem) *mem = freed;
 
@@ -1290,7 +1358,7 @@ void cleanup_destroyed_dictionaries(void) {
         const char *function = dict->creation_function;
 #endif
 
-        if(dictionary_free_all_resources(dict, NULL)) {
+        if(dictionary_free_all_resources(dict, NULL, false)) {
             internal_error(
                 true,
                 "DICTIONARY: cleaned up dictionary with delayed destruction, created from %s() %zu@%s.",
@@ -1304,6 +1372,117 @@ void cleanup_destroyed_dictionaries(void) {
     }
 
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+}
+
+// ----------------------------------------------------------------------------
+// API internal checks
+
+#ifdef NETDATA_INTERNAL_CHECKS
+#define api_internal_check(dict, item, allow_null_dict, allow_null_item) api_internal_check_with_trace(dict, item, __FUNCTION__, allow_null_dict, allow_null_item)
+static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *function, bool allow_null_dict, bool allow_null_item) {
+    if(!allow_null_dict && !dict) {
+        internal_error(
+            item,
+            "DICTIONARY: attempted to %s() with a NULL dictionary, passing an item created from %s() %zu@%s.",
+            function,
+            item->dict->creation_function,
+            item->dict->creation_line,
+            item->dict->creation_file);
+        fatal("DICTIONARY: attempted to %s() but item is NULL", function);
+    }
+
+    if(!allow_null_item && !item) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
+            function,
+            dict?dict->creation_function:"unknown",
+            dict?dict->creation_line:0,
+            dict?dict->creation_file:"unknown");
+        fatal("DICTIONARY: attempted to %s() but item is NULL", function);
+    }
+
+    if(dict && item && dict != item->dict) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() an item on a dictionary created from %s() %zu@%s, but the item belongs to the dictionary created from %s() %zu@%s.",
+            function,
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file,
+            item->dict->creation_function,
+            item->dict->creation_line,
+            item->dict->creation_file
+        );
+        fatal("DICTIONARY: %s(): item does not belong to this dictionary.", function);
+    }
+
+    if(item) {
+        REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
+        if (unlikely(refcount <= 0)) {
+            internal_error(
+                true,
+                "DICTIONARY: attempted to %s() of an item with reference counter = %d on a dictionary created from %s() %zu@%s",
+                function,
+                refcount,
+                item->dict->creation_function,
+                item->dict->creation_line,
+                item->dict->creation_file);
+            fatal("DICTIONARY: attempted to %s but item is having refcount = %d", function, refcount);
+        }
+    }
+}
+#else
+#define api_internal_check(dict, item, allow_null_dict, allow_null_item) debug_dummy()
+#endif
+
+#define api_is_name_good(dict, name, name_len) api_is_name_good_with_trace(dict, name, name_len, __FUNCTION__)
+static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const char *name, ssize_t name_len __maybe_unused, const char *function __maybe_unused) {
+    if(unlikely(!name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() with name = NULL on a dictionary created from %s() %zu@%s.",
+            function,
+            dict?dict->creation_function:"unknown",
+            dict?dict->creation_line:0,
+            dict?dict->creation_file:"unknown");
+        return false;
+    }
+
+    if(unlikely(!*name)) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to %s() with empty name on a dictionary created from %s() %zu@%s.",
+            function,
+            dict?dict->creation_function:"unknown",
+            dict?dict->creation_line:0,
+            dict?dict->creation_file:"unknown");
+        return false;
+    }
+
+    internal_error(
+        name_len > 0 && name_len != (ssize_t)(strlen(name) + 1),
+        "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu (incl. '\\0'), but the supplied name_len = %ld, on a dictionary created from %s() %zu@%s.",
+        function,
+        name,
+        strlen(name) + 1,
+        name_len,
+        dict?dict->creation_function:"unknown",
+        dict?dict->creation_line:0,
+        dict?dict->creation_file:"unknown");
+
+    internal_error(
+        name_len <= 0 && name_len != -1,
+        "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu (incl. '\\0'), but the supplied name_len = %ld, on a dictionary created from %s() %zu@%s.",
+        function,
+        name,
+        strlen(name) + 1,
+        name_len,
+        dict?dict->creation_function:"unknown",
+        dict?dict->creation_line:0,
+        dict?dict->creation_file:"unknown");
+
+    return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -1389,36 +1568,21 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     }
 
     size_t freed;
-    dictionary_free_all_resources(dict, &freed);
+    dictionary_free_all_resources(dict, &freed, true);
 
     return freed;
 }
 
 // ----------------------------------------------------------------------------
-// API - items management
+// SET an item to the dictionary
 
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!name || !*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+    if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
-    }
 
+    api_internal_check(dict, NULL, false, true);
     DICTIONARY_ITEM *item = item_add_or_reset_value_and_acquire(dict, name, name_len, value, value_len, constructor_data);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0))
-            fatal("DICTIONARY: got item with refcount = %d", refcount);
-    }
-#endif
-
+    api_internal_check(dict, item, false, false);
     return item;
 }
 
@@ -1434,31 +1598,16 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     return NULL;
 }
 
+// ----------------------------------------------------------------------------
+// GET an item from the dictionary
+
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!name || !*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+    if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
-    }
 
+    api_internal_check(dict, NULL, false, true);
     DICTIONARY_ITEM *item = item_find_and_acquire(dict, name, name_len);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0))
-            fatal("DICTIONARY: got item with refcount = %d", refcount);
-    }
-#endif
-
-    if(unlikely(!item))
-        return NULL;
-
+    api_internal_check(dict, item, false, true);
     return item;
 }
 
@@ -1474,94 +1623,60 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     return NULL;
 }
 
+// ----------------------------------------------------------------------------
+// DUP/REL an item (increase/decrease its reference counter)
+
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
-        return NULL;
+    // we allow the item to be NULL here
+    api_internal_check(dict, item, false, true);
+
+    if(likely(item)) {
+        item_acquire(dict, item);
+        api_internal_check(dict, item, false, false);
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
-    if (unlikely(refcount <= 0))
-        fatal("DICTIONARY: got item with refcount = %d", refcount);
-#endif
-
-    item_acquire(dict, item);
     return item;
 }
 
-const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without an item on a dictionary.",
-            __FUNCTION__);
-        return NULL;
-    }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(NULL, item);
-    if (unlikely(refcount <= 0))
-        fatal("DICTIONARY: got item with refcount = %d", refcount);
-#endif
-
-    return item_get_name(item);
-}
-
-void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return NULL;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(NULL, item);
-    if (unlikely(refcount <= 0))
-        fatal("DICTIONARY: got item with refcount = %d", refcount);
-#endif
-
-    return item->shared->value;
-}
-
 void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(unlikely(!item)) return;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
-    if (unlikely(refcount <= 0))
-        fatal("DICTIONARY: got item with refcount = %d", refcount);
-#endif
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(item->dict != dict)
-        fatal("DICTIONARY: %s(): item with name '%s' does not belong to this dictionary.", __FUNCTION__, item_get_name(item));
-#endif
+    // we allow the item to be NULL here
+    api_internal_check(dict, item, false, true);
 
     // no need to get a lock here
     // we pass the last parameter to reference_counter_release() as true
     // so that the release may get a write-lock if required to clean up
 
-    item_release(dict, item);
+    if(likely(item))
+        item_release(dict, item);
 }
 
+// ----------------------------------------------------------------------------
+// get the name/value of an item
+
+const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+    api_internal_check(NULL, item, true, false);
+    return item_get_name(item);
+}
+
+void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+    // we allow the item to be NULL here
+    api_internal_check(NULL, item, true, true);
+
+    if(likely(item))
+        return item->shared->value;
+
+    return NULL;
+}
+
+// ----------------------------------------------------------------------------
+// DEL an item
+
 bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!name || !*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
-        return -1;
-    }
+    if(unlikely(!api_is_name_good(dict, name, name_len)))
+        return false;
 
-    int ret = item_del(dict, name, name_len);
-
-    return ret;
+    api_internal_check(dict, NULL, false, true);
+    return item_del(dict, name, name_len);
 }
 
 // ----------------------------------------------------------------------------
