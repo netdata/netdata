@@ -1225,6 +1225,10 @@ struct dictionary_categories {
     const char *context_prefix;
     int priority;
 
+    RRDSET *st_dicts;
+    RRDDIM *rd_dicts_active;
+    RRDDIM *rd_dicts_deleted;
+
     RRDSET *st_items;
     RRDDIM *rd_items_entries;
     RRDDIM *rd_items_referenced;
@@ -1274,6 +1278,48 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     // ------------------------------------------------------------------------
 
     size_t total = 0;
+    load_dictionary_stats_entry(dictionaries.active);
+    load_dictionary_stats_entry(dictionaries.deleted);
+
+    if(c->st_dicts || total != 0) {
+        if (unlikely(!c->st_dicts)) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.dictionaries", c->context_prefix, stats.name);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.dictionaries", c->context_prefix);
+
+            c->st_dicts = rrdset_create_localhost(
+                "netdata"
+                , id
+                , NULL
+                , c->family
+                , context
+                , "Dictionaries"
+                , "dictionaries"
+                , "netdata"
+                , "stats"
+                , c->priority + 0
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            c->rd_dicts_active  = rrddim_add(c->st_dicts, "active",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            c->rd_dicts_deleted = rrddim_add(c->st_dicts, "deleted",   NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(c->st_dicts->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
+        }
+        else
+            rrdset_next(c->st_dicts);
+
+        rrddim_set_by_pointer(c->st_dicts, c->rd_dicts_active,  (collected_number)stats.dictionaries.active);
+        rrddim_set_by_pointer(c->st_dicts, c->rd_dicts_deleted, (collected_number)stats.dictionaries.deleted);
+        rrdset_done(c->st_dicts);
+    }
+
+    // ------------------------------------------------------------------------
+
+    total = 0;
     load_dictionary_stats_entry(items.entries);
     load_dictionary_stats_entry(items.referenced);
     load_dictionary_stats_entry(items.pending_deletion);
@@ -1296,7 +1342,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "items"
                 , "netdata"
                 , "stats"
-                , c->priority + 0
+                , c->priority + 1
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -1348,7 +1394,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "ops/s"
                 , "netdata"
                 , "stats"
-                , c->priority + 1
+                , c->priority + 2
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -1409,7 +1455,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "callbacks/s"
                 , "netdata"
                 , "stats"
-                , c->priority + 2
+                , c->priority + 3
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -1457,7 +1503,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "bytes"
                 , "netdata"
                 , "stats"
-                , c->priority + 3
+                , c->priority + 4
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_STACKED
             );
@@ -1503,7 +1549,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "count"
                 , "netdata"
                 , "stats"
-                , c->priority + 4
+                , c->priority + 5
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );

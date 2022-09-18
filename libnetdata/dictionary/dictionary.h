@@ -59,6 +59,11 @@ struct dictionary_stats {
     const char *name;               // the name of the category
 
     struct {
+        size_t active;              // the number of active dictionaries
+        size_t deleted;             // the number of dictionaries queued for destruction
+    } dictionaries;
+
+    struct {
         long entries;               // active items in the dictionary
         long pending_deletion;      // pending deletion items in the dictionary
         long referenced;            // referenced items in the dictionary
@@ -101,12 +106,20 @@ struct dictionary_stats {
 
 // Create a dictionary
 #ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, __FUNCTION__, __LINE__, __FILE__);
-#define dictionary_create_advanced(options, stats) dictionary_create_advanced_with_trace(options, stats, __FUNCTION__, __LINE__, __FILE__);
+#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, __FUNCTION__, __LINE__, __FILE__)
+#define dictionary_create_advanced(options, stats) dictionary_create_advanced_with_trace(options, stats, __FUNCTION__, __LINE__, __FILE__)
 extern DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file);
 #else
 #define dictionary_create(options) dictionary_create_advanced(options, NULL);
 extern DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats);
+#endif
+
+// Create a view on a dictionary
+#ifdef NETDATA_INTERNAL_CHECKS
+#define dictionary_create_view(master) dictionary_create_view_with_trace(master, __FUNCTION__, __LINE__, __FILE__)
+extern DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *function, size_t line, const char *file);
+#else
+extern DICTIONARY *dictionary_create_view(DICTIONARY *master);
 #endif
 
 // an insert callback to be called just after an item is added to the dictionary
@@ -162,6 +175,12 @@ extern void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t
 
 #define dictionary_set_and_acquire_item(dict, name, value, value_len) dictionary_set_and_acquire_item_advanced(dict, name, -1, value, value_len, NULL)
 extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
+
+// set an item in a dictionary view
+#define dictionary_view_set_and_acquire_item(dict, name, master_item) dictionary_view_set_and_acquire_item_advanced(dict, name, -1, master_item)
+extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item);
+#define dictionary_view_set(dict, name, master_item) dictionary_view_set_advanced(dict, name, -1, master_item)
+extern void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item);
 
 // ----------------------------------------------------------------------------
 // Get an item from the dictionary

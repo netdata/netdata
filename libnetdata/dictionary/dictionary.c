@@ -20,7 +20,8 @@ typedef enum {
 
 // configuration options macros
 #define is_dictionary_single_threaded(dict) ((dict)->options & DICT_OPTION_SINGLE_THREADED)
-#define is_master_dictionary(dict) (!(dict)->master)
+#define is_view_dictionary(dict) ((dict)->master)
+#define is_master_dictionary(dict) (!is_view_dictionary(dict))
 
 typedef enum item_options {
     ITEM_OPTION_NONE            = 0,
@@ -36,9 +37,9 @@ typedef enum item_flags {
     // IMPORTANT: This is 8-bit
 } ITEM_FLAGS;
 
-#define item_private_flag_check(item, flag) (__atomic_load_n(&((item)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define item_private_flag_set(item, flag)   __atomic_or_fetch(&((item)->flags), flag, __ATOMIC_SEQ_CST)
-#define item_private_flag_clear(item, flag) __atomic_and_fetch(&((item)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define item_flag_check(item, flag) (__atomic_load_n(&((item)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define item_flag_set(item, flag)   __atomic_or_fetch(&((item)->flags), flag, __ATOMIC_SEQ_CST)
+#define item_flag_clear(item, flag) __atomic_and_fetch(&((item)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 #define item_shared_flag_check(item, flag) (__atomic_load_n(&((item)->shared->flags), __ATOMIC_SEQ_CST) & (flag))
 #define item_shared_flag_set(item, flag)   __atomic_or_fetch(&((item)->shared->flags), flag, __ATOMIC_SEQ_CST)
@@ -107,6 +108,8 @@ struct dictionary_item {
 };
 
 struct dictionary_hooks {
+    REFCOUNT links;
+
     void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *ins_callback_data;
 
@@ -173,33 +176,88 @@ static bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONA
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *item);
 
 // ----------------------------------------------------------------------------
+// memory statistics
+
+static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+    if(key_size)
+        __atomic_fetch_add(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+
+    if(item_size)
+        __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+
+    if(value_size)
+        __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+    if(key_size)
+        __atomic_fetch_sub(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+
+    if(item_size)
+        __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+
+    if(value_size)
+        __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+}
+
+// ----------------------------------------------------------------------------
 // callbacks registration
 
-static inline void dictionary_allocate_hooks(DICTIONARY *dict) {
+static inline void dictionary_hooks_allocate(DICTIONARY *dict) {
     if(dict->hooks) return;
+
     dict->hooks = callocz(1, sizeof(struct dictionary_hooks));
+    dict->hooks->links = 1;
+
+    DICTIONARY_STATS_PLUS_MEMORY(dict, 0, sizeof(struct dictionary_hooks), 0);
+}
+
+static inline size_t dictionary_hooks_free(DICTIONARY *dict) {
+    if(!dict->hooks) return 0;
+
+    REFCOUNT links = __atomic_sub_fetch(&dict->hooks->links, 1, __ATOMIC_SEQ_CST);
+    if(links == 0) {
+        freez(dict->hooks);
+        dict->hooks = NULL;
+
+        DICTIONARY_STATS_MINUS_MEMORY(dict, 0, sizeof(struct dictionary_hooks), 0);
+        return sizeof(struct dictionary_hooks);
+    }
+
+    return 0;
 }
 
 void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    dictionary_allocate_hooks(dict);
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
+
+    dictionary_hooks_allocate(dict);
     dict->hooks->ins_callback = ins_callback;
     dict->hooks->ins_callback_data = data;
 }
 
 void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data) {
-    dictionary_allocate_hooks(dict);
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
+
+    dictionary_hooks_allocate(dict);
     dict->hooks->conflict_callback = conflict_callback;
     dict->hooks->conflict_callback_data = data;
 }
 
 void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    dictionary_allocate_hooks(dict);
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
+
+    dictionary_hooks_allocate(dict);
     dict->hooks->react_callback = react_callback;
     dict->hooks->react_callback_data = data;
 }
 
 void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    dictionary_allocate_hooks(dict);
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
+
+    dictionary_hooks_allocate(dict);
     dict->hooks->del_callback = del_callback;
     dict->hooks->del_callback_data = data;
 }
@@ -276,26 +334,6 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
         __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
     }
 }
-static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
-    if(key_size)
-        __atomic_fetch_add(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
-
-    if(item_size)
-        __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
-
-    if(value_size)
-        __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
-}
-static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
-    if(key_size)
-        __atomic_fetch_sub(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
-
-    if(item_size)
-        __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
-
-    if(value_size)
-        __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
-}
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
 
@@ -335,10 +373,18 @@ static inline void DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(DICTIONARY *dict) 
     __atomic_fetch_add(&dict->stats->ops.garbage_collections, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_DICT_CREATIONS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->dictionaries.active, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.creations, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_sub(&dict->stats->dictionaries.active, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.destructions, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(DICTIONARY *dict) {
+    __atomic_fetch_add(&dict->stats->dictionaries.deleted, 1, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(DICTIONARY *dict) {
+    __atomic_fetch_sub(&dict->stats->dictionaries.deleted, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.flushes, 1, __ATOMIC_RELAXED);
@@ -401,6 +447,9 @@ static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM
     if(likely(!dict->hooks || !dict->hooks->ins_callback))
         return;
 
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
+
     internal_error(false,
                    "DICTIONARY: Running insert callback on item '%s' of dictionary created from %s() %zu@%s.",
                    item_get_name(item),
@@ -412,24 +461,32 @@ static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM
     dict->hooks->ins_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
 }
 
-static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(likely(!dict->hooks || !dict->hooks->del_callback))
-        return;
+static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
+    if(likely(!dict->hooks || !dict->hooks->conflict_callback))
+        return false;
+
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     internal_error(false,
-                   "DICTIONARY: Running delete callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   "DICTIONARY: Running conflict callback on item '%s' of dictionary created from %s() %zu@%s.",
                    item_get_name(item),
                    dict->creation_function,
                    dict->creation_line,
                    dict->creation_file);
 
-    DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
-    dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+    DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict);
+    return dict->hooks->conflict_callback(
+        item, item->shared->value, new_value,
+        constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
 }
 
 static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
     if(likely(!dict->hooks || !dict->hooks->react_callback))
         return;
+
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     internal_error(false,
                    "DICTIONARY: Running react callback on item '%s' of dictionary created from %s() %zu@%s.",
@@ -443,21 +500,23 @@ static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM 
                                 constructor_data?constructor_data:dict->hooks->react_callback_data);
 }
 
-static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->conflict_callback))
-        return false;
+static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(likely(!dict->hooks || !dict->hooks->del_callback))
+        return;
+
+    // We may execute the delete callback on items deleted from a view,
+    // because we may have references to it, after the master is gone
+    // so, the shared structure will remain until the last reference is released.
 
     internal_error(false,
-                   "DICTIONARY: Running conflict callback on item '%s' of dictionary created from %s() %zu@%s.",
+                   "DICTIONARY: Running delete callback on item '%s' of dictionary created from %s() %zu@%s.",
                    item_get_name(item),
                    dict->creation_function,
                    dict->creation_line,
                    dict->creation_file);
 
-    DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict);
-    return dict->hooks->conflict_callback(
-        item, item->shared->value, new_value,
-        constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
+    DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
+    dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
 }
 
 // ----------------------------------------------------------------------------
@@ -575,7 +634,7 @@ static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
     while(item) {
         examined++;
 
-        if(item_private_flag_check(item, ITEM_FLAG_DELETED) && item_is_not_referenced_and_can_be_removed(dict, item)) {
+        if(item_flag_check(item, ITEM_FLAG_DELETED) && item_is_not_referenced_and_can_be_removed(dict, item)) {
             DICTIONARY_ITEM *item_next = item->next;
 
             DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
@@ -652,7 +711,7 @@ static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
         // if this is a deleted item, but the counter increased to 1
         // we need to remove it from the pending items to delete
-        if(item_private_flag_check(item, ITEM_FLAG_DELETED))
+        if(item_flag_check(item, ITEM_FLAG_DELETED))
             DICTIONARY_PENDING_DELETES_MINUS1(dict);
     }
 }
@@ -671,7 +730,7 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     else {
         // get the flags before decrementing any reference counters
         // (the other way around may lead to use-after-free)
-        is_deleted = item_private_flag_check(item, ITEM_FLAG_DELETED);
+        is_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
 
         // decrement the refcount
         refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
@@ -715,7 +774,7 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
 
         refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
 
-        if(refcount < 0 || item_private_flag_check(item, ITEM_FLAG_DELETED)) {
+        if(refcount < 0 || item_flag_check(item, ITEM_FLAG_DELETED)) {
             // we can't use this item
             return false;
         }
@@ -735,13 +794,18 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
             hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item);
 
             // mark it in our dictionary as deleted too
-            item_private_flag_set(item, ITEM_FLAG_DELETED);
+            item_flag_set(item, ITEM_FLAG_DELETED);
 
             // decrement the refcount we incremented above
             if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
                 // this is a deleted item, and we are the last one
                 DICTIONARY_PENDING_DELETES_PLUS1(dict);
             }
+        }
+        else {
+            // this is traversal / walkthrough
+            // decrement the refcount we incremented above
+            __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
         }
 
         return false;
@@ -794,8 +858,9 @@ static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *
 // ----------------------------------------------------------------------------
 // hash table operations
 
-static void hashtable_init_unsafe(DICTIONARY *dict) {
+static size_t hashtable_init_unsafe(DICTIONARY *dict) {
     dict->index.JudyHSArray = NULL;
+    return 0;
 }
 
 static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
@@ -965,55 +1030,75 @@ static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict __maybe_unused, size_t *a
     return item;
 }
 
-static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data) {
+static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data, DICTIONARY_ITEM *master_item) {
+#ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(name_len > KEY_LEN_MAX))
         fatal("DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu", name_len, (size_t)KEY_LEN_MAX);
 
     if(unlikely(value_len > VALUE_LEN_MAX))
         fatal("DICTIONARY: tried to add an item of size %zu, but the maximum acceptable is %zu", value_len, (size_t)VALUE_LEN_MAX);
+#endif
 
-    size_t item_size = 0, key_size, value_size = value_len;
-    DICTIONARY_ITEM *item = item_allocate(dict, &item_size, NULL);
+    size_t item_size = 0, key_size = 0, value_size = 0;
 
-    item->shared->value_len = value_len;
+    DICTIONARY_ITEM *item = item_allocate(dict, &item_size, master_item);
+    key_size += item_set_name(dict, item, name, name_len);
 
-    key_size = item_set_name(dict, item, name, name_len);
+    if(unlikely(is_view_dictionary(dict))) {
+        // we are on a view dictionary
+        // do not touch the value
+        ;
 
-    if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
-        item->shared->value = value;
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(!master_item))
+            fatal("DICTIONARY: cannot add an item to a view without a master item.");
+#endif
+    }
     else {
-        if(likely(value_len)) {
-            if (value) {
-                // a value has been supplied
-                // copy it
-                item->shared->value = mallocz(value_len);
-                memcpy(item->shared->value, value, value_len);
+        // we are on the master dictionary
+
+        if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
+            item->shared->value = value;
+        else {
+            if(likely(value_len)) {
+                if(value) {
+                    // a value has been supplied
+                    // copy it
+                    item->shared->value = mallocz(value_len);
+                    memcpy(item->shared->value, value, value_len);
+                }
+                else {
+                    // no value has been supplied
+                    // allocate a clear memory block
+                    item->shared->value = callocz(1, value_len);
+                }
+
             }
             else {
-                // no value has been supplied
-                // allocate a clear memory block
-                item->shared->value = callocz(1, value_len);
+                // the caller wants an item without any value
+                item->shared->value = NULL;
             }
         }
-        else {
-            // the caller wants an item without any value
-            item->shared->value = NULL;
-        }
+        item->shared->value_len = value_len;
+        value_size += value_len;
+
+        dictionary_execute_insert_callback(dict, item, constructor_data);
     }
-    value_size += value_len;
 
     DICTIONARY_ENTRIES_PLUS1(dict);
     DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size);
-
-    dictionary_execute_insert_callback(dict, item, constructor_data);
 
     return item;
 }
 
 static void item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: %s() should never be called on views.", __FUNCTION__ );
+
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
 
     DICTIONARY_VALUE_RESETS_PLUS1(dict);
+
     if(item->shared->value_len != value_len) {
         DICTIONARY_STATS_PLUS_MEMORY(dict, 0, 0, value_len);
         DICTIONARY_STATS_MINUS_MEMORY(dict, 0, 0, item->shared->value_len);
@@ -1049,22 +1134,24 @@ static void item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item,
 static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
-    dictionary_execute_delete_callback(dict, item);
+    size_t item_size = 0, key_size = 0, value_size = 0;
 
-    size_t item_size = 0, key_size = 0, value_size = item->shared->value_len;
-
-    if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
-        debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
-        freez(item->shared->value);
-    }
-
-    if(unlikely(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE))) {
-        debug(D_DICTIONARY, "Dictionary freeing name '%s'", item_get_name(item));
-        key_size += item_free_name(dict, item);
-    }
+    key_size += item->key_len;
+    if(unlikely(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE)))
+        item_free_name(dict, item);
 
     if(item_shared_release_and_check_if_it_can_be_freed(dict, item)) {
+        dictionary_execute_delete_callback(dict, item);
+
+        if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
+            debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
+            freez(item->shared->value);
+            item->shared->value = NULL;
+        }
+        value_size += item->shared->value_len;
+
         freez(item->shared);
+        item->shared = NULL;
         item_size += sizeof(DICTIONARY_ITEM_SHARED);
     }
 
@@ -1081,12 +1168,14 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 // item operations
 
 static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    item_shared_flag_set(item, ITEM_FLAG_DELETED);
+
     if(item_is_not_referenced_and_can_be_removed(dict, item)) {
         item_linked_list_remove(dict, item);
         item_free_with_hooks(dict, item);
     }
     else
-        item_private_flag_set(item, ITEM_FLAG_DELETED);
+        item_flag_set(item, ITEM_FLAG_DELETED);
 
     // the item is not available anymore
     DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1099,7 +1188,7 @@ static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *
 // to speed up everything!
 static inline void item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(DICTIONARY *dict, DICTIONARY_ITEM *item, char rw) {
     if(rw == DICTIONARY_LOCK_WRITE) {
-        bool should_be_deleted = item_private_flag_check(item, ITEM_FLAG_DELETED);
+        bool should_be_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
 
         item_release(dict, item);
 
@@ -1165,7 +1254,7 @@ static bool item_del(DICTIONARY *dict, const char *name, ssize_t name_len) {
     return ret;
 }
 
-static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data, DICTIONARY_ITEM *master_item) {
     if(unlikely(!name || !*name)) {
         internal_error(
             true,
@@ -1209,7 +1298,7 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
             // a new item added to the index
 
             // create the dictionary item
-            item = *item_pptr = item_create_with_hooks(dict, name, name_len, value, value_len, constructor_data);
+            item = *item_pptr = item_create_with_hooks(dict, name, name_len, value, value_len, constructor_data, master_item);
 
             // call the hashtable react
             hashtable_inserted_item_unsafe(dict, item);
@@ -1237,19 +1326,30 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
 
             item = *item_pptr;
 
-            if (!(dict->options & DICT_OPTION_DONT_OVERWRITE_VALUE)) {
-                item_reset_value_with_hooks(dict, item, value, value_len, constructor_data);
-                added_or_updated = true;
+            if(is_view_dictionary(dict)) {
+                // view dictionary
+                // the item is already there and can be used
+                if(item->shared != master_item->shared)
+                    error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
             }
-
-            else if(dictionary_execute_conflict_callback(dict, item, value, constructor_data)) {
-                dictionary_version_increment(dict);
-                added_or_updated = true;
-            }
-
             else {
-                // we did really nothing!
-                ;
+                // master dictionary
+                // the user wants to reset its value
+
+                if (!(dict->options & DICT_OPTION_DONT_OVERWRITE_VALUE)) {
+                    item_reset_value_with_hooks(dict, item, value, value_len, constructor_data);
+                    added_or_updated = true;
+                }
+
+                else if (dictionary_execute_conflict_callback(dict, item, value, constructor_data)) {
+                    dictionary_version_increment(dict);
+                    added_or_updated = true;
+                }
+
+                else {
+                    // we did really nothing!
+                    ;
+                }
             }
 
             dictionary_index_lock_unlock(dict);
@@ -1260,7 +1360,7 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
     if(unlikely(spins > 0 && dict->stats))
         DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, spins);
 
-    if(added_or_updated)
+    if(is_master_dictionary(dict) && added_or_updated)
         dictionary_execute_react_callback(dict, item, constructor_data);
 
     return item;
@@ -1311,7 +1411,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(!force && dictionary_referenced_items(dict))
         return false;
 
-    size_t freed = 0, counted_items = 0;
+    size_t dict_size = 0, counted_items = 0, item_size = 0, index_size = 0;
     (void)counted_items;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1324,7 +1424,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 #endif
 
     // destroy the index
-    freed += hashtable_destroy_unsafe(dict);
+    index_size += hashtable_destroy_unsafe(dict);
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *item = dict->items.list;
@@ -1332,7 +1432,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
         // cache item->next
         // because we are going to free item
         DICTIONARY_ITEM *item_next = item->next;
-        freed += item_free_with_hooks(dict, item);
+        item_size += item_free_with_hooks(dict, item);
         item = item_next;
 
         DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1345,27 +1445,25 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     dict->items.list = NULL;
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
-    freed += dictionary_locks_destroy(dict);
-    freed += reference_counter_free(dict);
+    dict_size += dictionary_locks_destroy(dict);
+    dict_size += reference_counter_free(dict);
+    dict_size += dictionary_hooks_free(dict);
+    dict_size += sizeof(DICTIONARY);
+    DICTIONARY_STATS_MINUS_MEMORY(dict, 0, sizeof(DICTIONARY), 0);
 
-    if(dict->hooks) {
-        freed += sizeof(struct dictionary_hooks);
-        freez(dict->hooks);
-        dict->hooks = NULL;
-    }
-
-    freed += sizeof(DICTIONARY);
     freez(dict);
 
     internal_error(
-        false,
+        true,
         "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total freed memory: %zu bytes (sizeof(dict) = %zu, sizeof(item) = %zu).",
         creation_function,
         creation_line,
         creation_file,
-        entries, counted_items, referenced_items, pending_deletion_items, freed, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM) + sizeof(DICTIONARY_ITEM_SHARED));
+        entries, counted_items, referenced_items, pending_deletion_items,
+        dict_size, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM) + sizeof(DICTIONARY_ITEM_SHARED));
 
-    if(mem) *mem = freed;
+    if(mem)
+        *mem = dict_size + item_size + index_size;
 
     return true;
 }
@@ -1373,10 +1471,11 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex = NETDATA_MUTEX_INITIALIZER;
 static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
 
-void dictionary_queue_for_destruction_unsafe(DICTIONARY *dict) {
+void dictionary_queue_for_destruction(DICTIONARY *dict) {
     if(is_dictionary_destroyed(dict))
         return;
 
+    DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
 
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
@@ -1404,9 +1503,11 @@ void cleanup_destroyed_dictionaries(void) {
 #endif
 
         if(dictionary_free_all_resources(dict, NULL, false)) {
+            DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
+
             internal_error(
                 true,
-                "DICTIONARY: cleaned up dictionary with delayed destruction, created from %s() %zu@%s.",
+                "DICTIONARY: freed dictionary with delayed destruction, created from %s() %zu@%s.",
                 function, line, file);
 
             if(last) last->next = next;
@@ -1533,33 +1634,58 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
 // ----------------------------------------------------------------------------
 // API - dictionary management
 
+static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dictionary_stats *stats) {
+    cleanup_destroyed_dictionaries();
+
+    DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
+    dict->options = options;
+    dict->stats = stats;
+
+    size_t dict_size = 0;
+    dict_size += sizeof(DICTIONARY);
+    dict_size += dictionary_locks_init(dict);
+    dict_size += reference_counter_init(dict);
+    dict_size += hashtable_init_unsafe(dict);
+
+    DICTIONARY_STATS_PLUS_MEMORY(dict, 0, dict_size, 0);
+
+    return dict;
+}
+
 #ifdef NETDATA_INTERNAL_CHECKS
 DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file) {
 #else
 DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats) {
 #endif
-    cleanup_destroyed_dictionaries();
 
-    debug(D_DICTIONARY, "Creating dictionary.");
+    DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other);
 
-    DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
-    size_t allocated = sizeof(DICTIONARY);
+#ifdef NETDATA_INTERNAL_CHECKS
+    dict->creation_function = function;
+    dict->creation_file = file;
+    dict->creation_line = line;
+#endif
 
-    dict->options = options;
-    dict->flags = DICT_FLAG_NONE;
-    dict->items.list = NULL;
+    DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
+    return dict;
+}
 
-    allocated += dictionary_locks_init(dict);
-    allocated += reference_counter_init(dict);
+#ifdef NETDATA_INTERNAL_CHECKS
+DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *function, size_t line, const char *file) {
+#else
+DICTIONARY *dictionary_create_view(DICTIONARY *master) {
+#endif
 
-    if(stats)
-        dict->stats = stats;
-    else
-        dict->stats = &dictionary_stats_category_other;
+    DICTIONARY *dict = dictionary_create_internal(master->options, master->stats);
+    dict->master = master;
 
-    DICTIONARY_STATS_PLUS_MEMORY(dict, 0, allocated, 0);
+    dictionary_hooks_allocate(master);
 
-    hashtable_init_unsafe(dict);
+    if(unlikely(__atomic_load_n(&master->hooks->links, __ATOMIC_SEQ_CST)) < 1)
+        fatal("DICTIONARY: attempted to create a view that has %d links", master->hooks->links);
+
+    dict->hooks = master->hooks;
+    __atomic_add_fetch(&master->hooks->links, 1, __ATOMIC_SEQ_CST);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     dict->creation_function = function;
@@ -1586,7 +1712,7 @@ void dictionary_flush(DICTIONARY *dict) {
     for (item = dict->items.list; item; item = item_next) {
         item_next = item->next;
 
-        if(!item_private_flag_check(item, ITEM_FLAG_DELETED))
+        if(!item_flag_check(item, ITEM_FLAG_DELETED))
             item_free_or_mark_deleted(dict, item);
     }
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -1604,7 +1730,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     size_t referenced_items = dictionary_referenced_items(dict);
     if(referenced_items) {
         dictionary_flush(dict);
-        dictionary_queue_for_destruction_unsafe(dict);
+        dictionary_queue_for_destruction(dict);
 
         internal_error(
             true,
@@ -1632,13 +1758,46 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIO
         return NULL;
 
     api_internal_check(dict, NULL, false, true);
-    DICTIONARY_ITEM *item = item_add_or_reset_value_and_acquire(dict, name, name_len, value, value_len, constructor_data);
+
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: this dictionary is a view, you cannot add items other than the ones from the master dictionary.");
+
+    DICTIONARY_ITEM *item = item_add_or_reset_value_and_acquire(dict, name, name_len, value, value_len, constructor_data, NULL);
     api_internal_check(dict, item, false, false);
     return item;
 }
 
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     DICTIONARY_ITEM *item = dictionary_set_and_acquire_item_advanced(dict, name, name_len, value, value_len, constructor_data);
+
+    if(likely(item)) {
+        void *v = item->shared->value;
+        item_release(dict, item);
+        return v;
+    }
+
+    return NULL;
+}
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
+    if(unlikely(!api_is_name_good(dict, name, name_len)))
+        return NULL;
+
+    api_internal_check(dict, NULL, false, true);
+
+    if(unlikely(is_master_dictionary(dict)))
+        fatal("DICTIONARY: this dictionary is a master, you cannot add items from other dictionaries.");
+
+    dictionary_acquired_item_dup(dict->master, master_item);
+    DICTIONARY_ITEM *item = item_add_or_reset_value_and_acquire(dict, name, name_len, NULL, 0, NULL, master_item);
+    dictionary_acquired_item_release(dict->master, master_item);
+
+    api_internal_check(dict, item, false, false);
+    return item;
+}
+
+void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
+    DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_advanced(dict, name, name_len, master_item);
 
     if(likely(item)) {
         void *v = item->shared->value;
