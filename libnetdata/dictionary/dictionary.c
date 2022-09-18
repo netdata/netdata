@@ -225,14 +225,11 @@ void dictionary_version_increment(DICTIONARY *dict) {
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.searches, 1, __ATOMIC_RELAXED);
 }
-static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict) {
     // statistics
     __atomic_fetch_add(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.inserts, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
@@ -260,15 +257,28 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
         __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
     }
 }
-static inline void DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
-    __atomic_fetch_sub(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
-    __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
-    __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+    if(key_size)
+        __atomic_fetch_add(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+
+    if(item_size)
+        __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+
+    if(value_size)
+        __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
-static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict, size_t old_value_size, size_t new_value_size) {
+static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+    if(key_size)
+        __atomic_fetch_sub(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+
+    if(item_size)
+        __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+
+    if(value_size)
+        __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&dict->stats->memory.values, (long)new_value_size, __ATOMIC_RELAXED);
-    __atomic_fetch_sub(&dict->stats->memory.values, (long)old_value_size, __ATOMIC_RELAXED);
 
     if(unlikely(is_dictionary_single_threaded(dict)))
         dict->version++;
@@ -911,7 +921,8 @@ static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *nam
     }
     value_size += value_len;
 
-    DICTIONARY_ENTRIES_PLUS1(dict, key_size, item_size, value_size);
+    DICTIONARY_ENTRIES_PLUS1(dict);
+    DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size);
 
     dictionary_execute_insert_callback(dict, item, constructor_data);
 
@@ -921,7 +932,11 @@ static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *nam
 static void item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item, void *value, size_t value_len, void *constructor_data) {
     debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
 
-    DICTIONARY_VALUE_RESETS_PLUS1(dict, item->shared->value_len, value_len);
+    DICTIONARY_VALUE_RESETS_PLUS1(dict);
+    if(item->shared->value_len != value_len) {
+        DICTIONARY_STATS_PLUS_MEMORY(dict, 0, 0, value_len);
+        DICTIONARY_STATS_MINUS_MEMORY(dict, 0, 0, item->shared->value_len);
+    }
 
     dictionary_execute_delete_callback(dict, item);
 
@@ -979,7 +994,7 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         item_size += sizeof(DICTIONARY_ITEM);
     }
 
-    DICTIONARY_STATS_ENTRIES_MINUS_MEMORY(dict, key_size, item_size, value_size);
+    DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size);
 
     // we return the memory we actually freed
     return item_size + (dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)?0:value_size;
@@ -1242,8 +1257,12 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
         DICTIONARY_ITEM *item_next = item->next;
         freed += item_free_with_hooks(dict, item);
         item = item_next;
+
+        DICTIONARY_ENTRIES_MINUS1(dict);
+
         // to speed up destruction, we don't
         // unlink item from the linked-list here
+
         counted_items++;
     }
     dict->items.list = NULL;
@@ -1461,7 +1480,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
     else
         dict->stats = &dictionary_stats_category_other;
 
-    dict->stats->memory.dict = (long)allocated;
+    DICTIONARY_STATS_PLUS_MEMORY(dict, 0, allocated, 0);
 
     hashtable_init_unsafe(dict);
 
