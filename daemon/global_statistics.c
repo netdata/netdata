@@ -1287,7 +1287,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.dictionaries", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.dictionaries", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.dictionaries", c->context_prefix);
 
             c->st_dicts = rrdset_create_localhost(
                 "netdata"
@@ -1330,7 +1330,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.items", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.items", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.items", c->context_prefix);
 
             c->st_items = rrdset_create_localhost(
                 "netdata"
@@ -1382,7 +1382,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.ops", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.ops", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.ops", c->context_prefix);
 
             c->st_ops = rrdset_create_localhost(
                 "netdata"
@@ -1443,7 +1443,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.callbacks", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.callbacks", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.callbacks", c->context_prefix);
 
             c->st_callbacks = rrdset_create_localhost(
                 "netdata"
@@ -1491,7 +1491,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.memory", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.memory", c->context_prefix);
 
             c->st_memory = rrdset_create_localhost(
                 "netdata"
@@ -1537,7 +1537,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "%s.category.memory", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.memory", c->context_prefix);
 
             c->st_spins = rrdset_create_localhost(
                 "netdata"
