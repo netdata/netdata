@@ -1281,10 +1281,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_items || total != 0) {
         if (unlikely(!c->st_items)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.items", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_items", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.category.items", c->context_prefix);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_category_items", c->context_prefix);
 
             c->st_items = rrdset_create_localhost(
                 "netdata"
@@ -1333,10 +1333,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_ops || total != 0) {
         if (unlikely(!c->st_ops)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.ops", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_ops", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.category.ops", c->context_prefix);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_category_ops", c->context_prefix);
 
             c->st_ops = rrdset_create_localhost(
                 "netdata"
@@ -1394,10 +1394,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_callbacks || total != 0) {
         if (unlikely(!c->st_callbacks)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.callbacks", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_callbacks", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.category.callbacks", c->context_prefix);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_category_callbacks", c->context_prefix);
 
             c->st_callbacks = rrdset_create_localhost(
                 "netdata"
@@ -1442,10 +1442,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_memory || total != 0) {
         if (unlikely(!c->st_memory)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_memory", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.category.memory", c->context_prefix);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_category_memory", c->context_prefix);
 
             c->st_memory = rrdset_create_localhost(
                 "netdata"
@@ -1488,10 +1488,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_spins || total != 0) {
         if (unlikely(!c->st_spins)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_memory", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.category.memory", c->context_prefix);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_category_memory", c->context_prefix);
 
             c->st_spins = rrdset_create_localhost(
                 "netdata"
