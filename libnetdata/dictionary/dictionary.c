@@ -938,7 +938,7 @@ static inline const char *item_get_name(const DICTIONARY_ITEM *item) {
         return item->caller_name;
 }
 
-static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
+static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict __maybe_unused, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
     DICTIONARY_ITEM *item;
 
     size_t size = sizeof(DICTIONARY_ITEM);
