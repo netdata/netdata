@@ -472,7 +472,6 @@ static inline void rrdset_update_permanent_labels(RRDSET *st) {
 
     rrdlabels_add(st->rrdlabels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
     rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->rrdlabels, "_instance_family",rrdset_family(st),      RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
 }
 
 RRDSET *rrdset_create_custom(
