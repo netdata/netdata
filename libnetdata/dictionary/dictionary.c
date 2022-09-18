@@ -26,7 +26,7 @@ typedef enum item_options {
     ITEM_OPTION_NONE            = 0,
     ITEM_OPTION_ALLOCATED_NAME  = (1 << 0), // the name pointer is a STRING
 
-    // IMPORTANT: This is 1-bit - to add more change ITEM_OPTIONS bitfield in struct dictionary_item.
+    // IMPORTANT: This is 1-bit - to add more change ITEM_OPTIONS_BITS
 } ITEM_OPTIONS;
 
 typedef enum item_flags {
@@ -36,12 +36,27 @@ typedef enum item_flags {
     // IMPORTANT: This is 8-bit
 } ITEM_FLAGS;
 
-#define item_flag_check(item, flag) (__atomic_load_n(&((item)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define item_flag_set(item, flag)   __atomic_or_fetch(&((item)->flags), flag, __ATOMIC_SEQ_CST)
-#define item_flag_clear(item, flag) __atomic_and_fetch(&((item)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define item_private_flag_check(item, flag) (__atomic_load_n(&((item)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define item_private_flag_set(item, flag)   __atomic_or_fetch(&((item)->flags), flag, __ATOMIC_SEQ_CST)
+#define item_private_flag_clear(item, flag) __atomic_and_fetch(&((item)->flags), ~(flag), __ATOMIC_SEQ_CST)
+
+#define item_shared_flag_check(item, flag) (__atomic_load_n(&((item)->shared->flags), __ATOMIC_SEQ_CST) & (flag))
+#define item_shared_flag_set(item, flag)   __atomic_or_fetch(&((item)->shared->flags), flag, __ATOMIC_SEQ_CST)
+#define item_shared_flag_clear(item, flag) __atomic_and_fetch(&((item)->shared->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 #define REFCOUNT_DELETING         (-100)
-#define REFCOUNT_DELETED          (-200)
+
+#define ITEM_FLAGS_TYPE uint8_t
+#define KEY_LEN_TYPE    uint32_t
+#define VALUE_LEN_TYPE  uint32_t
+
+#define ITEM_OPTIONS_BITS 1
+#define KEY_LEN_BITS ((sizeof(KEY_LEN_TYPE) * 8) - (sizeof(ITEM_FLAGS_TYPE) * 8) - ITEM_OPTIONS_BITS)
+#define KEY_LEN_MAX ((1 << KEY_LEN_BITS) - 1)
+
+#define VALUE_LEN_BITS ((sizeof(VALUE_LEN_TYPE) * 8) - (sizeof(ITEM_FLAGS_TYPE) * 8))
+#define VALUE_LEN_MAX ((1 << VALUE_LEN_BITS) - 1)
+
 
 /*
  * Every item in the dictionary has the following structure.
@@ -50,10 +65,14 @@ typedef enum item_flags {
 typedef int32_t REFCOUNT;
 
 typedef struct dictionary_item_shared {
-    void *value;            // the value of the dictionary item
-    uint32_t value_len;     // the size of the value (assumed binary)
-//    REFCOUNT refcount;      // the reference counter
-//    REFCOUNT instances;     // instances across dictionaries
+    void *value;                            // the value of the dictionary item
+
+    // the order of the following items is important!
+    // The total of their storage should be 64-bits
+
+    REFCOUNT links;                         // how many links this item has
+    VALUE_LEN_TYPE value_len:VALUE_LEN_BITS; // the size of the value
+    ITEM_FLAGS_TYPE flags;                  // shared flags
 } DICTIONARY_ITEM_SHARED;
 
 struct dictionary_item {
@@ -63,30 +82,29 @@ struct dictionary_item {
 
     DICTIONARY_ITEM_SHARED *shared;
 
-    struct dictionary_item *next;    // a double linked list to allow fast insertions and deletions
+    struct dictionary_item *next;           // a double linked list to allow fast insertions and deletions
     struct dictionary_item *prev;
 
     union {
-        STRING *string_name;    // the name of the dictionary item
-        char *caller_name;      // the user supplied string pointer
-//        void *key_ptr;          // binary key pointer
+        STRING *string_name;                // the name of the dictionary item
+        char *caller_name;                  // the user supplied string pointer
+//        void *key_ptr;                      // binary key pointer
     };
 
-    REFCOUNT refcount;
+    // the order of the following items is important!
+    // The total of their storage should be 64-bits
 
-    uint32_t key_len:23;        // the size of key indexed (for strings, including the null terminator)
-                                // this is (2^23 - 1) = 8.388.607 bytes max key length.
+    REFCOUNT refcount;                      // the private reference counter
 
-    ITEM_OPTIONS options:1;     // permanent configuration options (no atomic operations on this - they never change)
+    KEY_LEN_TYPE key_len:KEY_LEN_BITS;      // the size of key indexed (for strings, including the null terminator)
+                                            // this is (2^23 - 1) = 8.388.607 bytes max key length.
 
-    uint8_t flags;              // runtime changing flags for this item (atomic operations on this)
-                                // cannot be a bit field because of atomics.
+    ITEM_OPTIONS options:ITEM_OPTIONS_BITS; // permanent configuration options
+                                            // (no atomic operations on this - they never change)
+
+    ITEM_FLAGS_TYPE flags;                  // runtime changing flags for this item (atomic operations on this)
+                                            // cannot be a bit field because of atomics.
 };
-
-typedef struct dictionary_item_master_dict {
-    struct dictionary_item item;            // this must be first
-    struct dictionary_item_shared shared;
-} DICTIONARY_ITEM_MASTER_DICT;
 
 struct dictionary_hooks {
     void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
@@ -152,6 +170,7 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
 static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline const char *item_get_name(const DICTIONARY_ITEM *item);
 static bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item);
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *item);
 
 // ----------------------------------------------------------------------------
 // callbacks registration
@@ -556,7 +575,7 @@ static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
     while(item) {
         examined++;
 
-        if(item_flag_check(item, ITEM_FLAG_DELETED) && item_is_not_referenced_and_can_be_removed(dict, item)) {
+        if(item_private_flag_check(item, ITEM_FLAG_DELETED) && item_is_not_referenced_and_can_be_removed(dict, item)) {
             DICTIONARY_ITEM *item_next = item->next;
 
             DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
@@ -602,17 +621,29 @@ static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     REFCOUNT refcount;
 
     if(unlikely(is_dictionary_single_threaded(dict))) {
-        //++item->shared->refcount;
         refcount = ++item->refcount;
     }
     else {
-        //__atomic_add_fetch(&item->shared->refcount, 1, __ATOMIC_SEQ_CST);
+        // increment the refcount
         refcount = __atomic_add_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
     }
 
-    if(refcount <= 0)
-        fatal("DICTIONARY: request to acquire item '%s', which is deleted (refcount = %d)!",
-              item_get_name(item), refcount - 1);
+    if(refcount <= 0) {
+        internal_error(
+            true,
+            "DICTIONARY: attempted to acquire item which is deleted (refcount = %d): "
+            "'%s' on dictionary created by %s() (%zu@%s)",
+            refcount - 1,
+            item_get_name(item),
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
+
+        fatal(
+            "DICTIONARY: request to acquire item '%s', which is deleted (refcount = %d)!",
+            item_get_name(item),
+            refcount - 1);
+    }
 
     if(refcount == 1) {
         // referenced items counts number of unique items referenced
@@ -621,7 +652,7 @@ static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
         // if this is a deleted item, but the counter increased to 1
         // we need to remove it from the pending items to delete
-        if(item_flag_check(item, ITEM_FLAG_DELETED))
+        if(item_private_flag_check(item, ITEM_FLAG_DELETED))
             DICTIONARY_PENDING_DELETES_MINUS1(dict);
     }
 }
@@ -635,20 +666,32 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
     if(unlikely(is_dictionary_single_threaded(dict))) {
         is_deleted = item->flags & ITEM_FLAG_DELETED;
-        //--item->shared->refcount;
         refcount = --item->refcount;
     }
     else {
-        is_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
-        //__atomic_sub_fetch(&item->shared->refcount, 1, __ATOMIC_SEQ_CST);
+        // get the flags before decrementing any reference counters
+        // (the other way around may lead to use-after-free)
+        is_deleted = item_private_flag_check(item, ITEM_FLAG_DELETED);
+
+        // decrement the refcount
         refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
     }
 
     if(refcount < 0) {
-        internal_error(true, "DICTIONARY: attempted to release item which is released (refcount = %d): '%s' on dictionary created by %s() (%zu@%s)",
-            refcount, item_get_name(item), dict->creation_function, dict->creation_line, dict->creation_file);
+        internal_error(
+            true,
+            "DICTIONARY: attempted to release item without references (refcount = %d): "
+            "'%s' on dictionary created by %s() (%zu@%s)",
+            refcount + 1,
+            item_get_name(item),
+            dict->creation_function,
+            dict->creation_line,
+            dict->creation_file);
 
-        fatal("DICTIONARY: attempted to release item without references: '%s'", item_get_name(item));
+        fatal(
+            "DICTIONARY: attempted to release item '%s' without references (refcount = %d)",
+            item_get_name(item),
+            refcount + 1);
     }
 
     if(refcount == 0) {
@@ -662,50 +705,88 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     }
 }
 
-static bool item_check_and_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+#define item_check_and_acquire(dict, item) item_check_and_acquire_advanced(dict, item, false)
+static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock) {
     size_t spins = 0;
-    REFCOUNT expected, desired;
+    REFCOUNT refcount, desired;
+
     do {
         spins++;
 
-        expected = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
+        refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
 
-        if(expected < 0 || item_flag_check(item, ITEM_FLAG_DELETED)) {
-
+        if(refcount < 0 || item_private_flag_check(item, ITEM_FLAG_DELETED)) {
             // we can't use this item
             return false;
         }
 
-        desired = expected + 1;
+        desired = refcount + 1;
 
-    } while(!__atomic_compare_exchange_n(&item->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired,
+                                          false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
+    // we acquired the item
+
+    if(item_shared_flag_check(item, ITEM_FLAG_DELETED)) {
+        // but, we can't use this item
+
+        if(having_index_lock) {
+            // delete it from the hashtable
+            hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item);
+
+            // mark it in our dictionary as deleted too
+            item_private_flag_set(item, ITEM_FLAG_DELETED);
+
+            // decrement the refcount we incremented above
+            if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
+                // this is a deleted item, and we are the last one
+                DICTIONARY_PENDING_DELETES_PLUS1(dict);
+            }
+        }
+
+        return false;
+    }
 
     if(desired == 1)
         DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
 
-    if(unlikely(spins > 1 && dict->stats))
-        DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 1);
+    if(unlikely(spins > 2 && dict->stats))
+        DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 2);
 
-    return true;
+    return true; // we can use this item
 }
 
 // if a dictionary item can be deleted, return true, otherwise return false
+// we use the private reference counter
 static inline bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
     REFCOUNT expected = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
-    if(expected == 0 && __atomic_compare_exchange_n(&item->refcount, &expected, REFCOUNT_DELETING, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if(expected == 0 && __atomic_compare_exchange_n(&item->refcount, &expected, REFCOUNT_DELETING,
+                                                     false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 
         // we are going to delete it
-
-        // if an item with REFCOUNT_DELETED is found in the index
-        // it can be deleted by item_add_or_reset_value_and_acquire()
-        __atomic_store_n(&item->refcount, REFCOUNT_DELETED, __ATOMIC_SEQ_CST);
-
         return true;
     }
 
     // we can't delete this
+    return false;
+}
+
+// if a dictionary item can be freed, return true, otherwise return false
+// we use the shared reference counter
+static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+    // if we can set refcount to REFCOUNT_DELETING, we can delete this item
+
+    REFCOUNT links = __atomic_sub_fetch(&item->shared->links, 1, __ATOMIC_SEQ_CST);
+    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETING,
+                                                     false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+
+        // we can delete it
+        return true;
+    }
+
+    // we can't delete it
     return false;
 }
 
@@ -860,37 +941,37 @@ static inline const char *item_get_name(const DICTIONARY_ITEM *item) {
 static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
     DICTIONARY_ITEM *item;
 
-    if(is_master_dictionary(dict)) {
-        size_t size = sizeof(DICTIONARY_ITEM_MASTER_DICT);
-        DICTIONARY_ITEM_MASTER_DICT *tmp = mallocz(size);
-        tmp->item.shared = &tmp->shared;
-        *allocated_bytes += size;
-        item = (DICTIONARY_ITEM *)tmp;
+    size_t size = sizeof(DICTIONARY_ITEM);
+    item = callocz(1, size);
+    item->refcount = 1;
+    *allocated_bytes += size;
 
-        // create the item with 1 reference count
-        item->refcount = 1;
-//        item->shared->refcount = 1;
-    }
-    else if(!master_item) {
-        fatal("DICTIONARY: trying to allocate secondary item without a master item");
+    if(master_item) {
+        if(unlikely(__atomic_add_fetch(&item->shared->links, 1, __ATOMIC_SEQ_CST) <= 1))
+            fatal("DICTIONARY: attempted to link to a shared item structure that had zero references");
+
+        item->shared = master_item->shared;
     }
     else {
-        size_t size = sizeof(DICTIONARY_ITEM);
-        item = mallocz(size);
+        size = sizeof(DICTIONARY_ITEM_SHARED);
+        item->shared = callocz(1, size);
+        item->shared->links = 1;
         *allocated_bytes += size;
-        item->shared = master_item->shared;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->dict = dict;
 #endif
-    item->flags = ITEM_FLAG_NONE;
-    item->options = ITEM_OPTION_NONE;
-
     return item;
 }
 
 static DICTIONARY_ITEM *item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(name_len > KEY_LEN_MAX))
+        fatal("DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu", name_len, (size_t)KEY_LEN_MAX);
+
+    if(unlikely(value_len > VALUE_LEN_MAX))
+        fatal("DICTIONARY: tried to add an item of size %zu, but the maximum acceptable is %zu", value_len, (size_t)VALUE_LEN_MAX);
+
     size_t item_size = 0, key_size, value_size = value_len;
     DICTIONARY_ITEM *item = item_allocate(dict, &item_size, NULL);
 
@@ -982,17 +1063,13 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         key_size += item_free_name(dict, item);
     }
 
-    if(is_master_dictionary(dict)) {
-        freez(item);
-        item_size += sizeof(DICTIONARY_ITEM_MASTER_DICT);
-    }
-    else {
+    if(item_shared_release_and_check_if_it_can_be_freed(dict, item)) {
         freez(item->shared);
         item_size += sizeof(DICTIONARY_ITEM_SHARED);
-
-        freez(item);
-        item_size += sizeof(DICTIONARY_ITEM);
     }
+
+    freez(item);
+    item_size += sizeof(DICTIONARY_ITEM);
 
     DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size);
 
@@ -1009,7 +1086,7 @@ static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *
         item_free_with_hooks(dict, item);
     }
     else
-        item_flag_set(item, ITEM_FLAG_DELETED);
+        item_private_flag_set(item, ITEM_FLAG_DELETED);
 
     // the item is not available anymore
     DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1022,7 +1099,7 @@ static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *
 // to speed up everything!
 static inline void item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(DICTIONARY *dict, DICTIONARY_ITEM *item, char rw) {
     if(rw == DICTIONARY_LOCK_WRITE) {
-        bool should_be_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
+        bool should_be_deleted = item_private_flag_check(item, ITEM_FLAG_DELETED);
 
         item_release(dict, item);
 
@@ -1145,7 +1222,7 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
             added_or_updated = true;
         }
         else {
-            if (!item_check_and_acquire(dict, *item_pptr)) {
+            if(!item_check_and_acquire_advanced(dict, *item_pptr, true)) {
                 spins++;
                 continue;
             }
@@ -1281,12 +1358,12 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     freez(dict);
 
     internal_error(
-        true,
+        false,
         "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total freed memory: %zu bytes (sizeof(dict) = %zu, sizeof(item) = %zu).",
         creation_function,
         creation_line,
         creation_file,
-        entries, counted_items, referenced_items, pending_deletion_items, freed, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM_MASTER_DICT));
+        entries, counted_items, referenced_items, pending_deletion_items, freed, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM) + sizeof(DICTIONARY_ITEM_SHARED));
 
     if(mem) *mem = freed;
 
@@ -1509,7 +1586,7 @@ void dictionary_flush(DICTIONARY *dict) {
     for (item = dict->items.list; item; item = item_next) {
         item_next = item->next;
 
-        if(!item_flag_check(item, ITEM_FLAG_DELETED))
+        if(!item_private_flag_check(item, ITEM_FLAG_DELETED))
             item_free_or_mark_deleted(dict, item);
     }
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
