@@ -1168,7 +1168,8 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 // item operations
 
 static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    item_shared_flag_set(item, ITEM_FLAG_DELETED);
+    if(is_master_dictionary(dict))
+        item_shared_flag_set(item, ITEM_FLAG_DELETED);
 
     if(item_is_not_referenced_and_can_be_removed(dict, item)) {
         item_linked_list_remove(dict, item);
