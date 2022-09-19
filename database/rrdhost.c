@@ -353,14 +353,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    rrdhost_initialize_rrdpush(host,
-                               rrdpush_enabled,
-                               rrdpush_destination,
-                               rrdpush_api_key,
-                               rrdpush_send_charts_matching);
-
-    if (likely(!archived))
+    if (likely(!archived)) {
         host->rrdlabels = rrdlabels_create();
+        rrdhost_initialize_rrdpush(
+            host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+    }
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_mutex_init(&host->aclk_state_lock);
