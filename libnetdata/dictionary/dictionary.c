@@ -960,6 +960,7 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
     else
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(dict->items.list, item, prev, next);
 
+    garbage_collect_pending_deletes_unsafe(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 }
 
@@ -967,8 +968,8 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
-    garbage_collect_pending_deletes_unsafe(dict);
 
+    garbage_collect_pending_deletes_unsafe(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 }
 
