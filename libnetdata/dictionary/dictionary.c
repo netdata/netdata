@@ -109,6 +109,7 @@ struct dictionary_item {
 
 struct dictionary_hooks {
     REFCOUNT links;
+    usec_t last_master_deletion_us;
 
     void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
     void *ins_callback_data;
@@ -134,6 +135,7 @@ struct dictionary {
     size_t creation_line;
 #endif
 
+    usec_t last_gc_run_us;
     DICT_OPTIONS options;               // the configuration flags of the dictionary (they never change - no atomics)
     DICT_FLAGS flags;                   // run time flags for the dictionary (they change all the time - atomics needed)
 
@@ -169,11 +171,19 @@ struct dictionary {
 };
 
 // forward definitions of functions used in reverse order in the code
+static void garbage_collect_pending_deletes(DICTIONARY *dict);
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline const char *item_get_name(const DICTIONARY_ITEM *item);
 static bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *item);
+static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
+
+#define ITEM_OK 0
+#define ITEM_MARKED_FOR_DELETION (-1)  // the item is marked for deletion
+#define ITEM_IS_CURRENTLY_BEING_DELETED (-2) // the item is currently being deleted
+#define item_check_and_acquire(dict, item) (item_check_and_acquire_advanced(dict, item, false) == ITEM_OK)
+static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock);
 
 // ----------------------------------------------------------------------------
 // memory statistics
@@ -267,10 +277,17 @@ void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(
 
 size_t dictionary_version(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
+
+    // this is required for views to return the right number
+    garbage_collect_pending_deletes(dict);
+
     return __atomic_load_n(&dict->version, __ATOMIC_SEQ_CST);
 }
 size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
+
+    // this is required for views to return the right number
+    garbage_collect_pending_deletes(dict);
 
     long int entries = __atomic_load_n(&dict->entries, __ATOMIC_SEQ_CST);
     if(entries < 0)
@@ -433,7 +450,7 @@ static inline long int DICTIONARY_PENDING_DELETES_GET(DICTIONARY *dict) {
         return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_SEQ_CST);
 }
 
-static inline REFCOUNT DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(unlikely(dict && is_dictionary_single_threaded(dict))) // this is an exception, dict can be null
         return item->refcount;
     else
@@ -623,37 +640,68 @@ static inline void dictionary_index_lock_unlock(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // items garbage collector
 
-static void garbage_collect_pending_deletes_unsafe(DICTIONARY *dict) {
-    if(likely(DICTIONARY_PENDING_DELETES_GET(dict) <= 0))
+static void garbage_collect_pending_deletes(DICTIONARY *dict) {
+    usec_t last_master_deletion_us = dict->hooks?__atomic_load_n(&dict->hooks->last_master_deletion_us, __ATOMIC_SEQ_CST):0;
+    usec_t last_gc_run_us = __atomic_load_n(&dict->last_gc_run_us, __ATOMIC_SEQ_CST);
+
+    bool is_view = is_view_dictionary(dict);
+
+    if(likely(!(
+            DICTIONARY_PENDING_DELETES_GET(dict) > 0 ||
+            (is_view && last_master_deletion_us > last_gc_run_us)
+            )))
         return;
+
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+
+    __atomic_store_n(&dict->last_gc_run_us, now_realtime_usec(), __ATOMIC_SEQ_CST);
+
+    if(is_view)
+        dictionary_index_lock_wrlock(dict);
 
     DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
 
     size_t deleted = 0, pending = 0, examined = 0;
-    DICTIONARY_ITEM *item = dict->items.list;
+    DICTIONARY_ITEM *item = dict->items.list, *item_next;
     while(item) {
         examined++;
 
-        if(item_flag_check(item, ITEM_FLAG_DELETED) && item_is_not_referenced_and_can_be_removed(dict, item)) {
-            DICTIONARY_ITEM *item_next = item->next;
+        // this will cleanup
+        item_next = item->next;
+        int rc = item_check_and_acquire_advanced(dict, item, is_view);
 
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
-            item_free_with_hooks(dict, item);
-            deleted++;
+        if(rc == ITEM_MARKED_FOR_DELETION) {
+            // we don't have got a reference
 
-            pending = DICTIONARY_PENDING_DELETES_MINUS1(dict);
-            if(!pending) break;
+            if(item_is_not_referenced_and_can_be_removed(dict, item)) {
+                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
+                item_free_with_hooks(dict, item);
+                deleted++;
 
-            item = item_next;
+                pending = DICTIONARY_PENDING_DELETES_MINUS1(dict);
+                if (!pending)
+                    break;
+            }
         }
-        else
-            item = item->next;
+        else if(rc == ITEM_IS_CURRENTLY_BEING_DELETED)
+            ; // do not touch this item (we haven't got a reference)
+
+        else if(rc == ITEM_OK)
+            item_release(dict, item);
+
+        item = item_next;
     }
+
+    if(is_view)
+        dictionary_index_lock_unlock(dict);
+
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     (void)deleted;
     (void)examined;
-    //internal_error(true, "DICTIONARY: garbage collected dictionary created by %s (%zu@%s), examined %zu items, deleted %zu items, still pending %zu items",
-    //               dict->creation_function, dict->creation_line, dict->creation_file, examined, deleted, pending);
+
+    internal_error(false, "DICTIONARY: garbage collected dictionary created by %s (%zu@%s), examined %zu items, deleted %zu items, still pending %zu items",
+                   dict->creation_function, dict->creation_line, dict->creation_file, examined, deleted, pending);
 
 }
 
@@ -764,19 +812,23 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     }
 }
 
-#define item_check_and_acquire(dict, item) item_check_and_acquire_advanced(dict, item, false)
-static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock) {
+static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock) {
     size_t spins = 0;
     REFCOUNT refcount, desired;
 
     do {
         spins++;
 
-        refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
+        refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
 
-        if(refcount < 0 || item_flag_check(item, ITEM_FLAG_DELETED)) {
+        if(refcount < 0) {
             // we can't use this item
-            return false;
+            return ITEM_IS_CURRENTLY_BEING_DELETED;
+        }
+
+        if(item_flag_check(item, ITEM_FLAG_DELETED)) {
+            // we can't use this item
+            return ITEM_MARKED_FOR_DELETION;
         }
 
         desired = refcount + 1;
@@ -786,7 +838,7 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
 
     // we acquired the item
 
-    if(item_shared_flag_check(item, ITEM_FLAG_DELETED)) {
+    if(is_view_dictionary(dict) && item_shared_flag_check(item, ITEM_FLAG_DELETED) && !item_flag_check(item, ITEM_FLAG_DELETED)) {
         // but, we can't use this item
 
         if(having_index_lock) {
@@ -794,13 +846,19 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
             hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item);
 
             // mark it in our dictionary as deleted too
+            // this is safe to be done here, because we have got
+            // a reference counter on item
             item_flag_set(item, ITEM_FLAG_DELETED);
+
+            DICTIONARY_ENTRIES_MINUS1(dict);
 
             // decrement the refcount we incremented above
             if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
                 // this is a deleted item, and we are the last one
                 DICTIONARY_PENDING_DELETES_PLUS1(dict);
             }
+
+            // do not touch the item below this point
         }
         else {
             // this is traversal / walkthrough
@@ -808,7 +866,7 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
             __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
         }
 
-        return false;
+        return ITEM_MARKED_FOR_DELETION;
     }
 
     if(desired == 1)
@@ -817,7 +875,7 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
     if(unlikely(spins > 2 && dict->stats))
         DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 2);
 
-    return true; // we can use this item
+    return ITEM_OK; // we can use this item
 }
 
 // if a dictionary item can be deleted, return true, otherwise return false
@@ -825,7 +883,7 @@ static bool item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *i
 static inline bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
-    REFCOUNT expected = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
+    REFCOUNT expected = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
     if(expected == 0 && __atomic_compare_exchange_n(&item->refcount, &expected, REFCOUNT_DELETING,
                                                      false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 
@@ -960,7 +1018,7 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
     else
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(dict->items.list, item, prev, next);
 
-    garbage_collect_pending_deletes_unsafe(dict);
+    garbage_collect_pending_deletes(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 }
 
@@ -969,7 +1027,7 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
 
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
 
-    garbage_collect_pending_deletes_unsafe(dict);
+    garbage_collect_pending_deletes(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 }
 
@@ -1013,10 +1071,10 @@ static DICTIONARY_ITEM *item_allocate(DICTIONARY *dict __maybe_unused, size_t *a
     *allocated_bytes += size;
 
     if(master_item) {
+        item->shared = master_item->shared;
+
         if(unlikely(__atomic_add_fetch(&item->shared->links, 1, __ATOMIC_SEQ_CST) <= 1))
             fatal("DICTIONARY: attempted to link to a shared item structure that had zero references");
-
-        item->shared = master_item->shared;
     }
     else {
         size = sizeof(DICTIONARY_ITEM_SHARED);
@@ -1168,16 +1226,26 @@ static size_t item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 // ----------------------------------------------------------------------------
 // item operations
 
-static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(is_master_dictionary(dict))
+static void item_shared_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(is_master_dictionary(dict)) {
         item_shared_flag_set(item, ITEM_FLAG_DELETED);
 
+        if(dict->hooks)
+            __atomic_store_n(&dict->hooks->last_master_deletion_us, now_realtime_usec(), __ATOMIC_SEQ_CST);
+    }
+}
+
+static inline void item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     if(item_is_not_referenced_and_can_be_removed(dict, item)) {
+        item_shared_set_deleted(dict, item);
         item_linked_list_remove(dict, item);
         item_free_with_hooks(dict, item);
     }
-    else
+    else {
+        item_shared_set_deleted(dict, item);
         item_flag_set(item, ITEM_FLAG_DELETED);
+        // after this point do not touch the item
+    }
 
     // the item is not available anymore
     DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1313,7 +1381,7 @@ static DICTIONARY_ITEM *item_add_or_reset_value_and_acquire(DICTIONARY *dict, co
             added_or_updated = true;
         }
         else {
-            if(!item_check_and_acquire_advanced(dict, *item_pptr, true)) {
+            if(item_check_and_acquire_advanced(dict, *item_pptr, true) != ITEM_OK) {
                 spins++;
                 continue;
             }
@@ -1504,8 +1572,8 @@ void cleanup_destroyed_dictionaries(void) {
         const char *function = dict->creation_function;
 #endif
 
+        DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
         if(dictionary_free_all_resources(dict, NULL, false)) {
-            DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
 
             internal_error(
                 true,
@@ -1515,8 +1583,10 @@ void cleanup_destroyed_dictionaries(void) {
             if(last) last->next = next;
             else dictionaries_waiting_to_be_destroyed = next;
         }
-        else
+        else {
+            DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
+        }
     }
 
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
@@ -1566,7 +1636,7 @@ static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_IT
     }
 
     if(item) {
-        REFCOUNT refcount = DICTIONARY_PRIVATE_ITEM_REFCOUNT_GET(dict, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
         if (unlikely(refcount <= 0)) {
             internal_error(
                 true,
@@ -2090,7 +2160,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     ll_recursive_lock(dict, rw);
-    size_t entries = dictionary_entries(dict);
+    size_t entries = __atomic_load_n(&dict->entries, __ATOMIC_SEQ_CST);
     DICTIONARY_ITEM **array = mallocz(sizeof(DICTIONARY_ITEM *) * entries);
 
     size_t i;
@@ -2541,16 +2611,8 @@ static int unittest_check_dictionary_callback(const DICTIONARY_ITEM *item __mayb
     return 1;
 }
 
-static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, size_t active_items, size_t deleted_items, size_t referenced_items, size_t pending_deletion) {
+static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, size_t traversable, size_t active_items, size_t deleted_items, size_t referenced_items, size_t pending_deletion) {
     size_t errors = 0;
-
-    fprintf(stderr, "dictionary entries %zu, expected %zu...\t\t\t\t\t", dictionary_entries(dict), traversable);
-    if (dictionary_entries(dict) != traversable) {
-        fprintf(stderr, "FAILED\n");
-        errors++;
-    }
-    else
-        fprintf(stderr, "OK\n");
 
     size_t ll = 0;
     void *t;
@@ -2558,7 +2620,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
         ll++;
     dfe_done(t);
 
-    fprintf(stderr, "dictionary foreach entries %zu, expected %zu...\t\t\t\t", ll, traversable);
+    fprintf(stderr, "DICT %-20s: dictionary foreach entries %zu, expected %zu...\t\t\t\t\t",
+            label, ll, traversable);
     if(ll != traversable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2567,7 +2630,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
         fprintf(stderr, "OK\n");
 
     ll = dictionary_walkthrough_read(dict, unittest_check_dictionary_callback, NULL);
-    fprintf(stderr, "dictionary walkthrough entries %zu, expected %zu...\t\t\t\t", ll, traversable);
+    fprintf(stderr, "DICT %-20s: dictionary walkthrough entries %zu, expected %zu...\t\t\t\t",
+            label, ll, traversable);
     if(ll != traversable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2576,7 +2640,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
         fprintf(stderr, "OK\n");
 
     ll = dictionary_sorted_walkthrough_read(dict, unittest_check_dictionary_callback, NULL);
-    fprintf(stderr, "dictionary sorted walkthrough entries %zu, expected %zu...\t\t\t", ll, traversable);
+    fprintf(stderr, "DICT %-20s: dictionary sorted walkthrough entries %zu, expected %zu...\t\t\t",
+            label, ll, traversable);
     if(ll != traversable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2587,7 +2652,7 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
     DICTIONARY_ITEM *item;
     size_t active = 0, deleted = 0, referenced = 0, pending = 0;
     for(item = dict->items.list; item; item = item->next) {
-        if(!(item->flags & ITEM_FLAG_DELETED))
+        if(!(item->flags & ITEM_FLAG_DELETED) && !(item->shared->flags & ITEM_FLAG_DELETED))
             active++;
         else {
             deleted++;
@@ -2600,7 +2665,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
             referenced++;
     }
 
-    fprintf(stderr, "dictionary active items reported %ld, counted %zu, expected %zu...\t\t", dict->entries, active, active_items);
+    fprintf(stderr, "DICT %-20s: dictionary active items reported %ld, counted %zu, expected %zu...\t\t\t",
+            label, dict->entries, active, active_items);
     if(active != active_items || active != (size_t)dict->entries) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2608,7 +2674,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "dictionary deleted items counted %zu, expected %zu...\t\t\t", deleted, deleted_items);
+    fprintf(stderr, "DICT %-20s: dictionary deleted items counted %zu, expected %zu...\t\t\t\t",
+            label, deleted, deleted_items);
     if(deleted != deleted_items) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2616,7 +2683,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "dictionary referenced items reported %ld, counted %zu, expected %zu...\t", dict->referenced_items, referenced, referenced_items);
+    fprintf(stderr, "DICT %-20s: dictionary referenced items reported %ld, counted %zu, expected %zu...\t\t",
+            label, dict->referenced_items, referenced, referenced_items);
     if(referenced != referenced_items || dict->referenced_items != (long int)referenced) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2624,7 +2692,8 @@ static size_t unittest_check_dictionary(DICTIONARY *dict, size_t traversable, si
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "dictionary pending deletion items reported %ld, counted %zu, expected %zu...\t", dict->pending_deletion_items, pending, pending_deletion);
+    fprintf(stderr, "DICT %-20s: dictionary pending deletion items reported %ld, counted %zu, expected %zu...\t",
+            label, dict->pending_deletion_items, pending, pending_deletion);
     if(pending != pending_deletion || pending != (size_t)dict->pending_deletion_items) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2639,12 +2708,12 @@ static int check_item_callback(const DICTIONARY_ITEM *item __maybe_unused, void 
     return value == data;
 }
 
-static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
+static size_t unittest_check_item(const char *label, DICTIONARY *dict,
     DICTIONARY_ITEM *item, const char *name, const char *value, int refcount,
     ITEM_FLAGS deleted_flags, bool searchable, bool browsable, bool linked) {
     size_t errors = 0;
 
-    fprintf(stderr, "NAME_VALUE name is '%s', expected '%s'...\t\t\t\t", item_get_name(item), name);
+    fprintf(stderr, "ITEM %-20s: name is '%s', expected '%s'...\t\t\t\t\t\t", label, item_get_name(item), name);
     if(strcmp(item_get_name(item), name) != 0) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2652,7 +2721,7 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE value is '%s', expected '%s'...\t\t\t", (const char *)item->shared->value, value);
+    fprintf(stderr, "ITEM %-20s: value is '%s', expected '%s'...\t\t\t\t\t", label, (const char *)item->shared->value, value);
     if(strcmp((const char *)item->shared->value, value) != 0) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2660,7 +2729,7 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE refcount is %d, expected %d...\t\t\t\t\t", item->refcount, refcount);
+    fprintf(stderr, "ITEM %-20s: refcount is %d, expected %d...\t\t\t\t\t\t\t", label, item->refcount, refcount);
     if (item->refcount != refcount) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2668,8 +2737,11 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "NAME_VALUE deleted flag is %s, expected %s...\t\t\t", (item->flags & ITEM_FLAG_DELETED)?"TRUE":"FALSE", (deleted_flags & ITEM_FLAG_DELETED)?"TRUE":"FALSE");
-    if ((item->flags & ITEM_FLAG_DELETED) != (deleted_flags & ITEM_FLAG_DELETED)) {
+    fprintf(stderr, "ITEM %-20s: deleted flag is %s, expected %s...\t\t\t\t\t", label,
+            (item->flags & ITEM_FLAG_DELETED || item->shared->flags & ITEM_FLAG_DELETED)?"true":"false",
+            (deleted_flags & ITEM_FLAG_DELETED)?"true":"false");
+
+    if ((item->flags & ITEM_FLAG_DELETED || item->shared->flags & ITEM_FLAG_DELETED) != (deleted_flags & ITEM_FLAG_DELETED)) {
         fprintf(stderr, "FAILED\n");
         errors++;
     }
@@ -2678,7 +2750,8 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
 
     void *v = dictionary_get(dict, name);
     bool found = v == item->shared->value;
-    fprintf(stderr, "NAME_VALUE searchable %5s, expected %5s...\t\t\t\t", found?"true":"false", searchable?"true":"false");
+    fprintf(stderr, "ITEM %-20s: searchable %5s, expected %5s...\t\t\t\t\t\t", label,
+            found?"true":"false", searchable?"true":"false");
     if(found != searchable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2693,7 +2766,8 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
     }
     dfe_done(t);
 
-    fprintf(stderr, "NAME_VALUE dfe browsable %5s, expected %5s...\t\t\t", found?"true":"false", browsable?"true":"false");
+    fprintf(stderr, "ITEM %-20s: dfe browsable %5s, expected %5s...\t\t\t\t\t", label,
+            found?"true":"false", browsable?"true":"false");
     if(found != browsable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2702,7 +2776,8 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
         fprintf(stderr, "OK\n");
 
     found = dictionary_walkthrough_read(dict, check_item_callback, item->shared->value);
-    fprintf(stderr, "NAME_VALUE walkthrough browsable %5s, expected %5s...\t\t", found?"true":"false", browsable?"true":"false");
+    fprintf(stderr, "ITEM %-20s: walkthrough browsable %5s, expected %5s...\t\t\t\t", label,
+            found?"true":"false", browsable?"true":"false");
     if(found != browsable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2711,7 +2786,8 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
         fprintf(stderr, "OK\n");
 
     found = dictionary_sorted_walkthrough_read(dict, check_item_callback, item->shared->value);
-    fprintf(stderr, "NAME_VALUE sorted walkthrough browsable %5s, expected %5s...\t", found?"true":"false", browsable?"true":"false");
+    fprintf(stderr, "ITEM %-20s: sorted walkthrough browsable %5s, expected %5s...\t\t\t", label,
+            found?"true":"false", browsable?"true":"false");
     if(found != browsable) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2724,7 +2800,8 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
     for(n = dict->items.list; n ;n = n->next)
         if(n == item) found = true;
 
-    fprintf(stderr, "NAME_VALUE linked %5s, expected %5s...\t\t\t\t", found?"true":"false", linked?"true":"false");
+    fprintf(stderr, "ITEM %-20s: linked %5s, expected %5s...\t\t\t\t\t\t", label,
+            found?"true":"false", linked?"true":"false");
     if(found != linked) {
         fprintf(stderr, "FAILED\n");
         errors++;
@@ -2810,7 +2887,7 @@ static int dictionary_unittest_threads() {
     int threads_to_create = 2;
     fprintf(
         stderr,
-        "Checking dictionary concurrency with %d threads for %ld seconds...\n",
+        "\nChecking dictionary concurrency with %d threads for %ld seconds...\n",
         threads_to_create,
         seconds_to_run);
 
@@ -2861,6 +2938,221 @@ static int dictionary_unittest_threads() {
     tu.dict = NULL;
 
     return 0;
+}
+
+struct thread_view_unittest {
+    int join;
+    DICTIONARY *master;
+    DICTIONARY *view;
+    DICTIONARY_ITEM *item_master;
+    int dups;
+};
+
+static void *unittest_dict_master_thread(void *arg) {
+    struct thread_view_unittest *tv = arg;
+
+    while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST)) {
+        if(__atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST) != NULL)
+            continue;
+
+        DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(tv->master, "ITEM1", "123", strlen("123") + 1);
+        dictionary_acquired_item_dup(tv->master, item);
+        dictionary_del(tv->master, "ITEM1");
+
+        __atomic_store_n(&tv->item_master, item, __ATOMIC_SEQ_CST);
+
+        for(int i = 0; i < tv->dups ; i++) {
+            dictionary_acquired_item_dup(tv->master, item);
+        }
+
+        for(int i = 0; i < tv->dups ; i++) {
+            dictionary_acquired_item_release(tv->master, item);
+        }
+
+        dictionary_acquired_item_release(tv->master, item);
+    }
+
+    return arg;
+}
+
+static void *unittest_dict_view_thread(void *arg) {
+    struct thread_view_unittest *tv = arg;
+
+    while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST)) {
+        DICTIONARY_ITEM *m_item = __atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST);
+        if(!m_item) continue;
+
+        DICTIONARY_ITEM *v_item = dictionary_view_set_and_acquire_item(tv->view, "ITEM2", m_item);
+        dictionary_acquired_item_release(tv->master, m_item);
+        __atomic_store_n(&tv->item_master, NULL, __ATOMIC_SEQ_CST);
+
+        for(int i = 0; i < tv->dups ; i++) {
+            dictionary_acquired_item_dup(tv->view, v_item);
+        }
+
+        for(int i = 0; i < tv->dups ; i++) {
+            dictionary_acquired_item_release(tv->view, v_item);
+        }
+
+        dictionary_del(tv->view, "ITEM2");
+
+        dictionary_acquired_item_release(tv->view, v_item);
+    }
+
+    return arg;
+}
+
+static int dictionary_unittest_view_threads() {
+
+    struct thread_view_unittest tv = {
+        .join = 0,
+        .master = NULL,
+        .view = NULL,
+        .item_master = NULL,
+        .dups = 1,
+    };
+
+    // threads testing of dictionary
+    struct dictionary_stats stats = {};
+    tv.master = dictionary_create_advanced(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE, &stats);
+    tv.view = dictionary_create_view(tv.master);
+
+    time_t seconds_to_run = 5;
+    fprintf(
+        stderr,
+        "\nChecking dictionary concurrency with 1 master and 1 view threads for %ld seconds...\n",
+        seconds_to_run);
+
+    netdata_thread_t master_thread, view_thread;
+    tv.join = 0;
+
+    netdata_thread_create(
+        &master_thread,
+        "master",
+        NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+        unittest_dict_master_thread,
+        &tv);
+
+    netdata_thread_create(
+        &view_thread,
+        "view",
+        NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+        unittest_dict_view_thread,
+        &tv);
+
+    sleep_usec(seconds_to_run * USEC_PER_SEC);
+
+    __atomic_store_n(&tv.join, 1, __ATOMIC_RELAXED);
+    void *retval;
+    netdata_thread_join(view_thread, &retval);
+    netdata_thread_join(master_thread, &retval);
+
+    fprintf(stderr,
+            "inserts %zu"
+            ", deletes %zu"
+            ", searches %zu"
+            ", resets %zu"
+            ", entries %ld (%ld on view)"
+            ", referenced_items %ld (%ld on view)"
+            ", pending deletions %ld (%ld on view)"
+            ", check spins %zu"
+            ", insert spins %zu"
+            ", search ignores %zu"
+            "\n",
+            stats.ops.inserts,
+            stats.ops.deletes,
+            stats.ops.searches,
+            stats.ops.resets,
+            tv.master->entries, tv.view->entries,
+            tv.master->referenced_items, tv.view->referenced_items,
+            tv.master->pending_deletion_items, tv.view->pending_deletion_items,
+            stats.spin_locks.use,
+            stats.spin_locks.insert,
+            stats.spin_locks.search
+    );
+    dictionary_destroy(tv.master);
+    dictionary_destroy(tv.view);
+
+    return 0;
+}
+
+size_t dictionary_unittest_views(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats);
+    DICTIONARY *view = dictionary_create_view(master);
+
+    fprintf(stderr, "\n\nChecking dictionary views...\n");
+
+    // Add an item to both master and view, then remove the view first and the master second
+    fprintf(stderr, "\nPASS 1: Adding 1 item to master:\n");
+    DICTIONARY_ITEM *item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
+    errors += unittest_check_dictionary("master", master, 1, 1, 0, 1, 0);
+    errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
+
+    fprintf(stderr, "\nPASS 1: Adding master item to view:\n");
+    DICTIONARY_ITEM *item1_on_view = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", item1_on_master);
+    errors += unittest_check_dictionary("view", view, 1, 1, 0, 1, 0);
+    errors += unittest_check_item("view", view, item1_on_view, "KEY 1 ON VIEW", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
+
+    fprintf(stderr, "\nPASS 1: Deleting view item:\n");
+    dictionary_del(view, "KEY 1 ON VIEW");
+    errors += unittest_check_dictionary("master", master, 1, 1, 0, 1, 0);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 1, 0);
+    errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
+    errors += unittest_check_item("view", view, item1_on_view, "KEY 1 ON VIEW", item1_on_master->shared->value, 1, ITEM_FLAG_DELETED, false, false, true);
+
+    fprintf(stderr, "\nPASS 1: Releasing the deleted view item:\n");
+    dictionary_acquired_item_release(view, item1_on_view);
+    errors += unittest_check_dictionary("master", master, 1, 1, 0, 1, 0);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
+    errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
+
+    fprintf(stderr, "\nPASS 1: Releasing the acquired master item:\n");
+    dictionary_acquired_item_release(master, item1_on_master);
+    errors += unittest_check_dictionary("master", master, 1, 1, 0, 0, 0);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
+    errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 0, ITEM_FLAG_NONE, true, true, true);
+
+    fprintf(stderr, "\nPASS 1: Deleting the released master item:\n");
+    dictionary_del(master, "KEY 1");
+    errors += unittest_check_dictionary("master", master, 0, 0, 0, 0, 0);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
+
+    // The other way now:
+    // Add an item to both master and view, then remove the master first and verify it is deleted on the view also
+    fprintf(stderr, "\nPASS 2: Adding 1 item to master:\n");
+    item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
+    errors += unittest_check_dictionary("master", master, 1, 1, 0, 1, 0);
+    errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
+
+    fprintf(stderr, "\nPASS 2: Adding master item to view:\n");
+    item1_on_view = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", item1_on_master);
+    errors += unittest_check_dictionary("view", view, 1, 1, 0, 1, 0);
+    errors += unittest_check_item("view", view, item1_on_view, "KEY 1 ON VIEW", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
+
+    fprintf(stderr, "\nPASS 2: Deleting master item:\n");
+    dictionary_del(master, "KEY 1");
+    dictionary_version(view);
+    errors += unittest_check_dictionary("master", master, 0, 0, 1, 1, 0);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 1, 0);
+    errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_DELETED, false, false, true);
+    errors += unittest_check_item("view", view, item1_on_view, "KEY 1 ON VIEW", item1_on_master->shared->value, 1, ITEM_FLAG_DELETED, false, false, true);
+
+    fprintf(stderr, "\nPASS 2: Releasing the acquired master item:\n");
+    dictionary_acquired_item_release(master, item1_on_master);
+    errors += unittest_check_dictionary("master", master, 0, 0, 1, 0, 1);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 1, 0);
+    errors += unittest_check_item("view", view, item1_on_view, "KEY 1 ON VIEW", item1_on_master->shared->value, 1, ITEM_FLAG_DELETED, false, false, true);
+
+    fprintf(stderr, "\nPASS 2: Releasing the deleted view item:\n");
+    dictionary_acquired_item_release(view, item1_on_view);
+    errors += unittest_check_dictionary("master", master, 0, 0, 1, 0, 1);
+    errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
+
+    dictionary_destroy(master);
+    dictionary_destroy(view);
+    return errors;
 }
 
 int dictionary_unittest(size_t entries) {
@@ -2938,70 +3230,65 @@ int dictionary_unittest(size_t entries) {
     {
         fprintf(stderr, "\nTesting reference counters:\n");
         dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
-        errors += unittest_check_dictionary(dict, 0, 0, 0, 0, 0);
+        errors += unittest_check_dictionary("", dict, 0, 0, 0, 0, 0);
 
         fprintf(stderr, "\nAdding test item to dictionary and acquiring it\n");
         dictionary_set(dict, "test", "ITEM1", 6);
         DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, "test");
 
-        errors += unittest_check_dictionary(dict, 1, 1, 0, 1, 0);
-        errors += unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
+        errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
+        errors += unittest_check_item("ACQUIRED", dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nChecking that reference counters are increased:\n");
         void *t;
         dfe_start_read(dict, t) {
-            errors += unittest_check_dictionary(dict, 1, 1, 0, 1, 0);
-            errors +=
-                unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 2, ITEM_FLAG_NONE, true, true, true);
+            errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
+            errors += unittest_check_item("ACQUIRED TRAVERSAL", dict, item, "test", "ITEM1", 2, ITEM_FLAG_NONE, true, true, true);
         }
         dfe_done(t);
 
         fprintf(stderr, "\nChecking that reference counters are decreased:\n");
-        errors += unittest_check_dictionary(dict, 1, 1, 0, 1, 0);
-        errors += unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
+        errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
+        errors += unittest_check_item("ACQUIRED TRAVERSAL 2", dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDeleting the item we have acquired:\n");
         dictionary_del(dict, "test");
 
-        errors += unittest_check_dictionary(dict, 0, 0, 1, 1, 0);
-        errors +=
-            unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
+        errors += unittest_check_dictionary("", dict, 0, 0, 1, 1, 0);
+        errors += unittest_check_item("DELETED", dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
 
         fprintf(stderr, "\nAdding another item with the same name of the item we deleted, while being acquired:\n");
         dictionary_set(dict, "test", "ITEM2", 6);
-        errors += unittest_check_dictionary(dict, 1, 1, 1, 1, 0);
+        errors += unittest_check_dictionary("", dict, 1, 1, 1, 1, 0);
 
         fprintf(stderr, "\nAcquiring the second item:\n");
         DICTIONARY_ITEM *item2 = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, "test");
-        errors +=
-            unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
-        errors += unittest_check_item_deleted_flag(dict, item2, "test", "ITEM2", 1, ITEM_FLAG_NONE, true, true, true);
-        errors += unittest_check_dictionary(dict, 1, 1, 1, 2, 0);
+        errors += unittest_check_item("FIRST", dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
+        errors += unittest_check_item("SECOND", dict, item2, "test", "ITEM2", 1, ITEM_FLAG_NONE, true, true, true);
+        errors += unittest_check_dictionary("", dict, 1, 1, 1, 2, 0);
 
         fprintf(stderr, "\nReleasing the second item (the first is still acquired):\n");
         dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)item2);
-        errors += unittest_check_dictionary(dict, 1, 1, 1, 1, 0);
-        errors +=
-            unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
-        errors += unittest_check_item_deleted_flag(dict, item2, "test", "ITEM2", 0, ITEM_FLAG_NONE, true, true, true);
+        errors += unittest_check_dictionary("", dict, 1, 1, 1, 1, 0);
+        errors += unittest_check_item("FIRST", dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
+        errors += unittest_check_item("SECOND RELEASED", dict, item2, "test", "ITEM2", 0, ITEM_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDeleting the second item (the first is still acquired):\n");
         dictionary_del(dict, "test");
-        errors += unittest_check_dictionary(dict, 0, 0, 1, 1, 0);
-        errors +=
-            unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
+        errors += unittest_check_dictionary("", dict, 0, 0, 1, 1, 0);
+        errors += unittest_check_item("ACQUIRED DELETED", dict, item, "test", "ITEM1", 1, ITEM_FLAG_DELETED, false, false, true);
 
         fprintf(stderr, "\nReleasing the first item (which we have already deleted):\n");
         dictionary_acquired_item_release(dict, (DICTIONARY_ITEM *)item);
         dfe_start_write(dict, item) ; dfe_done(item);
-        errors += unittest_check_dictionary(dict, 0, 0, 1, 0, 1);
+        errors += unittest_check_dictionary("", dict, 0, 0, 1, 0, 1);
 
         fprintf(stderr, "\nAdding again the test item to dictionary and acquiring it\n");
         dictionary_set(dict, "test", "ITEM1", 6);
         item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, "test");
 
-        errors += unittest_check_dictionary(dict, 1, 1, 0, 1, 0);
-        errors += unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
+        errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
+        errors += unittest_check_item("RE-ADDITION", dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDestroying the dictionary while we have acquired an item\n");
         dictionary_destroy(dict);
@@ -3015,7 +3302,9 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
 
-    dictionary_unittest_threads();
+    errors += dictionary_unittest_views();
+    errors += dictionary_unittest_threads();
+    errors += dictionary_unittest_view_threads();
 
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;

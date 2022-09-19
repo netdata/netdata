@@ -853,8 +853,7 @@ void error_int( const char *prefix, const char *file __maybe_unused, const char 
 #ifdef NETDATA_INTERNAL_CHECKS
 static void crash_netdata(void) {
     // make Netdata core dump
-    int *p = NULL;
-    *p = 1;
+    abort();
 }
 #endif
 
