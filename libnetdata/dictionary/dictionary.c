@@ -3285,7 +3285,7 @@ int dictionary_unittest(size_t entries) {
         dictionary_set(dict, "test", "ITEM1", 6);
         item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, "test");
 
-        errors += unittest_check_dictionary(dict, 1, 1, 1, 1, 1);
+        errors += unittest_check_dictionary(dict, 1, 1, 0, 1, 0);
         errors += unittest_check_item_deleted_flag(dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
 
         fprintf(stderr, "\nDestroying the dictionary while we have acquired an item\n");
