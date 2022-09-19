@@ -84,9 +84,9 @@ struct dictionary_stats {
 
     struct {
         size_t inserts;             // number of times the insert callback is called
-        size_t conflicts;           // number of times the insert conflict is called
-        size_t reacts;              // number of times the insert react is called
-        size_t deletes;             // number of times the insert delete is called
+        size_t conflicts;           // number of times the conflict callback is called
+        size_t reacts;              // number of times the react callback is called
+        size_t deletes;             // number of times the delete callback is called
     } callbacks;
 
     // memory
