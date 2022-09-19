@@ -2735,62 +2735,132 @@ static size_t unittest_check_item_deleted_flag(DICTIONARY *dict,
     return errors;
 }
 
-static int unittest_dict_threads_join = 0;
-static DICTIONARY *dict_test1 = NULL;
-static void *unittest_dict_thread(void *arg __maybe_unused) {
-    int dups = 1; //(gettid() % 10);
+struct thread_unittest {
+    int join;
+    DICTIONARY *dict;
+    int dups;
+};
 
+static void *unittest_dict_thread(void *arg) {
+    struct thread_unittest *tu = arg;
     for(; 1 ;) {
-        if(__atomic_load_n(&unittest_dict_threads_join, __ATOMIC_RELAXED))
+        if(__atomic_load_n(&tu->join, __ATOMIC_RELAXED))
             break;
 
         DICT_ITEM_CONST DICTIONARY_ITEM *item =
-            dictionary_set_and_acquire_item_advanced(dict_test1, "dict thread checking 1234567890",
+            dictionary_set_and_acquire_item_advanced(tu->dict, "dict thread checking 1234567890",
                                                      -1, NULL, 0, NULL);
 
 
-        dictionary_get(dict_test1, dictionary_acquired_item_name(item));
+        dictionary_get(tu->dict, dictionary_acquired_item_name(item));
 
         void *t1;
-        dfe_start_write(dict_test1, t1) {
+        dfe_start_write(tu->dict, t1) {
 
             // this should delete the referenced item
-            dictionary_del(dict_test1, t1_dfe.name);
+            dictionary_del(tu->dict, t1_dfe.name);
 
             void *t2;
-            dfe_start_write(dict_test1, t2) {
+            dfe_start_write(tu->dict, t2) {
                 // this should add another
-                dictionary_set(dict_test1, t2_dfe.name, NULL, 0);
+                dictionary_set(tu->dict, t2_dfe.name, NULL, 0);
 
-                dictionary_get(dict_test1, dictionary_acquired_item_name(item));
+                dictionary_get(tu->dict, dictionary_acquired_item_name(item));
 
                 // and this should delete it again
-                dictionary_del(dict_test1, t2_dfe.name);
+                dictionary_del(tu->dict, t2_dfe.name);
             }
             dfe_done(t2);
 
             // this should fail to add it
-            dictionary_set(dict_test1, t1_dfe.name, NULL, 0);
-            dictionary_del(dict_test1, t1_dfe.name);
+            dictionary_set(tu->dict, t1_dfe.name, NULL, 0);
+            dictionary_del(tu->dict, t1_dfe.name);
         }
         dfe_done(t1);
 
-        for(int i = 0; i < dups ; i++) {
-            dictionary_acquired_item_dup(dict_test1, item);
-            dictionary_get(dict_test1, dictionary_acquired_item_name(item));
+        for(int i = 0; i < tu->dups ; i++) {
+            dictionary_acquired_item_dup(tu->dict, item);
+            dictionary_get(tu->dict, dictionary_acquired_item_name(item));
         }
 
-        for(int i = 0; i < dups ; i++) {
-            dictionary_acquired_item_release(dict_test1, item);
-            dictionary_del(dict_test1, dictionary_acquired_item_name(item));
+        for(int i = 0; i < tu->dups ; i++) {
+            dictionary_acquired_item_release(tu->dict, item);
+            dictionary_del(tu->dict, dictionary_acquired_item_name(item));
         }
 
-        dictionary_acquired_item_release(dict_test1, item);
+        dictionary_acquired_item_release(tu->dict, item);
 
-        dictionary_del(dict_test1, "dict thread checking 1234567890");
+        dictionary_del(tu->dict, "dict thread checking 1234567890");
     }
 
     return arg;
+}
+
+static int dictionary_unittest_threads() {
+
+    struct thread_unittest tu = {
+        .join = 0,
+        .dict = NULL,
+        .dups = 1,
+    };
+
+    // threads testing of dictionary
+    tu.dict = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    time_t seconds_to_run = 5;
+    int threads_to_create = 2;
+    fprintf(
+        stderr,
+        "Checking dictionary concurrency with %d threads for %ld seconds...\n",
+        threads_to_create,
+        seconds_to_run);
+
+    netdata_thread_t threads[threads_to_create];
+    tu.join = 0;
+    for (int i = 0; i < threads_to_create; i++) {
+        char buf[100 + 1];
+        snprintf(buf, 100, "dict%d", i);
+        netdata_thread_create(
+            &threads[i],
+            buf,
+            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+            unittest_dict_thread,
+            &tu);
+    }
+    sleep_usec(seconds_to_run * USEC_PER_SEC);
+
+    __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
+    for (int i = 0; i < threads_to_create; i++) {
+        void *retval;
+        netdata_thread_join(threads[i], &retval);
+    }
+
+    fprintf(stderr,
+            "inserts %zu"
+            ", deletes %zu"
+            ", searches %zu"
+            ", resets %zu"
+            ", entries %ld"
+            ", referenced_items %ld"
+            ", pending deletions %ld"
+            ", check spins %zu"
+            ", insert spins %zu"
+            ", search ignores %zu"
+            "\n",
+            tu.dict->stats->ops.inserts,
+            tu.dict->stats->ops.deletes,
+            tu.dict->stats->ops.searches,
+            tu.dict->stats->ops.resets,
+            tu.dict->entries,
+            tu.dict->referenced_items,
+            tu.dict->pending_deletion_items,
+            tu.dict->stats->spin_locks.use,
+            tu.dict->stats->spin_locks.insert,
+            tu.dict->stats->spin_locks.search
+    );
+    dictionary_destroy(tu.dict);
+    tu.dict = NULL;
+
+    return 0;
 }
 
 int dictionary_unittest(size_t entries) {
@@ -2945,64 +3015,7 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
 
-    // threads testing of dictionary
-    {
-        dict_test1 = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
-        time_t seconds_to_run = 5;
-        int threads_to_create = 2;
-        fprintf(
-            stderr,
-            "Checking dictionary concurrency with %d threads for %ld seconds...\n",
-            threads_to_create,
-            seconds_to_run);
-
-        netdata_thread_t threads[threads_to_create];
-        unittest_dict_threads_join = 0;
-        for (int i = 0; i < threads_to_create; i++) {
-            char buf[100 + 1];
-            snprintf(buf, 100, "dict%d", i);
-            netdata_thread_create(
-                &threads[i],
-                buf,
-                NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-                unittest_dict_thread,
-                NULL);
-        }
-        sleep_usec(seconds_to_run * USEC_PER_SEC);
-
-        __atomic_store_n(&unittest_dict_threads_join, 1, __ATOMIC_RELAXED);
-        for (int i = 0; i < threads_to_create; i++) {
-            void *retval;
-            netdata_thread_join(threads[i], &retval);
-        }
-
-        fprintf(stderr,
-                "inserts %zu"
-                ", deletes %zu"
-                ", searches %zu"
-                ", resets %zu"
-                ", entries %ld"
-                ", referenced_items %ld"
-                ", pending deletions %ld"
-                ", check spins %zu"
-                ", insert spins %zu"
-                ", search ignores %zu"
-                "\n",
-                dict_test1->stats->ops.inserts,
-                dict_test1->stats->ops.deletes,
-                dict_test1->stats->ops.searches,
-                dict_test1->stats->ops.resets,
-                dict_test1->entries,
-                dict_test1->referenced_items,
-                dict_test1->pending_deletion_items,
-                dict_test1->stats->spin_locks.use,
-                dict_test1->stats->spin_locks.insert,
-                dict_test1->stats->spin_locks.search
-                );
-        dictionary_destroy(dict_test1);
-        dict_test1 = NULL;
-    }
-
+    dictionary_unittest_threads();
 
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;

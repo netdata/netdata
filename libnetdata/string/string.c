@@ -342,19 +342,24 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
 // ----------------------------------------------------------------------------
 // STRING unit test
 
-static int string_threads_join = 0;
-static void *string_thread(void *arg __maybe_unused) {
-    int dups = 1; //(gettid() % 10);
+struct thread_unittest {
+    int join;
+    int dups;
+};
+
+static void *string_thread(void *arg) {
+    struct thread_unittest *tu = arg;
+
     for(; 1 ;) {
-        if(__atomic_load_n(&string_threads_join, __ATOMIC_RELAXED))
+        if(__atomic_load_n(&tu->join, __ATOMIC_RELAXED))
             break;
 
         STRING *s = string_strdupz("string thread checking 1234567890");
 
-        for(int i = 0; i < dups ; i++)
+        for(int i = 0; i < tu->dups ; i++)
             string_dup(s);
 
-        for(int i = 0; i < dups ; i++)
+        for(int i = 0; i < tu->dups ; i++)
             string_freez(s);
 
         string_freez(s);
@@ -520,6 +525,11 @@ int string_unittest(size_t entries) {
 
     // threads testing of string
     {
+        struct thread_unittest tu = {
+            .dups = 1,
+            .join = 0,
+        };
+
 #ifdef NETDATA_INTERNAL_CHECKS
         size_t ofound_deleted_on_search = string_base.found_deleted_on_search,
                ofound_available_on_search = string_base.found_available_on_search,
@@ -540,16 +550,16 @@ int string_unittest(size_t entries) {
             seconds_to_run);
         // check string concurrency
         netdata_thread_t threads[threads_to_create];
-        string_threads_join = 0;
+        tu.join = 0;
         for (int i = 0; i < threads_to_create; i++) {
             char buf[100 + 1];
             snprintf(buf, 100, "string%d", i);
             netdata_thread_create(
-                &threads[i], buf, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE, string_thread, NULL);
+                &threads[i], buf, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE, string_thread, &tu);
         }
         sleep_usec(seconds_to_run * USEC_PER_SEC);
 
-        __atomic_store_n(&string_threads_join, 1, __ATOMIC_RELAXED);
+        __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
         for (int i = 0; i < threads_to_create; i++) {
             void *retval;
             netdata_thread_join(threads[i], &retval);
