@@ -132,13 +132,13 @@ void rrdvar_delete_all(DICTIONARY *dict) {
 // CUSTOM HOST VARIABLES
 
 inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data) {
-    if(unlikely(!dict)) return 0;
+    if(unlikely(!dict)) return 0;  // when health is not enabled
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
 const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host, const char *name) {
     DICTIONARY *dict = host->rrdvars;
-    if(unlikely(!dict)) return NULL;
+    if(unlikely(!dict)) return NULL; // when health is not enabled
 
     STRING *name_string = rrdvar_name_to_string(name);
 
@@ -149,6 +149,7 @@ const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host
 }
 
 void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA_DOUBLE value) {
+    if(unlikely(!host->rrdvars || !rva)) return; // when health is not enabled
 
     if(rrdvar_type(rva) != RRDVAR_TYPE_CALCULATED || !(rrdvar_flags(rva) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_ALLOCATED)))
         error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rva), value);
@@ -165,7 +166,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, 
 }
 
 void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
-    if(unlikely(!dict || !rva)) return;
+    if(unlikely(!dict || !rva)) return;  // when health is not enabled
     dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
 }
 
