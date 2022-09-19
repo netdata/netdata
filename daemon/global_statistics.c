@@ -1534,10 +1534,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_spins || total != 0) {
         if (unlikely(!c->st_spins)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.spins", c->context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.memory", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.spins", c->context_prefix);
 
             c->st_spins = rrdset_create_localhost(
                 "netdata"
