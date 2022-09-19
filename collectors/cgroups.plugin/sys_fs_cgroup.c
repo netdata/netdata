@@ -857,16 +857,16 @@ struct cgroup {
     char *filename_cpu_cfs_quota;
     unsigned long long cpu_cfs_quota;
 
-    RRDSETVAR *chart_var_cpu_limit;
+    const RRDSETVAR_ACQUIRED *chart_var_cpu_limit;
     NETDATA_DOUBLE prev_cpu_usage;
 
     char *filename_memory_limit;
     unsigned long long memory_limit;
-    RRDSETVAR *chart_var_memory_limit;
+    const RRDSETVAR_ACQUIRED *chart_var_memory_limit;
 
     char *filename_memoryswap_limit;
     unsigned long long memoryswap_limit;
-    RRDSETVAR *chart_var_memoryswap_limit;
+    const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
     RRDDIM *rd_cpu;
@@ -3708,10 +3708,10 @@ cpu_limits2_err:
     }
 }
 
-static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
+static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
     if(*filename) {
         if(unlikely(!*chart_var)) {
-            *chart_var = rrdsetvar_custom_chart_variable_create(cg->st_mem_usage, chart_var_name);
+            *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, chart_var_name);
             if(!*chart_var) {
                 error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, chart_var_name);
                 freez(*filename);
@@ -3727,7 +3727,7 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                     *filename = NULL;
                 }
                 else {
-                    rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
+                    rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
             } else {
@@ -3742,11 +3742,11 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
                 char *s = "max\n\0";
                 if(strcmp(s, buffer) == 0){
                     *value = UINT64_MAX;
-                    rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
+                    rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
                 *value = str2ull(buffer);
-                rrdsetvar_custom_chart_variable_set(*chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
+                rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                 return 1;
             }
         }
@@ -3843,7 +3843,7 @@ void update_cgroup_charts(int update_every) {
                 }
 
                 if(unlikely(!cg->chart_var_cpu_limit)) {
-                    cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_create(cg->st_cpu, "cpu_limit");
+                    cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
                         error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
                         if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);
@@ -3868,8 +3868,6 @@ void update_cgroup_charts(int update_every) {
                             value = (NETDATA_DOUBLE)cg->cpuset_cpus * 100;
                     }
                     if(likely(value)) {
-                        rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, value);
-
                         if(unlikely(!cg->st_cpu_limit)) {
                             snprintfz(title, CHART_TITLE_MAX, "CPU Usage within the limits");
 
@@ -3909,14 +3907,15 @@ void update_cgroup_charts(int update_every) {
 
                         cg->prev_cpu_usage = cpu_usage;
 
+                        rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, value);
                         rrdset_done(cg->st_cpu_limit);
                     }
                     else {
-                        rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, NAN);
                         if(unlikely(cg->st_cpu_limit)) {
                             rrdset_is_obsolete(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
+                        rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, NAN);
                     }
                 }
             }

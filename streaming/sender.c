@@ -124,33 +124,31 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
-static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
-    NETDATA_DOUBLE *value = (NETDATA_DOUBLE *)rv->value;
-
+static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
     buffer_sprintf(
             host->sender->build
             , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
-            , rrdvar_name(rv)
-            , *value
+            , rrdvar_name(rva)
+            , rrdvar2number(rva)
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rv), *value);
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rva), rrdvar2number(rva));
 }
 
-void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
     if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && __atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)) {
         sender_start(host->sender);
-        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
+        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rva);
         sender_commit(host->sender);
     }
 }
 
 
-static int rrdpush_sender_thread_custom_host_variables_callback(const char *name __maybe_unused, void *rrdvar_ptr, void *host_ptr) {
-    RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
+static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr __maybe_unused, void *host_ptr) {
+    const RRDVAR_ACQUIRED *rv = (const RRDVAR_ACQUIRED *)item;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
-    if(unlikely(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR && rv->type == RRDVAR_TYPE_CALCULATED)) {
+    if(unlikely(rrdvar_flags(rv) & RRDVAR_FLAG_CUSTOM_HOST_VAR && rrdvar_type(rv) == RRDVAR_TYPE_CALCULATED)) {
         rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
 
         // return 1, so that the traversal will return the number of variables sent
@@ -163,7 +161,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const char *name
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
     sender_start(host->sender);
-    int ret = rrdvar_walkthrough_read(host->rrdvar_root_index, rrdpush_sender_thread_custom_host_variables_callback, host);
+    int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, host);
     (void)ret;
     sender_commit(host->sender);
 
@@ -173,24 +171,18 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
-    rrdhost_rdlock(host);
-
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         st->upstream_resync_time = 0;
 
-        rrdset_rdlock(st);
-
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
             rd->exposed = 0;
-
-        rrdset_unlock(st);
+        rrddim_foreach_done(rd);
     }
-
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 }
 
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {

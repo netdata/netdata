@@ -321,12 +321,12 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
     return 0;
 }
 
-static int format_variable_prometheus_remote_write_callback(const char *name_txt __maybe_unused, void *rv_ptr, void *data) {
-    RRDVAR *rv = rv_ptr;
+static int format_variable_prometheus_remote_write_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rv_ptr __maybe_unused, void *data) {
+    const RRDVAR_ACQUIRED *rv = (const RRDVAR_ACQUIRED *)item;
 
     struct prometheus_remote_write_variables_callback_options *opts = data;
 
-    if (rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR | RRDVAR_OPTION_CUSTOM_CHART_VAR)) {        
+    if (rrdvar_flags(rv) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
         RRDHOST *host = opts->host;
         struct instance *instance = opts->instance;
         struct simple_connector_data *simple_connector_data =
@@ -363,7 +363,7 @@ int format_variables_prometheus_remote_write(struct instance *instance, RRDHOST 
         .now = now_realtime_usec(),
     };
 
-    return rrdvar_walkthrough_read(host->rrdvar_root_index, format_variable_prometheus_remote_write_callback, &opt);
+    return rrdvar_walkthrough_read(host->rrdvars, format_variable_prometheus_remote_write_callback, &opt);
 }
 
 /**

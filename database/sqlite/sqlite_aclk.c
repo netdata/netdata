@@ -1023,9 +1023,6 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
     db_execute("DELETE FROM dimension_delete WHERE host_id NOT IN (SELECT host_id FROM host) "
                " OR unixepoch() - date_created > 604800;");
 
-    db_execute("DELETE FROM chart_hash WHERE CAST(last_used AS INT) < unixepoch() - 604800;");
-    db_execute("DELETE FROM chart_hash_map WHERE hash_id NOT IN (SELECT hash_id FROM chart_hash);");
-
     return;
 }
 

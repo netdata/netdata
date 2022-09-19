@@ -69,7 +69,6 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     );
 
     c = 0;
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             if(c) buffer_strcat(wb, ",");
@@ -82,13 +81,14 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
             st->last_accessed_time = now;
         }
     }
+    rrdset_foreach_done(st);
 
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(rc->rrdset)
             alarms++;
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     buffer_sprintf(wb
                    , "\n\t}"
@@ -150,9 +150,7 @@ struct array_printer {
     BUFFER *wb;
 };
 
-static int print_collector_callback(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int print_collector_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     struct array_printer *ap = (struct array_printer *)data;
     BUFFER *wb = ap->wb;
     struct collector *col=(struct collector *) entry;
@@ -167,12 +165,11 @@ static int print_collector_callback(const char *name, void *entry, void *data) {
 }
 
 void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     RRDSET *st;
     char name[500];
 
     time_t now = now_realtime_sec();
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
@@ -184,7 +181,7 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             st->last_accessed_time = now;
         }
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
     struct array_printer ap = {
             .c = 0,
             .wb = wb

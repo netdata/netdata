@@ -12,7 +12,6 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
 
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector_info col = {
@@ -23,7 +22,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
             dictionary_set(dict, name, &col, sizeof(struct collector_info));
         }
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 
     return dict;
 }
@@ -36,7 +35,7 @@ void sql_build_node_collectors(struct aclk_database_worker_config *wc)
         return;
 
     struct update_node_collectors upd_node_collectors;
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     upd_node_collectors.node_id = wc->node_id;
     upd_node_collectors.claim_id = get_agent_claimid();

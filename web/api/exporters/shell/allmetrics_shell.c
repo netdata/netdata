@@ -25,7 +25,6 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_shell();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     // for each chart
     RRDSET *st;
@@ -39,8 +38,6 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
         buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", rrdset_id(st), rrdset_name(st));
         if(rrdset_is_available_for_viewers(st)) {
-            rrdset_rdlock(st);
-
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
@@ -55,22 +52,23 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
                     else {
                         if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
                         n = roundndd(n);
-                        if(!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) total += n;
+                        if(!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)) total += n;
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, dimension, n, rrdset_units(st));
                     }
                 }
             }
+            rrddim_foreach_done(rd);
 
             total = roundndd(total);
             buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, total, rrdset_units(st));
-            rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
@@ -90,8 +88,8 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 
@@ -100,7 +98,6 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     buffer_strcat(wb, "{");
 
@@ -114,8 +111,6 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {
-            rrdset_rdlock(st);
-
             buffer_sprintf(
                 wb,
                 "%s\n"
@@ -132,7 +127,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                 rrdset_family(st),
                 rrdset_context(st),
                 rrdset_units(st),
-                (int64_t)rrdset_last_entry_t_nolock(st));
+                (int64_t)rrdset_last_entry_t(st));
 
             chart_counter++;
             dimension_counter = 0;
@@ -161,14 +156,14 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                     dimension_counter++;
                 }
             }
+            rrddim_foreach_done(rd);
 
             buffer_strcat(wb, "\n\t\t}\n\t}");
-            rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n}");
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 

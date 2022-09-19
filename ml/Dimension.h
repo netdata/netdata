@@ -44,7 +44,7 @@ public:
     RRDDIM *getAnomalyRateRD() const { return AnomalyRateRD; }
 
     void setAnomalyRateRDName(const char *Name) const {
-        rrddim_set_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
+        rrddim_reset_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
     }
 
     virtual ~RrdDimension() {}

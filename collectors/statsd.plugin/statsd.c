@@ -24,9 +24,9 @@
 
 #ifdef STATSD_MULTITHREADED
 // DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
-#define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DONT_OVERWRITE_VALUE|DICTIONARY_FLAG_ADD_IN_FRONT
+#define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT)
 #else
-#define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DONT_OVERWRITE_VALUE|DICTIONARY_FLAG_ADD_IN_FRONT|DICTIONARY_FLAG_SINGLE_THREADED
+#define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT | DICT_OPTION_SINGLE_THREADED)
 #endif
 
 #define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
@@ -192,6 +192,7 @@ typedef struct statsd_app_chart_dimension {
     collected_number multiplier;    // the multiplier of the dimension
     collected_number divisor;       // the divisor of the dimension
     RRDDIM_FLAGS flags;             // the RRDDIM flags for this dimension
+    RRDDIM_OPTIONS options;         // the RRDDIM options for this dimension
 
     STATSD_APP_CHART_DIM_VALUE_TYPE value_type; // which value to use of the source metric
 
@@ -371,9 +372,10 @@ static struct statsd {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd index management - add/find metrics
 
-static void dictionary_metric_insert_callback(const char *name, void *value, void *data) {
+static void dictionary_metric_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     STATSD_INDEX *index = (STATSD_INDEX *)data;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
+    const char *name = dictionary_acquired_item_name(item);
 
     debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
 
@@ -390,9 +392,9 @@ static void dictionary_metric_insert_callback(const char *name, void *value, voi
     __atomic_fetch_add(&index->metrics, 1, __ATOMIC_RELAXED);
 }
 
-static void dictionary_metric_delete_callback(const char *name, void *value, void *data) {
+static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     (void)data; // STATSD_INDEX *index = (STATSD_INDEX *)data;
-    (void)name;
+    (void)item;
     STATSD_METRIC *m = (STATSD_METRIC *)value;
 
     if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
@@ -416,7 +418,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
     // no locks here, go faster
     // this will call the dictionary_metric_insert_callback() if an item
     // is inserted, otherwise it will return the existing one.
-    // We used the flag DICTIONARY_FLAG_DONT_OVERWRITE_VALUE to support this.
+    // We used the flag DICT_OPTION_DONT_OVERWRITE_VALUE to support this.
     STATSD_METRIC *m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
 #endif
 
@@ -572,8 +574,8 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
 #define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
 #define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
-static void dictionary_metric_set_value_insert_callback(const char *name, void *value, void *data) {
-    (void)name;
+static void dictionary_metric_set_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    (void)item;
     (void)value;
     STATSD_METRIC *m = (STATSD_METRIC *)data;
     m->set.unique++;
@@ -617,8 +619,8 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     }
 }
 
-static void dictionary_metric_dict_value_insert_callback(const char *name, void *value, void *data) {
-    (void)name;
+static void dictionary_metric_dict_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    (void)item;
     (void)value;
     STATSD_METRIC *m = (STATSD_METRIC *)data;
     m->dictionary.unique++;
@@ -1209,6 +1211,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         , collected_number multiplier
         , collected_number divisor
         , RRDDIM_FLAGS flags
+        , RRDDIM_OPTIONS options
         , STATSD_APP_CHART_DIM_VALUE_TYPE value_type
 ) {
     STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
@@ -1221,6 +1224,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     dim->divisor = divisor;
     dim->value_type = value_type;
     dim->flags = flags;
+    dim->options = options;
 
     if(!dim->multiplier)
         dim->multiplier = 1;
@@ -1323,7 +1327,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if(app) {
                 if(!strcmp(s, "dictionary")) {
                     if(!app->dict)
-                        app->dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+                        app->dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
                     dict = app->dict;
                 }
@@ -1474,17 +1478,18 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     pattern = 1;
                 }
 
-                char *dim_name      = words[i++];
-                char *type          = words[i++];
-                char *multiplier    = words[i++];
-                char *divisor       = words[i++];
-                char *options       = words[i++];
+                char *dim_name   = words[i++];
+                char *type       = words[i++];
+                char *multiplier = words[i++];
+                char *divisor    = words[i++];
+                char *opts       = words[i++];
 
                 RRDDIM_FLAGS flags = RRDDIM_FLAG_NONE;
-                if(options && *options) {
-                    if(strstr(options, "hidden") != NULL) flags |= RRDDIM_FLAG_HIDDEN;
-                    if(strstr(options, "noreset") != NULL) flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
-                    if(strstr(options, "nooverflow") != NULL) flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                RRDDIM_OPTIONS options = RRDDIM_OPTION_NONE;
+                if(opts && *opts) {
+                    if(strstr(opts, "hidden") != NULL) options |= RRDDIM_OPTION_HIDDEN;
+                    if(strstr(opts, "noreset") != NULL) options |= RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                    if(strstr(opts, "nooverflow") != NULL) options |= RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS;
                 }
 
                 if(!pattern) {
@@ -1510,7 +1515,8 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                         , (multiplier && *multiplier)?str2l(multiplier):1
                         , (divisor && *divisor)?str2l(divisor):1
                         , flags
-                        , string2valuetype(type, line, filename)
+                        ,
+                    options, string2valuetype(type, line, filename)
                 );
 
                 if(pattern)
@@ -1775,7 +1781,7 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
 
     STATSD_METRIC_DICTIONARY_ITEM *t;
     dfe_start_read(m->dictionary.dict, t) {
-        if (!t->rd) t->rd = rrddim_add(m->st, t_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if (!t->rd) t->rd = rrddim_add(m->st, t_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rrddim_set_by_pointer(m->st, t->rd, (collected_number)t->count);
     }
     dfe_done(t);
@@ -2130,6 +2136,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                                     , dim->multiplier
                                     , dim->divisor
                                     , dim->flags
+                                    , dim->options
                                     , dim->value_type
                             );
 
@@ -2186,11 +2193,13 @@ static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CH
 
         dim->rd = rrddim_add(chart->st, metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
         if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
+        if(dim->options != RRDDIM_OPTION_NONE) dim->rd->options |= dim->options;
         return dim->rd;
     }
 
     dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
     if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
+    if(dim->options != RRDDIM_OPTION_NONE) dim->rd->options |= dim->options;
     return dim->rd;
 }
 

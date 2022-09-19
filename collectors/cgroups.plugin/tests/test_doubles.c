@@ -146,14 +146,6 @@ void netdev_rename_device_del(const char *host_device)
     UNUSED(host_device);
 }
 
-void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
-{
-    UNUSED(chart_uuid);
-    UNUSED(source_type);
-    UNUSED(label);
-    UNUSED(value);
-}
-
 void rrdcalc_update_rrdlabels(RRDSET *st) {
     (void)st;
 }

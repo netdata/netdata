@@ -10,23 +10,303 @@
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
-static inline void rrddim_index_add(RRDSET *st, RRDDIM *rd) {
-    if(likely(dictionary_set(st->rrddim_root_index, string2str(rd->id), rd, sizeof(RRDDIM)) == rd)) {
-        rrddim_flag_set(rd, RRDDIM_FLAG_INDEXED_ID);
-    }
-    else {
-        rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
-        error("RRDDIM: %s() attempted to index duplicate dimension with key '%s' of chart '%s' of host '%s'", __FUNCTION__, rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+struct rrddim_constructor {
+    RRDSET *st;
+    const char *id;
+    const char *name;
+    collected_number multiplier;
+    collected_number divisor;
+    RRD_ALGORITHM algorithm;
+    RRD_MEMORY_MODE memory_mode;
+
+    enum {
+        RRDDIM_REACT_NONE    = 0,
+        RRDDIM_REACT_NEW     = (1 << 0),
+        RRDDIM_REACT_UPDATED = (1 << 2),
+    } react_action;
+
+};
+
+static void rrddim_update_rrddimvars_unsafe(RRDDIM *rd) {
+    RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
+
+    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
     }
 }
 
-static inline void rrddim_index_del(RRDSET *st, RRDDIM *rd) {
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_INDEXED_ID)) {
-        if (likely(dictionary_del(st->rrddim_root_index, string2str(rd->id)) == 0))
-            rrddim_flag_clear(rd, RRDDIM_FLAG_INDEXED_ID);
-        else
-            error("RRDDIM: %s() attempted to delete non-indexed dimension with key '%s' of chart '%s' of host '%s'", __FUNCTION__, rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
+    struct rrddim_constructor *ctr = constructor_data;
+    RRDDIM *rd = rrddim;
+    RRDSET *st = ctr->st;
+    RRDHOST *host = st->rrdhost;
+
+    rd->flags = RRDDIM_FLAG_NONE;
+
+    rd->id = string_strdupz(ctr->id);
+    rd->name = (ctr->name && *ctr->name)?rrd_string_strdupz(ctr->name):string_dup(rd->id);
+
+    rd->algorithm = ctr->algorithm;
+    rd->multiplier = ctr->multiplier;
+    rd->divisor = ctr->divisor;
+    if(!rd->divisor) rd->divisor = 1;
+
+    rd->update_every = st->update_every;
+
+    rd->rrdset = st;
+
+    if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
+        rd->collections_counter = 1;
+
+    if(ctr->memory_mode == RRD_MEMORY_MODE_MAP || ctr->memory_mode == RRD_MEMORY_MODE_SAVE) {
+        if(!rrddim_memory_load_or_create_map_save(st, rd, ctr->memory_mode)) {
+            info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (ctr->memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
+            ctr->memory_mode = RRD_MEMORY_MODE_RAM;
+        }
     }
+
+    if(ctr->memory_mode == RRD_MEMORY_MODE_RAM) {
+        size_t entries = st->entries;
+        if(!entries) entries = 5;
+
+        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1);
+        if(!rd->db) {
+            info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
+            ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
+        }
+        else rd->memsize = entries * sizeof(storage_number);
+    }
+
+    if(ctr->memory_mode == RRD_MEMORY_MODE_ALLOC || ctr->memory_mode == RRD_MEMORY_MODE_NONE) {
+        size_t entries = st->entries;
+        if(entries < 5) entries = 5;
+
+        rd->db = callocz(entries, sizeof(storage_number));
+        rd->memsize = entries * sizeof(storage_number);
+    }
+
+    rd->rrd_memory_mode = ctr->memory_mode;
+
+#ifdef ENABLE_ACLK
+    rd->aclk_live_status = -1;
+#endif
+
+    (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
+
+    // initialize the db tiers
+    {
+        size_t initialized = 0;
+        RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
+        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+            if(!eng) continue;
+
+            rd->tiers[tier] = callocz(1, sizeof(struct rrddim_tier));
+            rd->tiers[tier]->tier_grouping = get_tier_grouping(tier);
+            rd->tiers[tier]->mode = eng->id;
+            rd->tiers[tier]->collect_ops = eng->api.collect_ops;
+            rd->tiers[tier]->query_ops = eng->api.query_ops;
+            rd->tiers[tier]->db_metric_handle = eng->api.init(rd, host->storage_instance[tier]);
+            storage_point_unset(rd->tiers[tier]->virtual_point);
+            initialized++;
+
+            // internal_error(true, "TIER GROUPING of chart '%s', dimension '%s' for tier %d is set to %d", rd->rrdset->name, rd->name, tier, rd->tiers[tier]->tier_grouping);
+        }
+
+        if(!initialized)
+            error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+
+        if(!rd->tiers[0])
+            error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+    }
+
+    // initialize data collection for all tiers
+    {
+        size_t initialized = 0;
+        for (int tier = 0; tier < storage_tiers; tier++) {
+            if (rd->tiers[tier]) {
+                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
+                initialized++;
+            }
+        }
+
+        if(!initialized)
+            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+    }
+
+    if(st->dimensions) {
+        RRDDIM *td = st->dimensions;
+
+        if(td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor)) {
+            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
+                     rrddim_name(rd),
+                     rrdset_name(st),
+                     rrdhost_hostname(host),
+                     rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
+                     rd->multiplier, td->multiplier,
+                     rd->divisor, td->divisor
+                );
+#endif
+                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+            }
+        }
+    }
+
+    rrddim_update_rrddimvars_unsafe(rd);
+
+    // let the chart resync
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
+    ml_new_dimension(rd);
+
+    ctr->react_action = RRDDIM_REACT_NEW;
+
+    internal_error(false, "RRDDIM: inserted dimension '%s' of chart '%s' of host '%s'",
+                   rrddim_name(rd), rrdset_name(st), rrdhost_hostname(st->rrdhost));
+
+}
+
+static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *rrdset) {
+    RRDDIM *rd = rrddim;
+    RRDSET *st = rrdset; (void)st;
+
+    internal_error(false, "RRDDIM: deleting dimension '%s' of chart '%s' of host '%s'",
+                   rrddim_name(rd), rrdset_name(st), rrdhost_hostname(st->rrdhost));
+
+    rrdcontext_removed_rrddim(rd);
+
+    ml_delete_dimension(rd);
+
+    debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
+
+    if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+
+        size_t tiers_available = 0, tiers_said_yes = 0;
+        for(int tier = 0; tier < storage_tiers ;tier++) {
+            if(rd->tiers[tier]) {
+                tiers_available++;
+
+                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                    tiers_said_yes++;
+
+                rd->tiers[tier]->db_collection_handle = NULL;
+            }
+        }
+
+        if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            /* This metric has no data and no references */
+            delete_dimension_uuid(&rd->metric_uuid);
+        }
+    }
+
+    rrddimvar_delete_all(rd);
+
+    // free(rd->annotations);
+    //#ifdef ENABLE_ACLK
+    //    if (!netdata_exit)
+    //        aclk_send_dimension_update(rd);
+    //#endif
+
+    // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
+    rrddim_memory_file_free(rd);
+
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(!rd->tiers[tier]) continue;
+
+        STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
+        if(eng)
+            eng->api.free(rd->tiers[tier]->db_metric_handle);
+
+        freez(rd->tiers[tier]);
+        rd->tiers[tier] = NULL;
+    }
+
+    if(rd->db) {
+        if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
+            munmap(rd->db, rd->memsize);
+        else
+            freez(rd->db);
+    }
+
+    string_freez(rd->id);
+    string_freez(rd->name);
+}
+
+static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *new_rrddim, void *constructor_data) {
+    (void)new_rrddim; // it is NULL
+
+    struct rrddim_constructor *ctr = constructor_data;
+    RRDDIM *rd = rrddim;
+    RRDSET *st = ctr->st;
+
+    ctr->react_action = RRDDIM_REACT_NONE;
+
+    int rc = rrddim_reset_name(st, rd, ctr->name);
+    rc += rrddim_set_algorithm(st, rd, ctr->algorithm);
+    rc += rrddim_set_multiplier(st, rd, ctr->multiplier);
+    rc += rrddim_set_divisor(st, rd, ctr->divisor);
+
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+
+        for(int tier = 0; tier < storage_tiers ;tier++) {
+            if (rd->tiers[tier])
+                rd->tiers[tier]->db_collection_handle =
+                    rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
+        }
+
+        rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
+        rrddim_update_rrddimvars_unsafe(rd);
+    }
+
+    if(unlikely(rc))
+        ctr->react_action = RRDDIM_REACT_UPDATED;
+
+    return ctr->react_action == RRDDIM_REACT_UPDATED;
+}
+
+static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
+    struct rrddim_constructor *ctr = constructor_data;
+    RRDDIM *rd = rrddim;
+    RRDSET *st = ctr->st;
+
+    if(ctr->react_action == RRDDIM_REACT_UPDATED) {
+        debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
+        (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
+#ifdef ENABLE_ACLK
+        queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
+#endif
+
+        // the chart needs to be updated to the parent
+        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    }
+
+    rrdcontext_updated_rrddim(rd);
+}
+
+void rrddim_index_init(RRDSET *st) {
+    if(!st->rrddim_root_index) {
+        st->rrddim_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
+        dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);
+        dictionary_register_delete_callback(st->rrddim_root_index, rrddim_delete_callback, st);
+        dictionary_register_react_callback(st->rrddim_root_index, rrddim_react_callback, st);
+    }
+}
+
+void rrddim_index_destroy(RRDSET *st) {
+    dictionary_destroy(st->rrddim_root_index);
+    st->rrddim_root_index = NULL;
 }
 
 static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
@@ -55,14 +335,15 @@ RRDDIM *rrddim_find_active(RRDSET *st, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDDIM rename a dimension
 
-inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
+inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
     if(unlikely(!name || !*name || !strcmp(rrddim_name(rd), name)))
         return 0;
 
-    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
+    debug(D_RRD_CALLS, "rrddim_reset_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
 
-    string_freez(rd->name);
+    STRING *old = rd->name;
     rd->name = rrd_string_strdupz(name);
+    string_freez(old);
 
     if (!rrdset_is_ar_chart(st))
         rrddimvar_rename_all(rd);
@@ -115,34 +396,34 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 }
 
 // ----------------------------------------------------------------------------
-// RRDDIM create a dimension
 
-void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
-    RRDCALC *rc;
-    
-    for (rc = host->alarms_with_foreach; rc; rc = rc->next) {
-        if (simple_pattern_matches(rc->spdim, rrddim_id(rd)) || simple_pattern_matches(rc->spdim, rrddim_name(rd))) {
-            if (rc->chart == st->name || rc->chart == st->id) {
-                char *name = alarm_name_with_dim(rrdcalc_name(rc), string_strlen(rc->name), rrddim_name(rd), string_strlen(rd->name));
-                if(rrdcalc_exists(host, rrdset_name(st), name)) {
-                    freez(name);
-                    continue;
-                }
+// get the timestamp of the last entry in the round-robin database
+time_t rrddim_last_entry_t(RRDDIM *rd) {
+    time_t latest = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
 
-                netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-                RRDCALC *child = rrdcalc_create_from_rrdcalc(rc, host, name, rrddim_name(rd));
-                netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    for(int tier = 1; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
 
-                if (child)
-                    rrdcalc_add_to_host(host, child);
-
-                else {
-                    error("Cannot allocate a new alarm.");
-                    rc->foreachcounter--;
-                }
-            }
-        }
+        time_t t = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
+        if(t > latest)
+            latest = t;
     }
+
+    return latest;
+}
+
+time_t rrddim_first_entry_t(RRDDIM *rd) {
+    time_t oldest = 0;
+
+    for(int tier = 0; tier < storage_tiers ;tier++) {
+        if(unlikely(!rd->tiers[tier])) continue;
+
+        time_t t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
+        if(t != 0 && (oldest == 0 || t < oldest))
+            oldest = t;
+    }
+
+    return oldest;
 }
 
 // Return either
@@ -154,12 +435,14 @@ time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
 {
     time_t last_updated = rd->last_collected_time.tv_sec;
     int live;
-    if (rd->aclk_live_status == 1)
-        live =
-            ((now - last_updated) <
-             MIN(rrdset_free_obsolete_time, RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER * rd->update_every));
+
+    if(rd->aclk_live_status == 1) {
+        int offline_time = RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER * rd->update_every;
+        live = ((now - last_updated) < MIN(rrdset_free_obsolete_time, offline_time));
+    }
     else
         live = ((now - last_updated) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
+
     return live ? 0 : last_updated;
 }
 #endif
@@ -172,260 +455,37 @@ RRDDIM *rrddim_add_custom(RRDSET *st
                           , RRD_ALGORITHM algorithm
                           , RRD_MEMORY_MODE memory_mode
                           ) {
-    RRDHOST *host = st->rrdhost;
-    rrdset_wrlock(st);
+    struct rrddim_constructor tmp = {
+        .st = st,
+        .id = id,
+        .name = name,
+        .multiplier = multiplier,
+        .divisor = divisor,
+        .algorithm = algorithm,
+        .memory_mode = memory_mode,
+    };
 
-    RRDDIM *rd = rrddim_find(st, id);
-    if(unlikely(rd)) {
-        debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", rrdset_id(st), name?name:"<NONAME>");
+    RRDDIM *rd = dictionary_set_advanced(st->rrddim_root_index, tmp.id, -1, NULL, sizeof(RRDDIM), &tmp);
 
-        int rc = rrddim_set_name(st, rd, name);
-        rc += rrddim_set_algorithm(st, rd, algorithm);
-        rc += rrddim_set_multiplier(st, rd, multiplier);
-        rc += rrddim_set_divisor(st, rd, divisor);
-
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            store_active_dimension(&rd->metric_uuid);
-
-            for(int tier = 0; tier < storage_tiers ;tier++) {
-                if (rd->tiers[tier])
-                    rd->tiers[tier]->db_collection_handle =
-                        rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
-            }
-
-            rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-
-            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-            rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-        }
-
-        if (unlikely(rc)) {
-            debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
-            (void)sql_store_dimension(&rd->metric_uuid, rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor,
-                                      rd->algorithm);
-#ifdef ENABLE_ACLK
-            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
-#endif
-            rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        }
+    if(tmp.react_action == RRDDIM_REACT_NEW) {
+        // append this dimension
+        rrdset_wrlock(st);
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
         rrdset_unlock(st);
-        rrdcontext_updated_rrddim(rd);
-        return rd;
     }
 
-    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-
-    rd = callocz(1, sizeof(RRDDIM));
-    rd->id = string_strdupz(id);
-
-    rd->name = (name && *name)?rrd_string_strdupz(name):string_dup(rd->id);
-
-    rd->algorithm = algorithm;
-    rd->multiplier = multiplier;
-    rd->divisor = divisor;
-    if(!rd->divisor) rd->divisor = 1;
-
-    rd->entries = st->entries;
-    rd->update_every = st->update_every;
-
-    if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
-        rd->collections_counter = 1;
-
-    rd->rrdset = st;
-
-    if(memory_mode == RRD_MEMORY_MODE_MAP || memory_mode == RRD_MEMORY_MODE_SAVE) {
-        if(!rrddim_memory_load_or_create_map_save(st, rd, memory_mode)) {
-            info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
-            memory_mode = RRD_MEMORY_MODE_RAM;
-        }
-    }
-
-    if(memory_mode == RRD_MEMORY_MODE_RAM) {
-        size_t entries = st->entries;
-        if(!entries) entries = 5;
-
-        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1);
-        if(!rd->db) {
-            info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
-            memory_mode = RRD_MEMORY_MODE_ALLOC;
-        }
-        else rd->memsize = entries * sizeof(storage_number);
-    }
-
-    if(memory_mode == RRD_MEMORY_MODE_ALLOC || memory_mode == RRD_MEMORY_MODE_NONE) {
-        size_t entries = st->entries;
-        if(entries < 5) entries = 5;
-
-        rd->db = callocz(entries, sizeof(storage_number));
-        rd->memsize = entries * sizeof(storage_number);
-    }
-
-    rd->rrd_memory_mode = memory_mode;
-
-#ifdef ENABLE_ACLK
-    rd->aclk_live_status = -1;
-#endif
-
-    (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
-
-    // initialize the db tiers
-    {
-        size_t initialized = 0;
-        RRD_MEMORY_MODE wanted_mode = memory_mode;
-        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
-            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
-            if(!eng) continue;
-
-            rd->tiers[tier] = callocz(1, sizeof(struct rrddim_tier));
-            rd->tiers[tier]->tier_grouping = get_tier_grouping(tier);
-            rd->tiers[tier]->mode = eng->id;
-            rd->tiers[tier]->collect_ops = eng->api.collect_ops;
-            rd->tiers[tier]->query_ops = eng->api.query_ops;
-            rd->tiers[tier]->db_metric_handle = eng->api.init(rd, host->storage_instance[tier]);
-            storage_point_unset(rd->tiers[tier]->virtual_point);
-            initialized++;
-
-            // internal_error(true, "TIER GROUPING of chart '%s', dimension '%s' for tier %d is set to %d", rd->rrdset->name, rd->name, tier, rd->tiers[tier]->tier_grouping);
-        }
-
-        if(!initialized)
-            error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
-
-        if(!rd->tiers[0])
-            error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
-    }
-
-    store_active_dimension(&rd->metric_uuid);
-
-    // initialize data collection for all tiers
-    {
-        size_t initialized = 0;
-        for (int tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier]) {
-                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
-                initialized++;
-            }
-        }
-
-        if(!initialized)
-            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
-    }
-
-    if(st->dimensions) {
-        RRDDIM *td = st->dimensions;
-
-        if(td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor)) {
-            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
-                #ifdef NETDATA_INTERNAL_CHECKS
-                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
-                        rrddim_name(rd),
-                        rrdset_name(st),
-                        rrdhost_hostname(host),
-                        rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
-                        rd->multiplier, td->multiplier,
-                        rd->divisor, td->divisor
-                );
-                #endif
-                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
-            }
-        }
-    }
-
-    // append this dimension
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->dimensions, rd, prev, next);
-
-    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
-        rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-        rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-        rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-    }
-
-    rrddim_index_add(st, rd);
-
-    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
-    rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-
-    ml_new_dimension(rd);
-
-    rrdset_unlock(st);
-    rrdcontext_updated_rrddim(rd);
     return(rd);
 }
 
 // ----------------------------------------------------------------------------
 // RRDDIM remove / free a dimension
 
-void rrddim_free(RRDSET *st, RRDDIM *rd)
-{
-    rrdcontext_removed_rrddim(rd);
-    ml_delete_dimension(rd);
-    
-    debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
-
-    if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-
-        size_t tiers_available = 0, tiers_said_yes = 0;
-        for(int tier = 0; tier < storage_tiers ;tier++) {
-            if(rd->tiers[tier]) {
-                tiers_available++;
-
-                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
-                    tiers_said_yes++;
-
-                rd->tiers[tier]->db_collection_handle = NULL;
-            }
-        }
-
-        if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            /* This metric has no data and no references */
-            delete_dimension_uuid(&rd->metric_uuid);
-        }
-    }
-
+void rrddim_free(RRDSET *st, RRDDIM *rd) {
+    rrdset_wrlock(st);
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->dimensions, rd, prev, next);
+    rrdset_unlock(st);
 
-    while(rd->variables)
-        rrddimvar_free(rd->variables);
-
-    rrddim_index_del(st, rd);
-
-    // free(rd->annotations);
-//#ifdef ENABLE_ACLK
-//    if (!netdata_exit)
-//        aclk_send_dimension_update(rd);
-//#endif
-
-    // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
-    rrddim_memory_file_free(rd);
-
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        if(!rd->tiers[tier]) continue;
-
-        STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
-        if(eng)
-            eng->api.free(rd->tiers[tier]->db_metric_handle);
-
-        freez(rd->tiers[tier]);
-        rd->tiers[tier] = NULL;
-    }
-
-    if(rd->db) {
-        if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
-            munmap(rd->db, rd->memsize);
-        else
-            freez(rd->db);
-    }
-
-    string_freez(rd->id);
-    string_freez(rd->name);
-    freez(rd);
+    dictionary_del(st->rrddim_root_index, string2str(rd->id));
 }
 
 
@@ -445,7 +505,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
         (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
 
-    rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
     rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
     rrdcontext_updated_rrddim_flags(rd);
     return 0;
@@ -463,7 +523,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
         (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
 
-    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
     rrdcontext_updated_rrddim_flags(rd);
     return 0;
@@ -478,6 +538,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
     rrdcontext_updated_rrddim_flags(rd);
 }
 

@@ -29,26 +29,35 @@ const char *netdata_thread_tag(void) {
 // ----------------------------------------------------------------------------
 // compatibility library functions
 
+static __thread pid_t gettid_cached_tid = 0;
 pid_t gettid(void) {
+    pid_t tid = 0;
+
+    if(likely(gettid_cached_tid > 0))
+        return gettid_cached_tid;
+
 #ifdef __FreeBSD__
 
-    return (pid_t)pthread_getthreadid_np();
+    tid = (pid_t)pthread_getthreadid_np();
 
 #elif defined(__APPLE__)
 
     #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         uint64_t curthreadid;
         pthread_threadid_np(NULL, &curthreadid);
-        return (pid_t)curthreadid;
+        tid = (pid_t)curthreadid;
     #else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-        return (pid_t)pthread_self;
+        tid = (pid_t)pthread_self;
     #endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
 
 #else /* __APPLE__*/
 
-    return (pid_t)syscall(SYS_gettid);
+    tid = (pid_t)syscall(SYS_gettid);
 
 #endif /* __FreeBSD__, __APPLE__*/
+
+    gettid_cached_tid = tid;
+    return tid;
 }
 
 // ----------------------------------------------------------------------------
@@ -97,6 +106,8 @@ void netdata_threads_init_after_fork(size_t stacksize) {
 // ----------------------------------------------------------------------------
 // netdata_thread_create
 
+extern void rrdset_thread_rda_free(void);
+
 static void thread_cleanup(void *ptr) {
     if(netdata_thread != ptr) {
         NETDATA_THREAD *info = (NETDATA_THREAD *)ptr;
@@ -106,6 +117,7 @@ static void thread_cleanup(void *ptr) {
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         info("thread with task id %d finished", gettid());
 
+    rrdset_thread_rda_free();
     thread_cache_destroy();
 
     freez((void *)netdata_thread->tag);
@@ -215,11 +227,18 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
 
 // ----------------------------------------------------------------------------
 // netdata_thread_cancel
-
+#ifdef NETDATA_INTERNAL_CHECKS
+int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const char *file, const char *function) {
+#else
 int netdata_thread_cancel(netdata_thread_t thread) {
+#endif
     int ret = pthread_cancel(thread);
     if(ret != 0)
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
+#else
         error("cannot cancel thread. pthread_cancel() failed with code %d.", ret);
+#endif
 
     return ret;
 }

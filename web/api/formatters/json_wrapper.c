@@ -7,9 +7,7 @@ struct value_output {
     BUFFER *wb;
 };
 
-static int value_list_output(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int value_list_output_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     struct value_output *ap = (struct value_output *)data;
     BUFFER *wb = ap->wb;
     char *output = (char *) entry;
@@ -64,8 +62,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         sq[0] = '"';
     }
 
-    if (should_lock)
-        rrdset_rdlock(r->st);
     buffer_sprintf(wb, "{\n"
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
@@ -83,8 +79,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):rrdset_name(r->st), sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t_nolock(r->st))
-                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t_nolock(r->st))
+                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t(r->st))
+                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t(r->st))
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
@@ -93,9 +89,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     web_client_api_request_v1_data_options_to_string(wb, r->internal.query_options);
 
     buffer_sprintf(wb, "%s,\n   %sdimension_names%s: [", sq, kq, kq);
-
-    if (should_lock)
-        rrdset_unlock(r->st);
 
     for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
@@ -147,37 +140,37 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         struct value_output co = {.c = 0, .wb = wb};
 
-        DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrddim_id(rd), rrddim_name(rd));
             int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrddim_id(rd), rrddim_name(rd));
             dictionary_set(dict, name, output, len+1);
         }
-        dictionary_walkthrough_read(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
-        dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
             snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
             dictionary_set(dict, name, output, len + 1);
         }
 
-        dictionary_walkthrough_read(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
         RRDSET *st;
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_labels%s: [", kq, kq);
-        dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
             st = rd->rrdset;
             if (st->rrdlabels)
                 rrdlabels_walkthrough_read(st->rrdlabels, fill_formatted_callback, dict);
         }
-        dictionary_walkthrough_read(dict, value_list_output, &co);
+        dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
         buffer_strcat(wb, "],\n");
     }

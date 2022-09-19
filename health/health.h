@@ -74,7 +74,7 @@ extern ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     uint32_t flags);
 
-extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
+extern void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);
@@ -89,7 +89,5 @@ extern void health_label_log_save(RRDHOST *host);
 
 extern char *health_edit_command_from_source(const char *source);
 extern void sql_refresh_hashes(void);
-
-extern SIMPLE_PATTERN *health_pattern_from_foreach(const char *s);
 
 #endif //NETDATA_HEALTH_H

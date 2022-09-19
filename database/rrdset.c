@@ -22,55 +22,394 @@ void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, c
 
 
 // ----------------------------------------------------------------------------
-// RRDSET index
-
-static inline void rrdset_index_add(RRDHOST *host, RRDSET *st) {
-    if(likely(dictionary_set(host->rrdset_root_index, rrdset_id(st), st, sizeof(RRDSET)) == st)) {
-        rrdset_flag_set(st, RRDSET_FLAG_INDEXED_ID);
-    }
-    else {
-        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
-        error("RRDSET: %s() attempted to index duplicate object with key '%s'", __FUNCTION__, rrdset_id(st));
-    }
-}
-
-static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID)) {
-        if(likely(dictionary_del(host->rrdset_root_index, rrdset_id(st)) == 0))
-            rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
-        else
-            error("RRDSET: %s() attempted to delete non-indexed object with key '%s'", __FUNCTION__, rrdset_id(st));
-    }
-}
-
-static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
-    return dictionary_get(host->rrdset_root_index, id);
-}
-
-// ----------------------------------------------------------------------------
 // RRDSET name index
 
+static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+    RRDSET *st = rrdset;
+    rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
+}
+static void rrdset_name_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+    RRDSET *st = rrdset;
+    rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
+}
+
 static inline void rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
-    if(likely(dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET)) == st)) {
-        rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
-    }
-    else {
-        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
-        error("RRDSET: %s() attempted to index duplicate object with key '%s'", __FUNCTION__, rrdset_name(st));
-    }
+    if(!st->name) return;
+    dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET));
 }
 
 static inline void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID)) {
-        if(likely(dictionary_del(host->rrdset_root_index_name, rrdset_name(st)) != 0))
-            rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
-        else
-            error("RRDSET: %s() attempted to delete non-index object with key '%s'", __FUNCTION__, rrdset_name(st));
-    }
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME))
+        dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
 }
 
 static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
     return dictionary_get(host->rrdset_root_index_name, name);
+}
+
+// ----------------------------------------------------------------------------
+// RRDSET index
+
+static inline void rrdset_update_permanent_labels(RRDSET *st) {
+    if(!st->rrdlabels) return;
+
+    rrdlabels_add(st->rrdlabels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+}
+
+static STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *type, const char *current_name, const char *name) {
+    if(!name || !*name) return NULL;
+
+    char full_name[RRD_ID_LENGTH_MAX + 1];
+    char sanitized_name[CONFIG_MAX_VALUE + 1];
+    char new_name[CONFIG_MAX_VALUE + 1];
+
+    snprintfz(full_name, RRD_ID_LENGTH_MAX, "%s.%s", type, name);
+    rrdset_strncpyz_name(sanitized_name, full_name, CONFIG_MAX_VALUE);
+    strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
+
+    if(rrdset_index_find_name(host, new_name)) {
+        debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
+        if(!strcmp(chart_full_id, full_name) && (!current_name || !*current_name)) {
+            unsigned i = 1;
+
+            do {
+                snprintfz(new_name, CONFIG_MAX_VALUE, "%s_%u", sanitized_name, i);
+                i++;
+            } while (rrdset_index_find_name(host, new_name));
+
+            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
+        }
+        else
+            return NULL;
+    }
+
+    return string_strdupz(new_name);
+}
+
+struct rrdset_constructor {
+    RRDHOST *host;
+    const char *type;
+    const char *id;
+    const char *name;
+    const char *family;
+    const char *context;
+    const char *title;
+    const char *units;
+    const char *plugin;
+    const char *module;
+    long priority;
+    int update_every;
+    RRDSET_TYPE chart_type;
+    RRD_MEMORY_MODE memory_mode;
+    long history_entries;
+
+    enum {
+        RRDSET_REACT_NONE                   = 0,
+        RRDSET_REACT_NEW                    = (1 << 0),
+        RRDSET_REACT_CHART_ARCHIVED_TO_LIVE = (1 << 1),
+        RRDSET_REACT_PLUGIN_UPDATED         = (1 << 2),
+        RRDSET_REACT_MODULE_UPDATED         = (1 << 3),
+        RRDSET_REACT_CHART_ACTIVATED        = (1 << 4),
+    } react_action;
+};
+
+// the constructor - the dictionary is write locked while this runs
+static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
+    static STRING *anomaly_rates_chart = NULL;
+
+    if(!unlikely(!anomaly_rates_chart))
+        anomaly_rates_chart = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
+
+    struct rrdset_constructor *ctr = constructor_data;
+    RRDHOST *host = ctr->host;
+    RRDSET *st = rrdset;
+
+    const char *chart_full_id = dictionary_acquired_item_name(item);
+
+    st->id = string_strdupz(chart_full_id);
+
+    st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
+    if(!st->name)
+        st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
+    rrdset_index_add_name(host, st);
+
+    st->parts.id = string_strdupz(ctr->id);
+    st->parts.type = string_strdupz(ctr->type);
+    st->parts.name = string_strdupz(ctr->name);
+
+    st->family = (ctr->family && *ctr->family) ? rrd_string_strdupz(ctr->family) : rrd_string_strdupz(ctr->type);
+    st->context = (ctr->context && *ctr->context) ? rrd_string_strdupz(ctr->context) : rrd_string_strdupz(chart_full_id);
+
+    st->units = rrd_string_strdupz(ctr->units);
+    st->title = rrd_string_strdupz(ctr->title);
+    st->plugin_name = rrd_string_strdupz(ctr->plugin);
+    st->module_name = rrd_string_strdupz(ctr->module);
+    st->priority = ctr->priority;
+
+    st->cache_dir = rrdset_cache_dir(host, chart_full_id);
+    st->entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
+    st->update_every = ctr->update_every;
+    st->rrd_memory_mode = ctr->memory_mode;
+
+    st->chart_type = ctr->chart_type;
+    st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
+    st->rrdhost = host;
+
+    st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
+    if(unlikely(st->id == anomaly_rates_chart))
+        st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
+
+    netdata_rwlock_init(&st->rrdset_rwlock);
+    netdata_rwlock_init(&st->alerts.rwlock);
+
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
+        if(!rrdset_memory_load_or_create_map_save(st, st->rrd_memory_mode)) {
+            info("Failed to use db mode %s for chart '%s', falling back to ram mode.", (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st));
+            st->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+        }
+    }
+
+    if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), &st->chart_uuid))
+        uuid_generate(st->chart_uuid);
+    update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
+
+    rrddim_index_init(st);
+
+    // chart variables - we need this for data collection to work (collector given chart variables) - not only health
+    rrdsetvar_index_init(st);
+
+    if(host->health_enabled) {
+        st->green = NAN;
+        st->red = NAN;
+        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
+        st->rrdvars = rrdvariables_create();
+        rrddimvar_index_init(st);
+    }
+
+    st->rrdlabels = rrdlabels_create();
+    rrdset_update_permanent_labels(st);
+
+    ctr->react_action = RRDSET_REACT_NEW;
+}
+
+// the destructor - the dictionary is write locked while this runs
+static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
+    RRDHOST *host = rrdhost;
+    RRDSET *st = rrdset;
+
+    rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
+
+    // remove it from the name index
+    rrdset_index_del_name(host, st);
+
+    rrdcalc_unlink_all_rrdset_alerts(st);
+
+    // ------------------------------------------------------------------------
+    // the order of destruction is important here
+
+    // 1. delete RRDDIMVAR index - this will speed up the destruction of RRDDIMs
+    //    because each dimension loops to find its own variables in this index.
+    //    There are no references to the items on this index from the dimensions.
+    //    To find their own, they have to walk-through the dictionary.
+    rrddimvar_index_destroy(st);                // destroy the rrddimvar index
+
+    // 2. delete RRDSETVAR index
+    rrdsetvar_index_destroy(st);                // destroy the rrdsetvar index
+
+    // 3. delete RRDVAR index after the above, to avoid triggering its garbage collector (they have references on this)
+    rrdvariables_destroy(st->rrdvars);      // free all variables and destroy the rrdvar dictionary
+
+    // 4. delete RRDFAMILY - this has to be last, because RRDDIMVAR and RRDSETVAR need the reference counter
+    rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily -- has to be after all variables
+
+    // 5. delete RRDDIMs, now their variables are not existing, so this is fast
+    rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
+
+    // 6. this has to be after the dimensions are freed, but before labels are freed (contexts need the labels)
+    rrdcontext_removed_rrdset(st);              // let contexts know
+
+    // 7. destroy the chart labels
+    rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
+
+    rrdset_memory_file_free(st);                // remove files of db mode save and map
+
+    // ------------------------------------------------------------------------
+    // free it
+
+    netdata_rwlock_destroy(&st->rrdset_rwlock);
+    netdata_rwlock_destroy(&st->alerts.rwlock);
+
+    string_freez(st->id);
+    string_freez(st->name);
+    string_freez(st->parts.id);
+    string_freez(st->parts.type);
+    string_freez(st->parts.name);
+    string_freez(st->family);
+    string_freez(st->title);
+    string_freez(st->units);
+    string_freez(st->context);
+    string_freez(st->plugin_name);
+    string_freez(st->module_name);
+
+    freez(st->exporting_flags);
+    freez(st->cache_dir);
+}
+
+// the item to be inserted, is already in the dictionary
+// this callback deals with the situation, migrating the existing object to the new values
+// the dictionary is write locked while this runs
+static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *new_rrdset, void *constructor_data) {
+    (void)new_rrdset; // it is NULL
+
+    struct rrdset_constructor *ctr = constructor_data;
+    RRDSET *st = rrdset;
+
+    rrdset_isnot_obsolete(st);
+
+    ctr->react_action = RRDSET_REACT_NONE;
+
+    if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+        rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+        ctr->react_action |= RRDSET_REACT_CHART_ACTIVATED;
+    }
+
+    if (rrdset_reset_name(st, (ctr->name && *ctr->name) ? ctr->name : ctr->id) == 2)
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+
+    if (unlikely(st->priority != ctr->priority)) {
+        st->priority = ctr->priority;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+    }
+    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != ctr->update_every)) {
+        st->update_every = ctr->update_every;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+    }
+
+    if(ctr->plugin && *ctr->plugin) {
+        STRING *old_plugin = st->plugin_name;
+        st->plugin_name = rrd_string_strdupz(ctr->plugin);
+        if (old_plugin != st->plugin_name)
+            ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
+        string_freez(old_plugin);
+    }
+
+    if(ctr->module && *ctr->module) {
+        STRING *old_module = st->module_name;
+        st->module_name = rrd_string_strdupz(ctr->module);
+        if (old_module != st->module_name)
+            ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
+        string_freez(old_module);
+    }
+
+    if(ctr->title && *ctr->title) {
+        STRING *old_title = st->title;
+        st->title = rrd_string_strdupz(ctr->title);
+        if(old_title != st->title)
+            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        string_freez(old_title);
+    }
+
+    if(ctr->units && *ctr->units) {
+        STRING *old_units = st->units;
+        st->units = rrd_string_strdupz(ctr->units);
+        if(old_units != st->units)
+            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        string_freez(old_units);
+    }
+
+    if(ctr->context && *ctr->context) {
+        STRING *old_context = st->context;
+        st->context = rrd_string_strdupz(ctr->context);
+        if(old_context != st->context)
+            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        string_freez(old_context);
+    }
+
+    if(st->chart_type != ctr->chart_type) {
+        st->chart_type = ctr->chart_type;
+        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+    }
+
+    if(ctr->react_action)
+        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+
+    rrdset_update_permanent_labels(st);
+
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
+    return ctr->react_action != RRDSET_REACT_NONE;
+}
+
+// this is called after all insertions/conflicts, with the dictionary unlocked, with a reference to RRDSET
+// so, any actions requiring locks on other objects, should be placed here
+static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
+    struct rrdset_constructor *ctr = constructor_data;
+    RRDSET *st = rrdset;
+    RRDHOST *host = st->rrdhost;
+
+    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
+        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
+
+        rrdcalc_link_matching_alerts_to_rrdset(st);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
+    }
+
+    if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
+        debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
+        if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
+            error_report("Failed to update chart metadata in the database");
+    }
+
+    rrdcontext_updated_rrdset(st);
+}
+
+void rrdset_index_init(RRDHOST *host) {
+    if(!host->rrdset_root_index) {
+        host->rrdset_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, NULL);
+        dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
+        dictionary_register_react_callback(host->rrdset_root_index, rrdset_react_callback, NULL);
+        dictionary_register_delete_callback(host->rrdset_root_index, rrdset_delete_callback, host);
+    }
+
+    if(!host->rrdset_root_index_name) {
+        host->rrdset_root_index_name = dictionary_create(
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
+        dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
+    }
+}
+
+void rrdset_index_destroy(RRDHOST *host) {
+    // destroy the name index first
+    dictionary_destroy(host->rrdset_root_index_name);
+    host->rrdset_root_index_name = NULL;
+
+    // destroy the id index last
+    dictionary_destroy(host->rrdset_root_index);
+    host->rrdset_root_index = NULL;
+}
+
+static inline RRDSET *rrdset_index_add(RRDHOST *host, const char *id, struct rrdset_constructor *st_ctr) {
+    return dictionary_set_advanced(host->rrdset_root_index, id, -1, NULL, sizeof(RRDSET), st_ctr);
+}
+
+static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_ID))
+        dictionary_del(host->rrdset_root_index, rrdset_id(st));
+}
+
+static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
+    // TODO - the name index should have an acquired dictionary item, not just a pointer to RRDSET
+    return dictionary_get(host->rrdset_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
@@ -118,53 +457,30 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length) {
     return to;
 }
 
-int rrdset_set_name(RRDSET *st, const char *name) {
+int rrdset_reset_name(RRDSET *st, const char *name) {
     if(unlikely(!strcmp(rrdset_name(st), name)))
         return 1;
 
     RRDHOST *host = st->rrdhost;
 
-    debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", rrdset_name(st), name);
+    debug(D_RRD_CALLS, "rrdset_reset_name() old: '%s', new: '%s'", rrdset_name(st), name);
 
-    char full_name[RRD_ID_LENGTH_MAX + 1];
-    char sanitized_name[CONFIG_MAX_VALUE + 1];
-    char new_name[CONFIG_MAX_VALUE + 1];
-
-    snprintfz(full_name, RRD_ID_LENGTH_MAX, "%s.%s", rrdset_type(st), name);
-    rrdset_strncpyz_name(sanitized_name, full_name, CONFIG_MAX_VALUE);
-    strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
-
-    if(rrdset_index_find_name(host, new_name)) {
-        debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
-        if(!strcmp(rrdset_id(st), full_name) && !st->name) {
-            unsigned i = 1;
-
-            do {
-                snprintfz(new_name, CONFIG_MAX_VALUE, "%s_%u", sanitized_name, i);
-                i++;
-            } while (rrdset_index_find_name(host, new_name));
-
-            info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
-        } else {
-            return 0;
-        }
-    }
+    STRING *name_string = rrdset_fix_name(host, rrdset_id(st), rrdset_parts_type(st), string2str(st->name), name);
+    if(!name_string) return 0;
 
     if(st->name) {
         rrdset_index_del_name(host, st);
         string_freez(st->name);
-        st->name = string_strdupz(new_name);
+        st->name = name_string;
         rrdsetvar_rename_all(st);
     }
-    else {
-        st->name = string_strdupz(new_name);
-    }
+    else
+        st->name = name_string;
 
-    rrdset_wrlock(st);
     RRDDIM *rd;
-    rrddim_foreach_write(rd, st)
+    rrddim_foreach_read(rd, st)
         rrddimvar_rename_all(rd);
-    rrdset_unlock(st);
+    rrddim_foreach_done(rd);
 
     rrdset_index_add_name(host, st);
 
@@ -178,6 +494,36 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     return 2;
 }
 
+// get the timestamp of the last entry in the round-robin database
+time_t rrdset_last_entry_t(RRDSET *st) {
+    RRDDIM *rd;
+    time_t last_entry_t  = 0;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_last_entry_t(rd);
+        if(t > last_entry_t) last_entry_t = t;
+    }
+    rrddim_foreach_done(rd);
+
+    return last_entry_t;
+}
+
+// get the timestamp of first entry in the round-robin database
+time_t rrdset_first_entry_t(RRDSET *st) {
+    RRDDIM *rd;
+    time_t first_entry_t = LONG_MAX;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_first_entry_t(rd);
+        if(t < first_entry_t)
+            first_entry_t = t;
+    }
+    rrddim_foreach_done(rd);
+
+    if (unlikely(LONG_MAX == first_entry_t)) return 0;
+    return first_entry_t;
+}
+
 inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))) {
         info("Cannot obsolete already archived chart %s", rrdset_name(st));
@@ -186,8 +532,9 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+
         st->last_accessed_time = now_realtime_sec();
-        st->rrdhost->obsolete_charts_count++;
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -202,7 +549,6 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time = now_realtime_sec();
-        st->rrdhost->obsolete_charts_count--;
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -220,11 +566,20 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
 
     rrdset_flag_clear(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
 
-    RRD_ALGORITHM algorithm = st->dimensions->algorithm;
-    collected_number multiplier = ABS(st->dimensions->multiplier);
-    collected_number divisor = ABS(st->dimensions->divisor);
+    bool init = false, is_heterogeneous = false;
+    RRD_ALGORITHM algorithm;
+    collected_number multiplier;
+    collected_number divisor;
 
     rrddim_foreach_read(rd, st) {
+        if(!init) {
+            algorithm = rd->algorithm;
+            multiplier = rd->multiplier;
+            divisor = ABS(rd->divisor);
+            init = true;
+            continue;
+        }
+
         if(algorithm != rd->algorithm || multiplier != ABS(rd->multiplier) || divisor != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
@@ -239,12 +594,17 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
                 #endif
                 rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
             }
-            return;
+
+            is_heterogeneous = true;
+            break;
         }
     }
+    rrddim_foreach_done(rd);
 
-    rrdset_flag_clear(st, RRDSET_FLAG_HETEROGENEOUS);
-    rrdcontext_updated_rrdset_flags(st);
+    if(!is_heterogeneous) {
+        rrdset_flag_clear(st, RRDSET_FLAG_HETEROGENEOUS);
+        rrdcontext_updated_rrdset_flags(st);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -275,6 +635,7 @@ void rrdset_reset(RRDSET *st) {
             }
         }
     }
+    rrddim_foreach_done(rd);
 }
 
 // ----------------------------------------------------------------------------
@@ -326,89 +687,20 @@ static inline void last_updated_time_align(RRDSET *st) {
 
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
-
-    RRDHOST *host = st->rrdhost;
-
-    rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
-    rrdset_wrlock(st);                  // lock this RRDSET
-    // info("Removing chart '%s' ('%s')", st->id, st->name);
-
-    // ------------------------------------------------------------------------
-    // remove it from the indexes
-
-    rrdset_index_del(host, st);
-    rrdset_index_del_name(host, st);
-
-    // ------------------------------------------------------------------------
-    // free its children structures
-
-    freez(st->exporting_flags);
-
-    while(st->variables)  rrdsetvar_free(st->variables);
-//  while(st->alarms)     rrdsetcalc_unlink(st->alarms);
-    /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
-     * created by a template. This leads to an effective memory leak, which cannot be detected since the
-     * alarms will still be connected to the host, and freed during shutdown. */
-    while(st->alarms) rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
-    while(st->dimensions)  rrddim_free(st, st->dimensions);
-
-    rrdfamily_free(host, st->rrdfamily);
-
-    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
-    rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
-
-    // ------------------------------------------------------------------------
-    // unlink it from the host
-
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->rrdset_root, st, prev, next);
-
-    rrdset_unlock(st);
-
-    // this has to be after the dimensions are freed
-    rrdcontext_removed_rrdset(st);
-
-    // ------------------------------------------------------------------------
-    // free it
-
-    netdata_rwlock_destroy(&st->rrdset_rwlock);
-
-    rrdset_memory_file_free(st);
-    rrdlabels_destroy(st->rrdlabels);
-
-    // free directly allocated members
-
-    dictionary_destroy(st->rrddim_root_index);
-    dictionary_destroy(st->rrdvar_root_index);
-
-    string_freez(st->id);
-    string_freez(st->name);
-    string_freez(st->type);
-    string_freez(st->family);
-    string_freez(st->title);
-    string_freez(st->units);
-    string_freez(st->context);
-    string_freez(st->plugin_name);
-    string_freez(st->module_name);
-
-    freez(st->cache_dir);
-    freez(st->chart_uuid);
-
-    freez(st);
+    rrdset_index_del(st->rrdhost, st);
 }
 
 void rrdset_save(RRDSET *st) {
-    rrdset_check_rdlock(st);
-
     rrdset_memory_file_save(st);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st)
         rrddim_memory_file_save(rd);
+    rrddim_foreach_done(rd);
 }
 
 void rrdset_delete_files(RRDSET *st) {
     RRDDIM *rd;
-    rrdset_check_rdlock(st);
 
     info("Deleting chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
@@ -431,14 +723,13 @@ void rrdset_delete_files(RRDSET *st) {
         if(unlikely(unlink(cache_filename) == -1))
             error("Cannot delete dimension file '%s'", cache_filename);
     }
+    rrddim_foreach_done(rd);
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
     RRDDIM *rd;
-
-    rrdset_check_rdlock(st);
 
     info("Deleting dimensions of chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
@@ -451,28 +742,11 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
                 error("Cannot delete dimension file '%s'", cache_filename);
         }
     }
+    rrddim_foreach_done(rd);
 }
 
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
-
-static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
-    RRDSET *st = rrdset_find(host, fullid);
-    if(unlikely(st)) {
-        rrdset_isnot_obsolete(st);
-        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
-        return st;
-    }
-
-    return NULL;
-}
-
-static inline void rrdset_update_permanent_labels(RRDSET *st) {
-    if(!st->rrdlabels) return;
-
-    rrdlabels_add(st->rrdlabels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-}
 
 RRDSET *rrdset_create_custom(
           RRDHOST *host
@@ -491,7 +765,10 @@ RRDSET *rrdset_create_custom(
         , RRD_MEMORY_MODE memory_mode
         , long history_entries
 ) {
-    if(!type || !type[0]) {
+    if (host != localhost)
+        host->senders_last_chart_command = now_realtime_sec();
+
+    if(!type || !type[0])
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
               , (id && *id)?id:"<unset>"
               , (name && *name)?name:"<unset>"
@@ -502,10 +779,8 @@ RRDSET *rrdset_create_custom(
               , (plugin && *plugin)?plugin:"<unset>"
               , (module && *module)?module:"<unset>"
         );
-        return NULL;
-    }
 
-    if(!id || !id[0]) {
+    if(!id || !id[0])
         fatal("Cannot create rrd stats without an id: type '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
               , type
               , (name && *name)?name:"<unset>"
@@ -516,248 +791,39 @@ RRDSET *rrdset_create_custom(
               , (plugin && *plugin)?plugin:"<unset>"
               , (module && *module)?module:"<unset>"
         );
-        return NULL;
-    }
-
-    if (host != localhost) {
-        host->senders_last_chart_command = now_realtime_sec();
-    }
 
     // ------------------------------------------------------------------------
     // check if it already exists
 
-    char fullid[RRD_ID_LENGTH_MAX + 1];
-    snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
-    json_fix_string(fullid);
-
-    int changed_from_archived_to_active = 0;
-    RRDSET *st = rrdset_find_on_create(host, fullid);
-    if (st) {
-        int mark_rebuild = 0;
-        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-            changed_from_archived_to_active = 1;
-            mark_rebuild |= META_CHART_ACTIVATED;
-        }
-
-        int rc;
-        if(unlikely(name && *name))
-            rc = rrdset_set_name(st, name);
-        else
-            rc = rrdset_set_name(st, id);
-
-        if (rc == 2)
-            mark_rebuild |= META_CHART_UPDATED;
-
-        if (unlikely(st->priority != priority)) {
-            st->priority = priority;
-            mark_rebuild |= META_CHART_UPDATED;
-        }
-        if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != update_every)) {
-            st->update_every = update_every;
-            mark_rebuild |= META_CHART_UPDATED;
-        }
-
-        if(plugin && *plugin) {
-            STRING *old_plugin = st->plugin_name;
-            st->plugin_name = rrd_string_strdupz(plugin);
-            if (old_plugin != st->plugin_name)
-                mark_rebuild |= META_PLUGIN_UPDATED;
-            string_freez(old_plugin);
-        }
-
-        if(module && *module) {
-            STRING *old_module = st->module_name;
-            st->module_name = rrd_string_strdupz(module);
-            if (old_module != st->module_name)
-                mark_rebuild |= META_MODULE_UPDATED;
-            string_freez(old_module);
-        }
-
-        if(title && *title) {
-            STRING *old_title = st->title;
-            st->title = rrd_string_strdupz(title);
-            if(old_title != st->title)
-                mark_rebuild |= META_CHART_UPDATED;
-            string_freez(old_title);
-        }
-
-        if(units && *units) {
-            STRING *old_units = st->units;
-            st->units = rrd_string_strdupz(units);
-            if(old_units != st->units)
-                mark_rebuild |= META_CHART_UPDATED;
-            string_freez(old_units);
-        }
-
-        if(context && *context) {
-            STRING *old_context = st->context;
-            st->context = rrd_string_strdupz(context);
-            if(old_context != st->context)
-                mark_rebuild |= META_CHART_UPDATED;
-            string_freez(old_context);
-        }
-
-        if (st->chart_type != chart_type) {
-            st->chart_type = chart_type;
-            mark_rebuild |= META_CHART_UPDATED;
-        }
-
-        if (mark_rebuild) {
-            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            if (mark_rebuild != META_CHART_ACTIVATED) {
-                info("Collector updated metadata for chart %s", rrdset_id(st));
-                sched_yield();
-            }
-        }
-        if (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
-            debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
-            rc = update_chart_metadata(st->chart_uuid, st, id, name);
-            if (unlikely(rc))
-                error_report("Failed to update chart metadata in the database");
-
-            if (!changed_from_archived_to_active) {
-                rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-                rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-            }
-        }
-        /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
-        if (!changed_from_archived_to_active) {
-            rrdset_update_permanent_labels(st);
-            rrdcontext_updated_rrdset(st);
-            return st;
-        }
-    }
-
-    rrdhost_wrlock(host);
-
-    st = rrdset_find_on_create(host, fullid);
-    if(st) {
-        if (changed_from_archived_to_active) {
-            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-            rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
-            rrdsetcalc_link_matching(st);
-            rrdcalctemplate_link_matching(st);
-        }
-        rrdhost_unlock(host);
-        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        rrdcontext_updated_rrdset(st);
-        return st;
-    }
+    char full_id[RRD_ID_LENGTH_MAX + 1];
+    snprintfz(full_id, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     // ------------------------------------------------------------------------
-    // get the options from the config, we need to create it
-
-    long entries = 5;
-    if (memory_mode != RRD_MEMORY_MODE_DBENGINE)
-        entries = align_entries_to_pagesize(memory_mode, history_entries);
-
-    char *cache_dir = rrdset_cache_dir(host, fullid);
-
-    // ------------------------------------------------------------------------
-    // load it or allocate it
+    // allocate it
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    st = callocz(1, sizeof(RRDSET));
+    struct rrdset_constructor tmp = {
+        .host = host,
+        .type = type,
+        .id = id,
+        .name = name,
+        .family = family,
+        .context = context,
+        .title = title,
+        .units = units,
+        .plugin = plugin,
+        .module = module,
+        .priority = priority,
+        .update_every = update_every,
+        .chart_type = chart_type,
+        .memory_mode = memory_mode,
+        .history_entries = history_entries,
+    };
 
-    st->id = string_strdupz(fullid); // fullid is already json_fix'ed
-
-    st->rrdhost = host;
-    st->cache_dir = cache_dir;
-    st->entries = entries;
-    st->update_every = update_every;
-
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
-        if(!rrdset_memory_load_or_create_map_save(st, memory_mode)) {
-            info("Failed to use memory mode %s for chart '%s', falling back to ram", (memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st));
-            memory_mode = RRD_MEMORY_MODE_RAM;
-        }
-    }
-    st->rrd_memory_mode = memory_mode;
-
-    st->plugin_name = rrd_string_strdupz(plugin);
-    st->module_name = rrd_string_strdupz(module);
-    st->chart_type  = chart_type;
-    st->type        = rrd_string_strdupz(type);
-    st->family      = family ? rrd_string_strdupz(family) : string_dup(st->type);
-
-    if(strcmp(rrdset_id(st), ML_ANOMALY_RATES_CHART_ID) == 0)
-        rrdset_flag_set(st, RRDSET_FLAG_ANOMALY_RATE_CHART);
-
-    st->units = rrd_string_strdupz(units);
-
-    st->context = (context && *context) ? rrd_string_strdupz(context) : string_dup(st->id);
-
-    st->priority = priority;
-
-    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-
-    st->green = NAN;
-    st->red = NAN;
-
-    st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
-
-    st->rrddim_root_index = dictionary_create(
-          DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-        );
-
-    st->rrdvar_root_index = dictionary_create(
-          DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-        | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-        );
-
-    netdata_rwlock_init(&st->rrdset_rwlock);
-    st->rrdlabels = rrdlabels_create();
-    rrdset_update_permanent_labels(st);
-
-    if(name && *name && rrdset_set_name(st, name))
-        // we did set the name
-        ;
-    else
-        // could not use the name, use the id
-        rrdset_set_name(st, id);
-
-    st->title = rrd_string_strdupz(title);
-
-    st->rrdfamily = rrdfamily_create(host, rrdset_family(st));
-
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->rrdset_root, st, prev, next);
-
-    if(host->health_enabled) {
-        rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
-    }
-
-    rrdset_index_add(host, st);
-    rrdsetcalc_link_matching(st);
-    rrdcalctemplate_link_matching(st);
-
-    st->chart_uuid = find_chart_uuid(host, type, id, name);
-    if (unlikely(!st->chart_uuid))
-        st->chart_uuid = create_chart_uuid(st, id, name);
-    else
-        update_chart_metadata(st->chart_uuid, st, id, name);
-
-    store_active_chart(st->chart_uuid);
-    compute_chart_hash(st);
-
-    rrdhost_unlock(host);
-    rrdcontext_updated_rrdset(st);
+    RRDSET *st = rrdset_index_add(host, full_id, &tmp);
     return(st);
 }
-
 
 // ----------------------------------------------------------------------------
 // RRDSET - data collection iteration control
@@ -1030,8 +1096,36 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rrdcontext_collected_rrddim(rd);
 }
 
+struct rda_item {
+    const DICTIONARY_ITEM *item;
+    RRDDIM *rd;
+};
+
+static __thread struct rda_item *thread_rda = NULL;
+static __thread size_t thread_rda_entries = 0;
+
+struct rda_item *rrdset_thread_rda(size_t *dimensions) {
+
+    if(unlikely(!thread_rda || (*dimensions) > thread_rda_entries)) {
+        freez(thread_rda);
+        thread_rda = mallocz((*dimensions) * sizeof(struct rda_item));
+        thread_rda_entries = *dimensions;
+    }
+
+    *dimensions = thread_rda_entries;
+    return thread_rda;
+}
+
+void rrdset_thread_rda_free(void) {
+    freez(thread_rda);
+    thread_rda = NULL;
+    thread_rda_entries = 0;
+}
+
 static inline size_t rrdset_done_interpolate(
         RRDSET *st
+        , struct rda_item *rda_base
+        , size_t rda_slots
         , usec_t update_every_ut
         , usec_t last_stored_ut
         , usec_t next_store_ut
@@ -1068,9 +1162,11 @@ static inline size_t rrdset_done_interpolate(
 
         last_ut = next_store_ut;
 
-        rrddim_foreach_read(rd, st) {
-            if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-                continue;
+        struct rda_item *rda;
+        size_t dim_id;
+        for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+            rd = rda->rd;
+            if(unlikely(!rd)) continue;
 
             NETDATA_DOUBLE new_value;
 
@@ -1226,6 +1322,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
             #endif
         }
     }
+    rrddim_foreach_done(rd);
 
     if(c > 0) {
         c--;
@@ -1258,13 +1355,14 @@ void rrdset_done(RRDSET *st) {
 
     netdata_thread_disable_cancelability();
 
-    // a read lock is OK here
-    rrdset_rdlock(st);
-
 #ifdef ENABLE_ACLK
-    if (likely(!rrdset_is_ar_chart(st))) {
-        if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-            if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
+    time_t mark = now_realtime_sec();
+    bool rrdset_flag_aclk = rrdset_flag_check(st, RRDSET_FLAG_ACLK);
+    bool rrdset_is_ar = rrdset_is_ar_chart(st);
+
+    if (likely(!rrdset_is_ar)) {
+        if (unlikely(!rrdset_flag_aclk)) {
+            if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
             }
         }
@@ -1414,6 +1512,42 @@ after_first_database_work:
     if(unlikely(st->rrdhost->rrdpush_send_enabled))
         rrdset_done_push(st);
 
+    size_t rda_slots = dictionary_entries(st->rrddim_root_index);
+    struct rda_item *rda_base = rrdset_thread_rda(&rda_slots);
+
+    size_t dim_id;
+    size_t dimensions = 0;
+    struct rda_item *rda = rda_base;
+    st->collected_total = 0;
+    rrddim_foreach_read(rd, st) {
+        if(rd_dfe.counter >= rda_slots)
+            break;
+
+        rda = &rda_base[dimensions++];
+
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+            rda->item = NULL;
+            rda->rd = NULL;
+            continue;
+        }
+
+        // store the dimension in the array
+        rda->item = dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
+        rda->rd = dictionary_acquired_item_value(rda->item);
+
+        // calculate totals
+        if(likely(rd->updated)) {
+            st->collected_total += rd->collected_value;
+
+            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
+                error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+                rrddim_isnot_obsolete(st, rd);
+            }
+        }
+    }
+    rrddim_foreach_done(rd);
+    rda_slots = dimensions;
+
     if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE))
         goto after_second_database_work;
 
@@ -1424,36 +1558,18 @@ after_first_database_work:
     rrdset_debug(st, "next_store_ut   = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
     #endif
 
-    // calculate totals and count the dimensions
-    int dimensions = 0;
-    st->collected_total = 0;
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-            continue;
-
-        dimensions++;
-
-        if(likely(rd->updated))
-            st->collected_total += rd->collected_value;
-    }
-
     uint32_t has_reset_value = 0;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
     // at this stage we do not interpolate anything
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-            continue;
+    for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+        rd = rda->rd;
+        if(unlikely(!rd)) continue;
 
         if(unlikely(!rd->updated)) {
             rd->calculated_value = 0;
             continue;
-        }
-
-        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
-            rrddim_isnot_obsolete(st, rd);
         }
 
         #ifdef NETDATA_INTERNAL_CHECKS
@@ -1530,7 +1646,7 @@ after_first_database_work:
                           , rd->last_collected_value
                           , rd->collected_value);
 
-                    if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                         has_reset_value = 1;
 
                     uint64_t last = (uint64_t)rd->last_collected_value;
@@ -1599,7 +1715,7 @@ after_first_database_work:
                           , rd->collected_value
                     );
 
-                    if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                         has_reset_value = 1;
 
                     rd->last_collected_value = rd->collected_value;
@@ -1669,7 +1785,10 @@ after_first_database_work:
 //     }
 // #endif
 
-    rrdset_done_interpolate(st
+    rrdset_done_interpolate(
+            st
+            , rda_base
+            ,rda_slots
             , update_every_ut
             , last_stored_ut
             , next_store_ut
@@ -1682,17 +1801,13 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#ifdef ENABLE_ACLK
-    time_t mark = now_realtime_sec();
-#endif
-
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
-            continue;
+    for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+        rd = rda->rd;
+        if(unlikely(!rd)) continue;
 
 #ifdef ENABLE_ACLK
-        if (likely(!rrdset_is_ar_chart(st))) {
-            if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) && likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
+        if (likely(!rrdset_is_ar)) {
+            if (!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) && likely(rrdset_flag_aclk))
                 queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
         }
 #endif
@@ -1760,97 +1875,25 @@ after_second_database_work:
         // update the memory mapped files with the latest values
 
         rrdset_memory_file_update(st);
-        rrddim_foreach_read(rd, st) {
+
+        for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+            rd = rda->rd;
+            if(unlikely(!rd)) continue;
             rrddim_memory_file_update(rd);
         }
     }
 
-    // find if there are any obsolete dimensions
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
-        rrddim_foreach_read(rd, st)
-            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
-                break;
+    for(dim_id = 0, rda = rda_base, rd = rda->rd ; dim_id < rda_slots ; ++dim_id, ++rda) {
+        rd = rda->rd;
+        if(unlikely(!rd)) continue;
 
-        if(unlikely(rd)) {
-            time_t now = now_realtime_sec();
-
-            RRDDIM *last;
-            // there is a dimension to free
-            // upgrade our read lock to a write lock
-            rrdset_unlock(st);
-            rrdset_wrlock(st);
-
-            for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&  !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)
-                             && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
-                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
-
-                    const char *cache_filename = rrddim_cache_filename(rd);
-                    if(cache_filename) {
-                        info("Deleting dimension file '%s'.", cache_filename);
-                        if (unlikely(unlink(cache_filename) == -1))
-                            error("Cannot delete dimension file '%s'", cache_filename);
-                    }
-
-#ifdef ENABLE_DBENGINE
-                    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                        rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-                        while(rd->variables)
-                            rrddimvar_free(rd->variables);
-
-                        rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
-
-                        size_t tiers_available = 0, tiers_said_yes = 0;
-                        for(int tier = 0; tier < storage_tiers ;tier++) {
-                            if(rd->tiers[tier]) {
-                                tiers_available++;
-
-                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
-                                    tiers_said_yes++;
-
-                                rd->tiers[tier]->db_collection_handle = NULL;
-                            }
-                        }
-
-                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
-                            /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->metric_uuid);
-                        } else {
-                            /* Do not delete this dimension */
-#ifdef ENABLE_ACLK
-                            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
-#endif
-                            last = rd;
-                            rd = rd->next;
-                            continue;
-                        }
-                    }
-#endif
-                    if(unlikely(!last)) {
-                        rrddim_free(st, rd);
-                        rd = st->dimensions;
-                        continue;
-                    }
-                    else {
-                        rrddim_free(st, rd);
-                        rd = last->next;
-                        continue;
-                    }
-                }
-
-                last = rd;
-                rd = rd->next;
-            }
-        }
-        else {
-            rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
-        }
+        dictionary_acquired_item_release(st->rrddim_root_index, rda->item);
+        rda->item = NULL;
+        rda->rd = NULL;
     }
 
     rrdcontext_collected_rrdset(st);
 
-    rrdset_unlock(st);
     netdata_thread_enable_cancelability();
 }
 

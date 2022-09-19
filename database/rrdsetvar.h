@@ -11,34 +11,20 @@
 // This means, there will be no speed penalty for using
 // these variables
 
-struct rrdsetvar {
-    STRING *variable;               // variable name
+extern void rrdsetvar_index_init(RRDSET *st);
+extern void rrdsetvar_index_destroy(RRDSET *st);
+extern void rrdsetvar_release_and_delete_all(RRDSET *st);
 
-    STRING *key_fullid;             // chart type.chart id.variable
-    STRING *key_fullname;           // chart type.chart name.variable
+#define rrdsetvar_custom_chart_variable_release(st, rsa) rrdsetvar_release((st)->rrdsetvar_root_index, rsa)
+extern void rrdsetvar_release(DICTIONARY *dict, const RRDSETVAR_ACQUIRED *rsa);
 
-    RRDVAR_TYPE type;
-    void *value;
-
-    RRDVAR_OPTIONS options;
-
-    RRDVAR *var_local;
-    RRDVAR *var_family;
-    RRDVAR *var_host;
-    RRDVAR *var_family_name;
-    RRDVAR *var_host_name;
-
-    struct rrdset *rrdset;
-
-    struct rrdsetvar *next;
-    struct rrdsetvar *prev;
-};
-
-extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);
-extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, NETDATA_DOUBLE value);
+extern const RRDSETVAR_ACQUIRED *rrdsetvar_custom_chart_variable_add_and_acquire(RRDSET *st, const char *name);
+extern void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *rsa, NETDATA_DOUBLE value);
 
 extern void rrdsetvar_rename_all(RRDSET *st);
-extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options);
-extern void rrdsetvar_free(RRDSETVAR *rs);
+extern const RRDSETVAR_ACQUIRED *rrdsetvar_add_and_acquire(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags);
+extern void rrdsetvar_add_and_leave_released(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags);
+
+extern void rrdsetvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb);
 
 #endif //NETDATA_RRDSETVAR_H

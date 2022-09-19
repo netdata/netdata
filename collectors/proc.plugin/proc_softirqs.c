@@ -155,7 +155,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
             // calls of this function.
             if(unlikely(!irr->rd || strncmp(irr->name, rrddim_name(irr->rd), MAX_INTERRUPT_NAME) != 0)) {
                 irr->rd = rrddim_add(st_system_softirqs, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_set_name(st_system_softirqs, irr->rd, irr->name);
+                rrddim_reset_name(st_system_softirqs, irr->rd, irr->name);
 
                 // also reset per cpu RRDDIMs to avoid repeating strncmp() in the per core loop
                 if(likely(do_per_core != CONFIG_BOOLEAN_NO)) {
@@ -231,7 +231,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 if(irr->used && (do_per_core == CONFIG_BOOLEAN_YES || irr->cpu[c].value)) {
                     if(unlikely(!irr->cpu[c].rd)) {
                         irr->cpu[c].rd = rrddim_add(core_st[c], irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                        rrddim_set_name(core_st[c], irr->cpu[c].rd, irr->name);
+                        rrddim_reset_name(core_st[c], irr->cpu[c].rd, irr->name);
                     }
 
                     rrddim_set_by_pointer(core_st[c], irr->cpu[c].rd, irr->cpu[c].value);

@@ -252,8 +252,8 @@ void disable_zfs_pool_state(struct zfs_pool *pool)
     pool->disabled = 1;
 }
 
-int update_zfs_pool_state_chart(const char *name, void *pool_p, void *update_every_p)
-{
+int update_zfs_pool_state_chart(const DICTIONARY_ITEM *item, void *pool_p, void *update_every_p) {
+    const char *name = dictionary_acquired_item_name(item);
     struct zfs_pool *pool = (struct zfs_pool *)pool_p;
     int update_every = *(int *)update_every_p;
 
@@ -321,7 +321,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
         dirname = config_get("plugin:proc:" ZFS_PROC_POOLS, "directory to monitor", filename);
 
-        zfs_pools = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        zfs_pools = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
         do_zfs_pool_state = 1;
     }

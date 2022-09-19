@@ -874,8 +874,6 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
             rrdlabels_add(st->rrdlabels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
             break;
     }
-
-    rrdcalc_update_rrdlabels(st);
 }
 
 int do_proc_diskstats(int update_every, usec_t dt) {

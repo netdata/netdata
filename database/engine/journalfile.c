@@ -519,7 +519,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     journalfile->file = file;
     journalfile->pos = file_size;
     journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0);
-    info("Loading journal file \"%s\" using %s.", path, journalfile->data?"using MMAP":"using uv_fs_read");
+    info("Loading journal file \"%s\" using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
 
     max_id = iterate_transactions(ctx, journalfile);
 

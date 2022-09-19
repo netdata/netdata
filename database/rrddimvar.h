@@ -10,48 +10,12 @@
 // calculated / processed by the normal data collection process
 // This means, there will be no speed penalty for using
 // these variables
-struct rrddimvar {
-    STRING *prefix;
-    STRING *suffix;
-
-    STRING *key_id;                   // dimension id
-    STRING *key_name;                 // dimension name
-    STRING *key_contextid;            // context + dimension id
-    STRING *key_contextname;          // context + dimension name
-    STRING *key_fullidid;             // chart type.chart id + dimension id
-    STRING *key_fullidname;           // chart type.chart id + dimension name
-    STRING *key_fullnameid;           // chart type.chart name + dimension id
-    STRING *key_fullnamename;         // chart type.chart name + dimension name
-
-    RRDVAR_TYPE type;
-    void *value;
-
-    RRDVAR_OPTIONS options;
-
-    RRDVAR *var_local_id;
-    RRDVAR *var_local_name;
-
-    RRDVAR *var_family_id;
-    RRDVAR *var_family_name;
-    RRDVAR *var_family_contextid;
-    RRDVAR *var_family_contextname;
-
-    RRDVAR *var_host_chartidid;
-    RRDVAR *var_host_chartidname;
-    RRDVAR *var_host_chartnameid;
-    RRDVAR *var_host_chartnamename;
-
-    struct rrddim *rrddim;
-
-    struct rrddimvar *next;
-    struct rrddimvar *prev;
-};
-
 
 extern void rrddimvar_rename_all(RRDDIM *rd);
-extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options);
-extern void rrddimvar_free(RRDDIMVAR *rs);
+extern void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS flags);
+extern void rrddimvar_delete_all(RRDDIM *rd);
 
-
+extern void rrddimvar_index_init(RRDSET *st);
+extern void rrddimvar_index_destroy(RRDSET *st);
 
 #endif //NETDATA_RRDDIMVAR_H

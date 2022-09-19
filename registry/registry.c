@@ -108,9 +108,7 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
@@ -443,8 +441,8 @@ void registry_statistics(void) {
     }
     else rrdset_next(stm);
 
-    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_allocated_memory(registry.persons));
-    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_allocated_memory(registry.machines));
+    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_for_registry(registry.persons));
+    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_for_registry(registry.machines));
     rrddim_set(stm, "urls",          registry.urls_memory);
     rrddim_set(stm, "persons_urls",  registry.persons_urls_memory);
     rrddim_set(stm, "machines_urls", registry.machines_urls_memory);

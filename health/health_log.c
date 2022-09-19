@@ -182,12 +182,15 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
     size_t line = 0, len = 0;
     ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
-
-    DICTIONARY *all_rrdcalcs = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    DICTIONARY *all_rrdcalcs = dictionary_create(
+        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(host, rc)
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
+
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
@@ -394,10 +397,10 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         }
     }
 
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
     dictionary_destroy(all_rrdcalcs);
     all_rrdcalcs = NULL;
-
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     freez(buf);
 
@@ -510,7 +513,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log(
+inline void health_alarm_log_add_entry(
         RRDHOST *host,
         ALARM_ENTRY *ae
 ) {
@@ -568,8 +571,6 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
-    rrdhost_check_wrlock(host);
-
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;

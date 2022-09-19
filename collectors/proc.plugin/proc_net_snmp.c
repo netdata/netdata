@@ -104,7 +104,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
              *arl_udp = NULL,
              *arl_udplite = NULL;
 
-    static RRDVAR *tcp_max_connections_var = NULL;
+    static const RRDVAR_ACQUIRED *tcp_max_connections_var = NULL;
 
     if(unlikely(!arl_ip)) {
         do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
@@ -216,7 +216,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
         arl_expect(arl_udplite, "InCsumErrors", &snmp_root.udplite_InCsumErrors);
         arl_expect(arl_udplite, "IgnoredMulti", &snmp_root.udplite_IgnoredMulti);
 
-        tcp_max_connections_var = rrdvar_custom_host_variable_create(localhost, "tcp_max_connections");
+        tcp_max_connections_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_connections");
     }
 
     if(unlikely(!ff)) {

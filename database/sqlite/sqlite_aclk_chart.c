@@ -150,7 +150,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
     if (likely(claim_id)) {
         struct chart_instance_updated chart_payload;
         memset(&chart_payload, 0, sizeof(chart_payload));
-        chart_payload.config_hash = get_str_from_uuid(&st->uuid);
+        chart_payload.config_hash = get_str_from_uuid(&st->hash_uuid);
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
         chart_payload.name = (char *)rrdset_name(st);
@@ -164,7 +164,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         size_t size;
         char *payload = generate_chart_instance_updated(&size, &chart_payload);
         if (likely(payload))
-            rc = aclk_add_chart_payload(wc, st->chart_uuid, claim_id, ACLK_PAYLOAD_CHART, (void *) payload, size, NULL, 1);
+            rc = aclk_add_chart_payload(wc, &st->chart_uuid, claim_id, ACLK_PAYLOAD_CHART, (void *) payload, size, NULL, 1);
         freez(payload);
         chart_instance_updated_destroy(&chart_payload);
     }
@@ -588,24 +588,23 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
 
         RRDHOST *host = wc->host;
         if (likely(host)) {
-            rrdhost_rdlock(host);
             RRDSET *st;
-            rrdset_foreach_read(st, host)
-            {
-                rrdset_rdlock(st);
+            rrdset_foreach_read(st, host) {
                 rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
                 RRDDIM *rd;
-                rrddim_foreach_read(rd, st)
-                {
+                rrddim_foreach_read(rd, st) {
                     rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
                     rd->aclk_live_status = (rd->aclk_live_status == 0);
                 }
-                rrdset_unlock(st);
+                rrddim_foreach_done(rd);
             }
-            rrdhost_unlock(host);
-        } else
+            rrdset_foreach_done(st);
+        }
+        else
             error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
-    } else {
+
+    }
+    else {
         log_access(
             "ACLK STA [%s (%s)]: RESTARTING CHART SYNC FROM SEQUENCE %" PRIu64,
             wc->node_id,
@@ -1268,29 +1267,26 @@ void sql_check_chart_liveness(RRDSET *st) {
     if (unlikely(rrdset_is_ar_chart(st)))
         return;
 
-    rrdset_rdlock(st);
-
-    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        rrdset_unlock(st);
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK)))
         return;
-    }
 
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        if (likely(st->dimensions && st->counter_done && !queue_chart_to_aclk(st))) {
+        if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
             debug(D_ACLK_SYNC,"Check chart liveness [%s] submit chart definition", rrdset_name(st));
             rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
     else
         debug(D_ACLK_SYNC,"Check chart liveness [%s] chart definition already submitted", rrdset_name(st));
+
     time_t mark = now_realtime_sec();
 
     debug(D_ACLK_SYNC,"Check chart liveness [%s] scanning dimensions", rrdset_name(st));
     rrddim_foreach_read(rd, st) {
-        if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN))
+        if (!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
             queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
     }
-    rrdset_unlock(st);
+    rrddim_foreach_done(rd);
 }
 
 // ST is read locked
