@@ -962,7 +962,8 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
     DICTIONARY *rrdfamily_root_index;               // the host's chart families index
-    DICTIONARY *rrdvars;                 // the host's chart variables index
+    DICTIONARY *rrdvars;                            // the host's chart variables index
+                                                    // this includes custom host variables
 
     STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 

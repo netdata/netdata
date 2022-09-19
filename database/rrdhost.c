@@ -243,7 +243,6 @@ static void rrdhost_initialize_health(RRDHOST *host,
     rrdfamily_index_init(host);
     rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
-    host->rrdvars = rrdvariables_create();
 
     host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
     host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
@@ -402,6 +401,10 @@ RRDHOST *rrdhost_create(const char *hostname,
         host->varlib_dir = strdupz(filename);
     }
 
+    // this is also needed for custom host variables - not only health
+    if(!host->rrdvars)
+        host->rrdvars = rrdvariables_create();
+    
     rrdhost_initialize_health(host, is_localhost);
 
     RRDHOST *t = rrdhost_index_add_by_guid(host);
@@ -621,6 +624,9 @@ void rrdhost_update(RRDHOST *host
 
     // update host tags
     rrdhost_init_tags(host, tags);
+
+    if(!host->rrdvars)
+        host->rrdvars = rrdvariables_create();
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
