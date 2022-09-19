@@ -404,7 +404,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     // this is also needed for custom host variables - not only health
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
-    
+
     rrdhost_initialize_health(host, is_localhost);
 
     RRDHOST *t = rrdhost_index_add_by_guid(host);

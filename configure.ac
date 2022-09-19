@@ -1718,6 +1718,7 @@ AC_CONFIG_FILES([
     libnetdata/simple_pattern/Makefile
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
+    libnetdata/string/Makefile
     libnetdata/storage_number/Makefile
     libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile

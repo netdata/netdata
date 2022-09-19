@@ -173,6 +173,8 @@ LIBNETDATA_FILES = \
     libnetdata/socket/security.h \
     libnetdata/statistical/statistical.c \
     libnetdata/statistical/statistical.h \
+    libnetdata/string/string.c \
+    libnetdata/string/string.h \
     libnetdata/storage_number/storage_number.c \
     libnetdata/storage_number/storage_number.h \
     libnetdata/threads/threads.c \

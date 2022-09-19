@@ -450,6 +450,8 @@ set(LIBNETDATA_FILES
         libnetdata/avl/avl.h
         libnetdata/buffer/buffer.c
         libnetdata/buffer/buffer.h
+        libnetdata/circular_buffer/circular_buffer.c
+        libnetdata/circular_buffer/circular_buffer.h
         libnetdata/clocks/clocks.c
         libnetdata/clocks/clocks.h
         libnetdata/completion/completion.c
@@ -458,10 +460,15 @@ set(LIBNETDATA_FILES
         libnetdata/dictionary/dictionary.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
+        libnetdata/health/health.c
+        libnetdata/health/health.h
         libnetdata/inlined.h
+        libnetdata/json/json.c
+        libnetdata/json/json.h
+        libnetdata/json/jsmn.c
+        libnetdata/json/jsmn.h
         libnetdata/libnetdata.c
         libnetdata/libnetdata.h
-        libnetdata/required_dummies.h
         libnetdata/locks/locks.c
         libnetdata/locks/locks.h
         libnetdata/log/log.c
@@ -474,6 +481,9 @@ set(LIBNETDATA_FILES
         libnetdata/popen/popen.h
         libnetdata/procfile/procfile.c
         libnetdata/procfile/procfile.h
+        libnetdata/required_dummies.h
+        libnetdata/socket/security.c
+        libnetdata/socket/security.h
         libnetdata/simple_pattern/simple_pattern.c
         libnetdata/simple_pattern/simple_pattern.h
         libnetdata/socket/socket.c
@@ -482,23 +492,16 @@ set(LIBNETDATA_FILES
         libnetdata/statistical/statistical.h
         libnetdata/storage_number/storage_number.c
         libnetdata/storage_number/storage_number.h
+        libnetdata/string/string.c
+        libnetdata/string/string.h
         libnetdata/threads/threads.c
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
-        libnetdata/json/json.c
-        libnetdata/json/json.h
-        libnetdata/json/jsmn.c
-        libnetdata/json/jsmn.h
-        libnetdata/health/health.c
-        libnetdata/health/health.h
         libnetdata/string/utf8.h
-        libnetdata/socket/security.c
-        libnetdata/socket/security.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
-        libnetdata/circular_buffer/circular_buffer.c
-        libnetdata/circular_buffer/circular_buffer.h)
+        )
 
 IF(ENABLE_PLUGIN_EBPF)
     list(APPEND LIBNETDATA_FILES

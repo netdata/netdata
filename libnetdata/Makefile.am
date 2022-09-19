@@ -25,6 +25,7 @@ SUBDIRS = \
     socket \
     statistical \
     storage_number \
+    string \
     threads \
     url \
     worker_utilization \
