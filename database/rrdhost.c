@@ -415,7 +415,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
         int rc;
 
-        rrdhost_initialize_health(host, is_localhost);
         if(!archived) {
             rc = sql_store_host_info(host);
             if (unlikely(rc))
@@ -426,6 +425,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
+
+    rrdhost_initialize_health(host, is_localhost);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
