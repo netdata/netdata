@@ -515,7 +515,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - cmd_ctx->command_string_size);
+        to_copy = MIN((size_t) nread, MAX_COMMAND_LENGTH - 1 - cmd_ctx->command_string_size);
         memcpy(cmd_ctx->command_string + cmd_ctx->command_string_size, buf->base, to_copy);
         cmd_ctx->command_string_size += to_copy;
         cmd_ctx->command_string[cmd_ctx->command_string_size] = '\0';
