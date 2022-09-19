@@ -405,8 +405,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
     
-    rrdhost_initialize_health(host, is_localhost);
-
     RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
         error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
@@ -416,6 +414,8 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
         int rc;
+
+        rrdhost_initialize_health(host, is_localhost);
         if(!archived) {
             rc = sql_store_host_info(host);
             if (unlikely(rc))
