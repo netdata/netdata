@@ -1524,13 +1524,13 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     freez(dict);
 
     internal_error(
-        true,
+        false,
         "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total freed memory: %zu bytes (sizeof(dict) = %zu, sizeof(item) = %zu).",
         creation_function,
         creation_line,
         creation_file,
         entries, counted_items, referenced_items, pending_deletion_items,
-        dict_size, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM) + sizeof(DICTIONARY_ITEM_SHARED));
+        dict_size + item_size, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM) + sizeof(DICTIONARY_ITEM_SHARED));
 
     if(mem)
         *mem = dict_size + item_size + index_size;
