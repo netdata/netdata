@@ -700,7 +700,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
         reset = 1;
     }
     else if(rd_on_file->memsize != size) {
-        error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, rd_on_file->memsize);
+        error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, (unsigned long int) rd_on_file->memsize);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
