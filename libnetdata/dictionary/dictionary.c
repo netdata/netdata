@@ -1684,7 +1684,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         function,
         name,
         strlen(name) + 1,
-        name_len,
+        (long int) name_len,
         dict?dict->creation_function:"unknown",
         dict?dict->creation_line:0,
         dict?dict->creation_file:"unknown");
@@ -1695,7 +1695,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         function,
         name,
         strlen(name) + 1,
-        name_len,
+        (long int) name_len,
         dict?dict->creation_function:"unknown",
         dict?dict->creation_line:0,
         dict?dict->creation_file:"unknown");
