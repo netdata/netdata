@@ -4,11 +4,7 @@
 #include "sqlite_functions.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
-
-inline int sqlite3_bind_string_or_null(sqlite3_stmt *res, STRING *key, int param)
-{
-    return key ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param);
-}
+#define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
 
 /* Health related SQL queries
    Creates a health log table in sqlite, one per host guid
