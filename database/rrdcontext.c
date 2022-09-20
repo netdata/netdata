@@ -857,7 +857,7 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
     RRDSET *st = ri->rrdset;
 
     if(likely(st)) {
-        if(unlikely(st->priority != ri->priority)) {
+        if(unlikely((unsigned int) st->priority != ri->priority)) {
             ri->priority = st->priority;
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
         }
