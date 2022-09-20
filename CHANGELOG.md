@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- disable internal log [\#13678](https://github.com/netdata/netdata/pull/13678) ([ktsaou](https://github.com/ktsaou))
+- bump go.d.plugin v0.40.0 [\#13675](https://github.com/netdata/netdata/pull/13675) ([ilyam8](https://github.com/ilyam8))
 - remove \_instance\_family label [\#13674](https://github.com/netdata/netdata/pull/13674) ([ilyam8](https://github.com/ilyam8))
 - fix typo not deleting collected flag; force removing collected flag on child disconnect [\#13672](https://github.com/netdata/netdata/pull/13672) ([ktsaou](https://github.com/ktsaou))
+- feat\(health\): add Postgres alarms [\#13671](https://github.com/netdata/netdata/pull/13671) ([ilyam8](https://github.com/ilyam8))
 - add proxysql dashboard info [\#13669](https://github.com/netdata/netdata/pull/13669) ([ilyam8](https://github.com/ilyam8))
 - Additional sqlite statistics [\#13668](https://github.com/netdata/netdata/pull/13668) ([stelfrag](https://github.com/stelfrag))
 - Advance the buffer properly to scan the journal file [\#13666](https://github.com/netdata/netdata/pull/13666) ([stelfrag](https://github.com/stelfrag))
@@ -20,6 +23,7 @@
 - Do not free AR dimensions from within ML. [\#13651](https://github.com/netdata/netdata/pull/13651) ([vkalintiris](https://github.com/vkalintiris))
 - Improve agent shutdown time [\#13649](https://github.com/netdata/netdata/pull/13649) ([stelfrag](https://github.com/stelfrag))
 - add \_collect\_job label to python.d/\* charts [\#13648](https://github.com/netdata/netdata/pull/13648) ([ilyam8](https://github.com/ilyam8))
+- RRD structures managed by dictionaries [\#13646](https://github.com/netdata/netdata/pull/13646) ([ktsaou](https://github.com/ktsaou))
 - fix rrdcontexts left in the post-processing queue from the garbage collector [\#13645](https://github.com/netdata/netdata/pull/13645) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin: Re-add `chrome` to the `webbrowser` group. [\#13642](https://github.com/netdata/netdata/pull/13642) ([Ferroin](https://github.com/Ferroin))
 - Fix a memory leak on archived host creation [\#13641](https://github.com/netdata/netdata/pull/13641) ([stelfrag](https://github.com/stelfrag))
@@ -306,7 +310,6 @@
 - Labels with dictionary [\#13070](https://github.com/netdata/netdata/pull/13070) ([ktsaou](https://github.com/ktsaou))
 - Use a separate thread for slow mountpoints in the diskspace plugin [\#13067](https://github.com/netdata/netdata/pull/13067) ([vlvkobal](https://github.com/vlvkobal))
 - Remove official support for Debian 9. [\#13065](https://github.com/netdata/netdata/pull/13065) ([Ferroin](https://github.com/Ferroin))
-- Fix coverity 378587 [\#13024](https://github.com/netdata/netdata/pull/13024) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
@@ -350,9 +353,6 @@
 - add hostname to mirrored hosts [\#13030](https://github.com/netdata/netdata/pull/13030) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v2.25.6. [\#13028](https://github.com/netdata/netdata/pull/13028) ([netdatabot](https://github.com/netdatabot))
 - prevent gap filling on dbengine gaps [\#13027](https://github.com/netdata/netdata/pull/13027) ([ktsaou](https://github.com/ktsaou))
-- Initialize a pointer and add a check for it [\#13023](https://github.com/netdata/netdata/pull/13023) ([vlvkobal](https://github.com/vlvkobal))
-- Fix coverity issue 378598 [\#13022](https://github.com/netdata/netdata/pull/13022) ([MrZammler](https://github.com/MrZammler))
-- Skip collecting network interface speed and duplex if carrier is down [\#13019](https://github.com/netdata/netdata/pull/13019) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
