@@ -102,7 +102,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", e->data.items);
+            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
