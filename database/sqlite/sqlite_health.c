@@ -1065,7 +1065,6 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
   if cloud is disabled or openssl is not available (which will prevent cloud connectivity)
   skip hash calculations
 */
-
 #if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
 #define DIGEST_ALERT_CONFIG_VAL(v) ((v) ? EVP_DigestUpdate(evpctx, (string2str(v)), string_strlen((v))) : EVP_DigestUpdate(evpctx, "", 1))
 #endif
