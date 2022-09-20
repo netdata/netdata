@@ -2951,25 +2951,38 @@ struct thread_view_unittest {
 static void *unittest_dict_master_thread(void *arg) {
     struct thread_view_unittest *tv = arg;
 
+    DICTIONARY_ITEM *item = NULL;
+    int loops = 0;
     while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST)) {
-        if(__atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST) != NULL)
-            continue;
 
-        DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(tv->master, "ITEM1", "123", strlen("123") + 1);
-        dictionary_acquired_item_dup(tv->master, item);
+        if(!item)
+            item = dictionary_set_and_acquire_item(tv->master, "ITEM1", "123", strlen("123") + 1);
+
+        if(__atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST) != NULL) {
+            dictionary_acquired_item_release(tv->master, item);
+            dictionary_del(tv->master, "ITEM1");
+            item = NULL;
+            loops++;
+            continue;
+        }
+
+        dictionary_acquired_item_dup(tv->master, item); // for the view thread
+        __atomic_store_n(&tv->item_master, item, __ATOMIC_SEQ_CST);
         dictionary_del(tv->master, "ITEM1");
 
-        __atomic_store_n(&tv->item_master, item, __ATOMIC_SEQ_CST);
 
-        for(int i = 0; i < tv->dups ; i++) {
+        for(int i = 0; i < tv->dups + loops ; i++) {
             dictionary_acquired_item_dup(tv->master, item);
         }
 
-        for(int i = 0; i < tv->dups ; i++) {
+        for(int i = 0; i < tv->dups + loops ; i++) {
             dictionary_acquired_item_release(tv->master, item);
         }
 
         dictionary_acquired_item_release(tv->master, item);
+
+        item = NULL;
+        loops = 0;
     }
 
     return arg;
@@ -2978,9 +2991,11 @@ static void *unittest_dict_master_thread(void *arg) {
 static void *unittest_dict_view_thread(void *arg) {
     struct thread_view_unittest *tv = arg;
 
+    DICTIONARY_ITEM *m_item = NULL;
+
     while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST)) {
-        DICTIONARY_ITEM *m_item = __atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST);
-        if(!m_item) continue;
+        if(!(m_item = __atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST)))
+            continue;
 
         DICTIONARY_ITEM *v_item = dictionary_view_set_and_acquire_item(tv->view, "ITEM2", m_item);
         dictionary_acquired_item_release(tv->master, m_item);
@@ -2995,6 +3010,11 @@ static void *unittest_dict_view_thread(void *arg) {
         }
 
         dictionary_del(tv->view, "ITEM2");
+
+        while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST) && !(m_item = __atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST))) {
+            dictionary_acquired_item_dup(tv->view, v_item);
+            dictionary_acquired_item_release(tv->view, v_item);
+        }
 
         dictionary_acquired_item_release(tv->view, v_item);
     }
@@ -3013,9 +3033,11 @@ static int dictionary_unittest_view_threads() {
     };
 
     // threads testing of dictionary
-    struct dictionary_stats stats = {};
-    tv.master = dictionary_create_advanced(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE, &stats);
+    struct dictionary_stats stats_master = {};
+    struct dictionary_stats stats_view = {};
+    tv.master = dictionary_create_advanced(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE, &stats_master);
     tv.view = dictionary_create_view(tv.master);
+    tv.view->stats = &stats_view;
 
     time_t seconds_to_run = 5;
     fprintf(
@@ -3048,27 +3070,50 @@ static int dictionary_unittest_view_threads() {
     netdata_thread_join(master_thread, &retval);
 
     fprintf(stderr,
-            "inserts %zu"
+            "MASTER: inserts %zu"
             ", deletes %zu"
             ", searches %zu"
             ", resets %zu"
-            ", entries %ld (%ld on view)"
-            ", referenced_items %ld (%ld on view)"
-            ", pending deletions %ld (%ld on view)"
+            ", entries %ld"
+            ", referenced_items %ld"
+            ", pending deletions %ld"
             ", check spins %zu"
             ", insert spins %zu"
             ", search ignores %zu"
             "\n",
-            stats.ops.inserts,
-            stats.ops.deletes,
-            stats.ops.searches,
-            stats.ops.resets,
-            tv.master->entries, tv.view->entries,
-            tv.master->referenced_items, tv.view->referenced_items,
-            tv.master->pending_deletion_items, tv.view->pending_deletion_items,
-            stats.spin_locks.use,
-            stats.spin_locks.insert,
-            stats.spin_locks.search
+            stats_master.ops.inserts,
+            stats_master.ops.deletes,
+            stats_master.ops.searches,
+            stats_master.ops.resets,
+            tv.master->entries,
+            tv.master->referenced_items,
+            tv.master->pending_deletion_items,
+            stats_master.spin_locks.use,
+            stats_master.spin_locks.insert,
+            stats_master.spin_locks.search
+    );
+    fprintf(stderr,
+            "VIEW  : inserts %zu"
+            ", deletes %zu"
+            ", searches %zu"
+            ", resets %zu"
+            ", entries %ld"
+            ", referenced_items %ld"
+            ", pending deletions %ld"
+            ", check spins %zu"
+            ", insert spins %zu"
+            ", search ignores %zu"
+            "\n",
+            stats_view.ops.inserts,
+            stats_view.ops.deletes,
+            stats_view.ops.searches,
+            stats_view.ops.resets,
+            tv.view->entries,
+            tv.view->referenced_items,
+            tv.view->pending_deletion_items,
+            stats_view.spin_locks.use,
+            stats_view.spin_locks.insert,
+            stats_view.spin_locks.search
     );
     dictionary_destroy(tv.master);
     dictionary_destroy(tv.view);

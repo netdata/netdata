@@ -12,8 +12,8 @@ struct netdata_string {
     uint32_t length;    // the string length including the terminating '\0'
 
     REFCOUNT refcount;  // how many times this string is used
-                       // We use a signed number to be able to detect duplicate frees of a string.
-                       // If at any point this goes below zero, we have a duplicate free.
+                        // We use a signed number to be able to detect duplicate frees of a string.
+                        // If at any point this goes below zero, we have a duplicate free.
 
     const char str[];   // the string itself, is appended to this structure
 };
