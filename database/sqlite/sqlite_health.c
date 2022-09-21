@@ -4,6 +4,7 @@
 #include "sqlite_functions.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
+#define sqlite3_bind_string_or_null(res,key,param) ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
 
 /* Health related SQL queries
    Creates a health log table in sqlite, one per host guid
@@ -215,49 +216,49 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 14, ae_name(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->name, 14);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind name parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 15, ae_chart_name(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->chart, 15);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 16, ae_family(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->family, 16);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind family parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 17, ae_exec(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->exec, 17);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind exec parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 18, ae_recipient(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->recipient, 18);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind recipient parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 19, ae_source(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->source, 19);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind source parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 20, ae_units(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->units, 20);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 21, ae_info(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->info, 21);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind info parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -305,25 +306,25 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 29, ae_classification(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->classification, 29);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind classification parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 30, ae_component(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->component, 30);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind component parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 31, ae_type(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->type, 31);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind type parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_text(res, 32, ae_chart_context(ae), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, ae->chart_context, 32);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_context parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -845,159 +846,153 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     }
 
     param++;
-    rc = sqlite3_bind_blob(res, 1, hash_id, sizeof(*hash_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, param, hash_id, sizeof(*hash_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    if (cfg->alarm)
-        rc = sqlite3_bind_text(res, 2, string2str(cfg->alarm), -1, SQLITE_STATIC);
-    else
-        rc = sqlite3_bind_null(res, 2);
+    rc = sqlite3_bind_string_or_null(res, cfg->alarm, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    if (cfg->template_key)
-        rc = sqlite3_bind_text(res, 3, string2str(cfg->template_key), -1, SQLITE_STATIC);
-    else
-        rc = sqlite3_bind_null(res, 3);
+    rc = sqlite3_bind_string_or_null(res, cfg->template_key, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 4, string2str(cfg->on), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->on, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 5, string2str(cfg->classification), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->classification, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 6, string2str(cfg->component), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->component, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 7, string2str(cfg->type), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->type, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 8, string2str(cfg->os), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->os, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 9, string2str(cfg->host), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->host, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 10, string2str(cfg->lookup), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->lookup, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 11, string2str(cfg->every), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->every, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 12, string2str(cfg->units), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->units, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 13, string2str(cfg->calc), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->calc, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 14, string2str(cfg->families), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->families, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 15, string2str(cfg->plugin), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->plugin, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 16, string2str(cfg->module), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->module, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 17, string2str(cfg->charts), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->charts, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 18, string2str(cfg->green), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->green, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 19, string2str(cfg->red), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->red, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 20, string2str(cfg->warn), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->warn, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 21, string2str(cfg->crit), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->crit, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 22, string2str(cfg->exec), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->exec, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 23, string2str(cfg->to), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->to, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 24, string2str(cfg->info), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->info, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 25, string2str(cfg->delay), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->delay, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 26, string2str(cfg->options), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->options, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 27, string2str(cfg->repeat), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->repeat, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 28, string2str(cfg->host_labels), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_string_or_null(res, cfg->host_labels, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     if (cfg->p_db_lookup_after) {
         param++;
-        rc = sqlite3_bind_text(res, 29, string2str(cfg->p_db_lookup_dimensions), -1, SQLITE_STATIC);
+        rc = sqlite3_bind_string_or_null(res, cfg->p_db_lookup_dimensions, param);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
         param++;
-        rc = sqlite3_bind_text(res, 30, string2str(cfg->p_db_lookup_method), -1, SQLITE_STATIC);
+        rc = sqlite3_bind_string_or_null(res, cfg->p_db_lookup_method, param);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
@@ -1067,7 +1062,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
   skip hash calculations
 */
 #if !defined DISABLE_CLOUD && defined ENABLE_HTTPS
-#define DIGEST_ALERT_CONFIG_VAL(v) EVP_DigestUpdate(evpctx, (string2str(v)), string_strlen(v))
+#define DIGEST_ALERT_CONFIG_VAL(v) ((v) ? EVP_DigestUpdate(evpctx, (string2str(v)), string_strlen((v))) : EVP_DigestUpdate(evpctx, "", 1))
 #endif
 int alert_hash_and_store_config(
     uuid_t hash_id,
