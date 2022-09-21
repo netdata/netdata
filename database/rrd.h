@@ -26,6 +26,10 @@ typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
+typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
+typedef struct rrdset_acquired RRDSET_ACQUIRED;
+typedef struct rrddim_acquired RRDDIM_ACQUIRED;
+
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
 
@@ -218,6 +222,7 @@ typedef enum rrdlabel_source {
 
 extern DICTIONARY *rrdlabels_create(void);
 extern void rrdlabels_destroy(DICTIONARY *labels_dict);
+extern void rrdlabels_flush(DICTIONARY *labels_dict);
 extern void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
 extern void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
 extern void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);

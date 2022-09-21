@@ -253,40 +253,21 @@ cleanup:
     return ret;
 }
 
-int rrdset2anything_api_v1(
-          ONEWAYALLOC *owa
-        , RRDSET *st
-        , QUERY_PARAMS *query_params
-        , BUFFER *dimensions
-        , uint32_t format
-        , long points
-        , long long after
-        , long long before
-        , int group_method
-        , const char *group_options
-        , long group_time
-        , uint32_t options
-        , time_t *latest_timestamp
-        , int tier
-)
-{
-    BUFFER *wb = query_params->wb;
-    if (query_params->context_param_list && !(query_params->context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
-        st->last_accessed_time = now_realtime_sec();
+int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp) {
 
     RRDR *r = rrd2rrdr(
         owa,
-        st,
-        points,
-        after,
-        before,
-        group_method,
-        group_time,
-        options,
-        dimensions ? buffer_tostring(dimensions) : NULL,
-        query_params->context_param_list,
-        group_options,
-        query_params->timeout, tier);
+        qt->request.st,
+        qt->request.points,
+        qt->request.after,
+        qt->request.before,
+        qt->request.group_method,
+        qt->request.resampling_time,
+        qt->request.options,
+        qt->request.dimensions,
+        NULL,
+        qt->request.group_options,
+        qt->request.timeout, qt->request.tier);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -298,9 +279,7 @@ int rrdset2anything_api_v1(
     }
 
     if (rrdset_is_ar_chart(st))
-        ml_process_rrdr(r, query_params->max_anomaly_rates);
-
-    RRDDIM *temp_rd = query_params->context_param_list ? query_params->context_param_list->rd : NULL;
+        ml_process_rrdr(r, qt->request.max_anomaly_rates);
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
         buffer_no_cacheable(wb);

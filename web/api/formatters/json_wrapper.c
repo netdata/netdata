@@ -132,7 +132,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     }
     buffer_strcat(wb, "],\n");
 
-    if (rrdset_query_data->show_dimensions) {
+    if (r->internal.query_options & RRDR_OPTION_ALL_DIMENSIONS) {
         buffer_sprintf(wb, "   %sfull_dimension_list%s: [", kq, kq);
 
         char name[RRD_ID_LENGTH_MAX * 2 + 2];

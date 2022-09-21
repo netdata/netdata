@@ -41,13 +41,14 @@ static struct {
         , {"jw-anomaly-rates"  , 0    , RRDR_OPTION_RETURN_JWAR}
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
+        , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
         , {NULL                , 0    , 0}
 };
 
 static struct {
     const char *name;
     uint32_t hash;
-    uint32_t value;
+    DATASOURCE_FORMAT value;
 } api_v1_data_formats[] = {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
         , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
@@ -68,7 +69,7 @@ static struct {
 static struct {
     const char *name;
     uint32_t hash;
-    uint32_t value;
+    DATASOURCE_FORMAT value;
 } api_v1_data_google_formats[] = {
         // this is not error - when google requests json, it expects javascript
         // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
@@ -198,7 +199,7 @@ void web_client_api_request_v1_data_options_to_string(BUFFER *wb, RRDR_OPTIONS o
     }
 }
 
-inline uint32_t web_client_api_request_v1_data_format(char *name) {
+inline DATASOURCE_FORMAT web_client_api_request_v1_data_format(char *name) {
     uint32_t hash = simple_hash(name);
     int i;
 
@@ -590,10 +591,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
     int tier = 0;
-    int group = RRDR_GROUPING_AVERAGE;
-    int show_dimensions = 0;
-    uint32_t format = DATASOURCE_JSON;
-    uint32_t options = 0x00000000;
+    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
+    DATASOURCE_FORMAT format = DATASOURCE_JSON;
+    RRDR_OPTIONS options = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -617,7 +617,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
-        else if(!strcmp(name, "show_dimensions")) show_dimensions = 1;
+        else if(!strcmp(name, "show_dimensions")) options |= RRDR_OPTION_ALL_DIMENSIONS;
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
@@ -691,79 +691,15 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     RRDSET *st = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
 
-    if((!chart || !*chart) && (!context)) {
-        buffer_sprintf(w->response.data, "No chart id is given at the request.");
+    if(!is_valid_sp(chart) && !is_valid_sp(context)) {
+        buffer_sprintf(w->response.data, "No chart or context is given.");
         goto cleanup;
     }
 
-    struct context_param  *context_param_list = NULL;
-
-    if (context && !chart) {
-        RRDSET *st1;
-
-        SIMPLE_PATTERN *chart_label_key_pattern = NULL;
-        if(chart_label_key)
-            chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
-
-        SIMPLE_PATTERN *chart_labels_filter_pattern = NULL;
-        if(chart_labels_filter)
-            chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
-
-        STRING *context_string = string_strdupz(context);
-        rrdset_foreach_read(st1, host) {
-            if (st1->context == context_string &&
-                (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->rrdlabels, chart_label_key_pattern, ':')) &&
-                (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->rrdlabels, chart_labels_filter_pattern, ':')))
-                    build_context_param_list(owa, &context_param_list, st1);
-        }
-        rrdset_foreach_done(st1);
-        string_freez(context_string);
-
-        if (likely(context_param_list && context_param_list->rd))  // Just set the first one
-            st = context_param_list->rd->rrdset;
-        else {
-            if (!chart_label_key && !chart_labels_filter)
-                sql_build_context_param_list(owa, &context_param_list, host, context, NULL);
-        }
-    }
-    else {
+    if(chart) {
+        // check if this is a specific chart
         st = rrdset_find(host, chart);
-        if (!st)
-            st = rrdset_find_byname(host, chart);
-        if (likely(st))
-            st->last_accessed_time = now_realtime_sec();
-        else
-            sql_build_context_param_list(owa, &context_param_list, host, NULL, chart);
-    }
-
-    if (!st) {
-        if (likely(context_param_list && context_param_list->rd && context_param_list->rd->rrdset))
-            st = context_param_list->rd->rrdset;
-        else {
-            free_context_param_list(owa, &context_param_list);
-            context_param_list = NULL;
-        }
-    }
-
-    if (!st && !context_param_list) {
-        if (context && !chart) {
-            if (!chart_label_key) {
-                buffer_strcat(w->response.data, "Context is not found: ");
-                buffer_strcat_htmlescape(w->response.data, context);
-            } else {
-                buffer_strcat(w->response.data, "Context: ");
-                buffer_strcat_htmlescape(w->response.data, context);
-                buffer_strcat(w->response.data, " or chart label key: ");
-                buffer_strcat_htmlescape(w->response.data, chart_label_key);
-                buffer_strcat(w->response.data, " not found");
-            }
-        }
-        else {
-            buffer_strcat(w->response.data, "Chart is not found: ");
-            buffer_strcat_htmlescape(w->response.data, chart);
-        }
-        ret = HTTP_RESP_NOT_FOUND;
-        goto cleanup;
+        if (!st) st = rrdset_find_byname(host, chart);
     }
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
@@ -772,6 +708,34 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
     int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
+
+    QUERY_TARGET_REQUEST qtr = {
+        .after = after,
+        .before = before,
+        .host = host,
+        .st = st,
+        .hosts = NULL,
+        .contexts = context,
+        .charts = chart,
+        .dimensions = buffer_tostring(dimensions),
+        .timeout = timeout,
+        .max_anomaly_rates = max_anomaly_rates,
+        .points = points,
+        .format = format,
+        .options = options,
+        .group_method = group,
+        .group_options = group_options,
+        .resampling_time = group_time,
+        .tier = tier,
+    };
+
+    QUERY_TARGET *qt = query_target_create(&qtr);
+
+    if(!qt || !qt->query.used) {
+        buffer_sprintf(w->response.data, "No metrics where matched to query.");
+        ret = HTTP_RESP_NOT_FOUND;
+        goto cleanup;
+    }
 
     if (timeout) {
         struct timeval now;
@@ -786,16 +750,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
-          , w->id
-          , chart
-          , (dimensions)?buffer_tostring(dimensions):""
-          , after
-          , before
-          , points
-          , group
-          , format
-          , options
-    );
+          , w->id, chart, (dimensions)?buffer_tostring(dimensions):"", after, before , points, group, format, options);
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
@@ -826,18 +781,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    QUERY_PARAMS query_params = {
-        .context_param_list = context_param_list,
-        .timeout = timeout,
-        .max_anomaly_rates = max_anomaly_rates,
-        .show_dimensions = show_dimensions,
-        .chart_label_key = chart_label_key,
-        .wb = w->response.data};
-
-    ret = rrdset2anything_api_v1(owa, st, &query_params, dimensions, format,
-            points, after, before, group, group_options, group_time, options, &last_timestamp_in_data, tier);
-
-    free_context_param_list(owa, &context_param_list);
+    ret = data_query_execute(owa, w->response.data, qt, &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)

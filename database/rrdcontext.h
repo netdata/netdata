@@ -90,5 +90,118 @@ extern int rrdcontext_enabled;
 extern void rrdcontext_db_rotation(void);
 extern void *rrdcontext_main(void *);
 
+// ----------------------------------------------------------------------------
+// public API for queries
+
+typedef struct query_metric {
+    uuid_t *metric_uuid;
+
+    time_t first_time_t;
+    time_t last_time_t;
+
+    int update_every;
+
+    struct {
+        uint32_t host_index;
+        uint32_t context_index;
+        uint32_t instance_index;
+        uint32_t metric_index;
+    } link;
+
+    struct {
+        STRING *id;
+        STRING *name;
+        RRDR_DIMENSION_FLAGS options;
+    } dimension;
+
+    struct {
+        STRING *id;
+        STRING *name;
+    } chart;
+
+} QUERY_METRIC;
+
+#define MAX_QUERY_TARGET_ID_LENGTH 200
+
+typedef struct query_target_request {
+    RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
+    RRDSET *st;                         // the chart to be queries (can be NULL, charts will be used)
+    const char *hosts;                  // hosts simple pattern
+    const char *contexts;               // contexts simple pattern
+    const char *charts;                 // charts simple pattern
+    const char *dimensions;             // dimensions simple pattern
+    const char *chart_label_key;        // select only the chart having this label key
+    const char *charts_labels_filter;   // select only the charts having this combo of label key:value
+    long long after;                    // the requested timeframe
+    long long before;                   // the requested timeframe
+    int points;
+    int timeout;                        // the timeout of the query
+    int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it
+    DATASOURCE_FORMAT format;
+    RRDR_OPTIONS options;
+    RRDR_GROUPING group_method;
+    const char *group_options;
+    long resampling_time;
+    int tier;
+} QUERY_TARGET_REQUEST;
+
+typedef struct query_target {
+    bool used;
+    bool composite_query;
+    usec_t start_us;
+
+    char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
+    int update_every;                        // the min update every of the metrics in the query
+    time_t first_time_t;                     // the combined first_time_t of all metrics in the query
+    time_t last_time_t;                      // the combined last_time_T of all metrics in the query
+    long points;                             // the number of points the query will return (maybe different from the request)
+
+    QUERY_TARGET_REQUEST request;
+
+    struct {
+        bool absolute;  // true when the request made with absolute timestamps, false if it was relative
+        size_t after;   // the absolute timestamp this query is about
+        size_t before;  // the absolute timestamp this query is about
+    } window;
+
+    struct {
+        QUERY_METRIC *array;
+        uint32_t used;
+        uint32_t size;
+    } query;
+
+    struct {
+        RRDMETRIC_ACQUIRED **array;
+        uint32_t used;
+        uint32_t size;
+    } metrics;
+
+    struct {
+        RRDINSTANCE_ACQUIRED **array;
+        uint32_t used;
+        uint32_t size;
+    } instances;
+
+    struct {
+        RRDCONTEXT_ACQUIRED **array;
+        uint32_t used;
+        uint32_t size;
+    } contexts;
+
+    struct {
+        RRDHOST **array;
+        uint32_t used;
+        uint32_t size;
+    } hosts;
+
+    DICTIONARY *rrdlabels;
+
+} QUERY_TARGET;
+
+extern void query_target_free(void);
+extern void query_target_release(QUERY_TARGET *qt);
+
+extern QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
+
 #endif // NETDATA_RRDCONTEXT_H
 

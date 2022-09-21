@@ -659,34 +659,22 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_GROUPING group_method) {
 
 // ----------------------------------------------------------------------------
 
-static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims,
-                                                 struct context_param *context_param_list)
+static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims, QUERY_TARGET *qt)
 {
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
-
     if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
 
-    if (should_lock)
-        rrdset_check_rdlock(r->st);
-
-    int match_ids = 0, match_names = 0;
-
-    if(unlikely(options & RRDR_OPTION_MATCH_IDS))
-        match_ids = 1;
-    if(unlikely(options & RRDR_OPTION_MATCH_NAMES))
-        match_names = 1;
-
+    bool match_ids = options & RRDR_OPTION_MATCH_IDS;
+    bool match_names = options & RRDR_OPTION_MATCH_NAMES;
     if(likely(!match_ids && !match_names))
-        match_ids = match_names = 1;
+        match_ids = match_names = true;
 
     SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
     RRDDIM *d;
-    long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
-    for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d ;c++, d = d->next) {
-        if(       (match_ids   && simple_pattern_matches(pattern, rrddim_id(d)))
-               || (match_names && simple_pattern_matches(pattern, rrddim_name(d)))
+    long dims_selected = 0, dims_not_hidden_not_zero = 0;
+    for(size_t c = 0, max = qt->query.used; c < max ;c++) {
+        if(       (match_ids   && simple_pattern_matches(pattern, string2str(qt->query.array[c].dimension.id)))
+               || (match_names && simple_pattern_matches(pattern, string2str(qt->query.array[c].dimension.name)))
                 ) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
@@ -716,7 +704,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
         // but they are all zero
         // enable the selected ones
         // to avoid returning an empty chart
-        for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d ;c++, d = d->next)
+        for(size_t c = 0, max = qt->query.used; c < max ;c++)
             if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED))
                 r->od[c] |= RRDR_DIMENSION_NONZERO;
     }
@@ -737,12 +725,12 @@ static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
     rrdr_line++;
 
     internal_error(rrdr_line >= r->n,
-                   "QUERY: requested to step above RRDR size for chart '%s'",
-                   rrdset_name(r->st));
+                   "QUERY: requested to step above RRDR size for query '%s'",
+                   r->qt->id);
 
     internal_error(r->t[rrdr_line] != 0 && r->t[rrdr_line] != t,
-                   "QUERY: overwriting the timestamp of RRDR line %zu from %zu to %zu, of chart '%s'",
-                   (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, rrdset_name(r->st));
+                   "QUERY: overwriting the timestamp of RRDR line %zu from %zu to %zu, of query '%s'",
+                   (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->qt->id);
 
     // save the time
     r->t[rrdr_line] = t;
@@ -758,18 +746,12 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // ----------------------------------------------------------------------------
 // tier management
 
-static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, time_t before_wanted, long points_wanted) {
+static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted) {
     if(unlikely(storage_tiers < 2))
         return 0;
 
-    if(unlikely(after_wanted == before_wanted || points_wanted <= 0 || !rd || !rd->rrdset)) {
-
-        if(!rd)
-            internal_error(true, "QUERY: NULL dimension - invalid params to tier calculation");
-        else
-            internal_error(true, "QUERY: chart '%s' dimension '%s' invalid params to tier calculation",
-                           (rd->rrdset)?rrdset_name(rd->rrdset):"unknown", rrddim_name(rd));
-
+    if(unlikely(after_wanted == before_wanted || points_wanted <= 0)) {
+        internal_error(true, "QUERY: '%s' has invalid params to tier calculation", qt->id);
         return 0;
     }
 
@@ -779,6 +761,7 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
 
     long weight[storage_tiers];
 
+    RRDHOST *host = qt->hosts.array[0];
     for(int tier = 0; tier < storage_tiers ; tier++) {
         if(unlikely(!rd->tiers[tier])) {
             internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized",
@@ -834,23 +817,14 @@ static int rrddim_find_best_tier_for_timeframe(RRDDIM *rd, time_t after_wanted, 
     return best_tier;
 }
 
-static int rrdset_find_natural_update_every_for_timeframe(RRDSET *st, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
-    int ret = st->update_every;
-
-    if(unlikely(!rrdset_number_of_dimensions(st)))
-        return ret;
-
-    RRDDIM *first_rd = NULL;
-    rrddim_foreach_read(first_rd, st) break; rrddim_foreach_done(first_rd);
-    if(!first_rd)
-        return ret;
+static int rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
+    int ret = qt->update_every;
 
     int best_tier;
     if(options & RRDR_OPTION_SELECTED_TIER && tier >= 0 && tier < storage_tiers)
         best_tier = tier;
-    else {
-        best_tier = rrddim_find_best_tier_for_timeframe(first_rd, after_wanted, before_wanted, points_wanted);
-    }
+    else
+        best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
 
     if(!first_rd->tiers[best_tier]) {
         internal_error(
@@ -1652,21 +1626,21 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before) {
 #define query_debug_log_free() debug_dummy()
 #endif
 
-RRDR *rrd2rrdr(
-          ONEWAYALLOC *owa
-        , RRDSET *st
-        , long points_requested
-        , long long after_requested
-        , long long before_requested
-        , RRDR_GROUPING group_method
-        , long resampling_time_requested
-        , RRDR_OPTIONS options
-        , const char *dimensions
-        , struct context_param *context_param_list
-        , const char *group_options
-        , int timeout
-        , int tier
-) {
+RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
+    if(unlikely(!qt)) return NULL;
+
+    long points_requested = qt->request.points;
+    long long after_requested = qt->request.after;
+    long long before_requested = qt->request.before;
+    RRDR_GROUPING group_method = qt->request.group_method;
+    long resampling_time_requested = qt->request.resampling_time;
+    RRDR_OPTIONS options = qt->request.options;
+    const char *dimensions = qt->request.dimensions;
+    const char *group_options = qt->request.group_options;
+    int timeout = qt->request.timeout;
+    int tier = qt->request.tier;
+    int update_every = qt->update_every;
+
     // RULES
     // points_requested = 0
     // the user wants all the natural points the database has
@@ -1683,7 +1657,6 @@ RRDR *rrd2rrdr(
     long points_wanted = points_requested;
     long long after_wanted = after_requested;
     long long before_wanted = before_requested;
-    int update_every = st->update_every;
 
     bool aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
     bool automatic_natural_points = (points_wanted == 0);
@@ -1725,38 +1698,33 @@ RRDR *rrd2rrdr(
     }
 
     if(after_wanted == 0 || before_wanted == 0) {
-        // for non-context queries we have to find the duration of the database
-        // for context queries we will assume 600 seconds duration
+        relative_period_requested = true;
 
-        if(!context_param_list) {
-            relative_period_requested = true;
+        time_t first_entry_t = qt->first_time_t;
+        time_t last_entry_t = qt->last_time_t;
 
-            time_t first_entry_t = rrdset_first_entry_t(st);
-            time_t last_entry_t = rrdset_last_entry_t(st);
+        if(first_entry_t == 0 || last_entry_t == 0) {
+            internal_error(true, "QUERY: no data detected on query '%s'", qt->id);
+            query_debug_log_free();
+            return NULL;
+        }
 
-            if(first_entry_t == 0 || last_entry_t == 0) {
-                internal_error(true, "QUERY: chart without data detected on '%s'", rrdset_name(st));
-                query_debug_log_free();
-                return NULL;
-            }
+        query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_t, last_entry_t);
 
-            query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_t, last_entry_t);
+        if (after_wanted == 0) {
+            after_wanted = first_entry_t;
+            query_debug_log(":zero after_wanted %lld", after_wanted);
+        }
 
-            if (after_wanted == 0) {
-                after_wanted = first_entry_t;
-                query_debug_log(":zero after_wanted %lld", after_wanted);
-            }
+        if (before_wanted == 0) {
+            before_wanted = last_entry_t;
+            before_is_aligned_to_db_end = true;
+            query_debug_log(":zero before_wanted %lld", before_wanted);
+        }
 
-            if (before_wanted == 0) {
-                before_wanted = last_entry_t;
-                before_is_aligned_to_db_end = true;
-                query_debug_log(":zero before_wanted %lld", before_wanted);
-            }
-
-            if(points_wanted == 0) {
-                points_wanted = (last_entry_t - first_entry_t) / update_every;
-                query_debug_log(":zero points_wanted %ld", points_wanted);
-            }
+        if(points_wanted == 0) {
+            points_wanted = (last_entry_t - first_entry_t) / update_every;
+            query_debug_log(":zero points_wanted %ld", points_wanted);
         }
 
         // if they are still zero, assume 600
@@ -1777,8 +1745,8 @@ RRDR *rrd2rrdr(
     query_debug_log(":relative2absolute after %lld, before %lld", after_wanted, before_wanted);
 
     if(natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
-        update_every = rrdset_find_natural_update_every_for_timeframe(st, after_wanted, before_wanted, points_wanted, options, tier);
-        if(update_every <= 0) update_every = st->update_every;
+        update_every = rrdset_find_natural_update_every_for_timeframe(qt, after_wanted, before_wanted, points_wanted, options, tier);
+        if(update_every <= 0) update_every = qt->update_every;
         query_debug_log(":natural update every %d", update_every);
     }
 
@@ -1906,15 +1874,6 @@ RRDR *rrd2rrdr(
     duration = before_wanted - after_wanted;
     query_debug_log(":final duration %ld", duration + 1);
 
-    // check the context query based on the starting time of the query
-    if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
-        rebuild_context_param_list(owa, context_param_list, after_wanted);
-        st = context_param_list->rd ? context_param_list->rd->rrdset : NULL;
-
-        if(unlikely(!st))
-            return NULL;
-    }
-
     internal_error(points_wanted != duration / (query_granularity * group) + 1,
                    "QUERY: points_wanted %ld is not points %ld",
                    points_wanted, duration / (query_granularity * group) + 1);
@@ -1931,16 +1890,18 @@ RRDR *rrd2rrdr(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(owa, st, points_wanted, context_param_list);
+    qt->points = points_wanted;
+
+    RRDR *r = rrdr_create(owa, qt);
     if(unlikely(!r)) {
         internal_error(true, "QUERY: cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld",
-                       rrdset_id(st), (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
+                       qt->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
         return NULL;
     }
 
     if(unlikely(!r->d || !points_wanted)) {
         internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%zu, points=%ld",
-                       rrdset_id(st), (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
+                       qt->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
         return r;
     }
 
@@ -1976,9 +1937,6 @@ RRDR *rrd2rrdr(
     // -------------------------------------------------------------------------
     // disable the not-wanted dimensions
 
-    if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
-        rrdset_check_rdlock(st);
-
     if(dimensions && *dimensions)
         rrdr_disable_not_selected_dimensions(r, options, dimensions, context_param_list);
 
@@ -1990,14 +1948,14 @@ RRDR *rrd2rrdr(
     time_t max_after = 0, min_before = 0;
     long max_rows = 0;
 
-    RRDDIM *first_rd = context_param_list ? context_param_list->rd : st->dimensions;
-    RRDDIM *rd;
-    long c, dimensions_used = 0, dimensions_nonzero = 0;
+    long dimensions_used = 0, dimensions_nonzero = 0;
     struct timeval query_start_time;
     struct timeval query_current_time;
     if (timeout) now_realtime_timeval(&query_start_time);
 
-    for(rd = first_rd, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+    for(size_t c = 0, max = qt->query.used; c < max ; c++) {
+        // set the query target dimension options to rrdr
+        r->od[c] = qt->query.array[c].dimension.options;
 
         // if we need a percentage, we need to calculate all dimensions
         if(unlikely(!(options & RRDR_OPTION_PERCENTAGE) && (r->od[c] & RRDR_DIMENSION_HIDDEN))) {
@@ -2025,21 +1983,21 @@ RRDR *rrd2rrdr(
         else {
             if(r->after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               rrdset_name(st), (size_t)max_after, rrddim_name(rd), (size_t)r->after);
+                               string2str(qt->query.array[c].dimension.id), (size_t)max_after, string2str(qt->query.array[c].dimension.name), (size_t)r->after);
 
                 r->after = (r->after > max_after) ? r->after : max_after;
             }
 
             if(r->before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               rrdset_name(st), (size_t)min_before, rrddim_name(rd), (size_t)r->before);
+                               string2str(qt->query.array[c].dimension.id), (size_t)min_before, string2str(qt->query.array[c].dimension.name), (size_t)r->before);
 
                 r->before = (r->before < min_before) ? r->before : min_before;
             }
 
             if(r->rows != max_rows) {
                 internal_error(true, "QUERY: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               rrdset_name(st), (size_t)max_rows, rrddim_name(rd), (size_t)r->rows);
+                               string2str(qt->query.array[c].dimension.id), (size_t)max_rows, string2str(qt->query.array[c].dimension.name), (size_t)r->rows);
 
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }
@@ -2107,7 +2065,7 @@ RRDR *rrd2rrdr(
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero && !(r->result_options & RRDR_RESULT_OPTION_CANCEL))) {
         // all the dimensions are zero
         // mark them as NONZERO to send them all
-        for(rd = first_rd, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+        for(size_t c = 0, max = qt->query.used; c < max ; c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             r->od[c] |= RRDR_DIMENSION_NONZERO;
         }

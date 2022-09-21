@@ -11,7 +11,6 @@ typedef struct query_params {
     char *chart_label_key;
     int max_anomaly_rates;
     int timeout;
-    int show_dimensions;
 } QUERY_PARAMS;
 
 
@@ -34,19 +33,20 @@ typedef struct query_params {
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 // type of JSON generations
-#define DATASOURCE_INVALID (-1)
-#define DATASOURCE_JSON 0
-#define DATASOURCE_DATATABLE_JSON 1
-#define DATASOURCE_DATATABLE_JSONP 2
-#define DATASOURCE_SSV 3
-#define DATASOURCE_CSV 4
-#define DATASOURCE_JSONP 5
-#define DATASOURCE_TSV 6
-#define DATASOURCE_HTML 7
-#define DATASOURCE_JS_ARRAY 8
-#define DATASOURCE_SSV_COMMA 9
-#define DATASOURCE_CSV_JSON_ARRAY 10
-#define DATASOURCE_CSV_MARKDOWN 11
+typedef enum {
+    DATASOURCE_JSON             = 0,
+    DATASOURCE_DATATABLE_JSON   = 1,
+    DATASOURCE_DATATABLE_JSONP  = 2,
+    DATASOURCE_SSV              = 3,
+    DATASOURCE_CSV              = 4,
+    DATASOURCE_JSONP            = 5,
+    DATASOURCE_TSV              = 6,
+    DATASOURCE_HTML             = 7,
+    DATASOURCE_JS_ARRAY         = 8,
+    DATASOURCE_SSV_COMMA        = 9,
+    DATASOURCE_CSV_JSON_ARRAY   = 10,
+    DATASOURCE_CSV_MARKDOWN     = 11,
+} DATASOURCE_FORMAT;
 
 #define DATASOURCE_FORMAT_JSON "json"
 #define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"
@@ -64,22 +64,7 @@ typedef struct query_params {
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 
-extern int rrdset2anything_api_v1(
-          ONEWAYALLOC *owa
-        , RRDSET *st
-        , QUERY_PARAMS *query_params
-        , BUFFER *dimensions
-        , uint32_t format
-        , long points
-        , long long after
-        , long long before
-        , int group_method
-        , const char *group_options
-        , long group_time
-        , uint32_t options
-        , time_t *latest_timestamp
-        , int tier
-);
+extern int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp);
 
 extern int rrdset2value_api_v1(
           RRDSET *st

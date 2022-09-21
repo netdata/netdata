@@ -313,8 +313,15 @@ typedef struct rrdcontext {
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDMETRIC
 
+static void rrdmetric_update_retention(RRDMETRIC *rm);
+
 static inline RRDMETRIC *rrdmetric_acquired_value(RRDMETRIC_ACQUIRED *rma) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)rma);
+}
+
+static inline RRDMETRIC_ACQUIRED *rrdmetric_acquired_dup(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return (RRDMETRIC_ACQUIRED *)dictionary_acquired_item_dup(rm->ri->rrdmetrics, (DICTIONARY_ITEM *)rma);
 }
 
 static inline void rrdmetric_release(RRDMETRIC_ACQUIRED *rma) {
@@ -329,6 +336,11 @@ static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria)
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)ria);
 }
 
+static inline RRDINSTANCE_ACQUIRED *rrdinstance_acquired_dup(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return (RRDINSTANCE_ACQUIRED *)dictionary_acquired_item_dup(ri->rc->rrdinstances, (DICTIONARY_ITEM *)ria);
+}
+
 static inline void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     dictionary_acquired_item_release(ri->rc->rrdinstances, (DICTIONARY_ITEM *)ria);
@@ -339,6 +351,11 @@ static inline void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
 
 static inline RRDCONTEXT *rrdcontext_acquired_value(RRDCONTEXT_ACQUIRED *rca) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)rca);
+}
+
+static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquired_dup(RRDCONTEXT_ACQUIRED *rca) {
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return (RRDCONTEXT_ACQUIRED *)dictionary_acquired_item_dup((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
 }
 
 static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
@@ -2063,6 +2080,415 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 
     return HTTP_RESP_OK;
 }
+
+// ----------------------------------------------------------------------------
+// query API
+
+static __thread QUERY_TARGET thread_query_target = {};
+void query_target_release(QUERY_TARGET *qt) {
+
+    // release the query
+    for(size_t i = 0, used = qt->query.used; i < used ;i++) {
+        string_freez(qt->query.array[i].dimension.id);
+        string_freez(qt->query.array[i].dimension.name);
+        string_freez(qt->query.array[i].chart.id);
+        string_freez(qt->query.array[i].chart.name);
+    }
+
+    // release the metrics
+    for(size_t i = 0, used = qt->metrics.used; i < used ;i++) {
+        rrdmetric_release(qt->metrics.array[i]);
+        qt->metrics.array[i] = NULL;
+    }
+
+    // release the instances
+    for(size_t i = 0, used = qt->instances.used; i < used ;i++) {
+        rrdinstance_release(qt->instances.array[i]);
+        qt->instances.array[i] = NULL;
+    }
+
+    // release the contexts
+    for(size_t i = 0, used = qt->contexts.used; i < used ;i++) {
+        rrdcontext_release(qt->contexts.array[i]);
+        qt->contexts.array[i] = NULL;
+    }
+
+    // release the hosts
+    for(size_t i = 0, used = qt->hosts.used; i < used ;i++) {
+        qt->hosts.array[i] = NULL;
+    }
+
+    qt->query.used = 0;
+    qt->metrics.used = 0;
+    qt->instances.used = 0;
+    qt->contexts.used = 0;
+    qt->hosts.used = 0;
+    qt->used = false;
+
+    qt->update_every = 0;
+    qt->first_time_t = 0;
+    qt->last_time_t = 0;
+
+    rrdlabels_flush(qt->rrdlabels);
+
+    qt->id[0] = '\0';
+}
+void query_target_free(void) {
+    if(thread_query_target.used)
+        query_target_release(&thread_query_target);
+
+    freez(thread_query_target.query.array);
+    freez(thread_query_target.metrics.array);
+    freez(thread_query_target.instances.array);
+    freez(thread_query_target.contexts.array);
+    freez(thread_query_target.hosts.array);
+
+    thread_query_target.query.array = NULL;
+    thread_query_target.metrics.array = NULL;
+    thread_query_target.instances.array = NULL;
+    thread_query_target.contexts.array = NULL;
+    thread_query_target.hosts.array = NULL;
+
+    thread_query_target.query.size = 0;
+    thread_query_target.metrics.size = 0;
+    thread_query_target.instances.size = 0;
+    thread_query_target.contexts.size = 0;
+    thread_query_target.hosts.size = 0;
+
+    rrdlabels_destroy(thread_query_target.rrdlabels);
+    thread_query_target.rrdlabels = NULL;
+}
+
+static void query_target_add_metric_to_query(
+    QUERY_TARGET *qt,
+    RRDMETRIC *rm,
+    RRDINSTANCE *ri,
+    size_t host_index,
+    size_t context_index,
+    size_t instance_index,
+    size_t metric_index,
+    time_t first_time_t,
+    time_t last_time_t,
+    int update_every,
+    RRDR_DIMENSION_FLAGS options
+    ) {
+    if(qt->query.used == qt->query.size) {
+        qt->query.size = (qt->query.size) ? qt->query.size * 2 : 2;
+        qt->query.array = reallocz(qt->query.array, qt->query.size * sizeof(QUERY_METRIC));
+    }
+
+    QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
+    qm->dimension.id = string_dup(rm->id);
+    qm->dimension.name = string_dup(rm->name);
+    qm->dimension.options = options;
+    qm->chart.id = string_dup(ri->id);
+    qm->chart.name = string_dup(ri->name);
+    qm->metric_uuid = &rm->uuid;
+    qm->link.host_index = host_index;
+    qm->link.context_index = context_index;
+    qm->link.instance_index = instance_index;
+    qm->link.metric_index = metric_index;
+    qm->first_time_t = first_time_t;
+    qm->last_time_t = last_time_t;
+    qm->update_every = update_every;
+
+    if(!qt->first_time_t || first_time_t < qt->first_time_t)
+        qt->first_time_t = first_time_t;
+
+    if(!qt->last_time_t || last_time_t > qt->last_time_t)
+        qt->last_time_t = last_time_t;
+}
+
+static size_t query_target_add_metric(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma) {
+    if(qt->metrics.used == qt->metrics.size) {
+        qt->metrics.size = (qt->metrics.size) ? qt->metrics.size * 2 : 2;
+        qt->metrics.array = reallocz(qt->metrics.array, qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *));
+    }
+    qt->metrics.array[qt->metrics.used] = rrdmetric_acquired_dup(rma);
+    return qt->metrics.used++;
+}
+
+static size_t query_target_add_instance(QUERY_TARGET *qt, RRDINSTANCE_ACQUIRED *ria, int update_every) {
+    if(qt->instances.used == qt->instances.size) {
+        qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 2;
+        qt->instances.array = reallocz(qt->instances.array, qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *));
+    }
+
+    if(qt->update_every == 0 || update_every < qt->update_every)
+        qt->update_every = update_every;
+
+    qt->instances.array[qt->instances.used] = rrdinstance_acquired_dup(ria);
+    return qt->instances.used++;
+}
+
+static size_t query_target_add_context(QUERY_TARGET *qt, RRDCONTEXT_ACQUIRED *rca) {
+    if(qt->contexts.used == qt->contexts.size) {
+        qt->contexts.size = (qt->contexts.size) ? qt->contexts.size * 2 : 2;
+        qt->contexts.array = reallocz(qt->contexts.array, qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *));
+    }
+    qt->contexts.array[qt->contexts.used] = rrdcontext_acquired_dup(rca);
+    return qt->contexts.used++;
+}
+
+static size_t query_target_add_host(QUERY_TARGET *qt, RRDHOST *host) {
+    if(qt->hosts.used == qt->hosts.size) {
+        qt->hosts.size = (qt->hosts.size) ? qt->hosts.size * 2 : 2;
+        qt->hosts.array = reallocz(qt->hosts.array, qt->hosts.size * sizeof(RRDHOST *));
+    }
+    qt->hosts.array[qt->hosts.used] = host;
+    return qt->hosts.used++;
+}
+
+typedef struct query_target_locals {
+    QUERY_TARGET *qt;
+
+    RRDHOST *host;
+    RRDSET *st;
+
+    const char *hosts;
+    const char *contexts;
+    const char *charts;
+    const char *dimensions;
+    const char *chart_label_key;
+    const char *charts_labels_filter;
+
+    SIMPLE_PATTERN *hosts_sp;
+    SIMPLE_PATTERN *contexts_sp;
+    SIMPLE_PATTERN *charts_sp;
+    SIMPLE_PATTERN *chart_label_key_sp;
+    SIMPLE_PATTERN *charts_labels_filter_sp;
+
+    long long after;
+    long long before;
+    RRDR_OPTIONS options;
+
+    // check context related
+    size_t host_index;
+    RRDCONTEXT_ACQUIRED *rca;
+
+    // check chart related
+    bool context_added;
+    bool instance_added;
+    size_t context_index;
+    size_t instance_index;
+    bool instance_matches_label_filters;
+} QUERY_TARGET_LOCALS;
+
+static void query_target_add_instance_metrics(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+
+    RRDMETRIC *rm;
+    dfe_start_read(ri->rrdmetrics, rm) {
+        if (!qtl->context_added) {
+            qtl->context_index = query_target_add_context(qtl->qt, qtl->rca);
+            qtl->context_added = true;
+        }
+
+        if (!qtl->instance_added) {
+
+            if(ri->rrdset)
+                ri->rrdset->last_accessed_time = (time_t)(qtl->qt->start_us / USEC_PER_SEC);
+
+            qtl->instance_index = query_target_add_instance(qtl->qt, ria, ri->update_every);
+            qtl->instance_added = true;
+        }
+
+        size_t metric_index = query_target_add_metric(qtl->qt, (RRDMETRIC_ACQUIRED *)rm_dfe.item);
+
+        if(!qtl->instance_matches_label_filters)
+            continue;
+
+        rrdmetric_update_retention(rm);
+
+        bool timeframe_matches = (rm->first_time_t <= qtl->before && rm->last_time_t >= qtl->after) ? true : false;
+
+        if(timeframe_matches)
+            query_target_add_metric_to_query(
+                qtl->qt,
+                rm,
+                ri,
+                qtl->host_index,
+                qtl->context_index,
+                qtl->instance_index,
+                metric_index,
+                rm->first_time_t,
+                rm->last_time_t,
+                ri->update_every,
+                ((rrd_flag_check(rm, RRD_FLAG_HIDDEN) ||
+                  (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) ?
+                     RRDR_DIMENSION_HIDDEN :
+                     RRDR_DIMENSION_DEFAULT));
+    }
+    dfe_done(rm);
+}
+
+static void query_target_add_context_instances(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIRED *rca) {
+    qtl->rca = rca;
+    qtl->context_added = false;
+    qtl->context_index = 0;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+        if (qtl->charts_sp && !simple_pattern_matches(qtl->charts_sp, string2str(ri->id)) &&
+            !simple_pattern_matches(qtl->charts_sp, string2str(ri->name)))
+            continue;
+
+        qtl->instance_index = 0;
+        qtl->instance_added = false;
+
+        qtl->instance_matches_label_filters = true;
+        if ((qtl->chart_label_key_sp     && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->chart_label_key_sp, ':')) ||
+            (qtl->charts_labels_filter_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->charts_labels_filter_sp, ':')))
+            qtl->instance_matches_label_filters = false;
+
+        query_target_add_instance_metrics(qtl, (RRDINSTANCE_ACQUIRED *)&ri_dfe.item);
+    }
+    dfe_done(ri);
+
+}
+
+QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
+    if(thread_query_target.used) fatal("QUERY TARGET: this query target is already used.");
+    thread_query_target.used = true;
+    thread_query_target.start_us = now_realtime_usec();
+
+    if(!thread_query_target.rrdlabels)
+        thread_query_target.rrdlabels = rrdlabels_create();
+
+    // copy the request into query_thread_target
+    thread_query_target.request = *qtr;
+
+    // prepare our local variables
+    QUERY_TARGET_LOCALS qtl = {
+        .qt = &thread_query_target,
+        .host = thread_query_target.request.host,
+        .st = thread_query_target.request.st,
+        .hosts = thread_query_target.request.hosts,
+        .contexts = thread_query_target.request.contexts,
+        .charts = thread_query_target.request.charts,
+        .dimensions = thread_query_target.request.dimensions,
+        .chart_label_key = thread_query_target.request.chart_label_key,
+        .charts_labels_filter = thread_query_target.request.charts_labels_filter,
+        .after = thread_query_target.request.after,
+        .before = thread_query_target.request.before,
+        .options = thread_query_target.request.options,
+    };
+
+    thread_query_target.window.absolute = rrdr_relative_window_to_absolute(&qtl.after, &qtl.before);
+    thread_query_target.window.after = qtl.after;
+    thread_query_target.window.before = qtl.before;
+
+    thread_query_target.update_every = 0; // it will be updated by query_target_add_query()
+
+    // prepare all the patterns
+    qtl.hosts_sp = is_valid_sp(qtl.hosts) ? simple_pattern_create(qtl.hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qtl.contexts_sp = is_valid_sp(qtl.contexts) ? simple_pattern_create(qtl.contexts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qtl.charts_sp = is_valid_sp(qtl.charts) ? simple_pattern_create(qtl.charts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qtl.chart_label_key_sp = is_valid_sp(qtl.chart_label_key) ? simple_pattern_create(qtl.chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qtl.charts_labels_filter_sp = is_valid_sp(qtl.charts_labels_filter) ? simple_pattern_create(qtl.charts_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+
+    // is the chart given valid?
+    if(qtl.st && (!qtl.st->rrdinstance || !qtl.st->rrdcontext)) {
+        error("QUERY TARGET: ignoring RRDSET '%s' given, because it is not linked to rrdcontext structures", rrdset_name(qtl.st));
+
+        if(!is_valid_sp(qtl.charts))
+            qtl.charts = rrdset_name(qtl.st);
+
+        qtl.st = NULL;
+    }
+
+    // is the host given NULL while we have a chart?
+    if(!qtl.host && qtl.st)
+        qtl.host = qtl.st->rrdhost;
+
+    // verify that the chart belongs to the host we are interested
+    if(qtl.st && qtl.host && qtl.host != qtl.st->rrdhost) {
+        error("QUERY TARGET: RRDSET '%s' does not belong to host '%s'", rrdset_name(qtl.st), rrdhost_hostname(qtl.host));
+
+        if(!is_valid_sp(qtl.charts))
+            qtl.charts = rrdset_name(qtl.st);
+
+        qtl.st = NULL;
+    }
+
+    if(qtl.host) {
+        // single host query
+        qtl.host_index = query_target_add_host(qtl.qt, qtl.host);
+        qtl.hosts = rrdhost_hostname(qtl.host);
+    }
+    else {
+        // multi host query
+        rrd_rdlock();
+        rrdhost_foreach_read(qtl.host) {
+            if(!qtl.hosts_sp || simple_pattern_matches(qtl.hosts_sp, rrdhost_hostname(qtl.host)))
+                qtl.host_index = query_target_add_host(qtl.qt, qtl.host);
+        }
+        rrd_unlock();
+    }
+
+    if(qtl.st) {
+        // single chart data queries
+        qtl.qt->composite_query = false;
+        qtl.host_index = 0;
+        snprintfz(thread_query_target.id, MAX_QUERY_TARGET_ID_LENGTH, "chart:%s@%s", rrdset_name(qtl.st), rrdhost_hostname(thread_query_target.hosts.array[qtl.host_index]));
+
+        qtl.rca = qtl.st->rrdcontext;
+        qtl.context_added = false;
+        qtl.context_index = 0;
+        qtl.instance_added = false;
+        qtl.instance_index = 0;
+
+        query_target_add_instance_metrics(&qtl, qtl.st->rrdinstance);
+    }
+    else {
+        // context pattern queries
+        qtl.qt->composite_query = true;
+        snprintfz(thread_query_target.id, MAX_QUERY_TARGET_ID_LENGTH, "context:%s/%s/%s/%s", qtl.hosts, qtl.contexts, qtl.charts, qtl.dimensions);
+
+        for (size_t host_index = 0, used = thread_query_target.hosts.used; host_index < used; host_index++) {
+            qtl.host_index = host_index;
+            qtl.host = thread_query_target.hosts.array[host_index];
+
+            RRDCONTEXT_ACQUIRED *rca =
+                (RRDCONTEXT_ACQUIRED  *)dictionary_get_and_acquire_item((DICTIONARY *)qtl.host->rrdctx, qtl.contexts);
+
+            if(rca) {
+                // we found it!
+                query_target_add_context_instances(&qtl, rca);
+                rrdcontext_release(rca);
+            }
+            else {
+                // it is a pattern, we need to search for it
+                RRDCONTEXT *rc;
+                dfe_start_read((DICTIONARY *)qtl.host->rrdctx, rc) {
+                    if(qtl.contexts_sp && !simple_pattern_matches(qtl.contexts_sp, string2str(rc->id)))
+                        continue;
+
+                    query_target_add_context_instances(&qtl, (RRDCONTEXT_ACQUIRED *)rc_dfe.item);
+                }
+                dfe_done(rc);
+            }
+        }
+    }
+
+    simple_pattern_free(qtl.charts_labels_filter_sp);
+    simple_pattern_free(qtl.chart_label_key_sp);
+    simple_pattern_free(qtl.charts_sp);
+    simple_pattern_free(qtl.contexts_sp);
+    simple_pattern_free(qtl.hosts_sp);
+
+    // make sure everything is good
+    if(!thread_query_target.query.used || !thread_query_target.metrics.used || !thread_query_target.instances.used || !thread_query_target.contexts.used || !thread_query_target.hosts.used) {
+        internal_error(true, "QUERY TARGET: query '%s' does not have all the data required. Aborting it.", thread_query_target.id);
+        query_target_release(&thread_query_target);
+        return NULL;
+    }
+
+    return &thread_query_target;
+}
+
 
 // ----------------------------------------------------------------------------
 // load from SQL

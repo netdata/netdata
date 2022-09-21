@@ -537,6 +537,9 @@ void rrdlabels_destroy(DICTIONARY *labels_dict) {
     dictionary_destroy(labels_dict);
 }
 
+void rrdlabels_flush(DICTIONARY *labels_dict) {
+    dictionary_flush(labels_dict);
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels_add()
