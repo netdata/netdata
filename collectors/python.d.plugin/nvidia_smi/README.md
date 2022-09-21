@@ -8,6 +8,8 @@ sidebar_label: "Nvidia GPUs"
 
 Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
 
+> **Warning**: this collector does not work when the Netdata Agent is [running in a container](https://learn.netdata.cloud/docs/agent/packaging/docker).
+
 
 ## Requirements and Notes
 
