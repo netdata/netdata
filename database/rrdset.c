@@ -331,9 +331,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
     }
 
-    if(ctr->react_action)
-        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-
     rrdset_update_permanent_labels(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);

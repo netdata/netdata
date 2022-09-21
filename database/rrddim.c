@@ -281,9 +281,6 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
         (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
-#ifdef ENABLE_ACLK
-        queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
-#endif
 
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
