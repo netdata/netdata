@@ -67,7 +67,7 @@ class Service(UrlService):
                       self.alarm_contains_words_list if alarm_contains_word in alarm_name}
         if self.alarm_excludes_words != '':
             alarms = {alarm_name: alarms[alarm_name] for alarm_name in alarms for alarm_excludes_word in
-                      self.alarm_excludes_words_list if not alarm_excludes_word in alarm_name}
+                      self.alarm_excludes_words_list if alarm_excludes_word not in alarm_name}
 
         data = {a: self.sm[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.sm}
         self.update_charts('alarms', data)
