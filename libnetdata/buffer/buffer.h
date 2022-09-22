@@ -54,8 +54,17 @@ extern const char *buffer_tostring(BUFFER *wb);
 #define buffer_flush(wb) wb->buffer[(wb)->len = 0] = '\0'
 extern void buffer_reset(BUFFER *wb);
 
+#define buffer_fast_strcat(wb, txt, len) do {               \
+        if(likely((txt) && *(txt))) {                       \
+            buffer_need_bytes(wb, (len) + 1);               \
+            memcpy(&(wb)->buffer[(wb)->len], txt, len);     \
+            (wb)->len += (len);                             \
+            (wb)->buffer[(wb)->len] = '\0';                 \
+        }                                                   \
+    } while(0)
+
 extern void buffer_strcat(BUFFER *wb, const char *txt);
-extern void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len);
+// extern void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len);
 extern void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value);
 
 extern void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
