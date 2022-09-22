@@ -42,10 +42,8 @@ abspath() {
 }
 
 is_prefix() {
-  case "${2}" in
-    "${1}*") return 0 ;;
-    *) return 1 ;;
-  esac
+  echo "${2}" | grep -qE "^${1}"
+  return $?
 }
 
 check_directories() {
