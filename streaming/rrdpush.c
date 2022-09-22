@@ -173,22 +173,7 @@ int configured_as_parent() {
     return is_parent;
 }
 
-// checks if the current chart definition has been sent
-static inline int need_to_send_chart_definition(RRDSET *st) {
-    if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))))
-        return 1;
-
-    RRDDIM *rd;
-    dfe_start_read(st->rrddim_root_index, rd) {
-        if(unlikely(!rd->exposed)) {
-            internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
-            return 1;
-        }
-    }
-    dfe_done(rd);
-
-    return 0;
-}
+#define need_to_send_chart_definition(st) (!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))
 
 // chart labels
 static int send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
@@ -276,22 +261,38 @@ static inline void rrdpush_send_chart_definition(RRDSET *st) {
 // sends the current chart dimensions
 static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", rrdset_id(st), (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
-    if (s->version >= VERSION_GAP_FILLING)
-        buffer_sprintf(host->sender->build, " %"PRId64"\n", (int64_t)st->last_collected_time.tv_sec);
-    else
-        buffer_strcat(host->sender->build, "\n");
+    BUFFER *wb = host->sender->build;
+
+    buffer_fast_strcat(wb, "BEGIN \"", 7);
+    buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
+    buffer_fast_strcat(wb, "\" ", 2);
+    buffer_print_llu(wb, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+
+    if (s->version >= VERSION_GAP_FILLING) {
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_ll(wb, st->last_collected_time.tv_sec);
+    }
+
+    buffer_fast_strcat(wb, "\n", 1);
 
     size_t count_of_dimensions_written = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(rd->updated && rd->exposed) {
-            buffer_sprintf(host->sender->build, "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n", rrddim_id(rd), rd->collected_value);
+        if(likely(rd->updated && rd->exposed)) {
+            buffer_fast_strcat(wb, "SET \"", 5);
+            buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+            buffer_fast_strcat(wb, "\" = ", 4);
+            buffer_print_ll(wb, rd->collected_value);
+            buffer_fast_strcat(wb, "\n", 1);
             count_of_dimensions_written++;
+        }
+        else if(rd->updated && !rd->exposed) {
+            internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' is updated but not exposed", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
     }
     rrddim_foreach_done(rd);
-    buffer_strcat(host->sender->build, "END\n");
+    buffer_fast_strcat(wb, "END\n", 4);
 
     return count_of_dimensions_written != 0;
 }
