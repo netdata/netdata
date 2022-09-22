@@ -148,18 +148,23 @@ void buffer_print_ll(BUFFER *wb, long long value)
     buffer_print_llu(wb, value);
 }
 
-//void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
-//    if(unlikely(!txt || !*txt)) return;
-//
-//    buffer_need_bytes(wb, len + 1);
-//
-//    memcpy(&wb->buffer[wb->len], txt, len);
-//    wb->len += len;
-//
-//    // keep it NULL terminating
-//    // not counting it at wb->len
-//    wb->buffer[wb->len] = '\0';
-//}
+void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
+    if(unlikely(!txt || !*txt)) return;
+
+    buffer_need_bytes(wb, len + 1);
+
+    char *s = &wb->buffer[wb->len];
+    const char *end = &txt[len + 1];
+
+    while(txt != end)
+        *s++ = *txt++;
+
+    wb->len += len;
+
+    // keep it NULL terminating
+    // not counting it at wb->len
+    wb->buffer[wb->len] = '\0';
+}
 
 void buffer_strcat(BUFFER *wb, const char *txt)
 {
