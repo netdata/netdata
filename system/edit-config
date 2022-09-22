@@ -2,12 +2,10 @@
 
 set -e
 
+# shellcheck disable=SC1091
 [ -f /etc/profile ] && . /etc/profile
 
 script_dir="$(CDPATH="" cd -- "$(dirname -- "$0")" && pwd -P)"
-
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="${script_dir}"
-[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 usage() {
   cat << EOF
@@ -45,6 +43,35 @@ is_prefix() {
     "${1}*") return 0 ;;
     *) return 1 ;;
   esac
+}
+
+check_directories() {
+  if [ -e "${script_dir}/.environment" ]; then
+    OLDPATH="${PATH}"
+    # shellcheck disable=SC1091
+    . "${script_dir}/.environment"
+    PATH="${OLDPATH}"
+  fi
+
+  if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}/usr/lib/netdata/conf.d" ]; then
+    stock_dir="${NETDATA_PREFIX}/usr/lib/netdata/conf.d"
+  elif [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}/lib/netdata/conf.d" ]; then
+    stock_dir="${NETDATA_PREFIX}/lib/netdata/conf.d"
+  elif [ -d "${script_dir}/../../usr/lib/netdata/conf.d" ]; then
+    stock_dir="${script_dir}/../../usr/lib/netdata/conf.d"
+  elif [ -d "${script_dir}/../../lib/netdata/conf.d" ]; then
+    stock_dir="${script_dir}/../../lib/netdata/conf.d"
+  elif [ -d "/usr/lib/netdata/conf.d" ]; then
+    stock_dir="/usr/lib/netdata/conf.d"
+  fi
+
+  [ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="${script_dir}"
+  [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="${stock_dir}"
+
+  if [ -z "${NETDATA_STOCK_CONFIG_DIR}" ]; then
+    error "Unable to find stock config directory."
+    exit 1
+  fi
 }
 
 check_editor() {
@@ -229,6 +256,7 @@ edit() {
 
 main() {
   parse_args "${@}"
+  check_directories
   check_editor
   handle_container
   copy "${file}"
