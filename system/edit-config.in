@@ -1,48 +1,215 @@
 #!/usr/bin/env sh
 
+set -e
+
 [ -f /etc/profile ] && . /etc/profile
 
-file="${1}"
+script_dir="$(CDPATH="" cd -- "$(dirname -- "$0")" && pwd -P)"
 
-if [ "$(command -v editor)" ]; then
-  EDITOR="${EDITOR-editor}"
-else
-  EDITOR="${EDITOR-vi}"
-fi
-
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="${script_dir}"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
-if [ -z "${file}" ]; then
+usage() {
   cat << EOF
-
 USAGE:
-  ${0} FILENAME
+  ${0} [options] FILENAME
 
   Copy and edit the stock config file named: FILENAME
   if FILENAME is already copied, it will be edited as-is.
 
-  The EDITOR shell variable is used to define the editor to be used.
-
   Stock config files at: '${NETDATA_STOCK_CONFIG_DIR}'
   User  config files at: '${NETDATA_USER_CONFIG_DIR}'
 
-  Available files in '${NETDATA_STOCK_CONFIG_DIR}' to copy and edit:
+  The editor to use can be specified either by setting the EDITOR
+  environment variable, or by using the --editor option.
 
+  The file to edit can also be specified using the --file option.
 EOF
+  exit 0
+}
 
-  cd "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
-  ls >&2 -R ./*.conf ./*/*.conf
-  exit 1
+error() {
+  echo >&2 "ERROR: ${1}"
+}
 
-fi
+abspath() {
+  if [ -d "${1}" ]; then
+    echo "$(cd "${1}" && /bin/env PWD= pwd -P)/"
+  else
+    echo "$(cd "$(dirname "${1}")" && /bin/env PWD= pwd -P )/$(basename "${1}")"
+  fi
+}
+
+is_prefix() {
+  case "${2}" in
+    "${1}*") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_editor() {
+  if [ -z "${editor}" ]; then
+    if [ -n "${EDITOR}" ] && command -v "${EDITOR}" >/dev/null 2>&1; then
+      editor="${EDITOR}"
+    elif command -v editor >/dev/null 2>&1; then
+      editor="editor"
+    elif command -v vi >/dev/null 2>&1; then
+      editor="vi"
+    else
+      error "Unable to find a usable editor, tried \${EDITOR} (${EDITOR}), editor, and vi."
+      exit 1
+    fi
+  elif ! command -v "${editor}" >/dev/null 2>&1; then
+    error "Unable to locate user specified editor ${editor}, is it in your PATH?"
+    exit 1
+  fi
+}
+
+get_docker_command() {
+  if [ -x "${docker}" ]; then
+    return 0
+  elif command -v docker >/dev/null 2>&1 ; then
+    docker="$(command -v docker)"
+  elif command -v podman >/dev/null 2>&1 ; then
+    docker="$(command -v podman)"
+  else
+    error "Unable to find a usable container tool stack. I support Docker and Podman."
+    exit 1
+  fi
+}
+
+run_in_container() {
+  ${docker} exec "${1}" /bin/sh -c "${2}" || return 1
+  return 0
+}
+
+check_for_container() {
+  get_docker_command
+  ${docker} container inspect "${1}" >/dev/null 2>&1 || return 1
+  run_in_container "${1}" "[ -d \"${NETDATA_STOCK_CONFIG_DIR}\" ]" >/dev/null 2>&1 || return 1
+  return 0
+}
+
+handle_container() {
+  if [ -z "${container}" ] && [ -f "${script_dir}/.container-hostname" ] && [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ]; then
+    echo >&2 "Autodetected containerized Netdata instance. Attempting to autodetect container ID."
+    possible_container="$(cat "${script_dir}/.container-hostname")"
+    if check_for_container "${possible_container}" ; then
+      container="${possible_container}"
+    elif check_for_container netdata ; then
+      container="netdata"
+    else
+      error "Could not autodetect container ID. It must be supplied on the command line with the --container option."
+      exit 1
+    fi
+
+    echo >&2 "Found Netdata container with ID or name ${container}"
+  elif [ -n "${container}" ]; then
+    if ! check_for_container "${container}" ; then
+      error "No container with ID or name ${container} exists."
+      exit 1
+    fi
+  fi
+}
+
+parse_args() {
+  while [ -n "${1}" ]; do
+    case "${1}" in
+      "--help") usage ;;
+      "--file")
+        if [ -n "${2}" ]; then
+          file="${2}"
+          shift 1
+        else
+          error "No file specified to edit."
+          exit 1
+        fi
+        ;;
+      "--container")
+        if [ -n "${2}" ]; then
+          container="${2}"
+          shift 1
+        else
+          error "No container ID or name specified with the --container option."
+          exit 1
+        fi
+        ;;
+      "--editor")
+        if [ -n "${2}" ]; then
+          editor="${2}"
+          shift 1
+        else
+          error "No editor specified with the --editor option."
+          exit 1
+        fi
+        ;;
+      *)
+        if [ -z "${2}" ]; then
+          file="${1}"
+        else
+          error "Unrecognized option ${1}."
+          exit 1
+        fi
+        ;;
+    esac
+    shift 1
+  done
+
+  [ -z "${file}" ] && usage
+
+  absfile="$(abspath "${file}")"
+  if ! is_prefix "${script_dir}" "${absfile}"; then
+    error "${file} is not located under ${script_dir}"
+    exit 1
+  fi
+}
+
+copy_native() {
+  if [ ! -w "${NETDATA_USER_CONFIG_DIR}" ]; then
+    error "Cannot write to ${NETDATA_USER_CONFIG_DIR}!"
+    exit 1
+  fi
+
+  if [ -f "${NETDATA_STOCK_CONFIG_DIR}/${1}" ]; then
+    echo >&2 "Copying '${NETDATA_STOCK_CONFIG_DIR}/${1}' to '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
+    cp -p "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
+  else
+    echo >&2 "Creating empty '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
+    touch "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
+  fi
+}
+
+copy_container() {
+  if [ ! -w "${NETDATA_USER_CONFIG_DIR}" ]; then
+    error "Cannot write to ${NETDATA_USER_CONFIG_DIR}!"
+    exit 1
+  fi
+
+  if run_in_container "${container}" "[ -f \"${NETDATA_STOCK_CONFIG_DIR}/${1}\" ]"; then
+    echo >&2 "Copying '${NETDATA_STOCK_CONFIG_DIR}/${1}' to '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
+    ${docker} cp -a "${container}:${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
+  else
+    echo >&2 "Creating empty '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
+    touch "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
+  fi
+}
+
+copy() {
+  if [ -f "${1}" ]; then
+    return 0
+  elif [ -n "${container}" ]; then
+    copy_container "${1}"
+  else
+    copy_native "${1}"
+  fi
+}
 
 edit() {
   echo >&2 "Editing '${1}' ..."
 
   # check we can edit
   if [ ! -w "${1}" ]; then
-    echo >&2 "Cannot write to ${1}! Aborting ..."
+    error "Cannot write to ${1}!"
     exit 1
   fi
 
@@ -50,34 +217,13 @@ edit() {
   exit $?
 }
 
-copy_and_edit() {
-  # check we can copy
-  if [ ! -w "${NETDATA_USER_CONFIG_DIR}" ]; then
-    echo >&2 "Cannot write to ${NETDATA_USER_CONFIG_DIR}! Aborting ..."
-    exit 1
-  fi
 
-  if [ ! -f "${NETDATA_USER_CONFIG_DIR}/${1}" ]; then
-    echo >&2 "Copying '${NETDATA_STOCK_CONFIG_DIR}/${1}' to '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
-    cp -p "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
-  fi
-
-  edit "${NETDATA_USER_CONFIG_DIR}/${1}"
+main() {
+  parse_args "${@}"
+  check_editor
+  handle_container
+  copy "${file}"
+  edit "${file}"
 }
 
-# make sure it is not absolute filename
-c1="$(echo "${file}" | cut -b 1)"
-if [ "${c1}" = "/" ] || [ "${c1}" = "." ]; then
-  echo >&2 "Please don't use filenames starting with '/' or '.'"
-  exit 1
-fi
-
-# already exists
-[ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ] && edit "${NETDATA_USER_CONFIG_DIR}/${file}"
-
-# stock config is valid, copy and edit
-[ -f "${NETDATA_STOCK_CONFIG_DIR}/${file}" ] && copy_and_edit "${file}"
-
-# no such config found
-echo >&2 "File '${file}' is not found in '${NETDATA_STOCK_CONFIG_DIR}'"
-exit 1
+main "${@}"
