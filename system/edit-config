@@ -97,7 +97,7 @@ check_editor() {
 running_in_container() {
   [ -e /.dockerenv ] && return 0
   [ -e /.dockerinit ] && return 0
-  [ -e /proc/1/environ ] && tr '\000' '\n' < /proc/1/environ | grep -Eiq '^container=podman' && return 0
+  [ -r /proc/1/environ ] && tr '\000' '\n' < /proc/1/environ | grep -Eiq '^container=podman' && return 0
   grep -qF -e /docker/ -e /libpod- /proc/self/cgroup 2>/dev/null && return 0
 }
 
