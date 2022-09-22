@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- disable Postgres last vacuum/analyze alarms [\#13698](https://github.com/netdata/netdata/pull/13698) ([ilyam8](https://github.com/ilyam8))
+- Update dashboard to version v2.29.1. [\#13696](https://github.com/netdata/netdata/pull/13696) ([netdatabot](https://github.com/netdatabot))
+- docs: nvidia-smi in a container limitation note [\#13695](https://github.com/netdata/netdata/pull/13695) ([ilyam8](https://github.com/ilyam8))
+- Store nulls instead of empty strings in health tables [\#13683](https://github.com/netdata/netdata/pull/13683) ([MrZammler](https://github.com/MrZammler))
 - dictionary updated documentation and cosmetics [\#13679](https://github.com/netdata/netdata/pull/13679) ([ktsaou](https://github.com/ktsaou))
 - disable internal log [\#13678](https://github.com/netdata/netdata/pull/13678) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.40.0 [\#13675](https://github.com/netdata/netdata/pull/13675) ([ilyam8](https://github.com/ilyam8))
@@ -35,6 +39,7 @@
 - remove forgotten avl structure from rrdcalc [\#13632](https://github.com/netdata/netdata/pull/13632) ([ktsaou](https://github.com/ktsaou))
 - Deaggregate the `gui` and `email` app groupx and improve GUI coverage. [\#13631](https://github.com/netdata/netdata/pull/13631) ([Ferroin](https://github.com/Ferroin))
 - Faster rrdcontext [\#13629](https://github.com/netdata/netdata/pull/13629) ([ktsaou](https://github.com/ktsaou))
+- Update uninstaller documentation. [\#13627](https://github.com/netdata/netdata/pull/13627) ([Ferroin](https://github.com/Ferroin))
 - eBPF different improvements [\#13624](https://github.com/netdata/netdata/pull/13624) ([thiagoftsm](https://github.com/thiagoftsm))
 - adjust systemdunits alarms [\#13623](https://github.com/netdata/netdata/pull/13623) ([ilyam8](https://github.com/ilyam8))
 - fix apps plugin users charts descriptipon [\#13621](https://github.com/netdata/netdata/pull/13621) ([ilyam8](https://github.com/ilyam8))
@@ -350,10 +355,6 @@
 - Add additional metadata to the data response [\#13036](https://github.com/netdata/netdata/pull/13036) ([stelfrag](https://github.com/stelfrag))
 - When sending a dimension for the first time, make sure there is a non zero created\_at timestamp [\#13035](https://github.com/netdata/netdata/pull/13035) ([stelfrag](https://github.com/stelfrag))
 - Update apps\_groups.conf [\#13033](https://github.com/netdata/netdata/pull/13033) ([fqx](https://github.com/fqx))
-- Dictionary with JudyHS and double linked list [\#13032](https://github.com/netdata/netdata/pull/13032) ([ktsaou](https://github.com/ktsaou))
-- add hostname to mirrored hosts [\#13030](https://github.com/netdata/netdata/pull/13030) ([ktsaou](https://github.com/ktsaou))
-- Update dashboard to version v2.25.6. [\#13028](https://github.com/netdata/netdata/pull/13028) ([netdatabot](https://github.com/netdatabot))
-- prevent gap filling on dbengine gaps [\#13027](https://github.com/netdata/netdata/pull/13027) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
