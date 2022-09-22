@@ -58,6 +58,9 @@ local:
   # a "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only
   # alarms with "cpu" or "load" in alarm name. Default includes all.
   alarm_contains_words: ''
+  # a "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude 
+  # all alarms with "cpu" or "load" in alarm name. Default excludes None.
+  alarm_excludes_words: ''
 ```
 
 It will default to pulling all alarms at each time step from the Netdata rest api at `http://127.0.0.1:19999/api/v1/alarms?all`
