@@ -65,6 +65,13 @@ check_editor() {
   fi
 }
 
+running_in_container() {
+  [ -e /.dockerenv ] && return 0
+  [ -e /.dockerinit ] && return 0
+  [ -e /proc/1/environ ] && tr '\000' '\n' < /proc/1/environ | grep -Eiq '^container=podman' && return 0
+  grep -qF -e /docker/ -e /libpod- /proc/self/cgroup 2>/dev/null && return 0
+}
+
 get_docker_command() {
   if [ -x "${docker}" ]; then
     return 0
@@ -91,7 +98,9 @@ check_for_container() {
 }
 
 handle_container() {
-  if [ -z "${container}" ] && [ -f "${script_dir}/.container-hostname" ] && [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ]; then
+  if running_in_container; then
+    return 0
+  elif [ -z "${container}" ] && [ -f "${script_dir}/.container-hostname" ]; then
     echo >&2 "Autodetected containerized Netdata instance. Attempting to autodetect container ID."
     possible_container="$(cat "${script_dir}/.container-hostname")"
     if check_for_container "${possible_container}" ; then
