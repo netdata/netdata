@@ -278,7 +278,10 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     size_t count_of_dimensions_written = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(likely(rd->updated && rd->exposed)) {
+        if(unlikely(!rd->updated))
+            continue;
+
+        if(likely(rd->exposed)) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
@@ -286,8 +289,9 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
             buffer_fast_strcat(wb, "\n", 1);
             count_of_dimensions_written++;
         }
-        else if(rd->updated && !rd->exposed) {
+        else {
             internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' is updated but not exposed", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+            // we will include it in the next iteration
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
     }
