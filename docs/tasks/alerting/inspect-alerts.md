@@ -8,28 +8,39 @@ learn_rel_path: "alerting"
 learn_docs_purpose: "Instructions on how the user can see their active alerts"
 -->
 
-**********************************************************************
-Template:
+From the Cloud interface, you can see the active Alerts of a War Room. In this Task you will learn how to inspect a War
+Room's Alerts, and how to further filter the results to your liking.
 
-Small intro, give some context to the user
+## Prerequisites
 
-## Prerequisite
-
-Unordered list of what you will need. 
+- A Cloud account with at least one node connected to one of its Spaces.
 
 ## Steps
 
-Exact list of steps the user must follow
+- Click on the **Alerts** view
+- Click on the **Active** tab
 
-## Expected result
+You will then be presented with a table of the active alerts (if any), containing info about the:
 
-What you expect to see when you complete the steps above
+- Alert Status
+- Alert name
+- Latest Value
+- Latest Updated timestamp
+- Triggered Value
+- Triggered Node
+- Chart Id
 
-## Example
+You can sort the results by these columns, and you can also filter the Alerts, from the right tab in the interface.  
+You can filter by:
 
-Example configuration/actions of the task
+- Status (Critical/Warning)
+- Class (Errors, Latency, Utilization, Workload)
+- Type & Component
+- Role
+- OS
+- Node (Select any node from the War Room)
 
 ## Related topics
 
-List of reference docs user needs to be aware of.
-
+1. [Alerts Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
+2. [Alerts Configuration Reference](https://github.com/netdata/netdata/blob/master/health/README.md)
