@@ -17,8 +17,8 @@ Room's Alerts, and how to further filter the results to your liking.
 
 ## Steps
 
-- Click on the **Alerts** view
-- Click on the **Active** tab
+1. Click on the **Alerts** view
+2. Click on the **Active** tab
 
 You will then be presented with a table of the active alerts (if any), containing info about the:
 
