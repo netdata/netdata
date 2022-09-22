@@ -54,11 +54,11 @@ extern const char *buffer_tostring(BUFFER *wb);
 #define buffer_flush(wb) wb->buffer[(wb)->len = 0] = '\0'
 extern void buffer_reset(BUFFER *wb);
 
-#define buffer_fast_strcat(wb, txt, len) do {               \
+#define buffer_fast_strcat(wb, txt, txt_len) do {           \
         if(likely((txt) && *(txt))) {                       \
-            buffer_need_bytes(wb, (len) + 1);               \
-            memcpy(&(wb)->buffer[(wb)->len], txt, len);     \
-            (wb)->len += (len);                             \
+            buffer_need_bytes(wb, (txt_len) + 1);           \
+            memcpy(&(wb)->buffer[(wb)->len], txt, txt_len); \
+            (wb)->len += (txt_len);                         \
             (wb)->buffer[(wb)->len] = '\0';                 \
         }                                                   \
     } while(0)
