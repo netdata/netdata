@@ -22,6 +22,8 @@ USAGE:
   environment variable, or by using the --editor option.
 
   The file to edit can also be specified using the --file option.
+
+  For a list of known config files, run '${0} --list'
 EOF
   exit 0
 }
@@ -148,10 +150,34 @@ handle_container() {
   fi
 }
 
+list_files() {
+  check_directories
+  handle_container
+
+  if [ -z "${container}" ]; then
+    files="$(cd "${NETDATA_STOCK_CONFIG_DIR}" && find . -type f | cut -d '/' -f 2-)"
+  else
+    files="$(run_in_container "${container}" "cd /usr/lib/netdata/conf.d && find . -type f" | cut -d '/' -f 2-)"
+  fi
+
+  if [ -z "${files}" ]; then
+    error "Failed to find any configuration files."
+    exit 1
+  fi
+
+  cat << EOF
+The following configuration files are known to this script:
+
+${files}
+EOF
+  exit 0
+}
+
 parse_args() {
   while [ -n "${1}" ]; do
     case "${1}" in
       "--help") usage ;;
+      "--list") list_files ;;
       "--file")
         if [ -n "${2}" ]; then
           file="${2}"
