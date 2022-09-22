@@ -223,6 +223,8 @@ parse_args() {
     error "${file} is not located under ${script_dir}"
     exit 1
   fi
+
+  file="${absfile##"${script_dir}"}"
 }
 
 copy_native() {
@@ -285,7 +287,7 @@ main() {
   check_editor
   handle_container
   copy "${file}"
-  edit "${file}"
+  edit "${absfile}"
 }
 
 main "${@}"
