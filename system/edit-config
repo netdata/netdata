@@ -35,9 +35,9 @@ error() {
 
 abspath() {
   if [ -d "${1}" ]; then
-    echo "$(cd "${1}" && /bin/env PWD= pwd -P)/"
+    echo "$(cd "${1}" && /usr/bin/env PWD= pwd -P)/"
   else
-    echo "$(cd "$(dirname "${1}")" && /bin/env PWD= pwd -P )/$(basename "${1}")"
+    echo "$(cd "$(dirname "${1}")" && /usr/bin/env PWD= pwd -P )/$(basename "${1}")"
   fi
 }
 
