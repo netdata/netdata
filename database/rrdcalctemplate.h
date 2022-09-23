@@ -48,14 +48,12 @@ struct rrdcalctemplate {
     // database lookup settings
 
     STRING *dimensions;             // the chart dimensions
-    STRING *foreachdim;             // the group of dimensions that the lookup will be applied.
-    SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
-    int foreachcounter;             // the number of alarms created with foreachdim, this also works as an id of the
-                                    // children
+    STRING *foreach_dimension;      // the group of dimensions that the lookup will be applied.
+    SIMPLE_PATTERN *foreach_dimension_pattern; // used if and only if there is a simple pattern for the chart.
     RRDR_GROUPING group;            // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
-    uint32_t options;               // calculation options
+    RRDCALC_OPTIONS options;        // configuration options
 
     // ------------------------------------------------------------------------
     // notification delay settings
@@ -87,8 +85,11 @@ struct rrdcalctemplate {
     struct rrdcalctemplate *prev;
 };
 
-#define foreach_rrdcalctemplate_in_rrdhost(host, rt) \
-    DOUBLE_LINKED_LIST_FOREACH_FORWARD((host)->alarms_templates, rt, prev, next)
+#define foreach_rrdcalctemplate_read(host, rt) \
+    dfe_start_read((host)->rrdcalctemplate_root_index, rt)
+
+#define foreach_rrdcalctemplate_done(rt) \
+    dfe_done(rt)
 
 #define rrdcalctemplate_name(rt) string2str((rt)->name)
 #define rrdcalctemplate_exec(rt) string2str((rt)->exec)
@@ -104,14 +105,24 @@ struct rrdcalctemplate {
 #define rrdcalctemplate_info(rt) string2str((rt)->info)
 #define rrdcalctemplate_source(rt) string2str((rt)->source)
 #define rrdcalctemplate_dimensions(rt) string2str((rt)->dimensions)
-#define rrdcalctemplate_foreachdim(rt) string2str((rt)->foreachdim)
+#define rrdcalctemplate_foreachdim(rt) string2str((rt)->foreach_dimension)
 #define rrdcalctemplate_host_labels(rt) string2str((rt)->host_labels)
 
 #define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
 
-extern void rrdcalctemplate_link_matching(RRDSET *st);
+extern void rrdcalctemplate_link_matching_templates_to_rrdset(RRDSET *st);
 
-extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
-extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
-extern void rrdcalctemplate_create_alarms(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st);
+extern void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt);
+extern void rrdcalctemplate_delete_all(RRDHOST *host);
+extern void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt);
+
+extern void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
+
+extern bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
+extern void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host);
+
+
+extern void rrdcalctemplate_index_init(RRDHOST *host);
+extern void rrdcalctemplate_index_destroy(RRDHOST *host);
+
 #endif //NETDATA_RRDCALCTEMPLATE_H

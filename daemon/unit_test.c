@@ -1269,27 +1269,27 @@ static int test_variable_renames(void) {
     fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming chart to CHARTNAME1\n");
-    rrdset_set_name(st, "CHARTNAME1");
+    rrdset_reset_name(st, "CHARTNAME1");
     fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming chart to CHARTNAME2\n");
-    rrdset_set_name(st, "CHARTNAME2");
+    rrdset_reset_name(st, "CHARTNAME2");
     fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");
-    rrddim_set_name(st, rd1, "DIM1NAME1");
+    rrddim_reset_name(st, rd1, "DIM1NAME1");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME2\n");
-    rrddim_set_name(st, rd1, "DIM1NAME2");
+    rrddim_reset_name(st, rd1, "DIM1NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME1\n");
-    rrddim_set_name(st, rd2, "DIM2NAME1");
+    rrddim_reset_name(st, rd2, "DIM2NAME1");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME2\n");
-    rrddim_set_name(st, rd2, "DIM2NAME2");
+    rrddim_reset_name(st, rd2, "DIM2NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     BUFFER *buf = buffer_create(1);
@@ -1447,9 +1447,8 @@ int unit_test(long delay, long shift)
     long increment = 1000;
     collected_number i = 0;
 
-    unsigned long c, dimensions = 0;
+    unsigned long c, dimensions = rrdset_number_of_dimensions(st);
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ; rd = rd->next) dimensions++;
 
     for(c = 0; c < 20 ;c++) {
         i += increment;
@@ -1470,8 +1469,10 @@ int unit_test(long delay, long shift)
         }
 
         // prevent it from deleting the dimensions
-        for(rd = st->dimensions; rd ; rd = rd->next)
+        rrddim_foreach_read(rd, st) {
             rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
+        }
+        rrddim_foreach_done(rd);
 
         rrdset_done(st);
     }
@@ -1486,7 +1487,7 @@ int unit_test(long delay, long shift)
     for(c = 0 ; c < st->counter ; c++) {
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
-        for(rd = st->dimensions; rd ; rd = rd->next) {
+        rrddim_foreach_read(rd, st) {
             sn = rd->db[c];
             cn = unpack_storage_number(sn);
             fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
@@ -1508,6 +1509,7 @@ int unit_test(long delay, long shift)
                 ret = 1;
             }
         }
+        rrddim_foreach_done(rd);
     }
 
     if(ret)
@@ -1967,7 +1969,11 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                 time_retrieved = r->t[c];
 
                 // for each dimension
-                for (j = 0, d = r->st->dimensions; d && j < r->d ; ++j, d = d->next) {
+                rrddim_foreach_read(d, r->st) {
+                    if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+
+                    j = (int)d_dfe.counter;
+
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
                     assert(rd[i][j] == d);
@@ -1990,6 +1996,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                         time_errors++;
                     }
                 }
+                rrddim_foreach_done(d);
             }
             rrdr_free(owa, r);
         }
@@ -2103,7 +2110,11 @@ int test_dbengine(void)
                 time_t time_retrieved = r->t[c];
 
                 // for each dimension
-                for(j = 0, d = r->st->dimensions; d && j < r->d ; ++j, d = d->next) {
+                rrddim_foreach_read(d, r->st) {
+                    if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+
+                    j = (int)d_dfe.counter;
+
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     NETDATA_DOUBLE value = cn[j];
                     assert(rd[i][j] == d);
@@ -2126,6 +2137,7 @@ int test_dbengine(void)
                         time_errors++;
                     }
                 }
+                rrddim_foreach_done(d);
             }
             rrdr_free(owa, r);
         }

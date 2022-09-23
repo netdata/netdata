@@ -893,6 +893,10 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t options = 0x00000000;
 
+    const RRDCALC_ACQUIRED *rca = NULL;
+    RRDCALC *rc = NULL;
+    RRDSET *st = NULL;
+
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -957,7 +961,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
-    RRDSET *st = rrdset_find(host, chart);
+    st = rrdset_find(host, chart);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
@@ -967,9 +971,10 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
     st->last_accessed_time = now_realtime_sec();
 
-    RRDCALC *rc = NULL;
     if(alarm) {
-        rc = rrdcalc_find(st, alarm);
+        rca = rrdcalc_from_rrdset_get(st, alarm);
+        rc = rrdcalc_acquired_to_rrdcalc(rca);
+
         if (!rc) {
             buffer_no_cacheable(w->response.data);
             buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1, NULL, NULL);
@@ -1143,7 +1148,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         );
     }
 
-    cleanup:
+cleanup:
+    rrdcalc_from_rrdset_release(st, rca);
     buffer_free(dimensions);
     return ret;
 }

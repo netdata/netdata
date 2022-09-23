@@ -111,7 +111,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
             t = t->next;
         }
     } else
-        rrddim_foreach_read(rd, st) dimensions++;
+        dimensions = rrdset_number_of_dimensions(st);
 
     // create the rrdr
     RRDR *r = rrdr_create_for_x_dimensions(owa, dimensions, n);
@@ -121,7 +121,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_pa
     // set the hidden flag on hidden dimensions
     int c;
     for (c = 0, rd = temp_rd ? temp_rd : st->dimensions; rd; c++, rd = rd->next) {
-        if (unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
+        if (unlikely(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)))
             r->od[c] = RRDR_DIMENSION_HIDDEN;
         else
             r->od[c] = RRDR_DIMENSION_DEFAULT;

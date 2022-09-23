@@ -51,18 +51,12 @@ static DICTIONARY *rrdhost_root_index_hostname = NULL;
 static inline void rrdhost_init() {
     if(unlikely(!rrdhost_root_index)) {
         rrdhost_root_index = dictionary_create(
-              DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            );
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     }
 
     if(unlikely(!rrdhost_root_index_hostname)) {
         rrdhost_root_index_hostname = dictionary_create(
-              DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            | DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            );
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
     }
 }
 
@@ -70,7 +64,7 @@ static inline void rrdhost_init() {
 // RRDHOST index by UUID
 
 inline long rrdhost_hosts_available(void) {
-    return dictionary_stats_entries(rrdhost_root_index);
+    return dictionary_entries(rrdhost_root_index);
 }
 
 inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
@@ -91,7 +85,7 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
 
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID)) {
-        if(dictionary_del(rrdhost_root_index, host->machine_guid) !=  0)
+        if(!dictionary_del(rrdhost_root_index, host->machine_guid))
             error("RRDHOST: %s() failed to delete machine guid '%s' from index", __FUNCTION__, host->machine_guid);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
@@ -126,7 +120,7 @@ static inline void rrdhost_index_del_hostname(RRDHOST *host) {
     if(unlikely(!host->hostname)) return;
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_HOSTNAME)) {
-        if(dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)) !=  0)
+        if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
             error("RRDHOST: %s() failed to delete hostname '%s' from index", __FUNCTION__, rrdhost_hostname(host));
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
@@ -206,6 +200,114 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
+static void rrdhost_initialize_rrdpush(RRDHOST *host,
+                                       unsigned int rrdpush_enabled,
+                                       char *rrdpush_destination,
+                                       char *rrdpush_api_key,
+                                       char *rrdpush_send_charts_matching
+) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH)) return;
+    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH);
+
+    sender_init(host);
+    netdata_mutex_init(&host->receiver_lock);
+
+    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
+    host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
+
+    if (host->rrdpush_send_destination)
+        host->destinations = destinations_init(host->rrdpush_send_destination);
+
+    host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
+    host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+
+    host->rrdpush_sender_pipe[0] = -1;
+    host->rrdpush_sender_pipe[1] = -1;
+    host->rrdpush_sender_socket  = -1;
+
+    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
+#ifdef ENABLE_HTTPS
+    host->ssl.conn = NULL;
+    host->ssl.flags = NETDATA_SSL_START;
+    host->stream_ssl.conn = NULL;
+    host->stream_ssl.flags = NETDATA_SSL_START;
+#endif
+}
+
+static void rrdhost_initialize_health(RRDHOST *host,
+                                      int is_localhost
+                                      ) {
+    if(!host->health_enabled || rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) return;
+    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
+
+    rrdfamily_index_init(host);
+    rrdcalctemplate_index_init(host);
+    rrdcalc_rrdhost_index_init(host);
+
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+
+    host->health_log.next_log_id = 1;
+    host->health_log.next_alarm_id = 1;
+    host->health_log.max = 1000;
+    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_alarm_id = 0;
+
+    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
+    if(n < 10) {
+        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
+        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
+    }
+    else
+        host->health_log.max = (unsigned int)n;
+
+    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
+
+    char filename[FILENAME_MAX + 1];
+
+    if(!is_localhost) {
+        int r = mkdir(host->varlib_dir, 0775);
+        if (r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
+    }
+
+    {
+        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+        int r = mkdir(filename, 0775);
+        if(r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
+    }
+
+    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
+    host->health_log_filename = strdupz(filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
+    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+    host->health_default_recipient = string_strdupz("root");
+
+    // ------------------------------------------------------------------------
+    // load health configuration
+
+    health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
+
+    if (!file_is_migrated(host->health_log_filename)) {
+        int rc = sql_create_health_log_table(host);
+        if (unlikely(rc)) {
+            error_report("Failed to create health log table in the database");
+            health_alarm_log_load(host);
+            health_alarm_log_open(host);
+        }
+        else {
+            health_alarm_log_load(host);
+            add_migrated_file(host->health_log_filename, 0);
+        }
+    } else {
+        sql_create_health_log_table(host);
+        sql_health_alarm_log_load(host);
+    }
+}
+
+
 RRDHOST *rrdhost_create(const char *hostname,
                         const char *registry_hostname,
                         const char *guid,
@@ -251,40 +353,18 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    sender_init(host);
-    netdata_mutex_init(&host->receiver_lock);
-
-    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
-    host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
-    if (host->rrdpush_send_destination)
-        host->destinations = destinations_init(host->rrdpush_send_destination);
-    host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
-    host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
-
-    host->rrdpush_sender_pipe[0] = -1;
-    host->rrdpush_sender_pipe[1] = -1;
-    host->rrdpush_sender_socket  = -1;
-
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
-#ifdef ENABLE_HTTPS
-    host->ssl.conn = NULL;
-    host->ssl.flags = NETDATA_SSL_START;
-    host->stream_ssl.conn = NULL;
-    host->stream_ssl.flags = NETDATA_SSL_START;
-#endif
+    if (likely(!archived)) {
+        host->rrdlabels = rrdlabels_create();
+        rrdhost_initialize_rrdpush(
+            host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+    }
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
-    if (likely(!archived))
-        host->rrdlabels = rrdlabels_create();
-
     netdata_mutex_init(&host->aclk_state_lock);
 
     host->system_info = system_info;
 
-    host->rrdset_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    host->rrdset_root_index_name = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    host->rrdfamily_root_index   = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
-    host->rrdvar_root_index      = dictionary_create(DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_DONT_OVERWRITE_VALUE);
+    rrdset_index_init(host);
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -292,41 +372,17 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_DB, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
-    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-
-    // ------------------------------------------------------------------------
-    // initialize health variables
-
-    host->health_log.next_log_id = 1;
-    host->health_log.next_alarm_id = 1;
-    host->health_log.max = 1000;
-    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
-    host->health_log.next_alarm_id = 0;
-
-    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
-    if(n < 10) {
-        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
-        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
-    }
-    else
-        host->health_log.max = (unsigned int)n;
-
-    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
-
     char filename[FILENAME_MAX + 1];
-
     if(is_localhost) {
-
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
         host->varlib_dir = strdupz(netdata_configured_varlib_dir);
-
     }
     else {
         // this is not localhost - append our GUID to localhost path
         if (is_in_multihost) { // don't append to cache dir in multihost
             host->cache_dir  = strdupz(netdata_configured_cache_dir);
-        } else {
+        }
+        else {
             snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
             host->cache_dir = strdupz(filename);
         }
@@ -340,38 +396,11 @@ RRDHOST *rrdhost_create(const char *hostname,
 
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
         host->varlib_dir = strdupz(filename);
-
-        if(host->health_enabled) {
-            int r = mkdir(host->varlib_dir, 0775);
-            if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-       }
-
     }
 
-    if(host->health_enabled) {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
-
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(filename);
-
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = string_strdupz("root");
-
-
-    // ------------------------------------------------------------------------
-    // load health configuration
-
-    if(host->health_enabled) {
-        rrdhost_wrlock(host);
-        health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-        rrdhost_unlock(host);
-    }
+    // this is also needed for custom host variables - not only health
+    if(!host->rrdvars)
+        host->rrdvars = rrdvariables_create();
 
     RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
@@ -382,32 +411,19 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
         int rc;
-        if (!archived) {
+
+        if(!archived) {
             rc = sql_store_host_info(host);
             if (unlikely(rc))
                 error_report("Failed to store machine GUID to the database");
         }
+
         sql_load_node_id(host);
-        if (host->health_enabled) {
-            if (!file_is_migrated(host->health_log_filename)) {
-                rc = sql_create_health_log_table(host);
-                if (unlikely(rc)) {
-                    error_report("Failed to create health log table in the database");
-                    health_alarm_log_load(host);
-                    health_alarm_log_open(host);
-                }
-                else {
-                    health_alarm_log_load(host);
-                    add_migrated_file(host->health_log_filename, 0);
-                }
-            } else {
-                sql_create_health_log_table(host);
-                sql_health_alarm_log_load(host);
-            }
-        }
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
+
+    rrdhost_initialize_health(host, is_localhost);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -530,6 +546,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         ml_new_host(host);
     else
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+
+
     return host;
 }
 
@@ -605,50 +623,24 @@ void rrdhost_update(RRDHOST *host
     // update host tags
     rrdhost_init_tags(host, tags);
 
+    if(!host->rrdvars)
+        host->rrdvars = rrdvariables_create();
+
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
-        host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
-        if (host->rrdpush_send_destination)
-            host->destinations = destinations_init(host->rrdpush_send_destination);
-        host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+        if(!host->rrdlabels)
+            host->rrdlabels = rrdlabels_create();
 
-        if(host->health_enabled) {
-            int r;
-            char filename[FILENAME_MAX + 1];
+        rrdhost_initialize_rrdpush(host,
+                                   rrdpush_enabled,
+                                   rrdpush_destination,
+                                   rrdpush_api_key,
+                                   rrdpush_send_charts_matching);
 
-            if (host != localhost) {
-                r = mkdir(host->varlib_dir, 0775);
-                if (r != 0 && errno != EEXIST)
-                    error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-            }
-            snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-            r = mkdir(filename, 0775);
-            if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
+        rrdhost_initialize_health(host,
+                                  host == localhost);
 
-            rrdhost_wrlock(host);
-            health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-            rrdhost_unlock(host);
-
-            if (!file_is_migrated(host->health_log_filename)) {
-                int rc = sql_create_health_log_table(host);
-                if (unlikely(rc)) {
-                    error_report("Failed to create health log table in the database");
-
-                    health_alarm_log_load(host);
-                    health_alarm_log_open(host);
-                } else {
-                    health_alarm_log_load(host);
-                    add_migrated_file(host->health_log_filename, 0);
-                }
-            } else {
-                sql_create_health_log_table(host);
-                sql_health_alarm_log_load(host);
-            }
-        }
         rrd_hosts_available++;
         ml_new_host(host);
         rrdhost_load_rrdcontext_data(host);
@@ -760,32 +752,6 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
         return 1;
 
     return 0;
-}
-
-void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host) {
-    time_t now = now_realtime_sec();
-
-    RRDHOST *host;
-
-restart_after_removal:
-    rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_removed(host, protected_host, now)) {
-            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
-
-            if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
-#ifdef ENABLE_DBENGINE
-                /* don't delete multi-host DB host files */
-                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
-#endif
-            )
-                rrdhost_delete_charts(host);
-            else
-                rrdhost_save_charts(host);
-
-            rrdhost_free(host, 0);
-            goto restart_after_removal;
-        }
-    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1091,12 +1057,21 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     // ------------------------------------------------------------------------
     // clean up streaming
+
     stop_streaming_sender(host);
 
     if (netdata_exit || force)
         stop_streaming_receiver(host);
 
+
+    // ------------------------------------------------------------------------
+    // clean up alarms
+
+    rrdcalc_delete_all(host);
+
+
     rrdhost_wrlock(host);   // lock this RRDHOST
+
     // ------------------------------------------------------------------------
     // release its children resources
 
@@ -1109,26 +1084,12 @@ void rrdhost_free(RRDHOST *host, bool force) {
     }
 #endif
 
-    while(host->rrdset_root)
-        rrdset_free(host->rrdset_root);
+    // delete all the RRDSETs of the host
+    rrdset_index_destroy(host);
+    rrdcalc_rrdhost_index_destroy(host);
+    rrdcalctemplate_index_destroy(host);
 
     freez(host->exporting_flags);
-
-    while(host->host_alarms)
-        rrdcalc_unlink_and_free(host, host->host_alarms);
-
-    RRDCALC *rc,*nc;
-    for(rc = host->alarms_with_foreach; rc ; rc = nc) {
-        nc = rc->next;
-        rrdcalc_free(rc);
-    }
-    host->alarms_with_foreach = NULL;
-
-    while(host->alarms_templates)
-        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
-
-    debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", rrdhost_hostname(host));
-    rrdvar_free_remaining_variables(host, host->rrdvar_root_index);
 
     health_alarm_log_free(host);
 
@@ -1208,10 +1169,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host->node_id);
 
-    dictionary_destroy(host->rrdset_root_index);
-    dictionary_destroy(host->rrdset_root_index_name);
-    dictionary_destroy(host->rrdfamily_root_index);
-    dictionary_destroy(host->rrdvar_root_index);
+    rrdfamily_index_destroy(host);
+    rrdvariables_destroy(host->rrdvars);
 
     rrdhost_destroy_rrdcontexts(host);
 
@@ -1249,15 +1208,10 @@ void rrdhost_save_charts(RRDHOST *host) {
 
     // we get a write lock
     // to ensure only one thread is saving the database
-    rrdhost_wrlock(host);
-
     rrdset_foreach_write(st, host) {
-        rrdset_rdlock(st);
         rrdset_save(st);
-        rrdset_unlock(st);
     }
-
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 }
 
 static void rrdhost_load_auto_labels(void) {
@@ -1411,17 +1365,12 @@ void rrdhost_delete_charts(RRDHOST *host) {
 
     // we get a write lock
     // to ensure only one thread is saving the database
-    rrdhost_wrlock(host);
-
     rrdset_foreach_write(st, host) {
-        rrdset_rdlock(st);
-        rrdset_delete_files(st);
-        rrdset_unlock(st);
+            rrdset_delete_files(st);
     }
+    rrdset_foreach_done(st);
 
     recursively_delete_dir(host->cache_dir, "left over host");
-
-    rrdhost_unlock(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -1437,22 +1386,19 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
 
     // we get a write lock
     // to ensure only one thread is saving the database
-    rrdhost_wrlock(host);
-
     rrdset_foreach_write(st, host) {
-        rrdset_rdlock(st);
 
         if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
             rrdset_delete_files(st);
+
         else if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
             rrdset_delete_obsolete_dimensions(st);
+
         else
             rrdset_save(st);
 
-        rrdset_unlock(st);
     }
-
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 }
 
 
@@ -1495,157 +1441,6 @@ void rrdhost_cleanup_all(void) {
     rrd_unlock();
 }
 
-
-// ----------------------------------------------------------------------------
-// RRDHOST - save or delete all the host charts from disk
-
-void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
-    time_t now = now_realtime_sec();
-
-    RRDSET *st;
-
-    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
-
-restart_after_removal:
-    rrdset_foreach_write(st, host) {
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                    && st->last_accessed_time + rrdset_free_obsolete_time < now
-                    && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
-                    && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
-        )) {
-            st->rrdhost->obsolete_charts_count--;
-#ifdef ENABLE_DBENGINE
-            if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                RRDDIM *rd, *last;
-
-                rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-                while (st->variables)    rrdsetvar_free(st->variables);
-                while (st->alarms) rrdsetcalc_unlink(st->alarms);
-                rrdset_wrlock(st);
-                for (rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-                        last = rd;
-                        rd = rd->next;
-                        continue;
-                    }
-
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)) {
-                        last = rd;
-                        rd = rd->next;
-                        continue;
-                    }
-                    rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-                    while (rd->variables)
-                        rrddimvar_free(rd->variables);
-
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-                        rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-
-                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
-
-                        size_t tiers_available = 0, tiers_said_yes = 0;
-                        for(int tier = 0; tier < storage_tiers ;tier++) {
-                            if(rd->tiers[tier]) {
-                                tiers_available++;
-
-                                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
-                                    tiers_said_yes++;
-
-                                rd->tiers[tier]->db_collection_handle = NULL;
-                            }
-                        }
-
-                        if (tiers_available == tiers_said_yes && tiers_said_yes) {
-                            /* This metric has no data and no references */
-                            delete_dimension_uuid(&rd->metric_uuid);
-                            rrddim_free(st, rd);
-                            if (unlikely(!last)) {
-                                rd = st->dimensions;
-                            }
-                            else {
-                                rd = last->next;
-                            }
-                            continue;
-                        }
-#ifdef ENABLE_ACLK
-                        else
-                            queue_dimension_to_aclk(rd, rd->last_collected_time.tv_sec);
-#endif
-                    }
-                    last = rd;
-                    rd = rd->next;
-                }
-                rrdset_unlock(st);
-
-                debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", rrdhost_hostname(host), rrdset_id(st));
-                rrdvar_free_remaining_variables(host, st->rrdvar_root_index);
-
-                rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-                
-                if (st->dimensions) {
-                    /* If the chart still has dimensions don't delete it from the metadata log */
-                    continue;
-                }
-            }
-#endif
-            rrdset_rdlock(st);
-
-            if(rrdhost_delete_obsolete_charts)
-                rrdset_delete_files(st);
-            else
-                rrdset_save(st);
-
-            rrdset_unlock(st);
-
-            rrdset_free(st);
-            goto restart_after_removal;
-        }
-#ifdef ENABLE_ACLK
-        else
-            sql_check_chart_liveness(st);
-#endif
-    }
-}
-
-void rrdset_check_obsoletion(RRDHOST *host)
-{
-    RRDSET *st;
-    time_t last_entry_t;
-    rrdset_foreach_read(st, host) {
-        last_entry_t = rrdset_last_entry_t(st);
-        if (last_entry_t && last_entry_t < host->senders_connect_time) {
-            rrdset_is_obsolete(st);
-        }
-    }
-}
-
-void rrd_cleanup_obsolete_charts()
-{
-    rrd_rdlock();
-
-    RRDHOST *host;
-    rrdhost_foreach_read(host)
-    {
-        if (host->obsolete_charts_count) {
-            rrdhost_wrlock(host);
-            rrdhost_cleanup_obsolete_charts(host);
-            rrdhost_unlock(host);
-        }
-
-        if ( host != localhost &&
-             host->trigger_chart_obsoletion_check &&
-             ((host->senders_last_chart_command &&
-             host->senders_last_chart_command + host->health_delay_up_to < now_realtime_sec())
-              || (host->senders_connect_time + 300 < now_realtime_sec())) ) {
-            rrdhost_rdlock(host);
-            rrdset_check_obsoletion(host);
-            rrdhost_unlock(host);
-            host->trigger_chart_obsoletion_check = 0;
-        }
-    }
-
-    rrd_unlock();
-}
 
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
@@ -1786,14 +1581,15 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 // Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
 // the last entry times as the metric updates, but let's see if it is a problem first.
 time_t rrdhost_last_entry_t(RRDHOST *h) {
-    rrdhost_rdlock(h);
     RRDSET *st;
     time_t result = 0;
+
     rrdset_foreach_read(st, h) {
         time_t st_last = rrdset_last_entry_t(st);
+
         if (st_last > result)
             result = st_last;
     }
-    rrdhost_unlock(h);
+    rrdset_foreach_done(st);
     return result;
 }

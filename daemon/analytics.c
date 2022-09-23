@@ -249,8 +249,7 @@ void analytics_exporters(void)
     buffer_free(bi);
 }
 
-int collector_counter_callb(const char *name, void *entry, void *data) {
-    (void)name;
+int collector_counter_callb(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
 
     struct array_printer *ap = (struct array_printer *)data;
     struct collector *col = (struct collector *)entry;
@@ -279,21 +278,22 @@ int collector_counter_callb(const char *name, void *entry, void *data) {
 void analytics_collectors(void)
 {
     RRDSET *st;
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     char name[500];
     BUFFER *bt = buffer_create(1000);
 
-    rrdset_foreach_read(st, localhost)
-    {
-        if (rrdset_is_available_for_viewers(st)) {
-            struct collector col = {
-                .plugin = rrdset_plugin_name(st),
-                .module = rrdset_module_name(st)
-            };
-            snprintfz(name, 499, "%s:%s", col.plugin, col.module);
-            dictionary_set(dict, name, &col, sizeof(struct collector));
-        }
+    rrdset_foreach_read(st, localhost) {
+        if(!rrdset_is_available_for_viewers(st))
+            continue;
+
+        struct collector col = {
+            .plugin = rrdset_plugin_name(st),
+            .module = rrdset_module_name(st)
+        };
+        snprintfz(name, 499, "%s:%s", col.plugin, col.module);
+        dictionary_set(dict, name, &col, sizeof(struct collector));
     }
+    rrdset_foreach_done(st);
 
     struct array_printer ap;
     ap.c = 0;
@@ -398,12 +398,11 @@ void analytics_charts(void)
 {
     RRDSET *st;
     int c = 0;
+
     rrdset_foreach_read(st, localhost)
-    {
-        if (rrdset_is_available_for_viewers(st)) {
-            c++;
-        }
-    }
+        if(rrdset_is_available_for_viewers(st)) c++;
+    rrdset_foreach_done(st);
+
     {
         char b[7];
         snprintfz(b, 6, "%d", c);
@@ -415,22 +414,19 @@ void analytics_metrics(void)
 {
     RRDSET *st;
     long int dimensions = 0;
-    RRDDIM *rd;
-    rrdset_foreach_read(st, localhost)
-    {
-        rrdset_rdlock(st);
-
+    rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
-            rrddim_foreach_read(rd, st)
-            {
-                if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
                     continue;
                 dimensions++;
             }
+            rrddim_foreach_done(rd);
         }
-
-        rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
+
     {
         char b[7];
         snprintfz(b, 6, "%ld", dimensions);
@@ -443,7 +439,7 @@ void analytics_alarms(void)
     int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[10];
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost(localhost, rc) {
+    foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -458,6 +454,7 @@ void analytics_alarms(void)
                 alarm_normal++;
         }
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     snprintfz(b, 9, "%d", alarm_normal);
     analytics_set_data(&analytics_data.netdata_alarms_normal, b);
@@ -527,16 +524,11 @@ void analytics_gather_immutable_meta_data(void)
  */
 void analytics_gather_mutable_meta_data(void)
 {
-    rrdhost_rdlock(localhost);
-
     analytics_collectors();
     analytics_alarms();
     analytics_charts();
     analytics_metrics();
     analytics_aclk();
-
-    rrdhost_unlock(localhost);
-
     analytics_mirrored_hosts();
     analytics_alarms_notifications();
 

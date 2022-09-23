@@ -79,6 +79,9 @@ void ml_new_dimension(RRDDIM *RD) {
     if (simple_pattern_matches(Cfg.SP_ChartsToSkip, rrdset_name(RS)))
         return;
 
+    if (rrdset_is_ar_chart(RS))
+        return;
+
     Dimension *D = new Dimension(RD);
     RD->ml_dimension = static_cast<ml_dimension_t>(D);
     H->addDimension(D);

@@ -25,10 +25,8 @@ void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 // generate JSON for the /api/v1/chart API call
 
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
-    rrdset_rdlock(st);
-
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-    time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
+    time_t first_entry_t = rrdset_first_entry_t(st);
+    time_t last_entry_t  = rrdset_last_entry_t(st);
 
     buffer_sprintf(
         wb,
@@ -47,7 +45,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"chart_type\": \"%s\",\n",
         rrdset_id(st),
         rrdset_name(st),
-        rrdset_type(st),
+        rrdset_parts_type(st),
         rrdset_family(st),
         rrdset_context(st),
         rrdset_title(st),
@@ -90,7 +88,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     size_t dimensions = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+        if(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
 
         memory += sizeof(RRDDIM) + rd->memsize;
 
@@ -105,6 +103,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
         dimensions++;
     }
+    rrddim_foreach_done(rd);
 
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;
@@ -121,7 +120,8 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
         size_t alarms = 0;
         RRDCALC *rc;
-        foreach_rrdcalc_in_rrdset(st, rc) {
+        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        DOUBLE_LINKED_LIST_FOREACH_FORWARD(st->alerts.base, rc, prev, next) {
             buffer_sprintf(
                 wb,
                 "%s"
@@ -136,6 +136,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
             alarms++;
         }
+        netdata_rwlock_unlock(&st->alerts.rwlock);
         buffer_sprintf(wb,
                        "\n\t\t\t}"
         );
@@ -148,6 +149,4 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     buffer_sprintf(wb,
             "\n\t\t}"
     );
-
-    rrdset_unlock(st);
 }

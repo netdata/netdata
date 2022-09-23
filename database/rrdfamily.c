@@ -3,61 +3,66 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+typedef struct rrdfamily {
+    STRING *family;
+    DICTIONARY *rrdvars;
+} RRDFAMILY;
+
 // ----------------------------------------------------------------------------
 // RRDFAMILY index
 
-static inline RRDFAMILY *rrdfamily_index_add(RRDHOST *host, RRDFAMILY *rc) {
-    return dictionary_set(host->rrdfamily_root_index, string2str(rc->family), rc, sizeof(RRDFAMILY));
+struct rrdfamily_constructor {
+    const char *family;
+};
+
+static void rrdfamily_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdfamily, void *constructor_data) {
+    RRDFAMILY *rf = rrdfamily;
+    struct rrdfamily_constructor *ctr = constructor_data;
+
+    rf->family = string_strdupz(ctr->family);
+    rf->rrdvars = rrdvariables_create();
 }
 
-static inline RRDFAMILY *rrdfamily_index_del(RRDHOST *host, RRDFAMILY *rc) {
-    dictionary_del(host->rrdfamily_root_index, string2str(rc->family));
-    return rc;
+static void rrdfamily_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdfamily, void *rrdhost __maybe_unused) {
+    RRDFAMILY *rf = rrdfamily;
+    string_freez(rf->family);
+    rrdvariables_destroy(rf->rrdvars);
+    rf->family = NULL;
+    rf->rrdvars = NULL;
 }
 
-static inline RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id) {
-    return dictionary_get(host->rrdfamily_root_index, id);
+void rrdfamily_index_init(RRDHOST *host) {
+    if(!host->rrdfamily_root_index) {
+        host->rrdfamily_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+        dictionary_register_insert_callback(host->rrdfamily_root_index, rrdfamily_insert_callback, NULL);
+        dictionary_register_delete_callback(host->rrdfamily_root_index, rrdfamily_delete_callback, host);
+    }
 }
+
+void rrdfamily_index_destroy(RRDHOST *host) {
+    dictionary_destroy(host->rrdfamily_root_index);
+    host->rrdfamily_root_index = NULL;
+}
+
 
 // ----------------------------------------------------------------------------
 // RRDFAMILY management
 
-RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
-    RRDFAMILY *rc = rrdfamily_index_find(host, id);
-    if(!rc) {
-        rc = callocz(1, sizeof(RRDFAMILY));
-
-        rc->family = string_strdupz(id);
-
-        rc->rrdvar_root_index = dictionary_create(
-             DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
-            |DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE
-            |DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            );
-
-        RRDFAMILY *ret = rrdfamily_index_add(host, rc);
-        if(ret != rc)
-            error("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
-    }
-
-    rc->use_count++;
-    return rc;
+const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id) {
+    struct rrdfamily_constructor tmp = {
+        .family = id,
+    };
+    return (const RRDFAMILY_ACQUIRED *)dictionary_set_and_acquire_item_advanced(host->rrdfamily_root_index, id, -1, NULL, sizeof(RRDFAMILY), &tmp);
 }
 
-void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
-    rc->use_count--;
-    if(!rc->use_count) {
-        RRDFAMILY *ret = rrdfamily_index_del(host, rc);
-        if(ret != rc)
-            error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", string2str(rc->family), (ret)?string2str(ret->family):"NONE");
-        else {
-            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", rrdhost_hostname(host), string2str(rc->family));
-            rrdvar_free_remaining_variables(host, rc->rrdvar_root_index);
-
-            dictionary_destroy(rc->rrdvar_root_index);
-            string_freez(rc->family);
-            freez(rc);
-        }
-    }
+void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa) {
+    if(unlikely(!rfa)) return;
+    dictionary_acquired_item_release(host->rrdfamily_root_index, (const DICTIONARY_ITEM *)rfa);
 }
 
+DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rfa) {
+    if(unlikely(!rfa)) return NULL;
+    RRDFAMILY *rf = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rfa);
+    return(rf->rrdvars);
+}

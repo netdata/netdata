@@ -101,15 +101,19 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
     UNUSED(user);
 
     if (global) {
-        RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
-        if (rv)
-            rrdvar_custom_host_variable_set(host, rv, value);
+        const RRDVAR_ACQUIRED *rva = rrdvar_custom_host_variable_add_and_acquire(host, name);
+        if (rva) {
+            rrdvar_custom_host_variable_set(host, rva, value);
+            rrdvar_custom_host_variable_release(host, rva);
+        }
         else
             error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, rrdhost_hostname(host));
     } else {
-        RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
-        if (rs)
-            rrdsetvar_custom_chart_variable_set(rs, value);
+        const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_custom_chart_variable_add_and_acquire(st, name);
+        if (rsa) {
+            rrdsetvar_custom_chart_variable_set(st, rsa, value);
+            rrdsetvar_custom_chart_variable_release(st, rsa);
+        }
         else
             error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }
@@ -127,7 +131,7 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, algorithm_type);
     int unhide_dimension = 1;
 
-    rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+    rrddim_option_clear(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
     if (options && *options) {
         if (strstr(options, "obsolete") != NULL)
             rrddim_is_obsolete(st, rd);
@@ -137,20 +141,20 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
         unhide_dimension = !strstr(options, "hidden");
 
         if (strstr(options, "noreset") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
         if (strstr(options, "nooverflow") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
     } else
         rrddim_isnot_obsolete(st, rd);
 
     if (likely(unhide_dimension)) {
-        rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+        rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
             (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
             rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
         }
     } else {
-        rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+        rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
            (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
             rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);

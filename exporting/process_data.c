@@ -338,26 +338,22 @@ void prepare_buffers(struct engine *engine)
 
     rrd_rdlock();
     RRDHOST *host;
-    rrdhost_foreach_read(host)
-    {
-        rrdhost_rdlock(host);
+    rrdhost_foreach_read(host) {
         start_host_formatting(engine, host);
         RRDSET *st;
-        rrdset_foreach_read(st, host)
-        {
-            rrdset_rdlock(st);
+        rrdset_foreach_read(st, host) {
             start_chart_formatting(engine, st);
 
             RRDDIM *rd;
             rrddim_foreach_read(rd, st)
                 metric_formatting(engine, rd);
+            rrddim_foreach_done(rd);
 
             end_chart_formatting(engine, st);
-            rrdset_unlock(st);
         }
+        rrdset_foreach_done(st);
         variables_formatting(engine, host);
         end_host_formatting(engine, host);
-        rrdhost_unlock(host);
     }
     rrd_unlock();
     netdata_thread_enable_cancelability();

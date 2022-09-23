@@ -74,7 +74,7 @@ struct tc_device {
 // ----------------------------------------------------------------------------
 // tc_class index
 
-static void tc_class_free_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+static void tc_class_free_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     // struct tc_device *d = data;
     struct tc_class *c = value;
 
@@ -84,22 +84,21 @@ static void tc_class_free_callback(const char *name __maybe_unused, void *value,
     string_freez(c->parentid);
 }
 
-static void tc_class_conflict_callback(const char *name __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+static bool tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     struct tc_device *d = data; (void)d;
     struct tc_class *c = old_value; (void)c;
     struct tc_class *new_c = new_value; (void)new_c;
 
-    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", name, string2str(d->id));
+    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
 
-    tc_class_free_callback(name, new_value, data);
+    tc_class_free_callback(item, new_value, data);
+
+    return true;
 }
 
 static void tc_class_index_init(struct tc_device *d) {
     if(!d->classes) {
-        d->classes = dictionary_create(
-             DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            |DICTIONARY_FLAG_SINGLE_THREADED
-        );
+        d->classes = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
 
         dictionary_register_delete_callback(d->classes, tc_class_free_callback, d);
         dictionary_register_conflict_callback(d->classes, tc_class_conflict_callback, d);
@@ -128,12 +127,12 @@ static inline struct tc_class *tc_class_index_find(struct tc_device *d, const ch
 
 static DICTIONARY *tc_device_root_index = NULL;
 
-static void tc_device_add_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+static void tc_device_add_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct tc_device *d = value;
     tc_class_index_init(d);
 }
 
-static void tc_device_free_callback(const char *name __maybe_unused, void *value, void *data __maybe_unused) {
+static void tc_device_free_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct tc_device *d = value;
 
     tc_class_index_destroy(d);
@@ -146,10 +145,7 @@ static void tc_device_free_callback(const char *name __maybe_unused, void *value
 static void tc_device_index_init() {
     if(!tc_device_root_index) {
         tc_device_root_index = dictionary_create(
-             DICTIONARY_FLAG_DONT_OVERWRITE_VALUE
-            |DICTIONARY_FLAG_SINGLE_THREADED
-            |DICTIONARY_FLAG_ADD_IN_FRONT
-            );
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_ADD_IN_FRONT);
 
         dictionary_register_insert_callback(tc_device_root_index, tc_device_add_callback, NULL);
         dictionary_register_delete_callback(tc_device_root_index, tc_device_free_callback, NULL);
@@ -196,7 +192,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
     d->family_updated = false;
 
     struct tc_class *c;
-    dfe_start_unsafe(d->classes, c) {
+    dfe_start_write(d->classes, c) {
         if(unlikely(cleanup_every && c->unupdated >= cleanup_every))
             tc_class_free(d, c);
 
@@ -254,7 +250,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // prepare all classes
     // we set reasonable defaults for the rest of the code below
 
-    dfe_start_unsafe(d->classes, c) {
+    dfe_start_read(d->classes, c) {
         c->render = false;      // do not render this class
         c->isleaf = true;       // this is a leaf class
         c->hasparent = false;   // without a parent
@@ -283,7 +279,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
 
         // set all classes to !updated
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if (unlikely(!c->isqdisc && c->updated))
                 c->updated = false;
         }
@@ -307,7 +303,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // so, here we remove the isleaf flag from nodes in the middle
     // and we add the hasparent flag to leaf nodes we found their parent
     if(likely(!d->enabled_all_classes_qdiscs)) {
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->updated))
                 continue;
 
@@ -319,7 +315,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             //    c->parentid?c->parentid:"NULL");
 
             // find if c is leaf or not
-            dfe_start_unsafe(d->classes, x) {
+            dfe_start_read(d->classes, x) {
                 if(unlikely(!x->updated || c == x || !x->parentid))
                     continue;
 
@@ -339,7 +335,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         dfe_done(c);
     }
 
-    dfe_start_unsafe(d->classes, c) {
+    dfe_start_read(d->classes, c) {
         if(unlikely(!c->updated))
             continue;
 
@@ -367,7 +363,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // dump all the list to see what we know
 
     if(unlikely(debug_flags & D_TC_LOOP)) {
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(c->render) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", string2str(d->name), string2str(c->id));
             else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class '%s', IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: '%s')",
                       string2str(d->name?d->name:d->id), string2str(c->id), c->updated, c->isleaf, c->hasparent, string2str(c->parentid));
@@ -426,7 +422,8 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
         else {
             rrdset_next(d->st_bytes);
-            if(unlikely(d->name_updated)) rrdset_set_name(d->st_bytes, string2str(d->name));
+            if(unlikely(d->name_updated))
+                rrdset_reset_name(d->st_bytes, string2str(d->name));
 
             if(d->name && d->name_updated)
                 rrdlabels_add(d->st_bytes->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
@@ -438,13 +435,13 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_bytes))
                 c->rd_bytes = rrddim_add(d->st_bytes, string2str(c->id), string2str(c->name?c->name:c->id), 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_bytes, c->rd_bytes, string2str(c->name));
+                rrddim_reset_name(d->st_bytes, c->rd_bytes, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
         }
@@ -491,7 +488,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_packets, name);
+                rrdset_reset_name(d->st_packets, name);
             }
 
             if(d->name && d->name_updated)
@@ -504,13 +501,13 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_packets))
                 c->rd_packets = rrddim_add(d->st_packets, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_packets, c->rd_packets, string2str(c->name));
+                rrddim_reset_name(d->st_packets, c->rd_packets, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
         }
@@ -557,7 +554,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_dropped, name);
+                rrdset_reset_name(d->st_dropped, name);
             }
 
             if(d->name && d->name_updated)
@@ -570,13 +567,13 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_dropped))
                 c->rd_dropped = rrddim_add(d->st_dropped, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_dropped, c->rd_dropped, string2str(c->name));
+                rrddim_reset_name(d->st_dropped, c->rd_dropped, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
         }
@@ -623,7 +620,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_tokens, name);
+                rrdset_reset_name(d->st_tokens, name);
             }
 
             if(d->name && d->name_updated)
@@ -636,14 +633,14 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_tokens)) {
                 c->rd_tokens = rrddim_add(d->st_tokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_tokens, c->rd_tokens, string2str(c->name));
+                rrddim_reset_name(d->st_tokens, c->rd_tokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_tokens, c->rd_tokens, c->tokens);
         }
@@ -691,7 +688,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->name?d->name:d->id));
-                rrdset_set_name(d->st_ctokens, name);
+                rrdset_reset_name(d->st_ctokens, name);
             }
 
             if(d->name && d->name_updated)
@@ -704,13 +701,13 @@ static inline void tc_device_commit(struct tc_device *d) {
             // update the family
         }
 
-        dfe_start_unsafe(d->classes, c) {
+        dfe_start_read(d->classes, c) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_ctokens))
                 c->rd_ctokens = rrddim_add(d->st_ctokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             else if(unlikely(c->name_updated))
-                rrddim_set_name(d->st_ctokens, c->rd_ctokens, string2str(c->name));
+                rrddim_reset_name(d->st_ctokens, c->rd_ctokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_ctokens, c->rd_ctokens, c->ctokens);
         }
@@ -1146,12 +1143,12 @@ void *tc_main(void *ptr) {
                 worker_is_busy(WORKER_TC_WORKTIME);
                 worker_set_metric(WORKER_TC_PLUGIN_TIME, str2ll(words[1], NULL));
 
-                size_t number_of_devices = dictionary_stats_entries(tc_device_root_index);
+                size_t number_of_devices = dictionary_entries(tc_device_root_index);
                 size_t number_of_classes = 0;
 
                 struct tc_device *d;
-                dfe_start_unsafe(tc_device_root_index, d) {
-                    number_of_classes += dictionary_stats_entries(d->classes);
+                dfe_start_read(tc_device_root_index, d) {
+                    number_of_classes += dictionary_entries(d->classes);
                 }
                 dfe_done(d);
 

@@ -710,14 +710,13 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
         STRING *context_string = string_strdupz(context);
-        rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
             if (st1->context == context_string &&
                 (!chart_label_key_pattern || rrdlabels_match_simple_pattern_parsed(st1->rrdlabels, chart_label_key_pattern, ':')) &&
                 (!chart_labels_filter_pattern || rrdlabels_match_simple_pattern_parsed(st1->rrdlabels, chart_labels_filter_pattern, ':')))
                     build_context_param_list(owa, &context_param_list, st1);
         }
-        rrdhost_unlock(host);
+        rrdset_foreach_done(st1);
         string_freez(context_string);
 
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
@@ -1054,8 +1053,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
-    rrdhost_rdlock(host);
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -1070,7 +1068,7 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
                 alarm_normal++;
         }
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
     buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
     buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
     buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);

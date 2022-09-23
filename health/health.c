@@ -153,63 +153,42 @@ static void health_reload_host(RRDHOST *host) {
     char *stock_path = health_stock_config_dir();
 
     // free all running alarms
-    rrdhost_wrlock(host);
-
-    while(host->alarms_templates)
-        rrdcalctemplate_unlink_and_free(host, host->alarms_templates);
-
-    while(host->host_alarms)
-        rrdcalc_unlink_and_free(host, host->host_alarms);
-
-    RRDCALC *rc,*nc;
-    for(rc = host->alarms_with_foreach; rc ; rc = nc) {
-        nc = rc->next;
-        rrdcalc_free(rc);
-    }
-    host->alarms_with_foreach = NULL;
-
-    rrdhost_unlock(host);
+    rrdcalc_delete_all(host);
+    rrdcalctemplate_delete_all(host);
 
     // invalidate all previous entries in the alarm log
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
             t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-    rrdhost_rdlock(host);
     // reset all thresholds to all charts
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         st->green = NAN;
         st->red = NAN;
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 
     // load the new alarms
-    rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
 
     //Discard alarms with labels that do not apply to host
-    rrdcalc_labels_unlink_alarm_from_host(host);
+    rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
 
     // link the loaded alarms to their charts
-    RRDDIM *rd;
     rrdset_foreach_write(st, host) {
         if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
-        rrdsetcalc_link_matching(st);
-        rrdcalctemplate_link_matching(st);
 
-        //This loop must be the last, because ` rrdcalctemplate_link_matching` will create alarms related to it.
-        rrdset_rdlock(st);
-        rrddim_foreach_read(rd, st) {
-            rrdcalc_link_to_rrddim(rd, st, host);
-        }
-        rrdset_unlock(st);
+        rrdcalc_link_matching_alerts_to_rrdset(st);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
+    rrdset_foreach_done(st);
 
-    rrdhost_unlock(host);
 }
 
 /**
@@ -323,7 +302,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
-    foreach_rrdcalc_in_rrdhost(host, rc) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -351,6 +330,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 expr = rc->warning;
         }
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     if (n_warn+n_crit>1)
         qsort (active_alerts, n_warn+n_crit, sizeof(active_alerts_t), compare_active_alerts);
@@ -477,12 +457,12 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         }
     }
 
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
     bool cleanup_excess_log_entries = host->health_log.count > host->health_log.max;
-
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     if (!cleanup_excess_log_entries)
         return;
@@ -554,10 +534,8 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     }
 
     int update_every = rc->rrdset->update_every;
-    rrdset_rdlock(rc->rrdset);
-    time_t first = rrdset_first_entry_t_nolock(rc->rrdset);
-    time_t last = rrdset_last_entry_t_nolock(rc->rrdset);
-    rrdset_unlock(rc->rrdset);
+    time_t first = rrdset_first_entry_t(rc->rrdset);
+    time_t last = rrdset_last_entry_t(rc->rrdset);
 
     if(unlikely(now + update_every < first /* || now - update_every > last */)) {
         debug(D_HEALTH
@@ -653,29 +631,29 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *sil
  * @return It returns 1 case rrdcalc_flags is DISABLED or 0 otherwise
  */
 static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
-    uint32_t rrdcalc_flags_old = rc->rrdcalc_flags;
+    uint32_t rrdcalc_flags_old = rc->run_flags;
     // Clear the flags
-    rc->rrdcalc_flags &= ~(RRDCALC_FLAG_DISABLED | RRDCALC_FLAG_SILENCED);
+    rc->run_flags &= ~(RRDCALC_FLAG_DISABLED | RRDCALC_FLAG_SILENCED);
     if (unlikely(silencers->all_alarms)) {
-        if (silencers->stype == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
-        else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
+        if (silencers->stype == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
+        else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
     } else {
         SILENCE_TYPE st = check_silenced(rc, rrdhost_hostname(host), silencers);
-        if (st == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
-        else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
+        if (st == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
+        else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
     }
 
-    if (rrdcalc_flags_old != rc->rrdcalc_flags) {
+    if (rrdcalc_flags_old != rc->run_flags) {
         info("Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
              rrdhost_hostname(host),
              rrdcalc_name(rc),
              (rrdcalc_flags_old & RRDCALC_FLAG_DISABLED)?"true":"false",
-             (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false",
+             (rc->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false",
              (rrdcalc_flags_old & RRDCALC_FLAG_SILENCED)?"true":"false",
-             (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
+             (rc->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
         );
     }
-    if (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
+    if (rc->run_flags & RRDCALC_FLAG_DISABLED)
         return 1;
     else
         return 0;
@@ -683,36 +661,38 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 
 // Create alarms for dimensions that have been added to charts
 // since the previous iteration.
-static void init_pending_foreach_alarms(RRDHOST *host) {
+static void health_execute_pending_updates(RRDHOST *host) {
     RRDSET *st;
-    RRDDIM *rd;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS))
         return;
 
-    rrdhost_wrlock(host);
-
-    rrdset_foreach_write(st, host) {
-        if (!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
+    rrdset_foreach_reentrant(st, host) {
+        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
             continue;
 
-        rrdset_rdlock(st);
-
+        RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            if (!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM))
+            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS))
                 continue;
 
-            rrdcalc_link_to_rrddim(rd, st, host);
+            RRDCALCTEMPLATE *rt;
+            foreach_rrdcalctemplate_read(host, rt) {
+                if(!rt->foreach_dimension_pattern)
+                    continue;
 
-            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARM);
+                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
+                    rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
+            }
+            foreach_rrdcalctemplate_done(rt);
+
+            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
         }
-
+        rrddim_foreach_done(rd);
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-        rrdset_unlock(st);
     }
-
+    rrdset_foreach_done(st);
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-    rrdhost_unlock(host);
 }
 
 /**
@@ -759,7 +739,7 @@ void *health_main(void *ptr) {
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
-    rrdcalc_labels_unlink();
+    rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 
     unsigned int loop = 0;
 #ifdef ENABLE_ACLK
@@ -829,13 +809,14 @@ void *health_main(void *ptr) {
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
 
-            init_pending_foreach_alarms(host);
+            health_execute_pending_updates(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
-            rrdhost_rdlock(host);
 
             // the first loop is to lookup values from the db
-            foreach_rrdcalc_in_rrdhost(host, rc) {
+            foreach_rrdcalc_in_rrdhost_read(host, rc) {
+
+                rrdcalc_update_info_using_rrdset_labels(rc);
 
                 if (update_disabled_silenced(host, rc))
                     continue;
@@ -876,7 +857,7 @@ void *health_main(void *ptr) {
                             rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
                         if (ae) {
-                            health_alarm_log(host, ae);
+                            health_alarm_log_add_entry(host, ae);
                             rc->old_status = rc->status;
                             rc->status = RRDCALC_STATUS_REMOVED;
                             rc->last_status_change = now;
@@ -891,14 +872,14 @@ void *health_main(void *ptr) {
                 }
 
                 if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
-                    if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
-                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUNNABLE;
+                    if (unlikely(rc->run_flags & RRDCALC_FLAG_RUNNABLE))
+                        rc->run_flags &= ~RRDCALC_FLAG_RUNNABLE;
                     continue;
                 }
 
                 runnable++;
                 rc->old_value = rc->value;
-                rc->rrdcalc_flags |= RRDCALC_FLAG_RUNNABLE;
+                rc->run_flags |= RRDCALC_FLAG_RUNNABLE;
 
                 // ------------------------------------------------------------
                 // if there is database lookup, do it
@@ -919,13 +900,13 @@ void *health_main(void *ptr) {
                     if (unlikely(ret != 200)) {
                         // database lookup failed
                         rc->value = NAN;
-                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
+                        rc->run_flags |= RRDCALC_FLAG_DB_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d",
                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), ret
                         );
                     } else
-                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
+                        rc->run_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
                     /* - RRDCALC_FLAG_DB_STALE not currently used
                     if (unlikely(old_db_timestamp == rc->db_before)) {
@@ -945,14 +926,14 @@ void *health_main(void *ptr) {
                     if (unlikely(value_is_null)) {
                         // collected value is null
                         rc->value = NAN;
-                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_NAN;
+                        rc->run_flags |= RRDCALC_FLAG_DB_NAN;
 
                         debug(D_HEALTH,
                               "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc)
                         );
                     } else
-                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
+                        rc->run_flags &= ~RRDCALC_FLAG_DB_NAN;
 
                     debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
                           rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), rc->value
@@ -968,14 +949,14 @@ void *health_main(void *ptr) {
                     if (unlikely(!expression_evaluate(rc->calculation))) {
                         // calculation failed
                         rc->value = NAN;
-                        rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
+                        rc->run_flags |= RRDCALC_FLAG_CALC_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                               rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
                         );
                     } else {
-                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
+                        rc->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
                               NETDATA_DOUBLE_FORMAT
@@ -985,25 +966,17 @@ void *health_main(void *ptr) {
                         );
 
                         rc->value = rc->calculation->result;
-
-                        if (rc->local) rc->local->last_updated = now;
-                        if (rc->family) rc->family->last_updated = now;
-                        if (rc->hostid) rc->hostid->last_updated = now;
-                        if (rc->hostname) rc->hostname->last_updated = now;
                     }
                 }
             }
-
-            rrdhost_unlock(host);
+            foreach_rrdcalc_in_rrdhost_done(rc);
 
             if (unlikely(runnable && !netdata_exit)) {
-                rrdhost_rdlock(host);
-
-                foreach_rrdcalc_in_rrdhost(host, rc) {
-                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
+                foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                    if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE)))
                         continue;
 
-                    if (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED) {
+                    if (rc->run_flags & RRDCALC_FLAG_DISABLED) {
                         continue;
                     }
                     RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
@@ -1017,7 +990,7 @@ void *health_main(void *ptr) {
 
                         if (unlikely(!expression_evaluate(rc->warning))) {
                             // calculation failed
-                            rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
+                            rc->run_flags |= RRDCALC_FLAG_WARN_ERROR;
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
@@ -1025,7 +998,7 @@ void *health_main(void *ptr) {
                                   buffer_tostring(rc->warning->error_msg)
                             );
                         } else {
-                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
+                            rc->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
                                   NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
@@ -1043,7 +1016,7 @@ void *health_main(void *ptr) {
 
                         if (unlikely(!expression_evaluate(rc->critical))) {
                             // calculation failed
-                            rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
+                            rc->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
@@ -1051,7 +1024,7 @@ void *health_main(void *ptr) {
                                   buffer_tostring(rc->critical->error_msg)
                             );
                         } else {
-                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
+                            rc->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
                                   NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
@@ -1156,13 +1129,13 @@ void *health_main(void *ptr) {
                             rc->info,
                             rc->delay_last,
                             (
-                                ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
+                                ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                 (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                 )
                         );
 
-                        health_alarm_log(host, ae);
+                        health_alarm_log_add_entry(host, ae);
 
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
@@ -1175,20 +1148,20 @@ void *health_main(void *ptr) {
                     if (next_run > rc->next_update)
                         next_run = rc->next_update;
                 }
+                foreach_rrdcalc_in_rrdhost_done(rc);
 
                 // process repeating alarms
-                RRDCALC *rc;
-                foreach_rrdcalc_in_rrdhost(host, rc) {
+                foreach_rrdcalc_in_rrdhost_read(host, rc) {
                     int repeat_every = 0;
                     if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUN_ONCE;
+                            rc->run_flags &= ~RRDCALC_FLAG_RUN_ONCE;
                             repeat_every = rc->warn_repeat_every;
                         } else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUN_ONCE;
+                            rc->run_flags &= ~RRDCALC_FLAG_RUN_ONCE;
                             repeat_every = rc->crit_repeat_every;
                         } else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
-                            if(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUN_ONCE)) {
+                            if(!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE)) {
                                 if(rc->old_status == RRDCALC_STATUS_CRITICAL) {
                                     repeat_every = 1;
                                 } else if (rc->old_status == RRDCALC_STATUS_WARNING) {
@@ -1230,25 +1203,24 @@ void *health_main(void *ptr) {
                             rc->info,
                             rc->delay_last,
                             (
-                                ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
+                                ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                 (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                 )
                         );
 
                         ae->last_repeat = rc->last_repeat;
-                        if (!(rc->rrdcalc_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {
+                        if (!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {
                             ae->flags |= HEALTH_ENTRY_RUN_ONCE;
                         }
-                        rc->rrdcalc_flags |= RRDCALC_FLAG_RUN_ONCE;
+                        rc->run_flags |= RRDCALC_FLAG_RUN_ONCE;
                         health_process_notifications(host, ae);
                         debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                         health_alarm_wait_for_execution(ae);
                         health_alarm_log_free_one_nochecks_nounlink(ae);
                     }
                 }
-
-                rrdhost_unlock(host);
+                foreach_rrdcalc_in_rrdhost_done(rc);
             }
 
             if (unlikely(netdata_exit))

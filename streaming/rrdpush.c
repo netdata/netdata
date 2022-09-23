@@ -205,7 +205,7 @@ void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
+static inline void rrdpush_send_chart_definition(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -260,26 +260,15 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
                 , rd->multiplier
                 , rd->divisor
                 , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
-                , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
-                , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+                , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
+                , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
         rd->exposed = 1;
     }
+    rrddim_foreach_done(rd);
 
     // send the chart local custom variables
-    RRDSETVAR *rs;
-    for(rs = st->variables; rs ;rs = rs->next) {
-        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
-            NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
-
-            buffer_sprintf(
-                    host->sender->build
-                    , "VARIABLE CHART %s = " NETDATA_DOUBLE_FORMAT "\n"
-                    , string2str(rs->variable)
-                    , *value
-            );
-        }
-    }
+    rrdsetvar_print_to_streaming_custom_chart_variables(st, host->sender->build);
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
@@ -301,6 +290,7 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
             count_of_dimensions_written++;
         }
     }
+    rrddim_foreach_done(rd);
     buffer_strcat(host->sender->build, "END\n");
 
     return count_of_dimensions_written != 0;
@@ -315,11 +305,9 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     if(unlikely(!host->rrdpush_send_enabled || !should_send_chart_matching(st)))
         return false;
 
-    rrdset_rdlock(st);
     sender_start(host->sender);
-    rrdpush_send_chart_definition_nolock(st);
+    rrdpush_send_chart_definition(st);
     sender_commit(host->sender);
-    rrdset_unlock(st);
 
     return true;
 }
@@ -380,13 +368,13 @@ void rrdset_done_push(RRDSET *st) {
         host->rrdpush_sender_error_shown = 0;
     }
 
-    if(dictionary_stats_entries(st->rrddim_root_index) == 0)
+    if(dictionary_entries(st->rrddim_root_index) == 0)
         return;
 
     sender_start(host->sender);
 
     if(need_to_send_chart_definition(st))
-        rrdpush_send_chart_definition_nolock(st);
+        rrdpush_send_chart_definition(st);
 
     if(rrdpush_send_chart_metrics_nolock(st, host->sender)) {
         // signal the sender there are more data

@@ -410,6 +410,7 @@ extern char *netdata_configured_host_prefix;
 #include "config/appconfig.h"
 #include "log/log.h"
 #include "procfile/procfile.h"
+#include "string/string.h"
 #include "dictionary/dictionary.h"
 #if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"

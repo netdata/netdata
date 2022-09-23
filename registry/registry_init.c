@@ -76,8 +76,8 @@ int registry_init(void) {
     netdata_mutex_init(&registry.lock);
 
     // create dictionaries
-    registry.persons = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
-    registry.machines = dictionary_create(REGISTRY_DICTIONARY_FLAGS);
+    registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+    registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
     avl_init(&registry.registry_urls_root_index, registry_url_compare);
 
     // load the registry database
@@ -93,9 +93,7 @@ int registry_init(void) {
     return 0;
 }
 
-static int machine_urls_delete_callback(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int machine_urls_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)data;
     (void)m;
 
@@ -110,10 +108,7 @@ static int machine_urls_delete_callback(const char *name, void *entry, void *dat
     return 1;
 }
 
-static int machine_delete_callback(const char *name, void *entry, void *data) {
-    (void)name;
-    (void)data;
-
+static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)entry;
     int ret = dictionary_walkthrough_read(m->machine_urls, machine_urls_delete_callback, m);
 
@@ -122,10 +117,7 @@ static int machine_delete_callback(const char *name, void *entry, void *data) {
 
     return ret + 1;
 }
-static int registry_person_del_callback(const char *name, void *entry, void *d) {
-    (void)name;
-    (void)d;
-
+static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *d __maybe_unused) {
     REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
 
     debug(D_REGISTRY, "Registry: registry_person_del('%s'): deleting person", p->guid);

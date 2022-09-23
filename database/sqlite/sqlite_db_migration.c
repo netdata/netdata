@@ -64,6 +64,15 @@ const char *database_migrate_v2_v3[] = {
     NULL
 };
 
+const char *database_migrate_v4_v5[] = {
+    "DROP TABLE IF EXISTS chart_active;",
+    "DROP TABLE IF EXISTS dimension_active;",
+    "DROP TABLE IF EXISTS chart_hash;",
+    "DROP TABLE IF EXISTS chart_hash_map;",
+    "DROP VIEW IF EXISTS v_chart_hash;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -116,6 +125,14 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
     return 0;
 }
 
+static int do_migration_v4_v5(sqlite3 *database, const char *name)
+{
+    UNUSED(name);
+    info("Running \"%s\" database migration", name);
+
+    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v4_v5[0]);
+}
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
@@ -163,6 +180,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v1 to v2",  .func = do_migration_v1_v2},
     {.name = "v2 to v3",  .func = do_migration_v2_v3},
     {.name = "v3 to v4",  .func = do_migration_v3_v4},
+    {.name = "v4 to v5",  .func = do_migration_v4_v5},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
