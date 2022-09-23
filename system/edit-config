@@ -276,7 +276,7 @@ edit() {
     exit 1
   fi
 
-  "${EDITOR}" "${1}"
+  "${editor}" "${1}"
   exit $?
 }
 
