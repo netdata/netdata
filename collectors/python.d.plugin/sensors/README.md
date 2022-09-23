@@ -20,7 +20,10 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/sensors.conf
 ```
 
-### possible issues
+Uncomment the `sensors=force` line and save the file. Restart Netdata with `sudo systemctl restart netdata` to enable
+Raspberry Pi temperature sensor monitoring.
+
+### Possible Issues
 
 There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
 We are tracking such cases in issue [#827](https://github.com/netdata/netdata/issues/827).
