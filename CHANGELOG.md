@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.40.1 [\#13704](https://github.com/netdata/netdata/pull/13704) ([ilyam8](https://github.com/ilyam8))
+- Build judy even without dbengine [\#13703](https://github.com/netdata/netdata/pull/13703) ([underhood](https://github.com/underhood))
+- alarms collector: ability to exclude certain alarms via config [\#13701](https://github.com/netdata/netdata/pull/13701) ([andrewm4894](https://github.com/andrewm4894))
+- Fix inconsistent alert class names [\#13699](https://github.com/netdata/netdata/pull/13699) ([ralphm](https://github.com/ralphm))
 - disable Postgres last vacuum/analyze alarms [\#13698](https://github.com/netdata/netdata/pull/13698) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.29.1. [\#13696](https://github.com/netdata/netdata/pull/13696) ([netdatabot](https://github.com/netdatabot))
 - docs: nvidia-smi in a container limitation note [\#13695](https://github.com/netdata/netdata/pull/13695) ([ilyam8](https://github.com/ilyam8))
@@ -349,12 +353,6 @@
 - Fix disabled apps \(ebpf.plugin\) [\#13044](https://github.com/netdata/netdata/pull/13044) ([thiagoftsm](https://github.com/thiagoftsm))
 - add note about anomaly advisor [\#13042](https://github.com/netdata/netdata/pull/13042) ([andrewm4894](https://github.com/andrewm4894))
 - replace `history` with relevant `dbengine` params [\#13041](https://github.com/netdata/netdata/pull/13041) ([andrewm4894](https://github.com/andrewm4894))
-- Fix the retry count and netdata\_exit check when running an sqlite3\_step command [\#13040](https://github.com/netdata/netdata/pull/13040) ([stelfrag](https://github.com/stelfrag))
-- Schedule retention message calculation to a worker thread [\#13039](https://github.com/netdata/netdata/pull/13039) ([stelfrag](https://github.com/stelfrag))
-- Check return value and log an error on failure [\#13037](https://github.com/netdata/netdata/pull/13037) ([stelfrag](https://github.com/stelfrag))
-- Add additional metadata to the data response [\#13036](https://github.com/netdata/netdata/pull/13036) ([stelfrag](https://github.com/stelfrag))
-- When sending a dimension for the first time, make sure there is a non zero created\_at timestamp [\#13035](https://github.com/netdata/netdata/pull/13035) ([stelfrag](https://github.com/stelfrag))
-- Update apps\_groups.conf [\#13033](https://github.com/netdata/netdata/pull/13033) ([fqx](https://github.com/fqx))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
