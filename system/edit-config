@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 
-set -e
-
 # shellcheck disable=SC1091
 [ -f /etc/profile ] && . /etc/profile
+
+set -e
 
 script_dir="$(CDPATH="" cd -- "$(dirname -- "$0")" && pwd -P)"
 
