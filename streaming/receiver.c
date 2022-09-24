@@ -381,7 +381,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, fp, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(rpt->host, &user, fp, fp, PARSER_INPUT_SPLIT);
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it

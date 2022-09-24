@@ -28,7 +28,7 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags)
+PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags)
 {
     PARSER *parser;
 
@@ -36,6 +36,7 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
     parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
     parser->user = user;
     parser->input = input;
+    parser->output = output;
     parser->flags = flags;
     parser->host = host;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;

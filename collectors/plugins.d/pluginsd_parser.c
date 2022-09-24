@@ -754,21 +754,21 @@ static void pluginsd_process_thread_cleanup(void *ptr) {
 
 // New plugins.d parser
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input __maybe_unused, FILE *fp_plugin_output, int trust_durations)
 {
     int enabled = cd->enabled;
 
-    if (!fp || !enabled) {
+    if (!fp_plugin_output || !enabled) {
         cd->enabled = 0;
         return 0;
     }
 
-    if (unlikely(fileno(fp) == -1)) {
+    if (unlikely(fileno(fp_plugin_output) == -1)) {
         error("file descriptor given is not a valid stream");
         cd->serial_failures++;
         return 0;
     }
-    clearerr(fp);
+    clearerr(fp_plugin_output);
 
     PARSER_USER_OBJECT user = {
         .enabled = cd->enabled,
@@ -777,7 +777,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         .trust_durations = trust_durations
     };
 
-    PARSER *parser = parser_init(host, &user, fp, PARSER_INPUT_SPLIT);
+    // fp_plugin_output = our input; fp_plugin_input = our output
+    PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT);
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it

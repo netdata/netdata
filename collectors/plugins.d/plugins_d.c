@@ -246,7 +246,7 @@ void *pluginsd_worker_thread(void *arg)
         }
 
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
-        count = pluginsd_process(localhost, cd, fp_child_output, 0);
+        count = pluginsd_process(localhost, cd, fp_child_input, fp_child_output, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid);
 
