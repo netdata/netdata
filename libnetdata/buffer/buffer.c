@@ -136,6 +136,18 @@ void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
     wb->len += wstr - str;
 }
 
+void buffer_print_ll(BUFFER *wb, long long value)
+{
+    buffer_need_bytes(wb, 50);
+
+    if(value < 0) {
+        buffer_fast_strcat(wb, "-", 1);
+        value = -value;
+    }
+
+    buffer_print_llu(wb, value);
+}
+
 void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 
