@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Do not create train/predict dimensions meant for tracking anomaly rates. [\#13707](https://github.com/netdata/netdata/pull/13707) ([vkalintiris](https://github.com/vkalintiris))
 - bump go.d.plugin to v0.40.1 [\#13704](https://github.com/netdata/netdata/pull/13704) ([ilyam8](https://github.com/ilyam8))
 - Build judy even without dbengine [\#13703](https://github.com/netdata/netdata/pull/13703) ([underhood](https://github.com/underhood))
 - alarms collector: ability to exclude certain alarms via config [\#13701](https://github.com/netdata/netdata/pull/13701) ([andrewm4894](https://github.com/andrewm4894))
@@ -351,8 +352,6 @@
 - coverity fixes about statsd; removal of strsame [\#13049](https://github.com/netdata/netdata/pull/13049) ([ktsaou](https://github.com/ktsaou))
 - Add improved reinstall documentation. [\#13047](https://github.com/netdata/netdata/pull/13047) ([Ferroin](https://github.com/Ferroin))
 - Fix disabled apps \(ebpf.plugin\) [\#13044](https://github.com/netdata/netdata/pull/13044) ([thiagoftsm](https://github.com/thiagoftsm))
-- add note about anomaly advisor [\#13042](https://github.com/netdata/netdata/pull/13042) ([andrewm4894](https://github.com/andrewm4894))
-- replace `history` with relevant `dbengine` params [\#13041](https://github.com/netdata/netdata/pull/13041) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
