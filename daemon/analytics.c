@@ -337,11 +337,12 @@ void analytics_alarms_notifications(void)
 
     BUFFER *b = buffer_create(1000);
     int cnt = 0;
-    FILE *fp = netdata_popen(script, &command_pid);
-    if (fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if (fp_child_output) {
         char line[200 + 1];
 
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *end = line;
             while (*end && *end != '\n')
                 end++;
@@ -354,7 +355,7 @@ void analytics_alarms_notifications(void)
 
             cnt++;
         }
-        netdata_pclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
 
@@ -1016,11 +1017,12 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
-    FILE *fp = netdata_popen(command_to_run, &command_pid);
-    if (fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(command_to_run, &command_pid, &fp_child_input);
+    if (fp_child_output) {
         char buffer[4 + 1];
-        char *s = fgets(buffer, 4, fp);
-        int exit_code = netdata_pclose(fp, command_pid);
+        char *s = fgets(buffer, 4, fp_child_output);
+        int exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
         if (exit_code)
             error("Execution of anonymous statistics script returned %d.", exit_code);
         if (s && strncmp(buffer, "200", 3))

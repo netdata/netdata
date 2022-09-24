@@ -801,12 +801,13 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     info("Executing %s", script);
 
-    FILE *fp = netdata_popen(script, &command_pid);
-    if(fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if(fp_child_output) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -827,7 +828,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        netdata_pclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
     return 0;

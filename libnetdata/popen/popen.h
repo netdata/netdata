@@ -19,14 +19,14 @@
 // mypopen_raw is the interface to use instead of custom_popene_variadic_internal_dont_use_directly()
 // mypopen_raw will add the terminating NULL at the arguments list
 // we append the parameter 'command' twice - this is because the underlying call needs the command to execute and the argv[0] to pass to it
-#define netdata_popen_raw_default_flags_and_environment(pidptr, fpp, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, environ, POPEN_FLAGS_DEFAULT, fpp, command, command, ##args, NULL)
-#define netdata_popen_raw_default_flags(pidptr, env, fpp, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, env, POPEN_FLAGS_DEFAULT, fpp, command, command, ##args, NULL)
-#define netdata_popen_raw(pidptr, env, flags, fpp, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, env, flags, fpp, command, command, ##args, NULL)
+#define netdata_popen_raw_default_flags_and_environment(pidptr, fpp_child_input, fpp_child_output, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, environ, POPEN_FLAGS_DEFAULT, fpp_child_input, fpp_child_output, command, command, ##args, NULL)
+#define netdata_popen_raw_default_flags(pidptr, env, fpp_child_input, fpp_child_output, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, env, POPEN_FLAGS_DEFAULT, fpp_child_input, fpp_child_output, command, command, ##args, NULL)
+#define netdata_popen_raw(pidptr, env, flags, fpp_child_input, fpp_child_output, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, env, flags, fpp_child_input, fpp_child_output, command, command, ##args, NULL)
 
-extern FILE *netdata_popen(const char *command, volatile pid_t *pidptr);
-extern FILE *netdata_popene(const char *command, volatile pid_t *pidptr, char **env);
-extern int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp, const char *command, ...);
-extern int netdata_pclose(FILE *fp, pid_t pid);
+extern FILE *netdata_popen(const char *command, volatile pid_t *pidptr, FILE **fp_child_input);
+extern FILE *netdata_popene(const char *command, volatile pid_t *pidptr, char **env, FILE **fp_child_input);
+extern int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp_child_input, FILE **fpp_child_output, const char *command, ...);
+extern int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid);
 
 extern int netdata_spawn(const char *command, volatile pid_t *pidptr);
 extern int netdata_spawn_waitpid(pid_t pid);

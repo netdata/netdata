@@ -238,18 +238,19 @@ void *pluginsd_worker_thread(void *arg)
     size_t count = 0;
 
     while (!netdata_exit) {
-        FILE *fp = netdata_popen(cd->cmd, &cd->pid);
-        if (unlikely(!fp)) {
+        FILE *fp_child_input;
+        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->pid, &fp_child_input);
+        if (unlikely(!fp_child_output)) {
             error("Cannot popen(\"%s\", \"r\").", cd->cmd);
             break;
         }
 
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
-        count = pluginsd_process(localhost, cd, fp, 0);
+        count = pluginsd_process(localhost, cd, fp_child_output, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid);
 
-        int worker_ret_code = netdata_pclose(fp, cd->pid);
+        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->pid);
 
         if (likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
