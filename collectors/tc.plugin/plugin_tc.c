@@ -947,7 +947,7 @@ void *tc_main(void *ptr) {
         snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
         debug(D_TC_LOOP, "executing '%s'", command);
 
-        fp = mypopen(command, (pid_t *)&tc_child_pid);
+        fp = netdata_popen(command, (pid_t *)&tc_child_pid);
         if(unlikely(!fp)) {
             error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
@@ -1163,7 +1163,7 @@ void *tc_main(void *ptr) {
         }
 
         // fgets() failed or loop broke
-        int code = mypclose(fp, (pid_t)tc_child_pid);
+        int code = netdata_pclose(fp, (pid_t)tc_child_pid);
         tc_child_pid = 0;
 
         if(unlikely(device)) {

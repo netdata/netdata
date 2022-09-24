@@ -238,7 +238,7 @@ void *pluginsd_worker_thread(void *arg)
     size_t count = 0;
 
     while (!netdata_exit) {
-        FILE *fp = mypopen(cd->cmd, &cd->pid);
+        FILE *fp = netdata_popen(cd->cmd, &cd->pid);
         if (unlikely(!fp)) {
             error("Cannot popen(\"%s\", \"r\").", cd->cmd);
             break;
@@ -249,7 +249,7 @@ void *pluginsd_worker_thread(void *arg)
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid);
 
-        int worker_ret_code = mypclose(fp, cd->pid);
+        int worker_ret_code = netdata_pclose(fp, cd->pid);
 
         if (likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);

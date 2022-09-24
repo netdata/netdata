@@ -1315,7 +1315,7 @@ static void rrdhost_load_kubernetes_labels(void) {
     debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
 
     pid_t pid;
-    FILE *fp = mypopen(label_script, &pid);
+    FILE *fp = netdata_popen(label_script, &pid);
     if(!fp) return;
 
     char buffer[1000 + 1];
@@ -1324,7 +1324,7 @@ static void rrdhost_load_kubernetes_labels(void) {
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
-    int rc = mypclose(fp, pid);
+    int rc = netdata_pclose(fp, pid);
     if(rc) error("%s exited abnormally. Failed to get kubernetes labels.", label_script);
 }
 

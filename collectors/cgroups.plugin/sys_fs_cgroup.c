@@ -153,7 +153,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     char buf[MAXSIZE_PROC_CMDLINE];
     char *begin, *end;
 
-    FILE *f = mypopen(exec, &command_pid);
+    FILE *f = netdata_popen(exec, &command_pid);
 
     if (!f)
         return retval;
@@ -196,7 +196,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         }
     }
 
-    if (mypclose(f, command_pid))
+    if (netdata_pclose(f, command_pid))
         return SYSTEMD_CGROUP_ERR;
 
     return retval;
@@ -210,7 +210,7 @@ static enum cgroups_type cgroups_try_detect_version()
     int cgroups2_available = 0;
 
     // 1. check if cgroups2 available on system at all
-    FILE *f = mypopen("grep cgroup /proc/filesystems", &command_pid);
+    FILE *f = netdata_popen("grep cgroup /proc/filesystems", &command_pid);
     if (!f) {
         error("popen failed");
         return CGROUPS_AUTODETECT_FAIL;
@@ -221,7 +221,7 @@ static enum cgroups_type cgroups_try_detect_version()
             break;
         }
     }
-    if(mypclose(f, command_pid))
+    if(netdata_pclose(f, command_pid))
         return CGROUPS_AUTODETECT_FAIL;
 
     if(!cgroups2_available)
@@ -1666,7 +1666,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
 
     debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
     FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
+    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp) {
         error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
@@ -1709,7 +1709,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         }
     }
 
-    mypclose(fp, cgroup_pid);
+    netdata_pclose(fp, cgroup_pid);
     // debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
 }
 
@@ -1872,7 +1872,8 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     pid_t cgroup_pid;
 
     FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cg->id, cg->intermediate_id);
+    (void)netdata_popen_raw_default_flags_and_environment(
+        &cgroup_pid, &fp, cgroups_rename_script, cg->id, cg->intermediate_id);
     if (!fp) {
         error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
@@ -1882,7 +1883,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
 
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
-    int exit_code = mypclose(fp, cgroup_pid);
+    int exit_code = netdata_pclose(fp, cgroup_pid);
 
     switch (exit_code) {
         case 0:

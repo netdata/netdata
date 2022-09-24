@@ -801,7 +801,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     info("Executing %s", script);
 
-    FILE *fp = mypopen(script, &command_pid);
+    FILE *fp = netdata_popen(script, &command_pid);
     if(fp) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
@@ -827,7 +827,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        mypclose(fp, command_pid);
+        netdata_pclose(fp, command_pid);
     }
     freez(script);
     return 0;

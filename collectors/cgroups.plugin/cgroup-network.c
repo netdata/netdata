@@ -509,12 +509,12 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     FILE *fp;
 
     if(cgroup) {
-        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
+        (void)netdata_popen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
     }
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
+        (void)netdata_popen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
     }
 
     if(fp) {
@@ -536,7 +536,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
             }
         }
 
-        mypclose(fp, cgroup_pid);
+        netdata_pclose(fp, cgroup_pid);
     }
     else
         error("cannot execute cgroup-network helper script: %s", command);

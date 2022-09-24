@@ -84,14 +84,14 @@ void claim_agent(char *claiming_arguments)
               claiming_arguments);
 
     info("Executing agent claiming command 'netdata-claim.sh'");
-    fp = mypopen(command_buffer, &command_pid);
+    fp = netdata_popen(command_buffer, &command_pid);
     if(!fp) {
         error("Cannot popen(\"%s\").", command_buffer);
         return;
     }
     info("Waiting for claiming command to finish.");
     while (fgets(command_buffer, CLAIMING_COMMAND_LENGTH, fp) != NULL) {;}
-    exit_code = mypclose(fp, command_pid);
+    exit_code = netdata_pclose(fp, command_pid);
     info("Agent claiming command returned with code %d", exit_code);
     if (0 == exit_code) {
         load_claiming_state();
