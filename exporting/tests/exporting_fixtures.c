@@ -108,9 +108,18 @@ int teardown_rrdhost()
         break;
     rrddim_foreach_done(rd);
 
+    string_freez(rd->id);
+    string_freez(rd->name);
+    free(rd->tiers[0]);
+
+    string_freez(st->id);
+    string_freez(st->name);
+    dictionary_destroy(st->rrddim_root_index);
+
     rrdlabels_destroy(localhost->rrdlabels);
 
     string_freez(localhost->tags);
+    dictionary_destroy(localhost->rrdset_root_index);
     free(localhost);
 
     return 0;
