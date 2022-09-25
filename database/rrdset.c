@@ -4,6 +4,163 @@
 #include "rrd.h"
 #include <sched.h>
 
+// ----------------------------------------------------------------------------
+// RRDSET - collector info and rrdset functions
+
+struct rrdset_collector_function {
+    int (*function)(BUFFER *wb, RRDSET *st, size_t timeout, const char *name, int argc, char **argv, void *data);
+    void *data;
+    struct rrdset_collector *collector;
+};
+
+struct rrdset_collector {
+    void *input;
+    void *output;
+    int32_t refcount;
+    pid_t tid;
+    bool running;
+};
+
+static __thread struct rrdset_collector *thread_collector = NULL;
+
+static void rrdset_collector_free(struct rrdset_collector *rdc) {
+    int32_t expected = 0;
+    if(likely(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))) {
+        // the collector is still referenced by charts.
+        // leave it hanging there, the last chart will actually free it.
+        return;
+    }
+
+    // we can free it now
+    freez(rdc);
+}
+
+// called once per collector
+void rrdset_collector_started(void *input, void *output) {
+    if(likely(thread_collector)) return;
+
+    thread_collector = callocz(1, sizeof(struct rrdset_collector));
+    thread_collector->tid = gettid();
+    thread_collector->running = true;
+    thread_collector->input = input;
+    thread_collector->output = output;
+}
+
+// called once per collector
+void rrdset_collector_finished(void) {
+    if(!thread_collector)
+        return;
+
+    thread_collector->running = false;
+    rrdset_collector_free(thread_collector);
+    thread_collector = NULL;
+}
+
+static struct rrdset_collector *rrdset_collector_acquire(void) {
+    __atomic_add_fetch(&thread_collector->refcount, 1, __ATOMIC_SEQ_CST);
+    return thread_collector;
+}
+
+static void rrdset_collector_release(struct rrdset_collector *rdc) {
+    if(unlikely(!rdc)) return;
+
+    int32_t refcount = __atomic_sub_fetch(&rdc->refcount, 1, __ATOMIC_SEQ_CST);
+    if(refcount == 0 && !rdc->running)
+        rrdset_collector_free(rdc);
+}
+
+static void rrdset_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdset __maybe_unused) {
+    struct rrdset_collector_function *rdcf = func;
+    RRDSET *st = rrdset;
+
+    if(!thread_collector)
+        fatal("RRDSET_COLLECTOR: called %s() without calling rrdset_collector_started() first, for chart '%s', host '%s'.", __FUNCTION__, rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
+    rdcf->collector = rrdset_collector_acquire();
+}
+
+static void rrdset_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdset __maybe_unused) {
+    struct rrdset_collector_function *rdcf = func;
+    rrdset_collector_release(rdcf->collector);
+}
+
+static bool rrdset_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func __maybe_unused, void *rrdset __maybe_unused) {
+    struct rrdset_collector_function *rdcf = func;
+    struct rrdset_collector_function *new_rdcf = new_func;
+    RRDSET *st = rrdset;
+
+    if(!thread_collector)
+        fatal("RRDSET_COLLECTOR: called %s() without calling rrdset_collector_started() first, for chart '%s', host '%s'.", __FUNCTION__, rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
+    bool changed = false;
+
+    if(rdcf->collector != thread_collector) {
+        struct rrdset_collector *old_rdc = rdcf->collector;
+        rdcf->collector = rrdset_collector_acquire();
+        rrdset_collector_release(old_rdc);
+        changed = true;
+    }
+
+    if(rdcf->function != new_rdcf->function) {
+        rdcf->function = new_rdcf->function;
+        changed = true;
+    }
+
+    if(rdcf->data != new_rdcf->data) {
+        rdcf->data = new_rdcf->data;
+        changed = true;
+    }
+
+    return changed;
+}
+
+void rrdset_collector_add_function(RRDSET *st, const char *name, int (*function)(BUFFER *wb, RRDSET *st, size_t timeout, const char *name, int argc, char **argv, void *data), void *data) {
+    if(!st->functions) {
+        st->functions = dictionary_create(DICT_OPTION_NONE);
+        dictionary_register_insert_callback(st->functions, rrdset_functions_insert_callback, st);
+        dictionary_register_delete_callback(st->functions, rrdset_functions_delete_callback, st);
+        dictionary_register_conflict_callback(st->functions, rrdset_functions_conflict_callback, st);
+    }
+
+    struct rrdset_collector_function tmp = {
+        .function = function,
+        .data = data,
+    };
+    dictionary_set(st->functions, name, &tmp, sizeof(tmp));
+}
+
+int rrdset_call_function(RRDHOST *host, BUFFER *wb, size_t timeout, const char *chart, const char *name, int argc, char **argv) {
+
+    RRDSET *st = rrdset_find(host, chart);
+    if(!st)
+        st = rrdset_find_byname(host, chart);
+
+    if(!st) {
+        buffer_strcat(wb, "Chart not found");
+        return HTTP_RESP_NOT_FOUND;
+    }
+
+    if(!st->functions) {
+        buffer_strcat(wb, "Function not found");
+        return HTTP_RESP_NOT_FOUND;
+    }
+
+    struct rrdset_collector_function *rdcf = dictionary_get(st->functions, name);
+    if(!rdcf) {
+        buffer_strcat(wb, "Function not found");
+        return HTTP_RESP_NOT_FOUND;
+    }
+
+    if(!rdcf->collector->running) {
+        buffer_strcat(wb, "Collector is not currently running");
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+    }
+
+    return rdcf->function(wb, st, timeout, name, argc, argv, rdcf->data);
+}
+
+// ----------------------------------------------------------------------------
+
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", rrdset_id(st));
 
@@ -202,6 +359,9 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
+
+    // release the collector info
+    dictionary_destroy(st->functions);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 
@@ -1096,6 +1256,7 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rrdcontext_collected_rrddim(rd);
 }
 
+// caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through
 struct rda_item {
     const DICTIONARY_ITEM *item;
     RRDDIM *rd;

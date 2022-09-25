@@ -367,6 +367,7 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
 
 static void streaming_parser_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
+    rrdset_collector_finished();
     parser_destroy(parser);
 }
 
@@ -383,25 +384,14 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
 
     PARSER *parser = parser_init(rpt->host, &user, fp, fp, PARSER_INPUT_SPLIT);
 
+    rrdset_collector_started(fp, fp);
+
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
 
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
-
-    parser->plugins_action->begin_action     = &pluginsd_begin_action;
-    parser->plugins_action->flush_action     = &pluginsd_flush_action;
-    parser->plugins_action->end_action       = &pluginsd_end_action;
-    parser->plugins_action->disable_action   = &pluginsd_disable_action;
-    parser->plugins_action->variable_action  = &pluginsd_variable_action;
-    parser->plugins_action->dimension_action = &pluginsd_dimension_action;
-    parser->plugins_action->label_action     = &pluginsd_label_action;
-    parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
-    parser->plugins_action->chart_action     = &pluginsd_chart_action;
-    parser->plugins_action->set_action       = &pluginsd_set_action;
-    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
-    parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
 
     user.parser = parser;
 

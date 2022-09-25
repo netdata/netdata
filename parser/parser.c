@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "parser.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
 
 static inline int find_keyword(char *str, char *keyword, int max_size, int (*custom_isspace)(char))
 {
@@ -47,18 +48,37 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
 #endif
 
     if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-        parser_add_keyword(parser, "CLABEL_COMMIT", pluginsd_clabel_commit);
-        parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-        parser_add_keyword(parser, "SET", pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL,          pluginsd_label);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE,      pluginsd_overwrite);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END,            pluginsd_end);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT,  pluginsd_clabel_commit);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
+        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_chart_function);
+        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT, pluginsd_chart_function_result);
+    }
+
+    if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
+        parser->plugins_action->begin_action            = &pluginsd_begin_action;
+        parser->plugins_action->flush_action            = &pluginsd_flush_action;
+        parser->plugins_action->end_action              = &pluginsd_end_action;
+        parser->plugins_action->disable_action          = &pluginsd_disable_action;
+        parser->plugins_action->variable_action         = &pluginsd_variable_action;
+        parser->plugins_action->dimension_action        = &pluginsd_dimension_action;
+        parser->plugins_action->label_action            = &pluginsd_label_action;
+        parser->plugins_action->overwrite_action        = &pluginsd_overwrite_action;
+        parser->plugins_action->chart_action            = &pluginsd_chart_action;
+        parser->plugins_action->set_action              = &pluginsd_set_action;
+        parser->plugins_action->clabel_commit_action    = &pluginsd_clabel_commit_action;
+        parser->plugins_action->clabel_action           = &pluginsd_clabel_action;
+        //parser->plugins_action->function_action         = &pluginsd_function_action;
+        //parser->plugins_action->function_result_action  = &pluginsd_function_result_action;
     }
 
     return parser;

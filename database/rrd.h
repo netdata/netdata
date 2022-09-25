@@ -583,6 +583,8 @@ struct rrdset {
 
     size_t rrdlabels_last_saved_version;
 
+    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
+
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
 
@@ -683,6 +685,11 @@ extern void rrdset_memory_file_free(RRDSET *st);
 extern void rrdset_memory_file_update(RRDSET *st);
 extern const char *rrdset_cache_filename(RRDSET *st);
 extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
+
+extern void rrdset_collector_started(void *input, void *output);
+extern void rrdset_collector_finished(void);
+extern void rrdset_collector_add_function(RRDSET *st, const char *name, int (*function)(BUFFER *wb, RRDSET *st, size_t timeout, const char *name, int argc, char **argv, void *data), void *data);
+extern int rrdset_call_function(RRDHOST *host, BUFFER *wb, size_t timeout, const char *chart, const char *name, int argc, char **argv);
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags

@@ -749,6 +749,7 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
 
 static void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
+    rrdset_collector_finished();
     parser_destroy(parser);
 }
 
@@ -780,22 +781,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // fp_plugin_output = our input; fp_plugin_input = our output
     PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT);
 
+    rrdset_collector_started(fp_plugin_input, fp_plugin_output);
+
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
-
-    parser->plugins_action->begin_action          = &pluginsd_begin_action;
-    parser->plugins_action->flush_action          = &pluginsd_flush_action;
-    parser->plugins_action->end_action            = &pluginsd_end_action;
-    parser->plugins_action->disable_action        = &pluginsd_disable_action;
-    parser->plugins_action->variable_action       = &pluginsd_variable_action;
-    parser->plugins_action->dimension_action      = &pluginsd_dimension_action;
-    parser->plugins_action->label_action          = &pluginsd_label_action;
-    parser->plugins_action->overwrite_action      = &pluginsd_overwrite_action;
-    parser->plugins_action->chart_action          = &pluginsd_chart_action;
-    parser->plugins_action->set_action            = &pluginsd_set_action;
-    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
-    parser->plugins_action->clabel_action         = &pluginsd_clabel_action;
 
     user.parser = parser;
 
