@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- feat\(health\): add new Redis alarms [\#13715](https://github.com/netdata/netdata/pull/13715) ([ilyam8](https://github.com/ilyam8))
+- Faster streaming by 25% on the child [\#13708](https://github.com/netdata/netdata/pull/13708) ([ktsaou](https://github.com/ktsaou))
 - Do not create train/predict dimensions meant for tracking anomaly rates. [\#13707](https://github.com/netdata/netdata/pull/13707) ([vkalintiris](https://github.com/vkalintiris))
 - bump go.d.plugin to v0.40.1 [\#13704](https://github.com/netdata/netdata/pull/13704) ([ilyam8](https://github.com/ilyam8))
 - Build judy even without dbengine [\#13703](https://github.com/netdata/netdata/pull/13703) ([underhood](https://github.com/underhood))
@@ -350,8 +352,6 @@
 - dictionary improvements [\#13052](https://github.com/netdata/netdata/pull/13052) ([ktsaou](https://github.com/ktsaou))
 - Fix dictionary crash walkthrough empty [\#13051](https://github.com/netdata/netdata/pull/13051) ([ktsaou](https://github.com/ktsaou))
 - coverity fixes about statsd; removal of strsame [\#13049](https://github.com/netdata/netdata/pull/13049) ([ktsaou](https://github.com/ktsaou))
-- Add improved reinstall documentation. [\#13047](https://github.com/netdata/netdata/pull/13047) ([Ferroin](https://github.com/Ferroin))
-- Fix disabled apps \(ebpf.plugin\) [\#13044](https://github.com/netdata/netdata/pull/13044) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
