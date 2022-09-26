@@ -8,8 +8,9 @@
 // the dictionary is created on demand (only when a function is added to an RRDSET)
 
 struct rrdset_collector_function {
-    STRING *format;
-    int timeout;
+    bool sync;                      // when true, the function is called synchronously
+    STRING *format;                 // the format the function produces
+    int timeout;                    // the default timeout of the function
     int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
     void *collector_data;
     struct rrdset_collector *collector;
@@ -134,6 +135,11 @@ static bool rrdset_functions_conflict_callback(const DICTIONARY_ITEM *item __may
         changed = true;
     }
 
+    if(rdcf->sync != new_rdcf->sync) {
+        rdcf->sync = new_rdcf->sync;
+        changed = true;
+    }
+
     if(rdcf->collector_data != new_rdcf->collector_data) {
         rdcf->collector_data = new_rdcf->collector_data;
         changed = true;
@@ -142,7 +148,7 @@ static bool rrdset_functions_conflict_callback(const DICTIONARY_ITEM *item __may
     return changed;
 }
 
-void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
+void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
     if(!st->functions) {
         st->functions = dictionary_create(DICT_OPTION_NONE);
         dictionary_register_insert_callback(st->functions, rrdset_functions_insert_callback, st);
@@ -151,6 +157,7 @@ void rrdset_collector_add_function(RRDSET *st, const char *name, const char *for
     }
 
     struct rrdset_collector_function tmp = {
+        .sync = sync,
         .timeout = timeout,
         .format = string_strdupz(format),
         .function = function,
@@ -245,56 +252,61 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
     if(code != HTTP_RESP_OK)
         return code;
 
-    struct rrdset_function_call_wait *tmp = mallocz(sizeof(struct rrdset_function_call_wait));
-    tmp->wb = buffer_create(100);
-    tmp->free_with_signal = false;
-    tmp->data_are_ready = false;
-    netdata_mutex_init(&tmp->mutex);
-    pthread_cond_init(&tmp->cond, NULL);
-
-    netdata_mutex_lock(&tmp->mutex);
-    int rc = 0;
-    bool we_should_free = true;
-
-    if(rdcf->function(tmp->wb, st, timeout, name, argc, argv, rdcf->collector_data, rrdset_call_function_signal_when_ready, &tmp) == 0) {
-
-        while(rc == 0 && !tmp->data_are_ready) {
-            // the mutex is unlocked within pthread_cond_timedwait()
-            rc = pthread_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
-            // the mutex is again ours
-        }
-
-        if(tmp->data_are_ready) {
-            // we have a response
-            buffer_fast_strcat(wb, buffer_tostring(tmp->wb), buffer_strlen(tmp->wb));
-            code = tmp->code;
-        }
-        else if(rc == ETIMEDOUT) {
-            // timeout
-            // we will go away and let the callback free the structure
-            buffer_flush(wb);
-            buffer_strcat(wb, "Timeout");
-            tmp->free_with_signal = true;
-            we_should_free = false;
-            code = HTTP_RESP_GATEWAY_TIMEOUT;
-        }
-        else {
-            error("RRDSET FUNCTIONS: failed to wait for a response from the collector");
-            buffer_flush(wb);
-            buffer_strcat(wb, "Failed to wait for a response from the collector");
-            code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-        }
+    if(rdcf->sync) {
+        code = rdcf->function(wb, st, timeout, name, argc, argv, rdcf->collector_data, rrdset_call_function_signal_when_ready, NULL);
     }
     else {
-        error("RRDSET FUNCTIONS: failed to send request to the collector");
-        buffer_flush(wb);
-        buffer_strcat(wb, "Failed to send request to the collector");
-        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-    }
-    netdata_mutex_unlock(&tmp->mutex);
+        struct rrdset_function_call_wait *tmp = mallocz(sizeof(struct rrdset_function_call_wait));
+        tmp->wb = buffer_create(100);
+        tmp->free_with_signal = false;
+        tmp->data_are_ready = false;
+        netdata_mutex_init(&tmp->mutex);
+        pthread_cond_init(&tmp->cond, NULL);
 
-    if(we_should_free)
-        rrdset_function_call_wait_free(tmp);
+        netdata_mutex_lock(&tmp->mutex);
+        int rc = 0;
+        bool we_should_free = true;
+
+        code = rdcf->function(tmp->wb, st, timeout, name, argc, argv, rdcf->collector_data, rrdset_call_function_signal_when_ready, &tmp);
+        if (code == 200) {
+            while (rc == 0 && !tmp->data_are_ready) {
+                // the mutex is unlocked within pthread_cond_timedwait()
+                rc = pthread_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
+                // the mutex is again ours
+            }
+
+            if (tmp->data_are_ready) {
+                // we have a response
+                buffer_fast_strcat(wb, buffer_tostring(tmp->wb), buffer_strlen(tmp->wb));
+                code = tmp->code;
+            }
+            else if (rc == ETIMEDOUT) {
+                // timeout
+                // we will go away and let the callback free the structure
+                buffer_flush(wb);
+                buffer_strcat(wb, "Timeout");
+                tmp->free_with_signal = true;
+                we_should_free = false;
+                code = HTTP_RESP_GATEWAY_TIMEOUT;
+            }
+            else {
+                error("RRDSET FUNCTIONS: failed to wait for a response from the collector");
+                buffer_flush(wb);
+                buffer_strcat(wb, "Failed to wait for a response from the collector");
+                code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+            }
+        }
+        else {
+            error("RRDSET FUNCTIONS: failed to send request to the collector");
+            buffer_flush(wb);
+            buffer_strcat(wb, "Failed to send request to the collector");
+            code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+        }
+        netdata_mutex_unlock(&tmp->mutex);
+
+        if (we_should_free)
+            rrdset_function_call_wait_free(tmp);
+    }
 
     return code;
 }
