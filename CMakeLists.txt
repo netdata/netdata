@@ -729,6 +729,7 @@ set(RRD_PLUGIN_FILES
         database/rrd.c
         database/rrd.h
         database/rrdset.c
+        database/rrdset_functions.c
         database/rrdsetvar.c
         database/rrdsetvar.h
         database/rrdvar.c
