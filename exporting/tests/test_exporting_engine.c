@@ -257,7 +257,10 @@ static void test_rrdset_is_exportable(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
-    RRDSET *st = localhost->rrdset_root;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
 
     assert_ptr_equal(st->exporting_flags, NULL);
 
@@ -271,7 +274,10 @@ static void test_false_rrdset_is_exportable(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
-    RRDSET *st = localhost->rrdset_root;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
 
     simple_pattern_free(instance->config.charts_pattern);
     instance->config.charts_pattern = simple_pattern_create("!*", NULL, SIMPLE_PATTERN_EXACT);
@@ -288,7 +294,17 @@ static void test_exporting_calculate_value_from_stored_data(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
+
     time_t timestamp;
 
     instance->after = 3;
@@ -348,7 +364,11 @@ static void test_prepare_buffers(void **state)
     expect_value(__mock_start_host_formatting, host, localhost);
     will_return(__mock_start_host_formatting, 0);
 
-    RRDSET *st = localhost->rrdset_root;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+    
     expect_function_call(__wrap_rrdset_is_exportable);
     expect_value(__wrap_rrdset_is_exportable, instance, instance);
     expect_value(__wrap_rrdset_is_exportable, st, st);
@@ -359,7 +379,10 @@ static void test_prepare_buffers(void **state)
     expect_value(__mock_start_chart_formatting, st, st);
     will_return(__mock_start_chart_formatting, 0);
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     expect_function_call(__mock_metric_formatting);
     expect_value(__mock_metric_formatting, instance, instance);
     expect_value(__mock_metric_formatting, rd, rd);
@@ -412,7 +435,15 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
 {
     struct engine *engine = *state;
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_collected_graphite_plaintext(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -426,7 +457,15 @@ static void test_format_dimension_stored_graphite_plaintext(void **state)
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+    
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_stored_graphite_plaintext(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -437,7 +476,15 @@ static void test_format_dimension_collected_json_plaintext(void **state)
 {
     struct engine *engine = *state;
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_collected_json_plaintext(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -454,7 +501,15 @@ static void test_format_dimension_stored_json_plaintext(void **state)
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_stored_json_plaintext(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -468,7 +523,15 @@ static void test_format_dimension_collected_opentsdb_telnet(void **state)
 {
     struct engine *engine = *state;
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_collected_opentsdb_telnet(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -482,7 +545,15 @@ static void test_format_dimension_stored_opentsdb_telnet(void **state)
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_stored_opentsdb_telnet(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -493,7 +564,15 @@ static void test_format_dimension_collected_opentsdb_http(void **state)
 {
     struct engine *engine = *state;
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+    
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_collected_opentsdb_http(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -510,7 +589,15 @@ static void test_format_dimension_stored_opentsdb_http(void **state)
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+    
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
     assert_int_equal(format_dimension_stored_opentsdb_http(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
@@ -986,21 +1073,26 @@ static void test_can_send_rrdset(void **state)
 {
     (void)*state;
 
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 1);
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
 
-    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 0);
-    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 1);
+
+    rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
 
     // TODO: test with a denying simple pattern
 
-    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 0);
-    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
+    rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
+    rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
-    localhost->rrdset_root->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
+    st->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
     prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
-    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root, NULL), 0);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
 }
 
 static void test_prometheus_name_copy(void **state)
@@ -1055,9 +1147,14 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 
     BUFFER *buffer = buffer_create(0);
 
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
     localhost->hostname = string_strdupz("test_hostname");
-    localhost->rrdset_root->family = string_strdupz("test_family");
-    localhost->rrdset_root->context = string_strdupz("test_context");
+    st->family = string_strdupz("test_family");
+    st->context = string_strdupz("test_context");
 
     expect_function_call(__wrap_now_realtime_sec);
     will_return(__wrap_now_realtime_sec, 2);
@@ -1104,8 +1201,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
         "netdata_info{instance=\"test_hostname\",application=\"\",version=\"\",key1=\"value1\",key2=\"value2\"} 1\n"
         "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\",instance=\"test_hostname\"} 690565856.0000000\n");
 
-    free(localhost->rrdset_root->context);
-    free(localhost->rrdset_root->family);
+    free(st->context);
+    free(st->family);
     free(localhost->hostname);
     buffer_free(buffer);
 }
@@ -1249,7 +1346,15 @@ static void test_format_dimension_prometheus_remote_write(void **state)
     simple_connector_data->connector_specific_data = (void *)connector_specific_data;
     connector_specific_data->write_request = (void *)0xff;
 
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+    
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st);
+        break;
+    rrddim_foreach_done(rd);
 
     expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
     will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_DEFAULT_FLAGS));
@@ -1428,7 +1533,11 @@ static void test_aws_kinesis_connector_worker(void **state)
     expect_value(__wrap_rrdhost_is_exportable, host, localhost);
     will_return(__wrap_rrdhost_is_exportable, 1);
 
-    RRDSET *st = localhost->rrdset_root;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
     expect_function_call(__wrap_rrdset_is_exportable);
     expect_value(__wrap_rrdset_is_exportable, instance, instance);
     expect_value(__wrap_rrdset_is_exportable, st, st);
@@ -1563,7 +1672,11 @@ static void test_pubsub_connector_worker(void **state)
     expect_value(__wrap_rrdhost_is_exportable, host, localhost);
     will_return(__wrap_rrdhost_is_exportable, 1);
 
-    RRDSET *st = localhost->rrdset_root;
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost);
+        break;
+    rrdset_foreach_done(st);
+
     expect_function_call(__wrap_rrdset_is_exportable);
     expect_value(__wrap_rrdset_is_exportable, instance, instance);
     expect_value(__wrap_rrdset_is_exportable, st, st);
