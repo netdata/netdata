@@ -275,7 +275,7 @@ copy_container() {
 }
 
 copy() {
-  if [ -f "${1}" ]; then
+  if [ -f "${NETDATA_USER_CONFIG_DIR}/${1}" ]; then
     return 0
   elif [ -n "${container}" ]; then
     copy_container "${1}"
