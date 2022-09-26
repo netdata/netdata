@@ -9,39 +9,8 @@ learn_docs_purpose: "Explain how metrics are collected [Existing plugins, Custom
 -->
 
 **********************************************************************
-Template:
 
-Small intro, what we are about to cover
-
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "How Netdata's metrics collectors work"
-description: "When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects per-second metrics."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/how-collectors-work.md
--->
-
-# How Netdata's metrics collectors work
-
-When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects
+With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects
 per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
@@ -102,13 +71,9 @@ terms related to collecting metrics.
 -   **Internal plugins** gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C`,
     and run as threads within the Netdata daemon.
 
-## What's next?
+## Related Documentation
 
-[Enable or configure a collector](/docs/collect/enable-configure.md) if the default settings are not compatible with
-your infrastructure.
 
-See our [collectors reference](/collectors/REFERENCE.md) for detailed information on Netdata's collector architecture,
-troubleshooting a collector, developing a custom collector, and more.
 
 
 *******************************************************************************
