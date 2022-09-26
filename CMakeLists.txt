@@ -724,12 +724,13 @@ set(RRD_PLUGIN_FILES
         database/rrddimvar.c
         database/rrddimvar.h
         database/rrdfamily.c
+        database/rrdfunctions.c
+        database/rrdfunctions.h
         database/rrdhost.c
         database/rrdlabels.c
         database/rrd.c
         database/rrd.h
         database/rrdset.c
-        database/rrdset_functions.c
         database/rrdsetvar.c
         database/rrdsetvar.h
         database/rrdvar.c

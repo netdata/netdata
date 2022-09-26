@@ -180,7 +180,7 @@ extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced
 #define dictionary_view_set_and_acquire_item(dict, name, master_item) dictionary_view_set_and_acquire_item_advanced(dict, name, -1, master_item)
 extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item);
 #define dictionary_view_set(dict, name, master_item) dictionary_view_set_advanced(dict, name, -1, master_item)
-extern void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item);
+extern void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICT_ITEM_CONST DICTIONARY_ITEM *master_item);
 
 // ----------------------------------------------------------------------------
 // Get an item from the dictionary

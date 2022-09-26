@@ -749,7 +749,7 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
 
 static void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
-    rrdset_collector_finished();
+    rrd_collector_finished();
     parser_destroy(parser);
 }
 
@@ -781,7 +781,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // fp_plugin_output = our input; fp_plugin_input = our output
     PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT);
 
-    rrdset_collector_started(fp_plugin_input, fp_plugin_output);
+    rrd_collector_started(fp_plugin_input, fp_plugin_output);
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it

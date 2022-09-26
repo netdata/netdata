@@ -206,7 +206,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_index_del_name(host, st);
 
     // release the collector info
-    dictionary_destroy(st->functions);
+    dictionary_destroy(st->functions_view);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 

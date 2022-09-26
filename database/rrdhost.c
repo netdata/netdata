@@ -354,6 +354,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
     if (likely(!archived)) {
+        rrdfunctions_init(host);
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush(
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
@@ -628,6 +629,8 @@ void rrdhost_update(RRDHOST *host
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
+
+        rrdfunctions_init(host);
 
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
@@ -1170,6 +1173,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->node_id);
 
     rrdfamily_index_destroy(host);
+    rrdfunctions_destroy(host);
     rrdvariables_destroy(host->rrdvars);
 
     rrdhost_destroy_rrdcontexts(host);

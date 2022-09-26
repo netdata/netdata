@@ -367,7 +367,7 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
 
 static void streaming_parser_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
-    rrdset_collector_finished();
+    rrd_collector_finished();
     parser_destroy(parser);
 }
 
@@ -384,7 +384,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
 
     PARSER *parser = parser_init(rpt->host, &user, fp, fp, PARSER_INPUT_SPLIT);
 
-    rrdset_collector_started(fp, fp);
+    rrd_collector_started(fp, fp);
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it

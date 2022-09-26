@@ -1555,7 +1555,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
         return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     int timeout = 0;
-    const char *chart = NULL, *function = NULL, *options = NULL;
+    const char *function = NULL;
 
     while (url) {
         char *value = mystrsep(&url, "&");
@@ -1568,14 +1568,8 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
         if (!value || !*value)
             continue;
 
-        if (!strcmp(name, "chart"))
-            chart = value;
-
-        else if (!strcmp(name, "function"))
+        if (!strcmp(name, "function"))
             function = value;
-
-        else if (!strcmp(name, "options"))
-            options = value;
 
         else if (!strcmp(name, "timeout"))
             timeout = (int) strtoul(value, NULL, 0);
@@ -1585,7 +1579,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     buffer_flush(wb);
     wb->contenttype = CT_TEXT_PLAIN;
 
-    return rrdset_call_function_and_wait(host, wb, timeout, chart, function, options);
+    return rrd_call_function_and_wait(host, wb, timeout, function);
 }
 
 #ifndef ENABLE_DBENGINE

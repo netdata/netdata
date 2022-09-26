@@ -583,7 +583,7 @@ struct rrdset {
 
     size_t rrdlabels_last_saved_version;
 
-    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
+    DICTIONARY *functions_view;                     // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
@@ -686,11 +686,7 @@ extern void rrdset_memory_file_update(RRDSET *st);
 extern const char *rrdset_cache_filename(RRDSET *st);
 extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
 
-extern void rrdset_collector_started(void *input, void *output);
-extern void rrdset_collector_finished(void);
-extern void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, const char *options, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data);
-extern int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, const char *options);
-extern int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, const char *options, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
+#include "rrdfunctions.h"
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags
@@ -962,6 +958,10 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // Support for host-level labels
     DICTIONARY *rrdlabels;
+
+    // ------------------------------------------------------------------------
+    // Support for functions
+    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // indexes

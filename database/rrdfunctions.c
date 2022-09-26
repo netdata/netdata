@@ -1,19 +1,21 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+#define MAX_FUNCTION_LENGTH (16384 - 1024)
+
 // ----------------------------------------------------------------------------
 // RRDSET - collector info and rrdset functions
 
 // we keep a dictionary per RRDSET with these functions
 // the dictionary is created on demand (only when a function is added to an RRDSET)
 
-struct rrdset_collector_function {
+struct rrd_collector_function {
     bool sync;                      // when true, the function is called synchronously
     STRING *format;                 // the format the function produces
     int timeout;                    // the default timeout of the function
-    int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, const char *options, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
+    int (*function)(BUFFER *wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
     void *collector_data;
-    struct rrdset_collector *collector;
+    struct rrd_collector *collector;
 };
 
 // Each function points to this collector structure
@@ -23,7 +25,7 @@ struct rrdset_collector_function {
 // frees the structure too (or when the collector calls
 // rrdset_collector_finished()).
 
-struct rrdset_collector {
+struct rrd_collector {
     void *input;
     void *output;
     int32_t refcount;
@@ -35,9 +37,9 @@ struct rrdset_collector {
 // rrdset_collector_started() and rrdset_collector_finished()
 // to create the collector structure.
 
-static __thread struct rrdset_collector *thread_collector = NULL;
+static __thread struct rrd_collector *thread_rrd_collector = NULL;
 
-static void rrdset_collector_free(struct rrdset_collector *rdc) {
+static void rrd_collector_free(struct rrd_collector *rdc) {
     int32_t expected = 0;
     if(likely(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))) {
         // the collector is still referenced by charts.
@@ -50,69 +52,67 @@ static void rrdset_collector_free(struct rrdset_collector *rdc) {
 }
 
 // called once per collector
-void rrdset_collector_started(void *input, void *output) {
-    if(likely(thread_collector)) return;
+void rrd_collector_started(void *input, void *output) {
+    if(likely(thread_rrd_collector)) return;
 
-    thread_collector = callocz(1, sizeof(struct rrdset_collector));
-    thread_collector->tid = gettid();
-    thread_collector->running = true;
-    thread_collector->input = input;
-    thread_collector->output = output;
+    thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
+    thread_rrd_collector->tid = gettid();
+    thread_rrd_collector->running = true;
+    thread_rrd_collector->input = input;
+    thread_rrd_collector->output = output;
 }
 
 // called once per collector
-void rrdset_collector_finished(void) {
-    if(!thread_collector)
+void rrd_collector_finished(void) {
+    if(!thread_rrd_collector)
         return;
 
-    thread_collector->running = false;
-    rrdset_collector_free(thread_collector);
-    thread_collector = NULL;
+    thread_rrd_collector->running = false;
+    rrd_collector_free(thread_rrd_collector);
+    thread_rrd_collector = NULL;
 }
 
-static struct rrdset_collector *rrdset_collector_acquire(void) {
-    __atomic_add_fetch(&thread_collector->refcount, 1, __ATOMIC_SEQ_CST);
-    return thread_collector;
+static struct rrd_collector *rrd_collector_acquire(void) {
+    __atomic_add_fetch(&thread_rrd_collector->refcount, 1, __ATOMIC_SEQ_CST);
+    return thread_rrd_collector;
 }
 
-static void rrdset_collector_release(struct rrdset_collector *rdc) {
+static void rrd_collector_release(struct rrd_collector *rdc) {
     if(unlikely(!rdc)) return;
 
     int32_t refcount = __atomic_sub_fetch(&rdc->refcount, 1, __ATOMIC_SEQ_CST);
     if(refcount == 0 && !rdc->running)
-        rrdset_collector_free(rdc);
+        rrd_collector_free(rdc);
 }
 
-static void rrdset_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdset __maybe_unused) {
-    struct rrdset_collector_function *rdcf = func;
-    RRDSET *st = rrdset;
+static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdhost __maybe_unused) {
+    struct rrd_collector_function *rdcf = func;
 
-    if(!thread_collector)
-        fatal("RRDSET_COLLECTOR: called %s() without calling rrdset_collector_started() first, for chart '%s', host '%s'.", __FUNCTION__, rrdset_id(st), rrdhost_hostname(st->rrdhost));
+    if(!thread_rrd_collector)
+        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.", __FUNCTION__, dictionary_acquired_item_name(item));
 
-    rdcf->collector = rrdset_collector_acquire();
+    rdcf->collector = rrd_collector_acquire();
 }
 
-static void rrdset_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdset __maybe_unused) {
-    struct rrdset_collector_function *rdcf = func;
-    rrdset_collector_release(rdcf->collector);
+static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdhost __maybe_unused) {
+    struct rrd_collector_function *rdcf = func;
+    rrd_collector_release(rdcf->collector);
     string_freez(rdcf->format);
 }
 
-static bool rrdset_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func __maybe_unused, void *rrdset __maybe_unused) {
-    struct rrdset_collector_function *rdcf = func;
-    struct rrdset_collector_function *new_rdcf = new_func;
-    RRDSET *st = rrdset;
+static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func __maybe_unused, void *rrdhost __maybe_unused) {
+    struct rrd_collector_function *rdcf = func;
+    struct rrd_collector_function *new_rdcf = new_func;
 
-    if(!thread_collector)
-        fatal("RRDSET_COLLECTOR: called %s() without calling rrdset_collector_started() first, for chart '%s', host '%s'.", __FUNCTION__, rrdset_id(st), rrdhost_hostname(st->rrdhost));
+    if(!thread_rrd_collector)
+        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.", __FUNCTION__, dictionary_acquired_item_name(item));
 
     bool changed = false;
 
-    if(rdcf->collector != thread_collector) {
-        struct rrdset_collector *old_rdc = rdcf->collector;
-        rdcf->collector = rrdset_collector_acquire();
-        rrdset_collector_release(old_rdc);
+    if(rdcf->collector != thread_rrd_collector) {
+        struct rrd_collector *old_rdc = rdcf->collector;
+        rdcf->collector = rrd_collector_acquire();
+        rrd_collector_release(old_rdc);
         changed = true;
     }
 
@@ -148,25 +148,37 @@ static bool rrdset_functions_conflict_callback(const DICTIONARY_ITEM *item __may
     return changed;
 }
 
-void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, const char *options, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
-    if(!st->functions) {
-        st->functions = dictionary_create(DICT_OPTION_NONE);
-        dictionary_register_insert_callback(st->functions, rrdset_functions_insert_callback, st);
-        dictionary_register_delete_callback(st->functions, rrdset_functions_delete_callback, st);
-        dictionary_register_conflict_callback(st->functions, rrdset_functions_conflict_callback, st);
-    }
 
-    struct rrdset_collector_function tmp = {
+void rrdfunctions_init(RRDHOST *host) {
+    if(host->functions) return;
+
+    host->functions = dictionary_create(DICT_OPTION_NONE);
+    dictionary_register_insert_callback(host->functions, rrd_functions_insert_callback, host);
+    dictionary_register_delete_callback(host->functions, rrd_functions_delete_callback, host);
+    dictionary_register_conflict_callback(host->functions, rrd_functions_conflict_callback, host);
+}
+
+void rrdfunctions_destroy(RRDHOST *host) {
+    dictionary_destroy(host->functions);
+}
+
+void rrd_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, int timeout, const char *name, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
+    if(!st->functions_view)
+        st->functions_view = dictionary_create_view(st->rrdhost->functions);
+
+    struct rrd_collector_function tmp = {
         .sync = sync,
         .timeout = timeout,
         .format = string_strdupz(format),
         .function = function,
         .collector_data = collector_data,
     };
-    dictionary_set(st->functions, name, &tmp, sizeof(tmp));
+    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(st->rrdhost->functions, name, &tmp, sizeof(tmp));
+    dictionary_view_set(st->functions_view, name, item);
+    dictionary_acquired_item_release(st->rrdhost->functions, item);
 }
 
-struct rrdset_function_call_wait {
+struct rrd_function_call_wait {
     BUFFER *wb;
     bool free_with_signal;
     bool data_are_ready;
@@ -175,34 +187,40 @@ struct rrdset_function_call_wait {
     int code;
 };
 
-static void rrdset_function_call_wait_free(struct rrdset_function_call_wait *tmp) {
+static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
     buffer_free(tmp->wb);
     pthread_cond_destroy(&tmp->cond);
     netdata_mutex_destroy(&tmp->mutex);
     freez(tmp);
 }
 
-static int rrdset_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *chart, const char *name, RRDSET **st, struct rrdset_collector_function **rdcf) {
-    *st = rrdset_find(host, chart);
-    if(!(*st))
-        *st = rrdset_find_byname(host, chart);
+static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
+    char buffer[MAX_FUNCTION_LENGTH + 1];
+    char *d = buffer, *e = &buffer[MAX_FUNCTION_LENGTH - 1];
+    const char *s = name;
 
-    if(!(*st)) {
-        buffer_flush(wb);
-        buffer_strcat(wb, "Chart not found");
-        return HTTP_RESP_NOT_FOUND;
+    // copy the first word - up to the 1st space
+    while(*s && !isspace(*s) && d < e)
+        *d++ = *s++;
+
+    *rdcf = NULL;
+    while(!(*rdcf) && d < e) {
+        *rdcf = dictionary_get(host->functions, buffer);
+        if(*rdcf || !*s)
+            break;
+
+        // copy all the spaces
+        while(*s && isspace(*s) && d < e)
+            *d++ = *s++;
+
+        // copy another word
+        while(*s && !isspace(*s) && d < e)
+            *d++ = *s++;
     }
 
-    if(!(*st)->functions) {
-        buffer_flush(wb);
-        buffer_strcat(wb, "Chart does not have any functions");
-        return HTTP_RESP_NOT_FOUND;
-    }
-
-    *rdcf = dictionary_get((*st)->functions, name);
     if(!(*rdcf)) {
         buffer_flush(wb);
-        buffer_strcat(wb, "Chart has functions, but the requested function is not found");
+        buffer_strcat(wb, "Function is not found.");
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -215,8 +233,8 @@ static int rrdset_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *c
     return HTTP_RESP_OK;
 }
 
-static void rrdset_call_function_signal_when_ready(BUFFER *wb __maybe_unused, int code, void *callback_data) {
-    struct rrdset_function_call_wait *tmp = callback_data;
+static void rrd_call_function_signal_when_ready(BUFFER *wb __maybe_unused, int code, void *callback_data) {
+    struct rrd_function_call_wait *tmp = callback_data;
     bool we_should_free = false;
 
     netdata_mutex_lock(&tmp->mutex);
@@ -236,19 +254,18 @@ static void rrdset_call_function_signal_when_ready(BUFFER *wb __maybe_unused, in
     netdata_mutex_unlock(&tmp->mutex);
 
     if(we_should_free)
-        rrdset_function_call_wait_free(tmp);
+        rrd_function_call_wait_free(tmp);
 }
 
-int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, const char *options) {
+int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name) {
     int code;
 
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
     tp.tv_sec += (time_t)timeout;
 
-    RRDSET *st = NULL;
-    struct rrdset_collector_function *rdcf = NULL;
-    code = rrdset_call_function_prepare(host, wb, chart, name, &st, &rdcf);
+    struct rrd_collector_function *rdcf = NULL;
+    code = rrd_call_function_prepare(host, wb, name, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 
@@ -256,10 +273,10 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
         timeout = rdcf->timeout;
 
     if(rdcf->sync) {
-        code = rdcf->function(wb, st, timeout, name, options, rdcf->collector_data, NULL, NULL);
+        code = rdcf->function(wb, timeout, name, rdcf->collector_data, NULL, NULL);
     }
     else {
-        struct rrdset_function_call_wait *tmp = mallocz(sizeof(struct rrdset_function_call_wait));
+        struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
         tmp->wb = buffer_create(100);
         tmp->free_with_signal = false;
         tmp->data_are_ready = false;
@@ -270,7 +287,7 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
         int rc = 0;
         bool we_should_free = true;
 
-        code = rdcf->function(tmp->wb, st, timeout, name, options, rdcf->collector_data, rrdset_call_function_signal_when_ready, &tmp);
+        code = rdcf->function(tmp->wb, timeout, name, rdcf->collector_data, rrd_call_function_signal_when_ready, &tmp);
         if (code == 200) {
             while (rc == 0 && !tmp->data_are_ready) {
                 // the mutex is unlocked within pthread_cond_timedwait()
@@ -308,25 +325,24 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
         netdata_mutex_unlock(&tmp->mutex);
 
         if (we_should_free)
-            rrdset_function_call_wait_free(tmp);
+            rrd_function_call_wait_free(tmp);
     }
 
     return code;
 }
 
-int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, const char *options, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
     int code;
 
-    RRDSET *st = NULL;
-    struct rrdset_collector_function *rdcf = NULL;
-    code = rrdset_call_function_prepare(host, wb, chart, name, &st, &rdcf);
+    struct rrd_collector_function *rdcf = NULL;
+    code = rrd_call_function_prepare(host, wb, name, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 
     if(timeout <= 0)
         timeout = rdcf->timeout;
 
-    code = rdcf->function(wb, st, timeout, name, options, rdcf->collector_data, callback, callback_data);
+    code = rdcf->function(wb, timeout, name, rdcf->collector_data, callback, callback_data);
 
     if(code != HTTP_RESP_OK) {
         error("RRDSET FUNCTIONS: failed to send request to the collector");

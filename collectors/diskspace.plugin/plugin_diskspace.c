@@ -165,10 +165,8 @@ static void free_basic_mountinfo_list(struct basic_mountinfo *root)
 // TODO - remove before merging
 int hello_world_function(
       BUFFER *wb
-    , RRDSET *st __maybe_unused
     , int timeout __maybe_unused
     , const char *name __maybe_unused
-    , const char *options __maybe_unused
     , void *collector_data __maybe_unused
     , void (*callback)(BUFFER *wb, int code, void *callback_data)
     , void *callback_data
@@ -256,7 +254,7 @@ static void calculate_values_and_show_charts(
             rrdset_update_rrdlabels(m->st_space, m->chart_labels);
 
             // TODO - remove before merging
-            rrdset_collector_add_function(m->st_space, "HelloWorld", "txt", 10, true, hello_world_function, NULL);
+            rrd_collector_add_function(m->st_space, "HelloWorld", "txt", 10, true, hello_world_function, NULL);
 
             m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -604,7 +602,7 @@ void *diskspace_slow_worker(void *ptr)
 }
 
 static void diskspace_main_cleanup(void *ptr) {
-    rrdset_collector_finished();
+    rrd_collector_finished();
     worker_unregister();
 
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -636,7 +634,7 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
-    rrdset_collector_started(NULL, NULL);
+    rrd_collector_started(NULL, NULL);
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
