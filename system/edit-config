@@ -153,10 +153,27 @@ list_files() {
   check_directories
   handle_container
 
+  if test -t; then
+    width="$(tput cols)"
+  fi
+
   if [ -z "${container}" ]; then
-    files="$(cd "${NETDATA_STOCK_CONFIG_DIR}" && find . -type f | cut -d '/' -f 2-)"
+    if [ "$(uname -s)" = "Linux" ]; then
+      # shellcheck disable=SC2046,SC2086
+      files="$(cd "${NETDATA_STOCK_CONFIG_DIR}" && ls ${width:+-C} ${width:+-w ${width}} $(find . -type f | cut -d '/' -f 2-))"
+    elif [ "$(uname -s)" = "FreeBSD" ]; then
+      if [ -n "${width}" ]; then
+        export COLUMNS="${width}"
+      fi
+
+      # shellcheck disable=SC2046
+      files="$(cd "${NETDATA_STOCK_CONFIG_DIR}" && ls ${width:+-C} $(find . -type f | cut -d '/' -f 2-))"
+    else
+      # shellcheck disable=SC2046
+      files="$(cd "${NETDATA_STOCK_CONFIG_DIR}" && ls $(find . -type f | cut -d '/' -f 2-))"
+    fi
   else
-    files="$(run_in_container "${container}" "cd /usr/lib/netdata/conf.d && find . -type f" | cut -d '/' -f 2-)"
+    files="$(run_in_container "${container}" "cd /usr/lib/netdata/conf.d && ls ${width:+-C} ${width:+-w ${width}} \$(find . -type f | cut -d '/' -f 2-)")"
   fi
 
   if [ -z "${files}" ]; then
