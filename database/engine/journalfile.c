@@ -315,14 +315,14 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         uint64_t end_time = jf_metric_data->descr[i].end_time;
 
         if (unlikely(start_time > end_time)) {
-            error("Invalid page encountered, start time %lu > end time %lu", start_time , end_time );
+            error("Invalid page encountered, start time %"PRIu64" > end time %"PRIu64"", start_time , end_time);
             continue;
         }
 
         if (unlikely(start_time == end_time)) {
             size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
             if (unlikely(entries > 1)) {
-                error("Invalid page encountered, start time %lu = end time but %zu entries were found", start_time, entries);
+                error("Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found", start_time, entries);
                 continue;
             }
         }

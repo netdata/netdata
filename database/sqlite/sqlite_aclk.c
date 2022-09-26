@@ -565,7 +565,7 @@ void aclk_database_worker(void *arg)
 //    wc->retry_count = 0;
     wc->node_info_send = 1;
 //    aclk_add_worker_thread(wc);
-    info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
+    info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, (unsigned long int) sizeof(*wc));
 
     memset(&cmd, 0, sizeof(cmd));
 #ifdef ENABLE_ACLK

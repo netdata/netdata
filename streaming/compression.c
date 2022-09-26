@@ -67,7 +67,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
         return 0;
 
     if(unlikely(size > LZ4_MAX_MSG_SIZE)) {
-        error("%s: Compression Failed - Message size %lu above compression buffer limit: %d", STREAM_COMPRESSION_MSG, size, LZ4_MAX_MSG_SIZE);
+        error("%s: Compression Failed - Message size %lu above compression buffer limit: %d", STREAM_COMPRESSION_MSG, (long unsigned int) size, LZ4_MAX_MSG_SIZE);
         return 0;
     }
 
@@ -239,7 +239,8 @@ static size_t lz4_decompressor_put(struct decompressor_state *state, const char 
 
     if (state->buffer_pos + size > state->buffer_len) {
         error("STREAM: Decompressor buffer overflow %lu + %lu > %lu",
-                    state->buffer_pos, size, state->buffer_len);
+                    (long unsigned int) state->buffer_pos, (long unsigned int) size,
+                    (long unsigned int) state->buffer_len);
         size = state->buffer_len - state->buffer_pos;
     }
     memcpy(state->buffer + state->buffer_pos, data, size);
@@ -299,7 +300,8 @@ static size_t lz4_decompressor_decompress(struct decompressor_state *state)
     (void)saving;
 
     if (old_avg_saving != avg_saving || old_avg_size != avg_size){
-        debug(D_STREAM, "%s: Saving: %lu%% (avg. %lu%%), avg.size: %lu", STREAM_COMPRESSION_MSG, saving, avg_saving, avg_size);
+        debug(D_STREAM, "%s: Saving: %lu%% (avg. %lu%%), avg.size: %lu", STREAM_COMPRESSION_MSG,
+              (long unsigned int) saving, (long unsigned int) avg_saving, (long unsigned int) avg_size);
     }
     return decompressed_size;
 }
