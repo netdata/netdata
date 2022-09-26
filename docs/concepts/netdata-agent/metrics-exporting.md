@@ -9,37 +9,6 @@ learn_docs_purpose: "Explain what exporting means and the purpose to export metr
 -->
 
 **********************************************************************
-Template:
-
-Small intro, what we are about to cover
-
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Export metrics to external time-series databases"
-description: "Use the exporting engine to send Netdata metrics to popular external time series databases for long-term storage or further analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/export/external-databases.md
--->
-
-# Export metrics to external time-series databases
 
 Netdata allows you to export metrics to external time-series databases with the [exporting
 engine](/exporting/README.md). This system uses a number of **connectors** to initiate connections to [more than
@@ -117,7 +86,7 @@ connector-specific configuration options.
 Read about one possible use case for exporting metrics in our guide: [_Export and visualize Netdata metrics in
 Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md).
 
-### Related reference documentation
+### Related documentation
 
 -   [Exporting engine reference](/exporting/README.md)
 
