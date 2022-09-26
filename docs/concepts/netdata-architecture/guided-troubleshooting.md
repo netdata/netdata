@@ -13,8 +13,8 @@ though neatly arranged into charts and dashboards, sometimes even masters of the
 section we will explain the methods and components Netdata provides, to guide you troubleshoot your infrastructure's
 issues. These components are:
 
-1.The [Anomaly Advisor](#anomaly-advisor)
-2The [metric correlation](#metric-corellation) component
+1. The [Anomaly Advisor](#anomaly-advisor)
+2. The [Metric Correlation](#metric-corellation) component
 
 ## Anomaly Advisor
 
