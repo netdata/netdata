@@ -14,14 +14,8 @@
 #endif
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_DATABASE_CLEANUP_FIRST  (60)
-#define ACLK_DATABASE_ROTATION_DELAY  (180)
-#define ACLK_DATABASE_RETENTION_RETRY (60)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
-#define ACLK_DATABASE_ROTATION_INTERVAL (3600)
-#define ACLK_DELETE_ACK_INTERNAL (600)
 #define ACLK_DELETE_ACK_ALERTS_INTERNAL (86400)
-#define ACLK_AUTO_MARK_SUBMIT_INTERVAL (3600)
-#define ACLK_AUTO_MARK_UPDATED_INTERVAL (1800)
 #define ACLK_SYNC_QUERY_SIZE 512
 
 struct aclk_completion {
@@ -140,12 +134,8 @@ struct aclk_database_worker_config {
     char node_id[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
     char *hostname;                 // hostname to avoid constant lookups
-    uint64_t chart_sequence_id;     // last chart_sequence_id
-    time_t chart_timestamp;         // last chart timestamp
     time_t cleanup_after;           // Start a cleanup after this timestamp
     time_t startup_time;           // When the sync thread started
-    time_t rotation_after;
-    uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
     uint64_t alert_sequence_id; // last alert sequence_id
@@ -161,15 +151,9 @@ struct aclk_database_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct aclk_database_cmdqueue cmd_queue;
-    uint32_t retry_count;
-    int chart_updates;
     int alert_updates;
-    time_t batch_created;
     int node_info_send;
     time_t node_collectors_send;
-    int chart_pending;
-    int chart_reset_count;
-    int retention_running;
     volatile unsigned is_shutting_down;
     volatile unsigned is_orphan;
     struct aclk_database_worker_config  *next;
