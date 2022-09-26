@@ -711,30 +711,8 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
 
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
 
-    buffer_sprintf(sql,"DELETE FROM aclk_chart_%s WHERE date_submitted IS NOT NULL AND "
-        "CAST(date_updated AS INT) < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_INTERNAL);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql,"DELETE FROM aclk_chart_payload_%s WHERE unique_id NOT IN "
-        "(SELECT unique_id FROM aclk_chart_%s) AND unique_id NOT IN (SELECT unique_id FROM aclk_chart_latest_%s);",
-          wc->uuid_str,  wc->uuid_str, wc->uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
     buffer_sprintf(sql,"DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
         "CAST(date_cloud_ack AS INT) < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql,"UPDATE aclk_chart_%s SET status = NULL, date_submitted=unixepoch() WHERE "
-            "date_submitted IS NULL AND CAST(date_created AS INT) < unixepoch()-%d;", wc->uuid_str, ACLK_AUTO_MARK_SUBMIT_INTERVAL);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql,"UPDATE aclk_chart_%s SET date_updated = unixepoch() WHERE date_updated IS NULL"
-                " AND date_submitted IS NOT NULL AND CAST(date_submitted AS INT) < unixepoch()-%d;",
-                wc->uuid_str, ACLK_AUTO_MARK_UPDATED_INTERVAL);
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
