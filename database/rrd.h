@@ -688,9 +688,9 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 
 extern void rrdset_collector_started(void *input, void *output);
 extern void rrdset_collector_finished(void);
-extern void rrdset_collector_add_function(RRDSET *st, const char *name, int (*function)(BUFFER *wb, RRDSET *st, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data);
-extern int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, size_t timeout, const char *chart, const char *name, int argc, char **argv);
-extern int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, const char *chart, const char *name, int argc, char **argv, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
+extern void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data);
+extern int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, int argc, char **argv);
+extern int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, int argc, char **argv, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags

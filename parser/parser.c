@@ -61,7 +61,8 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
         //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_chart_function);
-        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT, pluginsd_chart_function_result);
+        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_chart_function_result_begin);
+        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_END, pluginsd_chart_function_result_end);
     }
 
     if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
@@ -78,7 +79,8 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser->plugins_action->clabel_commit_action    = &pluginsd_clabel_commit_action;
         parser->plugins_action->clabel_action           = &pluginsd_clabel_action;
         //parser->plugins_action->function_action         = &pluginsd_function_action;
-        //parser->plugins_action->function_result_action  = &pluginsd_function_result_action;
+        //parser->plugins_action->function_result_begin_action  = &pluginsd_function_result_begin_action;
+        //parser->plugins_action->function_result_end_action  = &pluginsd_function_result_end_action;
     }
 
     return parser;
