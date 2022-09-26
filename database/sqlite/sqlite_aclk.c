@@ -842,32 +842,3 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
 
     return;
 }
-
-void aclk_data_rotated(void)
-{
-#ifdef ENABLE_ACLK
-
-    if (!aclk_connected)
-        return;
-
-    time_t next_rotation_time = now_realtime_sec()+ACLK_DATABASE_ROTATION_DELAY;
-    rrd_rdlock();
-    RRDHOST *this_host;
-    rrdhost_foreach_read(this_host) {
-        struct aclk_database_worker_config *wc = this_host->dbsync_worker;
-        if (wc)
-            wc->rotation_after = next_rotation_time;
-    }
-    rrd_unlock();
-
-    struct aclk_database_worker_config *tmp = aclk_thread_head;
-
-    uv_mutex_lock(&aclk_async_lock);
-    while (tmp) {
-        tmp->rotation_after = next_rotation_time;
-        tmp = tmp->next;
-    }
-    uv_mutex_unlock(&aclk_async_lock);
-#endif
-    return;
-}
