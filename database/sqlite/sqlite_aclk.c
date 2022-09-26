@@ -482,7 +482,6 @@ void aclk_database_worker(void *arg)
 
     wc->startup_time = now_realtime_sec();
     wc->cleanup_after = wc->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
-    wc->rotation_after = wc->startup_time + ACLK_DATABASE_ROTATION_DELAY;
 
     debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
 
@@ -517,6 +516,9 @@ void aclk_database_worker(void *arg)
                     sql_maint_aclk_sync_database(wc, cmd);
                     if (wc->host == localhost)
                         sql_check_aclk_table_list(wc);
+                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                    cmd.completion = NULL;
+                    (void) aclk_database_enq_cmd_noblock(wc, &cmd);
                     break;
 
                 case ACLK_DATABASE_DELETE_HOST:
@@ -689,9 +691,9 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     strcpy(wc->host_guid, host_guid);
-    wc->chart_updates = 0;
+//    wc->chart_updates = 0;
     wc->alert_updates = 0;
-    wc->retry_count = 0;
+//    wc->retry_count = 0;
     aclk_database_init_cmd_queue(wc);
     aclk_add_worker_thread(wc);
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
