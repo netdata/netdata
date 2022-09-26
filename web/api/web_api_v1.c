@@ -1550,6 +1550,44 @@ int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char 
     return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
 }
 
+int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    int timeout = 0;
+    const char *chart = NULL, *function = NULL, *options = NULL;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "chart"))
+            chart = value;
+
+        else if (!strcmp(name, "function"))
+            function = value;
+
+        else if (!strcmp(name, "options"))
+            options = value;
+
+        else if (!strcmp(name, "timeout"))
+            timeout = (int) strtoul(value, NULL, 0);
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_TEXT_PLAIN;
+
+    return rrdset_call_function_and_wait(host, wb, timeout, chart, function, options);
+}
+
 #ifndef ENABLE_DBENGINE
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host, struct web_client *w, char *url) {
     return HTTP_RESP_NOT_FOUND;
@@ -1689,6 +1727,8 @@ static struct api_command {
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state          },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_metric_correlations },
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_weights },
+
+        { "function",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_function },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_dbengine_stats },
 

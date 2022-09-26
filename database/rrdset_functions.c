@@ -11,7 +11,7 @@ struct rrdset_collector_function {
     bool sync;                      // when true, the function is called synchronously
     STRING *format;                 // the format the function produces
     int timeout;                    // the default timeout of the function
-    int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
+    int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, const char *options, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
     void *collector_data;
     struct rrdset_collector *collector;
 };
@@ -148,7 +148,7 @@ static bool rrdset_functions_conflict_callback(const DICTIONARY_ITEM *item __may
     return changed;
 }
 
-void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, int argc, char **argv, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
+void rrdset_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, RRDSET *st, int timeout, const char *name, const char *options, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
     if(!st->functions) {
         st->functions = dictionary_create(DICT_OPTION_NONE);
         dictionary_register_insert_callback(st->functions, rrdset_functions_insert_callback, st);
@@ -239,7 +239,7 @@ static void rrdset_call_function_signal_when_ready(BUFFER *wb __maybe_unused, in
         rrdset_function_call_wait_free(tmp);
 }
 
-int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, int argc, char **argv) {
+int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, const char *options) {
     int code;
 
     struct timespec tp;
@@ -252,8 +252,11 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
     if(code != HTTP_RESP_OK)
         return code;
 
+    if(timeout <= 0)
+        timeout = rdcf->timeout;
+
     if(rdcf->sync) {
-        code = rdcf->function(wb, st, timeout, name, argc, argv, rdcf->collector_data, rrdset_call_function_signal_when_ready, NULL);
+        code = rdcf->function(wb, st, timeout, name, options, rdcf->collector_data, NULL, NULL);
     }
     else {
         struct rrdset_function_call_wait *tmp = mallocz(sizeof(struct rrdset_function_call_wait));
@@ -267,7 +270,7 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
         int rc = 0;
         bool we_should_free = true;
 
-        code = rdcf->function(tmp->wb, st, timeout, name, argc, argv, rdcf->collector_data, rrdset_call_function_signal_when_ready, &tmp);
+        code = rdcf->function(tmp->wb, st, timeout, name, options, rdcf->collector_data, rrdset_call_function_signal_when_ready, &tmp);
         if (code == 200) {
             while (rc == 0 && !tmp->data_are_ready) {
                 // the mutex is unlocked within pthread_cond_timedwait()
@@ -311,7 +314,7 @@ int rrdset_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const 
     return code;
 }
 
-int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, int argc, char **argv, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *chart, const char *name, const char *options, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
     int code;
 
     RRDSET *st = NULL;
@@ -320,10 +323,12 @@ int rrdset_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const cha
     if(code != HTTP_RESP_OK)
         return code;
 
-    if(rdcf->function(wb, st, timeout, name, argc, argv, rdcf->collector_data, callback, callback_data) == 0) {
-        code = HTTP_RESP_OK;
-    }
-    else {
+    if(timeout <= 0)
+        timeout = rdcf->timeout;
+
+    code = rdcf->function(wb, st, timeout, name, options, rdcf->collector_data, callback, callback_data);
+
+    if(code != HTTP_RESP_OK) {
         error("RRDSET FUNCTIONS: failed to send request to the collector");
         buffer_flush(wb);
         buffer_strcat(wb, "Failed to send request to the collector");

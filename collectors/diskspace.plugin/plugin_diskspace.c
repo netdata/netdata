@@ -168,8 +168,7 @@ int hello_world_function(
     , RRDSET *st __maybe_unused
     , int timeout __maybe_unused
     , const char *name __maybe_unused
-    , int argc __maybe_unused
-    , char **argv __maybe_unused
+    , const char *options __maybe_unused
     , void *collector_data __maybe_unused
     , void (*callback)(BUFFER *wb, int code, void *callback_data)
     , void *callback_data
