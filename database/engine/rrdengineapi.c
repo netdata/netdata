@@ -483,7 +483,8 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     else {
         // TODO we should store the dt of each page in each page
         // now we keep the dt of whatever was before
-        ;
+        if (unlikely(!handle->dt))
+            handle->dt = USEC_PER_SEC;
     }
 
     handle->dt_sec = (time_t)(handle->dt / USEC_PER_SEC);
