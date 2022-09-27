@@ -1251,7 +1251,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
     // Do the cleanup if we are compiling with NETDATA_INTERNAL_CHECKS
     // This affects the reporting of dbengine statistics which are available in real time
     // via the /api/v1/dbengine_stats endpoint
-#ifndef NETDATA_INTERNAL_CHECKS
+#ifndef NETDATA_DBENGINE_FREE
     if (netdata_exit)
         return;
 #endif
