@@ -657,7 +657,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     // convert the socket to a FILE *
-    FILE *fp = fdopen(rpt->fd, "r");
+    FILE *fp = fdopen(rpt->fd, "r+");
     if(!fp) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
         error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);

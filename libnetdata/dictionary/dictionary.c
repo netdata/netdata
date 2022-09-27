@@ -1497,7 +1497,9 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 #endif
 
     // destroy the index
+    dictionary_index_lock_wrlock(dict);
     index_size += hashtable_destroy_unsafe(dict);
+    dictionary_index_lock_unlock(dict);
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *item = dict->items.list;
@@ -1800,6 +1802,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     if(!dict) return 0;
 
+    dict_flag_set(dict, DICT_FLAG_DESTROYED);
     DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict);
 
     size_t referenced_items = dictionary_referenced_items(dict);
