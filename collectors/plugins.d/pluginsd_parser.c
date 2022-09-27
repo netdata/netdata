@@ -568,11 +568,11 @@ PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_
         return PARSER_RC_ERROR;
     }
 
-    int timeout = 10;
+    int timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     if (timeout_s && *timeout_s) {
         timeout = str2i(timeout_s);
         if (unlikely(timeout <= 0))
-            timeout = 10;
+            timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     }
 
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;

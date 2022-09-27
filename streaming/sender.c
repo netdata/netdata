@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "parser/parser.h"
 
 #define WORKER_SENDER_JOB_CONNECT                    0
 #define WORKER_SENDER_JOB_PIPE_READ                  1
@@ -707,18 +708,73 @@ static ssize_t attempt_read(struct sender_state *s) {
     return ret;
 }
 
+struct inflight_stream_function {
+    struct sender_state *sender;
+    STRING *transaction;
+};
+
+void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
+    struct inflight_stream_function *tmp = data;
+
+    sender_start(tmp->sender);
+    buffer_sprintf(tmp->sender->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
+    buffer_fast_strcat(tmp->sender->build, buffer_tostring(wb), buffer_strlen(wb));
+    buffer_strcat(tmp->sender->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+    sender_commit(tmp->sender);
+
+    string_freez(tmp->transaction);
+    buffer_free(wb);
+    freez(tmp);
+}
+
 // This is just a placeholder until the gap filling state machine is inserted
 void execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
-    while( start<end && (newline=strchr(start, '\n')) ) {
-        *newline = 0;
-        info("STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
-        start = newline+1;
+    while( start < end && (newline = strchr(start, '\n')) ) {
+        *newline = '\0';
+
+        internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
+
+        char *words[PLUGINSD_MAX_WORDS] = { NULL };
+        pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+
+        if(words[0] && strcmp(words[0], PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            char *transaction = words[1];
+            char *timeout_s = words[2];
+            char *function = words[3];
+
+            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
+                error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                      rrdhost_hostname(s->host), s->connected_to,
+                      words[0],
+                      transaction?transaction:"(unset)",
+                      timeout_s?timeout_s:"(unset)",
+                      function?function:"(unset)");
+            }
+            else {
+                int timeout = str2i(timeout_s);
+                if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+
+                struct inflight_stream_function *tmp = callocz(1, sizeof(struct inflight_stream_function));
+                tmp->sender = s;
+                tmp->transaction = string_strdupz(transaction);
+                BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
+
+                int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
+
+                if(code != HTTP_RESP_OK)
+                    stream_execute_function_callback(wb, code, tmp);
+            }
+        }
+        else
+            error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, words[0]?words[0]:"(unset)");
+
+        start = newline + 1;
     }
-    if (start<end) {
+    if (start < end) {
         memmove(s->read_buffer, start, end-start);
-        s->read_len = end-start;
+        s->read_len = end - start;
     }
 }
 

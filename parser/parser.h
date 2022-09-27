@@ -103,6 +103,8 @@ typedef struct parser {
     DICTIONARY *inflight_functions;
 } PARSER;
 
+extern int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
+
 PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser);

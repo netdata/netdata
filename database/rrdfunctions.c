@@ -356,10 +356,9 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     code = rdcf->function(wb, timeout, name, rdcf->collector_data, callback, callback_data);
 
     if(code != HTTP_RESP_OK) {
-        error("RRDSET FUNCTIONS: failed to send request to the collector");
+        error("RRDSET FUNCTIONS: failed to send request to the collector with code %d", code);
         buffer_flush(wb);
         buffer_strcat(wb, "Failed to send request to the collector");
-        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     return code;

@@ -3,7 +3,7 @@
 #include "parser.h"
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-static inline int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char))
+inline int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char))
 {
     const char *s = str, *keyword_start;
 
