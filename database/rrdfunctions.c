@@ -1,7 +1,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-#define MAX_FUNCTION_LENGTH (16384 - 1024)
+#define MAX_FUNCTION_LENGTH PLUGINSD_LINE_MAX
 
 static unsigned char functions_allowed_chars[256] = {
     [0] = '\0', //
