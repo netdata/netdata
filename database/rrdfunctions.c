@@ -3,8 +3,268 @@
 
 #define MAX_FUNCTION_LENGTH (16384 - 1024)
 
-// ----------------------------------------------------------------------------
-// RRDSET - collector info and rrdset functions
+static unsigned char functions_allowed_chars[256] = {
+    [0] = '\0', //
+    [1] = '_', //
+    [2] = '_', //
+    [3] = '_', //
+    [4] = '_', //
+    [5] = '_', //
+    [6] = '_', //
+    [7] = '_', //
+    [8] = '_', //
+    [9] = '_', //
+    [10] = '_', //
+    [11] = '_', //
+    [12] = '_', //
+    [13] = '_', //
+    [14] = '_', //
+    [15] = '_', //
+    [16] = '_', //
+    [17] = '_', //
+    [18] = '_', //
+    [19] = '_', //
+    [20] = '_', //
+    [21] = '_', //
+    [22] = '_', //
+    [23] = '_', //
+    [24] = '_', //
+    [25] = '_', //
+    [26] = '_', //
+    [27] = '_', //
+    [28] = '_', //
+    [29] = '_', //
+    [30] = '_', //
+    [31] = '_', //
+    [32] = ' ', // SPACE keep
+    [33] = '_', // !
+    [34] = '_', // "
+    [35] = '_', // #
+    [36] = '_', // $
+    [37] = '_', // %
+    [38] = '_', // &
+    [39] = '_', // '
+    [40] = '(', // ( keep
+    [41] = ')', // ) keep
+    [42] = '_', // *
+    [43] = '_', // +
+    [44] = ',', // , keep
+    [45] = '-', // - keep
+    [46] = '.', // . keep
+    [47] = '/', // / keep
+    [48] = '0', // 0 keep
+    [49] = '1', // 1 keep
+    [50] = '2', // 2 keep
+    [51] = '3', // 3 keep
+    [52] = '4', // 4 keep
+    [53] = '5', // 5 keep
+    [54] = '6', // 6 keep
+    [55] = '7', // 7 keep
+    [56] = '8', // 8 keep
+    [57] = '9', // 9 keep
+    [58] = ':', // : keep
+    [59] = ':', // ; convert ; to :
+    [60] = '_', // <
+    [61] = ':', // = convert = to :
+    [62] = '_', // >
+    [63] = '_', // ?
+    [64] = '_', // @
+    [65] = 'A', // A keep
+    [66] = 'B', // B keep
+    [67] = 'C', // C keep
+    [68] = 'D', // D keep
+    [69] = 'E', // E keep
+    [70] = 'F', // F keep
+    [71] = 'G', // G keep
+    [72] = 'H', // H keep
+    [73] = 'I', // I keep
+    [74] = 'J', // J keep
+    [75] = 'K', // K keep
+    [76] = 'L', // L keep
+    [77] = 'M', // M keep
+    [78] = 'N', // N keep
+    [79] = 'O', // O keep
+    [80] = 'P', // P keep
+    [81] = 'Q', // Q keep
+    [82] = 'R', // R keep
+    [83] = 'S', // S keep
+    [84] = 'T', // T keep
+    [85] = 'U', // U keep
+    [86] = 'V', // V keep
+    [87] = 'W', // W keep
+    [88] = 'X', // X keep
+    [89] = 'Y', // Y keep
+    [90] = 'Z', // Z keep
+    [91] = '_', // [
+    [92] = '/', // backslash convert \ to /
+    [93] = '_', // ]
+    [94] = '_', // ^
+    [95] = '_', // _ keep
+    [96] = '_', // `
+    [97] = 'a', // a keep
+    [98] = 'b', // b keep
+    [99] = 'c', // c keep
+    [100] = 'd', // d keep
+    [101] = 'e', // e keep
+    [102] = 'f', // f keep
+    [103] = 'g', // g keep
+    [104] = 'h', // h keep
+    [105] = 'i', // i keep
+    [106] = 'j', // j keep
+    [107] = 'k', // k keep
+    [108] = 'l', // l keep
+    [109] = 'm', // m keep
+    [110] = 'n', // n keep
+    [111] = 'o', // o keep
+    [112] = 'p', // p keep
+    [113] = 'q', // q keep
+    [114] = 'r', // r keep
+    [115] = 's', // s keep
+    [116] = 't', // t keep
+    [117] = 'u', // u keep
+    [118] = 'v', // v keep
+    [119] = 'w', // w keep
+    [120] = 'x', // x keep
+    [121] = 'y', // y keep
+    [122] = 'z', // z keep
+    [123] = '_', // {
+    [124] = '_', // |
+    [125] = '_', // }
+    [126] = '_', // ~
+    [127] = '_', //
+    [128] = '_', //
+    [129] = '_', //
+    [130] = '_', //
+    [131] = '_', //
+    [132] = '_', //
+    [133] = '_', //
+    [134] = '_', //
+    [135] = '_', //
+    [136] = '_', //
+    [137] = '_', //
+    [138] = '_', //
+    [139] = '_', //
+    [140] = '_', //
+    [141] = '_', //
+    [142] = '_', //
+    [143] = '_', //
+    [144] = '_', //
+    [145] = '_', //
+    [146] = '_', //
+    [147] = '_', //
+    [148] = '_', //
+    [149] = '_', //
+    [150] = '_', //
+    [151] = '_', //
+    [152] = '_', //
+    [153] = '_', //
+    [154] = '_', //
+    [155] = '_', //
+    [156] = '_', //
+    [157] = '_', //
+    [158] = '_', //
+    [159] = '_', //
+    [160] = '_', //
+    [161] = '_', //
+    [162] = '_', //
+    [163] = '_', //
+    [164] = '_', //
+    [165] = '_', //
+    [166] = '_', //
+    [167] = '_', //
+    [168] = '_', //
+    [169] = '_', //
+    [170] = '_', //
+    [171] = '_', //
+    [172] = '_', //
+    [173] = '_', //
+    [174] = '_', //
+    [175] = '_', //
+    [176] = '_', //
+    [177] = '_', //
+    [178] = '_', //
+    [179] = '_', //
+    [180] = '_', //
+    [181] = '_', //
+    [182] = '_', //
+    [183] = '_', //
+    [184] = '_', //
+    [185] = '_', //
+    [186] = '_', //
+    [187] = '_', //
+    [188] = '_', //
+    [189] = '_', //
+    [190] = '_', //
+    [191] = '_', //
+    [192] = '_', //
+    [193] = '_', //
+    [194] = '_', //
+    [195] = '_', //
+    [196] = '_', //
+    [197] = '_', //
+    [198] = '_', //
+    [199] = '_', //
+    [200] = '_', //
+    [201] = '_', //
+    [202] = '_', //
+    [203] = '_', //
+    [204] = '_', //
+    [205] = '_', //
+    [206] = '_', //
+    [207] = '_', //
+    [208] = '_', //
+    [209] = '_', //
+    [210] = '_', //
+    [211] = '_', //
+    [212] = '_', //
+    [213] = '_', //
+    [214] = '_', //
+    [215] = '_', //
+    [216] = '_', //
+    [217] = '_', //
+    [218] = '_', //
+    [219] = '_', //
+    [220] = '_', //
+    [221] = '_', //
+    [222] = '_', //
+    [223] = '_', //
+    [224] = '_', //
+    [225] = '_', //
+    [226] = '_', //
+    [227] = '_', //
+    [228] = '_', //
+    [229] = '_', //
+    [230] = '_', //
+    [231] = '_', //
+    [232] = '_', //
+    [233] = '_', //
+    [234] = '_', //
+    [235] = '_', //
+    [236] = '_', //
+    [237] = '_', //
+    [238] = '_', //
+    [239] = '_', //
+    [240] = '_', //
+    [241] = '_', //
+    [242] = '_', //
+    [243] = '_', //
+    [244] = '_', //
+    [245] = '_', //
+    [246] = '_', //
+    [247] = '_', //
+    [248] = '_', //
+    [249] = '_', //
+    [250] = '_', //
+    [251] = '_', //
+    [252] = '_', //
+    [253] = '_', //
+    [254] = '_', //
+    [255] = '_'  //
+};
+
+static inline size_t sanitize_function_text(char *dst, const char *src, size_t dst_len) {
+    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_len, functions_allowed_chars, true, "");
+}
 
 // we keep a dictionary per RRDSET with these functions
 // the dictionary is created on demand (only when a function is added to an RRDSET)
@@ -176,6 +436,9 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
     if(!st->functions_view)
         st->functions_view = dictionary_create_view(st->rrdhost->functions);
 
+    char key[PLUGINSD_LINE_MAX + 1];
+    sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
+
     struct rrd_collector_function tmp = {
         .sync = sync,
         .timeout = timeout,
@@ -184,13 +447,13 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
         .collector_data = collector_data,
         .help = string_strdupz(help),
     };
-    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(st->rrdhost->functions, name, &tmp, sizeof(tmp));
-    dictionary_view_set(st->functions_view, name, item);
+    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(st->rrdhost->functions, key, &tmp, sizeof(tmp));
+    dictionary_view_set(st->functions_view, key, item);
     dictionary_acquired_item_release(st->rrdhost->functions, item);
 }
 
 struct rrd_function_call_wait {
-    BUFFER *wb;
+    BUFFER *destination_wb;
     bool free_with_signal;
     bool data_are_ready;
     netdata_mutex_t mutex;
@@ -199,7 +462,6 @@ struct rrd_function_call_wait {
 };
 
 static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
-    buffer_free(tmp->wb);
     pthread_cond_destroy(&tmp->cond);
     netdata_mutex_destroy(&tmp->mutex);
     freez(tmp);
@@ -244,7 +506,7 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
     return HTTP_RESP_OK;
 }
 
-static void rrd_call_function_signal_when_ready(BUFFER *wb __maybe_unused, int code, void *callback_data) {
+static void rrd_call_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, int code, void *callback_data) {
     struct rrd_function_call_wait *tmp = callback_data;
     bool we_should_free = false;
 
@@ -253,6 +515,11 @@ static void rrd_call_function_signal_when_ready(BUFFER *wb __maybe_unused, int c
     // since we got the mutex,
     // the waiting thread is either in pthread_cond_timedwait()
     // or gave up and left.
+
+    if(tmp->destination_wb)
+        buffer_fast_strcat(tmp->destination_wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
+
+    buffer_free(temp_wb);
 
     tmp->code = code;
     tmp->data_are_ready = true;
@@ -276,7 +543,10 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     tp.tv_sec += (time_t)timeout;
 
     struct rrd_collector_function *rdcf = NULL;
-    code = rrd_call_function_prepare(host, wb, name, &rdcf);
+
+    char key[PLUGINSD_LINE_MAX + 1];
+    sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
+    code = rrd_call_function_prepare(host, wb, key, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 
@@ -284,18 +554,19 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
         timeout = rdcf->timeout;
 
     if(rdcf->sync) {
-        code = rdcf->function(wb, timeout, name, rdcf->collector_data, NULL, NULL);
+        code = rdcf->function(wb, timeout, key, rdcf->collector_data, NULL, NULL);
     }
     else {
         struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
-        tmp->wb = buffer_create(100);
+        tmp->destination_wb = wb;
         tmp->free_with_signal = false;
         tmp->data_are_ready = false;
         netdata_mutex_init(&tmp->mutex);
         pthread_cond_init(&tmp->cond, NULL);
 
         bool we_should_free = true;
-        code = rdcf->function(tmp->wb, timeout, name, rdcf->collector_data, rrd_call_function_signal_when_ready, &tmp);
+        BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1); // we need it because we may give up on it
+        code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, &tmp);
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
 
@@ -308,7 +579,6 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
             if (tmp->data_are_ready) {
                 // we have a response
-                buffer_fast_strcat(wb, buffer_tostring(tmp->wb), buffer_strlen(tmp->wb));
                 code = tmp->code;
             }
             else if (rc == ETIMEDOUT) {
@@ -316,6 +586,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 // we will go away and let the callback free the structure
                 buffer_flush(wb);
                 buffer_strcat(wb, "Timeout");
+                tmp->destination_wb = NULL;
                 tmp->free_with_signal = true;
                 we_should_free = false;
                 code = HTTP_RESP_GATEWAY_TIMEOUT;
@@ -330,6 +601,8 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
             netdata_mutex_unlock(&tmp->mutex);
         }
         else {
+            buffer_free(temp_wb);
+
             error("RRDSET FUNCTIONS: failed to send request to the collector");
             buffer_flush(wb);
             buffer_strcat(wb, "Failed to send request to the collector");
@@ -346,14 +619,16 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     int code;
 
     struct rrd_collector_function *rdcf = NULL;
-    code = rrd_call_function_prepare(host, wb, name, &rdcf);
+    char key[PLUGINSD_LINE_MAX + 1];
+    sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
+    code = rrd_call_function_prepare(host, wb, key, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 
     if(timeout <= 0)
         timeout = rdcf->timeout;
 
-    code = rdcf->function(wb, timeout, name, rdcf->collector_data, callback, callback_data);
+    code = rdcf->function(wb, timeout, key, rdcf->collector_data, callback, callback_data);
 
     if(code != HTTP_RESP_OK) {
         error("RRDSET FUNCTIONS: failed to send request to the collector with code %d", code);

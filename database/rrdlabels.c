@@ -369,7 +369,7 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 
 }
 
-static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty) {
+size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty) {
     if(unlikely(!dst_size)) return 0;
     if(unlikely(!src || !*src)) {
         strncpyz((char *)dst, empty, dst_size);
@@ -463,11 +463,12 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
 }
 
 static inline size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "");
+    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "");
 }
 
 static inline size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[none]");
+    return text_sanitize(
+        (unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[none]");
 }
 
 // ----------------------------------------------------------------------------

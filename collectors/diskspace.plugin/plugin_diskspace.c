@@ -164,7 +164,7 @@ static void free_basic_mountinfo_list(struct basic_mountinfo *root)
 
 // TODO - remove before merging
 int hello_world_function(
-      BUFFER *wb
+      BUFFER *destination_wb
     , int timeout __maybe_unused
     , const char *name __maybe_unused
     , void *collector_data __maybe_unused
@@ -172,10 +172,10 @@ int hello_world_function(
     , void *callback_data
     ) {
 
-    buffer_sprintf(wb, "Hello World %ld\n", now_realtime_sec());
+    buffer_sprintf(destination_wb, "Hello World %ld\n", now_realtime_sec());
 
     if(callback)
-        callback(wb, 200, callback_data);
+        callback(destination_wb, 200, callback_data);
 
     return 200;
 }

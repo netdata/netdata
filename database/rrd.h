@@ -216,6 +216,8 @@ typedef enum rrdlabel_source {
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT)
 
+extern size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty);
+
 extern DICTIONARY *rrdlabels_create(void);
 extern void rrdlabels_destroy(DICTIONARY *labels_dict);
 extern void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);

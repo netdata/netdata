@@ -479,7 +479,7 @@ disable:
 
 struct inflight_function {
     int code;
-    BUFFER *wb;
+    BUFFER *destination_wb;
     int timeout;
     STRING *function;
     void (*callback)(BUFFER *wb, int code, void *callback_data);
@@ -505,22 +505,22 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     struct inflight_function *pf = new_func;
 
     error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
-    pf->callback(pf->wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
+    pf->callback(pf->destination_wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
     string_freez(pf->function);
 
     return false;
 }
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = func;
-    pf->callback(pf->wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
+    pf->callback(pf->destination_wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
     string_freez(pf->function);
 }
 
-static int pluginsd_execute_function_callback(BUFFER *wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
     PARSER  *parser = collector_data;
 
     struct inflight_function tmp = {
-        .wb = wb,
+        .destination_wb = destination_wb,
         .timeout = timeout,
         .function = string_strdupz(function),
         .callback = callback,
@@ -533,6 +533,8 @@ static int pluginsd_execute_function_callback(BUFFER *wb, int timeout, const cha
     char key[UUID_STR_LEN];
     uuid_unparse_lower(uuid, key);
 
+    // if there is any error, our dictionary callbacks will call the caller callback to notify
+    // the caller about the error - no need for error handling here.
     dictionary_set(parser->inflight_functions, key, &tmp, sizeof(struct inflight_function));
 
     return HTTP_RESP_OK;
@@ -605,7 +607,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
         return PARSER_RC_ERROR;
     }
 
-    int code = str2i(status && *status ? status : "500");
+    int code = str2i(status && *status ? status : "0");
     if (code <= 0)
         code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -617,10 +619,8 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
         return PARSER_RC_ERROR;
     }
 
-    buffer_flush(pf->wb);
     pf->code = code;
-
-    parser->defer.response = pf->wb;
+    parser->defer.response = pf->destination_wb;
     parser->defer.action = pluginsd_function_result_end;
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
     parser->defer.action_data = string_strdupz(key);
