@@ -46,7 +46,7 @@
 #define ENABLE_HTTPS 1
 #cmakedefine01 HAVE_X509_VERIFY_PARAM_set1_host
 
-#define ENABLE_ACLK
+#cmakedefine ENABLE_ACLK
 #define ENABLE_DBENGINE
 #define ENABLE_COMPRESSION // pkg_check_modules(LIBLZ4 REQUIRED liblz4)
 #cmakedefine ENABLE_APPS_PLUGIN
