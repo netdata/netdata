@@ -340,7 +340,7 @@ inline int parser_action(PARSER *parser, char *input)
         while ((action_function = *action_function_list) != NULL) {
                 rc = action_function(words, parser->user, parser->plugins_action);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
-                    internal_error(true, "action_function() failed with rc = %d", rc);
+                    internal_error(true, "action_function() failed with rc = %u", rc);
                     break;
                 }
                 action_function_list++;

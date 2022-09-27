@@ -367,6 +367,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     bool changed = false;
 
     if(rdcf->collector != thread_rrd_collector) {
+        internal_error(true, "Switching collector for function '%s'", dictionary_acquired_item_name(item));
         struct rrd_collector *old_rdc = rdcf->collector;
         rdcf->collector = rrd_collector_acquire();
         rrd_collector_release(old_rdc);

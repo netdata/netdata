@@ -45,7 +45,6 @@ typedef struct {
     char *kernel_version;
 } stream_encoded_t;
 
-#define COMPRESSION_MAX_MSG_SIZE 0x4000
 #ifdef ENABLE_COMPRESSION
 struct compressor_state {
     char *compression_result_buffer;
@@ -100,7 +99,7 @@ struct sender_state {
     netdata_mutex_t mutex;
     struct circular_buffer *buffer;
     BUFFER *build;
-    char read_buffer[512];
+    char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
     int32_t version;
 #ifdef ENABLE_COMPRESSION
@@ -130,7 +129,7 @@ struct receiver_state {
     int update_every;
     uint32_t stream_version;
     time_t last_msg_t;
-    char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
+    char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)

@@ -716,11 +716,14 @@ struct inflight_stream_function {
 void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
     struct inflight_stream_function *tmp = data;
 
-    sender_start(tmp->sender);
-    buffer_sprintf(tmp->sender->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
-    buffer_fast_strcat(tmp->sender->build, buffer_tostring(wb), buffer_strlen(wb));
-    buffer_strcat(tmp->sender->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
-    sender_commit(tmp->sender);
+    internal_error(true, "Sending response to parent...");
+
+    struct sender_state *s = tmp->sender;
+    sender_start(s);
+    buffer_sprintf(s->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
+    buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
+    buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+    sender_commit(s);
 
     string_freez(tmp->transaction);
     buffer_free(wb);

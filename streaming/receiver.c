@@ -355,21 +355,46 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
  */
-static char *receiver_next_line(struct receiver_state *r, int *pos) {
-    int start = *pos, scan = *pos;
-    if (scan >= r->read_len) {
+static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t buffer_length, size_t *pos) {
+    size_t start = *pos;
+
+    char *ss = &r->read_buffer[start];
+    char *se = &r->read_buffer[r->read_len];
+    char *ds = buffer;
+    char *de = &buffer[buffer_length - 2];
+
+    if(ss >= se) {
         r->read_len = 0;
         return NULL;
     }
-    while (scan < r->read_len && r->read_buffer[scan] != '\n')
-        scan++;
-    if (scan < r->read_len && r->read_buffer[scan] == '\n') {
-        *pos = scan+1;
-        r->read_buffer[scan] = 0;
-        return &r->read_buffer[start];
+
+    // copy all bytes to buffer
+    while(ss < se && ds < de && *ss != '\n')
+        *ds++ = *ss++;
+
+    // if we have a newline, return the buffer
+    if(ss < se && ds < de && *ss == '\n') {
+        // newline found in the r->read_buffer
+
+        *ds++ = *ss++; // copy the newline too
+        *ds = '\0';
+
+        *pos = ss - r->read_buffer;
+        return buffer;
     }
+
+    // if the destination is full, oops!
+    if(ds == de) {
+        error("STREAM: received line exceed %u bytes. Truncating it.", PLUGINSD_LINE_MAX);
+        *ds = '\0';
+        *pos = ss - r->read_buffer;
+        return buffer;
+    }
+
+    // no newline found in the r->read_buffer
+    // move everything to the beginning
     memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
-    r->read_len -= start;
+    r->read_len -= (int)start;
     return NULL;
 }
 
@@ -408,12 +433,12 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         rpt->decompressor->reset(rpt->decompressor);
 #endif
 
+    char buffer[PLUGINSD_LINE_MAX + 2];
     do {
         if(receiver_read(rpt, fp)) break;
 
-        int pos = 0;
-        char *line;
-        while ((line = receiver_next_line(rpt, &pos))) {
+        size_t pos = 0;
+        while(receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &pos)) {
             if(unlikely(netdata_exit)) {
                 internal_error(true, "exiting...");
                 goto done;
@@ -422,7 +447,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
                 internal_error(true, "parser shutdown...");
                 goto done;
             }
-            if (unlikely(parser_action(parser,  line))) {
+            if (unlikely(parser_action(parser,  buffer))) {
                 internal_error(true, "parser_action() failed...");
                 goto done;
             }
