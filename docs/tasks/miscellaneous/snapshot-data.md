@@ -8,112 +8,56 @@ learn_rel_path: "miscellaneous"
 learn_docs_purpose: "Instructions on how to take snapshots of data"
 -->
 
-**********************************************************************
-Template:
-
-Small intro, give some context to the user
-
-## Prerequisite
-
-Unordered list of what you will need. 
-
-## Steps
-
-Exact list of steps the user must follow
-
-## Expected result
-
-What you expect to see when you complete the steps above
-
-## Example
-
-Example configuration/actions of the task
-
-## Related topics
-
-List of reference docs user needs to be aware of.
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d---
-title: "Import, export, and print a snapshot"
-description: "Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata."
-type: how-to
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboard/import-export-print-snapshot.mdx
----
-
-# Import, export, and print snapshots
-
 Netdata can export snapshots of the contents of your dashboard at a given time, which you can then import into any other
 node running Netdata. Or, you can create a print-ready version of your dashboard to save to PDF or actually print to
 paper.
 
-Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered a warning alarm while you were asleep. In the morning, you can [select the
-timeframe](/docs/dashboard/visualization-date-and-time-controls.mdx) when the alarm triggered, export a snapshot, and send it to a
+Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered
+a warning alarm while you were asleep. In the morning, you can select the timeframe when the alarm triggered, export a
+snapshot, and send it to a colleague for further analysis.
 
-colleague for further analysis.
+## Prerequisites
 
-Or, send the Netdata team a snapshot of your dashboard when [filing a bug
-report](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) on
-GitHub.
+- A node with the Agent installed, and access to that node's local dashboard
 
-![The export, import, and print
-buttons](https://user-images.githubusercontent.com/1153921/114218399-360fb600-991e-11eb-8dea-fabd2bffc5b3.gif)
+## Export a snapshot
+
+To export a snapshot:
+
+1. Pan/zoom any chart to an appropriate _visible timeframe_. The export snapshot will only
+   contain the metrics you see in charts, so choose the most relevant timeframe.
+2. Click on the **export** icon in the top panel.
+3. Select the metrics resolution to export. The default is 1-second, equal to how often Netdata collects and stores
+   metrics. Lowering the resolution will reduce the number of data points, and thus the snapshot's overall size.
+4. Edit the snapshot file name and select your desired compression method. Click on **Export**. When the export is
+   complete, your browser will prompt you to save the `.snapshot` file to your machine.
 
 ## Import a snapshot
 
-To import a snapshot, click on the **import** icon ![Import
-icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/upload.svg)
-in the top panel.
+To import a snapshot:
 
-Select the Netdata snapshot file to import. Once the file is loaded, the modal updates with information about the
-snapshot and the system from which it was taken. Click **Import** to begin to process.
+1. Click on the **import** icon in the top panel.
+2. Select the Netdata snapshot file to import.
+3. Once the file is loaded, the modal updates with information about the snapshot and the system from which it was
+   taken.
+4. Click **Import** to begin the processing.
 
 Netdata takes the data embedded inside the snapshot and re-creates a static replica on your dashboard. When the import
-finishes, you're free to move around and examine the charts. 
+finishes, you're free to move around and examine the charts.
 
-Some caveats and tips to keep in mind:
+:::note
 
 - Only metrics in the export timeframe are available to you. If you zoom out or pan through time, you'll see the
   beginning and end of the snapshot.
 - Charts won't update with new information, as you're looking at a static replica, not the live dashboard.
 - The import is only temporary. Reload your browser tab to return to your node's real-time dashboard.
 
-## Export a snapshot
-
-To export a snapshot, first pan/zoom any chart to an appropriate _visible timeframe_. The export snapshot will only
-contain the metrics you see in charts, so choose the most relevant timeframe.
-
-Next, click on the **export** icon ![Export
-icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/download.svg)
-in the top panel.
-
-Select the metrics resolution to export. The default is 1-second, equal to how often Netdata collects and stores
-metrics. Lowering the resolution will reduce the number of data points, and thus the snapshot's overall size.
-
-Edit the snapshot file name and select your desired compression method. Click on **Export**. When the export is
-complete, your browser will prompt you to save the `.snapshot` file to your machine.
+:::
 
 ## Print a snapshot
 
-To print a snapshot, click on the **print** icon ![Import
-icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/print.svg)
-in the top panel.
+To print a snapshot:
 
-When you click **Print**, Netdata opens a new window to render every chart. This might take some time. When finished,
-Netdata opens a browser print dialog for you to save to PDF or print.
-
-## What's next?
-
-Now that you understand snapshots, now is a good time to delve deeper into some of the dashboard's lesser-known
-features, such as [customization](/docs/dashboard/customize.mdx) or [building new, custom
-dashboards](/web/gui/custom/README.md).
-
-### Further reading & related information
-
-- Dashboard
-  - [How the dashboard works](/docs/dashboard/how-dashboard-works.mdx)
-  - [Interact with charts](/docs/dashboard/interact-charts.mdx)
-  - [Chart dimensions, contexts, and families](/docs/dashboard/dimensions-contexts-families.mdx)
-  - [Select timeframes to visualize](/docs/dashboard/visualization-date-and-time-controls.mdx)
-  - **[Import, export, and print a snapshot](/docs/dashboard/import-export-print-snapshot.mdx)**
-  - [Customize the standard dashboard](/docs/dashboard/customize.mdx)*******************************************************************************
+1. Click on the **print** icon in the top panel.
+2. When you click **Print**, Netdata opens a new window to render every chart. This might take some time. When finished,
+   Netdata opens a browser print dialog for you to save to PDF or print.
