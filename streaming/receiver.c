@@ -292,8 +292,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
         size_t available = sizeof(r->read_buffer) - r->read_len;
         if (available) {
             size_t len = r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, available);
-            if (!len)
+            if (!len) {
+                internal_error(true, "decompressor returned zero length");
                 return 1;
+            }
 
             r->read_len += len;
         }
@@ -301,8 +303,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     }
 
     int ret = 0;
-    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret))
+    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret)) {
+        internal_error(true, "read_stream() failed (1).");
         return 1;
+    }
     
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
@@ -320,8 +324,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     // we're unable to decompress incomplete block
     char compressed[bytes_to_read];
     do {
-        if (read_stream(r, fp, compressed, bytes_to_read, &ret))
+        if (read_stream(r, fp, compressed, bytes_to_read, &ret)) {
+            internal_error(true, "read_stream() failed (2).");
             return 1;
+        }
 
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
@@ -334,8 +340,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
 
     // Decompress
     size_t bytes_to_parse = r->decompressor->decompress(r->decompressor);
-    if (!bytes_to_parse)
+    if (!bytes_to_parse) {
+        internal_error(true, "no bytes to parse.");
         return 1;
+    }
 
     // Fill read buffer with decompressed data
     r->read_len = r->decompressor->get(r->decompressor, r->read_buffer, sizeof(r->read_buffer));
@@ -400,15 +408,26 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         rpt->decompressor->reset(rpt->decompressor);
 #endif
 
-    do{
-        if (receiver_read(rpt, fp))
-            break;
+    do {
+        if(receiver_read(rpt, fp)) break;
+
         int pos = 0;
         char *line;
         while ((line = receiver_next_line(rpt, &pos))) {
-            if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
+            if(unlikely(netdata_exit)) {
+                internal_error(true, "exiting...");
                 goto done;
+            }
+            if(unlikely(rpt->shutdown)) {
+                internal_error(true, "parser shutdown...");
+                goto done;
+            }
+            if (unlikely(parser_action(parser,  line))) {
+                internal_error(true, "parser_action() failed...");
+                goto done;
+            }
         }
+
         rpt->last_msg_t = now_realtime_sec();
     }
     while(!netdata_exit);
@@ -657,7 +676,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     // convert the socket to a FILE *
-    FILE *fp = fdopen(rpt->fd, "r+");
+    FILE *fp = fdopen(rpt->fd, "a+");
     if(!fp) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
         error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
