@@ -624,6 +624,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
     parser->defer.action = pluginsd_function_result_end;
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
     parser->defer.action_data = string_strdupz(key);
+    parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
     return PARSER_RC_OK;
 }

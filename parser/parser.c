@@ -289,7 +289,15 @@ inline int parser_action(PARSER *parser, char *input)
             return 0;
         }
         else if(has_keyword) {
+            // call the action
             parser->defer.action(parser, parser->defer.action_data);
+
+            // empty everything
+            parser->defer.action = NULL;
+            parser->defer.action_data = NULL;
+            parser->defer.end_keyword = NULL;
+            parser->defer.response = NULL;
+            parser->flags &= ~PARSER_DEFER_UNTIL_KEYWORD;
         }
         return 0;
     }
