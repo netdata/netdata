@@ -3247,6 +3247,9 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 , update_every
         );
 
+        // TODO - remove me before merging!
+        fprintf(stdout, "FUNCTION text 10 \"top\" \"run the top command, add params if you like\"\n");
+
         fprintf(stdout,
                 "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
                 "DIMENSION utime '' absolute 1 %2$llu\n"
@@ -4134,6 +4137,68 @@ static int check_capabilities() {
 }
 #endif
 
+netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+
+void *reader_main(void *arg __maybe_unused) {
+    char buffer[PLUGINSD_LINE_MAX + 1];
+
+    while(fgets(buffer, PLUGINSD_LINE_MAX, stdin)) {
+
+        char *words[PLUGINSD_MAX_WORDS] = { NULL };
+        pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+
+        if(words[0] && strcmp(words[0], PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            char *transaction = words[1];
+            char *timeout_s = words[2];
+            char *function = words[3];
+
+            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
+                error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                      words[0],
+                      transaction?transaction:"(unset)",
+                      timeout_s?timeout_s:"(unset)",
+                      function?function:"(unset)");
+            }
+            else {
+                int timeout = str2i(timeout_s);
+                if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+
+                internal_error(true, "FUNCTION '%s' with transaction id '%s' received", function, transaction);
+
+                netdata_mutex_lock(&mutex);
+                fprintf(stdout, "FUNCTION_RESULT_BEGIN %s %d\n", transaction, 200);
+
+                // TODO - remove before merging!
+                
+                pid_t pid;
+                FILE *fpin;
+                FILE *fpout = netdata_popen("top -b -d 0.5 -n 1", &pid, &fpin);
+
+                if(fpout) {
+                    while (fgets(buffer, PLUGINSD_LINE_MAX, fpout))
+                        fprintf(stdout, "%s", buffer);
+                }
+                else
+                    fprintf(stderr, "Cannot execute top");
+
+                netdata_pclose(fpin, fpout, pid);
+//                fprintf(stdout, "Welcome to app.plugin functions!\n");
+//                fprintf(stdout, "Now is %ld.\n", now_realtime_sec());
+//                fprintf(stdout, "That's all for now...\n");
+                fprintf(stdout, "\nFUNCTION_RESULT_END\n");
+                fflush(stdout);
+                netdata_mutex_unlock(&mutex);
+            }
+        }
+        else
+            error("Received unknown command: %s", words[0]?words[0]:"(unset)");
+    }
+
+    exit(1);
+
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
 
@@ -4229,11 +4294,16 @@ int main(int argc, char **argv) {
 
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
 
+    netdata_thread_t reader_thread;
+    netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
+    netdata_mutex_lock(&mutex);
+
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(;1; global_iterations_counter++) {
+        netdata_mutex_unlock(&mutex);
 
 #ifdef NETDATA_PROFILING
 #warning "compiling for profiling"
@@ -4244,16 +4314,22 @@ int main(int argc, char **argv) {
 #else
         usec_t dt = heartbeat_next(&hb, step);
 #endif
+        netdata_mutex_lock(&mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
-        if (unlikely(poll(&pollfd, 1, 0) < 0))
+        if (unlikely(poll(&pollfd, 1, 0) < 0)) {
+            netdata_mutex_unlock(&mutex);
             fatal("Cannot check if a pipe is available");
-        if (unlikely(pollfd.revents & POLLERR))
+        }
+        if (unlikely(pollfd.revents & POLLERR)) {
+            netdata_mutex_unlock(&mutex);
             fatal("Cannot write to a pipe");
+        }
 
         if(!collect_data_for_all_processes()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
+            netdata_mutex_unlock(&mutex);
             exit(1);
         }
 

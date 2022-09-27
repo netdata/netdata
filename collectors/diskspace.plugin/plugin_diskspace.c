@@ -634,7 +634,7 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
-    rrd_collector_started(NULL, NULL);
+    rrd_collector_started();
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 

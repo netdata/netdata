@@ -496,10 +496,17 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     pf->code = HTTP_RESP_BACKEND_FETCH_FAILED;
 
     // send the command to the plugin
-    fprintf(fp, "FUNCTION %s %d \"%s\"\n",
+    int ret = fprintf(fp, "FUNCTION %s %d \"%s\"\n",
             dictionary_acquired_item_name(item),
             pf->timeout,
             string2str(pf->function));
+
+    if(ret < 0)
+        error("failed to send function to plugin, error %d", ret);
+
+    fflush(fp);
+
+    internal_error(true, "FUNCTION '%s' with transaction '%s' is sent to plugin (%d bytes, fd %d)", string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp));
 }
 static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = new_func;
@@ -512,12 +519,16 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
 }
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = func;
-    pf->callback(pf->destination_wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
+    pf->callback(pf->destination_wb, pf->code, pf->callback_data);
     string_freez(pf->function);
 }
 
+// this is the function that is called from
+// rrd_call_function_and_wait() and rrd_call_function_async()
 static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
     PARSER  *parser = collector_data;
+
+    internal_error(true, "FUNCTION '%s' run under plugins.d", function);
 
     struct inflight_function tmp = {
         .destination_wb = destination_wb,
@@ -621,8 +632,8 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 
     pf->code = code;
     parser->defer.response = pf->destination_wb;
-    parser->defer.action = pluginsd_function_result_end;
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
+    parser->defer.action = pluginsd_function_result_end;
     parser->defer.action_data = string_strdupz(key);
     parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
@@ -912,20 +923,28 @@ static void pluginsd_process_thread_cleanup(void *ptr) {
 
 // New plugins.d parser
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input __maybe_unused, FILE *fp_plugin_output, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
     int enabled = cd->enabled;
 
-    if (!fp_plugin_output || !enabled) {
+    if (!fp_plugin_input || !fp_plugin_output || !enabled) {
         cd->enabled = 0;
         return 0;
     }
 
-    if (unlikely(fileno(fp_plugin_output) == -1)) {
-        error("file descriptor given is not a valid stream");
+    if (unlikely(fileno(fp_plugin_input) == -1)) {
+        error("input file descriptor given is not a valid stream");
         cd->serial_failures++;
         return 0;
     }
+
+    if (unlikely(fileno(fp_plugin_output) == -1)) {
+        error("output file descriptor given is not a valid stream");
+        cd->serial_failures++;
+        return 0;
+    }
+
+    clearerr(fp_plugin_input);
     clearerr(fp_plugin_output);
 
     PARSER_USER_OBJECT user = {
@@ -938,7 +957,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // fp_plugin_output = our input; fp_plugin_input = our output
     PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT);
 
-    rrd_collector_started(fp_plugin_input, fp_plugin_output);
+    rrd_collector_started();
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it

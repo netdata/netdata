@@ -67,12 +67,7 @@ struct plugind {
 extern struct plugind *pluginsd_root;
 
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
-extern int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);
 
 extern int pluginsd_initialize_plugin_directories();
-
-extern int config_isspace(char c);
-extern int pluginsd_space(char c);
-int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
 
 #endif /* NETDATA_PLUGINS_D_H */

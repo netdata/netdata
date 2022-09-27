@@ -287,8 +287,6 @@ struct rrd_collector_function {
 // rrdset_collector_finished()).
 
 struct rrd_collector {
-    void *input;
-    void *output;
     int32_t refcount;
     pid_t tid;
     bool running;
@@ -313,14 +311,12 @@ static void rrd_collector_free(struct rrd_collector *rdc) {
 }
 
 // called once per collector
-void rrd_collector_started(void *input, void *output) {
+void rrd_collector_started(void) {
     if(likely(thread_rrd_collector)) return;
 
     thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
     thread_rrd_collector->tid = gettid();
     thread_rrd_collector->running = true;
-    thread_rrd_collector->input = input;
-    thread_rrd_collector->output = output;
 }
 
 // called once per collector
@@ -450,10 +446,22 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(st->rrdhost->functions, key, &tmp, sizeof(tmp));
     dictionary_view_set(st->functions_view, key, item);
     dictionary_acquired_item_release(st->rrdhost->functions, item);
+
+    internal_error(true, "FUNCTION: '%s' added to host '%s' and chart '%s'", key, rrdhost_hostname(st->rrdhost), rrdset_id(st));
+}
+
+void rrd_functions_expose(RRDSET *st, BUFFER *wb) {
+    if(!st->functions_view)
+        return;
+
+    struct rrd_collector_function *tmp;
+    dfe_start_read(st->functions_view, tmp) {
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n", string2str(tmp->format), tmp->timeout, tmp_dfe.name, string2str(tmp->help));
+    }
+    dfe_done(tmp);
 }
 
 struct rrd_function_call_wait {
-    BUFFER *destination_wb;
     bool free_with_signal;
     bool data_are_ready;
     netdata_mutex_t mutex;
@@ -476,6 +484,8 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
     while(*s && !isspace(*s) && d < e)
         *d++ = *s++;
 
+    *d = '\0';
+
     *rdcf = NULL;
     while(!(*rdcf) && d < e) {
         *rdcf = dictionary_get(host->functions, buffer);
@@ -489,11 +499,13 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
         // copy another word
         while(*s && !isspace(*s) && d < e)
             *d++ = *s++;
+
+        *d = '\0';
     }
 
     if(!(*rdcf)) {
         buffer_flush(wb);
-        buffer_strcat(wb, "Function is not found.");
+        buffer_sprintf(wb, "Function '%s' (sanitized as '%s') is not found.", name, buffer);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -516,31 +528,24 @@ static void rrd_call_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, 
     // the waiting thread is either in pthread_cond_timedwait()
     // or gave up and left.
 
-    if(tmp->destination_wb)
-        buffer_fast_strcat(tmp->destination_wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
-
-    buffer_free(temp_wb);
-
     tmp->code = code;
     tmp->data_are_ready = true;
-
-    pthread_cond_signal(&tmp->cond);
 
     if(tmp->free_with_signal)
         we_should_free = true;
 
+    pthread_cond_signal(&tmp->cond);
+
     netdata_mutex_unlock(&tmp->mutex);
 
-    if(we_should_free)
+    if(we_should_free) {
+        buffer_free(temp_wb);
         rrd_function_call_wait_free(tmp);
+    }
 }
 
 int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name) {
     int code;
-
-    struct timespec tp;
-    clock_gettime(CLOCK_REALTIME, &tp);
-    tp.tv_sec += (time_t)timeout;
 
     struct rrd_collector_function *rdcf = NULL;
 
@@ -553,12 +558,15 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     if(timeout <= 0)
         timeout = rdcf->timeout;
 
+    struct timespec tp;
+    clock_gettime(CLOCK_REALTIME, &tp);
+    tp.tv_sec += (time_t)timeout;
+
     if(rdcf->sync) {
         code = rdcf->function(wb, timeout, key, rdcf->collector_data, NULL, NULL);
     }
     else {
         struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
-        tmp->destination_wb = wb;
         tmp->free_with_signal = false;
         tmp->data_are_ready = false;
         netdata_mutex_init(&tmp->mutex);
@@ -566,7 +574,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
         bool we_should_free = true;
         BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1); // we need it because we may give up on it
-        code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, &tmp);
+        code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp);
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
 
@@ -579,6 +587,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
             if (tmp->data_are_ready) {
                 // we have a response
+                buffer_fast_strcat(wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
                 code = tmp->code;
             }
             else if (rc == ETIMEDOUT) {
@@ -586,7 +595,6 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 // we will go away and let the callback free the structure
                 buffer_flush(wb);
                 buffer_strcat(wb, "Timeout");
-                tmp->destination_wb = NULL;
                 tmp->free_with_signal = true;
                 we_should_free = false;
                 code = HTTP_RESP_GATEWAY_TIMEOUT;
