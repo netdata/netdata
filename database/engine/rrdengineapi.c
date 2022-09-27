@@ -480,8 +480,10 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     usec_t entries = handle->entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
     if (likely(entries > 1)) {
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
-        if (unlikely(!handle->dt))
+        if (unlikely(!handle->dt)) {
+            info("Adding default handle->dt");
             handle->dt = USEC_PER_SEC;
+        }
     }
     else {
         // TODO we should store the dt of each page in each page
