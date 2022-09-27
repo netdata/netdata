@@ -478,8 +478,11 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     handle->page_length = page_length;
     handle->page = descr->pg_cache_descr->page;
     usec_t entries = handle->entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
-    if (likely(entries > 1))
+    if (likely(entries > 1)) {
         handle->dt = (page_end_time - descr->start_time) / (entries - 1);
+        if (unlikely(!handle->dt))
+            handle->dt = USEC_PER_SEC;
+    }
     else {
         // TODO we should store the dt of each page in each page
         // now we keep the dt of whatever was before
