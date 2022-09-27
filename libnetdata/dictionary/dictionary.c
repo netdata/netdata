@@ -249,6 +249,9 @@ void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_cal
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
+    internal_error(!(dict->options & DICT_OPTION_DONT_OVERWRITE_VALUE), "DICTIONARY: registering conflict callback without DICT_OPTION_DONT_OVERWRITE_VALUE");
+    dict->options |= DICT_OPTION_DONT_OVERWRITE_VALUE;
+
     dictionary_hooks_allocate(dict);
     dict->hooks->conflict_callback = conflict_callback;
     dict->hooks->conflict_callback_data = data;

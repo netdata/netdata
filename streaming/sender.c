@@ -70,17 +70,17 @@ void sender_commit(struct sender_state *s) {
             while(src_len) {
                 size_t size_to_compress = src_len;
 
-                if(size_to_compress > LZ4_MAX_MSG_SIZE) {
+                if(size_to_compress > COMPRESSION_MAX_MSG_SIZE) {
                     // we need to find the last newline
                     // so that the decompressor will have a whole line to work with
 
-                    const char *t = &src[LZ4_MAX_MSG_SIZE - 1];
+                    const char *t = &src[COMPRESSION_MAX_MSG_SIZE - 1];
                     while(t-- > src)
                         if(*t == '\n')
                             break;
 
                     if(t == src)
-                        size_to_compress = LZ4_MAX_MSG_SIZE;
+                        size_to_compress = COMPRESSION_MAX_MSG_SIZE;
                     else
                         size_to_compress = t - src + 1;
                 }

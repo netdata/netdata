@@ -43,11 +43,12 @@ typedef struct pluginsd_action {
 } PLUGINSD_ACTION;
 
 typedef enum parser_input_type {
-    PARSER_INPUT_SPLIT       = 1 << 1,
-    PARSER_INPUT_ORIGINAL    = 1 << 2,
-    PARSER_INPUT_PROCESSED   = 1 << 3,
-    PARSER_NO_PARSE_INIT     = 1 << 4,
-    PARSER_NO_ACTION_INIT    = 1 << 5,
+    PARSER_INPUT_SPLIT          = (1 << 1),
+    PARSER_INPUT_KEEP_ORIGINAL  = (1 << 2),
+    PARSER_INPUT_PROCESSED      = (1 << 3),
+    PARSER_NO_PARSE_INIT        = (1 << 4),
+    PARSER_NO_ACTION_INIT       = (1 << 5),
+    PARSER_DEFER_UNTIL_KEYWORD  = (1 << 6),
 } PARSER_INPUT_TYPE;
 
 #define PARSER_INPUT_FULL   (PARSER_INPUT_SPLIT|PARSER_INPUT_ORIGINAL)
@@ -91,6 +92,15 @@ typedef struct parser {
     char tmpbuffer[PLUGINSD_LINE_MAX];
     char *readfrom;
 #endif
+
+    struct {
+        const char *end_keyword;
+        BUFFER *response;
+        void (*action)(struct parser *parser, void *action_data);
+        void *action_data;
+    } defer;
+
+    DICTIONARY *inflight_functions;
 } PARSER;
 
 PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags);

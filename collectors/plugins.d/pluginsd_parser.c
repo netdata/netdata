@@ -474,6 +474,162 @@ disable:
     return PARSER_RC_ERROR;
 }
 
+// ----------------------------------------------------------------------------
+// execution of functions
+
+struct inflight_function {
+    int code;
+    BUFFER *wb;
+    int timeout;
+    STRING *function;
+    void (*callback)(BUFFER *wb, int code, void *callback_data);
+    void *callback_data;
+};
+
+static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
+    struct inflight_function *pf = func;
+
+    PARSER  *parser = parser_ptr;
+    FILE *fp = parser->output;
+
+    // leave this code as default, so that when the dictionary is destroyed this will be sent back to the caller
+    pf->code = HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    // send the command to the plugin
+    fprintf(fp, "FUNCTION %s %d \"%s\"\n",
+            dictionary_acquired_item_name(item),
+            pf->timeout,
+            string2str(pf->function));
+}
+static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
+    struct inflight_function *pf = new_func;
+
+    error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
+    pf->callback(pf->wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
+    string_freez(pf->function);
+
+    return false;
+}
+static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
+    struct inflight_function *pf = func;
+    pf->callback(pf->wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
+    string_freez(pf->function);
+}
+
+static int pluginsd_execute_function_callback(BUFFER *wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+    PARSER  *parser = collector_data;
+
+    struct inflight_function tmp = {
+        .wb = wb,
+        .timeout = timeout,
+        .function = string_strdupz(function),
+        .callback = callback,
+        .callback_data = callback_data,
+    };
+
+    uuid_t uuid;
+    uuid_generate_time(uuid);
+
+    char key[UUID_STR_LEN];
+    uuid_unparse_lower(uuid, key);
+
+    dictionary_set(parser->inflight_functions, key, &tmp, sizeof(struct inflight_function));
+
+    return HTTP_RESP_OK;
+}
+
+PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+{
+    char *format = words[1];
+    char *timeout_s = words[2];
+    char *name = words[3];
+    char *help = words[4];
+
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
+        debug(D_PLUGINSD, "Ignoring function belonging to missing or ignored host.");
+        return PARSER_RC_OK;
+    }
+
+    if (unlikely(!format || !timeout_s || !name || !help)) {
+        error("requested a FUNCTION, without providing the required data (format = '%s', timeout = '%s', name = '%s', help = '%s'), host '%s' and chart '%s'. Ignoring it.",
+              format?format:"(unset)",
+              timeout_s?timeout_s:"(unset)",
+              name?name:"(unset)",
+              help?help:"(unset)",
+              rrdhost_hostname(host),
+              st ? rrdset_id(st) : "(unset)");
+        return PARSER_RC_ERROR;
+    }
+
+    if (unlikely(!st && !((PARSER_USER_OBJECT *) user)->st_exists)) {
+        error("requested a FUNCTION, without a CHART, on host '%s'. Disabling it.", rrdhost_hostname(host));
+        return PARSER_RC_ERROR;
+    }
+
+    int timeout = 10;
+    if (timeout_s && *timeout_s) {
+        timeout = str2i(timeout_s);
+        if (unlikely(timeout <= 0))
+            timeout = 10;
+    }
+
+    PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
+    if(!parser->inflight_functions) {
+        parser->inflight_functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        dictionary_register_insert_callback(parser->inflight_functions, inflight_functions_insert_callback, parser);
+        dictionary_register_delete_callback(parser->inflight_functions, inflight_functions_delete_callback, parser);
+        dictionary_register_conflict_callback(parser->inflight_functions, inflight_functions_conflict_callback, parser);
+    }
+    rrd_collector_add_function(st, name, help, format, timeout, false, pluginsd_execute_function_callback, parser);
+
+    return PARSER_RC_OK;
+}
+
+static void pluginsd_function_result_end(struct parser *parser, void *action_data) {
+    STRING *key = action_data;
+    dictionary_del(parser->inflight_functions, string2str(key));
+    string_freez(key);
+}
+
+PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+{
+    char *key = words[1];
+    char *status = words[2];
+
+    if (unlikely(!key || !*key)) {
+        error("got a FUNCTION_RESULT_BEGIN without providing the required data (key = '%s', status = '%s'). Ignoring it.",
+            key ? key : "(unset)",
+            status ? status : "(unset)");
+        return PARSER_RC_ERROR;
+    }
+
+    int code = str2i(status && *status ? status : "500");
+    if (code <= 0)
+        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+    PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
+
+    struct inflight_function *pf = (struct inflight_function *)dictionary_get(parser->inflight_functions, key);
+    if(!pf) {
+        error("got a FUNCTION_RESULT_BEGIN for transaction '%s', but the transaction is not found.", key);
+        return PARSER_RC_ERROR;
+    }
+
+    buffer_flush(pf->wb);
+    pf->code = code;
+
+    parser->defer.response = pf->wb;
+    parser->defer.action = pluginsd_function_result_end;
+    parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
+    parser->defer.action_data = string_strdupz(key);
+
+    return PARSER_RC_OK;
+}
+
+// ----------------------------------------------------------------------------
+
 PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *name = words[1];

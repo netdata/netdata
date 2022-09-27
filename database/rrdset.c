@@ -1794,7 +1794,7 @@ after_first_database_work:
     rrdset_done_interpolate(
             st
             , rda_base
-            ,rda_slots
+            , rda_slots
             , update_every_ut
             , last_stored_ut
             , next_store_ut

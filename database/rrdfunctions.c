@@ -12,6 +12,7 @@
 struct rrd_collector_function {
     bool sync;                      // when true, the function is called synchronously
     STRING *format;                 // the format the function produces
+    STRING *help;
     int timeout;                    // the default timeout of the function
     int (*function)(BUFFER *wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
     void *collector_data;
@@ -130,6 +131,15 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     else
         string_freez(new_rdcf->format);
 
+    if(rdcf->help != new_rdcf->help) {
+        STRING *old = rdcf->help;
+        rdcf->help = new_rdcf->help;
+        string_freez(old);
+        changed = true;
+    }
+    else
+        string_freez(new_rdcf->help);
+
     if(rdcf->timeout != new_rdcf->timeout) {
         rdcf->timeout = new_rdcf->timeout;
         changed = true;
@@ -152,7 +162,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 void rrdfunctions_init(RRDHOST *host) {
     if(host->functions) return;
 
-    host->functions = dictionary_create(DICT_OPTION_NONE);
+    host->functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(host->functions, rrd_functions_insert_callback, host);
     dictionary_register_delete_callback(host->functions, rrd_functions_delete_callback, host);
     dictionary_register_conflict_callback(host->functions, rrd_functions_conflict_callback, host);
@@ -162,7 +172,7 @@ void rrdfunctions_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
 
-void rrd_collector_add_function(RRDSET *st, const char *name, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, int timeout, const char *name, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
+void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, int timeout, const char *name, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
     if(!st->functions_view)
         st->functions_view = dictionary_create_view(st->rrdhost->functions);
 
@@ -172,6 +182,7 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *format
         .format = string_strdupz(format),
         .function = function,
         .collector_data = collector_data,
+        .help = string_strdupz(help),
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(st->rrdhost->functions, name, &tmp, sizeof(tmp));
     dictionary_view_set(st->functions_view, name, item);
@@ -283,12 +294,12 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
         netdata_mutex_init(&tmp->mutex);
         pthread_cond_init(&tmp->cond, NULL);
 
-        netdata_mutex_lock(&tmp->mutex);
-        int rc = 0;
         bool we_should_free = true;
-
         code = rdcf->function(tmp->wb, timeout, name, rdcf->collector_data, rrd_call_function_signal_when_ready, &tmp);
-        if (code == 200) {
+        if (code == HTTP_RESP_OK) {
+            netdata_mutex_lock(&tmp->mutex);
+
+            int rc = 0;
             while (rc == 0 && !tmp->data_are_ready) {
                 // the mutex is unlocked within pthread_cond_timedwait()
                 rc = pthread_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
@@ -315,14 +326,14 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 buffer_strcat(wb, "Failed to wait for a response from the collector");
                 code = HTTP_RESP_INTERNAL_SERVER_ERROR;
             }
+
+            netdata_mutex_unlock(&tmp->mutex);
         }
         else {
             error("RRDSET FUNCTIONS: failed to send request to the collector");
             buffer_flush(wb);
             buffer_strcat(wb, "Failed to send request to the collector");
-            code = HTTP_RESP_INTERNAL_SERVER_ERROR;
         }
-        netdata_mutex_unlock(&tmp->mutex);
 
         if (we_should_free)
             rrd_function_call_wait_free(tmp);

@@ -3,9 +3,9 @@
 #include "parser.h"
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-static inline int find_keyword(char *str, char *keyword, int max_size, int (*custom_isspace)(char))
+static inline int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char))
 {
-    char *s = str, *keyword_start;
+    const char *s = str, *keyword_start;
 
     while (unlikely(custom_isspace(*s))) s++;
     keyword_start = s;
@@ -60,9 +60,8 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
-        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_chart_function);
-        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_chart_function_result_begin);
-        //parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_END, pluginsd_chart_function_result_end);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
     }
 
     if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
@@ -78,9 +77,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser->plugins_action->set_action              = &pluginsd_set_action;
         parser->plugins_action->clabel_commit_action    = &pluginsd_clabel_commit_action;
         parser->plugins_action->clabel_action           = &pluginsd_clabel_action;
-        //parser->plugins_action->function_action         = &pluginsd_function_action;
-        //parser->plugins_action->function_result_begin_action  = &pluginsd_function_result_begin_action;
-        //parser->plugins_action->function_result_end_action  = &pluginsd_function_result_end_action;
     }
 
     return parser;
@@ -177,6 +173,8 @@ void parser_destroy(PARSER *parser)
 {
     if (unlikely(!parser))
         return;
+
+    dictionary_destroy(parser->inflight_functions);
 
     PARSER_KEYWORD  *tmp_keyword, *tmp_keyword_next;
     PARSER_DATA     *tmp_parser_data, *tmp_parser_data_next;
@@ -282,10 +280,24 @@ inline int parser_action(PARSER *parser, char *input)
     if (unlikely(!input))
         input = parser->buffer;
 
-    if (unlikely(!find_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
+
+    if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
+        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
+
+        if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
+            buffer_strcat(parser->defer.response, input);
+            return 0;
+        }
+        else if(has_keyword) {
+            parser->defer.action(parser, parser->defer.action_data);
+        }
+        return 0;
+    }
+
+    if (unlikely(!find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
         return 0;
 
-    if ((parser->flags & PARSER_INPUT_ORIGINAL) == PARSER_INPUT_ORIGINAL)
+    if ((parser->flags & PARSER_INPUT_KEEP_ORIGINAL) == PARSER_INPUT_KEEP_ORIGINAL)
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);

@@ -254,7 +254,7 @@ static void calculate_values_and_show_charts(
             rrdset_update_rrdlabels(m->st_space, m->chart_labels);
 
             // TODO - remove before merging
-            rrd_collector_add_function(m->st_space, "HelloWorld", "txt", 10, true, hello_world_function, NULL);
+            rrd_collector_add_function(m->st_space, "HelloWorld", "help string", "txt", 10, true, hello_world_function, NULL);
 
             m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
