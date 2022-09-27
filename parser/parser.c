@@ -41,6 +41,7 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
     parser->flags = flags;
     parser->host = host;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
+    inflight_functions_init(parser);
 
 #ifdef ENABLE_HTTPS
     parser->bytesleft = 0;

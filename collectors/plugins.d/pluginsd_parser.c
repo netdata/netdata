@@ -523,6 +523,13 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     string_freez(pf->function);
 }
 
+void inflight_functions_init(PARSER *parser) {
+    parser->inflight_functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(parser->inflight_functions, inflight_functions_insert_callback, parser);
+    dictionary_register_delete_callback(parser->inflight_functions, inflight_functions_delete_callback, parser);
+    dictionary_register_conflict_callback(parser->inflight_functions, inflight_functions_conflict_callback, parser);
+}
+
 // this is the function that is called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
 static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
@@ -589,12 +596,6 @@ PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_
     }
 
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
-    if(!parser->inflight_functions) {
-        parser->inflight_functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
-        dictionary_register_insert_callback(parser->inflight_functions, inflight_functions_insert_callback, parser);
-        dictionary_register_delete_callback(parser->inflight_functions, inflight_functions_delete_callback, parser);
-        dictionary_register_conflict_callback(parser->inflight_functions, inflight_functions_conflict_callback, parser);
-    }
     rrd_collector_add_function(st, name, help, format, timeout, false, pluginsd_execute_function_callback, parser);
 
     return PARSER_RC_OK;

@@ -40,5 +40,6 @@ extern PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, RRDL
 
 extern PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern void inflight_functions_init(PARSER *parser);
 
 #endif //NETDATA_PLUGINSD_PARSER_H

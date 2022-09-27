@@ -4169,7 +4169,7 @@ void *reader_main(void *arg __maybe_unused) {
                 fprintf(stdout, "FUNCTION_RESULT_BEGIN %s %d\n", transaction, 200);
 
                 // TODO - remove before merging!
-                
+
                 pid_t pid;
                 FILE *fpin;
                 FILE *fpout = netdata_popen("top -b -d 0.5 -n 1", &pid, &fpin);
