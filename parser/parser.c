@@ -259,28 +259,31 @@ int parser_next(PARSER *parser)
 
 inline int parser_action(PARSER *parser, char *input)
 {
-    PARSER_RC   rc = PARSER_RC_OK;
+    PARSER_RC rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     char command[PLUGINSD_LINE_MAX + 1];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
 
-    if (unlikely(!parser))
+    if (unlikely(!parser)) {
+        internal_error(true, "parser is NULL");
         return 1;
+    }
+
     parser->recover_location[0] = 0x0;
 
     // if not direct input check if we have reprocessed this
     if (unlikely(!input && parser->flags & PARSER_INPUT_PROCESSED))
         return 0;
 
-    PARSER_KEYWORD  *tmp_keyword = parser->keyword;
+    PARSER_KEYWORD *tmp_keyword = parser->keyword;
     if (unlikely(!tmp_keyword)) {
+        internal_error(true, "called without a keyword");
         return 1;
     }
 
     if (unlikely(!input))
         input = parser->buffer;
-
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
         bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
@@ -329,16 +332,17 @@ inline int parser_action(PARSER *parser, char *input)
             rc = parser->unknown_function(words, parser->user, NULL);
         else
             rc = PARSER_RC_ERROR;
-#ifdef NETDATA_INTERNAL_CHECKS
-        error("Unknown keyword [%s]", input);
-#endif
+
+        internal_error(rc != PARSER_RC_OK, "Unknown keyword [%s]", input);
     }
     else {
         worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
                 rc = action_function(words, parser->user, parser->plugins_action);
-                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
-                    break;                
+                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
+                    internal_error(true, "action_function() failed with rc = %d", rc);
+                    break;
+                }
                 action_function_list++;
         }
         worker_is_idle();
@@ -347,6 +351,7 @@ inline int parser_action(PARSER *parser, char *input)
     if (likely(input == parser->buffer))
         parser->flags |= PARSER_INPUT_PROCESSED;
 
+    internal_error(rc == PARSER_RC_ERROR, "parser_action() failed.");
     return (rc == PARSER_RC_ERROR);
 }
 
