@@ -788,7 +788,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(host) },
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
+        { .name = "ctx",   .version = 1,                     .enabled = 1 },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
     node_state_update.capabilities = caps;
@@ -834,7 +834,7 @@ void aclk_send_node_instances()
                 { .name = "proto", .version = 1,                     .enabled = 1 },
                 { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
                 { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-                { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled },
+                { .name = "ctx",   .version = 1,                     .enabled = 1 },
                 { .name = NULL,    .version = 0,                     .enabled = 0 }
             };
             node_state_update.capabilities = caps;
@@ -904,38 +904,6 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
         status.pending_max_sequence_id,
         status.last_submitted_sequence_id
     );
-}
-
-static void fill_chart_status_for_host(BUFFER *wb, RRDHOST *host)
-{
-    struct aclk_chart_sync_stats *stats = aclk_get_chart_sync_stats(host);
-    if (!stats) {
-        buffer_strcat(wb, "\n\t\tFailed to get alert streaming status for this host");
-        return;
-    }
-    buffer_sprintf(wb,
-        "\n\t\tUpdates: %d"
-        "\n\t\tBatch ID: %"PRIu64
-        "\n\t\tMin Seq ID: %"PRIu64
-        "\n\t\tMax Seq ID: %"PRIu64
-        "\n\t\tPending Min Seq ID: %"PRIu64
-        "\n\t\tPending Max Seq ID: %"PRIu64
-        "\n\t\tSent Min Seq ID: %"PRIu64
-        "\n\t\tSent Max Seq ID: %"PRIu64
-        "\n\t\tAcked Min Seq ID: %"PRIu64
-        "\n\t\tAcked Max Seq ID: %"PRIu64,
-        stats->updates,
-        stats->batch_id,
-        stats->min_seqid,
-        stats->max_seqid,
-        stats->min_seqid_pend,
-        stats->max_seqid_pend,
-        stats->min_seqid_sent,
-        stats->max_seqid_sent,
-        stats->min_seqid_ack,
-        stats->max_seqid_ack
-    );
-    freez(stats);
 }
 #endif /* ENABLE_ACLK */
 
@@ -1018,9 +986,6 @@ char *aclk_state(void)
 
             buffer_strcat(wb, "\n\tAlert Streaming Status:");
             fill_alert_status_for_host(wb, host);
-
-            buffer_strcat(wb, "\n\tChart Streaming Status:");
-            fill_chart_status_for_host(wb, host);
         }
         rrd_unlock();
     }
@@ -1056,45 +1021,6 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 
     tmp = json_object_new_int(status.last_submitted_sequence_id);
     json_object_object_add(obj, "last-submitted-seq-id", tmp);
-}
-
-static void fill_chart_status_for_host_json(json_object *obj, RRDHOST *host)
-{
-    struct aclk_chart_sync_stats *stats = aclk_get_chart_sync_stats(host);
-    if (!stats)
-        return;
-
-    json_object *tmp = json_object_new_int(stats->updates);
-    json_object_object_add(obj, "updates", tmp);
-
-    tmp = json_object_new_int(stats->batch_id);
-    json_object_object_add(obj, "batch-id", tmp);
-
-    tmp = json_object_new_int(stats->min_seqid);
-    json_object_object_add(obj, "min-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->max_seqid);
-    json_object_object_add(obj, "max-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->min_seqid_pend);
-    json_object_object_add(obj, "pending-min-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->max_seqid_pend);
-    json_object_object_add(obj, "pending-max-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->min_seqid_sent);
-    json_object_object_add(obj, "sent-min-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->max_seqid_sent);
-    json_object_object_add(obj, "sent-max-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->min_seqid_ack);
-    json_object_object_add(obj, "acked-min-seq-id", tmp);
-
-    tmp = json_object_new_int(stats->max_seqid_ack);
-    json_object_object_add(obj, "acked-max-seq-id", tmp);
-
-    freez(stats);
 }
 
 static json_object *timestamp_to_json(const time_t *t)
@@ -1214,10 +1140,6 @@ char *aclk_state_json(void)
         tmp = json_object_new_object();
         fill_alert_status_for_host_json(tmp, host);
         json_object_object_add(nodeinstance, "alert-sync-status", tmp);
-
-        tmp = json_object_new_object();
-        fill_chart_status_for_host_json(tmp, host);
-        json_object_object_add(nodeinstance, "chart-sync-status", tmp);
 
         json_object_array_add(grp, nodeinstance);
     }

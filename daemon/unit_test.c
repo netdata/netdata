@@ -1550,42 +1550,6 @@ int test_sqlite(void) {
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
     char *uuid_str = "0000_000";
 
-    buffer_sprintf(sql, TABLE_ACLK_CHART, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    buffer_flush(sql);
-    if (rc != SQLITE_OK)
-        goto error;
-
-    buffer_sprintf(sql, TABLE_ACLK_CHART_PAYLOAD, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    buffer_flush(sql);
-    if (rc != SQLITE_OK)
-        goto error;
-
-    buffer_sprintf(sql, TABLE_ACLK_CHART_LATEST, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    if (rc != SQLITE_OK)
-        goto error;
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, INDEX_ACLK_CHART, uuid_str, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    if (rc != SQLITE_OK)
-        goto error;
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, INDEX_ACLK_CHART_LATEST, uuid_str, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    if (rc != SQLITE_OK)
-        goto error;
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, TRIGGER_ACLK_CHART_PAYLOAD, uuid_str, uuid_str, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    if (rc != SQLITE_OK)
-        goto error;
-    buffer_flush(sql);
-
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
     rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)

@@ -85,8 +85,6 @@ extern void rrdcontext_hub_stop_streaming_command(void *cmd);
 // ----------------------------------------------------------------------------
 // public API for threads
 
-extern int rrdcontext_enabled;
-
 extern void rrdcontext_db_rotation(void);
 extern void *rrdcontext_main(void *);
 

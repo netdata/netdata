@@ -752,8 +752,6 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_health.h
         database/sqlite/sqlite_aclk_node.c
         database/sqlite/sqlite_aclk_node.h
-        database/sqlite/sqlite_aclk_chart.c
-        database/sqlite/sqlite_aclk_chart.h
         database/sqlite/sqlite_aclk_alert.c
         database/sqlite/sqlite_aclk_alert.h
         database/sqlite/sqlite3.c
@@ -894,8 +892,6 @@ set(ACLK_FILES
         aclk/aclk_rx_msgs.h
         aclk/https_client.c
         aclk/https_client.h
-        aclk/aclk_charts_api.c
-        aclk/aclk_charts_api.h
         aclk/aclk_alarm_api.c
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
@@ -922,10 +918,6 @@ set(ACLK_FILES
         aclk/schema-wrappers/node_connection.h
         aclk/schema-wrappers/node_creation.cc
         aclk/schema-wrappers/node_creation.h
-        aclk/schema-wrappers/chart_stream.cc
-        aclk/schema-wrappers/chart_stream.h
-        aclk/schema-wrappers/chart_config.cc
-        aclk/schema-wrappers/chart_config.h
         aclk/schema-wrappers/alarm_stream.cc
         aclk/schema-wrappers/alarm_stream.h
         aclk/schema-wrappers/alarm_config.cc
@@ -1247,10 +1239,6 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/agent/v1/connection.proto
         aclk/aclk-schemas/proto/alarm/v1/config.proto
         aclk/aclk-schemas/proto/alarm/v1/stream.proto
-        aclk/aclk-schemas/proto/chart/v1/config.proto
-        aclk/aclk-schemas/proto/chart/v1/dimension.proto
-        aclk/aclk-schemas/proto/chart/v1/instance.proto
-        aclk/aclk-schemas/proto/chart/v1/stream.proto
         aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto

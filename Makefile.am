@@ -467,8 +467,6 @@ RRD_PLUGIN_FILES = \
     database/sqlite/sqlite_health.h \
     database/sqlite/sqlite_aclk_node.c \
     database/sqlite/sqlite_aclk_node.h \
-    database/sqlite/sqlite_aclk_chart.c \
-    database/sqlite/sqlite_aclk_chart.h \
     database/sqlite/sqlite_aclk_alert.c \
     database/sqlite/sqlite_aclk_alert.h \
     database/sqlite/sqlite3.c \
@@ -710,8 +708,6 @@ ACLK_FILES = \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
     mqtt_websockets/MQTT-C/include/mqtt.h \
-    aclk/aclk_charts_api.c \
-    aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
@@ -722,10 +718,6 @@ ACLK_FILES = \
     aclk/schema-wrappers/node_connection.h \
     aclk/schema-wrappers/node_creation.cc \
     aclk/schema-wrappers/node_creation.h \
-    aclk/schema-wrappers/chart_stream.cc \
-    aclk/schema-wrappers/chart_stream.h \
-    aclk/schema-wrappers/chart_config.cc \
-    aclk/schema-wrappers/chart_config.h \
     aclk/schema-wrappers/alarm_stream.cc \
     aclk/schema-wrappers/alarm_stream.h \
     aclk/schema-wrappers/alarm_config.cc \
@@ -753,10 +745,6 @@ ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/agent/v1/connection.proto \
     aclk/aclk-schemas/proto/alarm/v1/config.proto \
     aclk/aclk-schemas/proto/alarm/v1/stream.proto \
-    aclk/aclk-schemas/proto/chart/v1/config.proto \
-    aclk/aclk-schemas/proto/chart/v1/dimension.proto \
-    aclk/aclk-schemas/proto/chart/v1/instance.proto \
-    aclk/aclk-schemas/proto/chart/v1/stream.proto \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
@@ -772,14 +760,6 @@ ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/stream.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/instance.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/dimension.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/config.pb.h \
     aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
     aclk/aclk-schemas/proto/aclk/v1/lib.pb.h \
     aclk/aclk-schemas/proto/agent/v1/disconnect.pb.cc \
@@ -810,22 +790,6 @@ aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-sc
 
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/stream.pb.h: aclk/aclk-schemas/proto/chart/v1/stream.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/instance.pb.h: aclk/aclk-schemas/proto/chart/v1/instance.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/dimension.pb.h: aclk/aclk-schemas/proto/chart/v1/dimension.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/config.pb.h: aclk/aclk-schemas/proto/chart/v1/config.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
