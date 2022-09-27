@@ -385,7 +385,7 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
 
     // if the destination is full, oops!
     if(ds == de) {
-        error("STREAM: received line exceed %u bytes. Truncating it.", PLUGINSD_LINE_MAX);
+        error("STREAM: received line exceed %d bytes. Truncating it.", PLUGINSD_LINE_MAX);
         *ds = '\0';
         *pos = ss - r->read_buffer;
         return buffer;
@@ -404,7 +404,7 @@ static void streaming_parser_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
-size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
+size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
@@ -415,7 +415,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, fp, fp, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT);
 
     rrd_collector_started();
 
@@ -435,7 +435,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
 
     char buffer[PLUGINSD_LINE_MAX + 2];
     do {
-        if(receiver_read(rpt, fp)) break;
+        if(receiver_read(rpt, fp_in)) break;
 
         size_t pos = 0;
         while(receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &pos)) {
@@ -701,8 +701,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     // convert the socket to a FILE *
-    FILE *fp = fdopen(rpt->fd, "a+");
-    if(!fp) {
+    FILE *fp_out = fdopen(rpt->fd, "w");
+    FILE *fp_in = fdopen(rpt->fd, "r");
+    if(!fp_in) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
         error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
         close(rpt->fd);
@@ -758,7 +759,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdcontext_host_child_connected(rpt->host);
 
-    size_t count = streaming_parser(rpt, &cd, fp);
+    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out);
 
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
                           "DISCONNECTED");
@@ -796,7 +797,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 
     // cleanup
-    fclose(fp);
+    fclose(fp_in);
+    fclose(fp_out);
     return (int)count;
 }
 
