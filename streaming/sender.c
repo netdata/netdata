@@ -767,12 +767,14 @@ void execute_commands(struct sender_state *s) {
                 if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
 
                 struct inflight_stream_function *tmp = callocz(1, sizeof(struct inflight_stream_function));
+                tmp->received_ut = now_realtime_usec();
                 tmp->sender = s;
                 tmp->transaction = string_strdupz(transaction);
-                tmp->received_ut = now_realtime_usec();
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
+
+                internal_error(true, "FUNCTION: rrd_call_function_async() delay %llu usec", now_realtime_usec() - tmp->received_ut);
 
                 if(code != HTTP_RESP_OK)
                     stream_execute_function_callback(wb, code, tmp);
