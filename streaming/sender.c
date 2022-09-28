@@ -719,18 +719,18 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
 
     struct sender_state *s = tmp->sender;
 
-    internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
-          rrdhost_hostname(s->host), s->connected_to,
-          string2str(tmp->transaction),
-          buffer_strlen(wb),
-          now_realtime_usec() - tmp->received_ut);
-
     sender_start(s);
     buffer_sprintf(s->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
     buffer_sprintf(s->build, "\npassed through node '%s', delay %llu", rrdhost_hostname(localhost), now_realtime_usec() - tmp->received_ut);
     buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
     sender_commit(s);
+
+    internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
+                   rrdhost_hostname(s->host), s->connected_to,
+                   string2str(tmp->transaction),
+                   buffer_strlen(wb),
+                   now_realtime_usec() - tmp->received_ut);
 
     string_freez(tmp->transaction);
     buffer_free(wb);
