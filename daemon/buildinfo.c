@@ -319,7 +319,7 @@ void print_build_info_json(void) {
     printf("    \"aclk\": %s,\n", FEAT_JSON_BOOL(FEAT_CLOUD));
 
     printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
-    printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
+    printf("    \"machine-learning\": %s,\n",  FEAT_JSON_BOOL(FEAT_ML));
     printf("    \"stream-compression\": %s\n",   FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
     printf("  },\n");
 

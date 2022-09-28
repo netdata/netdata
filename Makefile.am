@@ -123,6 +123,7 @@ AM_CFLAGS = \
     $(OPTIONAL_CUPS_CFLAGS) \
     $(OPTIONAL_XENSTAT_CFLAGS) \
     $(OPTIONAL_BPF_CFLAGS) \
+    $(OPTIONAL_PROTOBUF_CFLAGS) \
     $(NULL)
 
 sbin_PROGRAMS =
@@ -631,7 +632,35 @@ STREAMING_PLUGIN_FILES = \
     streaming/sender.c \
     streaming/receiver.c \
     streaming/rrdpush.h \
+    streaming/protocol/setup.h \
+    streaming/protocol/setup.c \
+    streaming/protocol/handshake.h \
     $(NULL)
+
+if ENABLE_HANDSHAKE
+
+dist_noinst_DATA += streaming/protocol/proto/command.proto
+
+streaming/protocol/proto/command.pb.cc \
+streaming/protocol/proto/command.pb.h: streaming/protocol/proto/command.proto
+	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
+
+HANDSHAKE_BUILT_FILES = \
+    streaming/protocol/proto/command.pb.cc \
+    streaming/protocol/proto/command.pb.h \
+    $(NULL)
+
+BUILT_SOURCES += $(HANDSHAKE_BUILT_FILES)
+nodist_netdata_SOURCES += $(HANDSHAKE_BUILT_FILES)
+CLEANFILES += $(HANDSHAKE_BUILT_FILES)
+
+STREAMING_PLUGIN_FILES += \
+    streaming/protocol/message.cc \
+    streaming/protocol/message.h \
+    streaming/protocol/handshake.cc \
+    $(NULL)
+
+endif # ENABLE_HANDSHAKE
 
 REGISTRY_PLUGIN_FILES = \
     registry/registry.c \
@@ -970,6 +999,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
+    $(OPTIONAL_PROTOBUF_LIBS) \
     $(NULL)
 
 if LINK_STATIC_JSONC

@@ -528,6 +528,16 @@ struct rrdpush_destinations *destinations_init(const char *dests) {
     return destinations;
 }
 
+void rrdpush_sender_thread_close_socket(RRDHOST *host) {
+    rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
+    __atomic_clear(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+
+    if(host->rrdpush_sender_socket != -1) {
+        close(host->rrdpush_sender_socket);
+        host->rrdpush_sender_socket = -1;
+    }
+}
+
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
@@ -616,7 +626,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     char buf[GUID_LEN + 1];
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+
     system_info->hops = 1;
+    system_info->handshake_enabled = 0;
+
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -655,7 +668,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             tags = value;
         else if(!strcmp(name, "ver"))
             stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
-        else {
+        else if(!strcmp(name, "handshake_enabled")) {
+            system_info->handshake_enabled = strtoul(value, NULL, 0);
+        } else {
             // An old Netdata child does not have a compatible streaming protocol, map to something sane.
             if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
                 name = "NETDATA_HOST_OS_NAME";

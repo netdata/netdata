@@ -605,7 +605,7 @@ copy_protobuf() {
 }
 
 bundle_protobuf() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ] && [ -n "${DISABLE_HANDSHAKE}" ]; then
     echo "Skipping protobuf"
     return 0
   fi

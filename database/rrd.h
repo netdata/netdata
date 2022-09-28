@@ -837,6 +837,7 @@ struct rrdhost_system_info {
     uint16_t hops;
     bool ml_capable;
     bool ml_enabled;
+    bool handshake_enabled;
     char *install_type;
     char *prebuilt_arch;
     char *prebuilt_dist;
@@ -974,10 +975,8 @@ struct rrdhost {
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
 
-#ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                         //Structure used to encrypt the connection
-    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
-#endif
+    struct netdata_ssl ssl;                         // Structure used to encrypt the connection
+    struct netdata_ssl stream_ssl;                  // Structure used to encrypt the stream
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;

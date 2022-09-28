@@ -441,6 +441,8 @@ set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES
 set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
 
+set(ENABLE_HANDSHAKE True)
+
 # -----------------------------------------------------------------------------
 # netdata files
 
@@ -859,12 +861,23 @@ set(API_PLUGIN_FILES
         )
 
 set(STREAMING_PLUGIN_FILES
+        streaming/protocol/handshake.h
         streaming/rrdpush.c
         streaming/rrdpush.h
         streaming/compression.c
         streaming/receiver.c
         streaming/sender.c
-        )
+        streaming/protocol/setup.h
+        streaming/protocol/setup.c
+)
+
+if(ENABLE_HANDSHAKE)
+    list(APPEND STREAMING_PLUGIN_FILES
+        streaming/protocol/handshake.cc
+        streaming/protocol/message.cc
+        streaming/protocol/message.h
+    )
+endif()
 
 set(CLAIM_PLUGIN_FILES
         claim/claim.c
@@ -1266,8 +1279,51 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
 ENDIF()
 
-list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
+# -----------------------------------------------------------------------------
+# handshake
+
+function(PROTOBUF_HANDSHAKE_GENERATE_CPP SRCS HDRS)
+  if(NOT ARGN)
+    message(SEND_ERROR "Error: PROTOBUF_HANDSHAKE_GENERATE_CPP() called without any proto files")
+    return()
+  endif()
+
+  set(${SRCS})
+  set(${HDRS})
+  foreach(FIL ${ARGN})
+    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+    get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+    get_filename_component(FIL_WE ${FIL} NAME_WE)
+    set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+    set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+# cmake > 3.20 required :(
+#    cmake_path(SET GENERATED_PB_CC "${DIR}")
+#    cmake_path(SET GENERATED_PB_H "${DIR}")
+#    cmake_path(APPEND GENERATED_PB_CC "${FIL_WE}.pb.cc")
+#    cmake_path(APPEND GENERATED_PB_H "${FIL_WE}.pb.h")
+
+    list(APPEND ${SRCS} ${GENERATED_PB_CC})
+    list(APPEND ${HDRS} ${GENERATED_PB_H})
+    add_custom_command(
+      OUTPUT ${GENERATED_PB_CC}
+             ${GENERATED_PB_H}
+      COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+      ARGS -I=${CMAKE_SOURCE_DIR}/streaming/protocol/proto --cpp_out=${CMAKE_SOURCE_DIR}/streaming/protocol/proto ${ABS_FIL}
+      DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+      COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+      VERBATIM )
+  endforeach()
+  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+endfunction()
+
+set(HANDSHAKE_PROTO_DEFS streaming/protocol/proto/command.proto)
+PROTOBUF_HANDSHAKE_GENERATE_CPP(HANDSHAKE_PROTO_BUILT_SRCS HANDSHAKE_PROTO_BUILT_HDRS ${HANDSHAKE_PROTO_DEFS})
+
+
+#list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
+#list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 
 # -----------------------------------------------------------------------------
 # netdata

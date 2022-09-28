@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package protocol;
+
+enum VersionValue {
+    Unknown = 0;
+    V1 = 1;
+}
+
+message HandshakeInfo {
+    VersionValue Version = 1;
+}

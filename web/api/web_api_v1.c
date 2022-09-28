@@ -1247,6 +1247,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     analytics_get_data(analytics_data.netdata_config_stream_enabled, wb);
     buffer_strcat(wb, ",\n");
 
+    buffer_sprintf(wb, "\t\"handshake-enabled\": %s,\n", host->system_info->handshake_enabled ? "true" : "false");
+
 #ifdef  ENABLE_COMPRESSION
     if(host->sender){
         buffer_strcat(wb, "\t\"stream-compression\": ");

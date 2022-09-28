@@ -494,6 +494,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     //
 
     if (is_localhost && host->system_info) {
+#ifdef ENABLE_HANDSHAKE
+        host->system_info->handshake_enabled = true;
+#else
+        host->system_info->handshake_enabled = false;
+#endif
         host->system_info->ml_capable = ml_capable();
         host->system_info->ml_enabled = ml_enabled(host);
         host->system_info->mc_version = enable_metric_correlations ? metric_correlations_version : 0;

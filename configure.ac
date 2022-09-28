@@ -1168,6 +1168,23 @@ if test "${build_ml_tests}" = "yes"; then
 fi
 
 # -----------------------------------------------------------------------------
+# handshake
+
+if test "${have_libprotobuf}" = "yes" -a "${have_protoc}" = "yes"; then
+    build_handshake="yes"
+else
+    build_handshake="no"
+fi
+
+AM_CONDITIONAL([ENABLE_HANDSHAKE], [test "${build_handshake}" = "yes"])
+if test "${build_handshake}" = "yes"; then
+    AC_DEFINE([ENABLE_HANDSHAKE], [1], [handshake usability])
+
+    OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+    OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
+fi
+
+# -----------------------------------------------------------------------------
 # ebpf.plugin
 
 if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
