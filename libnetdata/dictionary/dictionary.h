@@ -252,6 +252,9 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
 #define DICTIONARY_LOCK_WRITE     'w'
 #define DICTIONARY_LOCK_REENTRANT 'z'
 
+extern void dictionary_write_lock(DICTIONARY *dict);
+extern void dictionary_write_unlock(DICTIONARY *dict);
+
 typedef DICTFE_CONST struct dictionary_foreach {
     DICTIONARY *dict;           // the dictionary upon we work
 

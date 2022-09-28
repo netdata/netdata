@@ -711,14 +711,20 @@ static ssize_t attempt_read(struct sender_state *s) {
 struct inflight_stream_function {
     struct sender_state *sender;
     STRING *transaction;
+    usec_t received_ut;
 };
 
 void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
     struct inflight_stream_function *tmp = data;
 
-    internal_error(true, "Sending response to parent...");
-
     struct sender_state *s = tmp->sender;
+
+    internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
+          rrdhost_hostname(s->host), s->connected_to,
+          string2str(tmp->transaction),
+          buffer_strlen(wb),
+          now_realtime_usec() - tmp->received_ut);
+
     sender_start(s);
     buffer_sprintf(s->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
@@ -762,6 +768,7 @@ void execute_commands(struct sender_state *s) {
                 struct inflight_stream_function *tmp = callocz(1, sizeof(struct inflight_stream_function));
                 tmp->sender = s;
                 tmp->transaction = string_strdupz(transaction);
+                tmp->received_ut = now_realtime_usec();
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);

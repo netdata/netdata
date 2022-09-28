@@ -100,7 +100,11 @@ typedef struct parser {
         void *action_data;
     } defer;
 
-    DICTIONARY *inflight_functions;
+    struct {
+        DICTIONARY *functions;
+        usec_t smaller_timeout;
+    } inflight;
+
 } PARSER;
 
 extern int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));

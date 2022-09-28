@@ -175,7 +175,7 @@ void parser_destroy(PARSER *parser)
     if (unlikely(!parser))
         return;
 
-    dictionary_destroy(parser->inflight_functions);
+    dictionary_destroy(parser->inflight.functions);
 
     PARSER_KEYWORD  *tmp_keyword, *tmp_keyword_next;
     PARSER_DATA     *tmp_parser_data, *tmp_parser_data_next;

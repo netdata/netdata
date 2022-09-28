@@ -479,11 +479,14 @@ disable:
 
 struct inflight_function {
     int code;
-    BUFFER *destination_wb;
     int timeout;
+    BUFFER *destination_wb;
     STRING *function;
     void (*callback)(BUFFER *wb, int code, void *callback_data);
     void *callback_data;
+    usec_t timeout_ut;
+    usec_t started_ut;
+    usec_t sent_ut;
 };
 
 static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
@@ -505,8 +508,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
         error("failed to send function to plugin, error %d", ret);
 
     fflush(fp);
+    pf->sent_ut = now_realtime_usec();
 
-    internal_error(true, "FUNCTION '%s' with transaction '%s' is sent to plugin (%d bytes, fd %d)", string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp));
+    internal_error(true, "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
+                   string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
+                   pf->sent_ut - pf->started_ut);
 }
 static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = new_func;
@@ -519,15 +525,21 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
 }
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = func;
+
+    internal_error(true,
+                   "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %llu usec, response %llu usec)",
+                   string2str(pf->function), dictionary_acquired_item_name(item),
+                   buffer_strlen(pf->destination_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
+
     pf->callback(pf->destination_wb, pf->code, pf->callback_data);
     string_freez(pf->function);
 }
 
 void inflight_functions_init(PARSER *parser) {
-    parser->inflight_functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(parser->inflight_functions, inflight_functions_insert_callback, parser);
-    dictionary_register_delete_callback(parser->inflight_functions, inflight_functions_delete_callback, parser);
-    dictionary_register_conflict_callback(parser->inflight_functions, inflight_functions_conflict_callback, parser);
+    parser->inflight.functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
+    dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
+    dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);
 }
 
 // this is the function that is called from
@@ -535,9 +547,11 @@ void inflight_functions_init(PARSER *parser) {
 static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
     PARSER  *parser = collector_data;
 
-    internal_error(true, "FUNCTION '%s' run under plugins.d", function);
+    usec_t now = now_realtime_usec();
 
     struct inflight_function tmp = {
+        .started_ut = now,
+        .timeout_ut = now + timeout * USEC_PER_SEC,
         .destination_wb = destination_wb,
         .timeout = timeout,
         .function = string_strdupz(function),
@@ -551,9 +565,34 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
     char key[UUID_STR_LEN];
     uuid_unparse_lower(uuid, key);
 
+    dictionary_write_lock(parser->inflight.functions);
+
     // if there is any error, our dictionary callbacks will call the caller callback to notify
     // the caller about the error - no need for error handling here.
-    dictionary_set(parser->inflight_functions, key, &tmp, sizeof(struct inflight_function));
+    dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
+
+    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
+        parser->inflight.smaller_timeout = tmp.timeout_ut;
+
+    // garbage collect stale inflight functions
+    if(parser->inflight.smaller_timeout < now) {
+        parser->inflight.smaller_timeout = 0;
+        struct inflight_function *t;
+        dfe_start_write(parser->inflight.functions, t) {
+            if (t->timeout_ut < now) {
+                internal_error(true,
+                               "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
+                               string2str(t->function), t_dfe.name, now - t->started_ut);
+                dictionary_del(parser->inflight.functions, t_dfe.name);
+            }
+
+            else if(!parser->inflight.smaller_timeout || t->timeout_ut < parser->inflight.smaller_timeout)
+                parser->inflight.smaller_timeout = t->timeout_ut;
+        }
+        dfe_done(t);
+    }
+
+    dictionary_write_unlock(parser->inflight.functions);
 
     return HTTP_RESP_OK;
 }
@@ -603,7 +642,7 @@ PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_
 
 static void pluginsd_function_result_end(struct parser *parser, void *action_data) {
     STRING *key = action_data;
-    dictionary_del(parser->inflight_functions, string2str(key));
+    dictionary_del(parser->inflight.functions, string2str(key));
     string_freez(key);
 }
 
@@ -625,7 +664,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
 
-    struct inflight_function *pf = (struct inflight_function *)dictionary_get(parser->inflight_functions, key);
+    struct inflight_function *pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
     if(!pf) {
         error("got a FUNCTION_RESULT_BEGIN for transaction '%s', but the transaction is not found.", key);
         return PARSER_RC_ERROR;

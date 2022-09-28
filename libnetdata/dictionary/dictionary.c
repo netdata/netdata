@@ -620,6 +620,12 @@ static void ll_recursive_unlock(DICTIONARY *dict, char rw) {
     }
 }
 
+void dictionary_write_lock(DICTIONARY *dict) {
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+}
+void dictionary_write_unlock(DICTIONARY *dict) {
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+}
 
 static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
@@ -1942,14 +1948,10 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
 // get the name/value of an item
 
 const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    api_internal_check(NULL, item, true, false);
     return item_get_name(item);
 }
 
 void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    // we allow the item to be NULL here
-    api_internal_check(NULL, item, true, true);
-
     if(likely(item))
         return item->shared->value;
 
