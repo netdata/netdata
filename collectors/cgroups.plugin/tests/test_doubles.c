@@ -101,7 +101,7 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
     return 0;
 }
 
-RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name)
+const RRDSETVAR_ACQUIRED *rrdsetvar_custom_chart_variable_add_and_acquire(RRDSET *st, const char *name)
 {
     UNUSED(st);
     UNUSED(name);
@@ -109,9 +109,10 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name)
     return NULL;
 }
 
-void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value)
+void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *rsa, NETDATA_DOUBLE value)
 {
-    UNUSED(rs);
+    UNUSED(st);
+    UNUSED(rsa);
     UNUSED(value);
 }
 

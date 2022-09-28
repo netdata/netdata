@@ -877,7 +877,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
     ALARM_ENTRY *ae = host->health_log.alarms;
 
     while (ae) {
-        if (ae->alarm_id == alarm_id && ae->unique_id > mark &&
+        if (ae->alarm_id == alarm_id && ae->unique_id > (uint32_t)mark &&
             (ae->new_status != RRDCALC_STATUS_WARNING && ae->new_status != RRDCALC_STATUS_CRITICAL))
             return 1;
         ae = ae->next;

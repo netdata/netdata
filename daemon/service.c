@@ -61,9 +61,6 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
         }
         else {
             /* Do not delete this dimension */
-#ifdef ENABLE_ACLK
-            queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
-#endif
             return;
         }
     }
@@ -139,10 +136,6 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
             rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
             svc_rrdset_archive_obsolete_dimensions(st, false);
         }
-#ifdef ENABLE_ACLK
-        else
-            sql_check_chart_liveness(st);
-#endif
     }
     rrdset_foreach_done(st);
 }

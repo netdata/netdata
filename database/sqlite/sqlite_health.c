@@ -382,7 +382,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, host->health_log_entries_written - rotate_every));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, (unsigned long int) (host->health_log_entries_written - rotate_every)));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -437,7 +437,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to count health log entries from db");
 
-    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, host->health_log_entries_written);
+    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", rrdhost_hostname(host), uuid_str, (unsigned long int) host->health_log_entries_written);
 }
 
 #define SQL_INJECT_REMOVED(guid, guid2) "insert into health_log_%s (hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, " \

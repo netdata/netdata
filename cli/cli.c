@@ -78,7 +78,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - response_string_size);
+        to_copy = MIN((unsigned int) nread, MAX_COMMAND_LENGTH - 1 - response_string_size);
         memcpy(response_string + response_string_size, buf->base, to_copy);
         response_string_size += to_copy;
         response_string[response_string_size] = '\0';

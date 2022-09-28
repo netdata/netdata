@@ -3,9 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_node.h"
 
-#ifdef ENABLE_ACLK
-#include "../../aclk/aclk_charts_api.h"
-#endif
+#include "../../aclk/aclk_contexts_api.h"
 
 #ifdef ENABLE_ACLK
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
@@ -77,7 +75,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
         { .name = "proto", .version = 1,                     .enabled = 1 },
         { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
         { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = rrdcontext_enabled},
+        { .name = "ctx",   .version = 1,                     .enabled = 1 },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
     node_info.node_instance_capabilities = instance_caps;

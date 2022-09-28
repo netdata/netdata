@@ -67,6 +67,9 @@ ENDIF()
 # show the operating system on the console
 message(STATUS "system name: ${CMAKE_SYSTEM_NAME}")
 
+set(GENERATED_CONFIG_H_DIR ${CMAKE_BINARY_DIR})
+set(GENERATED_CONFIG_H ${GENERATED_CONFIG_H_DIR}/config.h)
+
 # -----------------------------------------------------------------------------
 # Detect libuuid
 
@@ -414,6 +417,8 @@ target_include_directories(judy PUBLIC
     libnetdata/libjudy/src
     libnetdata/libjudy/src/JudyCommon)
 
+target_include_directories(judy BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
+
 target_compile_definitions(judy PUBLIC
     JU_64BIT
     JUDYL)
@@ -510,6 +515,8 @@ IF(ENABLE_PLUGIN_EBPF)
 ENDIF()
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
+
+target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
@@ -751,8 +758,6 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_health.h
         database/sqlite/sqlite_aclk_node.c
         database/sqlite/sqlite_aclk_node.h
-        database/sqlite/sqlite_aclk_chart.c
-        database/sqlite/sqlite_aclk_chart.h
         database/sqlite/sqlite_aclk_alert.c
         database/sqlite/sqlite_aclk_alert.h
         database/sqlite/sqlite3.c
@@ -893,8 +898,6 @@ set(ACLK_FILES
         aclk/aclk_rx_msgs.h
         aclk/https_client.c
         aclk/https_client.h
-        aclk/aclk_charts_api.c
-        aclk/aclk_charts_api.h
         aclk/aclk_alarm_api.c
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
@@ -921,10 +924,6 @@ set(ACLK_FILES
         aclk/schema-wrappers/node_connection.h
         aclk/schema-wrappers/node_creation.cc
         aclk/schema-wrappers/node_creation.h
-        aclk/schema-wrappers/chart_stream.cc
-        aclk/schema-wrappers/chart_stream.h
-        aclk/schema-wrappers/chart_config.cc
-        aclk/schema-wrappers/chart_config.h
         aclk/schema-wrappers/alarm_stream.cc
         aclk/schema-wrappers/alarm_stream.h
         aclk/schema-wrappers/alarm_config.cc
@@ -1202,6 +1201,10 @@ ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
+option(ENABLE_ACLK "Enables functionality required to connect to cloud (must be activated by user at run time)" ON)
+
+if(ENABLE_ACLK)
+
 find_package(Protobuf REQUIRED)
 
 function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
@@ -1246,10 +1249,6 @@ set(ACLK_PROTO_DEFS
         aclk/aclk-schemas/proto/agent/v1/connection.proto
         aclk/aclk-schemas/proto/alarm/v1/config.proto
         aclk/aclk-schemas/proto/alarm/v1/stream.proto
-        aclk/aclk-schemas/proto/chart/v1/config.proto
-        aclk/aclk-schemas/proto/chart/v1/dimension.proto
-        aclk/aclk-schemas/proto/chart/v1/instance.proto
-        aclk/aclk-schemas/proto/chart/v1/stream.proto
         aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
@@ -1261,13 +1260,16 @@ PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PR
 list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
 list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
-list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
+
+ENDIF()
+
+list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
+list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 
 # -----------------------------------------------------------------------------
 # netdata
@@ -1276,7 +1278,7 @@ IF(LINUX)
     list(APPEND NETDATA_FILES daemon/static_threads_linux.c)
     list(APPEND NETDATA_COMMON_LIBRARIES rt)
 
-    add_executable(netdata config.h ${NETDATA_FILES}
+    add_executable(netdata ${GENERATED_CONFIG_H} ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
@@ -1284,6 +1286,7 @@ IF(LINUX)
             )
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(netdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
@@ -1294,9 +1297,10 @@ IF(LINUX)
 ELSEIF(FREEBSD)
     list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
 
-    add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
+    add_executable(netdata ${GENERATED_CONFIG_H} ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(netdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS True)
@@ -1307,9 +1311,10 @@ ELSEIF(FREEBSD)
 ELSEIF(MACOS)
     list(APPEND NETDATA_FILES daemon/static_threads_macos.c)
 
-    add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
+    add_executable(netdata ${GENERATED_CONFIG_H} ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(netdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
@@ -1352,9 +1357,10 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # netdatacli
 
-add_executable(netdatacli config.h ${NETDATACLI_FILES})
+add_executable(netdatacli ${GENERATED_CONFIG_H} ${NETDATACLI_FILES})
 target_link_libraries (netdatacli libnetdata ${NETDATA_COMMON_LIBRARIES})
 target_include_directories(netdatacli PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+target_include_directories(netdatacli BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
 
 
@@ -1363,9 +1369,10 @@ target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
 
 IF(ENABLE_PLUGIN_APPS)
     message(STATUS "apps.plugin: enabled")
-    add_executable(apps.plugin config.h ${APPS_PLUGIN_FILES})
+    add_executable(apps.plugin ${GENERATED_CONFIG_H} ${APPS_PLUGIN_FILES})
     target_link_libraries (apps.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CAP_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CAP_INCLUDE_DIRS})
+    target_include_directories(apps.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CAP_CFLAGS_OTHER})
 ELSE()
     message(STATUS "apps.plugin: disabled")
@@ -1377,9 +1384,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_FREEIPMI)
     message(STATUS "freeipmi.plugin: enabled")
-    add_executable(freeipmi.plugin config.h ${FREEIPMI_PLUGIN_FILES})
+    add_executable(freeipmi.plugin ${GENERATED_CONFIG_H} ${FREEIPMI_PLUGIN_FILES})
     target_link_libraries (freeipmi.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${IPMI_LIBRARIES})
     target_include_directories(freeipmi.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
+    target_include_directories(freeipmi.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(freeipmi.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
 ELSE()
     message(STATUS "freeipmi.plugin: disabled (depends on libipmimonitoring)")
@@ -1391,9 +1399,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_NFACCT)
     message(STATUS "nfacct.plugin: enabled")
-    add_executable(nfacct.plugin config.h ${NFACCT_PLUGIN_FILES})
+    add_executable(nfacct.plugin ${GENERATED_CONFIG_H} ${NFACCT_PLUGIN_FILES})
     target_link_libraries (nfacct.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
     target_include_directories(nfacct.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${MNL_INCLUDE_DIRS} ${NFACCT_INCLUDE_DIRS})
+    target_include_directories(nfacct.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(nfacct.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
 ELSE()
     message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
@@ -1405,9 +1414,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_XENSTAT)
     message(STATUS "xenstat.plugin: enabled")
-    add_executable(xenstat.plugin config.h ${XENSTAT_PLUGIN_FILES})
+    add_executable(xenstat.plugin ${GENERATED_CONFIG_H} ${XENSTAT_PLUGIN_FILES})
     target_link_libraries (xenstat.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${XENSTAT_LIBRARIES})
     target_include_directories(xenstat.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${XENSTAT_INCLUDE_DIRS})
+    target_include_directories(xenstat.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(xenstat.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${XENSTAT_CFLAGS_OTHER})
 ELSE()
     message(STATUS "xenstat.plugin: disabled (requires libxenstat)")
@@ -1419,9 +1429,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_PERF)
     message(STATUS "perf.plugin: enabled")
-    add_executable(perf.plugin config.h ${PERF_PLUGIN_FILES})
+    add_executable(perf.plugin ${GENERATED_CONFIG_H} ${PERF_PLUGIN_FILES})
     target_link_libraries (perf.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(perf.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(perf.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(perf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "perf.plugin: disabled")
@@ -1433,9 +1444,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_EBPF)
     message(STATUS "ebpf.plugin: enabled")
-    add_executable(ebpf.plugin config.h ${EBPF_PROCESS_PLUGIN_FILES})
+    add_executable(ebpf.plugin ${GENERATED_CONFIG_H} ${EBPF_PROCESS_PLUGIN_FILES})
     target_link_libraries (ebpf.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(ebpf.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(ebpf.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(ebpf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "ebpf.plugin: disabled")
@@ -1447,9 +1459,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_SLABINFO)
     message(STATUS "slabinfo.plugin: enabled")
-    add_executable(slabinfo.plugin config.h ${SLABINFO_PLUGIN_FILES})
+    add_executable(slabinfo.plugin ${GENERATED_CONFIG_H} ${SLABINFO_PLUGIN_FILES})
     target_link_libraries (slabinfo.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(slabinfo.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(slabinfo.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(slabinfo.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "slabinfo.plugin: disabled")
@@ -1461,9 +1474,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_CUPS)
     message(STATUS "cups.plugin: enabled")
-    add_executable(cups.plugin config.h ${CUPS_PLUGIN_FILES})
+    add_executable(cups.plugin ${GENERATED_CONFIG_H} ${CUPS_PLUGIN_FILES})
     target_link_libraries (cups.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${CUPS_LIBRARIES})
     target_include_directories(cups.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CUPS_INCLUDE_DIRS})
+    target_include_directories(cups.plugin BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(cups.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CUPS_CFLAGS_OTHER})
 ELSE()
     message(STATUS "cups.plugin: disabled")
@@ -1475,9 +1489,10 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_CGROUP_NETWORK)
     message(STATUS "cgroup-network: enabled")
-    add_executable(cgroup-network config.h ${CGROUP_NETWORK_FILES})
+    add_executable(cgroup-network ${GENERATED_CONFIG_H} ${CGROUP_NETWORK_FILES})
     target_link_libraries (cgroup-network libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(cgroup-network PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(cgroup-network BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(cgroup-network PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
