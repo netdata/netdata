@@ -701,11 +701,16 @@ static int rrdpush_receive(struct receiver_state *rpt)
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     // convert the socket to a FILE *
+    // It seems that the same FILE * cannot be used for both reading and writing.
+    // (reads and writes seem to interfere with each other, with undefined results).
+    // So, we fdopen() twice the same socket.
     FILE *fp_out = fdopen(rpt->fd, "w");
     FILE *fp_in = fdopen(rpt->fd, "r");
-    if(!fp_in) {
+    if(!fp_in || !fp_out) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
-        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        if(fp_in) fclose(fp_in);
+        if(fp_out) fclose(fp_out);
         close(rpt->fd);
         return 0;
     }
