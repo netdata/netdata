@@ -3247,9 +3247,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 , update_every
         );
 
-        // TODO - remove me before merging!
-        fprintf(stdout, "FUNCTION text 10 \"top\" \"run the top command, add params if you like\"\n");
-
         fprintf(stdout,
                 "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
                 "DIMENSION utime '' absolute 1 %2$llu\n"
@@ -3707,6 +3704,9 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
+
+    // TODO - remove me before merging!
+    fprintf(stdout, "FUNCTION text 10 \"top\" \"run the top command, add params if you like\"\n");
 
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {

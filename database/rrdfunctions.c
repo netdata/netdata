@@ -647,3 +647,52 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     return code;
 }
 
+static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident, const char *kq, const char *sq) {
+    struct rrd_collector_function *t;
+    dfe_start_read(functions, t) {
+        if(!t->collector->running) continue;
+
+        if(t_dfe.counter)
+            buffer_strcat(wb, ",\n");
+
+        buffer_sprintf(wb, "%s%s%s%s: {\n", ident, kq, t_dfe.name, kq);
+        buffer_sprintf(wb, "\t%s%sformat%s: %s%s%s,\n", ident, kq, kq, sq, string2str(t->format), sq);
+        buffer_sprintf(wb, "\t%s%shelp%s: %s%s%s,\n", ident, kq, kq, sq, string2str(t->help), sq);
+        buffer_sprintf(wb, "\t%s%stimeout%s: %d\n", ident, kq, kq, t->timeout);
+        buffer_sprintf(wb, "%s}", ident);
+    }
+    dfe_done(t);
+    buffer_strcat(wb, "\n");
+}
+
+void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, const char *sq) {
+    if(!st || !st->functions_view) return;
+
+    char ident[tabs + 1];
+    ident[tabs] = '\0';
+    while(tabs) ident[--tabs] = '\t';
+
+    functions2json(st->functions_view, wb, ident, kq, sq);
+}
+
+void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, const char *sq) {
+    if(!host || !host->functions) return;
+
+    char ident[tabs + 1];
+    ident[tabs] = '\0';
+    while(tabs) ident[--tabs] = '\t';
+
+    functions2json(host->functions, wb, ident, kq, sq);
+}
+
+void chart_functions_to_dict(RRDSET *st, DICTIONARY *dict) {
+    if(!st || !st->functions_view) return;
+
+    struct rrd_collector_function *t;
+    dfe_start_read(st->functions_view, t) {
+        if(!t->collector->running) continue;
+
+        dictionary_set(dict, t_dfe.name, NULL, 0);
+    }
+    dfe_done(t);
+}

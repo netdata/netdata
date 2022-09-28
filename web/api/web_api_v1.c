@@ -1200,6 +1200,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t},\n");
 
+    buffer_strcat(wb, "\t\"functions\": {\n");
+    host_functions2json(host, wb, 2, "\"", "\"");
+    buffer_strcat(wb, "\t},\n");
+
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);
     buffer_strcat(wb, "\n\t],\n");
