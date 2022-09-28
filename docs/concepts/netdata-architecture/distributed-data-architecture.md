@@ -8,7 +8,7 @@ learn_rel_path: "netdata-architecture"
 learn_docs_purpose: "Explain the Netdata approach, every Agent a standalone database+data collection tool+integration tools"
 -->
 
-### The Netdata approach
+## The Netdata approach
 
 Netdata was build with a distributed data architecture mindset. All data are collected and stored on the edge, whenever
 it's possible. This approach has a number of benefits:
@@ -26,14 +26,14 @@ it's possible. This approach has a number of benefits:
 - **No filtering and boundaries on the metrics**: Netdata allows you to store all metrics, you don't have to configure
   which metrics you retain. Keep everything for full visibility during troubleshooting and root cause analysis.
 
-### Holistic observability of an infrastructure in a distributed data architecture approach
+## Holistic observability of an infrastructure in a distributed data architecture approach
 
 Netdata Cloud bridges the gap between many distributed databases by centralizing only the interface. You query and
 visualize your nodes' metrics real time and whenever your need to. When
 you [look at charts in Netdata Cloud](/docs/visualize/interact-dashboards-charts.md), the metrics values are queried
 directly from that node's database and securely streamed to Netdata Cloud, which proxies them to your browser.
 
-### Integrity of metrics in a distributed data architecture approach
+## Integrity of metrics in a distributed data architecture approach
 
 Netdata Agents will collect and store the data for your nodes in any given moment even at partial outages. To ensure
 though accessibility of your data in any given moment, Netdata Agents utilize technologies such

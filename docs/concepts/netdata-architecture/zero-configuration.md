@@ -8,9 +8,10 @@ learn_rel_path: "netdata-architecture"
 learn_docs_purpose: "Explain what Netdata can do out of the box"
 -->
 
-Your Netdata journey doesn't contain a cold start. Netdata is preconfigured and capable to autodetect and monitor any
-well known application that run in your system. You just deploy and claim Netdata Agents in your Netdata space, and 
-you monitor them in seconds. Alerts are preconfigured and fine-tuned, according to community users' observations and notification about the health of your infrastructure are enabled by default in your Netdata Space.
+Your Netdata journey doesn't have a cold start. Netdata is preconfigured and capable to autodetect and monitor any well
+known application that runs on your system. You just deploy and claim Netdata Agents in your Netdata space, and monitor
+them in seconds. Alerts are also preconfigured and fine-tuned, from community members with years of experience in any
+component. Notifications about the health of your infrastructure are enabled by default in your Netdata Space.
 
 :::info
 

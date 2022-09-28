@@ -8,84 +8,12 @@ learn_rel_path: "netdata-agent"
 learn_docs_purpose: "Explain how the Agent can manage/retain the metrics it collects, where it stores them, how it stores them and deletion policies (innovations like the tiering mechanism)"
 -->
 
-**********************************************************************
-Template:
+Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The
+Agent is capable to store metrics both short and long-term, with or without the usage of volatile storage.
 
-Small intro, what we are about to cover
+## Agent database modes and their cases
 
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Database"
-description: "The Netdata Agent leverages multiple, user-configurable time-series databases that use RAM and/or disk to store metrics on any type of node."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/database/README.md
--->
-
-# Database
-
-Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
-(`dbengine`). But to remain as flexible as possible, Netdata supports several storage options:
-
-1. `dbengine`, (the default) data are in database files. The [Database Engine](/database/engine/README.md) works like a
-   traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
-   reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
-   disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
-   the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
-   details see [here](/database/engine/README.md).
-
-2. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
-
-3. `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata restart. It also
-   uses `mmap()` and supports [KSM](#ksm).
-
-4. `map`, data are in memory mapped files. This works like the swap. When Netdata writes data on its memory, the Linux
-   kernel marks the related memory pages as dirty and automatically starts updating them on disk. Unfortunately we
-   cannot control how frequently this works. The Linux kernel uses exactly the same algorithm it uses for its swap
-   memory. This mode uses `mmap()` but does not support [KSM](#ksm). _Keep in mind though, this option will have a
-   constant write on your disk._
-
-5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all others
-   except `none`.
-
-6. `none`, without a database (collected metrics can only be streamed to another Netdata).
-
-## Which database mode to use
-
-The default mode `[db].mode = dbengine` has been designed to scale for longer retentions and is the only mode suitable
-for parent Agents in the _Parent - Child_ setups
-
-The other available database modes are designed to minimize resource utilization and should only be considered on
-[Parent - Child](/docs/metrics-storage-management/how-streaming-works.mdx) setups at the children side and only when the
-resource constraints are very strict.
-
-So,
-
-- On a single node setup, use `[db].mode = dbengine`.
-- On a [Parent - Child](/docs/metrics-storage-management/how-streaming-works.mdx) setup, use `[db].mode = dbengine` on the
-  parent to increase retention, a more resource efficient mode like, `dbengine` with light retention settings, and
-  `save`, `ram` or `none` modes for the children to minimize resource utilization.
-
-## Choose your database mode
-
-You can select the database mode by editing `netdata.conf` and setting:
+The Agent support different modes of managing metrics to cover any deployment case.
 
 ```conf
 [db]
@@ -93,91 +21,137 @@ You can select the database mode by editing `netdata.conf` and setting:
   mode = dbengine
 ```
 
-## Netdata Longer Metrics Retention
+In a nutshell you can use:
 
-Metrics retention is controlled only by the disk space allocated to storing metrics. But it also affects the memory and
-CPU required by the agent to query longer timeframes.
+1. `[db].mode = dbengine` [default mode]: Is the custom, tailored-made time series database. It works like a traditional
+   database, and it's optimized for the Agent's operations. You can use this mode in any case that you want to store
+   Agent related metrics to a designated area of non-volatile devices. These metrics can be either collected metrics on
+   the spot or streamed/replicated metrics of other Agents.
 
-Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
-When having a [**parent - child**](/docs/metrics-storage-management/how-streaming-works.mdx) setup, the child (the
-Netdata Agent running on a production system) delegates all of its functions, including longer metrics retention and
-querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
-multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).
+2. `[db].mode = ram`: data are purely in memory as such they are never saved on disks. This mode uses `mmap()` and
+   supports [KSM](#ksm). You can use this mode in cases where there are no non-volatile devices in your system or you
+   don't want to use them. You can only make use of the last `[db].retention = <time_points>`. The impact on ram may
+   vary, it depends on the metrics that are collected.
 
-## Running Netdata on embedded devices
+3. `[db].mode = save`, data are only in RAM while Netdata runs. On restart Agent flushes them into `[directories].cache`
+   as unique files of any chart. On Agent's reboot it also loads the data from this directory. The metric retention
+   equal to last the `[db].retention = <time_points>`. It uses `mmap()` and supports [KSM](#ksm). This is a legacy
+   configuratio, you can use it in cases where you may want to back up partial chucks of metrics.
 
-Embedded devices typically have very limited RAM resources available.
+4. `[db].mode = map`, data are in memory mapped files. This works like the swap. When Netdata writes data on its memory,
+   the Linux kernel marks the related memory pages as dirty and automatically starts updating them on disk during
+   periodical `sync` flushes. Unfortunately we cannot control how frequently this works. The Linux kernel uses exactly
+   the same algorithm it uses for its swap memory. This mode uses `mmap()` but does not support [KSM](#ksm). _Keep in
+   mind though, this option will have a constant write on your disk._
 
-There are two settings for you to configure:
+5. `[db].mode = alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback
+   for all others except `none`.
 
-1. `[db].update every`, which controls the data collection frequency
-2. `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)
+6. `[db].mode = none`, without a database (collected metrics can only be streamed to another Netdata).
 
-By default `[db].update every = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
+## Netdata's dbengine
 
-If you set `[db].update every = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once
-every 2 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit to find the right setting.
-On very weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but
-1/5 of the CPU and RAM resources).
+In the `dbengine`'s implementation, the amount of historical metrics stored is based on the amount of disk space you
+allocate and the effective compression ratio, not just on the fixed number of metrics collected. It allocates a certain
+amount of ram ( subject to `[db].dbengine page cache size MB`) and stores them into the allocated space for each tier of
+data collected.
 
-You can also disable [data collection plugins](/collectors/README.md) that you don't need. Disabling such plugins will also
-free both CPU and RAM resources.
+### Tiering
 
-## Memory optimizations
+Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are
+collected and stored, i.e. their resolution) is significantly affecting retention. Every Tier down samples the exact
+lower tier (lower tiers have greater resolution). You can have up to 5 Tiers [0. . 4] of data (including the Tier 0,
+which has the highest resolution)
 
-### KSM
+Lowering the granularity from per second to every two seconds, will double their retention and half the CPU requirements
+of the Netdata Agent, without affecting disk space or memory requirements.
 
-KSM performs memory deduplication by scanning through main memory for physical pages that have identical content, and
-identifies the virtual pages that are mapped to those physical pages. It leaves one page unchanged, and re-maps each
-duplicate page to point to the same physical page. Netdata offers all of its in-memory database to kernel for
-deduplication.
+The `dbengine` is capable of retaining metrics for years. To further understand the `dbengine` tiering mechanism let's
+explore the following configuration.
 
-In the past, KSM has been criticized for consuming a lot of CPU resources. This is true when KSM is used for
-deduplicating certain applications, but it is not true for Netdata. Agent's memory is written very infrequently
-(if you have 24 hours of metrics in Netdata, each byte at the in-memory database will be updated just once per day). KSM
-is a solution that will provide 60+% memory savings to Netdata.
+```conf
+[db]
+    mode = dbengine
+    
+    # per second data collection
+    update every = 1
+    
+    # enables Tier 1 and Tier 2, Tier 0 is always enabled in dbengine mode
+    storage tiers = 3
+    
+    # Tier 0, per second data for a week
+    dbengine multihost disk space MB = 1100
+    
+    # Tier 1, per minute data for a month
+    dbengine tier 1 multihost disk space MB = 330
 
-### Enable KSM in kernel
-
-To enable KSM in kernel, you need to run a kernel compiled with the following:
-
-```sh
-CONFIG_KSM=y
+    # Tier 2, per hour data for a year
+    dbengine tier 2 multihost disk space MB = 67
 ```
 
-When KSM is enabled at the kernel, it is just available for the user to enable it.
+For 2000 metrics, collected every second and retained for a week, Tier 0 needs: 1 byte x 2000 metrics x 3600 secs per
+hour x 24 hours per day x 7 days per week = 1100MB.
 
-If you build a kernel with `CONFIG_KSM=y`, you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else
-happens. There is no performance penalty (apart from the memory this code occupies into the kernel).
+By setting `dbengine multihost disk space MB` to `1100`, this node will start maintaining about a week of data. But pay
+attention to the number of metrics. If you have more than 2000 metrics on a node, or you need more that a week of high
+resolution metrics, you may need to adjust this setting accordingly.
 
-The files that `CONFIG_KSM=y` offers include:
+Tier 1 is by default sampling the data every **60 points of Tier 0**. In our case, Tier 0 is per second, if we want to
+transform this information in terms of time then the Tier 1 "resolution" is per minute.
 
-- `/sys/kernel/mm/ksm/run` by default `0`. You have to set this to `1` for the kernel to spawn `ksmd`.
-- `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd should evaluate memory for deduplication.
-- `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
+Tier 1 needs four times more storage per point compared to Tier 0. So, for 2000 metrics, with per minute resolution,
+retained for a month, Tier 1 needs: 4 bytes x 2000 metrics x 60 minutes per hour x 24 hours per day x 30 days per month
+= 330MB.
 
-So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources
-they are willing to have used by `ksmd`.
+Tier 2 is by default sampling data every 3600 points of Tier 0 (60 of Tier 1, which is the previous exact Tier). Again
+in term of "time" (Tier 0 is per second), then Tier 2 is per hour.
 
-### Run `ksmd` kernel daemon
+The storage requirements are the same to Tier 1.
 
-To activate / run `ksmd,` you need to run the following:
+For 2000 metrics, with per hour resolution, retained for a year, Tier 2 needs: 4 bytes x 2000 metrics x 24 hours per day
+x 365 days per year = 67MB.
+
+:::caution
+
+Every storage disk space option contains the keyword `multihost`, this is due to the fact that this space is allocated 
+for any data this Agent stores, including data of other Agent's that are streamed to it.
+
+:::
+
+### Metric size
+
+Tier 0 is the default that was always available in dbengine mode. Tier 1 is the first level of aggregation, Tier 2 is
+the second, and so on.
+
+Metrics on all tiers except of the Tier 0 also store the following five additional values for every point for accurate
+representation:
+
+The sum of the points aggregated The min of the points aggregated The max of the points aggregated The count of the
+points aggregated (could be constant, but it may not be due to gaps in data collection)
+The anomaly_count of the points aggregated (how many of the aggregated points found anomalous)
+Among min, max and sum, the correct value is chosen based on the user query. average is calculated on the fly at query
+time.
+
+
+### Storage files
+
+With the DB engine mode the metric data are stored in database files. These files are organized in pairs, the datafiles
+and their corresponding journalfiles, e.g.:
 
 ```sh
-echo 1 >/sys/kernel/mm/ksm/run
-echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
+datafile-1-0000000001.ndf
+journalfile-1-0000000001.njf
+datafile-1-0000000002.ndf
+journalfile-1-0000000002.njf
+datafile-1-0000000003.ndf
+journalfile-1-0000000003.njf
+...
 ```
 
-With these settings, ksmd does not even appear in the running process list (it will run once per second and evaluate 100
-pages for de-duplication).
+They are located under their host's cache directory in the directory `./dbengine` (e.g. for localhost the default
+location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames contain more recent metric data. The user
+can safely delete some pairs of files when Netdata is stopped to manually free up some space.
 
-Put the above lines in your boot sequence (`/etc/rc.local` or equivalent) to have `ksmd` run at boot.
+_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
 
-### Monitoring Kernel Memory de-duplication performance
-
-Netdata will create charts for kernel memory de-duplication performance, like this:
-
-![image](https://cloud.githubusercontent.com/assets/2662304/11998786/eb23ae54-aab6-11e5-94d4-e848e8a5c56a.png)
-
-
-*******************************************************************************
+## Related topics

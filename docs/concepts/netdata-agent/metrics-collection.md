@@ -8,8 +8,6 @@ learn_rel_path: "netdata-agent"
 learn_docs_purpose: "Explain how metrics are collected [Existing plugins, Custom plugins (plugins.d protocol, for C, Go, Java, Node.js, Python, etc), Statsd]. Auto detection"
 -->
 
-**********************************************************************
-
 With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects
 per-second metrics.
 
@@ -73,7 +71,3 @@ terms related to collecting metrics.
 
 ## Related Documentation
 
-
-
-
-*******************************************************************************
