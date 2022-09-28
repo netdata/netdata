@@ -4172,7 +4172,7 @@ void *reader_main(void *arg __maybe_unused) {
 
                 pid_t pid;
                 FILE *fpin;
-                FILE *fpout = netdata_popen("top -b -d 0.5 -n 1 -w 180", &pid, &fpin);
+                FILE *fpout = netdata_popen("top -b -d 0.5 -n 1 -w 180 2>&1", &pid, &fpin);
 
                 if(fpout) {
                     while (fgets(buffer, PLUGINSD_LINE_MAX, fpout))
