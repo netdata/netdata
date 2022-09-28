@@ -263,7 +263,8 @@ static unsigned char functions_allowed_chars[256] = {
 };
 
 static inline size_t sanitize_function_text(char *dst, const char *src, size_t dst_len) {
-    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_len, functions_allowed_chars, true, "");
+    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_len,
+                         functions_allowed_chars, true, "");
 }
 
 // we keep a dictionary per RRDSET with these functions
@@ -274,7 +275,10 @@ struct rrd_collector_function {
     STRING *format;                 // the format the function produces
     STRING *help;
     int timeout;                    // the default timeout of the function
-    int (*function)(BUFFER *wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data);
+
+    int (*function)(BUFFER *wb, int timeout, const char *function, void *collector_data,
+                    function_data_ready_callback callback, void *callback_data);
+
     void *collector_data;
     struct rrd_collector *collector;
 };
@@ -342,27 +346,32 @@ static void rrd_collector_release(struct rrd_collector *rdc) {
         rrd_collector_free(rdc);
 }
 
-static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdhost __maybe_unused) {
+static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
+                                          void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
 
     if(!thread_rrd_collector)
-        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.", __FUNCTION__, dictionary_acquired_item_name(item));
+        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.",
+              __FUNCTION__, dictionary_acquired_item_name(item));
 
     rdcf->collector = rrd_collector_acquire();
 }
 
-static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *rrdhost __maybe_unused) {
+static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
+                                          void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
     rrd_collector_release(rdcf->collector);
     string_freez(rdcf->format);
 }
 
-static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func __maybe_unused, void *rrdhost __maybe_unused) {
+static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
+                                            void *new_func __maybe_unused, void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
     struct rrd_collector_function *new_rdcf = new_func;
 
     if(!thread_rrd_collector)
-        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.", __FUNCTION__, dictionary_acquired_item_name(item));
+        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.",
+              __FUNCTION__, dictionary_acquired_item_name(item));
 
     bool changed = false;
 
@@ -428,7 +437,8 @@ void rrdfunctions_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
 
-void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, int timeout, const char *name, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data) {
+void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, const char *format, int timeout,
+                                bool sync, function_execute_at_collector function, void *collector_data) {
     if(!st->functions_view)
         st->functions_view = dictionary_create_view(st->rrdhost->functions);
 
@@ -447,7 +457,8 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
     dictionary_view_set(st->functions_view, key, item);
     dictionary_acquired_item_release(st->rrdhost->functions, item);
 
-    internal_error(true, "FUNCTION: '%s' added to host '%s' and chart '%s'", key, rrdhost_hostname(st->rrdhost), rrdset_id(st));
+    internal_error(true, "FUNCTION: '%s' added to host '%s' and chart '%s'",
+                   key, rrdhost_hostname(st->rrdhost), rrdset_id(st));
 }
 
 void rrd_functions_expose(RRDSET *st, BUFFER *wb) {
@@ -456,7 +467,8 @@ void rrd_functions_expose(RRDSET *st, BUFFER *wb) {
 
     struct rrd_collector_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n", string2str(tmp->format), tmp->timeout, tmp_dfe.name, string2str(tmp->help));
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n", string2str(tmp->format),
+                       tmp->timeout, tmp_dfe.name, string2str(tmp->help));
     }
     dfe_done(tmp);
 }
@@ -503,13 +515,13 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
 
     if(!(*rdcf)) {
         buffer_flush(wb);
-        buffer_sprintf(wb, "Function '%s' (sanitized as '%s') is not found.", name, buffer);
+        buffer_sprintf(wb, "No function named '%s' found.", buffer);
         return HTTP_RESP_NOT_FOUND;
     }
 
     if(!(*rdcf)->collector->running) {
         buffer_flush(wb);
-        buffer_strcat(wb, "Collector is not currently running");
+        buffer_sprintf(wb, "The collector for function '%s' is not currently running.", buffer);
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 

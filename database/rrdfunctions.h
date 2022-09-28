@@ -9,7 +9,13 @@ extern void rrdfunctions_destroy(RRDHOST *host);
 extern void rrd_collector_started(void);
 extern void rrd_collector_finished(void);
 
-extern void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, const char *format, int timeout, bool sync, int (*function)(BUFFER *wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data), void *collector_data);
+typedef void (*function_data_ready_callback)(BUFFER *wb, int code, void *callback_data);
+
+typedef int (*function_execute_at_collector)(BUFFER *wb, int timeout, const char *function, void *collector_data,
+                                             function_data_ready_callback callback, void *callback_data);
+
+extern void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, const char *format, int timeout,
+                                       bool sync, function_execute_at_collector function, void *collector_data);
 
 extern int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name);
 
