@@ -505,6 +505,7 @@ int connect_to_one_of_destinations(
 struct rrdpush_destinations *destinations_init(const char *dests) {
     const char *s = dests;
     struct rrdpush_destinations *destinations = NULL;
+    int count = 0;
     while(*s) {
         const char *e = s;
 
@@ -523,6 +524,9 @@ struct rrdpush_destinations *destinations_init(const char *dests) {
             DOUBLE_LINKED_LIST_APPEND_UNSAFE(destinations, d, prev, next);
 
             s = e;
+
+            count++;
+            info("STREAM: added streaming destination No %d: '%s'", count, string2str(d->destination));
         }
     }
     return destinations;

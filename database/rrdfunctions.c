@@ -621,7 +621,8 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     return code;
 }
 
-int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+    rrd_call_function_async_callback callback, void *callback_data) {
     int code;
 
     struct rrd_collector_function *rdcf = NULL;
