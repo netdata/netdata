@@ -471,7 +471,7 @@ int connect_to_one_of_destinations(
     for (struct rrdpush_destinations *d = destinations; d; d = d->next) {
         if (d->disabled_no_proper_reply) {
             d->disabled_no_proper_reply = 0;
-            info("STREAM %s: skipping destination '%s' (default port: %d) - it did not reply properly in the past.", rrdhost_hostname(host), d->destination, default_port);
+            info("STREAM %s: skipping destination '%s' (default port: %d) - it did not reply properly in the past - will try it next time.", rrdhost_hostname(host), d->destination, default_port);
             continue;
         } else if (d->disabled_because_of_localhost) {
             info("STREAM %s: skipping destination '%s' (default port: %d) - it is the origin server for this host.", rrdhost_hostname(host), d->destination, default_port);
@@ -481,7 +481,7 @@ int connect_to_one_of_destinations(
             continue;
         } else if (d->disabled_because_of_denied_access) {
             d->disabled_because_of_denied_access = 0;
-            info("STREAM %s: skipping destination '%s' (default port: %d) - it denied access in the past.", rrdhost_hostname(host), d->destination, default_port);
+            info("STREAM %s: skipping destination '%s' (default port: %d) - it denied access in the past - will try it next time.", rrdhost_hostname(host), d->destination, default_port);
             continue;
         }
 
