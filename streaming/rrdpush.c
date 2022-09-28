@@ -468,7 +468,7 @@ int connect_to_one_of_destinations(
     int sock = -1;
     bool have_disabled_that_can_run = true;
 
-    while(have_disabled_that_can_run) {
+    while(sock == -1 && have_disabled_that_can_run) {
         have_disabled_that_can_run = false;
 
         for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
