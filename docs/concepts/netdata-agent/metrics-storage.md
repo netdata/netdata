@@ -9,7 +9,7 @@ learn_docs_purpose: "Explain how the Agent can manage/retain the metrics it coll
 -->
 
 Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The
-Agent is capable to store metrics both short and long-term, with or without the usage of volatile storage.
+Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
 
 ## Agent database modes and their cases
 
@@ -120,17 +120,24 @@ for any data this Agent stores, including data of other Agent's that are streame
 
 ### Metric size
 
-Tier 0 is the default that was always available in dbengine mode. Tier 1 is the first level of aggregation, Tier 2 is
+
+Every Tier down samples the exact lower tier (lower tiers have greater resolution). You can have up to 5
+Tiers **[0. . 4]** of data (including the Tier 0, which has the highest resolution)
+
+Tier 0 is the default that was always available in `dbengine` mode. Tier 1 is the first level of aggregation, Tier 2 is
 the second, and so on.
 
-Metrics on all tiers except of the Tier 0 also store the following five additional values for every point for accurate
+Metrics on all tiers except of the _Tier 0_ also store the following five additional values for every point for accurate
 representation:
 
-The sum of the points aggregated The min of the points aggregated The max of the points aggregated The count of the
-points aggregated (could be constant, but it may not be due to gaps in data collection)
-The anomaly_count of the points aggregated (how many of the aggregated points found anomalous)
-Among min, max and sum, the correct value is chosen based on the user query. average is calculated on the fly at query
-time.
+1. The `sum` of the points aggregated
+2. The `min` of the points aggregated
+3. The `max` of the points aggregated
+4. The `count` of the points aggregated (could be constant, but it may not be due to gaps in data collection)
+5. The `anomaly_count` of the points aggregated (how many of the aggregated points found anomalous)
+
+Among `min`, `max` and `sum`, the correct value is chosen based on the user query. `average` is calculated on the fly at
+query time.
 
 
 ### Storage files
