@@ -37,6 +37,7 @@
 - Update dashboard to version v2.29.0. [\#13654](https://github.com/netdata/netdata/pull/13654) ([netdatabot](https://github.com/netdatabot))
 - Fix container virtualization info [\#13653](https://github.com/netdata/netdata/pull/13653) ([vlvkobal](https://github.com/vlvkobal))
 - Do not free AR dimensions from within ML. [\#13651](https://github.com/netdata/netdata/pull/13651) ([vkalintiris](https://github.com/vkalintiris))
+- Remove Chart/Dim based communication [\#13650](https://github.com/netdata/netdata/pull/13650) ([underhood](https://github.com/underhood))
 - Improve agent shutdown time [\#13649](https://github.com/netdata/netdata/pull/13649) ([stelfrag](https://github.com/stelfrag))
 - add \_collect\_job label to python.d/\* charts [\#13648](https://github.com/netdata/netdata/pull/13648) ([ilyam8](https://github.com/ilyam8))
 - RRD structures managed by dictionaries [\#13646](https://github.com/netdata/netdata/pull/13646) ([ktsaou](https://github.com/ktsaou))
@@ -349,9 +350,6 @@
 - fix\(cgroup.plugin\): read k8s\_cluster\_name label from the correct file [\#13062](https://github.com/netdata/netdata/pull/13062) ([ilyam8](https://github.com/ilyam8))
 - Initialize chart label key parameter correctly [\#13061](https://github.com/netdata/netdata/pull/13061) ([stelfrag](https://github.com/stelfrag))
 - Added Alma Linux 9 and RHEL 9 support to CI and packaging. [\#13058](https://github.com/netdata/netdata/pull/13058) ([Ferroin](https://github.com/Ferroin))
-- Fix handling of temp directory in kickstart when uninstalling. [\#13056](https://github.com/netdata/netdata/pull/13056) ([Ferroin](https://github.com/Ferroin))
-- Fix coverity 378625 [\#13055](https://github.com/netdata/netdata/pull/13055) ([MrZammler](https://github.com/MrZammler))
-- add the ability to merge dictionary items [\#13054](https://github.com/netdata/netdata/pull/13054) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
