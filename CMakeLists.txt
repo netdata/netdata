@@ -417,6 +417,8 @@ target_include_directories(judy PUBLIC
     libnetdata/libjudy/src
     libnetdata/libjudy/src/JudyCommon)
 
+target_include_directories(judy BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
+
 target_compile_definitions(judy PUBLIC
     JU_64BIT
     JUDYL)
@@ -513,6 +515,8 @@ IF(ENABLE_PLUGIN_EBPF)
 ENDIF()
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
+
+target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
@@ -1195,6 +1199,10 @@ ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
+option(ENABLE_ACLK "Enables functionality required to connect to cloud (must be activated by user at run time)" ON)
+
+if(ENABLE_ACLK)
+
 find_package(Protobuf REQUIRED)
 
 function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
@@ -1250,13 +1258,16 @@ PROTOBUF_ACLK_GENERATE_CPP(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PR
 list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
 list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
-list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
+
+ENDIF()
+
+list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
+list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
 
 # -----------------------------------------------------------------------------
 # netdata
@@ -1273,6 +1284,7 @@ IF(LINUX)
             )
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_include_directories(netdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
