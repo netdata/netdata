@@ -779,6 +779,10 @@ void execute_commands(struct sender_state *s) {
         memmove(s->read_buffer, start, end-start);
         s->read_len = end - start;
     }
+    else {
+        s->read_buffer[0] = '\0';
+        s->read_len = 0;
+    }
 }
 
 struct rrdpush_sender_thread_data {
