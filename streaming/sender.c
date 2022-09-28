@@ -722,7 +722,6 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
     sender_start(s);
     buffer_sprintf(s->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
-    buffer_sprintf(s->build, "\npassed through node '%s', delay %llu", rrdhost_hostname(localhost), now_realtime_usec() - tmp->received_ut);
     buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
     rrdpush_signal_sender_to_wake_up(s);
     sender_commit(s);
@@ -774,9 +773,6 @@ void execute_commands(struct sender_state *s) {
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
-
-                internal_error(true, "FUNCTION: rrd_call_function_async() delay %llu usec", now_realtime_usec() - tmp->received_ut);
-
                 if(code != HTTP_RESP_OK)
                     stream_execute_function_callback(wb, code, tmp);
             }
@@ -985,7 +981,7 @@ void *rrdpush_sender_thread(void *ptr) {
             s->buffer->read = 0;
             s->buffer->write = 0;
             attempt_to_connect(s);
-            if (s->version >= VERSION_GAP_FILLING) {
+            if (s->version >= STREAM_VERSION_INTERIM_GAP_FILLING) {
                 time_t now = now_realtime_sec();
                 sender_start(s);
                 buffer_sprintf(s->build, "TIMESTAMP %"PRId64"", (int64_t)now);

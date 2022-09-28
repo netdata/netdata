@@ -10,10 +10,34 @@
 
 #define CONNECTED_TO_SIZE 100
 
-#define STREAM_VERSION_CLAIM 3
-#define STREAM_VERSION_CLABELS 4
-#define STREAM_VERSION_COMPRESSION 5
-#define VERSION_GAP_FILLING 6
+#define STREAM_VERSION_CLAIM                3
+#define STREAM_VERSION_CLABELS              4
+#define STREAM_VERSION_COMPRESSION          5 // this is production
+#define STREAM_VERSION_INTERIM_GAP_FILLING  6
+
+//#define STREAM_VERSION_FUNCTIONS            7
+//
+//typedef enum {
+//    // do not use the first 3 bits
+//    STREAM_CAP_CLAIM            = (1 << 3),
+//    STREAM_CAP_CLABELS          = (1 << 4),
+//    STREAM_CAP_COMPRESSION      = (1 << 5),
+//    STREAM_CAP_FUNCTIONS        = (1 << 6),
+//    STREAM_CAP_GAP_FILLING      = (1 << 7),
+//    STREAM_CAP_PROTOBUF         = (1 << 8),
+//} STREAM_CAPABILITIES;
+//
+//STREAM_CAPABILITIES convert_version(uint32_t version) {
+//    if(version > STREAM_VERSION_COMPRESSION) return version;
+//
+//    if(version < STREAM_VERSION_CLAIM) return 0;
+//    if(version <= STREAM_VERSION_CLAIM) return STREAM_CAP_CLAIM;
+//    if(version <= STREAM_VERSION_CLABELS) return STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
+//    if(version <= STREAM_VERSION_COMPRESSION) return STREAM_CAP_COMPRESSION | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
+//}
+//
+//#define stream_capability(rpt, capability) ((rpt)->stream_version & (capability))
+//
 
 #ifdef  ENABLE_COMPRESSION
 #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_COMPRESSION)

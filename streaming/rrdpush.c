@@ -286,7 +286,7 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     buffer_fast_strcat(wb, "\" ", 2);
     buffer_print_llu(wb, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
-    if (s->version >= VERSION_GAP_FILLING) {
+    if (s->version >= STREAM_VERSION_INTERIM_GAP_FILLING) {
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_ll(wb, st->last_collected_time.tv_sec);
     }

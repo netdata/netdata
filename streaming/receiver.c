@@ -72,7 +72,7 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     time_t remote_time = 0;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (cd->version < VERSION_GAP_FILLING ) {
+    if (cd->version < STREAM_VERSION_INTERIM_GAP_FILLING) {
         error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd,
                cd->version);
         return PARSER_RC_OK;    // Ignore error and continue stream
