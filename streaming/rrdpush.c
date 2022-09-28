@@ -457,6 +457,7 @@ void rrdpush_claimed_id(RRDHOST *host)
 }
 
 int connect_to_one_of_destinations(
+    RRDHOST *host,
     struct rrdpush_destinations *destinations,
     int default_port,
     struct timeval *timeout,
@@ -470,18 +471,23 @@ int connect_to_one_of_destinations(
     for (struct rrdpush_destinations *d = destinations; d; d = d->next) {
         if (d->disabled_no_proper_reply) {
             d->disabled_no_proper_reply = 0;
+            info("STREAM %s: skipping destination '%s' (default port: %d) - it did not reply properly in the past.", rrdhost_hostname(host), d->destination, default_port);
             continue;
         } else if (d->disabled_because_of_localhost) {
+            info("STREAM %s: skipping destination '%s' (default port: %d) - it is the origin server for this host.", rrdhost_hostname(host), d->destination, default_port);
             continue;
         } else if (d->disabled_already_streaming && (d->disabled_already_streaming + 30 > now_realtime_sec())) {
+            info("STREAM %s: skipping destination '%s' (default port: %d) - it already has this host - will give it a try later.", rrdhost_hostname(host), d->destination, default_port);
             continue;
         } else if (d->disabled_because_of_denied_access) {
             d->disabled_because_of_denied_access = 0;
+            info("STREAM %s: skipping destination '%s' (default port: %d) - it denied access in the past.", rrdhost_hostname(host), d->destination, default_port);
             continue;
         }
 
-        if (reconnects_counter)
-            *reconnects_counter += 1;
+        info("STREAM %s: attempting to connect to '%s' (default port: %d)...", rrdhost_hostname(host), d->destination, default_port);
+
+        if (reconnects_counter) *reconnects_counter += 1;
         sock = connect_to_this(d->destination, default_port, timeout);
         if (sock != -1) {
             if (connected_to && connected_to_size) {

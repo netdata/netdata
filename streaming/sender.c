@@ -287,10 +287,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     // make sure the socket is closed
     rrdpush_sender_thread_close_socket(host);
 
-    debug(D_STREAM, "STREAM: Attempting to connect...");
-    info("STREAM %s [send to %s]: connecting...", rrdhost_hostname(host), host->rrdpush_send_destination);
-
     host->rrdpush_sender_socket = connect_to_one_of_destinations(
+            host,
             host->destinations
             , default_port
             , &tv
