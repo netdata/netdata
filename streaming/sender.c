@@ -728,6 +728,7 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
     sender_start(s);
     buffer_sprintf(s->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
+    buffer_sprintf(s->build, "\npassed through node '%s'", rrdhost_hostname(localhost));
     buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
     sender_commit(s);
 
