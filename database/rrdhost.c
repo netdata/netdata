@@ -1156,11 +1156,11 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
     freez(host->rrdpush_send_destination);
-    struct rrdpush_destinations *tmp_destination;
     while (host->destinations) {
-        tmp_destination = host->destinations->next;
-        freez(host->destinations);
-        host->destinations = tmp_destination;
+        struct rrdpush_destinations *tmp = host->destinations;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, tmp, prev, next);
+        string_freez(tmp->destination);
+        freez(tmp);
     }
     string_freez(host->health_default_exec);
     string_freez(host->health_default_recipient);

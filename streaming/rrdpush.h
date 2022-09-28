@@ -167,11 +167,12 @@ struct receiver_state {
 };
 
 struct rrdpush_destinations {
-    char destination[CONNECTED_TO_SIZE + 1];
+    STRING *destination;
     int disabled_no_proper_reply;
     int disabled_because_of_localhost;
     time_t disabled_already_streaming;
     int disabled_because_of_denied_access;
+    struct rrdpush_destinations *prev;
     struct rrdpush_destinations *next;
 };
 
