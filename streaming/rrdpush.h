@@ -188,6 +188,8 @@ extern int connect_to_one_of_destinations(
     size_t connected_to_size,
     struct rrdpush_destinations **destination);
 
+extern void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
+
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();

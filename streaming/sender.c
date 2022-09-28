@@ -724,6 +724,7 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
     buffer_sprintf(s->build, "\npassed through node '%s', delay %llu", rrdhost_hostname(localhost), now_realtime_usec() - tmp->received_ut);
     buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+    rrdpush_signal_sender_to_wake_up(s);
     sender_commit(s);
 
     internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",

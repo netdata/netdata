@@ -367,6 +367,14 @@ bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE
     return true;
 }
 
+void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
+    RRDHOST *host = s->host;
+
+    // signal the sender there are more data
+    if (host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
+}
+
 void rrdset_done_push(RRDSET *st) {
     if(unlikely(!should_send_chart_matching(st)))
         return;
@@ -398,10 +406,7 @@ void rrdset_done_push(RRDSET *st) {
         rrdpush_send_chart_definition(st);
 
     if(likely(rrdpush_send_chart_metrics_nolock(st, host->sender))) {
-        // signal the sender there are more data
-        if (host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-            error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
-
+        rrdpush_signal_sender_to_wake_up(host->sender);
         sender_commit(host->sender);
     }
     else
