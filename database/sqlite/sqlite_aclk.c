@@ -513,12 +513,16 @@ void aclk_database_worker(void *arg)
 // MAINTENANCE
                 case ACLK_DATABASE_CLEANUP:
                     debug(D_ACLK_SYNC, "Database cleanup for %s", wc->host_guid);
+
+                    if (wc->startup_time + ACLK_DATABASE_CLEANUP_FIRST + 2 < now_realtime_sec() && claimed() && aclk_connected) {
+                        cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                        cmd.completion = NULL;
+                        (void) aclk_database_enq_cmd_noblock(wc, &cmd);
+                    }
+
                     sql_maint_aclk_sync_database(wc, cmd);
                     if (wc->host == localhost)
                         sql_check_aclk_table_list(wc);
-                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
-                    cmd.completion = NULL;
-                    (void) aclk_database_enq_cmd_noblock(wc, &cmd);
                     break;
 
                 case ACLK_DATABASE_DELETE_HOST:
