@@ -146,130 +146,134 @@ static inline void convert_argv_to_string(char *dst, size_t size, const char *sp
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp_child_input, FILE **fpp_child_output, const char *command, const char *spawn_argv[]) {
+static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp_child_stdin, FILE **fpp_child_stdout, const char *command, const char *spawn_argv[]) {
     // create a string to be logged about the command we are running
     char command_to_be_logged[2048];
     convert_argv_to_string(command_to_be_logged, sizeof(command_to_be_logged), spawn_argv);
     // info("custom_popene() running command: %s", command_to_be_logged);
 
+    int ret = 0;     // success by default
+    int attr_rc = 1; // failure by default
+
     FILE *fp_child_stdin = NULL, *fp_child_stdout = NULL;
-    int ret = 0; // success by default
-    int error;
     int pipefd_stdin[2] = { -1, -1 };
     int pipefd_stdout[2] = { -1, -1 };
+
     pid_t pid;
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    if (flags & POPEN_FLAG_CREATE_PIPE) {
+    int stdin_fd_to_exclude_from_closing = -1;
+    int stdout_fd_to_exclude_from_closing = -1;
+
+    if(posix_spawn_file_actions_init(&fa)) {
+        error("POPEN: posix_spawn_file_actions_init() failed.");
+        return -1;
+    }
+
+    if(fpp_child_stdin) {
         if (pipe(pipefd_stdin) == -1) {
             error("POPEN: stdin pipe() failed");
-            goto cleanup_pipes;
-        }
-
-        if (pipe(pipefd_stdout) == -1) {
-            error("POPEN: stdout pipe() failed");
-            goto cleanup_pipes;
+            ret = -1;
+            goto cleanup_and_return;
         }
 
         if ((fp_child_stdin = fdopen(pipefd_stdin[PIPE_WRITE], "w")) == NULL) {
             error("POPEN: fdopen() stdin failed");
-            goto cleanup_pipes;
+            ret = -1;
+            goto cleanup_and_return;
+        }
+
+        if(posix_spawn_file_actions_adddup2(&fa, pipefd_stdin[PIPE_READ], STDIN_FILENO)) {
+            error("POPEN: posix_spawn_file_actions_adddup2() on stdin failed.");
+            ret = -1;
+            goto cleanup_and_return;
+        }
+    }
+    else {
+        if (posix_spawn_file_actions_addopen(&fa, STDIN_FILENO, "/dev/null", O_RDONLY, 0)) {
+            error("POPEN: posix_spawn_file_actions_addopen() on stdin to /dev/null failed.");
+            // this is not a fatal error
+            stdin_fd_to_exclude_from_closing = STDIN_FILENO;
+        }
+    }
+
+    if (fpp_child_stdout) {
+        if (pipe(pipefd_stdout) == -1) {
+            error("POPEN: stdout pipe() failed");
+            ret = -1;
+            goto cleanup_and_return;
         }
 
         if ((fp_child_stdout = fdopen(pipefd_stdout[PIPE_READ], "r")) == NULL) {
             error("POPEN: fdopen() stdout failed");
-            goto cleanup_pipes;
+            ret = -1;
+            goto cleanup_and_return;
+        }
+
+        if(posix_spawn_file_actions_adddup2(&fa, pipefd_stdout[PIPE_WRITE], STDOUT_FILENO)) {
+            error("POPEN: posix_spawn_file_actions_adddup2() on stdout failed.");
+            ret = -1;
+            goto cleanup_and_return;
+        }
+    }
+    else {
+        if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
+            error("POPEN: posix_spawn_file_actions_addopen() on stdout to /dev/null failed.");
+            // this is not a fatal error
+            stdout_fd_to_exclude_from_closing = STDOUT_FILENO;
         }
     }
 
     if(flags & POPEN_FLAG_CLOSE_FD) {
         // Mark all files to be closed by the exec() stage of posix_spawn()
         for(int i = (int)(sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
-            if(likely(i != STDERR_FILENO))
+            if(likely(i != STDERR_FILENO && i != stdin_fd_to_exclude_from_closing && i != stdout_fd_to_exclude_from_closing))
                 (void)fcntl(i, F_SETFD, FD_CLOEXEC);
         }
     }
 
-    if(posix_spawn_file_actions_init(&fa)) {
-        error("POPEN: posix_spawn_file_actions_init() failed.");
-        goto cleanup_pipes;
-    }
-
-    if(flags & POPEN_FLAG_CREATE_PIPE) {
-        // move the pipe to stdout in the child
-        if(posix_spawn_file_actions_adddup2(&fa, pipefd_stdin[PIPE_READ], STDIN_FILENO)) {
-            error("POPEN: posix_spawn_file_actions_adddup2() on stdin failed.");
-            goto error_after_posix_spawn_file_actions_init;
-        }
-
-        if(posix_spawn_file_actions_adddup2(&fa, pipefd_stdout[PIPE_WRITE], STDOUT_FILENO)) {
-            error("POPEN: posix_spawn_file_actions_adddup2() on stdout failed.");
-            goto error_after_posix_spawn_file_actions_init;
-        }
+    attr_rc = posix_spawnattr_init(&attr);
+    if(attr_rc) {
+        // failed
+        error("POPEN: posix_spawnattr_init() failed.");
     }
     else {
-        // set stdin to /dev/null
-        if (posix_spawn_file_actions_addopen(&fa, STDIN_FILENO, "/dev/null", O_RDONLY, 0)) {
-            error("POPEN: posix_spawn_file_actions_addopen() on stdin failed.");
-            // this is not a fatal error
-        }
-
-        // set stdout to /dev/null
-        if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
-            error("POPEN: posix_spawn_file_actions_addopen() on stdout failed.");
-            // this is not a fatal error
-        }
-    }
-
-    if(!(error = posix_spawnattr_init(&attr))) {
+        // success
         // reset all signals in the child
-        sigset_t mask;
 
         if (posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
             error("POPEN: posix_spawnattr_setflags() failed.");
 
+        sigset_t mask;
         sigemptyset(&mask);
 
         if (posix_spawnattr_setsigmask(&attr, &mask))
             error("POPEN: posix_spawnattr_setsigmask() failed.");
     }
-    else
-        error("POPEN: posix_spawnattr_init() failed.");
 
     // Take the lock while we fork to ensure we don't race with SIGCHLD
     // delivery on a process which exits quickly.
     netdata_popen_tracking_lock();
     if (!posix_spawn(&pid, command, &fa, &attr, (char * const*)spawn_argv, env)) {
+        // success
         *pidptr = pid;
         netdata_popen_tracking_add_pid_unsafe(pid);
         netdata_popen_tracking_unlock();
-        debug(D_CHILDS, "POPEN: spawned command: \"%s\" on pid %d from parent pid %d.", command_to_be_logged, pid, getpid());
     }
     else {
+        // failure
         netdata_popen_tracking_unlock();
         error("POPEN: failed to spawn command: \"%s\" from parent pid %d.", command_to_be_logged, getpid());
-        if(flags & POPEN_FLAG_CREATE_PIPE) {
-            fclose(fp_child_stdin);
-            fp_child_stdin = NULL;
-            fclose(fp_child_stdout);
-            fp_child_stdout = NULL;
-        }
         ret = -1;
+        goto cleanup_and_return;
     }
 
-    if(flags & POPEN_FLAG_CREATE_PIPE) {
-        close(pipefd_stdin[PIPE_READ]);
-        close(pipefd_stdout[PIPE_WRITE]);
+    // the normal cleanup will run
+    // but ret == 0 at this point
 
-        if (0 == ret) {
-            // on success set FILE * pointer
-            if (fpp_child_input) *fpp_child_input = fp_child_stdin;
-            if (fpp_child_output) *fpp_child_output = fp_child_stdout;
-        }
-    }
-
-    if(!error) {
+cleanup_and_return:
+    if(!attr_rc) {
         // posix_spawnattr_init() succeeded
         if (posix_spawnattr_destroy(&attr))
             error("POPEN: posix_spawnattr_destroy() failed");
@@ -278,30 +282,41 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     if (posix_spawn_file_actions_destroy(&fa))
         error("POPEN: posix_spawn_file_actions_destroy() failed");
 
-    return ret;
-
-error_after_posix_spawn_file_actions_init:
-    if (posix_spawn_file_actions_destroy(&fa))
-        error("POPEN: posix_spawn_file_actions_destroy() failed");
-
-cleanup_pipes:
-    if (flags & POPEN_FLAG_CREATE_PIPE) {
+    if (ret == -1) {
         if (fp_child_stdout)
             fclose(fp_child_stdout);
-        else if(pipefd_stdout[PIPE_READ] != -1)
+
+        if (fp_child_stdin)
+            fclose(fp_child_stdin);
+
+        if (pipefd_stdin[PIPE_READ] != -1)
+            close(pipefd_stdin[PIPE_READ]);
+
+        if (pipefd_stdin[PIPE_WRITE] != -1)
+            close(pipefd_stdin[PIPE_WRITE]);
+
+        if (pipefd_stdout[PIPE_READ] != -1)
             close(pipefd_stdout[PIPE_READ]);
+
+        if (pipefd_stdout[PIPE_WRITE] != -1)
+            close(pipefd_stdout[PIPE_WRITE]);
+    }
+    else {
+        // we are at the parent
+        // so close the child ends of the pipes
+
+        if(pipefd_stdin[PIPE_READ] != -1)
+            close(pipefd_stdin[PIPE_READ]);
 
         if(pipefd_stdout[PIPE_WRITE] != -1)
             close(pipefd_stdout[PIPE_WRITE]);
 
-        if(fp_child_stdin)
-            fclose(fp_child_stdin);
-        else if(pipefd_stdin[PIPE_WRITE] != -1)
-            close(pipefd_stdin[PIPE_WRITE]);
-
-        if(pipefd_stdin[PIPE_READ] != -1)
-            close(pipefd_stdin[PIPE_READ]);
+        // and these are the file pointer that can be used
+        // to communicate with the child
+        if(fpp_child_stdin)  *fpp_child_stdin  = fp_child_stdin;
+        if(fpp_child_stdout) *fpp_child_stdout = fp_child_stdout;
     }
+
     return -1;
 }
 
@@ -351,7 +366,7 @@ FILE *netdata_popen(const char *command, volatile pid_t *pidptr, FILE **fpp_chil
         command,
         NULL
     };
-    (void)popene_internal(pidptr, environ, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, fpp_child_input, &fp_child_output, "/bin/sh", spawn_argv);
+    (void)popene_internal(pidptr, environ, POPEN_FLAG_CLOSE_FD, fpp_child_input, &fp_child_output, "/bin/sh", spawn_argv);
     return fp_child_output;
 }
 
@@ -363,7 +378,7 @@ FILE *netdata_popene(const char *command, volatile pid_t *pidptr, char **env, FI
         command,
         NULL
     };
-    (void)popene_internal(pidptr, env, POPEN_FLAG_CREATE_PIPE | POPEN_FLAG_CLOSE_FD, fpp_child_input, &fp_child_output, "/bin/sh", spawn_argv);
+    (void)popene_internal(pidptr, env, POPEN_FLAG_CLOSE_FD, fpp_child_input, &fp_child_output, "/bin/sh", spawn_argv);
     return fp_child_output;
 }
 

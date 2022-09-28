@@ -10,11 +10,10 @@
 
 /* custom_popene_variadic_internal_dont_use_directly flag definitions */
 #define POPEN_FLAG_NONE        0
-#define POPEN_FLAG_CREATE_PIPE 1 // Create a pipe like popen() when set, otherwise set stdout to /dev/null
-#define POPEN_FLAG_CLOSE_FD    2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
+#define POPEN_FLAG_CLOSE_FD    (1 << 0) // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
 
 // the flags to be used by default
-#define POPEN_FLAGS_DEFAULT (POPEN_FLAG_CREATE_PIPE|POPEN_FLAG_CLOSE_FD)
+#define POPEN_FLAGS_DEFAULT (POPEN_FLAG_CLOSE_FD)
 
 // mypopen_raw is the interface to use instead of custom_popene_variadic_internal_dont_use_directly()
 // mypopen_raw will add the terminating NULL at the arguments list
