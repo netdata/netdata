@@ -1,7 +1,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-#define MAX_FUNCTION_LENGTH PLUGINSD_LINE_MAX
+#define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
 
 static unsigned char functions_allowed_chars[256] = {
     [0] = '\0', //
@@ -477,30 +477,28 @@ static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
 
 static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
-    char *d = buffer, *e = &buffer[MAX_FUNCTION_LENGTH - 1];
-    const char *s = name;
 
-    // copy the first word - up to the 1st space
-    while(*s && !isspace(*s) && d < e)
-        *d++ = *s++;
-
-    *d = '\0';
+    strncpyz(buffer, name, MAX_FUNCTION_LENGTH);
+    char *s = NULL;
 
     *rdcf = NULL;
-    while(!(*rdcf) && d < e) {
+    while(!(*rdcf) && s > buffer) {
         *rdcf = dictionary_get(host->functions, buffer);
-        if(*rdcf || !*s)
-            break;
+        if(*rdcf) break;
 
-        // copy all the spaces
-        while(*s && isspace(*s) && d < e)
-            *d++ = *s++;
+        // if s == NULL, set it to the end of the buffer
+        // this should happen only the first time
+        if(unlikely(!s))
+            s = &buffer[strlen(buffer) - 1];
 
-        // copy another word
-        while(*s && !isspace(*s) && d < e)
-            *d++ = *s++;
+        // skip a word from the end
+        while(s > buffer && !isspace(*s)) --s;
 
-        *d = '\0';
+        // skip all spaces
+        while(s > buffer && isspace(*s)) --s;
+
+        if(s > buffer) // it is a space - terminate there
+            *s-- = '\0';
     }
 
     if(!(*rdcf)) {
