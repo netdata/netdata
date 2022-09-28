@@ -168,10 +168,12 @@ struct receiver_state {
 
 struct rrdpush_destinations {
     STRING *destination;
+
     int disabled_no_proper_reply;
     int disabled_because_of_localhost;
     time_t disabled_already_streaming;
     int disabled_because_of_denied_access;
+
     struct rrdpush_destinations *prev;
     struct rrdpush_destinations *next;
 };
@@ -206,7 +208,6 @@ extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDV
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 extern int connect_to_one_of_destinations(
     RRDHOST *host,
-    struct rrdpush_destinations *destinations,
     int default_port,
     struct timeval *timeout,
     size_t *reconnects_counter,

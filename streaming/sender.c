@@ -288,8 +288,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     rrdpush_sender_thread_close_socket(host);
 
     host->rrdpush_sender_socket = connect_to_one_of_destinations(
-            host,
-            host->destinations
+              host
             , default_port
             , &tv
             , &s->reconnects_counter
@@ -456,8 +455,7 @@ if(!s->rrdpush_compression)
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                 rrdpush_sender_thread_close_socket(host);
-                if (host->destination->next)
-                    host->destination->disabled_no_proper_reply = 1;
+                host->destination->disabled_no_proper_reply = 1;
                 return 0;
             }else {
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -470,8 +468,7 @@ if(!s->rrdpush_compression)
                         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                         error("Closing the stream connection, because the server SSL certificate is not valid.");
                         rrdpush_sender_thread_close_socket(host);
-                        if (host->destination->next)
-                            host->destination->disabled_no_proper_reply = 1;
+                        host->destination->disabled_no_proper_reply = 1;
                         return 0;
                     }
                 }
@@ -512,8 +509,7 @@ if(!s->rrdpush_compression)
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", rrdhost_hostname(host), s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         //catch other reject reasons and force to check other destinations
-        if (host->destination->next)
-            host->destination->disabled_no_proper_reply = 1;
+        host->destination->disabled_no_proper_reply = 1;
         return 0;
     }
     else if(version == -2) {
@@ -531,8 +527,7 @@ if(!s->rrdpush_compression)
     else if(version == -4) {
         error("STREAM %s [send to %s]: remote server denied access for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
         rrdpush_sender_thread_close_socket(host);
-        if (host->destination->next)
-            host->destination->disabled_because_of_denied_access = 1;
+        host->destination->disabled_because_of_denied_access = 1;
         return 0;
     }
     s->version = version;
