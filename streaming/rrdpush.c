@@ -1007,6 +1007,15 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version) {
     else if(version <= STREAM_OLD_VERSION_COMPRESSION) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION;
     else caps = version;
 
+    if(caps & STREAM_CAP_VCAPS)
+        caps &= ~(STREAM_CAP_V1|STREAM_CAP_V2|STREAM_CAP_VN);
+
+    if(caps & STREAM_CAP_VN)
+        caps &= ~(STREAM_CAP_V1|STREAM_CAP_V2);
+
+    if(caps & STREAM_CAP_V2)
+        caps &= ~(STREAM_CAP_V1);
+
     return caps & STREAM_OUR_CAPABILITIES;
 }
 
