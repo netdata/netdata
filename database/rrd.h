@@ -193,7 +193,6 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
-    RRDDIM_FLAG_PENDING_FOREACH_ALARMS          = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 
     // this is 8 bit
@@ -327,8 +326,6 @@ struct rrddim {
 
 #define rrddim_id(rd) string2str((rd)->id)
 #define rrddim_name(rd) string2str((rd) ->name)
-
-extern void rrddim_update_rrddimvars(RRDDIM *rd);
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 extern const char *rrddim_cache_filename(RRDDIM *rd);
@@ -498,7 +495,6 @@ typedef enum rrdset_flags {
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
 //    RRDSET_FLAG_ACLK                    = (1 << 16), // not used anymore
-    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
@@ -708,7 +704,6 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 3), // send it to external databases
     RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 4), // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED                       = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS         = (1 << 7), // contains dims with uninitialized foreach alarms
     RRDHOST_FLAG_STREAM_LABELS_UPDATE           = (1 << 8),
     RRDHOST_FLAG_STREAM_LABELS_STOP             = (1 << 9),
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 10), // when set, we should send ACLK stream context updates

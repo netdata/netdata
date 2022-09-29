@@ -27,20 +27,6 @@ struct rrddim_constructor {
 
 };
 
-void rrddim_update_rrddimvars(RRDDIM *rd) {
-    RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
-
-    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
-        rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-    }
-}
-
 static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
     struct rrddim_constructor *ctr = constructor_data;
     RRDDIM *rd = rrddim;
@@ -160,9 +146,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-    rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-    rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    if(!rrdset_is_ar_chart(st)) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -267,9 +255,11 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
 
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+        if(!rrdset_is_ar_chart(st)) {
+            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+            rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+            rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+        }
     }
 
     if(unlikely(rc))

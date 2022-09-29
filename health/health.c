@@ -659,39 +659,6 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 0;
 }
 
-// Create alarms for dimensions that have been added to charts
-// since the previous iteration.
-static void health_execute_pending_updates(RRDHOST *host) {
-    RRDSET *st;
-
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS)) return;
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-
-    rrdset_foreach_reentrant(st, host) {
-        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS)) continue;
-        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-
-        RRDDIM *rd;
-        rrddim_foreach_read(rd, st) {
-            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS)) continue;
-            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
-
-            RRDCALCTEMPLATE *rt;
-            foreach_rrdcalctemplate_read(host, rt) {
-                if(!rt->foreach_dimension_pattern)
-                    continue;
-
-                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
-                    rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
-            }
-            foreach_rrdcalctemplate_done(rt);
-
-        }
-        rrddim_foreach_done(rd);
-    }
-    rrdset_foreach_done(st);
-}
-
 static void health_execute_delayed_initializations(RRDHOST *host) {
     RRDSET *st;
 
@@ -724,7 +691,19 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
             if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
             rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
 
-            rrddim_update_rrddimvars(rd);
+            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+
+            RRDCALCTEMPLATE *rt;
+            foreach_rrdcalctemplate_read(host, rt) {
+                if(!rt->foreach_dimension_pattern)
+                    continue;
+
+                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
+                    rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
+            }
+            foreach_rrdcalctemplate_done(rt);
         }
         rrddim_foreach_done(rd);
     }
@@ -846,7 +825,6 @@ void *health_main(void *ptr) {
                 sql_health_alarm_log_cleanup(host);
 
             health_execute_delayed_initializations(host);
-            health_execute_pending_updates(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
 
