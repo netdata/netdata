@@ -29,6 +29,8 @@
 #define PLUGINSD_KEYWORD_CONTEXT                "CONTEXT"
 #define PLUGINSD_KEYWORD_TOMBSTONE              "TOMBSTONE"
 #define PLUGINSD_KEYWORD_HOST                   "HOST"
+//#define PLUGINSD_KEYWORD_GAPS_REQUEST           "GAPS_REQUEST" // child -> parent
+//#define PLUGINSD_KEYWORD_CHART_GAP              "CHART_GAP"    // parent <- child
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
@@ -59,7 +61,7 @@ struct plugind {
     volatile sig_atomic_t enabled;      // if this is enabled or not
 
     time_t started_t;
-    uint32_t version;
+    uint32_t capabilities;              // follows the same principles as streaming capabilities
     struct plugind *next;
 };
 

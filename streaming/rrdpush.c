@@ -268,7 +268,8 @@ static inline void rrdpush_send_chart_definition(RRDSET *st) {
     rrddim_foreach_done(rd);
 
     // send the chart functions
-    rrd_functions_expose(st, host->sender->build);
+    if(stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
+        rrd_functions_expose(st, host->sender->build);
 
     // send the chart local custom variables
     rrdsetvar_print_to_streaming_custom_chart_variables(st, host->sender->build);

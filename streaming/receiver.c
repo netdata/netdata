@@ -72,9 +72,8 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     time_t remote_time = 0;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (!(cd->version & STREAM_CAP_GAP_FILLING)) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd,
-               cd->version);
+    if (!(cd->capabilities & STREAM_CAP_GAP_FILLING)) {
+        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd, cd->capabilities);
         return PARSER_RC_OK;    // Ignore error and continue stream
     }
     if (remote_time_txt && *remote_time_txt) {
@@ -645,7 +644,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
             .obsolete = 0,
             .started_t = now_realtime_sec(),
             .next = NULL,
-            .version = 0,
+            .capabilities = 0,
     };
 
     // put the client IP and port into the buffers used by plugins.d
@@ -754,7 +753,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
 
-    cd.version = rpt->capabilities;
+    cd.capabilities = rpt->capabilities;
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud

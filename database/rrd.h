@@ -879,9 +879,9 @@ struct rrdhost {
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
-    // streaming of data to remote hosts - rrdpush
+    // streaming of data to remote hosts - rrdpush sender
 
-    unsigned int rrdpush_send_enabled;            // 1 when this host sends metrics to another netdata
+    unsigned int rrdpush_send_enabled;              // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
@@ -890,7 +890,7 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    volatile unsigned int rrdpush_sender_spawn;   // 1 when the sender thread has been spawn
+    volatile unsigned int rrdpush_sender_spawn;     // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
 
@@ -898,17 +898,14 @@ struct rrdhost {
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
 
     volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
-    volatile unsigned int rrdpush_sender_join;    // 1 when we have to join the sending thread
+    volatile unsigned int rrdpush_sender_join;      // 1 when we have to join the sending thread
 
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
-    //BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
-
-    //uint32_t stream_version;                             //Set the current version of the stream.
 
     // ------------------------------------------------------------------------
-    // streaming of data from remote hosts - rrdpush
+    // streaming of data from remote hosts - rrdpush receiver
 
     time_t senders_connect_time;                    // the time the last sender was connected
     time_t senders_last_chart_command;              // the time of the last CHART streaming command
@@ -922,25 +919,21 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // health monitoring options
 
-    unsigned int health_enabled;                  // 1 when this host has health enabled
-    time_t health_delay_up_to;                    // a timestamp to delay alarms processing up to
-    STRING *health_default_exec;                  // the full path of the alarms notifications program
-    STRING *health_default_recipient;             // the default recipient for all alarms
-    char *health_log_filename;                    // the alarms event log filename
-    size_t health_log_entries_written;            // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                          // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;    // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;    // the default value for the interval between repeating critical notifications
+    unsigned int health_enabled;                    // 1 when this host has health enabled
+    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                    // the full path of the alarms notifications program
+    STRING *health_default_recipient;               // the default recipient for all alarms
+    char *health_log_filename;                      // the alarms event log filename
+    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
 
 
     // all RRDCALCs are primarily allocated and linked here
-    // RRDCALCs may be linked to charts at any point
-    // (charts may or may not exist when these are loaded)
     DICTIONARY *rrdcalc_root_index;
 
     // templates of alarms
-    // these are used to create alarms when charts
-    // are created or renamed, that match them
     DICTIONARY *rrdcalctemplate_root_index;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)

@@ -11,7 +11,7 @@
 #define CONNECTED_TO_SIZE 100
 
 // ----------------------------------------------------------------------------
-// obsolete versions - do not use any more
+// obsolete versions - do not use anymore
 
 #define STREAM_OLD_VERSION_CLAIM 3
 #define STREAM_OLD_VERSION_CLABELS 4
@@ -22,19 +22,22 @@
 
 typedef enum {
     // do not use the first 3 bits
-    STREAM_CAP_V1               = (1 << 3), //
-    STREAM_CAP_V2               = (1 << 4), //
-    STREAM_CAP_VN               = (1 << 5), // version negotiation
-    STREAM_CAP_VCAPS            = (1 << 6), // capabilities negotiation
-    STREAM_CAP_HLABELS          = (1 << 7),
-    STREAM_CAP_CLAIM            = (1 << 8),
-    STREAM_CAP_CLABELS          = (1 << 9),
-    STREAM_CAP_COMPRESSION      = (1 << 10),
-    STREAM_CAP_FUNCTIONS        = (1 << 11),
-    STREAM_CAP_GAP_FILLING      = (1 << 12), // not to be enabled yet
+    STREAM_CAP_V1               = (1 << 3), // v1 = the oldest protocol
+    STREAM_CAP_V2               = (1 << 4), // v2 = the second version of the protocol (with host labels)
+    STREAM_CAP_VN               = (1 << 5), // version negotiation supported (for versions 3, 4, 5 of the protocol)
+                                            // v3 = claiming supported
+                                            // v4 = chart labels supported
+                                            // v5 = lz4 compression supported
+    STREAM_CAP_VCAPS            = (1 << 6), // capabilities negotiation supported
+    STREAM_CAP_HLABELS          = (1 << 7), // host labels supported
+    STREAM_CAP_CLAIM            = (1 << 8), // claiming supported
+    STREAM_CAP_CLABELS          = (1 << 9), // chart labels supported
+    STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
+    STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
+    STREAM_CAP_GAP_FILLING      = (1 << 12), // gap filling supported
 
     // this must be signed int, so don't use the last bit
-    // needed for negotiating errors
+    // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
 
 #ifdef  ENABLE_COMPRESSION
@@ -57,11 +60,6 @@ typedef enum {
 #define START_STREAMING_ERROR_NOT_PERMITTED "You are not permitted to access this. Check the logs for more info."
 
 #define HTTP_HEADER_SIZE 8192
-
-typedef enum {
-    RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
-    RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
-} RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
 typedef struct {
     char *os_name;

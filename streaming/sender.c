@@ -53,9 +53,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 static inline void deactivate_compression(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
     error("STREAM_COMPRESSION: Compression returned error, disabling it.");
-    default_compression_enabled = 0;
     s->rrdpush_compression = 0;
-    s->capabilities &= ~STREAM_CAP_COMPRESSION;
     error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
     rrdpush_sender_thread_close_socket(s->host);
 }
@@ -333,11 +331,13 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
 #endif
 
+    // reset our capabilities to default
+    s->capabilities = STREAM_OUR_CAPABILITIES;
+
 #ifdef  ENABLE_COMPRESSION
-// Negotiate stream VERSION_CLABELS if stream compression is not supported
-s->rrdpush_compression = (default_compression_enabled && stream_has_capability(s, STREAM_CAP_COMPRESSION));
-if(!s->rrdpush_compression)
-    s->capabilities &= ~STREAM_CAP_COMPRESSION;
+    // Negotiate stream VERSION_CLABELS if stream compression is not supported
+    if(!s->rrdpush_compression && stream_has_capability(s, STREAM_CAP_COMPRESSION))
+        s->capabilities &= ~STREAM_CAP_COMPRESSION;
 #endif  //ENABLE_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
@@ -409,7 +409,8 @@ if(!s->rrdpush_compression)
                  , host->system_info->ml_enabled
                  , host->system_info->mc_version
                  , rrdhost_tags(host)
-                 , s->capabilities, (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
+                 , s->capabilities
+                 , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
                  , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""
                  , (host->system_info->cloud_instance_region) ? host->system_info->cloud_instance_region : ""
                  , se.os_name
@@ -532,9 +533,10 @@ if(!s->rrdpush_compression)
     s->capabilities = convert_stream_version_to_capabilities(version);
 
 #ifdef ENABLE_COMPRESSION
+    // check if parent supports compression - and we do too
     s->rrdpush_compression = (s->rrdpush_compression && stream_has_capability(s, STREAM_CAP_COMPRESSION));
+
     if(s->rrdpush_compression) {
-        // parent supports compression
         if(s->compressor)
             s->compressor->reset(s->compressor);
     }
@@ -731,6 +733,9 @@ void execute_commands(struct sender_state *s) {
     while( start < end && (newline = strchr(start, '\n')) ) {
         *newline = '\0';
 
+        log_access("STREAM: %d from '%s' for host '%s': %s",
+                   gettid(), s->connected_to, rrdhost_hostname(s->host), start);
+
         internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -867,11 +872,14 @@ void sender_init(RRDHOST *parent)
     parent->sender->host = parent;
     parent->sender->buffer = cbuffer_new(1024, 1024*1024);
     parent->sender->build = buffer_create(1);
+    parent->sender->capabilities = STREAM_OUR_CAPABILITIES;
+
 #ifdef ENABLE_COMPRESSION
     parent->sender->rrdpush_compression = default_compression_enabled;
     if (default_compression_enabled)
         parent->sender->compressor = create_compressor();
 #endif
+
     netdata_mutex_init(&parent->sender->mutex);
 }
 
@@ -914,7 +922,6 @@ void *rrdpush_sender_thread(void *ptr) {
         error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", rrdhost_hostname(s->host));
         return NULL;
     }
-    s->capabilities = STREAM_OUR_CAPABILITIES;
 
     enum {
         Collector,
