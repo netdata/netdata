@@ -26,9 +26,11 @@ DIMENSION_SET = "SET '{id}' = {value}\n"
 
 CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
 
+# 1 is label source auto
+# https://github.com/netdata/netdata/blob/cc2586de697702f86a3c34e60e23652dd4ddcb42/database/rrd.h#L205
 RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time' 'ms' 'python.d' " \
                        "netdata.pythond_runtime line 145000 {update_every} '' 'python.d.plugin' '{module_name}'\n" \
-                       "CLABEL '_collect_job' '{actual_job_name}' '0'\n" \
+                       "CLABEL '_collect_job' '{actual_job_name}' '1'\n" \
                        "CLABEL_COMMIT\n" \
                        "DIMENSION run_time 'run time' absolute 1 1\n"
 
