@@ -176,17 +176,18 @@ Using the above, you access Netdata on the backend servers, like this:
 ### Encrypt the communication between Nginx and Netdata
 
 In case Netdata's web server has been [configured to use TLS](/web/server/README.md#enabling-tls-support), it is
-necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append
-the following parameters in your `nginx.conf`
+necessary to specify inside the Nginx configuration that the final destination is using TLS.
 
-```conf
-proxy_set_header X-Forwarded-Proto https;
-proxy_pass https://localhost:19999;
-```
+1. To do this, please, append the following parameters in your `nginx.conf`
 
-Optionally it is also possible
-to [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html), this way the user will
-encrypt not only the communication between Nginx and Netdata but also between the user and Nginx.
+   ```conf
+   proxy_set_header X-Forwarded-Proto https;
+   proxy_pass https://localhost:19999;
+   ```
+
+2. Optionally it is also possible
+   to [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html), this way the user will
+   encrypt not only the communication between Nginx and Netdata but also between the user and Nginx.
 
 If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
@@ -194,22 +195,24 @@ If Nginx is not configured as described here, you will probably receive the erro
 
 Create an authentication file to enable basic authentication via Nginx, this secures your Netdata dashboard.
 
-If you don't have an authentication file, you can use the following command:
+If you don't have an authentication file:
 
-```sh
-printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
-```
+1. You can use the following command:
 
-And then enable the authentication inside your server directive:
+   ```sh
+   printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
+   ```
 
-```conf
-server {
-    # ...
-    auth_basic "Protected";
-    auth_basic_user_file passwords;
-    # ...
-}
-```
+2. And then enable the authentication inside your server directive:
+
+   ```conf
+   server {
+       # ...
+       auth_basic "Protected";
+       auth_basic_user_file passwords;
+       # ...
+   }
+   ```
 
 ### Limit direct access to Netdata
 
@@ -220,16 +223,12 @@ If your Nginx is on `localhost`, you can use this to protect your Netdata:
     bind to = 127.0.0.1 ::1
 ```
 
----
-
 You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
 ```
 [web]
     bind to = unix:/var/run/netdata/netdata.sock
 ```
-
-*note: Netdata v1.08+ support unix domain sockets*
 
 At the Nginx side, use something like this to use the same unix domain socket:
 
@@ -240,8 +239,6 @@ upstream backend {
 }
 ```
 
----
-
 If your Nginx server is not on localhost, you can set:
 
 ```
@@ -250,10 +247,9 @@ If your Nginx server is not on localhost, you can set:
     allow connections from = IP_OF_NGINX_SERVER
 ```
 
-*note: Netdata v1.9+ support `allow connections from`*
-
-`allow connections from` accepts [Netdata simple patterns](/libnetdata/simple_pattern/README.md) to match against the
-connection IP address.
+`allow connections from`
+accepts [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) to
+match against the connection IP address.
 
 ### Prevent the double access.log
 
@@ -308,8 +304,6 @@ Also, enable the rewrite module:
 ```sh
 sudo a2enmod rewrite
 ```
-
----
 
 ### Netdata on an existing virtual host
 
@@ -392,38 +386,38 @@ allows only `server1`, `server2`, `server3` and `server4`.
 
 You can proxy Netdata through apache, using a dedicated apache virtual host.
 
-Create a new apache site:
+1. Create a new apache site:
 
-```sh
-nano /etc/apache2/sites-available/netdata.conf
-```
+   ```sh
+   nano /etc/apache2/sites-available/netdata.conf
+   ```
 
-with this content:
+   with this content:
 
-```conf
-<VirtualHost *:80>
-	ProxyRequests Off
-	ProxyPreserveHost On
-	
-	ServerName netdata.domain.tld
+   ```conf
+   <VirtualHost *:80>
+       ProxyRequests Off
+       ProxyPreserveHost On
+       
+       ServerName netdata.domain.tld
+   
+       <Proxy *>
+           Require all granted
+       </Proxy>
+   
+       ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
+       ProxyPassReverse "/" "http://localhost:19999/"
+   
+       ErrorLog ${APACHE_LOG_DIR}/netdata-error.log
+       CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
+   </VirtualHost>
+   ```
 
-	<Proxy *>
-		Require all granted
-	</Proxy>
+2. Enable the VirtualHost:
 
-	ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
-	ProxyPassReverse "/" "http://localhost:19999/"
-
-	ErrorLog ${APACHE_LOG_DIR}/netdata-error.log
-	CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
-</VirtualHost>
-```
-
-Enable the VirtualHost:
-
-```sh
-sudo a2ensite netdata.conf && service apache2 reload
-```
+   ```sh
+   sudo a2ensite netdata.conf && service apache2 reload
+   ```
 
 ### Netdata proxy in Plesk
 
@@ -445,12 +439,13 @@ Repeat the operation for as many servers as you need.
 
 If you wish to add an authentication (user/password) to access your Netdata, do these:
 
-Install the package `apache2-utils`. On Debian/Ubuntu run `sudo apt-get install apache2-utils`.
+1. Install the package `apache2-utils`. On Debian/Ubuntu run `sudo apt-get install apache2-utils`.
 
-Then, generate password for user `netdata`, using `htpasswd -c /etc/apache2/.htpasswd netdata`
+2. Then, generate password for user `netdata`, using `htpasswd -c /etc/apache2/.htpasswd netdata`
 
-**Apache 2.2 Example:**  
-Modify the virtual host with these:
+<details><summary>Apache 2.2 Example:</summary>
+
+Modify the virtual host with:
 
 ```conf
 	# replace the <Proxy *> section
@@ -472,7 +467,9 @@ Modify the virtual host with these:
 
 Specify `Location /` if Netdata is running on dedicated virtual host.
 
-**Apache 2.4 (dedicated virtual host) Example:**
+</details>
+
+<details><summary>Apache 2.4 (dedicated virtual host) Example:</summary>
 
 ```conf
 <VirtualHost *:80>
@@ -497,6 +494,8 @@ Specify `Location /` if Netdata is running on dedicated virtual host.
 	CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
 </VirtualHost>
 ```
+
+</details>
 
 Note: Changes are applied by reloading or restarting Apache.
 
@@ -597,8 +596,6 @@ or
     bind to = ::1
 ```
 
----
-
 You can also use a unix domain socket. This will also provide a faster route between apache and Netdata:
 
 ```
@@ -620,8 +617,6 @@ At the apache side, prepend the 2nd argument to `ProxyPass` with `unix:/tmp/netd
 ```
 ProxyPass "/netdata/" "unix:/tmp/netdata.sock|http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
 ```
-
----
 
 If your apache server is not on localhost, you can set:
 
@@ -679,10 +674,8 @@ $SERVER["socket"] == ":19998" {
 }
 ```
 
----
-
 If the only thing the server is exposing via the web is Netdata (and thus no suburl rewriting required),
-then you can get away with just
+then you can get away with just:
 
 ```
 proxy.server  = ( "" => ( ( "host" => "127.0.0.1", "port" => 19999 )))
@@ -1175,8 +1168,6 @@ If your H2O server is on `localhost`, you can use this to ensure external access
     bind to = 127.0.0.1 ::1
 ```
 
----
-
 You can also use a unix domain socket. This will provide faster communication between H2O and Netdata as well:
 
 ```
@@ -1189,8 +1180,6 @@ In the H2O configuration, use a line like the following to connect to Netdata vi
 ```yaml
 proxy.reverse.url http://[unix:/run/netdata/netdata.sock]
 ```
-
----
 
 If your H2O server is not on localhost, you can set:
 
