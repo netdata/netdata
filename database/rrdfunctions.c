@@ -494,7 +494,7 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
     char *s = NULL;
 
     *rdcf = NULL;
-    while(!(*rdcf) && s > buffer) {
+    while(!(*rdcf) && buffer[0]) {
         *rdcf = dictionary_get(host->functions, buffer);
         if(*rdcf) break;
 
@@ -509,7 +509,7 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
         // skip all spaces
         while(s > buffer && isspace(*s)) --s;
 
-        if(s > buffer) // it is a space - terminate there
+        if(s >= buffer) // it is a space or the whole buffer - terminate it there
             *s-- = '\0';
     }
 
