@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Dont send NodeInfo during first database cleanup [\#13740](https://github.com/netdata/netdata/pull/13740) ([MrZammler](https://github.com/MrZammler))
+- CMake - add possibility to build without ACLK [\#13736](https://github.com/netdata/netdata/pull/13736) ([underhood](https://github.com/underhood))
+- Change cast to remove coverity warnings [\#13735](https://github.com/netdata/netdata/pull/13735) ([thiagoftsm](https://github.com/thiagoftsm))
 - Do not try to start an archived host in dbengine if dbengine is not compiled [\#13724](https://github.com/netdata/netdata/pull/13724) ([stelfrag](https://github.com/stelfrag))
 - feat\(health\): add new Redis alarms [\#13715](https://github.com/netdata/netdata/pull/13715) ([ilyam8](https://github.com/ilyam8))
 - Faster streaming by 25% on the child [\#13708](https://github.com/netdata/netdata/pull/13708) ([ktsaou](https://github.com/ktsaou))
@@ -347,9 +350,6 @@
 - Fix handling of DEB package naming in CI. [\#13076](https://github.com/netdata/netdata/pull/13076) ([Ferroin](https://github.com/Ferroin))
 - Update default value for "host anomaly rate threshold" [\#13075](https://github.com/netdata/netdata/pull/13075) ([shyamvalsan](https://github.com/shyamvalsan))
 - Fix locking access to chart labels [\#13064](https://github.com/netdata/netdata/pull/13064) ([stelfrag](https://github.com/stelfrag))
-- fix\(cgroup.plugin\): read k8s\_cluster\_name label from the correct file [\#13062](https://github.com/netdata/netdata/pull/13062) ([ilyam8](https://github.com/ilyam8))
-- Initialize chart label key parameter correctly [\#13061](https://github.com/netdata/netdata/pull/13061) ([stelfrag](https://github.com/stelfrag))
-- Added Alma Linux 9 and RHEL 9 support to CI and packaging. [\#13058](https://github.com/netdata/netdata/pull/13058) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
