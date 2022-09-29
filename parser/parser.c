@@ -77,8 +77,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser->plugins_action->overwrite_action        = &pluginsd_overwrite_action;
         parser->plugins_action->chart_action            = &pluginsd_chart_action;
         parser->plugins_action->set_action              = &pluginsd_set_action;
-        parser->plugins_action->clabel_commit_action    = &pluginsd_clabel_commit_action;
-        parser->plugins_action->clabel_action           = &pluginsd_clabel_action;
     }
 
     return parser;
