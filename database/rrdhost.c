@@ -214,9 +214,7 @@ static void rrdhost_initialize_rrdpush(RRDHOST *host,
 
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
-
-    if (host->rrdpush_send_destination)
-        host->destinations = destinations_init(host->rrdpush_send_destination);
+    rrdpush_destinations_init(host);
 
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
     host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
@@ -1156,12 +1154,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
     freez(host->rrdpush_send_destination);
-    while (host->destinations) {
-        struct rrdpush_destinations *tmp = host->destinations;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, tmp, prev, next);
-        string_freez(tmp->destination);
-        freez(tmp);
-    }
+    rrdpush_destinations_free(host);
     string_freez(host->health_default_exec);
     string_freez(host->health_default_recipient);
     freez(host->health_log_filename);

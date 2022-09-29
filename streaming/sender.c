@@ -55,7 +55,7 @@ static inline void deactivate_compression(struct sender_state *s) {
     error("STREAM_COMPRESSION: Compression returned error, disabling it.");
     default_compression_enabled = 0;
     s->rrdpush_compression = 0;
-    s->version = STREAM_VERSION_CLABELS;
+    s->capabilities &= ~STREAM_CAP_COMPRESSION;
     error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
     rrdpush_sender_thread_close_socket(s->host);
 }
@@ -244,7 +244,7 @@ static inline long int parse_stream_version_for_errors(char *http)
         return -1;
 }
 
-static inline long int parse_stream_version(RRDHOST *host, char *http)
+static inline int32_t parse_stream_version(RRDHOST *host, char *http)
 {
     long int stream_version = -1;
     int answer = -1;
@@ -262,7 +262,7 @@ static inline long int parse_stream_version(RRDHOST *host, char *http)
             stream_version = 1;
             rrdpush_set_flags_to_newest_stream(host);
         } else {
-            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+            answer = memcmp(http, START_STREAMING_PROMPT_V1, strlen(START_STREAMING_PROMPT_V1));
             if (!answer) {
                 stream_version = 0;
                 rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
@@ -335,9 +335,9 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
 #ifdef  ENABLE_COMPRESSION
 // Negotiate stream VERSION_CLABELS if stream compression is not supported
-s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
+s->rrdpush_compression = (default_compression_enabled && stream_has_capability(s, STREAM_CAP_COMPRESSION));
 if(!s->rrdpush_compression)
-    s->version = STREAM_VERSION_CLABELS;
+    s->capabilities &= ~STREAM_CAP_COMPRESSION;
 #endif  //ENABLE_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
@@ -409,8 +409,7 @@ if(!s->rrdpush_compression)
                  , host->system_info->ml_enabled
                  , host->system_info->mc_version
                  , rrdhost_tags(host)
-                 , s->version
-                 , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
+                 , s->capabilities, (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
                  , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""
                  , (host->system_info->cloud_instance_region) ? host->system_info->cloud_instance_region : ""
                  , se.os_name
@@ -524,18 +523,17 @@ if(!s->rrdpush_compression)
         host->destination->disabled_already_streaming = now_realtime_sec();
         return 0;
     }
-    else if(version == -4) {
+    else if(version <= -4) {
         error("STREAM %s [send to %s]: remote server denied access for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
         rrdpush_sender_thread_close_socket(host);
         host->destination->disabled_because_of_denied_access = 1;
         return 0;
     }
-    s->version = version;
+    s->capabilities = convert_stream_version_to_capabilities(version);
 
 #ifdef ENABLE_COMPRESSION
-    s->rrdpush_compression = (s->rrdpush_compression && (s->version >= STREAM_VERSION_COMPRESSION));
-    if(s->rrdpush_compression)
-    {
+    s->rrdpush_compression = (s->rrdpush_compression && stream_has_capability(s, STREAM_CAP_COMPRESSION));
+    if(s->rrdpush_compression) {
         // parent supports compression
         if(s->compressor)
             s->compressor->reset(s->compressor);
@@ -544,15 +542,11 @@ if(!s->rrdpush_compression)
         //parent does not support compression or has compression disabled
         debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, rrdhost_hostname(s->host));
         infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, rrdhost_hostname(s->host));
-        s->version = STREAM_VERSION_CLABELS;
-    }        
+        s->capabilities &= ~STREAM_CAP_COMPRESSION;
+    }
 #endif  //ENABLE_COMPRESSION
 
-
-    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d"
-         , rrdhost_hostname(host)
-         , s->connected_to
-         , s->version);
+    log_sender_capabilities(s);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
@@ -920,7 +914,7 @@ void *rrdpush_sender_thread(void *ptr) {
         error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", rrdhost_hostname(s->host));
         return NULL;
     }
-    s->version = STREAMING_PROTOCOL_CURRENT_VERSION;
+    s->capabilities = STREAM_OUR_CAPABILITIES;
 
     enum {
         Collector,
@@ -974,7 +968,7 @@ void *rrdpush_sender_thread(void *ptr) {
             s->buffer->read = 0;
             s->buffer->write = 0;
             attempt_to_connect(s);
-            if (s->version >= STREAM_VERSION_INTERIM_GAP_FILLING) {
+            if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
                 time_t now = now_realtime_sec();
                 sender_start(s);
                 buffer_sprintf(s->build, "TIMESTAMP %"PRId64"", (int64_t)now);

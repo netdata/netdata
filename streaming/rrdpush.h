@@ -10,44 +10,46 @@
 
 #define CONNECTED_TO_SIZE 100
 
-#define STREAM_VERSION_CLAIM                3
-#define STREAM_VERSION_CLABELS              4
-#define STREAM_VERSION_COMPRESSION          5 // this is production
-#define STREAM_VERSION_INTERIM_GAP_FILLING  6
+// ----------------------------------------------------------------------------
+// obsolete versions - do not use any more
 
-//#define STREAM_VERSION_FUNCTIONS            7
-//
-//typedef enum {
-//    // do not use the first 3 bits
-//    STREAM_CAP_CLAIM            = (1 << 3),
-//    STREAM_CAP_CLABELS          = (1 << 4),
-//    STREAM_CAP_COMPRESSION      = (1 << 5),
-//    STREAM_CAP_FUNCTIONS        = (1 << 6),
-//    STREAM_CAP_GAP_FILLING      = (1 << 7),
-//    STREAM_CAP_PROTOBUF         = (1 << 8),
-//} STREAM_CAPABILITIES;
-//
-//STREAM_CAPABILITIES convert_version(uint32_t version) {
-//    if(version > STREAM_VERSION_COMPRESSION) return version;
-//
-//    if(version < STREAM_VERSION_CLAIM) return 0;
-//    if(version <= STREAM_VERSION_CLAIM) return STREAM_CAP_CLAIM;
-//    if(version <= STREAM_VERSION_CLABELS) return STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
-//    if(version <= STREAM_VERSION_COMPRESSION) return STREAM_CAP_COMPRESSION | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
-//}
-//
-//#define stream_capability(rpt, capability) ((rpt)->stream_version & (capability))
-//
+#define STREAM_OLD_VERSION_CLAIM 3
+#define STREAM_OLD_VERSION_CLABELS 4
+#define STREAM_OLD_VERSION_COMPRESSION 5 // this is production
+
+// ----------------------------------------------------------------------------
+// capabilities negotiation
+
+typedef enum {
+    // do not use the first 3 bits
+    STREAM_CAP_V1               = (1 << 3), //
+    STREAM_CAP_V2               = (1 << 4), //
+    STREAM_CAP_VN               = (1 << 5), // version negotiation
+    STREAM_CAP_VCAPS            = (1 << 6), // capabilities negotiation
+    STREAM_CAP_HLABELS          = (1 << 7),
+    STREAM_CAP_CLAIM            = (1 << 8),
+    STREAM_CAP_CLABELS          = (1 << 9),
+    STREAM_CAP_COMPRESSION      = (1 << 10),
+    STREAM_CAP_FUNCTIONS        = (1 << 11),
+    STREAM_CAP_GAP_FILLING      = (1 << 12), // not to be enabled yet
+
+    // this must be signed int, so don't use the last bit
+    // needed for negotiating errors
+} STREAM_CAPABILITIES;
 
 #ifdef  ENABLE_COMPRESSION
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_COMPRESSION)
+#define STREAM_HAS_COMPRESSION STREAM_CAP_COMPRESSION
 #else
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)(STREAM_VERSION_CLABELS)
+#define STREAM_HAS_COMPRESSION 0
 #endif  //ENABLE_COMPRESSION
 
+#define STREAM_OUR_CAPABILITIES (STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS)
+
+#define stream_has_capability(rpt, capability) ((rpt)->capabilities & (capability))
+
 #define STREAMING_PROTOCOL_VERSION "1.1"
-#define START_STREAMING_PROMPT "Hit me baby, push them over..."
-#define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
+#define START_STREAMING_PROMPT_V1 "Hit me baby, push them over..."
+#define START_STREAMING_PROMPT_V2 "Hit me baby, push them over and bring the host labels..."
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
 #define START_STREAMING_ERROR_SAME_LOCALHOST "Don't hit me baby, you are trying to stream my localhost back"
@@ -125,7 +127,7 @@ struct sender_state {
     BUFFER *build;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
-    int32_t version;
+    STREAM_CAPABILITIES capabilities;
 #ifdef ENABLE_COMPRESSION
     unsigned int rrdpush_compression;
     struct compressor_state *compressor;
@@ -151,7 +153,7 @@ struct receiver_state {
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
-    uint32_t stream_version;
+    STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
@@ -187,8 +189,10 @@ extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
+extern void rrdpush_destinations_init(RRDHOST *host);
+extern void rrdpush_destinations_free(RRDHOST *host);
+
 extern void sender_init(RRDHOST *parent);
-extern struct rrdpush_destinations *destinations_init(const char *destinations);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
 void sender_cancel(struct sender_state *s);
@@ -222,5 +226,10 @@ struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
 size_t is_compressed_data(const char *data, size_t data_size);
 #endif
+
+extern void log_receiver_capabilities(struct receiver_state *rpt);
+extern void log_sender_capabilities(struct sender_state *s);
+extern STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
+extern int32_t stream_capabilities_to_vn(uint32_t caps);
 
 #endif //NETDATA_RRDPUSH_H

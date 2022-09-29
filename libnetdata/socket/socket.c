@@ -779,6 +779,10 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         char *path = host + 5;
         return connect_to_unix(path, timeout);
     }
+    else if(*host == '/') {
+        char *path = host;
+        return connect_to_unix(path, timeout);
+    }
 
     char *e = host;
     if(*e == '[') {
@@ -826,41 +830,92 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout);
 }
 
-int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
-    int sock = -1;
-
+void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data) {
     const char *s = destination;
     while(*s) {
         const char *e = s;
-
-        // skip path, moving both s(tart) and e(nd)
-        if(*e == '/')
-            while(!isspace(*e) && *e != ',') s = ++e;
 
         // skip separators, moving both s(tart) and e(nd)
         while(isspace(*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
+        while(*e && !isspace(*e) && *e != ',') e++;
 
         // is there anything?
         if(!*s || s == e) break;
 
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
-        if(reconnects_counter) *reconnects_counter += 1;
-        sock = connect_to_this(buf, default_port, timeout);
-        if(sock != -1) {
-            if(connected_to && connected_to_size) {
-                strncpy(connected_to, buf, connected_to_size);
-                connected_to[connected_to_size - 1] = '\0';
-            }
-            break;
-        }
+
+        if(callback(buf, data)) break;
+
         s = e;
     }
+}
 
-    return sock;
+struct connect_to_one_of_data {
+    int default_port;
+    struct timeval *timeout;
+    size_t *reconnects_counter;
+    char *connected_to;
+    size_t connected_to_size;
+    int sock;
+};
+
+static bool connect_to_one_of_callback(char *entry, void *data) {
+    struct connect_to_one_of_data *t = data;
+
+    if(t->reconnects_counter)
+        t->reconnects_counter++;
+
+    t->sock = connect_to_this(entry, t->default_port, t->timeout);
+    if(t->sock != -1) {
+        if(t->connected_to && t->connected_to_size) {
+            strncpy(t->connected_to, entry, t->connected_to_size);
+            t->connected_to[t->connected_to_size - 1] = '\0';
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+    struct connect_to_one_of_data t = {
+        .default_port = default_port,
+        .timeout = timeout,
+        .reconnects_counter = reconnects_counter,
+        .connected_to = connected_to,
+        .connected_to_size = connected_to_size,
+        .sock = -1,
+    };
+
+    foreach_entry_in_connection_string(destination, connect_to_one_of_callback, &t);
+
+    return t.sock;
+}
+
+static bool connect_to_one_of_urls_callback(char *entry, void *data) {
+    char *s = strchr(entry, '/');
+    if(s) *s = '\0';
+
+    return connect_to_one_of_callback(entry, data);
+}
+
+int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+    struct connect_to_one_of_data t = {
+        .default_port = default_port,
+        .timeout = timeout,
+        .reconnects_counter = reconnects_counter,
+        .connected_to = connected_to,
+        .connected_to_size = connected_to_size,
+        .sock = -1,
+    };
+
+    foreach_entry_in_connection_string(destination, connect_to_one_of_urls_callback, &t);
+
+    return t.sock;
 }
 
 

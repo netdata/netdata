@@ -72,7 +72,7 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     time_t remote_time = 0;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (cd->version < STREAM_VERSION_INTERIM_GAP_FILLING) {
+    if (!(cd->version & STREAM_CAP_GAP_FILLING)) {
         error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd,
                cd->version);
         return PARSER_RC_OK;    // Ignore error and continue stream
@@ -654,27 +654,28 @@ static int rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
+#ifdef ENABLE_COMPRESSION
+    if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
+        if (!rpt->rrdpush_compression)
+            rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
+    }
+#endif
+
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     char initial_response[HTTP_HEADER_SIZE];
-    if (rpt->stream_version > 1) {
-        if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
-#ifdef ENABLE_COMPRESSION
-            if(!rpt->rrdpush_compression)
-                rpt->stream_version = STREAM_VERSION_CLABELS;
-#else
-            if(STREAMING_PROTOCOL_CURRENT_VERSION < rpt->stream_version) {
-                rpt->stream_version =  STREAMING_PROTOCOL_CURRENT_VERSION;               
-            }
-#endif
-        }
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
-        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->stream_version);
-    } else if (rpt->stream_version == 1) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
+    if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
+        log_receiver_capabilities(rpt);
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->capabilities);
+    }
+    else if (stream_has_capability(rpt, STREAM_CAP_VN)) {
+        log_receiver_capabilities(rpt);
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_capabilities_to_vn(rpt->capabilities));
+    } else if (stream_has_capability(rpt, STREAM_CAP_V2)) {
+        log_receiver_capabilities(rpt);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
-    } else {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-        sprintf(initial_response, "%s", START_STREAMING_PROMPT);
+    } else { // stream_has_capability(rpt, STREAM_CAP_V1)
+        log_receiver_capabilities(rpt);
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT_V1);
     }
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
     #ifdef ENABLE_HTTPS
@@ -726,7 +727,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 */
 
 //    rpt->host->connected_senders++;
-    if(rpt->stream_version > 0) {
+    if(stream_has_capability(rpt, STREAM_CAP_HLABELS)) {
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_LABELS_STOP);
     }
@@ -753,7 +754,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
 
-    cd.version = rpt->stream_version;
+    cd.version = rpt->capabilities;
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud

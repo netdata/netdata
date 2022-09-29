@@ -245,7 +245,7 @@ static inline void rrdpush_send_chart_definition(RRDSET *st) {
     );
 
     // send the chart labels
-    if (host->sender->version >= STREAM_VERSION_CLABELS)
+    if (stream_has_capability(host->sender, STREAM_CAP_CLABELS))
         rrdpush_send_clabels(host, st);
 
     // send the dimensions
@@ -286,7 +286,7 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     buffer_fast_strcat(wb, "\" ", 2);
     buffer_print_llu(wb, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
-    if (s->version >= STREAM_VERSION_INTERIM_GAP_FILLING) {
+    if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_ll(wb, st->last_collected_time.tv_sec);
     }
@@ -440,7 +440,7 @@ void rrdpush_claimed_id(RRDHOST *host)
     if(unlikely(!host->rrdpush_send_enabled || !__atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)))
         return;
     
-    if(host->sender->version < STREAM_VERSION_CLAIM)
+    if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
         return;
 
     sender_start(host->sender);
@@ -542,34 +542,51 @@ int connect_to_one_of_destinations(
     return sock;
 }
 
-struct rrdpush_destinations *destinations_init(const char *dests) {
-    const char *s = dests;
-    struct rrdpush_destinations *destinations = NULL;
-    int count = 0;
-    while(*s) {
-        const char *e = s;
+struct destinations_init_tmp {
+    RRDHOST *host;
+    struct rrdpush_destinations *list;
+    int count;
+};
 
-        // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e)) s = ++e;
+bool destinations_init_add_one(char *entry, void *data) {
+    struct destinations_init_tmp *t = data;
 
-        // move e(nd) to the first separator
-        while(*e && !isspace(*e)) e++;
+    struct rrdpush_destinations *d = callocz(1, sizeof(struct rrdpush_destinations));
+    d->destination = string_strdupz(entry);
 
-        if(s != e) {
-            char buf[e - s + 1];
-            strncpyz(buf, s, e - s);
-            struct rrdpush_destinations *d = callocz(1, sizeof(struct rrdpush_destinations));
-            d->destination = string_strdupz(buf);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(t->list, d, prev, next);
 
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(destinations, d, prev, next);
+    t->count++;
+    info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
 
-            s = e;
+    return false; // we return false, so that we will get all defined destinations
+}
 
-            count++;
-            info("STREAM: added streaming destination No %d: '%s'", count, string2str(d->destination));
-        }
+void rrdpush_destinations_init(RRDHOST *host) {
+    if(!host->rrdpush_send_destination) return;
+
+    rrdpush_destinations_free(host);
+
+    struct destinations_init_tmp t = {
+        .host = host,
+        .list = NULL,
+        .count = 0,
+    };
+
+    foreach_entry_in_connection_string(host->rrdpush_send_destination, destinations_init_add_one, &t);
+
+    host->destinations = t.list;
+}
+
+void rrdpush_destinations_free(RRDHOST *host) {
+    while (host->destinations) {
+        struct rrdpush_destinations *tmp = host->destinations;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, tmp, prev, next);
+        string_freez(tmp->destination);
+        freez(tmp);
     }
-    return destinations;
+
+    host->destinations = NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -698,7 +715,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))
-            stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
+            stream_version = convert_stream_version_to_capabilities(strtoul(value, NULL, 0));
         else {
             // An old Netdata child does not have a compatible streaming protocol, map to something sane.
             if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
@@ -714,7 +731,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             else if (!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION"))
                 name = "NETDATA_HOST_OS_DETECTION";
             else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && stream_version == UINT_MAX) {
-                stream_version = 1;
+                stream_version = convert_stream_version_to_capabilities(1);
             }
 
             if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
@@ -725,7 +742,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
 
     if (stream_version == UINT_MAX)
-        stream_version = 0;
+        stream_version = convert_stream_version_to_capabilities(0);
 
     if(!key || !*key) {
         rrdhost_system_info_free(system_info);
@@ -901,7 +918,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
-    rpt->stream_version    = stream_version;
+    rpt->capabilities = stream_version;
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.flags         = w->ssl.flags;
@@ -945,3 +962,56 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     buffer_flush(w->response.data);
     return 200;
 }
+
+static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {
+    if(caps & STREAM_CAP_V1) buffer_strcat(wb, "V1 ");
+    if(caps & STREAM_CAP_V2) buffer_strcat(wb, "V2 ");
+    if(caps & STREAM_CAP_VN) buffer_strcat(wb, "VN ");
+    if(caps & STREAM_CAP_VCAPS) buffer_strcat(wb, "VCAPS ");
+    if(caps & STREAM_CAP_HLABELS) buffer_strcat(wb, "HLABELS ");
+    if(caps & STREAM_CAP_CLAIM) buffer_strcat(wb, "CLAIM ");
+    if(caps & STREAM_CAP_CLABELS) buffer_strcat(wb, "CLABELS ");
+    if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
+    if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
+    if(caps & STREAM_CAP_GAP_FILLING) buffer_strcat(wb, "GAP_FILLING ");
+}
+
+void log_receiver_capabilities(struct receiver_state *rpt) {
+    BUFFER *wb = buffer_create(100);
+    stream_capabilities_to_string(wb, rpt->capabilities);
+
+    info("STREAM %s [receive from [%s]:%s]: Netdata is using stream capabilities: %s",
+         rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
+
+    buffer_free(wb);
+}
+
+void log_sender_capabilities(struct sender_state *s) {
+    BUFFER *wb = buffer_create(100);
+    stream_capabilities_to_string(wb, s->capabilities);
+
+    info("STREAM %s [send to %s]: established communication with a parent using stream capabilities: %s",
+         rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
+
+    buffer_free(wb);
+}
+
+STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version) {
+    STREAM_CAPABILITIES caps = 0;
+
+    if(version <= 0) caps = STREAM_CAP_V1;
+    else if(version < STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_V2 | STREAM_CAP_HLABELS;
+    else if(version <= STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM;
+    else if(version <= STREAM_OLD_VERSION_CLABELS) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
+    else if(version <= STREAM_OLD_VERSION_COMPRESSION) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION;
+    else caps = version;
+
+    return caps & STREAM_OUR_CAPABILITIES;
+}
+
+int32_t stream_capabilities_to_vn(uint32_t caps) {
+    if(caps & STREAM_CAP_COMPRESSION) return STREAM_OLD_VERSION_COMPRESSION;
+    if(caps & STREAM_CAP_CLABELS) return STREAM_OLD_VERSION_CLABELS;
+    return STREAM_OLD_VERSION_CLAIM; // if(caps & STREAM_CAP_CLAIM)
+}
+

@@ -313,7 +313,7 @@ void simple_connector_worker(void *instance_p)
         if (unlikely(sock == -1)) {
             size_t reconnects = 0;
 
-            sock = connect_to_one_of(
+            sock = connect_to_one_of_urls(
                 instance->config.destination,
                 connector_specific_config->default_port,
                 &timeout,
