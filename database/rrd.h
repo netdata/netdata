@@ -178,13 +178,15 @@ typedef enum rrddim_options {
     // this is 8-bit
 } RRDDIM_OPTIONS;
 
-#define rrddim_option_check(rd, flag) ((rd)->flags & (flag))
-#define rrddim_option_set(rd, flag)   (rd)->flags |= (flag)
-#define rrddim_option_clear(rd, flag) (rd)->flags &= ~(flag)
+#define rrddim_option_check(rd, option) ((rd)->options & (option))
+#define rrddim_option_set(rd, option)   (rd)->options |= (option)
+#define rrddim_option_clear(rd, option) (rd)->options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
+    RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
+
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
@@ -325,6 +327,8 @@ struct rrddim {
 
 #define rrddim_id(rd) string2str((rd)->id)
 #define rrddim_name(rd) string2str((rd) ->name)
+
+extern void rrddim_update_rrddimvars(RRDDIM *rd);
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 extern const char *rrddim_cache_filename(RRDDIM *rd);
@@ -500,6 +504,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
 
     RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 22),
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -714,6 +719,7 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_INITIALIZED_RRDPUSH            = (1 << 15), // the host has initialized rrdpush structures
     RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
     RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 17), // the host has pending dimension obsoletions
+    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 18), // contains charts and dims with uninitialized variables
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

@@ -181,16 +181,11 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
 
-    if(host->health_enabled) {
-        st->green = NAN;
-        st->red = NAN;
-        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
-        st->rrdvars = rrdvariables_create();
-        rrddimvar_index_init(st);
-    }
-
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
+
+    st->green = NAN;
+    st->red = NAN;
 
     ctr->react_action = RRDSET_REACT_NEW;
 }
@@ -352,14 +347,8 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDHOST *host = st->rrdhost;
 
     if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
-        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
-
-        rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching_templates_to_rrdset(st);
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {

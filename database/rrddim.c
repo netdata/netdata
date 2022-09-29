@@ -27,7 +27,7 @@ struct rrddim_constructor {
 
 };
 
-static void rrddim_update_rrddimvars_unsafe(RRDDIM *rd) {
+void rrddim_update_rrddimvars(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -160,7 +160,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    rrddim_update_rrddimvars_unsafe(rd);
+    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -264,7 +266,10 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         }
 
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-        rrddim_update_rrddimvars_unsafe(rd);
+
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     if(unlikely(rc))

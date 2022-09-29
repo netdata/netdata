@@ -664,17 +664,17 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 static void health_execute_pending_updates(RRDHOST *host) {
     RRDSET *st;
 
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS))
-        return;
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS)) return;
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
 
     rrdset_foreach_reentrant(st, host) {
-        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
-            continue;
+        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS)) continue;
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS))
-                continue;
+            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS)) continue;
+            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
 
             RRDCALCTEMPLATE *rt;
             foreach_rrdcalctemplate_read(host, rt) {
@@ -686,13 +686,49 @@ static void health_execute_pending_updates(RRDHOST *host) {
             }
             foreach_rrdcalctemplate_done(rt);
 
-            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
         }
         rrddim_foreach_done(rd);
-        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
     }
     rrdset_foreach_done(st);
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
+}
+
+static void health_execute_delayed_initializations(RRDHOST *host) {
+    RRDSET *st;
+
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+
+    rrdset_foreach_reentrant(st, host) {
+        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+
+        if(!st->rrdfamily)
+            st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
+
+        if(!st->rrdvars)
+            st->rrdvars = rrdvariables_create();
+
+        rrddimvar_index_init(st);
+
+        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
+
+        rrdcalc_link_matching_alerts_to_rrdset(st);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
+
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
+            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+
+            rrddim_update_rrddimvars(rd);
+        }
+        rrddim_foreach_done(rd);
+    }
+    rrdset_foreach_done(st);
 }
 
 /**
@@ -809,6 +845,7 @@ void *health_main(void *ptr) {
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
 
+            health_execute_delayed_initializations(host);
             health_execute_pending_updates(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
