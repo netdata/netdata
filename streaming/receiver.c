@@ -668,7 +668,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
     else if (stream_has_capability(rpt, STREAM_CAP_VN)) {
         log_receiver_capabilities(rpt);
-        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_capabilities_to_vn(rpt->capabilities));
+        sprintf(initial_response, "%s%d", START_STREAMING_PROMPT_VN, stream_capabilities_to_vn(rpt->capabilities));
     } else if (stream_has_capability(rpt, STREAM_CAP_V2)) {
         log_receiver_capabilities(rpt);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);

@@ -363,7 +363,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  "&ml_enabled=%d"
                  "&mc_version=%d"
                  "&tags=%s"
-                 "&ver=%d"
+                 "&ver=%u"
                  "&NETDATA_INSTANCE_CLOUD_TYPE=%s"
                  "&NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=%s"
                  "&NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=%s"
