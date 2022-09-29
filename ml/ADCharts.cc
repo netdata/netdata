@@ -158,6 +158,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
     rrdset_done(AnomalyDetectionRS);
 
     rrdr_free(OWA, R);
+    onewayalloc_destroy(OWA);
 }
 
 void ml::updateDetectionChart(RRDHOST *RH) {
