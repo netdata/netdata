@@ -4268,7 +4268,7 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
         if(group && p->group_target != group)
             continue;
 
-        if(process_name && (strcmp(p->comm, process_name) != 0 || (p->parent && strcmp(p->parent->comm, process_name) != 0)))
+        if(process_name && ((strcmp(p->comm, process_name) != 0 && !p->parent) || (p->parent && strcmp(p->comm, process_name) != 0 && strcmp(p->parent->comm, process_name) != 0)))
             continue;
 
         if(pid && (p->pid != pid && p->ppid != pid))
