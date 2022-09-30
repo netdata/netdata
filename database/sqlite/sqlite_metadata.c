@@ -977,7 +977,7 @@ static void metadata_event_loop(void *arg)
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            if (unlikely(cmd_batch_size >= METADATA_MAX_BATCH_SIZE))
+            if (likely(!(wc->flags & METADATA_FLAG_SHUTDOWN)) & unlikely(cmd_batch_size >= METADATA_MAX_BATCH_SIZE))
                 break;
             cmd = metadata_deq_cmd(wc, &next_opcode);
             opcode = cmd.opcode;
@@ -1203,6 +1203,7 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
+    buffer_free(work_buffer);
     info("METADATA: Shutting down metadata event loop. Maximum commands in queue %u", max_commands_in_queue);
     completion_mark_complete(shutdown_completion);
     return;
