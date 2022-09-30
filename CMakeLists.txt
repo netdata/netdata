@@ -748,6 +748,8 @@ set(RRD_PLUGIN_FILES
         database/storage_engine.h
         database/ram/rrddim_mem.c
         database/ram/rrddim_mem.h
+        database/sqlite/sqlite_metadata.c
+        database/sqlite/sqlite_metadata.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
 		database/sqlite/sqlite_context.c
@@ -779,16 +781,6 @@ set(RRD_PLUGIN_FILES
         database/engine/pagecache.h
         database/engine/rrdenglocking.c
         database/engine/rrdenglocking.h
-        database/engine/metadata_log/metadatalog.h
-        database/engine/metadata_log/metadatalogapi.c
-        database/engine/metadata_log/metadatalogapi.h
-        database/engine/metadata_log/logfile.h
-        database/engine/metadata_log/logfile.c
-        database/engine/metadata_log/metadatalogprotocol.h
-        database/engine/metadata_log/metalogpluginsd.c
-        database/engine/metadata_log/metalogpluginsd.h
-        database/engine/metadata_log/compaction.c
-        database/engine/metadata_log/compaction.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )
