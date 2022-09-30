@@ -1582,6 +1582,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_TEXT_PLAIN;
+    buffer_no_cacheable(wb);
 
     return rrd_call_function_and_wait(host, wb, timeout, function);
 }

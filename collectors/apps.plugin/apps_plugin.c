@@ -4224,18 +4224,23 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
 
         if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &words[i][strlen(PROCESS_FILTER_CATEGORY)]);
+            internal_error(category, "looking up for category '%s'", category->name);
         }
         else if(!user && strncmp(words[i], PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &words[i][strlen(PROCESS_FILTER_USER)]);
+            internal_error(user, "looking up for user '%s'", user->name);
         }
         else if(strncmp(words[i], PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &words[i][strlen(PROCESS_FILTER_GROUP)]);
+            internal_error(group, "looking up for group '%s'", group->name);
         }
         else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
             process_name = &words[i][strlen(PROCESS_FILTER_PROCESS)];
+            internal_error(process_name, "looking up for process '%s'", process_name);
         }
         else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, strlen(PROCESS_FILTER_PID)) == 0) {
             pid = str2i(&words[i][strlen(PROCESS_FILTER_PID)]);
+            internal_error(pid, "looking up for pid %d", pid);
         }
     }
 
@@ -4271,7 +4276,7 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
         if(process_name && ((strcmp(p->comm, process_name) != 0 && !p->parent) || (p->parent && strcmp(p->comm, process_name) != 0 && strcmp(p->parent->comm, process_name) != 0)))
             continue;
 
-        if(pid && (p->pid != pid && p->ppid != pid))
+        if(pid && p->pid != pid && p->ppid != pid)
             continue;
 
         fprintf(stdout,
