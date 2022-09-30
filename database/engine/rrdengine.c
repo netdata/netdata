@@ -947,12 +947,12 @@ static void delete_old_data(void *arg)
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
             can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
-            if (unlikely(can_delete_metric && ctx->metalog_ctx->initialized)) {
+            if (unlikely(can_delete_metric)) {
                 /*
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
                  * attempt to delete the corresponding netdata dimension.
                  */
-                metalog_delete_dimension_by_uuid(ctx->metalog_ctx, &metric_id);
+                queue_delete_dimension_uuid(&metric_id);
             }
         }
         next = extent->next;

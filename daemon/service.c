@@ -60,7 +60,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
 
         if (tiers_available == tiers_said_yes && tiers_said_yes) {
             /* This metric has no data and no references */
-            delete_dimension_uuid(&rd->metric_uuid);
+            queue_delete_dimension_uuid(&rd->metric_uuid);
         }
         else {
             /* Do not delete this dimension */

@@ -173,9 +173,13 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), &st->chart_uuid))
-        uuid_generate(st->chart_uuid);
-    update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
+//    if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), &st->chart_uuid)) {
+//        uuid_generate(st->chart_uuid);
+////        char uuid_str[UUID_STR_LEN];
+////        uuid_unparse_lower(st->chart_uuid, uuid_str);
+////        info("DEBUG: Failed to find chart UUID : Host %s  type=%s, id=%s, name=%s (generated %s)",
+////             string2str(host->hostname), string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), uuid_str);
+//    }
 
     // initialize the db tiers
     {
@@ -392,10 +396,25 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
-    if(ctr->react_action & (RRDSET_REACT_UPDATED | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
-        debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
-        if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
-            error_report("Failed to update chart metadata in the database");
+    if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
+        if (ctr->react_action & RRDSET_REACT_NEW) {
+            if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), &st->chart_uuid)) {
+                uuid_generate(st->chart_uuid);
+                info("DEBUG: CHART type=[%s] id=[%s] name=[%s] generating new UUID",
+                     string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name));
+            }
+            //else
+            //    info("DEBUG: New CHART %s UUID found already", string2str(st->id));
+        }
+//        char uuid_str[UUID_STR_LEN];
+//        uuid_unparse_lower(st->chart_uuid, uuid_str);
+//        info("DEBUG: Failed to find chart UUID : Host %s  type=%s, id=%s, name=%s (generated %s)",
+//             string2str(host->hostname), string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), uuid_str);
+
+        // THIS IS TO BE CHECKED BY A DIMENSION
+        // The DIMENSION WILL QUEUE A CHART UPDATE AND THEN CLEAR IT
+        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+        //queue_chart_update_metadata(st);
     }
 
     rrdcontext_updated_rrdset(st);

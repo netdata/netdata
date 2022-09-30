@@ -992,9 +992,7 @@ void rrdset_save_rrdlabels_to_sql(RRDSET *st) {
         struct label_str tmp = {.sql = sql_buf, .count = 0};
         uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
         rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-        db_execute(buffer_tostring(sql_buf));
-        buffer_free(sql_buf);
-
+        queue_metadata_buffer(sql_buf);
         st->rrdlabels_last_saved_version = new_version;
     }
 }
