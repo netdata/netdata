@@ -501,6 +501,8 @@ typedef enum rrdset_flags {
                                                      // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
+    RRDSET_FLAG_METADATA_UPDATE         = (1 << 16), // Mark that metadata needs to be stored
+    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
@@ -1311,6 +1313,7 @@ int get_tier_grouping(int tier);
 #endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"
+#include "sqlite/sqlite_metadata.h"
 #include "sqlite/sqlite_aclk.h"
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"

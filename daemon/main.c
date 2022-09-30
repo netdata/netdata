@@ -61,6 +61,7 @@ void netdata_cleanup_and_exit(int ret) {
         }
 #endif
         rrdhost_free_all();
+        metadata_sync_shutdown();
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             for (int tier = 0; tier < storage_tiers; tier++)

@@ -1832,6 +1832,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
     { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },
+    { .name = "METASYNC",    .family = "workers metadata sync",           .priority = 1000000 },
     { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
     { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
     { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
