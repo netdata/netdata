@@ -1665,3 +1665,21 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
     else
         ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
 }
+
+bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
+    pid_t pid;
+    FILE *fp = netdata_popen(command, &pid, NULL);
+
+    if(fp) {
+        char buffer[max_line_length + 1];
+        while (fgets(buffer, max_line_length, fp))
+            fprintf(stdout, "%s", buffer);
+    }
+    else {
+        error("Failed to execute command '%s'.", command);
+        return false;
+    }
+
+    netdata_pclose(NULL, fp, pid);
+    return true;
+}

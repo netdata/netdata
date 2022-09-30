@@ -491,16 +491,16 @@ struct {
     const char *format;
     uint8_t content_type;
 } function_formats[] = {
+    { .format = "application/json", CT_APPLICATION_JSON },
+    { .format = "text/plain",       CT_TEXT_PLAIN },
+    { .format = "application/xml",  CT_APPLICATION_XML },
+    { .format = "prometheus",       CT_PROMETHEUS },
     { .format = "text",             CT_TEXT_PLAIN },
     { .format = "txt",              CT_TEXT_PLAIN },
-    { .format = "text/plain",       CT_TEXT_PLAIN },
     { .format = "json",             CT_APPLICATION_JSON },
-    { .format = "application/json", CT_APPLICATION_JSON },
     { .format = "html",             CT_TEXT_HTML },
     { .format = "text/html",        CT_TEXT_HTML },
     { .format = "xml",              CT_APPLICATION_XML },
-    { .format = "application/xml",  CT_APPLICATION_XML },
-    { .format = "prometheus",       CT_PROMETHEUS },
 
     // terminator
     { .format = NULL,               CT_TEXT_PLAIN },
@@ -522,6 +522,17 @@ const char *functions_content_type_to_format(uint8_t content_type) {
             return function_formats[i].format;
 
     return "text/plain";
+}
+
+int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
+    char buffer[1024];
+    strncpyz(buffer, msg, 1024);
+    json_fix_string(buffer);
+
+    buffer_flush(wb);
+    buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
+    wb->contenttype = CT_APPLICATION_JSON;
+    return code;
 }
 
 static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
@@ -547,19 +558,13 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
         while(s >= buffer && isspace(*s)) *s-- = '\0';
     }
 
-    if(!(*rdcf)) {
-        buffer_flush(wb);
-        buffer_sprintf(wb, "No function found with this definition.");
-        wb->contenttype = CT_TEXT_PLAIN;
-        return HTTP_RESP_NOT_FOUND;
-    }
+    buffer_flush(wb);
 
-    if(!(*rdcf)->collector->running) {
-        buffer_flush(wb);
-        buffer_sprintf(wb, "The collector for this function is not currently running.");
-        wb->contenttype = CT_TEXT_PLAIN;
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-    }
+    if(!(*rdcf))
+        return rrd_call_function_error(wb, "No function with this name found at this host", HTTP_RESP_NOT_FOUND);
+
+    if(!(*rdcf)->collector->running)
+        return rrd_call_function_error(wb, "The collector for this function is not currently running", HTTP_RESP_BACKEND_FETCH_FAILED);
 
     wb->contenttype = (*rdcf)->content_type;
 
@@ -643,30 +648,19 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
             else if (rc == ETIMEDOUT) {
                 // timeout
                 // we will go away and let the callback free the structure
-                buffer_flush(wb);
-                buffer_strcat(wb, "Timeout");
-                wb->contenttype = CT_TEXT_PLAIN;
                 tmp->free_with_signal = true;
                 we_should_free = false;
-                code = HTTP_RESP_GATEWAY_TIMEOUT;
+                code = rrd_call_function_error(wb, "Timeout while waiting for a response from the collector", HTTP_RESP_GATEWAY_TIMEOUT);
             }
-            else {
-                error("RRDSET FUNCTIONS: failed to wait for a response from the collector");
-                buffer_flush(wb);
-                buffer_strcat(wb, "Failed to wait for a response from the collector");
-                wb->contenttype = CT_TEXT_PLAIN;
-                code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-            }
+            else
+                code = rrd_call_function_error(wb, "Failed to get the response from the collector", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
             netdata_mutex_unlock(&tmp->mutex);
         }
         else {
             buffer_free(temp_wb);
-
-            error("RRDSET FUNCTIONS: failed to send request to the collector");
-            buffer_flush(wb);
-            buffer_strcat(wb, "Failed to send request to the collector");
-            wb->contenttype = CT_TEXT_PLAIN;
+            if(!buffer_strlen(wb))
+                rrd_call_function_error(wb, "Failed to send request to the collector", code);
         }
 
         if (we_should_free)
@@ -693,10 +687,8 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     code = rdcf->function(wb, timeout, key, rdcf->collector_data, callback, callback_data);
 
     if(code != HTTP_RESP_OK) {
-        error("RRDSET FUNCTIONS: failed to send request to the collector with code %d", code);
-        buffer_flush(wb);
-        buffer_strcat(wb, "Failed to send request to the collector");
-        wb->contenttype = CT_TEXT_PLAIN;
+        if (!buffer_strlen(wb))
+            rrd_call_function_error(wb, "Failed to send request to the collector", code);
     }
 
     return code;

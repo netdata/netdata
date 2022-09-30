@@ -773,8 +773,10 @@ void execute_commands(struct sender_state *s) {
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
-                if(code != HTTP_RESP_OK)
+                if(code != HTTP_RESP_OK) {
+                    rrd_call_function_error(wb, "Failed to route request to collector", code);
                     stream_execute_function_callback(wb, code, tmp);
+                }
             }
         }
         else

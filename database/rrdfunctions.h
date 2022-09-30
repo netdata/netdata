@@ -30,5 +30,6 @@ extern void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char 
 
 extern uint8_t functions_format_to_content_type(const char *format);
 extern const char *functions_content_type_to_format(uint8_t content_type);
+extern int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 #endif // NETDATA_RRDFUNCTIONS_H

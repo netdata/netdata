@@ -162,24 +162,6 @@ static void free_basic_mountinfo_list(struct basic_mountinfo *root)
     }
 }
 
-// TODO - remove before merging
-int hello_world_function(
-      BUFFER *destination_wb
-    , int timeout __maybe_unused
-    , const char *name __maybe_unused
-    , void *collector_data __maybe_unused
-    , void (*callback)(BUFFER *wb, int code, void *callback_data)
-    , void *callback_data
-    ) {
-
-    buffer_sprintf(destination_wb, "Hello World %ld\n", now_realtime_sec());
-
-    if(callback)
-        callback(destination_wb, 200, callback_data);
-
-    return 200;
-}
-
 static void calculate_values_and_show_charts(
     struct basic_mountinfo *mi,
     struct mount_point_metadata *m,
@@ -252,9 +234,6 @@ static void calculate_values_and_show_charts(
             }
 
             rrdset_update_rrdlabels(m->st_space, m->chart_labels);
-
-            // TODO - remove before merging
-            rrd_collector_add_function(m->st_space, "HelloWorld", "help string", "txt", 10, true, hello_world_function, NULL);
 
             m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);

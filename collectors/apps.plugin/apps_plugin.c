@@ -10,19 +10,8 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#ifdef NETDATA_INTERNAL_CHECKS
-#define ENABLE_TOP 1
-#endif
-
-#ifdef ENABLE_TOP
-#define FUNCTION_TOP() fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " text 10 \"top\" \"run the top command\"\n")
-#else
-#define FUNCTION_TOP() debug_dummy()
-#endif
-
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " html 10 \"processes\" \"detailed processes information\"\n"); \
-        FUNCTION_TOP();                                                                         \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " application/json 10 \"processes\" \"detailed processes information\"\n"); \
     } while(0)
 
 
@@ -4177,22 +4166,6 @@ static int check_capabilities() {
 
 netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 
-#ifdef ENABLE_TOP
-void apps_plugin_function_run_top(char *function __maybe_unused, char *line_buffer, int line_max, int timeout __maybe_unused) {
-    pid_t pid;
-    FILE *fp = netdata_popen("top -b -d 0.5 -n 1 -w 180 2>&1", &pid, NULL);
-
-    if(fp) {
-        while (fgets(line_buffer, line_max, fp))
-            fprintf(stdout, "%s", line_buffer);
-    }
-    else
-        fprintf(stdout, "Cannot execute top.");
-
-    netdata_pclose(NULL, fp, pid);
-}
-#endif
-
 #define PROCESS_FILTER_CATEGORY "category:"
 #define PROCESS_FILTER_USER "user:"
 #define PROCESS_FILTER_GROUP "group:"
@@ -4224,23 +4197,18 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
 
         if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &words[i][strlen(PROCESS_FILTER_CATEGORY)]);
-            internal_error(category, "looking up for category '%s'", category->name);
         }
         else if(!user && strncmp(words[i], PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &words[i][strlen(PROCESS_FILTER_USER)]);
-            internal_error(user, "looking up for user '%s'", user->name);
         }
         else if(strncmp(words[i], PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &words[i][strlen(PROCESS_FILTER_GROUP)]);
-            internal_error(group, "looking up for group '%s'", group->name);
         }
         else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
             process_name = &words[i][strlen(PROCESS_FILTER_PROCESS)];
-            internal_error(process_name, "looking up for process '%s'", process_name);
         }
         else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, strlen(PROCESS_FILTER_PID)) == 0) {
             pid = str2i(&words[i][strlen(PROCESS_FILTER_PID)]);
-            internal_error(pid, "looking up for pid %d", pid);
         }
     }
 
@@ -4294,7 +4262,7 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
                 "</tr>\n"
                 , p->pid
                 , p->comm
-                , p->cmdline?p->cmdline:"-"
+                , p->cmdline && p->cmdline?p->cmdline:p->comm
                 , p->ppid
                 , p->target?p->target->name:"-"
                 , p->user_target?p->user_target->name:"-", p->uid
@@ -4342,16 +4310,9 @@ void *reader_main(void *arg __maybe_unused) {
                     apps_plugin_function_process_tree(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
                 }
-#ifdef ENABLE_TOP
-                else if(strncmp(function, "top", strlen("top")) == 0) {
-                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 200 text/plain\n", transaction);
-                    apps_plugin_function_run_top(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
-                    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
-                }
-#endif
                 else {
-                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 404 text/plain\n", transaction);
-                    fprintf(stdout, "No function with this name found in apps.plugin");
+                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 404 application/json\n", transaction);
+                    fprintf(stdout, "{\"status\":404,\"error_message\":\"No function with this name found in apps.plugin\"}");
                     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
                 }
 

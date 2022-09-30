@@ -481,21 +481,27 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
             pf->timeout,
             string2str(pf->function));
 
-    if(ret < 0)
-        error("failed to send function to plugin, error %d", ret);
+    if(ret < 0) {
+        error("FUNCTION: failed to send function to plugin, fprintf() returned error %d", ret);
+        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
+    }
+    else {
+        fflush(fp);
 
-    fflush(fp);
+        internal_error(true, "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
+                       string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
+                       pf->sent_ut - pf->started_ut);
+    }
+
     pf->sent_ut = now_realtime_usec();
-
-    internal_error(true, "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
-                   string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
-                   pf->sent_ut - pf->started_ut);
 }
+
 static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = new_func;
 
     error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
-    pf->callback(pf->destination_wb, HTTP_RESP_INTERNAL_SERVER_ERROR, pf->callback_data);
+    pf->code = rrd_call_function_error(pf->destination_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
+    pf->callback(pf->destination_wb, pf->code, pf->callback_data);
     string_freez(pf->function);
 
     return false;
@@ -517,6 +523,29 @@ void inflight_functions_init(PARSER *parser) {
     dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
     dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
     dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);
+}
+
+static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
+    parser->inflight.smaller_timeout = 0;
+    struct inflight_function *pf;
+    dfe_start_write(parser->inflight.functions, pf) {
+        if (pf->timeout_ut < now) {
+            internal_error(true,
+                           "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
+                           string2str(pf->function), pf_dfe.name, now - pf->started_ut);
+
+            if(!buffer_strlen(pf->destination_wb) || pf->code == HTTP_RESP_OK)
+                pf->code = rrd_call_function_error(pf->destination_wb,
+                                                   "Timeout waiting for collector response.",
+                                                   HTTP_RESP_GATEWAY_TIMEOUT);
+
+            dictionary_del(parser->inflight.functions, pf_dfe.name);
+        }
+
+        else if(!parser->inflight.smaller_timeout || pf->timeout_ut < parser->inflight.smaller_timeout)
+            parser->inflight.smaller_timeout = pf->timeout_ut;
+    }
+    dfe_done(pf);
 }
 
 // this is the function that is called from
@@ -552,22 +581,8 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
         parser->inflight.smaller_timeout = tmp.timeout_ut;
 
     // garbage collect stale inflight functions
-    if(parser->inflight.smaller_timeout < now) {
-        parser->inflight.smaller_timeout = 0;
-        struct inflight_function *t;
-        dfe_start_write(parser->inflight.functions, t) {
-            if (t->timeout_ut < now) {
-                internal_error(true,
-                               "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
-                               string2str(t->function), t_dfe.name, now - t->started_ut);
-                dictionary_del(parser->inflight.functions, t_dfe.name);
-            }
-
-            else if(!parser->inflight.smaller_timeout || t->timeout_ut < parser->inflight.smaller_timeout)
-                parser->inflight.smaller_timeout = t->timeout_ut;
-        }
-        dfe_done(t);
-    }
+    if(parser->inflight.smaller_timeout < now)
+        inflight_functions_garbage_collect(parser, now);
 
     dictionary_write_unlock(parser->inflight.functions);
 
