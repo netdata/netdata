@@ -18,11 +18,14 @@
 # When set to 1, we use netdatacli for reload/rotate/save commands instead of s-s-d.
 : "${NETDATA_USE_NETDATACLI:=0}"
 
+# Specifies the pidfile to use when running in the background.
+: "${NETDATA_PIDFILE:=@localstatedir_POST@/run/netdata/netdata.pid}"
+
 extra_started_commands="reload rotate save"
-pidfile="@localstatedir_POST@/run/netdata/netdata.pid"
 command_prefix="@sbindir_POST@"
 command="${command_prefix}/netdata"
-command_args="-P ${pidfile} ${NETDATA_EXTRA_ARGS}"
+command_args="-P ${NETDATA_PIDFILE}${NETDATA_EXTRA_ARGS}"
+command_args_foreground="-D"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
 required_files="/etc/netdata/netdata.conf"
 if [ "${NETDATA_FORCE_EXIT}" -eq 1 ]; then
@@ -39,6 +42,10 @@ depend() {
 
 start_pre() {
     checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata @localstatedir_POST@/run/netdata
+
+    if [ -z "${supervisor}" ]; then
+        pidfile="${NETDATA_PIDFILE}"
+    fi
 }
 
 reload() {
