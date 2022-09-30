@@ -525,9 +525,8 @@ const char *functions_content_type_to_format(uint8_t content_type) {
 }
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
-    char buffer[1024];
-    strncpyz(buffer, msg, 1024);
-    json_fix_string(buffer);
+    char buffer[PLUGINSD_LINE_MAX];
+    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
 
     buffer_flush(wb);
     buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
