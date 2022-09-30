@@ -943,6 +943,7 @@ static void metadata_event_loop(void *arg)
     int in_transaction = 0;
     struct completion *shutdown_completion = NULL;
     int commands_in_transaction = 0;
+    BUFFER *work_buffer = buffer_create(1024);
     completion_mark_complete(&wc->init_complete);
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_CLEANUP)) {
         RRDDIM *rd;
@@ -1032,7 +1033,28 @@ static void metadata_event_loop(void *arg)
                     dictionary_acquired_item_release(st->rrdhost->rrdset_root_index, dict_item);
                     break;
                 case METADATA_ADD_CHART_LABEL:
-//                      rrdlabels_walkthrough_read(st->state->chart_labels, store_labels_callback, st->chart_uuid);
+                    dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
+                    st = (RRDSET *) dictionary_acquired_item_value(dict_item);
+
+                    struct label_str {
+                        BUFFER  *sql;
+                        int count;
+                        char uuid_str[UUID_STR_LEN];
+                    };
+
+                    size_t old_version = st->rrdlabels_last_saved_version;
+                    size_t new_version = dictionary_version(st->rrdlabels);
+
+                    if(new_version != old_version) {
+                        buffer_flush(work_buffer);
+                        struct label_str tmp = {.sql = work_buffer, .count = 0};
+                        uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
+                        rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
+                        st->rrdlabels_last_saved_version = new_version;
+                        db_execute(buffer_tostring(work_buffer));
+                    }
+
+                    dictionary_acquired_item_release(st->rrdhost->rrdset_root_index, dict_item);
                     break;
                 case METADATA_ADD_DIMENSION:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
@@ -1306,4 +1328,10 @@ void queue_store_host_labels(const char *machine_guid)
 void queue_metadata_buffer(BUFFER *buffer)
 {
     _queue_metadata_cmd(METADATA_STORE_BUFFER, buffer, NULL);
+}
+
+void queue_chart_labels(RRDSET *st)
+{
+    const DICTIONARY_ITEM *acquired_st = dictionary_get_and_acquire_item(st->rrdhost->rrdset_root_index, string2str(st->id));
+    _queue_metadata_cmd(METADATA_ADD_CHART_LABEL, acquired_st, NULL);
 }

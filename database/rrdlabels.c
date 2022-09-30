@@ -958,7 +958,7 @@ struct label_str {
     char uuid_str[UUID_STR_LEN];
 };
 
-static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct label_str *lb = data;
     if (unlikely(!lb->count))
         buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");

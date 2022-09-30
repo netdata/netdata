@@ -92,4 +92,5 @@ void queue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid);
 void queue_store_host_labels(const char *machine_guid);
 void queue_metadata_buffer(BUFFER *buffer);
 void migrate_localhost(uuid_t *host_uuid);
+void queue_chart_labels(RRDSET *st);
 #endif //NETDATA_SQLITE_METADATA_H

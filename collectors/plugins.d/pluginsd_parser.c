@@ -752,6 +752,9 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
 
     rrdlabels_remove_all_unmarked(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
 
+    queue_chart_labels(((PARSER_USER_OBJECT *)user)->st);
+
+
     ((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily = NULL;
     return PARSER_RC_OK;
 }
