@@ -475,18 +475,26 @@ install_non_systemd_init() {
   return 1
 }
 
-# This is used by netdata-installer.sh
-# shellcheck disable=SC2034
-NETDATA_STOP_CMD="netdatacli shutdown-agent"
-
-NETDATA_START_CMD="netdata"
-NETDATA_INSTALLER_START_CMD=""
-
 install_netdata_service() {
   if [ "${UID}" -eq 0 ]; then
     if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
       run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds && return 0
+
+      if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
+        if [ -n "${NETDATA_START_CMD}" ]; then
+          NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+        else
+          NETDATA_INSTALLER_START_CMD="netdata"
+        fi
+      fi
     else
+      # This is used by netdata-installer.sh
+      # shellcheck disable=SC2034
+      NETDATA_STOP_CMD="netdatacli shutdown-agent"
+
+      NETDATA_START_CMD="netdata"
+      NETDATA_INSTALLER_START_CMD=""
+
       uname="$(uname 2> /dev/null)"
 
       if [ "${uname}" = "Darwin" ]; then
