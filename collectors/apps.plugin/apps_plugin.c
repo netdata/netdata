@@ -4222,20 +4222,20 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
         if(!words[i]) break;
 
-        if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, sizeof(PROCESS_FILTER_CATEGORY)) == 0) {
-            category = find_target_by_name(apps_groups_root_target, &words[i][sizeof(PROCESS_FILTER_CATEGORY)]);
+        if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
+            category = find_target_by_name(apps_groups_root_target, &words[i][strlen(PROCESS_FILTER_CATEGORY)]);
         }
-        else if(!user && strncmp(words[i], PROCESS_FILTER_USER, sizeof(PROCESS_FILTER_USER)) == 0) {
-            user = find_target_by_name(users_root_target, &words[i][sizeof(PROCESS_FILTER_USER)]);
+        else if(!user && strncmp(words[i], PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
+            user = find_target_by_name(users_root_target, &words[i][strlen(PROCESS_FILTER_USER)]);
         }
-        else if(strncmp(words[i], PROCESS_FILTER_GROUP, sizeof(PROCESS_FILTER_GROUP)) == 0) {
-            group = find_target_by_name(groups_root_target, &words[i][sizeof(PROCESS_FILTER_GROUP)]);
+        else if(strncmp(words[i], PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
+            group = find_target_by_name(groups_root_target, &words[i][strlen(PROCESS_FILTER_GROUP)]);
         }
-        else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, sizeof(PROCESS_FILTER_PROCESS)) == 0) {
-            process_name = &words[i][sizeof(PROCESS_FILTER_PROCESS)];
+        else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
+            process_name = &words[i][strlen(PROCESS_FILTER_PROCESS)];
         }
-        else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, sizeof(PROCESS_FILTER_PID)) == 0) {
-            pid = str2i(&words[i][sizeof(PROCESS_FILTER_PID)]);
+        else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, strlen(PROCESS_FILTER_PID)) == 0) {
+            pid = str2i(&words[i][strlen(PROCESS_FILTER_PID)]);
         }
     }
 
@@ -4271,7 +4271,7 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
         if(process_name && (strcmp(p->comm, process_name) != 0 || (p->parent && strcmp(p->parent->comm, process_name) != 0)))
             continue;
 
-        if(pid && (p->pid != pid || p->ppid != pid))
+        if(pid && (p->pid != pid && p->ppid != pid))
             continue;
 
         fprintf(stdout,
@@ -4332,13 +4332,13 @@ void *reader_main(void *arg __maybe_unused) {
 
                 netdata_mutex_lock(&mutex);
 
-                if(strncmp(function, "processes", sizeof("processes")) == 0) {
+                if(strncmp(function, "processes", strlen("processes")) == 0) {
                     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 200 text/html\n", transaction);
                     apps_plugin_function_process_tree(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
                 }
 #ifdef ENABLE_TOP
-                else if(strncmp(function, "top", sizeof("top")) == 0) {
+                else if(strncmp(function, "top", strlen("top")) == 0) {
                     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 200 text/plain\n", transaction);
                     apps_plugin_function_run_top(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
