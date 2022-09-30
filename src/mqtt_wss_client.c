@@ -533,11 +533,16 @@ inline static int base64_encode_helper(unsigned char *out, int *outl, const unsi
     str += *outl;
     EVP_EncodeFinal(ctx, str, &len);
     *outl += len;
-    // if we ever expect longer output than what OpenSSL would pack into single line
-    // we would have to skip the endlines, until then we can just cut the string short
-    str = (unsigned char*)strchr((char*)out, '\n');
-    if (str)
-        *str = 0;
+
+    str = out;
+    while(*str) {
+        if (*str != 0x0D && *str != 0x0A)
+            *out++ = *str++;
+        else
+            str++;
+    }
+    *out = 0;
+
     EVP_ENCODE_CTX_free(ctx);
     return 0;
 }
@@ -568,6 +573,9 @@ static int http_proxy_connect(mqtt_wss_client client)
             goto cleanup;
         }
         int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
+        // OpenSSL encoder puts newline every 64 output bytes
+        // we remove those but during encoding we need that space in the buffer
+        creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
         char *creds_base64 = malloc(creds_base64_len + 1);
         if (!creds_base64) {
             free(creds_plain);
