@@ -7,6 +7,23 @@ extern DICTIONARY *rrdhost_root_index;
 
 // Metadata functions
 
+struct label_str {
+    BUFFER  *sql;
+    int count;
+    char uuid_str[UUID_STR_LEN];
+};
+
+static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    struct label_str *lb = data;
+    if (unlikely(!lb->count))
+        buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");
+    else
+        buffer_strcat(lb->sql, ", ");
+    buffer_sprintf(lb->sql, "(u2h('%s'), %d,'%s','%s', unixepoch())", lb->uuid_str, ls, name, value);
+    lb->count++;
+    return 1;
+}
+
 // Migrate all hosts with hops zero to this host_uuid
 void migrate_localhost(uuid_t *host_uuid)
 {
