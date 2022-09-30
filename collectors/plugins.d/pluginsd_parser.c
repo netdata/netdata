@@ -627,9 +627,10 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 {
     char *key = words[1];
     char *status = words[2];
+    char *format = words[3];
 
     if (unlikely(!key || !*key)) {
-        error("got a FUNCTION_RESULT_BEGIN without providing the required data (key = '%s', status = '%s'). Ignoring it.",
+        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s'). Ignoring it.",
             key ? key : "(unset)",
             status ? status : "(unset)");
         return PARSER_RC_ERROR;
@@ -643,9 +644,12 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 
     struct inflight_function *pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
     if(!pf) {
-        error("got a FUNCTION_RESULT_BEGIN for transaction '%s', but the transaction is not found.", key);
+        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key);
         return PARSER_RC_ERROR;
     }
+
+    if(format && *format)
+        pf->destination_wb->contenttype = functions_format_to_content_type(format);
 
     pf->code = code;
     parser->defer.response = pf->destination_wb;

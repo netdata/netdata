@@ -272,7 +272,7 @@ static inline size_t sanitize_function_text(char *dst, const char *src, size_t d
 
 struct rrd_collector_function {
     bool sync;                      // when true, the function is called synchronously
-    STRING *format;                 // the format the function produces
+    uint8_t content_type;
     STRING *help;
     int timeout;                    // the default timeout of the function
 
@@ -361,7 +361,6 @@ static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_un
                                           void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
     rrd_collector_release(rdcf->collector);
-    string_freez(rdcf->format);
 }
 
 static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
@@ -387,14 +386,10 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->format != new_rdcf->format) {
-        STRING *old = rdcf->format;
-        rdcf->format = new_rdcf->format;
-        string_freez(old);
+    if(rdcf->content_type != new_rdcf->content_type) {
+        rdcf->content_type = new_rdcf->content_type;
         changed = true;
     }
-    else
-        string_freez(new_rdcf->format);
 
     if(rdcf->help != new_rdcf->help) {
         STRING *old = rdcf->help;
@@ -448,7 +443,7 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
     struct rrd_collector_function tmp = {
         .sync = sync,
         .timeout = timeout,
-        .format = string_strdupz(format),
+        .content_type = functions_format_to_content_type(format),
         .function = function,
         .collector_data = collector_data,
         .help = string_strdupz(help),
@@ -467,8 +462,13 @@ void rrd_functions_expose(RRDSET *st, BUFFER *wb) {
 
     struct rrd_collector_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n", string2str(tmp->format),
-                       tmp->timeout, tmp_dfe.name, string2str(tmp->help));
+        buffer_sprintf(wb
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\"\n"
+                       , functions_content_type_to_format(tmp->content_type)
+                       , tmp->timeout
+                       , tmp_dfe.name
+                       , string2str(tmp->help)
+                       );
     }
     dfe_done(tmp);
 }
@@ -485,6 +485,43 @@ static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
     pthread_cond_destroy(&tmp->cond);
     netdata_mutex_destroy(&tmp->mutex);
     freez(tmp);
+}
+
+struct {
+    const char *format;
+    uint8_t content_type;
+} function_formats[] = {
+    { .format = "text",             CT_TEXT_PLAIN },
+    { .format = "txt",              CT_TEXT_PLAIN },
+    { .format = "text/plain",       CT_TEXT_PLAIN },
+    { .format = "json",             CT_APPLICATION_JSON },
+    { .format = "application/json", CT_APPLICATION_JSON },
+    { .format = "html",             CT_TEXT_HTML },
+    { .format = "text/html",        CT_TEXT_HTML },
+    { .format = "xml",              CT_APPLICATION_XML },
+    { .format = "application/xml",  CT_APPLICATION_XML },
+    { .format = "prometheus",       CT_PROMETHEUS },
+
+    // terminator
+    { .format = NULL,               CT_TEXT_PLAIN },
+};
+
+uint8_t functions_format_to_content_type(const char *format) {
+    if(format && *format) {
+        for (int i = 0; function_formats[i].format; i++)
+            if (strcmp(function_formats[i].format, format) == 0)
+                return function_formats[i].content_type;
+    }
+
+    return CT_TEXT_PLAIN;
+}
+
+const char *functions_content_type_to_format(uint8_t content_type) {
+    for (int i = 0; function_formats[i].format; i++)
+        if (function_formats[i].content_type == content_type)
+            return function_formats[i].format;
+
+    return "text/plain";
 }
 
 static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
@@ -504,26 +541,27 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
             s = &buffer[strlen(buffer) - 1];
 
         // skip a word from the end
-        while(s > buffer && !isspace(*s)) --s;
+        while(s >= buffer && !isspace(*s)) *s-- = '\0';
 
         // skip all spaces
-        while(s > buffer && isspace(*s)) --s;
-
-        if(s >= buffer) // it is a space or the whole buffer - terminate it there
-            *s-- = '\0';
+        while(s >= buffer && isspace(*s)) *s-- = '\0';
     }
 
     if(!(*rdcf)) {
         buffer_flush(wb);
-        buffer_sprintf(wb, "No function named '%s' found.", buffer);
+        buffer_sprintf(wb, "No function found with this definition.");
+        wb->contenttype = CT_TEXT_PLAIN;
         return HTTP_RESP_NOT_FOUND;
     }
 
     if(!(*rdcf)->collector->running) {
         buffer_flush(wb);
-        buffer_sprintf(wb, "The collector for function '%s' is not currently running.", buffer);
+        buffer_sprintf(wb, "The collector for this function is not currently running.");
+        wb->contenttype = CT_TEXT_PLAIN;
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
+
+    wb->contenttype = (*rdcf)->content_type;
 
     return HTTP_RESP_OK;
 }
@@ -584,6 +622,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
         bool we_should_free = true;
         BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1); // we need it because we may give up on it
+        temp_wb->contenttype = wb->contenttype;
         code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp);
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
@@ -598,6 +637,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
             if (tmp->data_are_ready) {
                 // we have a response
                 buffer_fast_strcat(wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
+                wb->contenttype = temp_wb->contenttype;
                 code = tmp->code;
             }
             else if (rc == ETIMEDOUT) {
@@ -605,6 +645,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 // we will go away and let the callback free the structure
                 buffer_flush(wb);
                 buffer_strcat(wb, "Timeout");
+                wb->contenttype = CT_TEXT_PLAIN;
                 tmp->free_with_signal = true;
                 we_should_free = false;
                 code = HTTP_RESP_GATEWAY_TIMEOUT;
@@ -613,6 +654,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 error("RRDSET FUNCTIONS: failed to wait for a response from the collector");
                 buffer_flush(wb);
                 buffer_strcat(wb, "Failed to wait for a response from the collector");
+                wb->contenttype = CT_TEXT_PLAIN;
                 code = HTTP_RESP_INTERNAL_SERVER_ERROR;
             }
 
@@ -624,6 +666,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
             error("RRDSET FUNCTIONS: failed to send request to the collector");
             buffer_flush(wb);
             buffer_strcat(wb, "Failed to send request to the collector");
+            wb->contenttype = CT_TEXT_PLAIN;
         }
 
         if (we_should_free)
@@ -653,6 +696,7 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
         error("RRDSET FUNCTIONS: failed to send request to the collector with code %d", code);
         buffer_flush(wb);
         buffer_strcat(wb, "Failed to send request to the collector");
+        wb->contenttype = CT_TEXT_PLAIN;
     }
 
     return code;
@@ -667,7 +711,7 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident,
             buffer_strcat(wb, ",\n");
 
         buffer_sprintf(wb, "%s%s%s%s: {\n", ident, kq, t_dfe.name, kq);
-        buffer_sprintf(wb, "\t%s%sformat%s: %s%s%s,\n", ident, kq, kq, sq, string2str(t->format), sq);
+        buffer_sprintf(wb, "\t%s%sformat%s: %s%s%s,\n", ident, kq, kq, sq, functions_content_type_to_format(t->content_type), sq);
         buffer_sprintf(wb, "\t%s%shelp%s: %s%s%s,\n", ident, kq, kq, sq, string2str(t->help), sq);
         buffer_sprintf(wb, "\t%s%stimeout%s: %d\n", ident, kq, kq, t->timeout);
         buffer_sprintf(wb, "%s}", ident);

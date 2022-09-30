@@ -709,9 +709,17 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
     struct sender_state *s = tmp->sender;
 
     sender_start(s);
-    buffer_sprintf(s->build, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d\n", string2str(tmp->transaction), code);
+
+    buffer_sprintf(s->build
+                   , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d %s\n"
+                   , string2str(tmp->transaction)
+                   , code
+                   , functions_content_type_to_format(wb->contenttype)
+                   );
+
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
     buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+
     rrdpush_signal_sender_to_wake_up(s);
     sender_commit(s);
 

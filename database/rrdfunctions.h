@@ -28,4 +28,7 @@ extern void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *k
 extern void chart_functions_to_dict(RRDSET *st, DICTIONARY *dict);
 extern void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, const char *sq);
 
+extern uint8_t functions_format_to_content_type(const char *format);
+extern const char *functions_content_type_to_format(uint8_t content_type);
+
 #endif // NETDATA_RRDFUNCTIONS_H

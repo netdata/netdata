@@ -10,6 +10,22 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#define ENABLE_TOP 1
+#endif
+
+#ifdef ENABLE_TOP
+#define FUNCTION_TOP() fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " text 10 \"top\" \"run the top command\"\n")
+#else
+#define FUNCTION_TOP() debug_dummy()
+#endif
+
+#define APPS_PLUGIN_FUNCTIONS() do { \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " html 10 \"processes\" \"detailed processes information\"\n"); \
+        FUNCTION_TOP();                                                                         \
+    } while(0)
+
+
 // ----------------------------------------------------------------------------
 // debugging
 
@@ -397,7 +413,7 @@ struct pid_stat {
     // kernel_uint_t io_cancelled_write_bytes;
 
     struct pid_fd *fds;             // array of fds it uses
-    size_t fds_size;                   // the size of the fds array
+    size_t fds_size;                // the size of the fds array
 
     int children_count;             // number of processes directly referencing this
     unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
@@ -447,8 +463,8 @@ kernel_uint_t global_uptime;
 
 static struct pid_stat
         *root_of_pids = NULL,   // global list of all processes running
-        **all_pids = NULL;      // to avoid allocations, we pre-allocate the
-                                // the entire pid space.
+        **all_pids = NULL;      // to avoid allocations, we pre-allocate
+                                // a pointer for each pid in the entire pid space.
 
 static size_t
         all_pids_count = 0;     // the number of processes running
@@ -3704,33 +3720,36 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
-
-    // TODO - remove me before merging!
-    fprintf(stdout, "FUNCTION text 10 \"top\" \"run the top command, add params if you like\"\n");
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
+    APPS_PLUGIN_FUNCTIONS();
+
 
     fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MiB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20006 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20007 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
@@ -3738,6 +3757,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     if (enable_detailed_uptime_charts) {
         fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
@@ -3745,18 +3765,21 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        APPS_PLUGIN_FUNCTIONS();
 
         fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        APPS_PLUGIN_FUNCTIONS();
 
         fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        APPS_PLUGIN_FUNCTIONS();
     }
 #endif
 
@@ -3765,12 +3788,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (100%% = 1 core)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     if(show_guest_time) {
         fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_guest stacked 20022 %d\n", type, title, type, update_every);
@@ -3778,6 +3803,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
         }
+        APPS_PLUGIN_FUNCTIONS();
     }
 
 #ifndef __FreeBSD__
@@ -3786,6 +3812,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
+    APPS_PLUGIN_FUNCTIONS();
 #endif
 
     fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20012 %d\n", type, title, type, update_every);
@@ -3793,12 +3820,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
 #ifdef __FreeBSD__
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'blocks/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
@@ -3806,36 +3835,42 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
+    TOP_FUNCTION();
 
     fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'blocks/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
+    TOP_FUNCTION();
 #else
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'KiB/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'KiB/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'KiB/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'KiB/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
+    APPS_PLUGIN_FUNCTIONS();
 #endif
 
     if(enable_file_charts) {
@@ -3845,6 +3880,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        APPS_PLUGIN_FUNCTIONS();
 
         fprintf(stdout, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n",
                        type, title, type, update_every);
@@ -3852,6 +3888,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        APPS_PLUGIN_FUNCTIONS();
 
         fprintf(stdout, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type,
                        title, type, update_every);
@@ -3859,6 +3896,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        APPS_PLUGIN_FUNCTIONS();
     }
 }
 
@@ -4139,7 +4177,134 @@ static int check_capabilities() {
 
 netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 
+#ifdef ENABLE_TOP
+void apps_plugin_function_run_top(char *function __maybe_unused, char *line_buffer, int line_max, int timeout __maybe_unused) {
+    pid_t pid;
+    FILE *fp = netdata_popen("top -b -d 0.5 -n 1 -w 180 2>&1", &pid, NULL);
+
+    if(fp) {
+        while (fgets(line_buffer, line_max, fp))
+            fprintf(stdout, "%s", line_buffer);
+    }
+    else
+        fprintf(stdout, "Cannot execute top.");
+
+    netdata_pclose(NULL, fp, pid);
+}
+#endif
+
+#define PROCESS_FILTER_CATEGORY "category:"
+#define PROCESS_FILTER_USER "user:"
+#define PROCESS_FILTER_GROUP "group:"
+#define PROCESS_FILTER_PROCESS "process:"
+#define PROCESS_FILTER_PID "pid:"
+
+static struct target *find_target_by_name(struct target *base, const char *name) {
+    struct target *t;
+    for(t = base; t ; t = t->next) {
+        if (strcmp(t->name, name) == 0)
+            return t;
+    }
+
+    return NULL;
+}
+
+static void apps_plugin_function_process_tree(char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+    struct pid_stat *p;
+
+    char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+
+    struct target *category = NULL, *user = NULL, *group = NULL;
+    const char *process_name = NULL;
+    pid_t pid = 0;
+
+    for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
+        if(!words[i]) break;
+
+        if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, sizeof(PROCESS_FILTER_CATEGORY)) == 0) {
+            category = find_target_by_name(apps_groups_root_target, &words[i][sizeof(PROCESS_FILTER_CATEGORY)]);
+        }
+        else if(!user && strncmp(words[i], PROCESS_FILTER_USER, sizeof(PROCESS_FILTER_USER)) == 0) {
+            user = find_target_by_name(users_root_target, &words[i][sizeof(PROCESS_FILTER_USER)]);
+        }
+        else if(strncmp(words[i], PROCESS_FILTER_GROUP, sizeof(PROCESS_FILTER_GROUP)) == 0) {
+            group = find_target_by_name(groups_root_target, &words[i][sizeof(PROCESS_FILTER_GROUP)]);
+        }
+        else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, sizeof(PROCESS_FILTER_PROCESS)) == 0) {
+            process_name = &words[i][sizeof(PROCESS_FILTER_PROCESS)];
+        }
+        else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, sizeof(PROCESS_FILTER_PID)) == 0) {
+            pid = str2i(&words[i][sizeof(PROCESS_FILTER_PID)]);
+        }
+    }
+
+    // pid, cmd, cmdline, parent, target
+    fprintf(stdout, "<table class=\"apps_plugin_processes\">\n");
+    fprintf(stdout,
+            "<tr>"
+            "<th>PID</th>"
+            "<th>Command</th>"
+            "<th>Command Line</th>"
+            "<th>Parent PID</th>"
+            "<th>Category</th>"
+            "<th>User</th>"
+            "<th>Group</th>"
+            "<th>SubProcesses</th>"
+            "<th>Threads</th>"
+            "<th>Uptime</th>"
+            "</tr>\n");
+
+    for(p = root_of_pids; p ; p = p->next) {
+        if(!p->updated)
+            continue;
+
+        if(category && p->target != category)
+            continue;
+
+        if(user && p->user_target != user)
+            continue;
+
+        if(group && p->group_target != group)
+            continue;
+
+        if(process_name && (strcmp(p->comm, process_name) != 0 || (p->parent && strcmp(p->parent->comm, process_name) != 0)))
+            continue;
+
+        if(pid && (p->pid != pid || p->ppid != pid))
+            continue;
+
+        fprintf(stdout,
+                "<tr>"
+                "<td>%d</td>"       // pid
+                "<td>%s</td>"       // cmd
+                "<td>%s</td>"       // cmdline
+                "<td>%d</td>"       // parent pid
+                "<td>%s</td>"       // category
+                "<td>%s (%d)</td>"  // user
+                "<td>%s (%d)</td>"  // group
+                "<td>%d</td>"       // sub-processes
+                "<td>%d</td>"       // threads
+                "<td>%lu</td>"       // uptime
+                "</tr>\n"
+                , p->pid
+                , p->comm
+                , p->cmdline?p->cmdline:"-"
+                , p->ppid
+                , p->target?p->target->name:"-"
+                , p->user_target?p->user_target->name:"-", p->uid
+                , p->group_target?p->group_target->name:"-", p->gid
+                , p->children_count
+                , p->num_threads
+                , p->uptime
+                );
+    }
+    fprintf(stdout, "</table>\n");
+}
+
 void *reader_main(void *arg __maybe_unused) {
+    netdata_thread_detach(netdata_thread_self());
+
     char buffer[PLUGINSD_LINE_MAX + 1];
 
     while(fgets(buffer, PLUGINSD_LINE_MAX, stdin)) {
@@ -4163,39 +4328,39 @@ void *reader_main(void *arg __maybe_unused) {
                 int timeout = str2i(timeout_s);
                 if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
 
-                internal_error(true, "FUNCTION '%s' with transaction id '%s' received", function, transaction);
+                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
 
                 netdata_mutex_lock(&mutex);
-                fprintf(stdout, "FUNCTION_RESULT_BEGIN %s %d\n", transaction, 200);
 
-                // TODO - remove before merging!
-
-                pid_t pid;
-                FILE *fpin;
-                FILE *fpout = netdata_popen("top -b -d 0.5 -n 1 -w 180 2>&1", &pid, &fpin);
-
-                if(fpout) {
-                    while (fgets(buffer, PLUGINSD_LINE_MAX, fpout))
-                        fprintf(stdout, "%s", buffer);
+                if(strncmp(function, "processes", sizeof("processes")) == 0) {
+                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 200 text/html\n", transaction);
+                    apps_plugin_function_process_tree(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
                 }
-                else
-                    fprintf(stderr, "Cannot execute top");
+#ifdef ENABLE_TOP
+                else if(strncmp(function, "top", sizeof("top")) == 0) {
+                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 200 text/plain\n", transaction);
+                    apps_plugin_function_run_top(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+                }
+#endif
+                else {
+                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 404 text/plain\n", transaction);
+                    fprintf(stdout, "No function with this name found in apps.plugin");
+                    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+                }
 
-                netdata_pclose(fpin, fpout, pid);
-//                fprintf(stdout, "Welcome to app.plugin functions!\n");
-//                fprintf(stdout, "Now is %ld.\n", now_realtime_sec());
-//                fprintf(stdout, "That's all for now...\n");
-                fprintf(stdout, "\nFUNCTION_RESULT_END\n");
                 fflush(stdout);
                 netdata_mutex_unlock(&mutex);
+
+                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
             }
         }
         else
             error("Received unknown command: %s", words[0]?words[0]:"(unset)");
     }
 
-    exit(1);
-
+    fatal("Received error on read pipe.");
     return NULL;
 }
 
@@ -4289,10 +4454,10 @@ int main(int argc, char **argv) {
     debug_log("group file: '%s'", all_group_ids.filename);
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-    all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
+    all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max + 1);
 #endif
 
-    all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
+    all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max + 1);
 
     netdata_thread_t reader_thread;
     netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
@@ -4319,17 +4484,20 @@ int main(int argc, char **argv) {
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
         if (unlikely(poll(&pollfd, 1, 0) < 0)) {
             netdata_mutex_unlock(&mutex);
+            netdata_thread_cancel(reader_thread);
             fatal("Cannot check if a pipe is available");
         }
         if (unlikely(pollfd.revents & POLLERR)) {
             netdata_mutex_unlock(&mutex);
-            fatal("Cannot write to a pipe");
+            netdata_thread_cancel(reader_thread);
+            fatal("Received error on read pipe.");
         }
 
         if(!collect_data_for_all_processes()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
             netdata_mutex_unlock(&mutex);
+            netdata_thread_cancel(reader_thread);
             exit(1);
         }
 
