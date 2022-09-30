@@ -4182,7 +4182,16 @@ static struct target *find_target_by_name(struct target *base, const char *name)
     return NULL;
 }
 
-static void apps_plugin_function_process_tree(char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void apps_plugin_function_error(const char *transaction, int code, const char *msg) {
+    char buffer[PLUGINSD_LINE_MAX + 1];
+    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
+
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d text/html\n", transaction, code);
+    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
+    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+}
+
+static void apps_plugin_function_process_tree(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -4197,12 +4206,24 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
 
         if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &words[i][strlen(PROCESS_FILTER_CATEGORY)]);
+            if(!category) {
+                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
+                return;
+            }
         }
         else if(!user && strncmp(words[i], PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &words[i][strlen(PROCESS_FILTER_USER)]);
+            if(!user) {
+                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
+                return;
+            }
         }
         else if(strncmp(words[i], PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &words[i][strlen(PROCESS_FILTER_GROUP)]);
+            if(!group) {
+                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
+                return;
+            }
         }
         else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
             process_name = &words[i][strlen(PROCESS_FILTER_PROCESS)];
@@ -4212,23 +4233,117 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
         }
     }
 
-    // pid, cmd, cmdline, parent, target
-    fprintf(stdout, "<table class=\"apps_plugin_processes\">\n");
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d text/html\n", transaction, HTTP_RESP_OK);
     fprintf(stdout,
-            "<tr>"
-            "<th>PID</th>"
-            "<th>Command</th>"
-            "<th>Command Line</th>"
-            "<th>Parent PID</th>"
-            "<th>Category</th>"
-            "<th>User</th>"
-            "<th>Group</th>"
-            "<th>SubProcesses</th>"
-            "<th>Threads</th>"
-            "<th>Uptime</th>"
-            "</tr>\n");
+            "{\n"
+            "   \"status\":%d,\n"
+            "   \"columns\": {\n"
+            "      \"pid\": {\n"
+            "         \"index\":1,\n"
+            "         \"name\":\"PID\",\n"
+            "         \"info\":\"The process ID.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"integer\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"cmd\": {\n"
+            "         \"index\":2,\n"
+            "         \"name\":\"Command\",\n"
+            "         \"info\":\"The process name.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"string\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"cmdline\": {\n"
+            "         \"index\":3,\n"
+            "         \"name\":\"Command\",\n"
+            "         \"info\":\"The full command line.\",\n"
+            "         \"visible\":false,\n"
+            "         \"type\":\"detail string\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"ppid\": {\n"
+            "         \"index\":4,\n"
+            "         \"name\":\"Parent PID\",\n"
+            "         \"info\":\"The process ID of the parent process.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"integer\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"category\": {\n"
+            "         \"index\":5,\n"
+            "         \"name\":\"Category\",\n"
+            "         \"info\":\"The applications category, as defined in apps_groups.conf.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"string\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"user\": {\n"
+            "         \"index\":6,\n"
+            "         \"name\":\"User\",\n"
+            "         \"info\":\"The user this applications runs for.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"string\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"uid\": {\n"
+            "         \"index\":7,\n"
+            "         \"name\":\"User ID\",\n"
+            "         \"info\":\"The user ID this applications runs for.\",\n"
+            "         \"visible\":false,\n"
+            "         \"type\":\"integer\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"group\": {\n"
+            "         \"index\":8,\n"
+            "         \"name\":\"Group\",\n"
+            "         \"info\":\"The group this applications runs for.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"string\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"gid\": {\n"
+            "         \"index\":9,\n"
+            "         \"name\":\"Group ID\",\n"
+            "         \"info\":\"The group ID this applications runs for.\",\n"
+            "         \"visible\":false,\n"
+            "         \"type\":\"integer\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      },\n"
+            "      \"procs\": {\n"
+            "         \"index\":10,\n"
+            "         \"name\":\"Sub Processes\",\n"
+            "         \"info\":\"The number of direct subprocesses running.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"integer\",\n"
+            "         \"sort\":\"descending\"\n"
+            "      },\n"
+            "      \"threads\": {\n"
+            "         \"index\":11,\n"
+            "         \"name\":\"Threads\",\n"
+            "         \"info\":\"The number of threads running.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"integer\",\n"
+            "         \"sort\":\"descending\"\n"
+            "      },\n"
+            "      \"uptime\": {\n"
+            "         \"index\":12,\n"
+            "         \"name\":\"Uptime\",\n"
+            "         \"info\":\"The duration this process is running.\",\n"
+            "         \"visible\":true,\n"
+            "         \"type\":\"duration\",\n"
+            "         \"sort\":\"ascending\"\n"
+            "      }\n"
+            "   },\n"
+            "   \"default sort column\": \"category\",\n"
+            "   \"data\":[\n"
+            , HTTP_RESP_OK
+            );
 
-    for(p = root_of_pids; p ; p = p->next) {
+    char buffer[PLUGINSD_LINE_MAX + 1];
+
+    int i = 0;
+    for(p = root_of_pids; p ; p = p->next, i++) {
         if(!p->updated)
             continue;
 
@@ -4247,32 +4362,57 @@ static void apps_plugin_function_process_tree(char *function __maybe_unused, cha
         if(pid && p->pid != pid && p->ppid != pid)
             continue;
 
-        fprintf(stdout,
-                "<tr>"
-                "<td>%d</td>"       // pid
-                "<td>%s</td>"       // cmd
-                "<td>%s</td>"       // cmdline
-                "<td>%d</td>"       // parent pid
-                "<td>%s</td>"       // category
-                "<td>%s (%d)</td>"  // user
-                "<td>%s (%d)</td>"  // group
-                "<td>%d</td>"       // sub-processes
-                "<td>%d</td>"       // threads
-                "<td>%lu</td>"       // uptime
-                "</tr>\n"
-                , p->pid
-                , p->comm
-                , p->cmdline && p->cmdline?p->cmdline:p->comm
-                , p->ppid
-                , p->target?p->target->name:"-"
-                , p->user_target?p->user_target->name:"-", p->uid
-                , p->group_target?p->group_target->name:"-", p->gid
-                , p->children_count
-                , p->num_threads
-                , p->uptime
-                );
+        if(i)
+            fprintf(stdout, ",\n");
+
+        fprintf(stdout, "      [");
+
+        // 1
+        fprintf(stdout, "%d", p->pid);
+
+        // 2
+        json_escape_string(buffer, p->comm, PLUGINSD_LINE_MAX);
+        fprintf(stdout, ", \"%s\"", buffer);
+
+        // 3
+        json_escape_string(buffer, p->cmdline && *p->cmdline?p->cmdline:p->comm, PLUGINSD_LINE_MAX);
+        fprintf(stdout, ", \"%s\"", buffer);
+
+        // 4
+        fprintf(stdout, ", %d", p->ppid);
+
+        // 5
+        json_escape_string(buffer, p->target?p->target->name:"-", PLUGINSD_LINE_MAX);
+        fprintf(stdout, ", \"%s\"", buffer);
+
+        // 6
+        json_escape_string(buffer, p->user_target?p->user_target->name:"-", PLUGINSD_LINE_MAX);
+        fprintf(stdout, ", \"%s\"", buffer);
+
+        // 7
+        fprintf(stdout, ", %d", p->uid);
+
+        // 8
+        json_escape_string(buffer, p->group_target?p->group_target->name:"-", PLUGINSD_LINE_MAX);
+        fprintf(stdout, ", \"%s\"", buffer);
+
+        // 9
+        fprintf(stdout, ", %d", p->gid);
+
+        // 10
+        fprintf(stdout, ", %d", p->children_count);
+
+        // 11
+        fprintf(stdout, ", %d", p->num_threads);
+
+        // 12
+        fprintf(stdout, ", %zu", (size_t)p->uptime);
+
+        fprintf(stdout, "]");
     }
-    fprintf(stdout, "</table>\n");
+
+    fprintf(stdout, "\n   ]\n}");
+    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
 }
 
 void *reader_main(void *arg __maybe_unused) {
@@ -4305,16 +4445,10 @@ void *reader_main(void *arg __maybe_unused) {
 
                 netdata_mutex_lock(&mutex);
 
-                if(strncmp(function, "processes", strlen("processes")) == 0) {
-                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 200 text/html\n", transaction);
-                    apps_plugin_function_process_tree(function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
-                    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
-                }
-                else {
-                    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s 404 application/json\n", transaction);
-                    fprintf(stdout, "{\"status\":404,\"error_message\":\"No function with this name found in apps.plugin\"}");
-                    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
-                }
+                if(strncmp(function, "processes", strlen("processes")) == 0)
+                    apps_plugin_function_process_tree(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                else
+                    apps_plugin_function_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
 
                 fflush(stdout);
                 netdata_mutex_unlock(&mutex);
