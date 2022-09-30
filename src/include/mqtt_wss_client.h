@@ -118,6 +118,8 @@ struct mqtt_wss_proxy {
     enum mqtt_wss_proxy_type type;
     const char *host;
     int port;
+    const char *username;
+    const char *password;
 };
 
 /* Publishes MQTT message

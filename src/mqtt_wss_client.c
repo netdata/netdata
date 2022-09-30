@@ -86,6 +86,8 @@ struct mqtt_wss_client_struct {
     int target_port;
 
     enum mqtt_wss_proxy_type proxy_type;
+    char *proxy_uname;
+    char *proxy_passwd;
 
 // nonblock IO related
     int sockfd;
@@ -375,6 +377,8 @@ void mqtt_wss_destroy(mqtt_wss_client client)
         free(client->target_host);
     if (client->host)
         free(client->host);
+    free(client->proxy_passwd);
+    free(client->proxy_uname);
 
     if (client->ssl)
         SSL_free(client->ssl);
@@ -502,6 +506,42 @@ static int http_parse_reply(mqtt_wss_client client, rbuf_t buf)
     return 0;
 }
 
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
+{
+	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+
+	if (ctx != NULL) {
+		memset(ctx, 0, sizeof(*ctx));
+	}
+	return ctx;
+}
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+	return;
+}
+#endif
+
+inline static int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
+{
+    int len;
+    unsigned char *str = out;
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_EncodeInit(ctx);
+    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
+    str += *outl;
+    EVP_EncodeFinal(ctx, str, &len);
+    *outl += len;
+    // if we ever expect longer output than what OpenSSL would pack into single line
+    // we would have to skip the endlines, until then we can just cut the string short
+    str = (unsigned char*)strchr((char*)out, '\n');
+    if (str)
+        *str = 0;
+    EVP_ENCODE_CTX_free(ctx);
+    return 0;
+}
+
 static int http_proxy_connect(mqtt_wss_client client)
 {
     int rc;
@@ -516,8 +556,41 @@ static int http_proxy_connect(mqtt_wss_client client)
     poll_fd.events = POLLIN;
 
     r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
-    snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_HDR_TERMINATOR, PROXY_CONNECT, client->target_host, client->target_port, PROXY_HTTP);
+    snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_ENDLINE, PROXY_CONNECT, client->target_host, client->target_port, PROXY_HTTP);
     write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
+
+    if (client->proxy_uname) {
+        size_t creds_plain_len = strlen(client->proxy_uname) + strlen(client->proxy_passwd) + 2;
+        char *creds_plain = malloc(creds_plain_len);
+        if (!creds_plain) {
+            mws_error(client->log, "OOM creds_plain");
+            rc = 6;
+            goto cleanup;
+        }
+        int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
+        char *creds_base64 = malloc(creds_base64_len + 1);
+        if (!creds_base64) {
+            free(creds_plain);
+            mws_error(client->log, "OOM creds_base64");
+            rc = 6;
+            goto cleanup;
+        }
+        char *ptr = creds_plain;
+        strcpy(ptr, client->proxy_uname);
+        ptr += strlen(client->proxy_uname);
+        *ptr++ = ':';
+        strcpy(ptr, client->proxy_passwd);
+
+        int b64_len;
+        base64_encode_helper((unsigned char*)creds_base64, &b64_len, (unsigned char*)creds_plain, strlen(creds_plain));
+        free(creds_plain);
+
+        r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
+        snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"Proxy-Authorization: Basic %s" HTTP_ENDLINE, creds_base64);
+        write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
+        free(creds_base64);
+    }
+    write(client->sockfd, HTTP_ENDLINE, strlen(HTTP_ENDLINE));
 
     // read until you find CRLF, CRLF (HTTP HDR end)
     // or ring buffer is full
@@ -608,6 +681,10 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         client->target_host = strdup(host);
         client->target_port = port;
         client->proxy_type = proxy->type;
+        if (proxy->username)
+            client->proxy_uname = strdup(proxy->username);
+        if (proxy->password)
+            client->proxy_passwd = strdup(proxy->password);
     } else {
         client->host = strdup(host);
         client->port = port;
