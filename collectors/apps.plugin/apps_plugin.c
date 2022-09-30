@@ -4390,14 +4390,14 @@ static void apps_plugin_function_process_tree(const char *transaction, char *fun
         fprintf(stdout, ", \"%s\"", buffer);
 
         // 7
-        fprintf(stdout, ", %d", p->uid);
+        fprintf(stdout, ", %u", (unsigned)p->uid);
 
         // 8
         json_escape_string(buffer, p->group_target?p->group_target->name:"-", PLUGINSD_LINE_MAX);
         fprintf(stdout, ", \"%s\"", buffer);
 
         // 9
-        fprintf(stdout, ", %d", p->gid);
+        fprintf(stdout, ", %u", (unsigned)p->gid);
 
         // 10
         fprintf(stdout, ", %d", p->children_count);
