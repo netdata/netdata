@@ -32,7 +32,7 @@ USAGE:
 EOF
 
   cd "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
-  ls >&2 -R ./*.conf ./*/*.conf
+  ls >&2 -R *.conf */*.conf
   exit 1
 
 fi
