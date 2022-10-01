@@ -1001,12 +1001,9 @@ void *rrdpush_sender_thread(void *ptr) {
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
     __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
 
-    int pipe_buffer_size = 10 * 1024;
-#ifdef F_GETPIPE_SZ
-    pipe_buffer_size = fcntl(s->host->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
+    int pipe_buffer_size = fcntl(s->host->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
     if(pipe_buffer_size < 10 * 1024)
         pipe_buffer_size = 10 * 1024;
-#endif
 
     if(!rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true)) {
         error("STREAM %s [send]: cannot create inter-thread communication pipe. Disabling streaming.",
