@@ -196,6 +196,18 @@ struct pid_on_target {
     struct pid_on_target *next;
 };
 
+struct openfds {
+    kernel_uint_t files;
+    kernel_uint_t pipes;
+    kernel_uint_t sockets;
+    kernel_uint_t inotifies;
+    kernel_uint_t eventfds;
+    kernel_uint_t timerfds;
+    kernel_uint_t signalfds;
+    kernel_uint_t eventpolls;
+    kernel_uint_t other;
+};
+
 // ----------------------------------------------------------------------------
 // target
 //
@@ -240,24 +252,16 @@ struct target {
 
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
-    // kernel_uint_t io_read_calls;
-    // kernel_uint_t io_write_calls;
+    kernel_uint_t io_read_calls;
+    kernel_uint_t io_write_calls;
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
-    // kernel_uint_t io_cancelled_write_bytes;
+    kernel_uint_t io_cancelled_write_bytes;
 
     int *target_fds;
     int target_fds_size;
 
-    kernel_uint_t openfiles;
-    kernel_uint_t openpipes;
-    kernel_uint_t opensockets;
-    kernel_uint_t openinotifies;
-    kernel_uint_t openeventfds;
-    kernel_uint_t opentimerfds;
-    kernel_uint_t opensignalfds;
-    kernel_uint_t openeventpolls;
-    kernel_uint_t openother;
+    struct openfds openfds;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
@@ -387,22 +391,24 @@ struct pid_stat {
 
     kernel_uint_t io_logical_bytes_read_raw;
     kernel_uint_t io_logical_bytes_written_raw;
-    // kernel_uint_t io_read_calls_raw;
-    // kernel_uint_t io_write_calls_raw;
+    kernel_uint_t io_read_calls_raw;
+    kernel_uint_t io_write_calls_raw;
     kernel_uint_t io_storage_bytes_read_raw;
     kernel_uint_t io_storage_bytes_written_raw;
-    // kernel_uint_t io_cancelled_write_bytes_raw;
+    kernel_uint_t io_cancelled_write_bytes_raw;
 
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
-    // kernel_uint_t io_read_calls;
-    // kernel_uint_t io_write_calls;
+    kernel_uint_t io_read_calls;
+    kernel_uint_t io_write_calls;
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
-    // kernel_uint_t io_cancelled_write_bytes;
+    kernel_uint_t io_cancelled_write_bytes;
 
     struct pid_fd *fds;             // array of fds it uses
     size_t fds_size;                // the size of the fds array
+
+    struct openfds openfds;
 
     int children_count;             // number of processes directly referencing this
     unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
@@ -1559,21 +1565,21 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 #else
     pid_incremental_rate(io, p->io_logical_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
     pid_incremental_rate(io, p->io_logical_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
-    // pid_incremental_rate(io, p->io_read_calls,               str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
-    // pid_incremental_rate(io, p->io_write_calls,              str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
+    pid_incremental_rate(io, p->io_read_calls,               str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
+    pid_incremental_rate(io, p->io_write_calls,              str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
     pid_incremental_rate(io, p->io_storage_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
     pid_incremental_rate(io, p->io_storage_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
-    // pid_incremental_rate(io, p->io_cancelled_write_bytes,    str2kernel_uint_t(procfile_lineword(ff, 6,  1)));
+    pid_incremental_rate(io, p->io_cancelled_write_bytes,    str2kernel_uint_t(procfile_lineword(ff, 6,  1)));
 #endif
 
     if(unlikely(global_iterations_counter == 1)) {
         p->io_logical_bytes_read        = 0;
         p->io_logical_bytes_written     = 0;
-        // p->io_read_calls             = 0;
-        // p->io_write_calls            = 0;
+        p->io_read_calls                = 0;
+        p->io_write_calls               = 0;
         p->io_storage_bytes_read        = 0;
         p->io_storage_bytes_written     = 0;
-        // p->io_cancelled_write_bytes  = 0;
+        p->io_cancelled_write_bytes     = 0;
     }
 
     return 1;
@@ -1582,11 +1588,11 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 cleanup:
     p->io_logical_bytes_read        = 0;
     p->io_logical_bytes_written     = 0;
-    // p->io_read_calls             = 0;
-    // p->io_write_calls            = 0;
+    p->io_read_calls                = 0;
+    p->io_write_calls               = 0;
     p->io_storage_bytes_read        = 0;
     p->io_storage_bytes_written     = 0;
-    // p->io_cancelled_write_bytes  = 0;
+    p->io_cancelled_write_bytes     = 0;
     return 0;
 #endif
 }
@@ -1893,7 +1899,7 @@ static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
     else if(likely(strncmp(name, "anon_inode:", 11) == 0)) {
         const char *t = &name[11];
 
-             if(strcmp(t, "inotify") == 0) type = FILETYPE_INOTIFY;
+        if(strcmp(t, "inotify") == 0) type = FILETYPE_INOTIFY;
         else if(strcmp(t, "[eventfd]") == 0) type = FILETYPE_EVENTFD;
         else if(strcmp(t, "[eventpoll]") == 0) type = FILETYPE_EVENTPOLL;
         else if(strcmp(t, "[timerfd]") == 0) type = FILETYPE_TIMERFD;
@@ -1948,7 +1954,6 @@ static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
 
 static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
     struct pid_fd *pfd = &p->fds[first], *pfdend = &p->fds[first + size];
-    size_t i = first;
 
     while(pfd < pfdend) {
 #ifndef __FreeBSD__
@@ -1956,7 +1961,6 @@ static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
 #endif
         clear_pid_fd(pfd);
         pfd++;
-        i++;
     }
 }
 
@@ -2909,24 +2913,24 @@ static size_t zero_all_targets(struct target *root) {
 
         w->io_logical_bytes_read = 0;
         w->io_logical_bytes_written = 0;
-        // w->io_read_calls = 0;
-        // w->io_write_calls = 0;
+        w->io_read_calls = 0;
+        w->io_write_calls = 0;
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
-        // w->io_cancelled_write_bytes = 0;
+        w->io_cancelled_write_bytes = 0;
 
         // zero file counters
         if(w->target_fds) {
             memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
-            w->openfiles = 0;
-            w->openpipes = 0;
-            w->opensockets = 0;
-            w->openinotifies = 0;
-            w->openeventfds = 0;
-            w->opentimerfds = 0;
-            w->opensignalfds = 0;
-            w->openeventpolls = 0;
-            w->openother = 0;
+            w->openfds.files = 0;
+            w->openfds.pipes = 0;
+            w->openfds.sockets = 0;
+            w->openfds.inotifies = 0;
+            w->openfds.eventfds = 0;
+            w->openfds.timerfds = 0;
+            w->openfds.signalfds = 0;
+            w->openfds.eventpolls = 0;
+            w->openfds.other = 0;
         }
 
         w->collected_starttime = 0;
@@ -2961,6 +2965,46 @@ static inline void reallocate_target_fds(struct target *w) {
     }
 }
 
+static void aggregage_fd_type_on_openfds(FD_FILETYPE type, struct openfds *openfds) {
+    switch(type) {
+        case FILETYPE_FILE:
+            openfds->files++;
+            break;
+
+        case FILETYPE_PIPE:
+            openfds->pipes++;
+            break;
+
+        case FILETYPE_SOCKET:
+            openfds->sockets++;
+            break;
+
+        case FILETYPE_INOTIFY:
+            openfds->inotifies++;
+            break;
+
+        case FILETYPE_EVENTFD:
+            openfds->eventfds++;
+            break;
+
+        case FILETYPE_TIMERFD:
+            openfds->timerfds++;
+            break;
+
+        case FILETYPE_SIGNALFD:
+            openfds->signalfds++;
+            break;
+
+        case FILETYPE_EVENTPOLL:
+            openfds->eventpolls++;
+            break;
+
+        case FILETYPE_OTHER:
+            openfds->other++;
+            break;
+    }
+}
+
 static inline void aggregate_fd_on_target(int fd, struct target *w) {
     if(unlikely(!w))
         return;
@@ -2976,43 +3020,7 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
     // so that we will not add it again
     w->target_fds[fd]++;
 
-    switch(all_files[fd].type) {
-        case FILETYPE_FILE:
-            w->openfiles++;
-            break;
-
-        case FILETYPE_PIPE:
-            w->openpipes++;
-            break;
-
-        case FILETYPE_SOCKET:
-            w->opensockets++;
-            break;
-
-        case FILETYPE_INOTIFY:
-            w->openinotifies++;
-            break;
-
-        case FILETYPE_EVENTFD:
-            w->openeventfds++;
-            break;
-
-        case FILETYPE_TIMERFD:
-            w->opentimerfds++;
-            break;
-
-        case FILETYPE_SIGNALFD:
-            w->opensignalfds++;
-            break;
-
-        case FILETYPE_EVENTPOLL:
-            w->openeventpolls++;
-            break;
-
-        case FILETYPE_OTHER:
-            w->openother++;
-            break;
-    }
+    aggregage_fd_type_on_openfds(all_files[fd].type, &w->openfds);
 }
 
 static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
@@ -3028,6 +3036,16 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
+    p->openfds.files = 0;
+    p->openfds.pipes = 0;
+    p->openfds.sockets = 0;
+    p->openfds.inotifies = 0;
+    p->openfds.eventfds = 0;
+    p->openfds.timerfds = 0;
+    p->openfds.signalfds = 0;
+    p->openfds.eventpolls = 0;
+    p->openfds.other = 0;
+
     long currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
@@ -3038,6 +3056,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
             continue;
 
         currentfds++;
+        aggregage_fd_type_on_openfds(all_files[fd].type, &p->openfds);
 
         aggregate_fd_on_target(fd, w);
         aggregate_fd_on_target(fd, u);
@@ -3084,11 +3103,11 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 
     w->io_logical_bytes_read    += p->io_logical_bytes_read;
     w->io_logical_bytes_written += p->io_logical_bytes_written;
-    // w->io_read_calls            += p->io_read_calls;
-    // w->io_write_calls           += p->io_write_calls;
+    w->io_read_calls            += p->io_read_calls;
+    w->io_write_calls           += p->io_write_calls;
     w->io_storage_bytes_read    += p->io_storage_bytes_read;
     w->io_storage_bytes_written += p->io_storage_bytes_written;
-    // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+    w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 
     w->processes++;
     w->num_threads += p->num_threads;
@@ -3643,7 +3662,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfiles);
+                send_SET(w->name, w->openfds.files);
         }
         if (!strcmp("apps", type)){
             kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
@@ -3654,14 +3673,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_BEGIN(type, "sockets", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->opensockets);
+                send_SET(w->name, w->openfds.sockets);
         }
         send_END();
 
         send_BEGIN(type, "pipes", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openpipes);
+                send_SET(w->name, w->openfds.pipes);
         }
         send_END();
     }
@@ -4171,6 +4190,8 @@ netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 #define PROCESS_FILTER_GROUP "group:"
 #define PROCESS_FILTER_PROCESS "process:"
 #define PROCESS_FILTER_PID "pid:"
+#define PROCESS_FILTER_UID "uid:"
+#define PROCESS_FILTER_GID "gid:"
 
 static struct target *find_target_by_name(struct target *base, const char *name) {
     struct target *t;
@@ -4186,12 +4207,64 @@ static void apps_plugin_function_error(const char *transaction, int code, const 
     char buffer[PLUGINSD_LINE_MAX + 1];
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
 
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d text/html\n", transaction, code);
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d application/json\n", transaction, code);
     fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
 }
 
-static void apps_plugin_function_process_tree(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void apps_plugin_function_processes_help(const char *transaction) {
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d text/plain\n", transaction, HTTP_RESP_OK);
+    fprintf(stdout, "%s",
+            "apps.plugin / processes\n"
+            "\n"
+            "Function `processes` presents all the currently running processes of the system.\n"
+            "\n"
+            "The following filters are supported:\n"
+            "\n"
+            "   category:NAME\n"
+            "      Shows only processes that are assigned the category `NAME` in apps_groups.conf\n"
+            "\n"
+            "   user:NAME\n"
+            "      Shows only processes that are running as user name `NAME`.\n"
+            "\n"
+            "   group:NAME\n"
+            "      Shows only processes that are running as group name `NAME`.\n"
+            "\n"
+            "   process:NAME\n"
+            "      Shows only processes that their Command is `NAME` or their parent's Command is `NAME`.\n"
+            "\n"
+            "   pid:NUMBER\n"
+            "      Shows only processes that their PID is `NUMBER` or their parent's PID is `NUMBER`\n"
+            "\n"
+            "   uid:NUMBER\n"
+            "      Shows only processes that their UID is `NUMBER`\n"
+            "\n"
+            "   gid:NUMBER\n"
+            "      Shows only processes that their GID is `NUMBER`\n"
+            "\n"
+            "Filters can be combined. Each filter can be given only one time.\n"
+            );
+    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+
+}
+
+#define add_table_field(key, name, info, visible, type, autoscale, sort)       do { \
+        if(fields_added) fprintf(stdout, ",");                                      \
+        fprintf(stdout, "\n      \"%s\": {", key);                                  \
+        fprintf(stdout, "\n         \"index\":%d,", fields_added);                  \
+        fprintf(stdout, "\n         \"name\":\"%s\",", name);                       \
+        json_escape_string(buffer, info, PLUGINSD_LINE_MAX);                        \
+        fprintf(stdout, "\n         \"info\":\"%s\",", buffer);                     \
+        fprintf(stdout, "\n         \"visible\":%s,", (visible)?"true":"false");    \
+        fprintf(stdout, "\n         \"type\":\"%s\",", type);                       \
+        if(autoscale)                                                               \
+           fprintf(stdout, "\n         \"autoscale\":\"%s\",", (char *)(autoscale));\
+        fprintf(stdout, "\n         \"sort\":\"%s\"", sort);                        \
+        fprintf(stdout, "\n      }");                                               \
+        fields_added++;                                                             \
+    } while(0)
+
+static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -4200,6 +4273,10 @@ static void apps_plugin_function_process_tree(const char *transaction, char *fun
     struct target *category = NULL, *user = NULL, *group = NULL;
     const char *process_name = NULL;
     pid_t pid = 0;
+    uid_t uid = 0;
+    gid_t gid = 0;
+
+    bool filter_pid = false, filter_uid = false, filter_gid = false;
 
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
         if(!words[i]) break;
@@ -4230,117 +4307,176 @@ static void apps_plugin_function_process_tree(const char *transaction, char *fun
         }
         else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, strlen(PROCESS_FILTER_PID)) == 0) {
             pid = str2i(&words[i][strlen(PROCESS_FILTER_PID)]);
+            filter_pid = true;
+        }
+        else if(!uid && strncmp(words[i], PROCESS_FILTER_UID, strlen(PROCESS_FILTER_UID)) == 0) {
+            uid = str2i(&words[i][strlen(PROCESS_FILTER_UID)]);
+            filter_uid = true;
+        }
+        else if(!gid && strncmp(words[i], PROCESS_FILTER_GID, strlen(PROCESS_FILTER_GID)) == 0) {
+            gid = str2i(&words[i][strlen(PROCESS_FILTER_GID)]);
+            filter_gid = true;
+        }
+        else if(strcmp(words[i], "help") == 0) {
+            apps_plugin_function_processes_help(transaction);
+            return;
+        }
+        else {
+            char msg[PLUGINSD_LINE_MAX];
+            snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", words[i]);
+            apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
+            return;
         }
     }
 
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d text/html\n", transaction, HTTP_RESP_OK);
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d application/json\n", transaction, HTTP_RESP_OK);
+
     fprintf(stdout,
-            "{\n"
-            "   \"status\":%d,\n"
-            "   \"columns\": {\n"
-            "      \"pid\": {\n"
-            "         \"index\":1,\n"
-            "         \"name\":\"PID\",\n"
-            "         \"info\":\"The process ID.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"integer\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"cmd\": {\n"
-            "         \"index\":2,\n"
-            "         \"name\":\"Command\",\n"
-            "         \"info\":\"The process name.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"string\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"cmdline\": {\n"
-            "         \"index\":3,\n"
-            "         \"name\":\"Command\",\n"
-            "         \"info\":\"The full command line.\",\n"
-            "         \"visible\":false,\n"
-            "         \"type\":\"detail string\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"ppid\": {\n"
-            "         \"index\":4,\n"
-            "         \"name\":\"Parent PID\",\n"
-            "         \"info\":\"The process ID of the parent process.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"integer\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"category\": {\n"
-            "         \"index\":5,\n"
-            "         \"name\":\"Category\",\n"
-            "         \"info\":\"The applications category, as defined in apps_groups.conf.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"string\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"user\": {\n"
-            "         \"index\":6,\n"
-            "         \"name\":\"User\",\n"
-            "         \"info\":\"The user this applications runs for.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"string\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"uid\": {\n"
-            "         \"index\":7,\n"
-            "         \"name\":\"User ID\",\n"
-            "         \"info\":\"The user ID this applications runs for.\",\n"
-            "         \"visible\":false,\n"
-            "         \"type\":\"integer\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"group\": {\n"
-            "         \"index\":8,\n"
-            "         \"name\":\"Group\",\n"
-            "         \"info\":\"The group this applications runs for.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"string\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"gid\": {\n"
-            "         \"index\":9,\n"
-            "         \"name\":\"Group ID\",\n"
-            "         \"info\":\"The group ID this applications runs for.\",\n"
-            "         \"visible\":false,\n"
-            "         \"type\":\"integer\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      },\n"
-            "      \"procs\": {\n"
-            "         \"index\":10,\n"
-            "         \"name\":\"Sub Processes\",\n"
-            "         \"info\":\"The number of direct subprocesses running.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"integer\",\n"
-            "         \"sort\":\"descending\"\n"
-            "      },\n"
-            "      \"threads\": {\n"
-            "         \"index\":11,\n"
-            "         \"name\":\"Threads\",\n"
-            "         \"info\":\"The number of threads running.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"integer\",\n"
-            "         \"sort\":\"descending\"\n"
-            "      },\n"
-            "      \"uptime\": {\n"
-            "         \"index\":12,\n"
-            "         \"name\":\"Uptime\",\n"
-            "         \"info\":\"The duration this process is running.\",\n"
-            "         \"visible\":true,\n"
-            "         \"type\":\"duration\",\n"
-            "         \"sort\":\"ascending\"\n"
-            "      }\n"
-            "   },\n"
-            "   \"default sort column\": \"category\",\n"
-            "   \"data\":[\n"
+            "{"
+            "\n   \"status\":%d,"
+            "\n   \"type\":\"table\","
+            "\n   \"columns\": {"
             , HTTP_RESP_OK
-            );
+    );
 
     char buffer[PLUGINSD_LINE_MAX + 1];
+    int fields_added = 0;
+
+    // IMPORTANT!
+    // 1. THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+    // 2. THE KEY SHOULD NEVER CHANGE!
+
+    add_table_field("pid", "PID", "The process ID", true, "integer", NULL, "ascending");
+    add_table_field("cmd", "Command", "The process name", true, "string", NULL, "ascending");
+    add_table_field("cmdline", "Command Line", "The command line", false, "detail-string:cmd", NULL, "ascending");
+    add_table_field("ppid", "Parent PID", "The process ID of the parent process", false, "integer", NULL, "ascending");
+    add_table_field("category", "Category", "The applications category, as defined in apps_groups.conf", true, "string", NULL, "ascending");
+    add_table_field("user", "User", "The user name of the application owner", true, "string", NULL, "ascending");
+    add_table_field("uid", "User ID", "The user ID of the application owner", false, "integer", NULL, "ascending");
+    add_table_field("group", "Group", "The group name of the application owner", true, "string", NULL, "ascending");
+    add_table_field("gid", "Group ID", "The group ID the application owner", false, "integer", NULL, "ascending");
+    add_table_field("procs", "Processes", "The number of processes running", true, "bar-with-integer", "generic", "descending");
+    add_table_field("threads", "Threads", "The number of threads running", true, "bar-with-integer", "generic", "descending");
+    add_table_field("uptime", "Uptime", "The duration the process is running", true, "duration", NULL, "descending");
+
+    // minor page faults
+    add_table_field("minflt", "Minor Page Faults", "The number of page faults happening in the main memory.", false, "bar", "generic", "descending");
+    add_table_field("cminflt", "Children Minor Page Faults", "The number of minor faults for the process's waited-for children", false, "bar", "generic", "descending");
+    add_table_field("tminflt", "Total Minor Page Faults", "The total number of page faults happening in the main memory, including waited-for children.", true, "bar", "generic", "descending");
+
+    // major page faults
+    add_table_field("majflt", "Major Page Faults", "The number of page faults happening out of the main memory.", false, "bar", "generic", "descending");
+    add_table_field("cmajflt", "Children Major Page Faults", "The number of major faults for the process's waited-for children", false, "bar", "generic", "descending");
+    add_table_field("tmajflt", "Total Major Page Faults", "The total number of page faults happening out of the main memory, including waited-for children.", true, "bar", "generic", "descending");
+
+    // CPU utilization
+    add_table_field("utime", "User CPU Time", "The user CPU time, which is the amount of time the process has spent executing on the CPU in user mode (i.e. everything but system calls)", false, "bar-only", NULL, "descending");
+    add_table_field("stime", "System CPU Time", "The system CPU time, which is the amount of time the kernel has spent executing system calls on behalf of the process", false, "bar-only", NULL, "descending");
+    add_table_field("gtime", "Guest CPU Time", "The guest CPU time", false, "bar-only", NULL, "descending");
+    add_table_field("cutime", "Children User CPU Time", "The user CPU time, for the process's waited-for children", false, "bar-only", NULL, "descending");
+    add_table_field("cstime", "Children System CPU Time", "The system CPU time, for the process's waited-for children", false, "bar-only", NULL, "descending");
+    add_table_field("cgtime", "Children Guest CPU Time", "The guest CPU time, for the process's waited-for children", false, "bar-only", NULL, "descending");
+    add_table_field("cpu", "Total CPU Time", "The total CPU time of the process, including system, user, guest and waited-for children", true, "bar-only", NULL, "descending");
+
+    // memory
+    add_table_field("vmsize", "Virtual Memory Size", "The size of the virtual memory of the process.", false, "bar", "bytes", "descending");
+    add_table_field("vmrss", "Resident Set Size", "The resident set size (text + data + stack) of the process (i.e. the size of the process's used physical memory).", true, "bar", "bytes", "descending");
+    add_table_field("vmshared", "Shared Size", "The size of the process's shared pages.", false, "bar", "bytes", "descending");
+    add_table_field("vmswap", "Swap Size", "The size of the process's swap memory used by anonymous private data.", false, "bar", "bytes", "descending");
+
+    // Logical I/O
+    add_table_field("lreads", "Logical I/O Reads", "The logical I/O reads of the process", false, "bar", "bytes/s", "descending");
+    add_table_field("lwrites", "Logical I/O Writes", "The logical I/O writes of the process", false, "bar", "bytes/s", "descending");
+
+    // Physical I/O
+    add_table_field("preads", "Physical I/O Reads", "The physical I/O reads of the process", true, "bar", "bytes/s", "descending");
+    add_table_field("pwrites", "Physical I/O Writes", "The physical I/O writes of the process", true, "bar", "bytes/s", "descending");
+
+    // I/O calls
+    add_table_field("readcalls", "I/O Read Calls", "The number of I/O read calls the process does", false, "bar", "generic", "descending");
+    add_table_field("writecalls", "I/O Write Calls", "The number of I/O write calls the process does", false, "bar", "generic", "descending");
+
+    // open file descriptors
+    add_table_field("fds", "File Descriptors", "The number of open files", false, "bar", "generic", "descending");
+    add_table_field("pipefds", "Pipe Descriptors", "The number of open pipes", false, "bar", "generic", "descending");
+    add_table_field("socketfds", "Socket Descriptors", "The number of open sockets", false, "bar", "generic", "descending");
+    add_table_field("inotifyfds", "iNotify Descriptors", "The number of open inotify descriptors", false, "bar", "generic", "descending");
+    add_table_field("eventfds", "Event Descriptors", "The number of open event descriptors", false, "bar", "generic", "descending");
+    add_table_field("timerfds", "Timer Descriptors", "The number of open timer descriptors", false, "bar", "generic", "descending");
+    add_table_field("signalfds", "Signal Descriptors", "The number of open signal descriptors", false, "bar", "generic", "descending");
+    add_table_field("eventpolls", "Event Poll Descriptors", "The number of open event poll descriptors", false, "bar", "generic", "descending");
+    add_table_field("otherfds", "Other Descriptors", "The number of other open descriptors", false, "bar", "generic", "descending");
+    add_table_field("allfds", "All File Descriptors", "The number of all open descriptors", true, "bar", "generic", "descending");
+
+    fprintf(stdout,
+            ""
+            "\n   },"
+            "\n   \"default sort column\": \"category\","
+            "\n   \"charts\": {"
+            "\n      \"cpu\": {"
+            "\n         \"name\":\"CPU Utilization\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"utime\", \"stime\", \"gtime\", \"cutime\", \"cstime\", \"cgtime\" ]"
+            "\n      },"
+            "\n      \"memory\": {"
+            "\n         \"name\":\"Memory\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"vmsize\", \"vmrss\", \"vmshared\", \"vmswap\" ]"
+            "\n      },"
+            "\n      \"reads\": {"
+            "\n         \"name\":\"I/O Reads\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"lreads\", \"preads\" ]"
+            "\n      },"
+            "\n      \"writes\": {"
+            "\n         \"name\":\"I/O Writes\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"lwrites\", \"pwrites\" ]"
+            "\n      },"
+            "\n      \"logical_io\": {"
+            "\n         \"name\":\"Logical I/O\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"lreads\", \"lwrites\" ]"
+            "\n      },"
+            "\n      \"physical_io\": {"
+            "\n         \"name\":\"Physical I/O\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"preads\", \"pwrites\" ]"
+            "\n      },"
+            "\n      \"io_calls\": {"
+            "\n         \"name\":\"I/O Calls\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"readcalls\", \"writecalls\" ]"
+            "\n      },"
+            "\n      \"minflt\": {"
+            "\n         \"name\":\"Minor Page Faults\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"minflt\", \"cminflt\" ]"
+            "\n      },"
+            "\n      \"majflt\": {"
+            "\n         \"name\":\"Major Page Faults\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"majflt\", \"cmajflt\" ]"
+            "\n      },"
+            "\n      \"threads\": {"
+            "\n         \"name\":\"Threads\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"threads\" ]"
+            "\n      },"
+            "\n      \"procs\": {"
+            "\n         \"name\":\"Processes\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"procs\" ]"
+            "\n      },"
+            "\n      \"fds\": {"
+            "\n         \"name\":\"File Descriptors\","
+            "\n         \"type\":\"stacked-bar\","
+            "\n         \"columns\": [ \"fds\", \"pipefds\", \"socketfds\", \"inotifyfds\", \"eventfds\", \"timerfds\", \"signalfds\", \"eventpolls\", \"otherfds\" ]"
+            "\n      }"
+            "\n   },"
+            "\n   \"data\":["
+            "\n"
+            );
 
     int i = 0;
     for(p = root_of_pids; p ; p = p->next, i++) {
@@ -4359,7 +4495,13 @@ static void apps_plugin_function_process_tree(const char *transaction, char *fun
         if(process_name && ((strcmp(p->comm, process_name) != 0 && !p->parent) || (p->parent && strcmp(p->comm, process_name) != 0 && strcmp(p->parent->comm, process_name) != 0)))
             continue;
 
-        if(pid && p->pid != pid && p->ppid != pid)
+        if(filter_pid && p->pid != pid && p->ppid != pid)
+            continue;
+
+        if(filter_uid && p->uid != uid)
+            continue;
+
+        if(filter_gid && p->gid != gid)
             continue;
 
         if(i)
@@ -4367,51 +4509,104 @@ static void apps_plugin_function_process_tree(const char *transaction, char *fun
 
         fprintf(stdout, "      [");
 
-        // 1
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+        // pid
         fprintf(stdout, "%d", p->pid);
 
-        // 2
+        // cmd
         json_escape_string(buffer, p->comm, PLUGINSD_LINE_MAX);
         fprintf(stdout, ", \"%s\"", buffer);
 
-        // 3
+        // cmdline
         json_escape_string(buffer, p->cmdline && *p->cmdline?p->cmdline:p->comm, PLUGINSD_LINE_MAX);
         fprintf(stdout, ", \"%s\"", buffer);
 
-        // 4
+        // ppid
         fprintf(stdout, ", %d", p->ppid);
 
-        // 5
+        // category
         json_escape_string(buffer, p->target?p->target->name:"-", PLUGINSD_LINE_MAX);
         fprintf(stdout, ", \"%s\"", buffer);
 
-        // 6
+        // user
         json_escape_string(buffer, p->user_target?p->user_target->name:"-", PLUGINSD_LINE_MAX);
         fprintf(stdout, ", \"%s\"", buffer);
 
-        // 7
+        // uid
         fprintf(stdout, ", %u", (unsigned)p->uid);
 
-        // 8
+        // group
         json_escape_string(buffer, p->group_target?p->group_target->name:"-", PLUGINSD_LINE_MAX);
         fprintf(stdout, ", \"%s\"", buffer);
 
-        // 9
+        // gid
         fprintf(stdout, ", %u", (unsigned)p->gid);
 
-        // 10
+        // procs
         fprintf(stdout, ", %d", p->children_count);
 
-        // 11
+        // threads
         fprintf(stdout, ", %d", p->num_threads);
 
-        // 12
+        // uptime
         fprintf(stdout, ", %zu", (size_t)p->uptime);
+
+        // minor page faults
+        fprintf(stdout, ", %zu", (size_t)p->minflt);
+        fprintf(stdout, ", %zu", (size_t)p->cminflt);
+        fprintf(stdout, ", %zu", (size_t)(p->minflt + p->cminflt));
+
+        // major page faults
+        fprintf(stdout, ", %zu", (size_t)p->majflt);
+        fprintf(stdout, ", %zu", (size_t)p->cmajflt);
+        fprintf(stdout, ", %zu", (size_t)(p->majflt + p->cmajflt));
+
+        // CPU utilization
+        fprintf(stdout, ", %zu", (size_t)p->utime);
+        fprintf(stdout, ", %zu", (size_t)p->stime);
+        fprintf(stdout, ", %zu", (size_t)p->gtime);
+        fprintf(stdout, ", %zu", (size_t)p->cutime);
+        fprintf(stdout, ", %zu", (size_t)p->cstime);
+        fprintf(stdout, ", %zu", (size_t)p->cgtime);
+        fprintf(stdout, ", %zu", (size_t)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime));
+
+        // memory
+        fprintf(stdout, ", %zu", (size_t)p->status_vmsize);
+        fprintf(stdout, ", %zu", (size_t)p->status_vmrss);
+        fprintf(stdout, ", %zu", (size_t)p->status_vmshared);
+        fprintf(stdout, ", %zu", (size_t)p->status_vmswap);
+
+        // Logical I/O
+        fprintf(stdout, ", %zu", (size_t)p->io_logical_bytes_read);
+        fprintf(stdout, ", %zu", (size_t)p->io_logical_bytes_written);
+
+        // Physical I/O
+        fprintf(stdout, ", %zu", (size_t)p->io_storage_bytes_read);
+        fprintf(stdout, ", %zu", (size_t)p->io_storage_bytes_written);
+
+        // I/O calls
+        fprintf(stdout, ", %zu", (size_t)p->io_read_calls);
+        fprintf(stdout, ", %zu", (size_t)p->io_write_calls);
+
+        // open file descriptors
+        fprintf(stdout, ", %zu", (size_t)p->openfds.files);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.pipes);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.sockets);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.inotifies);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.eventfds);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.timerfds);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.signalfds);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.eventpolls);
+        fprintf(stdout, ", %zu", (size_t)p->openfds.other);
+        fprintf(stdout, ", %zu", (size_t)(p->openfds.files + p->openfds.pipes + p->openfds.sockets + p->openfds.inotifies + p->openfds.eventfds + p->openfds.timerfds + p->openfds.signalfds + p->openfds.eventpolls + p->openfds.other));
 
         fprintf(stdout, "]");
     }
 
-    fprintf(stdout, "\n   ]\n}");
+    fprintf(stdout, "\n   ]");
+    fprintf(stdout, "\n}");
     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
 }
 
@@ -4446,7 +4641,7 @@ void *reader_main(void *arg __maybe_unused) {
                 netdata_mutex_lock(&mutex);
 
                 if(strncmp(function, "processes", strlen("processes")) == 0)
-                    apps_plugin_function_process_tree(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    apps_plugin_function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else
                     apps_plugin_function_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
 

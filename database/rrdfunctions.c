@@ -560,10 +560,10 @@ static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name
     buffer_flush(wb);
 
     if(!(*rdcf))
-        return rrd_call_function_error(wb, "No function with this name found at this host", HTTP_RESP_NOT_FOUND);
+        return rrd_call_function_error(wb, "No collector is supplying this function on this host at this time.", HTTP_RESP_NOT_FOUND);
 
     if(!(*rdcf)->collector->running)
-        return rrd_call_function_error(wb, "The collector for this function is not currently running", HTTP_RESP_BACKEND_FETCH_FAILED);
+        return rrd_call_function_error(wb, "The collector that registered this function, is not currently running.", HTTP_RESP_BACKEND_FETCH_FAILED);
 
     wb->contenttype = (*rdcf)->content_type;
 
@@ -649,17 +649,17 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 // we will go away and let the callback free the structure
                 tmp->free_with_signal = true;
                 we_should_free = false;
-                code = rrd_call_function_error(wb, "Timeout while waiting for a response from the collector", HTTP_RESP_GATEWAY_TIMEOUT);
+                code = rrd_call_function_error(wb, "Timeout while waiting for a response from the collector.", HTTP_RESP_GATEWAY_TIMEOUT);
             }
             else
-                code = rrd_call_function_error(wb, "Failed to get the response from the collector", HTTP_RESP_INTERNAL_SERVER_ERROR);
+                code = rrd_call_function_error(wb, "Failed to get the response from the collector.", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
             netdata_mutex_unlock(&tmp->mutex);
         }
         else {
             buffer_free(temp_wb);
             if(!buffer_strlen(wb))
-                rrd_call_function_error(wb, "Failed to send request to the collector", code);
+                rrd_call_function_error(wb, "Failed to send request to the collector.", code);
         }
 
         if (we_should_free)
@@ -687,7 +687,7 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(wb))
-            rrd_call_function_error(wb, "Failed to send request to the collector", code);
+            rrd_call_function_error(wb, "Failed to send request to the collector.", code);
     }
 
     return code;
