@@ -691,7 +691,7 @@ update_binpkg() {
       opensuse-leap)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
-      almalinux|rocky|rhel)
+      cloudlinux|almalinux|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
       *)
