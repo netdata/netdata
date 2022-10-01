@@ -703,15 +703,31 @@ static int rrdpush_receive(struct receiver_state *rpt)
     // convert the socket to a FILE *
     // It seems that the same FILE * cannot be used for both reading and writing.
     // (reads and writes seem to interfere with each other, with undefined results).
-    // So, we fdopen() twice the same socket.
-    FILE *fp_out = fdopen(rpt->fd, "w");
-    FILE *fp_in = fdopen(rpt->fd, "r");
-    if(!fp_in || !fp_out) {
+
+    int fd_in = rpt->fd;
+    int fd_out = fcntl(rpt->fd, F_DUPFD_CLOEXEC, 0);
+    if(fd_out == -1) {
+        error("STREAM %s [receive from [%s]:%s]: failed to duplicate FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
-        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
-        if(fp_in) fclose(fp_in);
-        if(fp_out) fclose(fp_out);
-        close(rpt->fd);
+        close(fd_in);
+        return 0;
+    }
+
+    FILE *fp_out = fdopen(fd_out, "w");
+    if(!fp_out) {
+        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for fd_out %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
+        close(fd_in);
+        close(fd_out);
+        return 0;
+    }
+
+    FILE *fp_in  = fdopen(fd_in, "r");
+    if(!fp_in) {
+        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for fd_in %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
+        close(fd_in);
+        fclose(fp_out);
         return 0;
     }
 

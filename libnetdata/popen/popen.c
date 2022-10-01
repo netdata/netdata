@@ -282,38 +282,34 @@ cleanup_and_return:
     if (posix_spawn_file_actions_destroy(&fa))
         error("POPEN: posix_spawn_file_actions_destroy() failed");
 
+    // the child end - close it
+    if(pipefd_stdin[PIPE_READ] != -1)
+        close(pipefd_stdin[PIPE_READ]);
+
+    // our end
     if(ret == -1 || !fpp_child_stdin) {
-        if (pipefd_stdin[PIPE_READ] != -1)
-            close(pipefd_stdin[PIPE_READ]);
-
-        if (pipefd_stdin[PIPE_WRITE] != -1)
-            close(pipefd_stdin[PIPE_WRITE]);
-
         if (fp_child_stdin)
             fclose(fp_child_stdin);
+        else if (pipefd_stdin[PIPE_WRITE] != -1)
+            close(pipefd_stdin[PIPE_WRITE]);
     }
     else {
-        if(pipefd_stdin[PIPE_READ] != -1)
-            close(pipefd_stdin[PIPE_READ]);
-
         if(fpp_child_stdin)
             *fpp_child_stdin  = fp_child_stdin;
     }
 
+    // the child end - close it
+    if (pipefd_stdout[PIPE_WRITE] != -1)
+        close(pipefd_stdout[PIPE_WRITE]);
+
+    // our end
     if (ret == -1 || !fpp_child_stdout) {
-        if (pipefd_stdout[PIPE_READ] != -1)
-            close(pipefd_stdout[PIPE_READ]);
-
-        if (pipefd_stdout[PIPE_WRITE] != -1)
-            close(pipefd_stdout[PIPE_WRITE]);
-
         if (fp_child_stdout)
             fclose(fp_child_stdout);
+        else if (pipefd_stdout[PIPE_READ] != -1)
+            close(pipefd_stdout[PIPE_READ]);
     }
     else {
-        if(pipefd_stdout[PIPE_WRITE] != -1)
-            close(pipefd_stdout[PIPE_WRITE]);
-
         if(fpp_child_stdout)
             *fpp_child_stdout = fp_child_stdout;
     }
@@ -400,25 +396,11 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
 
     debug(D_EXIT, "Request to netdata_pclose() on pid %d", pid);
 
-    if (fp_child_input) {
-        // close the pipe fd
-        // this is required in musl
-        // without it the childs do not exit
-        close(fileno(fp_child_input));
-
-        // close the pipe file pointer
+    if (fp_child_input)
         fclose(fp_child_input);
-    }
 
-    if (fp_child_output) {
-        // close the pipe fd
-        // this is required in musl
-        // without it the childs do not exit
-        close(fileno(fp_child_output));
-
-        // close the pipe file pointer
+    if (fp_child_output)
         fclose(fp_child_output);
-    }
 
     errno = 0;
 
