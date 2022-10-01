@@ -370,14 +370,14 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 }
 
 size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
-    size_t mblen = 0;
-
     if(unlikely(!dst_size)) return 0;
+
     if(unlikely(!src || !*src)) {
         strncpyz((char *)dst, empty, dst_size);
         dst[dst_size - 1] = '\0';
-        mblen = strlen((char *)dst);
-        if(multibyte_length) *multibyte_length = mblen;
+        size_t len = strlen((char *)dst);
+        if(multibyte_length) *multibyte_length = len;
+        return len;
     }
 
     unsigned char *d = dst;
@@ -388,6 +388,9 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
     // copy while converting, but keep only one white space
     // we start wil last_is_space = 1 to skip leading spaces
     int last_is_space = 1;
+
+    size_t mblen = 0;
+
     while(*src && d < end) {
         unsigned char c = *src;
 
