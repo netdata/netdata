@@ -871,7 +871,7 @@ static bool connect_to_one_of_callback(char *entry, void *data) {
     t->sock = connect_to_this(entry, t->default_port, t->timeout);
     if(t->sock != -1) {
         if(t->connected_to && t->connected_to_size) {
-            strncpy(t->connected_to, entry, t->connected_to_size);
+            strncpyz(t->connected_to, entry, t->connected_to_size);
             t->connected_to[t->connected_to_size - 1] = '\0';
         }
 
@@ -1142,12 +1142,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
-            strncpyz(client_ip, "UNKNOWN", ipsize - 1);
-            strncpyz(client_port, "UNKNOWN", portsize - 1);
+            strncpyz(client_ip, "UNKNOWN", ipsize);
+            strncpyz(client_port, "UNKNOWN", portsize);
         }
         if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
-            strncpy(client_ip, "localhost", ipsize);
-            client_ip[ipsize - 1] = '\0';
+            strncpyz(client_ip, "localhost", ipsize);
         }
 
 #ifdef __FreeBSD__
@@ -1162,8 +1161,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             case AF_UNIX:
                 debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
                 // set the port - certain versions of libc return garbage on unix sockets
-                strncpy(client_port, "UNIX", portsize);
-                client_port[portsize - 1] = '\0';
+                strncpyz(client_port, "UNIX", portsize);
                 break;
 
             case AF_INET:

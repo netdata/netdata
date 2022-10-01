@@ -264,7 +264,7 @@ static unsigned char functions_allowed_chars[256] = {
 
 static inline size_t sanitize_function_text(char *dst, const char *src, size_t dst_len) {
     return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_len,
-                         functions_allowed_chars, true, "");
+                         functions_allowed_chars, true, "", NULL);
 }
 
 // we keep a dictionary per RRDSET with these functions
@@ -539,7 +539,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     return code;
 }
 
-static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
+static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, struct rrd_collector_function **rdcf) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
 
     strncpyz(buffer, name, MAX_FUNCTION_LENGTH);
@@ -553,7 +553,7 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
         // if s == NULL, set it to the end of the buffer
         // this should happen only the first time
         if(unlikely(!s))
-            s = &buffer[strlen(buffer) - 1];
+            s = &buffer[key_length - 1];
 
         // skip a word from the end
         while(s >= buffer && !isspace(*s)) *s-- = '\0';
@@ -605,8 +605,8 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     struct rrd_collector_function *rdcf = NULL;
 
     char key[PLUGINSD_LINE_MAX + 1];
-    sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
-    code = rrd_call_function_find(host, wb, key, &rdcf);
+    size_t key_length = sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
+    code = rrd_call_function_find(host, wb, key, key_length, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 
@@ -678,8 +678,8 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
 
     struct rrd_collector_function *rdcf = NULL;
     char key[PLUGINSD_LINE_MAX + 1];
-    sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
-    code = rrd_call_function_find(host, wb, key, &rdcf);
+    size_t key_length = sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
+    code = rrd_call_function_find(host, wb, key, key_length, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 

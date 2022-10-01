@@ -230,47 +230,33 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
         freez(se->kernel_version);
 }
 
-static inline long int parse_stream_version_for_errors(char *http)
-{
-    if (!memcmp(http, START_STREAMING_ERROR_SAME_LOCALHOST, sizeof(START_STREAMING_ERROR_SAME_LOCALHOST)))
-        return -2;
-    else if (!memcmp(http, START_STREAMING_ERROR_ALREADY_STREAMING, sizeof(START_STREAMING_ERROR_ALREADY_STREAMING)))
-        return -3;
-    else if (!memcmp(http, START_STREAMING_ERROR_NOT_PERMITTED, sizeof(START_STREAMING_ERROR_NOT_PERMITTED)))
-        return -4;
-    else
-        return -1;
-}
+static inline int32_t parse_stream_version(RRDHOST *host, char *http) {
+    int32_t stream_version = -1;
 
-static inline int32_t parse_stream_version(RRDHOST *host, char *http)
-{
-    long int stream_version = -1;
-    int answer = -1;
-    char *stream_version_start = strchr(http, '=');
-    if (stream_version_start) {
-        stream_version_start++;
-        stream_version = strtol(stream_version_start, NULL, 10);
-        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(stream_version_start - http));
-        if (!answer) {
-            rrdpush_set_flags_to_newest_stream(host);
-        }
-    } else {
-        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-        if (!answer) {
-            stream_version = 1;
-            rrdpush_set_flags_to_newest_stream(host);
-        } else {
-            answer = memcmp(http, START_STREAMING_PROMPT_V1, strlen(START_STREAMING_PROMPT_V1));
-            if (!answer) {
-                stream_version = 0;
-                rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
-                rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-            }
-            else {
-                stream_version = parse_stream_version_for_errors(http);
-            }
-        }
+    if(strncmp(http, START_STREAMING_PROMPT_VN, strlen(START_STREAMING_PROMPT_VN)) == 0) {
+        stream_version = str2i(&http[strlen(START_STREAMING_PROMPT_VN)]);
+        rrdpush_set_flags_to_newest_stream(host);
     }
+    else if(strncmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2)) == 0) {
+        stream_version = 1;
+        rrdpush_set_flags_to_newest_stream(host);
+    }
+    else if(strncmp(http, START_STREAMING_PROMPT_V1, strlen(START_STREAMING_PROMPT_V1)) == 0) {
+        stream_version = 0;
+        rrdpush_set_flags_to_newest_stream(host);
+    }
+    else if (strncmp(http, START_STREAMING_ERROR_SAME_LOCALHOST, strlen(START_STREAMING_ERROR_SAME_LOCALHOST)) == 0) {
+        stream_version = -2;
+    }
+    else if (strncmp(http, START_STREAMING_ERROR_ALREADY_STREAMING, strlen(START_STREAMING_ERROR_ALREADY_STREAMING)) == 0) {
+        stream_version = -3;
+    }
+    else if (strncmp(http, START_STREAMING_ERROR_NOT_PERMITTED, strlen(START_STREAMING_ERROR_NOT_PERMITTED)) == 0) {
+        stream_version = -4;
+    }
+    else
+        stream_version = -1;
+
     return stream_version;
 }
 
@@ -503,7 +489,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     http[received] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
-    int32_t version = (int32_t)parse_stream_version(host, http);
+    int32_t version = parse_stream_version(host, http);
     if(version == -1) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE);
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", rrdhost_hostname(host), s->connected_to);

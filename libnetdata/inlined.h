@@ -44,10 +44,10 @@ static inline uint32_t simple_uhash(const char *name) {
 
 static inline int str2i(const char *s) {
     int n = 0;
-    char c, negative = (*s == '-');
+    char c, negative = (char)(*s == '-');
     const char *e = &s[30]; // max number of character to iterate
 
-    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
+    for(c = (char)((negative)?*(++s):*s); c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }

@@ -504,10 +504,8 @@ int connect_to_one_of_destinations(
             sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
             if (sock != -1) {
-                if (connected_to && connected_to_size) {
-                    strncpy(connected_to, string2str(d->destination), connected_to_size);
-                    connected_to[connected_to_size - 1] = '\0';
-                }
+                if (connected_to && connected_to_size)
+                    strncpyz(connected_to, string2str(d->destination), connected_to_size);
 
                 *destination = d;
 
@@ -982,7 +980,7 @@ void log_sender_capabilities(struct sender_state *s) {
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version) {
     STREAM_CAPABILITIES caps = 0;
 
-    if(version <= 0) caps = STREAM_CAP_V1;
+    if(version <= 1) caps = STREAM_CAP_V1;
     else if(version < STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_V2 | STREAM_CAP_HLABELS;
     else if(version <= STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM;
     else if(version <= STREAM_OLD_VERSION_CLABELS) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;

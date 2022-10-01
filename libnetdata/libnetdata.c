@@ -1607,7 +1607,7 @@ inline int quoted_strings_splitter(char *str, char **words, int max_words, int (
         else if (unlikely(quote == 0 && custom_isspace(*s))) {
             // terminate the word
             if (recover && rec < max_recover) {
-                if (!rec || (rec && recover_location[rec-1] != s)) {
+                if (!rec || recover_location[rec-1] != s) {
                     recover_location[rec++] = s;
                     *recover++ = *s;
                 }

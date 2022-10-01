@@ -339,8 +339,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    strncpy(host->machine_guid, guid, GUID_LEN);
-    host->machine_guid[GUID_LEN] = '\0';
+    strncpyz(host->machine_guid, guid, GUID_LEN + 1);
 
     set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, registry_hostname, os,
                         tags, timezone, abbrev_timezone, utc_offset, program_name, program_version);

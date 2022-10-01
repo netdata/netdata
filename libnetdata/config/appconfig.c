@@ -32,8 +32,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
     local_ci = callocz(1, sizeof(struct _connector_instance));
     local_ci->instance = instance;
     local_ci->connector = connector;
-    strncpy(local_ci->instance_name, instance->name, CONFIG_MAX_NAME);
-    strncpy(local_ci->connector_name, connector->name, CONFIG_MAX_NAME);
+    strncpyz(local_ci->instance_name, instance->name, CONFIG_MAX_NAME);
+    strncpyz(local_ci->connector_name, connector->name, CONFIG_MAX_NAME);
     local_ci->next = global_connector_instance;
     global_connector_instance = local_ci;
 
@@ -686,14 +686,14 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                     int rc;
                     rc = is_valid_connector(s, 0);
                     if (likely(rc)) {
-                        strncpy(working_connector, s, CONFIG_MAX_NAME);
+                        strncpyz(working_connector, s, CONFIG_MAX_NAME);
                         s = s + rc + 1;
                         if (unlikely(!(*s))) {
                             _connectors++;
                             sprintf(buffer, "instance_%d", _connectors);
                             s = buffer;
                         }
-                        strncpy(working_instance, s, CONFIG_MAX_NAME);
+                        strncpyz(working_instance, s, CONFIG_MAX_NAME);
                         working_connector_section = NULL;
                         if (unlikely(appconfig_section_find(root, working_instance))) {
                             error("Instance (%s) already exists", working_instance);

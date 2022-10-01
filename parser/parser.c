@@ -291,7 +291,7 @@ inline int parser_action(PARSER *parser, char *input)
             buffer_strcat(parser->defer.response, input);
             return 0;
         }
-        else if(has_keyword) {
+        else {
             // call the action
             parser->defer.action(parser, parser->defer.action_data);
 

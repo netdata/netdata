@@ -294,8 +294,7 @@ cleanup_and_return:
             close(pipefd_stdin[PIPE_WRITE]);
     }
     else {
-        if(fpp_child_stdin)
-            *fpp_child_stdin  = fp_child_stdin;
+        *fpp_child_stdin  = fp_child_stdin;
     }
 
     // the child end - close it
@@ -310,8 +309,7 @@ cleanup_and_return:
             close(pipefd_stdout[PIPE_READ]);
     }
     else {
-        if(fpp_child_stdout)
-            *fpp_child_stdout = fp_child_stdout;
+        *fpp_child_stdout = fp_child_stdout;
     }
 
     return ret;
