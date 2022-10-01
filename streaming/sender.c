@@ -62,7 +62,7 @@ static inline void deactivate_compression(struct sender_state *s) {
 // Collector thread finishing a transmission
 void sender_commit(struct sender_state *s) {
     char *src = (char *)buffer_tostring(s->host->sender->build);
-    size_t src_len = s->host->sender->build->len;
+    size_t src_len = buffer_strlen(s->host->sender->build);
 #ifdef ENABLE_COMPRESSION
     if (src && src_len) {
         if (s->compressor && s->rrdpush_compression) {
