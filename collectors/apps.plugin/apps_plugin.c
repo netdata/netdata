@@ -4478,8 +4478,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
             "\n"
             );
 
-    int i = 0;
-    for(p = root_of_pids; p ; p = p->next, i++) {
+    int rows= 0;
+    for(p = root_of_pids; p ; p = p->next) {
         if(!p->updated)
             continue;
 
@@ -4504,8 +4504,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         if(filter_gid && p->gid != gid)
             continue;
 
-        if(i)
-            fprintf(stdout, ",\n");
+        if(rows) fprintf(stdout, ",\n");
+        rows++;
 
         fprintf(stdout, "      [");
 
