@@ -481,6 +481,8 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
             pf->timeout,
             string2str(pf->function));
 
+    pf->sent_ut = now_realtime_usec();
+
     if(ret < 0) {
         error("FUNCTION: failed to send function to plugin, fprintf() returned error %d", ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
@@ -492,8 +494,6 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
                        string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
                        pf->sent_ut - pf->started_ut);
     }
-
-    pf->sent_ut = now_realtime_usec();
 }
 
 static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
