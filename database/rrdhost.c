@@ -223,7 +223,6 @@ static void rrdhost_initialize_rrdpush(RRDHOST *host,
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
 
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
     host->ssl.flags = NETDATA_SSL_START;
@@ -354,8 +353,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (likely(!archived)) {
         rrdfunctions_init(host);
         host->rrdlabels = rrdlabels_create();
-        rrdhost_initialize_rrdpush(
-            host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+        rrdhost_initialize_rrdpush(host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
     }
 
     netdata_rwlock_init(&host->rrdhost_rwlock);

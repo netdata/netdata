@@ -278,7 +278,7 @@ static inline void rrdpush_send_chart_definition(RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
+static inline void rrdpush_send_chart_metrics(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
     BUFFER *wb = host->sender->build;
 
@@ -294,7 +294,6 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
 
     buffer_fast_strcat(wb, "\n", 1);
 
-    size_t count_of_dimensions_written = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(unlikely(!rd->updated))
@@ -306,7 +305,6 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
             buffer_fast_strcat(wb, "\" = ", 4);
             buffer_print_ll(wb, rd->collected_value);
             buffer_fast_strcat(wb, "\n", 1);
-            count_of_dimensions_written++;
         }
         else {
             internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' is updated but not exposed", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
@@ -316,8 +314,6 @@ static inline bool rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     }
     rrddim_foreach_done(rd);
     buffer_fast_strcat(wb, "END\n", 4);
-
-    return count_of_dimensions_written != 0;
 }
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
@@ -368,14 +364,6 @@ bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE
     return true;
 }
 
-void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
-    RRDHOST *host = s->host;
-
-    // signal the sender there are more data
-    if (host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
-}
-
 void rrdset_done_push(RRDSET *st) {
     if(unlikely(!should_send_chart_matching(st)))
         return;
@@ -406,12 +394,10 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(need_to_send_chart_definition(st)))
         rrdpush_send_chart_definition(st);
 
-    if(likely(rrdpush_send_chart_metrics_nolock(st, host->sender))) {
-        rrdpush_signal_sender_to_wake_up(host->sender);
-        sender_commit(host->sender);
-    }
-    else
-        sender_cancel(host->sender);
+    rrdpush_send_chart_metrics(st, host->sender);
+    sender_commit(host->sender);
+
+    rrdpush_signal_sender_to_wake_up(host->sender);
 }
 
 // labels
@@ -430,8 +416,7 @@ void rrdpush_send_labels(RRDHOST *host) {
     buffer_sprintf(host->sender->build, "OVERWRITE %s\n", "labels");
     sender_commit(host->sender);
 
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
+    rrdpush_signal_sender_to_wake_up(host->sender);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
 }
@@ -451,10 +436,7 @@ void rrdpush_claimed_id(RRDHOST *host)
 
     rrdhost_aclk_state_unlock(host);
     sender_commit(host->sender);
-
-    // signal the sender there are more data
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", rrdhost_hostname(host));
+    rrdpush_signal_sender_to_wake_up(host->sender);
 }
 
 int connect_to_one_of_destinations(

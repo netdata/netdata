@@ -452,8 +452,8 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
     dictionary_view_set(st->functions_view, key, item);
     dictionary_acquired_item_release(st->rrdhost->functions, item);
 
-    internal_error(true, "FUNCTION: '%s' added to host '%s' and chart '%s'",
-                   key, rrdhost_hostname(st->rrdhost), rrdset_id(st));
+//    internal_error(true, "FUNCTION: '%s' added to host '%s' and chart '%s'",
+//                   key, rrdhost_hostname(st->rrdhost), rrdset_id(st));
 }
 
 void rrd_functions_expose(RRDSET *st, BUFFER *wb) {

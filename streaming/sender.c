@@ -719,9 +719,8 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
 
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
     buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
-
-    rrdpush_signal_sender_to_wake_up(s);
     sender_commit(s);
+    rrdpush_signal_sender_to_wake_up(s);
 
     internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
                    rrdhost_hostname(s->host), s->connected_to,
@@ -803,6 +802,7 @@ struct rrdpush_sender_thread_data {
         SENDING_DEFINITIONS_CONTINUE,
         SENDING_DEFINITIONS_DONE,
     } sending_definitions_status;
+    char *pipe_buffer;
 };
 
 static size_t cbuffer_available_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
@@ -834,6 +834,58 @@ static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_d
     }
 }
 
+static bool rrdpush_sender_pipe_close(RRDHOST *host, int *pipe_fds, bool reopen) {
+    static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+
+    bool ret = true;
+
+    netdata_mutex_lock(&mutex);
+
+    int new_pipe_fds[2];
+    if(reopen) {
+        if(pipe(new_pipe_fds) != 0) {
+            error("STREAM %s [send]: cannot create required pipe.", rrdhost_hostname(host));
+            new_pipe_fds[PIPE_READ] = -1;
+            new_pipe_fds[PIPE_WRITE] = -1;
+            ret = false;
+        }
+    }
+
+    int old_pipe_fds[2];
+    old_pipe_fds[PIPE_READ] = pipe_fds[PIPE_READ];
+    old_pipe_fds[PIPE_WRITE] = pipe_fds[PIPE_WRITE];
+
+    if(reopen) {
+        pipe_fds[PIPE_READ] = new_pipe_fds[PIPE_READ];
+        pipe_fds[PIPE_WRITE] = new_pipe_fds[PIPE_WRITE];
+    }
+    else {
+        pipe_fds[PIPE_READ] = -1;
+        pipe_fds[PIPE_WRITE] = -1;
+    }
+
+    if(old_pipe_fds[PIPE_READ] > 2)
+        close(old_pipe_fds[PIPE_READ]);
+
+    if(old_pipe_fds[PIPE_WRITE] > 2)
+        close(old_pipe_fds[PIPE_WRITE]);
+
+    netdata_mutex_unlock(&mutex);
+    return ret;
+}
+
+void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
+    RRDHOST *host = s->host;
+
+    int pipe_fd = host->rrdpush_sender_pipe[PIPE_WRITE];
+
+    // signal the sender there are more data
+    if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1) {
+        error("STREAM %s [send]: cannot write to internal pipe.", rrdhost_hostname(host));
+        rrdpush_sender_pipe_close(host, host->rrdpush_sender_pipe, true);
+    }
+}
+
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     struct rrdpush_sender_thread_data *data = ptr;
     worker_unregister();
@@ -847,17 +899,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     info("STREAM %s [send]: sending thread cleans up...", rrdhost_hostname(host));
 
     rrdpush_sender_thread_close_socket(host);
-
-    // close the pipe
-    if(host->rrdpush_sender_pipe[PIPE_READ] != -1) {
-        close(host->rrdpush_sender_pipe[PIPE_READ]);
-        host->rrdpush_sender_pipe[PIPE_READ] = -1;
-    }
-
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1) {
-        close(host->rrdpush_sender_pipe[PIPE_WRITE]);
-        host->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    }
+    rrdpush_sender_pipe_close(host, host->rrdpush_sender_pipe, false);
 
     if(!host->rrdpush_sender_join) {
         info("STREAM %s [send]: sending thread detaches itself.", rrdhost_hostname(host));
@@ -870,6 +912,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     netdata_mutex_unlock(&host->sender->mutex);
 
+    freez(data->pipe_buffer);
     freez(data);
 }
 
@@ -894,53 +937,6 @@ void sender_init(RRDHOST *parent)
 }
 
 void *rrdpush_sender_thread(void *ptr) {
-    struct sender_state *s = ptr;
-    s->task_id = gettid();
-
-    if(!s->host->rrdpush_send_enabled || !s->host->rrdpush_send_destination ||
-       !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
-       !*s->host->rrdpush_send_api_key) {
-        error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              rrdhost_hostname(s->host), s->task_id);
-        return NULL;
-    }
-
-#ifdef ENABLE_HTTPS
-    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
-        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
-        security_location_for_context(netdata_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
-    }
-#endif
-
-    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->task_id);
-
-    s->timeout = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
-    s->default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
-    s->buffer->max_size =
-        (size_t)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "buffer size bytes", 1024 * 1024 * 10);
-    s->reconnect_delay =
-        (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
-    remote_clock_resync_iterations = (unsigned int)appconfig_get_number(
-        &stream_config, CONFIG_SECTION_STREAM,
-        "initial clock resync iterations",
-        remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
-
-    // initialize rrdpush globals
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
-    __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
-    if(pipe(s->host->rrdpush_sender_pipe) == -1) {
-        error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", rrdhost_hostname(s->host));
-        return NULL;
-    }
-
-    enum {
-        Collector,
-        Socket
-    };
-    struct pollfd fds[2];
-    fds[Collector].fd = s->host->rrdpush_sender_pipe[PIPE_READ];
-    fds[Collector].events = POLLIN;
-
     worker_register("STREAMSND");
     worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
     worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
@@ -964,7 +960,62 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENTAL);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENTAL);
 
+    struct sender_state *s = ptr;
+    s->task_id = gettid();
+
+    if(!s->host->rrdpush_send_enabled || !s->host->rrdpush_send_destination ||
+       !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
+       !*s->host->rrdpush_send_api_key) {
+        error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
+              rrdhost_hostname(s->host), s->task_id);
+        return NULL;
+    }
+
+#ifdef ENABLE_HTTPS
+    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
+        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+        security_location_for_context(netdata_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+    }
+#endif
+
+    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->task_id);
+
+    s->timeout = (int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
+
+    s->default_port = (int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
+
+    s->buffer->max_size = (size_t)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "buffer size bytes", 1024 * 1024 * 10);
+
+    s->reconnect_delay = (unsigned int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
+
+    remote_clock_resync_iterations = (unsigned int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM,
+        "initial clock resync iterations",
+        remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+
+    // initialize rrdpush globals
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
+    __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+
+    int pipe_buffer_size = 10 * 1024;
+#ifdef F_GETPIPE_SZ
+    pipe_buffer_size = fcntl(s->host->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
+    if(pipe_buffer_size < 10 * 1024)
+        pipe_buffer_size = 10 * 1024;
+#endif
+
+    if(!rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true)) {
+        error("STREAM %s [send]: cannot create inter-thread communication pipe. Disabling streaming.",
+              rrdhost_hostname(s->host));
+        return NULL;
+    }
+
     struct rrdpush_sender_thread_data *thread_data = callocz(1, sizeof(struct rrdpush_sender_thread_data));
+    thread_data->pipe_buffer = mallocz(pipe_buffer_size);
     thread_data->sender_state = s;
     thread_data->host = s->host;
     thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
@@ -1015,11 +1066,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
         worker_is_idle();
 
-        // Wait until buffer opens in the socket or a rrdset_done_push wakes us
-        fds[Collector].revents = 0;
-        fds[Socket].revents = 0;
-        fds[Socket].fd = s->host->rrdpush_sender_socket;
-
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
@@ -1027,50 +1073,79 @@ void *rrdpush_sender_thread(void *ptr) {
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->host->sender->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->host->sender->buffer->max_size);
 
-        if(outstanding) {
+        if(outstanding)
             s->send_attempts++;
-            fds[Socket].events = POLLIN | POLLOUT;
-        }
         else {
-            fds[Socket].events = POLLIN;
-
             if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE
                          && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
                          && !rrdhost_flag_check(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS)
-                         )) {
+                             )) {
                 // let the data collection threads know we are ready to push metrics
                 rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
                 info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
             }
         }
 
-        int retval = poll(fds, 2, 1000);
+        if(unlikely(s->host->rrdpush_sender_pipe[PIPE_READ] == -1)) {
+            if(!rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true)) {
+                error("STREAM %s [send]: cannot create inter-thread communication pipe. Disabling streaming.",
+                      rrdhost_hostname(s->host));
+                rrdpush_sender_thread_close_socket(s->host);
+                break;
+            }
+        }
+
+        // Wait until buffer opens in the socket or a rrdset_done_push wakes us
+        enum {
+            Collector = 0,
+            Socket    = 1,
+        };
+        struct pollfd fds[2] = {
+            [Collector] = {
+                .fd = s->host->rrdpush_sender_pipe[PIPE_READ],
+                .events = POLLIN,
+                .revents = 0,
+            },
+            [Socket] = {
+                .fd = s->host->rrdpush_sender_socket,
+                .events = POLLIN | (outstanding ? POLLOUT : 0 ),
+                .revents = 0,
+            }
+        };
+        int poll_rc = poll(fds, 2, 1000);
+
         debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);
 
         if(unlikely(netdata_exit)) break;
 
+        internal_error(fds[Collector].fd != s->host->rrdpush_sender_pipe[PIPE_READ],
+            "STREAM %s [send to %s]: pipe changed after poll().", rrdhost_hostname(s->host), s->connected_to);
+
+        internal_error(fds[Socket].fd != s->host->rrdpush_sender_socket,
+            "STREAM %s [send to %s]: socket changed after poll().", rrdhost_hostname(s->host), s->connected_to);
+
         // Spurious wake-ups without error - loop again
-        if (retval == 0 || ((retval == -1) && (errno == EAGAIN || errno == EINTR))) {
+        if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
             debug(D_STREAM, "Spurious wakeup");
             continue;
         }
 
         // Only errors from poll() are internal, but try restarting the connection
-        if(unlikely(retval == -1)) {
+        if(unlikely(poll_rc == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
             error("STREAM %s [send to %s]: failed to poll(). Closing socket.", rrdhost_hostname(s->host), s->connected_to);
+            rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true);
             rrdpush_sender_thread_close_socket(s->host);
             continue;
         }
 
         // If the collector woke us up then empty the pipe to remove the signal
-        if (fds[Collector].revents & POLLIN || fds[Collector].revents & POLLPRI) {
+        if (fds[Collector].revents & (POLLIN|POLLPRI)) {
             worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
             debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
 
-            char buffer[10000 + 1];
-            if (read(s->host->rrdpush_sender_pipe[PIPE_READ], buffer, 10000) == -1)
+            if (read(fds[Collector].fd, thread_data->pipe_buffer, pipe_buffer_size) == -1)
                 error("STREAM %s [send to %s]: cannot read from internal pipe.", rrdhost_hostname(s->host), s->connected_to);
         }
 
@@ -1095,19 +1170,37 @@ void *rrdpush_sender_thread(void *ptr) {
                 worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, bytes);
         }
 
-        // TODO-GAPS - why do we only check this on the socket, not the pipe?
-        if(outstanding) {
+        if(unlikely(fds[Collector].revents & (POLLERR|POLLHUP|POLLNVAL))) {
             char *error = NULL;
+
+            if (unlikely(fds[Collector].revents & POLLERR))
+                error = "pipe reports errors (POLLERR)";
+            else if (unlikely(fds[Collector].revents & POLLHUP))
+                error = "pipe closed (POLLHUP)";
+            else if (unlikely(fds[Collector].revents & POLLNVAL))
+                error = "pipe is invalid (POLLNVAL)";
+
+            if(error) {
+                rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true);
+                error("STREAM %s [send to %s]: restart internal pipe because %s.",
+                      rrdhost_hostname(s->host), s->connected_to, error);
+            }
+        }
+
+        if(unlikely(fds[Socket].revents & (POLLERR|POLLHUP|POLLNVAL))) {
+            char *error = NULL;
+
             if (unlikely(fds[Socket].revents & POLLERR))
                 error = "socket reports errors (POLLERR)";
             else if (unlikely(fds[Socket].revents & POLLHUP))
                 error = "connection closed by remote end (POLLHUP)";
             else if (unlikely(fds[Socket].revents & POLLNVAL))
                 error = "connection is invalid (POLLNVAL)";
+
             if(unlikely(error)) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR);
-                error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.", rrdhost_hostname(s->host),
-                      s->connected_to, error, s->sent_bytes_on_this_connection);
+                error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.",
+                      rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
                 rrdpush_sender_thread_close_socket(s->host);
             }
         }
