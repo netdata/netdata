@@ -397,12 +397,12 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
     buffer_strcat(wb, "\n\t}\n}\n");
 }
 
-static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
+static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
 
     while(ae) {
-        if (ae->alarm_id == alarm_id && ae->unique_id > (unsigned int) mark &&
+        if (ae->alarm_id == alarm_id && ae->unique_id > mark &&
             (ae->new_status != RRDCALC_STATUS_WARNING && ae->new_status != RRDCALC_STATUS_CRITICAL))
             return 1;
         ae = ae->next;
