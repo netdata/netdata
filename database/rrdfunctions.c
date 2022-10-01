@@ -432,10 +432,14 @@ void rrdfunctions_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
 
-void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, const char *format, int timeout,
+void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, const char *help, const char *format, int timeout,
                                 bool sync, function_execute_at_collector function, void *collector_data) {
-    if(!st->functions_view)
-        st->functions_view = dictionary_create_view(st->rrdhost->functions);
+
+    // RRDSET *st may be NULL in this function
+    // to create a GLOBAL function
+
+    if(st && !st->functions_view)
+        st->functions_view = dictionary_create_view(host->functions);
 
     char key[PLUGINSD_LINE_MAX + 1];
     sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
@@ -448,15 +452,15 @@ void rrd_collector_add_function(RRDSET *st, const char *name, const char *help, 
         .collector_data = collector_data,
         .help = string_strdupz(help),
     };
-    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(st->rrdhost->functions, key, &tmp, sizeof(tmp));
-    dictionary_view_set(st->functions_view, key, item);
-    dictionary_acquired_item_release(st->rrdhost->functions, item);
+    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
 
-//    internal_error(true, "FUNCTION: '%s' added to host '%s' and chart '%s'",
-//                   key, rrdhost_hostname(st->rrdhost), rrdset_id(st));
+    if(st)
+        dictionary_view_set(st->functions_view, key, item);
+
+    dictionary_acquired_item_release(host->functions, item);
 }
 
-void rrd_functions_expose(RRDSET *st, BUFFER *wb) {
+void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     if(!st->functions_view)
         return;
 
@@ -534,7 +538,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     return code;
 }
 
-static int rrd_call_function_prepare(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
+static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, struct rrd_collector_function **rdcf) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
 
     strncpyz(buffer, name, MAX_FUNCTION_LENGTH);
@@ -603,7 +607,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
     char key[PLUGINSD_LINE_MAX + 1];
     sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
-    code = rrd_call_function_prepare(host, wb, key, &rdcf);
+    code = rrd_call_function_find(host, wb, key, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 
@@ -676,7 +680,7 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     struct rrd_collector_function *rdcf = NULL;
     char key[PLUGINSD_LINE_MAX + 1];
     sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
-    code = rrd_call_function_prepare(host, wb, key, &rdcf);
+    code = rrd_call_function_find(host, wb, key, &rdcf);
     if(code != HTTP_RESP_OK)
         return code;
 

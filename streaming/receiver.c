@@ -384,7 +384,7 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
 
     // if the destination is full, oops!
     if(ds == de) {
-        error("STREAM: received line exceed %d bytes. Truncating it.", PLUGINSD_LINE_MAX);
+        error("STREAM: received line exceeds %d bytes. Truncating it.", PLUGINSD_LINE_MAX);
         *ds = '\0';
         *pos = ss - r->read_buffer;
         return buffer;
