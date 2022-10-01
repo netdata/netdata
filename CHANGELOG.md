@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- bump go.d v0.40.2 [\#13747](https://github.com/netdata/netdata/pull/13747) ([ilyam8](https://github.com/ilyam8))
+- fix\(python.d\): set correct label source for \_collect\_job label [\#13746](https://github.com/netdata/netdata/pull/13746) ([ilyam8](https://github.com/ilyam8))
+- Provide Details on Label Filtering/Custom Labels [\#13745](https://github.com/netdata/netdata/pull/13745) ([DShreve2](https://github.com/DShreve2))
 - Fix handling of temporary directories in kickstart code. [\#13744](https://github.com/netdata/netdata/pull/13744) ([Ferroin](https://github.com/Ferroin))
 - Dont send NodeInfo during first database cleanup [\#13740](https://github.com/netdata/netdata/pull/13740) ([MrZammler](https://github.com/MrZammler))
 - CMake - add possibility to build without ACLK [\#13736](https://github.com/netdata/netdata/pull/13736) ([underhood](https://github.com/underhood))
@@ -23,6 +26,7 @@
 - Update dashboard to version v2.29.1. [\#13696](https://github.com/netdata/netdata/pull/13696) ([netdatabot](https://github.com/netdatabot))
 - docs: nvidia-smi in a container limitation note [\#13695](https://github.com/netdata/netdata/pull/13695) ([ilyam8](https://github.com/ilyam8))
 - Use CMake generated config.h also in out of tree CMake build [\#13692](https://github.com/netdata/netdata/pull/13692) ([underhood](https://github.com/underhood))
+- Add info for Docker containers about using hostname from host. [\#13685](https://github.com/netdata/netdata/pull/13685) ([Ferroin](https://github.com/Ferroin))
 - Store nulls instead of empty strings in health tables [\#13683](https://github.com/netdata/netdata/pull/13683) ([MrZammler](https://github.com/MrZammler))
 - Fix warnings during compilation time on ARM \(32 bits\) [\#13681](https://github.com/netdata/netdata/pull/13681) ([thiagoftsm](https://github.com/thiagoftsm))
 - dictionary updated documentation and cosmetics [\#13679](https://github.com/netdata/netdata/pull/13679) ([ktsaou](https://github.com/ktsaou))
@@ -330,8 +334,6 @@
 - Update netdata commands [\#13080](https://github.com/netdata/netdata/pull/13080) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: fix a base64\_encode bug [\#13074](https://github.com/netdata/netdata/pull/13074) ([kklionz](https://github.com/kklionz))
 - Labels with dictionary [\#13070](https://github.com/netdata/netdata/pull/13070) ([ktsaou](https://github.com/ktsaou))
-- Use a separate thread for slow mountpoints in the diskspace plugin [\#13067](https://github.com/netdata/netdata/pull/13067) ([vlvkobal](https://github.com/vlvkobal))
-- Remove official support for Debian 9. [\#13065](https://github.com/netdata/netdata/pull/13065) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
