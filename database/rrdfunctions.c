@@ -270,9 +270,16 @@ static inline size_t sanitize_function_text(char *dst, const char *src, size_t d
 // we keep a dictionary per RRDSET with these functions
 // the dictionary is created on demand (only when a function is added to an RRDSET)
 
+typedef enum {
+    RRD_FUNCTION_LOCAL  = (1 << 0),
+    RRD_FUNCTION_GLOBAL = (1 << 1),
+
+    // this is 8-bit
+} RRD_FUNCTION_OPTIONS;
+
 struct rrd_collector_function {
     bool sync;                      // when true, the function is called synchronously
-    uint8_t content_type;
+    uint8_t options;                // RRD_FUNCTION_OPTIONS
     STRING *help;
     int timeout;                    // the default timeout of the function
 
@@ -386,11 +393,6 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->content_type != new_rdcf->content_type) {
-        rdcf->content_type = new_rdcf->content_type;
-        changed = true;
-    }
-
     if(rdcf->help != new_rdcf->help) {
         STRING *old = rdcf->help;
         rdcf->help = new_rdcf->help;
@@ -432,7 +434,7 @@ void rrdfunctions_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
 
-void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, const char *help, const char *format, int timeout,
+void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
                                 bool sync, function_execute_at_collector function, void *collector_data) {
 
     // RRDSET *st may be NULL in this function
@@ -447,7 +449,7 @@ void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, con
     struct rrd_collector_function tmp = {
         .sync = sync,
         .timeout = timeout,
-        .content_type = functions_format_to_content_type(format),
+        .options = (st)?RRD_FUNCTION_LOCAL:RRD_FUNCTION_GLOBAL,
         .function = function,
         .collector_data = collector_data,
         .help = string_strdupz(help),
@@ -467,10 +469,9 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     struct rrd_collector_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\"\n"
-                       , functions_content_type_to_format(tmp->content_type)
-                       , tmp->timeout
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\"\n"
                        , tmp_dfe.name
+                       , tmp->timeout
                        , string2str(tmp->help)
                        );
     }
@@ -568,8 +569,6 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
 
     if(!(*rdcf)->collector->running)
         return rrd_call_function_error(wb, "The collector that registered this function, is not currently running.", HTTP_RESP_BACKEND_FETCH_FAILED);
-
-    wb->contenttype = (*rdcf)->content_type;
 
     return HTTP_RESP_OK;
 }
@@ -705,11 +704,14 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident,
         if(t_dfe.counter)
             buffer_strcat(wb, ",\n");
 
-        buffer_sprintf(wb, "%s%s%s%s: {\n", ident, kq, t_dfe.name, kq);
-        buffer_sprintf(wb, "\t%s%sformat%s: %s%s%s,\n", ident, kq, kq, sq, functions_content_type_to_format(t->content_type), sq);
-        buffer_sprintf(wb, "\t%s%shelp%s: %s%s%s,\n", ident, kq, kq, sq, string2str(t->help), sq);
-        buffer_sprintf(wb, "\t%s%stimeout%s: %d\n", ident, kq, kq, t->timeout);
-        buffer_sprintf(wb, "%s}", ident);
+        buffer_sprintf(wb, "%s%s%s%s: {", ident, kq, t_dfe.name, kq);
+        buffer_sprintf(wb, "\n\t%s%shelp%s: %s%s%s", ident, kq, kq, sq, string2str(t->help), sq);
+        buffer_sprintf(wb, ",\n\t%s%stimeout%s: %d", ident, kq, kq, t->timeout);
+        buffer_sprintf(wb, ",\n\t%s%soptions%s: \"%s%s\"", ident, kq, kq
+                       , (t->options & RRD_FUNCTION_LOCAL)?"LOCAL ":""
+                       , (t->options & RRD_FUNCTION_GLOBAL)?"GLOBAL ":""
+                       );
+        buffer_sprintf(wb, "\n%s}", ident);
     }
     dfe_done(t);
     buffer_strcat(wb, "\n");

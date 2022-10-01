@@ -1569,8 +1569,6 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
         char *name = mystrsep(&value, "=");
         if (!name || !*name)
             continue;
-        if (!value || !*value)
-            continue;
 
         if (!strcmp(name, "function"))
             function = value;
@@ -1585,6 +1583,22 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     buffer_no_cacheable(wb);
 
     return rrd_call_function_and_wait(host, wb, timeout, function);
+}
+
+int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
+
+    buffer_strcat(wb, "{\n");
+    host_functions2json(host, wb, 1, "\"", "\"");
+    buffer_strcat(wb, "}");
+
+    return HTTP_RESP_OK;
 }
 
 #ifndef ENABLE_DBENGINE
@@ -1734,6 +1748,8 @@ static struct api_command {
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_weights               },
 
         { "function",            0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
+        { "functions",            0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_dbengine_stats },
 
         // terminator

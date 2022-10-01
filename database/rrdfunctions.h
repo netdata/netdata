@@ -14,7 +14,7 @@ typedef void (*function_data_ready_callback)(BUFFER *wb, int code, void *callbac
 typedef int (*function_execute_at_collector)(BUFFER *wb, int timeout, const char *function, void *collector_data,
                                              function_data_ready_callback callback, void *callback_data);
 
-extern void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, const char *help, const char *format, int timeout,
+extern void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
                                        bool sync, function_execute_at_collector function, void *collector_data);
 
 extern int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name);

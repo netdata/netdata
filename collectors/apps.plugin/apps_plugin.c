@@ -11,7 +11,7 @@
 #include "libnetdata/required_dummies.h"
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " application/json 10 \"processes\" \"detailed processes information\"\n"); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" 10 \"Detailed information on the currently running processes on this node\"\n"); \
     } while(0)
 
 

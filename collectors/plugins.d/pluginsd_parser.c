@@ -591,35 +591,27 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
 
 PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    char *format = words[1];
-
     bool global = false;
-    int i = 2;
-    if(strcmp(words[2], "GLOBAL") == 0) {
+    int i = 1;
+    if(strcmp(words[i], "GLOBAL") == 0) {
+        i++;
         global = true;
-        i = 3;
     }
 
+    char *name      = words[i++];
     char *timeout_s = words[i++];
-    char *name = words[i++];
-    char *help = words[i++];
+    char *help      = words[i++];
 
     RRDSET *st = (global)?NULL:((PARSER_USER_OBJECT *) user)->st;
-
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
-        debug(D_PLUGINSD, "Ignoring function belonging to missing or ignored host.");
-        return PARSER_RC_OK;
-    }
 
-    if (unlikely(!format || !timeout_s || !name || !help || (!global && !st))) {
-        error("requested a FUNCTION, without providing the required data (global = '%s', format = '%s', timeout = '%s', name = '%s', help = '%s'), host '%s', chart '%s'. Ignoring it.",
+    if (unlikely(!host || !timeout_s || !name || !help || (!global && !st))) {
+        error("requested a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', help = '%s'), host '%s', chart '%s'. Ignoring it.",
               global?"yes":"no",
-              format?format:"(unset)",
-              timeout_s?timeout_s:"(unset)",
               name?name:"(unset)",
+              timeout_s?timeout_s:"(unset)",
               help?help:"(unset)",
-              rrdhost_hostname(host),
+              host?rrdhost_hostname(host):"(unset)",
               st?rrdset_id(st):"(unset)");
         return PARSER_RC_OK;
     }
@@ -632,7 +624,7 @@ PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_
     }
 
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
-    rrd_collector_add_function(host, (global)?NULL:st, name, help, format, timeout, false, pluginsd_execute_function_callback, parser);
+    rrd_collector_add_function(host, st, name, timeout, help, false, pluginsd_execute_function_callback, parser);
 
     return PARSER_RC_OK;
 }
