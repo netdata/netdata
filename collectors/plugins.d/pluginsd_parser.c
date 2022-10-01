@@ -473,7 +473,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     FILE *fp = parser->output;
 
     // leave this code as default, so that when the dictionary is destroyed this will be sent back to the caller
-    pf->code = HTTP_RESP_BACKEND_FETCH_FAILED;
+    pf->code = HTTP_RESP_GATEWAY_TIMEOUT;
 
     // send the command to the plugin
     int ret = fprintf(fp, "FUNCTION %s %d \"%s\"\n",
@@ -650,7 +650,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 
     int code = str2i(status && *status ? status : "0");
     if (code <= 0)
-        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+        code = HTTP_RESP_BACKEND_RESPONSE_INVALID;
 
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
 

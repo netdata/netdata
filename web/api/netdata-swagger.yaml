@@ -1351,6 +1351,47 @@ paths:
             that correlated the metrics did not produce any result.
         "504":
           description: Timeout - the query took too long and has been cancelled.
+  /function:
+    get:
+      summary: "Execute a collector function."
+      parameters:
+        - name: function
+          in: query
+          description: The name of the function, as returned by the collector.
+          required: true
+          allowEmptyValue: false
+          schema:
+            type: string
+        - name: timeout
+          in: query
+          description: The timeout in seconds to wait for the function to complete.
+          required: false
+          schema:
+            type: number
+            format: integer
+            default: 10
+      responses:
+        "200":
+          description: The collector function has been executed successfully. Each collector may return a different type of content.
+        "400":
+          description: The request was rejected by the collector.
+        "404":
+          description: The requested function is not found.
+        "500":
+          description: Other internal error, getting this error means there is a bug in Netdata.
+        "503":
+          description: The collector to execute the function is not currently available.
+        "504":
+          description: Timeout while waiting for the collector to execute the function.
+        "591":
+          description: The collector sent a response, but it was invalid or corrupted.
+  /functions:
+    get:
+      summary: Get a list of all registered collector functions.
+      description: Collector functions are programs that can be executed on demand.
+      responses:
+        "200":
+          description: A JSON object containing one object per supported function.
   /weights:
     get:
       summary: "Analyze all the metrics using an algorithm and score them accordingly"
