@@ -60,6 +60,7 @@ void netdata_cleanup_and_exit(int ret) {
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
+        metadata_sync_shutdown_prepare();
         rrdhost_free_all();
         metadata_sync_shutdown();
 #ifdef ENABLE_DBENGINE
@@ -1039,6 +1040,9 @@ int main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
                             return rrdlabels_unittest();
+                        }
+                        else if(strcmp(optarg, "metatest") == 0) {
+                            return metadata_unittest(10000);
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);

@@ -8,10 +8,14 @@
 
 extern sqlite3 *db_meta;
 
-#define METADATA_CMD_Q_MAX_SIZE (65535)             // Max queue size; callers will block until there is room
-#define METADATA_MAINTENANCE_FIRST_CHECK (180)      // Maintenace first run after agent startup in seconds
+#define METADATA_CMD_Q_MAX_SIZE (100000)            // Max queue size; callers will block until there is room
+#define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running Or last run did actual work
 #define METADATA_MAINTENANCE_INTERVAL (3600)        // Repeat maintenance after latest successful
+
+#define METADATA_HOST_CHECK_FIRST_CHECK (30)        // Check host for pending metadata within 60 seconds
+#define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat host check every 60 seconds
+
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
 #define METADATA_MAX_TRANSACTION_BATCH (128)        // Maximum commands to add in a transaction
@@ -32,8 +36,10 @@ enum metadata_opcode {
 
     METADATA_SKIP_TRANSACTION,                      // Dummy -- OPCODES less than this one can be in a tranasction
 
+    METADATA_SCAN_HOSTS,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
+    METADATA_UNITTEST,
     // leave this last
     // we need it to check for worker utilization
     METADATA_MAX_ENUMERATIONS_DEFINED
@@ -52,25 +58,37 @@ struct metadata_database_cmdqueue {
 };
 
 typedef enum {
-    METADATA_FLAG_CLEAR     = 0,
-    METADATA_FLAG_CLEANUP   = (1 << 0), // Cleanup is running
-    METADATA_FLAG_SHUTDOWN  = (1 << 1), // Shutting down
+    METADATA_FLAG_CLEAR             = 0,
+    METADATA_FLAG_CLEANUP           = (1 << 0), // Cleanup is running
+    METADATA_FLAG_SCANNING_HOSTS    = (1 << 1), // Scanning of hosts in worker thread
+    METADATA_FLAG_SHUTDOWN          = (1 << 2), // Shutting down
 } METADATA_FLAG;
 
+#define METADATA_WORKER_BUSY    (METADATA_FLAG_CLEANUP | METADATA_FLAG_SCANNING_HOSTS)
 
 #define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define metadata_flag_set(target_flags, flag)   __atomic_or_fetch(&((target_flags)->flags), (flag), __ATOMIC_SEQ_CST)
 #define metadata_flag_clear(target_flags, flag) __atomic_and_fetch(&((target_flags)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
+struct metadata_queue {
+    volatile unsigned queue_size;
+    struct metadata_database_cmdqueue cmd_queue;
+    struct metadata_queue *prev;
+    struct metadata_queue *next;
+};
+
 struct metadata_wc {
     uv_thread_t thread;
     time_t check_metadata_after;
+    time_t check_hosts_after;
     unsigned max_commands_in_queue;
     volatile unsigned queue_size;
     uv_loop_t *loop;
     uv_async_t async;
     METADATA_FLAG flags;
     uint64_t row_id;
+    unsigned batch_size;
+    uv_timer_t timer_req;
     struct completion init_complete;
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -81,6 +99,7 @@ struct metadata_wc {
 // To initialize and shutdown
 void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
+void metadata_sync_shutdown_prepare(void);
 
 void queue_dimension_update_metadata(RRDDIM *rd);
 void queue_chart_update_metadata(RRDSET *st);
@@ -93,4 +112,7 @@ void queue_store_host_labels(const char *machine_guid);
 void queue_metadata_buffer(BUFFER *buffer);
 void migrate_localhost(uuid_t *host_uuid);
 void queue_chart_labels(RRDSET *st);
+
+// UNIT TEST
+int metadata_unittest(int);
 #endif //NETDATA_SQLITE_METADATA_H

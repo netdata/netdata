@@ -778,8 +778,15 @@ int metadata_database_enq_cmd_noblock(struct metadata_wc *wc, struct metadata_cm
 
     /* wait for free space in queue */
     uv_mutex_lock(&wc->cmd_mutex);
-    if ((queue_size = wc->queue_size) == METADATA_CMD_Q_MAX_SIZE ||
-        metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)) {
+
+    if (cmd->opcode == METADATA_SYNC_SHUTDOWN) {
+        metadata_flag_set(wc, METADATA_FLAG_SHUTDOWN);
+        uv_mutex_unlock(&wc->cmd_mutex);
+        return 0;
+    }
+
+    if (unlikely((queue_size = wc->queue_size) == METADATA_CMD_Q_MAX_SIZE ||
+        metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
         uv_mutex_unlock(&wc->cmd_mutex);
         return 1;
     }
@@ -797,16 +804,27 @@ int metadata_database_enq_cmd_noblock(struct metadata_wc *wc, struct metadata_cm
 static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
 {
     unsigned queue_size;
-    bool wakeup = false;
 
     /* wait for free space in queue */
     uv_mutex_lock(&wc->cmd_mutex);
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
         uv_mutex_unlock(&wc->cmd_mutex);
+        (void) uv_async_send(&wc->async);
+        return;
+    }
+
+    if (cmd->opcode == METADATA_SYNC_SHUTDOWN) {
+        metadata_flag_set(wc, METADATA_FLAG_SHUTDOWN);
+        uv_mutex_unlock(&wc->cmd_mutex);
+        (void) uv_async_send(&wc->async);
         return;
     }
 
     while ((queue_size = wc->queue_size) == METADATA_CMD_Q_MAX_SIZE) {
+        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
+            uv_mutex_unlock(&wc->cmd_mutex);
+            return;
+        }
         uv_cond_wait(&wc->cmd_cond, &wc->cmd_mutex);
     }
     fatal_assert(queue_size < METADATA_CMD_Q_MAX_SIZE);
@@ -815,14 +833,10 @@ static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
     wc->cmd_queue.tail = wc->cmd_queue.tail != METADATA_CMD_Q_MAX_SIZE - 1 ?
                              wc->cmd_queue.tail + 1 : 0;
     wc->queue_size = queue_size + 1;
-    if (wc->queue_size > wc->max_commands_in_queue)
-        wc->max_commands_in_queue = wc->queue_size;
-    wakeup = (wc->queue_size > 10000);
     uv_mutex_unlock(&wc->cmd_mutex);
 
     /* wake up event loop */
-    if (wakeup)
-        (void) uv_async_send(&wc->async);
+    (void) uv_async_send(&wc->async);
 }
 
 static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc, enum metadata_opcode *next_opcode)
@@ -860,19 +874,6 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc, enum metadat
     return ret;
 }
 
-static void after_metadata_cleanup(uv_work_t *req, int status)
-{
-    UNUSED(status);
-
-    struct metadata_wc *wc = req->data;
-    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
-}
-static void start_metadata_cleanup(uv_work_t *req)
-{
-    struct metadata_wc *wc = req->data;
-    check_dimension_metadata(wc);
-}
-
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -898,6 +899,107 @@ static void timer_cb(uv_timer_t* handle)
        if (!metadata_database_enq_cmd_noblock(wc, &cmd))
            wc->check_metadata_after = now + METADATA_MAINTENANCE_INTERVAL;
    }
+
+   if (wc->check_hosts_after && wc->check_hosts_after < now) {
+       cmd.opcode = METADATA_SCAN_HOSTS;
+       if (!metadata_database_enq_cmd_noblock(wc, &cmd))
+           wc->check_hosts_after = now + METADATA_HOST_CHECK_INTERVAL;
+   }
+}
+
+static void metadata_scan_host(RRDHOST *host) {
+    RRDSET *st;
+    int rc;
+
+    rrdset_foreach_reentrant(st, host) {
+        if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
+
+            internal_error(true, "METADATA: Storing metadata for chart %s", string2str(st->id));
+            rc = sql_store_chart(
+                &st->chart_uuid,
+                &st->rrdhost->host_uuid,
+                string2str(st->parts.type),
+                string2str(st->parts.id),
+                string2str(st->parts.name),
+                rrdset_family(st),
+                rrdset_context(st),
+                rrdset_title(st),
+                rrdset_units(st),
+                rrdset_plugin_name(st),
+                rrdset_module_name(st),
+                st->priority,
+                st->update_every,
+                st->chart_type,
+                st->rrd_memory_mode,
+                st->entries);
+            if (rc)
+                internal_error(true, "METADATA: Failed to store chart metadata %s", string2str(st->id));
+
+        }
+
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_METADATA_UPDATE)) {
+                rrddim_flag_clear(rd, RRDDIM_FLAG_METADATA_UPDATE);
+
+                internal_error(true, "METADATA:  Storing metadata for dimension %s", string2str(rd->id));
+                rc = sql_store_dimension(
+                    &rd->metric_uuid,
+                    &rd->rrdset->chart_uuid,
+                    string2str(rd->id),
+                    string2str(rd->name),
+                    rd->multiplier,
+                    rd->divisor,
+                    rd->algorithm);
+
+                if (unlikely(rc))
+                    error_report("METADATA: Failed to store dimension %s", string2str(rd->id));
+            }
+        }
+        rrddim_foreach_done(rd);
+    }
+    rrdset_foreach_done(st);
+}
+
+static void after_metadata_cleanup(uv_work_t *req, int status)
+{
+    UNUSED(status);
+
+    struct metadata_wc *wc = req->data;
+    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
+}
+static void start_metadata_cleanup(uv_work_t *req)
+{
+    struct metadata_wc *wc = req->data;
+    check_dimension_metadata(wc);
+}
+
+
+// Callback after scan of hosts is done
+static void after_metadata_hosts(uv_work_t *req, int status)
+{
+    UNUSED(status);
+
+    struct metadata_wc *wc = req->data;
+    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+    internal_error(true, "METADATA: scanning hosts complete");
+}
+
+// Worker thread to scan hosts for pending metadata to store
+static void start_metadata_hosts(uv_work_t *req __maybe_unused)
+{
+    RRDHOST *host;
+//    struct metadata_wc *wc = req->data;
+
+    dfe_start_reentrant(rrdhost_root_index, host) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) && !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
+            continue;
+        internal_error(true, "METADATA: %d Scanning host %s", gettid(), rrdhost_hostname(host));
+        rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
+        metadata_scan_host(host);
+    }
+    dfe_done(host);
 }
 
 static void metadata_event_loop(void *arg)
@@ -918,11 +1020,11 @@ static void metadata_event_loop(void *arg)
 
     int ret;
     uv_loop_t *loop;
-    uv_timer_t timer_req;
     unsigned cmd_batch_size;
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode, next_opcode;
     uv_work_t metadata_cleanup_worker;
+    uv_work_t metadata_scan_hosts_worker;
 
     uv_thread_set_name_np(wc->thread, "METASYNC");
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
@@ -940,29 +1042,33 @@ static void metadata_event_loop(void *arg)
     }
     wc->async.data = wc;
 
-    ret = uv_timer_init(loop, &timer_req);
+    ret = uv_timer_init(loop, &wc->timer_req);
     if (ret) {
         error("uv_timer_init(): %s", uv_strerror(ret));
         goto error_after_timer_init;
     }
-    timer_req.data = wc;
-    fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
+    wc->timer_req.data = wc;
+    fatal_assert(0 == uv_timer_start(&wc->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
     info("Starting metadata sync thread -- scratch area %d entries, %lu bytes", METADATA_CMD_Q_MAX_SIZE, sizeof(*wc));
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
+    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+
     wc->check_metadata_after = now_realtime_sec() + METADATA_MAINTENANCE_FIRST_CHECK;
+    wc->check_hosts_after    = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
     unsigned int max_commands_in_queue = 0;
     int shutdown = 0;
     int in_transaction = 0;
-    struct completion *shutdown_completion = NULL;
     int commands_in_transaction = 0;
     BUFFER *work_buffer = buffer_create(1024);
+    wc->row_id = 0;
     completion_mark_complete(&wc->init_complete);
-    while (shutdown == 0 || (wc->flags & METADATA_FLAG_CLEANUP)) {
+
+    while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         RRDDIM *rd;
         RRDSET *st;
         RRDHOST *host;
@@ -977,12 +1083,13 @@ static void metadata_event_loop(void *arg)
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            if (likely(!(wc->flags & METADATA_FLAG_SHUTDOWN)) & unlikely(cmd_batch_size >= METADATA_MAX_BATCH_SIZE))
+            if (unlikely(cmd_batch_size >= METADATA_MAX_BATCH_SIZE))
                 break;
+
             cmd = metadata_deq_cmd(wc, &next_opcode);
             opcode = cmd.opcode;
 
-            if (unlikely(opcode == METADATA_DATABASE_NOOP && (wc->flags & METADATA_FLAG_SHUTDOWN))) {
+            if (unlikely(opcode == METADATA_DATABASE_NOOP && metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
                 shutdown = 1;
                 continue;
             }
@@ -1001,15 +1108,15 @@ static void metadata_event_loop(void *arg)
                 commands_in_transaction++;
             }
 
-            if (wc->max_commands_in_queue > max_commands_in_queue) {
-                max_commands_in_queue = wc->max_commands_in_queue;
-                info("Maximum commands in metadata queue = %u", max_commands_in_queue);
-            }
+//            if (wc->max_commands_in_queue > max_commands_in_queue) {
+//                max_commands_in_queue = wc->max_commands_in_queue;
+//                info("Maximum commands in metadata queue = %u", max_commands_in_queue);
+//            }
 
             if (likely(opcode != METADATA_DATABASE_NOOP)) {
-                if (opcode == METADATA_STORE_BUFFER)
-                    worker_is_busy(METADATA_ADD_CHART_LABEL);
-                else
+//                if (opcode == METADATA_STORE_BUFFER)
+//                    worker_is_busy(METADATA_ADD_CHART_LABEL);
+//                else
                     worker_is_busy(opcode);
             }
 
@@ -1138,6 +1245,19 @@ static void metadata_event_loop(void *arg)
                     sql_store_host_labels(host);
                     dictionary_acquired_item_release(rrdhost_root_index, dict_item);
                     break;
+
+                case METADATA_SCAN_HOSTS:
+                    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
+                        break;
+
+                    metadata_scan_hosts_worker.data = wc;
+                    metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
+                    internal_error(true, "Starting metadata host check in a worker thread");
+                    if (unlikely(
+                            uv_queue_work(loop, &metadata_scan_hosts_worker, start_metadata_hosts, after_metadata_hosts))) {
+                        metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+                    }
+                    break;
                 case METADATA_STORE_BUFFER:
                     buffer = (BUFFER *) cmd.param[0];
 
@@ -1157,12 +1277,20 @@ static void metadata_event_loop(void *arg)
                         metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
                     }
                     break;
-                case METADATA_SYNC_SHUTDOWN:
-                    info("METADATA: Shutdown command received; draining queue and shutting down");
-//                    metadata_flag_set(wc, METADATA_FLAG_SHUTDOWN);
-                    wc->flags |= METADATA_FLAG_SHUTDOWN;
-                    shutdown_completion = cmd.completion;
-                    cmd.completion = NULL;
+                case METADATA_UNITTEST:
+                    ;
+                    struct thread_unittest {
+                        int join;
+                        unsigned added;
+                        unsigned processed;
+                        unsigned *done;
+                    };
+
+                    struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
+                    //if (!shutdown)
+                        usleep(1000); // processing takes 1ms
+                    __atomic_fetch_add(&tu->processed, 1, __ATOMIC_SEQ_CST);
+//                    tu->processed++;
                     break;
                 default:
                     break;
@@ -1179,8 +1307,8 @@ static void metadata_event_loop(void *arg)
         } while (opcode != METADATA_DATABASE_NOOP);
     }
 
-    if (!uv_timer_stop(&timer_req))
-        uv_close((uv_handle_t *)&timer_req, NULL);
+    if (!uv_timer_stop(&wc->timer_req))
+        uv_close((uv_handle_t *)&wc->timer_req, NULL);
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
@@ -1205,7 +1333,7 @@ static void metadata_event_loop(void *arg)
 
     buffer_free(work_buffer);
     info("METADATA: Shutting down metadata event loop. Maximum commands in queue %u", max_commands_in_queue);
-    completion_mark_complete(shutdown_completion);
+    completion_mark_complete(&wc->init_complete);
     return;
 
 error_after_timer_init:
@@ -1221,19 +1349,40 @@ struct metadata_wc metasync_worker;
 
 void metadata_sync_shutdown(void)
 {
-    struct completion compl;
-    completion_init(&compl);
+    completion_init(&metasync_worker.init_complete);
 
-    info("METADATA: Shutting down metadata sync thread");
+    info("METADATA: Starting shutdown...");
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
+
+    info("METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
-    cmd.completion = &compl;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     /* wait for metadata thread to shut down */
+    info("METADATA: Waiting for shutdown ACK");
+    completion_wait_for(&metasync_worker.init_complete);
+    completion_destroy(&metasync_worker.init_complete);
+    info("METADATA: Shutdown complete");
+}
+
+void metadata_sync_shutdown_prepare(void)
+{
+    struct metadata_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+
+    struct completion compl;
+    completion_init(&compl);
+
+    info("METADATA: Sending a scan host command");
+    cmd.opcode = METADATA_SCAN_HOSTS;
+    cmd.completion = &compl;
+    metadata_enq_cmd(&metasync_worker, &cmd);
+
+    info("METADATA: Waiting for host scan completion");
     completion_wait_for(&compl);
     completion_destroy(&compl);
+    info("METADATA: Host scan complete; can continue with shutdown");
 }
 
 // -------------------------------------------------------------
@@ -1260,6 +1409,7 @@ void metadata_sync_init(void)
 
 
 //  Helpers
+
 static inline void _queue_metadata_cmd(enum metadata_opcode opcode, const void *param0, const void *param1)
 {
     struct metadata_cmd cmd;
@@ -1352,4 +1502,111 @@ void queue_chart_labels(RRDSET *st)
 {
     const DICTIONARY_ITEM *acquired_st = dictionary_get_and_acquire_item(st->rrdhost->rrdset_root_index, string2str(st->id));
     _queue_metadata_cmd(METADATA_ADD_CHART_LABEL, acquired_st, NULL);
+}
+
+
+// unitests
+
+struct thread_unittest {
+    int join;
+    unsigned added;
+    unsigned processed;
+    unsigned *done;
+};
+
+static void *unittest_queue_metadata(void *arg) {
+    struct thread_unittest *tu = arg;
+
+    struct metadata_cmd cmd;
+    cmd.opcode = METADATA_UNITTEST;
+    cmd.param[0] = tu;
+    cmd.param[1] = NULL;
+    cmd.completion = NULL;
+    metadata_enq_cmd(&metasync_worker, &cmd);
+
+    do {
+        //usleep(1000);
+        __atomic_fetch_add(&tu->added, 1, __ATOMIC_SEQ_CST);
+        if (metadata_database_enq_cmd_noblock(&metasync_worker, &cmd))
+            break;
+        usleep(10000);
+    } while (!__atomic_load_n(&tu->join, __ATOMIC_RELAXED));
+//    fprintf(stderr, "%d: Thread done\n", gettid());
+    return arg;
+}
+
+static void *metadata_unittest_threads(int items __maybe_unused)
+{
+
+    unsigned done;
+
+    struct thread_unittest tu = {
+        .join = 0,
+        .added = 0,
+        .processed = 0,
+        .done = &done,
+    };
+
+    // Queue messages / Time it
+    time_t seconds_to_run = 5;
+    int threads_to_create = 10;
+    fprintf(
+        stderr,
+        "\nChecking metadata queue using %d threads for %ld seconds...\n",
+        threads_to_create,
+        seconds_to_run);
+
+    // Ok unlimited run, wakeup
+    metasync_worker.batch_size = 2000000;
+
+    netdata_thread_t threads[threads_to_create];
+    tu.join = 0;
+    for (int i = 0; i < threads_to_create; i++) {
+        char buf[100 + 1];
+        snprintf(buf, 100, "meta%d", i);
+        netdata_thread_create(
+            &threads[i],
+            buf,
+            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+            unittest_queue_metadata,
+            &tu);
+    }
+    uv_async_send(&metasync_worker.async);
+    sleep_usec(seconds_to_run * USEC_PER_SEC);
+
+    __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
+    for (int i = 0; i < threads_to_create; i++) {
+        void *retval;
+        netdata_thread_join(threads[i], &retval);
+    }
+    fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
+
+    // Ok unlimited run, wakeup
+    metasync_worker.batch_size = 2000000;
+    uv_async_send(&metasync_worker.async);
+
+    sleep_usec(5 * USEC_PER_SEC);
+    // Do immediate shutdown / Drains queue
+    _queue_metadata_cmd(METADATA_SYNC_SHUTDOWN, NULL, NULL);
+
+    fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
+
+    return 0;
+}
+
+int metadata_unittest(int items)
+{
+    metadata_sync_init();
+
+    // Stop the timer to avoid processing commands
+//    uv_timer_stop(&metasync_worker.timer_req);
+//    uv_close((uv_handle_t *)&metasync_worker.timer_req, NULL);
+
+    // Queue items
+    metadata_unittest_threads(items);
+
+    fprintf(stderr, "Items still in queue %u\n", metasync_worker.queue_size);
+    //metadata_sync_shutdown();
+
+    return 0;
 }
