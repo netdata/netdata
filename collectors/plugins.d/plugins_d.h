@@ -71,4 +71,30 @@ extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
 extern int pluginsd_initialize_plugin_directories();
 
+
+
+#define pluginsd_function_result_begin_to_buffer(wb, transaction, code, content_type, expires)      \
+    buffer_sprintf(wb                                                                               \
+                    , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " \"%s\" %d \"%s\" %ld\n"              \
+                    , (transaction) ? (transaction) : ""                                            \
+                    , (int)(code)                                                                   \
+                    , (content_type) ? (content_type) : ""                                          \
+                    , (long int)(expires)                                                           \
+    )
+
+#define pluginsd_function_result_end_to_buffer(wb) \
+    buffer_strcat(wb, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
+
+#define pluginsd_function_result_begin_to_stdout(transaction, code, content_type, expires)          \
+    fprintf(stdout                                                                                  \
+                    , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " \"%s\" %d \"%s\" %ld\n"              \
+                    , (transaction) ? (transaction) : ""                                            \
+                    , (int)(code)                                                                   \
+                    , (content_type) ? (content_type) : ""                                          \
+                    , (long int)(expires)                                                           \
+    )
+
+#define pluginsd_function_result_end_to_stdout() \
+    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
+
 #endif /* NETDATA_PLUGINS_D_H */

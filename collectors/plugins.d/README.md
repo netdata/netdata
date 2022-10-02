@@ -417,13 +417,14 @@ FUNCTION_RESULT_END
 
 If the plugin prepares a response, it should send (via its standard output, together with the collected data, but not interleaved with them):
 
-> FUNCTION_RESULT_BEGIN transaction_id http_error_code content_type
+> FUNCTION_RESULT_BEGIN transaction_id http_error_code content_type expiration
 
 Where:
 
   - `transaction_id` is the transaction id that Netdata sent for this function execution
   - `http_error` is the http error code Netdata should respond with, 200 is the "ok" response
   - `content_type` is the content type of the response
+  - `expiration` is the absolute timestamp (number, unix epoch) this response expires
 
 Immediately after this, all text is assumed to be the response content.
 The content is text and line oriented. The maximum line length accepted is 15kb. Longer lines will be truncated.
@@ -538,7 +539,7 @@ There are a few rules for writing plugins properly:
    readConfiguration();
 
    if(!verifyWeCanCollectValues()) {
-      print "DISABLE";
+      print("DISABLE");
       exit(1);
    }
 
@@ -550,7 +551,7 @@ There are a few rules for writing plugins properly:
    var dt_since_last_run = 0;
    var now = 0;
 
-   FOREVER {
+   while(true) {
        /* find the current time in milliseconds */
        now = currentTimeStampInMilliseconds();
 

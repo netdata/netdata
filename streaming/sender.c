@@ -778,15 +778,15 @@ void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
 
     sender_start(s);
 
-    buffer_sprintf(s->build
-                   , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d %s\n"
-                   , string2str(tmp->transaction)
-                   , code
-                   , functions_content_type_to_format(wb->contenttype)
-                   );
+    pluginsd_function_result_begin_to_buffer(s->build
+                                             , string2str(tmp->transaction)
+                                             , code
+                                             , functions_content_type_to_format(wb->contenttype)
+                                             , wb->expires);
 
     buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
-    buffer_strcat(s->build, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+    pluginsd_function_result_end_to_buffer(s->build);
+
     sender_commit(s);
     rrdpush_signal_sender_to_wake_up(s);
 

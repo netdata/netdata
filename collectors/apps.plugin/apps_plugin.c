@@ -4329,14 +4329,19 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         }
     }
 
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d application/json\n", transaction, HTTP_RESP_OK);
+    time_t expires = now_realtime_sec() + update_every;
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
     fprintf(stdout,
             "{"
             "\n   \"status\":%d,"
             "\n   \"type\":\"table\","
+            "\n   \"update_every\":%d,"
+            "\n   \"expires\":%ld,"
             "\n   \"columns\": {"
             , HTTP_RESP_OK
+            , update_every
+            , expires
     );
 
     char buffer[PLUGINSD_LINE_MAX + 1];
@@ -4607,7 +4612,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
     fprintf(stdout, "\n   ]");
     fprintf(stdout, "\n}");
-    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+
+    pluginsd_function_result_end_to_stdout();
 }
 
 void *reader_main(void *arg __maybe_unused) {

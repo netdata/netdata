@@ -288,7 +288,15 @@ inline int parser_action(PARSER *parser, char *input)
         bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
 
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
-            buffer_strcat(parser->defer.response, input);
+            if(parser->defer.response) {
+                buffer_strcat(parser->defer.response, input);
+                if(buffer_strlen(parser->defer.response) > 10 * 1024 * 1024) {
+                    // more than 10MB of data
+                    // a bad plugin that did not send the end_keyword
+                    internal_error(true, "Deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
+                    return 1;
+                }
+            }
             return 0;
         }
         else {

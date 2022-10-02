@@ -631,7 +631,8 @@ PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_
 
 static void pluginsd_function_result_end(struct parser *parser, void *action_data) {
     STRING *key = action_data;
-    dictionary_del(parser->inflight.functions, string2str(key));
+    if(key)
+        dictionary_del(parser->inflight.functions, string2str(key));
     string_freez(key);
 }
 
@@ -640,34 +641,50 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
     char *key = words[1];
     char *status = words[2];
     char *format = words[3];
+    char *expires = words[4];
 
-    if (unlikely(!key || !*key)) {
-        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s'). Ignoring it.",
-            key ? key : "(unset)",
-            status ? status : "(unset)");
-        return PARSER_RC_ERROR;
+    if (unlikely(!key || !*key || !status || !*status || !format || !*format || !expires || !*expires)) {
+        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s', format = '%s', expires = '%s')."
+              , key ? key : "(unset)"
+              , status ? status : "(unset)"
+              , format ? format : "(unset)"
+              , expires ? expires : "(unset)"
+              );
     }
 
     int code = str2i(status && *status ? status : "0");
     if (code <= 0)
         code = HTTP_RESP_BACKEND_RESPONSE_INVALID;
 
+    time_t expiration = str2l(expires && *expires ? expires : 0);
+
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
 
-    struct inflight_function *pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
+    struct inflight_function *pf = NULL;
+
+    if(key && *key)
+        pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
+
     if(!pf) {
         error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key);
-        return PARSER_RC_ERROR;
+    }
+    else {
+        if(format && *format)
+            pf->destination_wb->contenttype = functions_format_to_content_type(format);
+
+        pf->code = code;
+
+        pf->destination_wb->expires = expiration;
+        if(expiration <= now_realtime_sec())
+            buffer_no_cacheable(pf->destination_wb);
+        else
+            buffer_cacheable(pf->destination_wb);
     }
 
-    if(format && *format)
-        pf->destination_wb->contenttype = functions_format_to_content_type(format);
-
-    pf->code = code;
-    parser->defer.response = pf->destination_wb;
+    parser->defer.response = (pf) ? pf->destination_wb : NULL;
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
     parser->defer.action = pluginsd_function_result_end;
-    parser->defer.action_data = string_strdupz(key);
+    parser->defer.action_data = string_strdupz(key); // it is ok is key is NULL
     parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
     return PARSER_RC_OK;

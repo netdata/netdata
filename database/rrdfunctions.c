@@ -536,6 +536,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     buffer_flush(wb);
     buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
     wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
     return code;
 }
 
@@ -645,6 +646,13 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                 // we have a response
                 buffer_fast_strcat(wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
                 wb->contenttype = temp_wb->contenttype;
+                wb->expires = temp_wb->expires;
+
+                if(wb->expires)
+                    buffer_cacheable(wb);
+                else
+                    buffer_no_cacheable(wb);
+                
                 code = tmp->code;
             }
             else if (rc == ETIMEDOUT) {
