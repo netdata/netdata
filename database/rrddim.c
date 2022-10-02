@@ -281,7 +281,10 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = ctr->st;
 
     if(ctr->react_action & (RRDDIM_REACT_UPDATED | RRDDIM_REACT_NEW)) {
-        queue_dimension_update_metadata(rd);
+//        queue_dimension_update_metadata(rd);
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {

@@ -193,7 +193,7 @@ typedef enum rrddim_flags {
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
-    RRDDIM_FLAG_ACLK                            = (1 << 4),
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 4),  // Metadata needs to go to the database
 
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 
@@ -729,6 +729,8 @@ typedef enum rrdhost_flags {
 
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
+    // Metadata
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
