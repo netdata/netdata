@@ -549,10 +549,21 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
             }
         }
     }
-    if(send_timeout(&host->ssl,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
-#else
-    if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
+
+    ssize_t bytes;
+
+    bytes = send_timeout(
+#ifdef ENABLE_HTTPS
+        &host->ssl,
+#endif
+        host->rrdpush_sender_socket,
+        http,
+        strlen(http),
+        0,
+        timeout);
+
+    if(bytes <= 0) { // timeout is 0
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(host);
         error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", rrdhost_hostname(host), s->connected_to);
@@ -564,26 +575,29 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
-    ssize_t received;
+    bytes = recv_timeout(
 #ifdef ENABLE_HTTPS
-    received = recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
-    if(received == -1) {
-#else
-    received = recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
-    if(received == -1) {
+        &host->ssl,
 #endif
+        host->rrdpush_sender_socket,
+        http,
+        HTTP_HEADER_SIZE,
+        0,
+        timeout);
+
+    if(bytes <= 0) { // timeout is 0
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(host);
         error("STREAM %s [send to %s]: remote netdata does not respond.", rrdhost_hostname(host), s->connected_to);
         host->destination->last_error = "timeout while expecting first response";
         host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT;
-        host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
+        host->destination->postpone_reconnection_until = now_realtime_sec() + 30;
         return false;
     }
 
-    http[received] = '\0';
+    http[bytes] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
-    if(!rrdpush_sender_validate_response(host, s, http, received))
+    if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
 #ifdef ENABLE_COMPRESSION
