@@ -198,11 +198,6 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_sender_thread_send_custom_host_variables(host);
 }
 
-static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-    rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
-}
-
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
 {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
@@ -230,37 +225,125 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
         freez(se->kernel_version);
 }
 
-static inline int32_t parse_stream_version(RRDHOST *host, char *http) {
-    int32_t stream_version = -1;
+struct {
+    const char *response;
+    size_t length;
+    int32_t version;
+    bool dynamic;
+    const char *error;
+    int worker_job_id;
+    time_t postpone_reconnect_seconds;
+} stream_responses[] = {
+    {
+        .response = START_STREAMING_PROMPT_VN,
+        .length = strlen(START_STREAMING_PROMPT_VN),
+        .version = STREAM_HANDSHAKE_OK_V3, // and above
+        .dynamic = true,                 // dynamic = we will parse the version / capabilities
+        .error = NULL,
+        .worker_job_id = 0,
+        .postpone_reconnect_seconds = 0,
+    },
+    {
+        .response = START_STREAMING_PROMPT_V2,
+        .length = strlen(START_STREAMING_PROMPT_V2),
+        .version = STREAM_HANDSHAKE_OK_V2,
+        .dynamic = false,
+        .error = NULL,
+        .worker_job_id = 0,
+        .postpone_reconnect_seconds = 0,
+    },
+    {
+        .response = START_STREAMING_PROMPT_V1,
+        .length = strlen(START_STREAMING_PROMPT_V1),
+        .version = STREAM_HANDSHAKE_OK_V1,
+        .dynamic = false,
+        .error = NULL,
+        .worker_job_id = 0,
+        .postpone_reconnect_seconds = 0,
+    },
+    {
+        .response = START_STREAMING_ERROR_SAME_LOCALHOST,
+        .length = strlen(START_STREAMING_ERROR_SAME_LOCALHOST),
+        .version = STREAM_HANDSHAKE_ERROR_LOCALHOST,
+        .dynamic = false,
+        .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
+        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .postpone_reconnect_seconds = 60 * 60, // the IP may change, try it every hour
+    },
+    {
+        .response = START_STREAMING_ERROR_ALREADY_STREAMING,
+        .length = strlen(START_STREAMING_ERROR_ALREADY_STREAMING),
+        .version = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED,
+        .dynamic = false,
+        .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
+        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .postpone_reconnect_seconds = 1 * 60, // 1 minute
+    },
+    {
+        .response = START_STREAMING_ERROR_NOT_PERMITTED,
+        .length = strlen(START_STREAMING_ERROR_NOT_PERMITTED),
+        .version = STREAM_HANDSHAKE_ERROR_DENIED,
+        .dynamic = false,
+        .error = "remote server denied access, probably we don't have the right API key?",
+        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .postpone_reconnect_seconds = 1 * 60, // 1 minute
+    },
 
-    if(strncmp(http, START_STREAMING_PROMPT_VN, strlen(START_STREAMING_PROMPT_VN)) == 0) {
-        stream_version = str2i(&http[strlen(START_STREAMING_PROMPT_VN)]);
-        rrdpush_set_flags_to_newest_stream(host);
+    // terminator
+    {
+        .response = NULL,
+        .length = 0,
+        .version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE,
+        .dynamic = false,
+        .error = "remote node response is not understood, is it Netdata?",
+        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .postpone_reconnect_seconds = 1 * 60, // 1 minute
     }
-    else if(strncmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2)) == 0) {
-        stream_version = 1;
-        rrdpush_set_flags_to_newest_stream(host);
-    }
-    else if(strncmp(http, START_STREAMING_PROMPT_V1, strlen(START_STREAMING_PROMPT_V1)) == 0) {
-        stream_version = 0;
-        rrdpush_set_flags_to_newest_stream(host);
-    }
-    else if (strncmp(http, START_STREAMING_ERROR_SAME_LOCALHOST, strlen(START_STREAMING_ERROR_SAME_LOCALHOST)) == 0) {
-        stream_version = -2;
-    }
-    else if (strncmp(http, START_STREAMING_ERROR_ALREADY_STREAMING, strlen(START_STREAMING_ERROR_ALREADY_STREAMING)) == 0) {
-        stream_version = -3;
-    }
-    else if (strncmp(http, START_STREAMING_ERROR_NOT_PERMITTED, strlen(START_STREAMING_ERROR_NOT_PERMITTED)) == 0) {
-        stream_version = -4;
-    }
-    else
-        stream_version = -1;
+};
 
-    return stream_version;
+static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
+    int32_t version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE;
+
+    int i;
+    for(i = 0; stream_responses[i].response ; i++) {
+        if(stream_responses[i].dynamic &&
+            http_length > stream_responses[i].length && http_length < (stream_responses[i].length + 30) &&
+            strncmp(http, stream_responses[i].response, stream_responses[i].length) == 0) {
+
+            version = str2i(&http[stream_responses[i].length]);
+            break;
+        }
+        else if(http_length == stream_responses[i].length && strcmp(http, stream_responses[i].response) == 0) {
+            version = stream_responses[i].version;
+
+            break;
+        }
+    }
+    const char *error = stream_responses[i].error;
+    int worker_job_id = stream_responses[i].worker_job_id;
+    time_t delay = stream_responses[i].postpone_reconnect_seconds;
+
+    if(version >= STREAM_HANDSHAKE_OK_V1) {
+        rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
+        rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
+        host->destination->last_error = NULL;
+        host->destination->last_handshake = version;
+        host->destination->postpone_reconnection_until = 0;
+        s->capabilities = convert_stream_version_to_capabilities(version);
+        return true;
+    }
+
+    error("STREAM %s [send to %s]: %s.", rrdhost_hostname(host), s->connected_to, error);
+
+    worker_is_busy(worker_job_id);
+    rrdpush_sender_thread_close_socket(host);
+    host->destination->last_error = error;
+    host->destination->last_handshake = version;
+    host->destination->postpone_reconnection_until = now_realtime_sec() + delay;
+    return false;
 }
 
-static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
+static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
     struct sender_state *s) {
 
     struct timeval tv = {
@@ -282,8 +365,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     );
 
     if(unlikely(host->rrdpush_sender_socket == -1)) {
-        error("STREAM %s [send to %s]: failed to connect", rrdhost_hostname(host), host->rrdpush_send_destination);
-        return 0;
+        error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
+        return false;
     }
 
     info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
@@ -441,9 +524,12 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                 rrdpush_sender_thread_close_socket(host);
-                host->destination->disabled_no_proper_reply = 1;
-                return 0;
-            }else {
+                host->destination->last_error = "SSL error";
+                host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
+                host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
+                return false;
+            }
+            else {
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
@@ -454,8 +540,10 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                         error("Closing the stream connection, because the server SSL certificate is not valid.");
                         rrdpush_sender_thread_close_socket(host);
-                        host->destination->disabled_no_proper_reply = 1;
-                        return 0;
+                        host->destination->last_error = "invalid SSL certificate";
+                        host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
+                        host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
+                        return false;
                     }
                 }
             }
@@ -466,9 +554,12 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-        error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", rrdhost_hostname(host), s->connected_to);
         rrdpush_sender_thread_close_socket(host);
-        return 0;
+        error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", rrdhost_hostname(host), s->connected_to);
+        host->destination->last_error = "timeout while sending request";
+        host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT;
+        host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
+        return false;
     }
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
@@ -482,41 +573,18 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     if(received == -1) {
 #endif
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-        error("STREAM %s [send to %s]: remote netdata does not respond.", rrdhost_hostname(host), s->connected_to);
         rrdpush_sender_thread_close_socket(host);
-        return 0;
+        error("STREAM %s [send to %s]: remote netdata does not respond.", rrdhost_hostname(host), s->connected_to);
+        host->destination->last_error = "timeout while expecting first response";
+        host->destination->last_handshake = STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT;
+        host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
+        return false;
     }
 
     http[received] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
-    int32_t version = parse_stream_version(host, http);
-    if(version == -1) {
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE);
-        error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", rrdhost_hostname(host), s->connected_to);
-        rrdpush_sender_thread_close_socket(host);
-        //catch other reject reasons and force to check other destinations
-        host->destination->disabled_no_proper_reply = 1;
-        return 0;
-    }
-    else if(version == -2) {
-        error("STREAM %s [send to %s]: remote server is the localhost for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
-        rrdpush_sender_thread_close_socket(host);
-        host->destination->disabled_because_of_localhost = 1;
-        return 0;
-    }
-    else if(version == -3) {
-        error("STREAM %s [send to %s]: remote server already receives metrics for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
-        rrdpush_sender_thread_close_socket(host);
-        host->destination->disabled_already_streaming = now_realtime_sec();
-        return 0;
-    }
-    else if(version <= -4) {
-        error("STREAM %s [send to %s]: remote server denied access for [%s].", rrdhost_hostname(host), s->connected_to, rrdhost_hostname(host));
-        rrdpush_sender_thread_close_socket(host);
-        host->destination->disabled_because_of_denied_access = 1;
-        return 0;
-    }
-    s->capabilities = convert_stream_version_to_capabilities(version);
+    if(!rrdpush_sender_validate_response(host, s, http, received))
+        return false;
 
 #ifdef ENABLE_COMPRESSION
     // check if parent supports compression - and we do too
@@ -544,10 +612,10 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_sender_socket);
 
-    return 1;
+    return true;
 }
 
-static void attempt_to_connect(struct sender_state *state)
+static bool attempt_to_connect(struct sender_state *state)
 {
     state->send_attempts = 0;
 
@@ -568,17 +636,22 @@ static void attempt_to_connect(struct sender_state *state)
 
         // let the data collection threads know we are ready
         __atomic_test_and_set(&state->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
-    }
-    else {
-        // increase the failed connections counter
-        state->not_connected_loops++;
 
-        // reset the number of bytes sent
-        state->sent_bytes_on_this_connection = 0;
-
-        // slow re-connection on repeating errors
-        sleep_usec(USEC_PER_SEC * state->reconnect_delay); // seconds
+        return true;
     }
+
+    // we couldn't connect
+
+    // increase the failed connections counter
+    state->not_connected_loops++;
+
+    // reset the number of bytes sent
+    state->sent_bytes_on_this_connection = 0;
+
+    // slow re-connection on repeating errors
+    sleep_usec(USEC_PER_SEC * state->reconnect_delay); // seconds
+
+    return false;
 }
 
 // TCP window is open and we have data to transmit.
@@ -1018,7 +1091,10 @@ void *rrdpush_sender_thread(void *ptr) {
             s->read_len = 0;
             s->buffer->read = 0;
             s->buffer->write = 0;
-            attempt_to_connect(s);
+
+            if(unlikely(!attempt_to_connect(s)))
+                continue;
+
             if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
                 time_t now = now_realtime_sec();
                 sender_start(s);

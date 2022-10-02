@@ -50,6 +50,11 @@ typedef enum {
 
 #define stream_has_capability(rpt, capability) ((rpt)->capabilities & (capability))
 
+// ----------------------------------------------------------------------------
+// stream handshake
+
+#define HTTP_HEADER_SIZE 8192
+
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT_V1 "Hit me baby, push them over..."
 #define START_STREAMING_PROMPT_V2 "Hit me baby, push them over and bring the host labels..."
@@ -59,7 +64,25 @@ typedef enum {
 #define START_STREAMING_ERROR_ALREADY_STREAMING "This GUID is already streaming to this server"
 #define START_STREAMING_ERROR_NOT_PERMITTED "You are not permitted to access this. Check the logs for more info."
 
-#define HTTP_HEADER_SIZE 8192
+typedef enum {
+    STREAM_HANDSHAKE_OK_V5 = 5, // COMPRESSION
+    STREAM_HANDSHAKE_OK_V4 = 4, // CLABELS
+    STREAM_HANDSHAKE_OK_V3 = 3, // CLAIM
+    STREAM_HANDSHAKE_OK_V2 = 2, // HLABELS
+    STREAM_HANDSHAKE_OK_V1 = 1,
+    STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE = -1,
+    STREAM_HANDSHAKE_ERROR_LOCALHOST = -2,
+    STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED = -3,
+    STREAM_HANDSHAKE_ERROR_DENIED = -4,
+    STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT = -5,
+    STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT = -6,
+    STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE = -7,
+    STREAM_HANDSHAKE_ERROR_SSL_ERROR = -8,
+    STREAM_HANDSHAKE_ERROR_CANT_CONNECT = -9
+} STREAM_HANDSHAKE;
+
+
+// ----------------------------------------------------------------------------
 
 typedef struct {
     char *os_name;
@@ -169,10 +192,9 @@ struct receiver_state {
 struct rrdpush_destinations {
     STRING *destination;
 
-    int disabled_no_proper_reply;
-    int disabled_because_of_localhost;
-    time_t disabled_already_streaming;
-    int disabled_because_of_denied_access;
+    const char *last_error;
+    time_t postpone_reconnection_until;
+    STREAM_HANDSHAKE last_handshake;
 
     struct rrdpush_destinations *prev;
     struct rrdpush_destinations *next;

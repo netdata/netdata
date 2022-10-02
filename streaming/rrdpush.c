@@ -449,74 +449,46 @@ int connect_to_one_of_destinations(
     struct rrdpush_destinations **destination)
 {
     int sock = -1;
-    bool have_disabled_that_can_run = true;
 
-    while(sock == -1 && have_disabled_that_can_run) {
-        have_disabled_that_can_run = false;
+    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
+        time_t now = now_realtime_sec();
 
-        for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
-            if(d->disabled_no_proper_reply) {
-                d->disabled_no_proper_reply = 0;
-                have_disabled_that_can_run = true;
-                info(
-                    "STREAM %s: skipping destination '%s' (default port: %d) - it did not reply properly in the past - will try it next time.",
-                    rrdhost_hostname(host),
-                    string2str(d->destination),
-                    default_port);
-                continue;
-            }
-            else if(d->disabled_because_of_localhost) {
-                info(
-                    "STREAM %s: skipping destination '%s' (default port: %d) - it is the origin server for this host - will not try it again.",
-                    rrdhost_hostname(host),
-                    string2str(d->destination),
-                    default_port);
-                continue;
-            }
-            else if(d->disabled_already_streaming && (d->disabled_already_streaming + 30 > now_realtime_sec())) {
-                info(
-                    "STREAM %s: skipping destination '%s' (default port: %d) - it already has this host - will give it a try later.",
-                    rrdhost_hostname(host),
-                    string2str(d->destination),
-                    default_port);
-                continue;
-            }
-            else if(d->disabled_because_of_denied_access) {
-                d->disabled_because_of_denied_access = 0;
-                have_disabled_that_can_run = true;
-                info(
-                    "STREAM %s: skipping destination '%s' (default port: %d) - it denied access in the past - will try it next time.",
-                    rrdhost_hostname(host),
-                    string2str(d->destination),
-                    default_port);
-                continue;
-            }
-
+        if(d->postpone_reconnection_until > now) {
             info(
-                "STREAM %s: attempting to connect to '%s' (default port: %d)...",
+                "STREAM %s: skipping destination '%s' (default port: %d) due to last error (code: %d, %s), will retry it in %d seconds",
                 rrdhost_hostname(host),
                 string2str(d->destination),
-                default_port);
+                default_port,
+                d->last_handshake, d->last_error?d->last_error:"unset reason description",
+                (int)(d->postpone_reconnection_until - now));
 
-            if (reconnects_counter)
-                *reconnects_counter += 1;
+            continue;
+        }
 
-            sock = connect_to_this(string2str(d->destination), default_port, timeout);
+        info(
+            "STREAM %s: attempting to connect to '%s' (default port: %d)...",
+            rrdhost_hostname(host),
+            string2str(d->destination),
+            default_port);
 
-            if (sock != -1) {
-                if (connected_to && connected_to_size)
-                    strncpyz(connected_to, string2str(d->destination), connected_to_size);
+        if (reconnects_counter)
+            *reconnects_counter += 1;
 
-                *destination = d;
+        sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
-                // move the current item to the end of the list
-                // without this, this destination will break the loop again and again
-                // not advancing the destinations to find one that may work
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, d, prev, next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->destinations, d, prev, next);
+        if (sock != -1) {
+            if (connected_to && connected_to_size)
+                strncpyz(connected_to, string2str(d->destination), connected_to_size);
 
-                break;
-            }
+            *destination = d;
+
+            // move the current item to the end of the list
+            // without this, this destination will break the loop again and again
+            // not advancing the destinations to find one that may work
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, d, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->destinations, d, prev, next);
+
+            break;
         }
     }
 
