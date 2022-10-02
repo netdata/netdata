@@ -972,14 +972,9 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
     init_pid_fds(p, 0, p->fds_size);
-
-    if(likely(root_of_pids))
-        root_of_pids->prev = p;
-
-    p->next = root_of_pids;
-    root_of_pids = p;
-
     p->pid = pid;
+
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(root_of_pids, p, prev, next);
 
     all_pids[pid] = p;
     all_pids_count++;
@@ -997,11 +992,7 @@ static inline void del_pid_entry(pid_t pid) {
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    if(root_of_pids == p)
-        root_of_pids = p->next;
-
-    if(p->next) p->next->prev = p->prev;
-    if(p->prev) p->prev->next = p->next;
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(root_of_pids, p, prev, next);
 
     // free the filename
 #ifndef __FreeBSD__
