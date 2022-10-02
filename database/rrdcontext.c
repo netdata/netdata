@@ -11,6 +11,8 @@
 #define RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC             (1000 * USEC_PER_MS)
 #define RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY                 10
 
+#define LOG_TRANSITIONS false
+
 #define WORKER_JOB_HOSTS            1
 #define WORKER_JOB_CHECK            2
 #define WORKER_JOB_SEND             3
@@ -2822,7 +2824,8 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
 
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
-        internal_error(true, "RRDCONTEXT: %s NEW VERSION '%s'%s, version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+        internal_error(LOG_TRANSITIONS,
+                       "RRDCONTEXT: %s NEW VERSION '%s'%s, version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
                        sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rc->version,

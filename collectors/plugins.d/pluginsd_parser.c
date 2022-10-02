@@ -2,6 +2,8 @@
 
 #include "pluginsd_parser.h"
 
+#define LOG_FUNCTIONS false
+
 /*
  * This is the action defined for the FLUSH command
  */
@@ -490,7 +492,8 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         fflush(fp);
 
-        internal_error(true, "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
+        internal_error(LOG_FUNCTIONS,
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
                        pf->sent_ut - pf->started_ut);
     }
@@ -509,7 +512,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = func;
 
-    internal_error(true,
+    internal_error(LOG_FUNCTIONS,
                    "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %llu usec, response %llu usec)",
                    string2str(pf->function), dictionary_acquired_item_name(item),
                    buffer_strlen(pf->destination_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);

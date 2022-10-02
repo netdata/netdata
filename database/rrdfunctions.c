@@ -652,7 +652,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
                     buffer_cacheable(wb);
                 else
                     buffer_no_cacheable(wb);
-                
+
                 code = tmp->code;
             }
             else if (rc == ETIMEDOUT) {

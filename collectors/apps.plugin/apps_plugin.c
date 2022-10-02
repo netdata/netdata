@@ -4642,7 +4642,7 @@ void *reader_main(void *arg __maybe_unused) {
                 int timeout = str2i(timeout_s);
                 if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
 
-                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
+//                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
 
                 netdata_mutex_lock(&mutex);
 
@@ -4654,7 +4654,7 @@ void *reader_main(void *arg __maybe_unused) {
                 fflush(stdout);
                 netdata_mutex_unlock(&mutex);
 
-                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
+//                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
             }
         }
         else
