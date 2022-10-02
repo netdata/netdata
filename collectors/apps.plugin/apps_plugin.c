@@ -4207,9 +4207,9 @@ static void apps_plugin_function_error(const char *transaction, int code, const 
     char buffer[PLUGINSD_LINE_MAX + 1];
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
 
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d application/json\n", transaction, code);
+    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
     fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
+    pluginsd_function_result_end_to_stdout();
 }
 
 static void apps_plugin_function_processes_help(const char *transaction) {

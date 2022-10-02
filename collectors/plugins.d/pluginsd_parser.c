@@ -669,7 +669,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
         pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
 
     if(!pf) {
-        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key);
+        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key?key:"(unset)");
     }
     else {
         if(format && *format)
