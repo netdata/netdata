@@ -678,7 +678,6 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     struct circular_buffer *cb = s->buffer;
 #endif
 
-    netdata_thread_disable_cancelability();
     netdata_mutex_lock(&s->mutex);
     char *chunk;
     size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
@@ -713,7 +712,6 @@ static ssize_t attempt_to_send(struct sender_state *s) {
         debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
 
     netdata_mutex_unlock(&s->mutex);
-    netdata_thread_enable_cancelability();
 
     return ret;
 }
@@ -739,9 +737,8 @@ static ssize_t attempt_read(struct sender_state *s) {
         char buf[256];
         while ((err = ERR_get_error()) != 0) {
             ERR_error_string_n(err, buf, sizeof(buf));
-            error("STREAM %s [send to %s] ssl error: %s", rrdhost_hostname(s->host), s->connected_to, buf);
+            error("STREAM %s [send to %s] SSL error: %s", rrdhost_hostname(s->host), s->connected_to, buf);
         }
-        error("Restarting connection");
         rrdpush_sender_thread_close_socket(s->host);
         return ret;
     }
@@ -752,18 +749,16 @@ static ssize_t attempt_read(struct sender_state *s) {
         return ret;
     }
 
-    debug(D_STREAM, "Socket was POLLIN, but req %zu bytes gave %zd", sizeof(s->read_buffer) - s->read_len - 1, ret);
-
     if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
         return ret;
 
-    if (ret == 0) {
+    if (ret == 0 || errno == ECONNRESET) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
-        error("STREAM %s [send to %s]: connection closed by far end. Restarting connection", rrdhost_hostname(s->host), s->connected_to);
+        error("STREAM %s [send to %s]: connection closed by far end.", rrdhost_hostname(s->host), s->connected_to);
     }
     else {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
-        error("STREAM %s [send to %s]: error during receive (%zd). Restarting connection", rrdhost_hostname(s->host), s->connected_to, ret);
+        error("STREAM %s [send to %s]: error during receive (%zd) - closing connection.", rrdhost_hostname(s->host), s->connected_to, ret);
     }
     rrdpush_sender_thread_close_socket(s->host);
 
@@ -1255,7 +1250,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
             if(error) {
                 rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true);
-                error("STREAM %s [send to %s]: restart internal pipe because %s.",
+                error("STREAM %s [send to %s]: restarting internal pipe: %s.",
                       rrdhost_hostname(s->host), s->connected_to, error);
             }
         }
@@ -1272,7 +1267,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
             if(unlikely(error)) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKER_ERROR);
-                error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.",
+                error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
                       rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
                 rrdpush_sender_thread_close_socket(s->host);
             }

@@ -933,7 +933,7 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
     BUFFER *wb = buffer_create(100);
     stream_capabilities_to_string(wb, rpt->capabilities);
 
-    info("STREAM %s [receive from [%s]:%s]: established link with agreed capabilities: %s",
+    info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
          rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
 
     buffer_free(wb);
@@ -943,7 +943,7 @@ void log_sender_capabilities(struct sender_state *s) {
     BUFFER *wb = buffer_create(100);
     stream_capabilities_to_string(wb, s->capabilities);
 
-    info("STREAM %s [send to %s]: established link with agreed capabilities: %s",
+    info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",
          rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
 
     buffer_free(wb);
