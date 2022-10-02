@@ -655,11 +655,11 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
               );
     }
 
-    int code = str2i(status && *status ? status : "0");
+    int code = (status && *status) ? str2i(status) : 0;
     if (code <= 0)
         code = HTTP_RESP_BACKEND_RESPONSE_INVALID;
 
-    time_t expiration = str2l(expires && *expires ? expires : 0);
+    time_t expiration = (expires && *expires) ? str2l(expires) : 0;
 
     PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
 

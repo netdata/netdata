@@ -4213,7 +4213,7 @@ static void apps_plugin_function_error(const char *transaction, int code, const 
 }
 
 static void apps_plugin_function_processes_help(const char *transaction) {
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " %s %d text/plain\n", transaction, HTTP_RESP_OK);
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
             "apps.plugin / processes\n"
             "\n"
@@ -4244,8 +4244,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
             "\n"
             "Filters can be combined. Each filter can be given only one time.\n"
             );
-    fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n");
-
+    pluginsd_function_result_end_to_stdout();
 }
 
 #define add_table_field(wb, key, name, visible, type, units, sort)       do { \
