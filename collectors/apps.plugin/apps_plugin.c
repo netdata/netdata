@@ -3843,14 +3843,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
-    TOP_FUNCTION();
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'blocks/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
-    TOP_FUNCTION();
+    APPS_PLUGIN_FUNCTIONS();
 #else
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'KiB/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
@@ -4248,21 +4248,21 @@ static void apps_plugin_function_processes_help(const char *transaction) {
 
 }
 
-#define add_table_field(key, name, info, visible, type, autoscale, sort)       do { \
-        if(fields_added) fprintf(stdout, ",");                                      \
-        fprintf(stdout, "\n      \"%s\": {", key);                                  \
-        fprintf(stdout, "\n         \"index\":%d,", fields_added);                  \
-        fprintf(stdout, "\n         \"name\":\"%s\",", name);                       \
-        json_escape_string(buffer, info, PLUGINSD_LINE_MAX);                        \
-        fprintf(stdout, "\n         \"info\":\"%s\",", buffer);                     \
-        fprintf(stdout, "\n         \"visible\":%s,", (visible)?"true":"false");    \
-        fprintf(stdout, "\n         \"type\":\"%s\",", type);                       \
-        if(autoscale)                                                               \
-           fprintf(stdout, "\n         \"autoscale\":\"%s\",", (char *)(autoscale));\
-        fprintf(stdout, "\n         \"sort\":\"%s\"", sort);                        \
-        fprintf(stdout, "\n      }");                                               \
-        fields_added++;                                                             \
+#define add_table_field(wb, key, name, visible, type, units, sort)       do { \
+        if(fields_added) buffer_strcat(wb, ",");                                        \
+        buffer_sprintf(wb, "\n      \"%s\": {", key);                                   \
+        buffer_sprintf(wb, "\n         \"index\":%d,", fields_added);                   \
+        buffer_sprintf(wb, "\n         \"name\":\"%s\",", name);                        \
+        buffer_sprintf(wb, "\n         \"visible\":%s,", (visible)?"true":"false");     \
+        buffer_sprintf(wb, "\n         \"type\":\"%s\",", type);                        \
+        if(units)                                                                       \
+           buffer_sprintf(wb, "\n         \"units\":\"%s\",", (char*)(units));          \
+        buffer_sprintf(wb, "\n         \"sort\":\"%s\"", sort);                         \
+        buffer_sprintf(wb, "\n      }");                                                \
+        fields_added++;                                                                 \
     } while(0)
+
+static BUFFER *func_processes_fields = NULL;
 
 static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     struct pid_stat *p;
@@ -4332,157 +4332,178 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     time_t expires = now_realtime_sec() + update_every;
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
-    fprintf(stdout,
-            "{"
-            "\n   \"status\":%d,"
-            "\n   \"type\":\"table\","
-            "\n   \"update_every\":%d,"
-            "\n   \"expires\":%ld,"
-            "\n   \"columns\": {"
-            , HTTP_RESP_OK
-            , update_every
-            , expires
-    );
-
     char buffer[PLUGINSD_LINE_MAX + 1];
-    int fields_added = 0;
 
-    // IMPORTANT!
-    // 1. THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-    // 2. THE KEY SHOULD NEVER CHANGE!
+    if(unlikely(!func_processes_fields)) {
+        func_processes_fields = buffer_create(1000);
 
-    add_table_field("pid", "PID", "The process ID", true, "integer", NULL, "ascending");
-    add_table_field("cmd", "Command", "The process name", true, "string", NULL, "ascending");
-    add_table_field("cmdline", "Command Line", "The command line", false, "detail-string:cmd", NULL, "ascending");
-    add_table_field("ppid", "Parent PID", "The process ID of the parent process", false, "integer", NULL, "ascending");
-    add_table_field("category", "Category", "The applications category, as defined in apps_groups.conf", true, "string", NULL, "ascending");
-    add_table_field("user", "User", "The user name of the application owner", true, "string", NULL, "ascending");
-    add_table_field("uid", "User ID", "The user ID of the application owner", false, "integer", NULL, "ascending");
-    add_table_field("group", "Group", "The group name of the application owner", true, "string", NULL, "ascending");
-    add_table_field("gid", "Group ID", "The group ID the application owner", false, "integer", NULL, "ascending");
-    add_table_field("procs", "Processes", "The number of processes running", true, "bar-with-integer", "generic", "descending");
-    add_table_field("threads", "Threads", "The number of threads running", true, "bar-with-integer", "generic", "descending");
-    add_table_field("uptime", "Uptime", "The duration the process is running", true, "duration", NULL, "descending");
+        int fields_added = 0;
 
-    // minor page faults
-    add_table_field("minflt", "Minor Page Faults", "The number of page faults happening in the main memory.", false, "bar", "generic", "descending");
-    add_table_field("cminflt", "Children Minor Page Faults", "The number of minor faults for the process's waited-for children", false, "bar", "generic", "descending");
-    add_table_field("tminflt", "Total Minor Page Faults", "The total number of page faults happening in the main memory, including waited-for children.", true, "bar", "generic", "descending");
+        buffer_sprintf(func_processes_fields,
+                "{"
+                "\n   \"status\":%d"
+                ",\n   \"type\":\"table\""
+                ",\n   \"update_every\":%d"
+                ",\n   \"columns\": {"
+                , HTTP_RESP_OK
+                , update_every
+        );
 
-    // major page faults
-    add_table_field("majflt", "Major Page Faults", "The number of page faults happening out of the main memory.", false, "bar", "generic", "descending");
-    add_table_field("cmajflt", "Children Major Page Faults", "The number of major faults for the process's waited-for children", false, "bar", "generic", "descending");
-    add_table_field("tmajflt", "Total Major Page Faults", "The total number of page faults happening out of the main memory, including waited-for children.", true, "bar", "generic", "descending");
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
 
-    // CPU utilization
-    add_table_field("utime", "User CPU Time", "The user CPU time, which is the amount of time the process has spent executing on the CPU in user mode (i.e. everything but system calls)", false, "bar-only", NULL, "descending");
-    add_table_field("stime", "System CPU Time", "The system CPU time, which is the amount of time the kernel has spent executing system calls on behalf of the process", false, "bar-only", NULL, "descending");
-    add_table_field("gtime", "Guest CPU Time", "The guest CPU time", false, "bar-only", NULL, "descending");
-    add_table_field("cutime", "Children User CPU Time", "The user CPU time, for the process's waited-for children", false, "bar-only", NULL, "descending");
-    add_table_field("cstime", "Children System CPU Time", "The system CPU time, for the process's waited-for children", false, "bar-only", NULL, "descending");
-    add_table_field("cgtime", "Children Guest CPU Time", "The guest CPU time, for the process's waited-for children", false, "bar-only", NULL, "descending");
-    add_table_field("cpu", "Total CPU Time", "The total CPU time of the process, including system, user, guest and waited-for children", true, "bar-only", NULL, "descending");
+        add_table_field(func_processes_fields, "Pid", "Process ID", true, "integer", NULL, "ascending");
+        add_table_field(func_processes_fields, "Cmd", "Process Name", true, "string", NULL, "ascending");
+        add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:cmd", NULL, "ascending");
+        add_table_field(func_processes_fields, "PPid", "Parent Process ID", false, "integer", NULL, "ascending");
+        add_table_field(func_processes_fields, "Category", "Category, as defined in apps_groups.conf", true, "string", NULL, "ascending");
+        add_table_field(func_processes_fields, "User", "User Owner", true, "string", NULL, "ascending");
+        add_table_field(func_processes_fields, "Uid", "User ID", false, "integer", NULL, "ascending");
+        add_table_field(func_processes_fields, "Group", "Group Owner", true, "string", NULL, "ascending");
+        add_table_field(func_processes_fields, "Gid", "Group ID", false, "integer", NULL, "ascending");
+        add_table_field(func_processes_fields, "Procs", "Processes", true, "bar-with-integer", "processes", "descending");
+        add_table_field(func_processes_fields, "Threads", "Threads", true, "bar-with-integer", "threads", "descending");
+        add_table_field(func_processes_fields, "Uptime", "Uptime in seconds", true, "duration", "seconds", "descending");
 
-    // memory
-    add_table_field("vmsize", "Virtual Memory Size", "The size of the virtual memory of the process.", false, "bar", "bytes", "descending");
-    add_table_field("vmrss", "Resident Set Size", "The resident set size (text + data + stack) of the process (i.e. the size of the process's used physical memory).", true, "bar", "bytes", "descending");
-    add_table_field("vmshared", "Shared Size", "The size of the process's shared pages.", false, "bar", "bytes", "descending");
-    add_table_field("vmswap", "Swap Size", "The size of the process's swap memory used by anonymous private data.", false, "bar", "bytes", "descending");
+        // minor page faults
+        add_table_field(func_processes_fields, "MinFlt", "Minor Page Faults/s", false, "bar", "page faults/s", "descending");
+        add_table_field(func_processes_fields, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "page faults/s", "descending");
+        add_table_field(func_processes_fields, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "page faults/s", "descending");
 
-    // Logical I/O
-    add_table_field("lreads", "Logical I/O Reads", "The logical I/O reads of the process", false, "bar", "bytes/s", "descending");
-    add_table_field("lwrites", "Logical I/O Writes", "The logical I/O writes of the process", false, "bar", "bytes/s", "descending");
+        // major page faults
+        add_table_field(func_processes_fields, "MajFlt", "Major Page Faults/s", false, "bar", "page faults/s", "descending");
+        add_table_field(func_processes_fields, "CMajFlt", "Children Major Page Faults/s", false, "bar", "page faults/s", "descending");
+        add_table_field(func_processes_fields, "TMajFlt", "Total Major Page Faults/s", true, "bar", "page faults/s", "descending");
 
-    // Physical I/O
-    add_table_field("preads", "Physical I/O Reads", "The physical I/O reads of the process", true, "bar", "bytes/s", "descending");
-    add_table_field("pwrites", "Physical I/O Writes", "The physical I/O writes of the process", true, "bar", "bytes/s", "descending");
+        // CPU utilization
+        add_table_field(func_processes_fields, "UserCPU", "User CPU time", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "SysCPU", "System CPU Time", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "GuestCPU", "Guest CPU Time", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time, for the process's waited-for children", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time, for the process's waited-for children", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time, for the process's waited-for children", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CPU", "Total CPU Time", true, "bar-only", "%", "descending");
 
-    // I/O calls
-    add_table_field("readcalls", "I/O Read Calls", "The number of I/O read calls the process does", false, "bar", "generic", "descending");
-    add_table_field("writecalls", "I/O Write Calls", "The number of I/O write calls the process does", false, "bar", "generic", "descending");
+        // memory
+        add_table_field(func_processes_fields, "VMSize", "Virtual Memory Size", false, "bar", "MiB", "descending");
+        add_table_field(func_processes_fields, "RSS", "Resident Set Size", true, "bar", "MiB", "descending");
+        add_table_field(func_processes_fields, "Shared", "Shared Pages", false, "bar", "MiB", "descending");
+        add_table_field(func_processes_fields, "Swap", "Swap Memory", false, "bar", "MiB", "descending");
 
-    // open file descriptors
-    add_table_field("fds", "File Descriptors", "The number of open files", false, "bar", "generic", "descending");
-    add_table_field("pipefds", "Pipe Descriptors", "The number of open pipes", false, "bar", "generic", "descending");
-    add_table_field("socketfds", "Socket Descriptors", "The number of open sockets", false, "bar", "generic", "descending");
-    add_table_field("inotifyfds", "iNotify Descriptors", "The number of open inotify descriptors", false, "bar", "generic", "descending");
-    add_table_field("eventfds", "Event Descriptors", "The number of open event descriptors", false, "bar", "generic", "descending");
-    add_table_field("timerfds", "Timer Descriptors", "The number of open timer descriptors", false, "bar", "generic", "descending");
-    add_table_field("signalfds", "Signal Descriptors", "The number of open signal descriptors", false, "bar", "generic", "descending");
-    add_table_field("eventpolls", "Event Poll Descriptors", "The number of open event poll descriptors", false, "bar", "generic", "descending");
-    add_table_field("otherfds", "Other Descriptors", "The number of other open descriptors", false, "bar", "generic", "descending");
-    add_table_field("allfds", "All File Descriptors", "The number of all open descriptors", true, "bar", "generic", "descending");
+        // Logical I/O
+#ifndef __FreeBSD__
+        add_table_field(func_processes_fields, "LReads", "Logical I/O Reads", false, "bar", "KiB/s", "descending");
+        add_table_field(func_processes_fields, "LWrites", "Logical I/O Writes", false, "bar", "KiB/s", "descending");
+#endif
 
-    fprintf(stdout,
-            ""
-            "\n   },"
-            "\n   \"default sort column\": \"category\","
-            "\n   \"charts\": {"
-            "\n      \"cpu\": {"
-            "\n         \"name\":\"CPU Utilization\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"utime\", \"stime\", \"gtime\", \"cutime\", \"cstime\", \"cgtime\" ]"
-            "\n      },"
-            "\n      \"memory\": {"
-            "\n         \"name\":\"Memory\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"vmsize\", \"vmrss\", \"vmshared\", \"vmswap\" ]"
-            "\n      },"
-            "\n      \"reads\": {"
-            "\n         \"name\":\"I/O Reads\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"lreads\", \"preads\" ]"
-            "\n      },"
-            "\n      \"writes\": {"
-            "\n         \"name\":\"I/O Writes\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"lwrites\", \"pwrites\" ]"
-            "\n      },"
-            "\n      \"logical_io\": {"
-            "\n         \"name\":\"Logical I/O\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"lreads\", \"lwrites\" ]"
-            "\n      },"
-            "\n      \"physical_io\": {"
-            "\n         \"name\":\"Physical I/O\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"preads\", \"pwrites\" ]"
-            "\n      },"
-            "\n      \"io_calls\": {"
-            "\n         \"name\":\"I/O Calls\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"readcalls\", \"writecalls\" ]"
-            "\n      },"
-            "\n      \"minflt\": {"
-            "\n         \"name\":\"Minor Page Faults\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"minflt\", \"cminflt\" ]"
-            "\n      },"
-            "\n      \"majflt\": {"
-            "\n         \"name\":\"Major Page Faults\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"majflt\", \"cmajflt\" ]"
-            "\n      },"
-            "\n      \"threads\": {"
-            "\n         \"name\":\"Threads\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"threads\" ]"
-            "\n      },"
-            "\n      \"procs\": {"
-            "\n         \"name\":\"Processes\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"procs\" ]"
-            "\n      },"
-            "\n      \"fds\": {"
-            "\n         \"name\":\"File Descriptors\","
-            "\n         \"type\":\"stacked-bar\","
-            "\n         \"columns\": [ \"fds\", \"pipefds\", \"socketfds\", \"inotifyfds\", \"eventfds\", \"timerfds\", \"signalfds\", \"eventpolls\", \"otherfds\" ]"
-            "\n      }"
-            "\n   },"
-            "\n   \"data\":["
-            "\n"
-            );
+        // Physical I/O
+        add_table_field(func_processes_fields, "PReads", "Physical I/O Reads", true, "bar", "KiB/s", "descending");
+        add_table_field(func_processes_fields, "PWrites", "Physical I/O Writes", true, "bar", "KiB/s", "descending");
 
+        // I/O calls
+        add_table_field(func_processes_fields, "RCalls", "I/O Read Calls", false, "bar", "calls/s", "descending");
+        add_table_field(func_processes_fields, "WCalls", "I/O Write Calls", false, "bar", "calls/s", "descending");
+
+        // open file descriptors
+        add_table_field(func_processes_fields, "Files", "Open Files", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "Pipes", "Open Pipes", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "Sockets", "Open Sockets", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "EventFDs", "Open Event Descriptors", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "TimerFDs", "Open Timer Descriptors", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "SigFDs", "Open Signal Descriptors", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "OtherFDs", "Other Open Descriptors", false, "bar", "generic", "descending");
+        add_table_field(func_processes_fields, "FDs", "All Open File Descriptors", true, "bar", "generic", "descending");
+
+        buffer_sprintf(
+            func_processes_fields,
+                ""
+                "\n   },"
+                "\n   \"default sort column\": \"category\","
+                "\n   \"charts\": {"
+                "\n      \"cpu\": {"
+                "\n         \"name\":\"CPU Utilization\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"utime\", \"stime\", \"gtime\", \"cutime\", \"cstime\", \"cgtime\" ]"
+                "\n      },"
+                "\n      \"memory\": {"
+                "\n         \"name\":\"Memory\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"vmsize\", \"vmrss\", \"vmshared\", \"vmswap\" ]"
+                "\n      },"
+                "\n      \"reads\": {"
+                "\n         \"name\":\"I/O Reads\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ "
+#ifndef __FreeBSD__
+                                "\"lreads\", "
+#endif
+                                "\"preads\" ]"
+                "\n      },"
+                "\n      \"writes\": {"
+                "\n         \"name\":\"I/O Writes\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ "
+#ifndef __FreeBSD__
+                                "\"lwrites\", "
+#endif
+                                "\"pwrites\" ]"
+                "\n      },"
+#ifndef __FreeBSD__
+                "\n      \"logical_io\": {"
+                "\n         \"name\":\"Logical I/O\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"lreads\", \"lwrites\" ]"
+                "\n      },"
+#endif
+                "\n      \"physical_io\": {"
+                "\n         \"name\":\"Physical I/O\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"preads\", \"pwrites\" ]"
+                "\n      },"
+                "\n      \"io_calls\": {"
+                "\n         \"name\":\"I/O Calls\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"readcalls\", \"writecalls\" ]"
+                "\n      },"
+                "\n      \"minflt\": {"
+                "\n         \"name\":\"Minor Page Faults\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"minflt\", \"cminflt\" ]"
+                "\n      },"
+                "\n      \"majflt\": {"
+                "\n         \"name\":\"Major Page Faults\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"majflt\", \"cmajflt\" ]"
+                "\n      },"
+                "\n      \"threads\": {"
+                "\n         \"name\":\"Threads\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"threads\" ]"
+                "\n      },"
+                "\n      \"procs\": {"
+                "\n         \"name\":\"Processes\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"procs\" ]"
+                "\n      },"
+                "\n      \"fds\": {"
+                "\n         \"name\":\"File Descriptors\","
+                "\n         \"type\":\"stacked-bar\","
+                "\n         \"columns\": [ \"fds\", \"pipefds\", \"socketfds\", \"inotifyfds\", \"eventfds\", \"timerfds\", \"signalfds\", \"eventpolls\", \"otherfds\" ]"
+                "\n      }"
+                "\n   },"
+                "\n   \"data\":["
+                "\n"
+                );
+    }
+
+    fwrite(buffer_tostring(func_processes_fields), buffer_strlen(func_processes_fields), 1, stdout);
+
+    NETDATA_DOUBLE cpu_divisor = (NETDATA_DOUBLE)(time_factor * RATES_DETAIL / 100);
+    NETDATA_DOUBLE memory_divisor = 1024.0;
+    unsigned long long io_divisor = 1024LLU * RATES_DETAIL;
+    
     int rows= 0;
     for(p = root_of_pids; p ; p = p->next) {
         if(!p->updated)
@@ -4559,41 +4580,43 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         fprintf(stdout, ", %zu", (size_t)p->uptime);
 
         // minor page faults
-        fprintf(stdout, ", %zu", (size_t)p->minflt);
-        fprintf(stdout, ", %zu", (size_t)p->cminflt);
-        fprintf(stdout, ", %zu", (size_t)(p->minflt + p->cminflt));
+        fprintf(stdout, ", %llu", p->minflt / RATES_DETAIL);
+        fprintf(stdout, ", %llu", p->cminflt / RATES_DETAIL);
+        fprintf(stdout, ", %llu", (p->minflt + p->cminflt) / RATES_DETAIL);
 
         // major page faults
-        fprintf(stdout, ", %zu", (size_t)p->majflt);
-        fprintf(stdout, ", %zu", (size_t)p->cmajflt);
-        fprintf(stdout, ", %zu", (size_t)(p->majflt + p->cmajflt));
+        fprintf(stdout, ", %llu", p->majflt / RATES_DETAIL);
+        fprintf(stdout, ", %llu", p->cmajflt / RATES_DETAIL);
+        fprintf(stdout, ", %llu", (p->majflt + p->cmajflt) / RATES_DETAIL);
 
-        // CPU utilization
-        fprintf(stdout, ", %zu", (size_t)p->utime);
-        fprintf(stdout, ", %zu", (size_t)p->stime);
-        fprintf(stdout, ", %zu", (size_t)p->gtime);
-        fprintf(stdout, ", %zu", (size_t)p->cutime);
-        fprintf(stdout, ", %zu", (size_t)p->cstime);
-        fprintf(stdout, ", %zu", (size_t)p->cgtime);
-        fprintf(stdout, ", %zu", (size_t)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime));
+        // CPU utilization %
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->utime) / cpu_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->stime) / cpu_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->gtime) / cpu_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->cutime) / cpu_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->cstime) / cpu_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->cgtime) / cpu_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)((p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime)) / cpu_divisor);
 
-        // memory
-        fprintf(stdout, ", %zu", (size_t)p->status_vmsize);
-        fprintf(stdout, ", %zu", (size_t)p->status_vmrss);
-        fprintf(stdout, ", %zu", (size_t)p->status_vmshared);
-        fprintf(stdout, ", %zu", (size_t)p->status_vmswap);
+        // memory MiB
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmsize / memory_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmrss / memory_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmshared / memory_divisor);
+        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmswap / memory_divisor);
 
         // Logical I/O
-        fprintf(stdout, ", %zu", (size_t)p->io_logical_bytes_read);
-        fprintf(stdout, ", %zu", (size_t)p->io_logical_bytes_written);
+#ifndef __FreeBSD__
+        fprintf(stdout, ", %llu", p->io_logical_bytes_read / io_divisor);
+        fprintf(stdout, ", %llu", p->io_logical_bytes_written / io_divisor);
+#endif
 
         // Physical I/O
-        fprintf(stdout, ", %zu", (size_t)p->io_storage_bytes_read);
-        fprintf(stdout, ", %zu", (size_t)p->io_storage_bytes_written);
+        fprintf(stdout, ", %llu", p->io_storage_bytes_read / io_divisor);
+        fprintf(stdout, ", %llu", p->io_storage_bytes_written / io_divisor);
 
         // I/O calls
-        fprintf(stdout, ", %zu", (size_t)p->io_read_calls);
-        fprintf(stdout, ", %zu", (size_t)p->io_write_calls);
+        fprintf(stdout, ", %llu", p->io_read_calls / RATES_DETAIL);
+        fprintf(stdout, ", %llu", p->io_write_calls / RATES_DETAIL);
 
         // open file descriptors
         fprintf(stdout, ", %zu", (size_t)p->openfds.files);
@@ -4611,6 +4634,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     }
 
     fprintf(stdout, "\n   ]");
+    fprintf(stdout, ",\n   \"expires\":%ld", expires);
     fprintf(stdout, "\n}");
 
     pluginsd_function_result_end_to_stdout();
