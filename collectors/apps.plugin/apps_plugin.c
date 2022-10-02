@@ -4356,7 +4356,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(func_processes_fields, "Cmd", "Process Name", true, "string", NULL, "ascending");
         add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:cmd", NULL, "ascending");
         add_table_field(func_processes_fields, "PPid", "Parent Process ID", false, "integer", NULL, "ascending");
-        add_table_field(func_processes_fields, "Category", "Category, as defined in apps_groups.conf", true, "string", NULL, "ascending");
+        add_table_field(func_processes_fields, "Category", "Category (apps_groups.conf)", true, "string", NULL, "ascending");
         add_table_field(func_processes_fields, "User", "User Owner", true, "string", NULL, "ascending");
         add_table_field(func_processes_fields, "Uid", "User ID", false, "integer", NULL, "ascending");
         add_table_field(func_processes_fields, "Group", "Group Owner", true, "string", NULL, "ascending");
@@ -4379,9 +4379,9 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(func_processes_fields, "UserCPU", "User CPU time", false, "bar-only", "%", "descending");
         add_table_field(func_processes_fields, "SysCPU", "System CPU Time", false, "bar-only", "%", "descending");
         add_table_field(func_processes_fields, "GuestCPU", "Guest CPU Time", false, "bar-only", "%", "descending");
-        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time, for the process's waited-for children", false, "bar-only", "%", "descending");
-        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time, for the process's waited-for children", false, "bar-only", "%", "descending");
-        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time, for the process's waited-for children", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time", false, "bar-only", "%", "descending");
+        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time", false, "bar-only", "%", "descending");
         add_table_field(func_processes_fields, "CPU", "Total CPU Time", true, "bar-only", "%", "descending");
 
         // memory
@@ -4503,7 +4503,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     NETDATA_DOUBLE cpu_divisor = (NETDATA_DOUBLE)(time_factor * RATES_DETAIL / 100);
     NETDATA_DOUBLE memory_divisor = 1024.0;
     unsigned long long io_divisor = 1024LLU * RATES_DETAIL;
-    
+
     int rows= 0;
     for(p = root_of_pids; p ; p = p->next) {
         if(!p->updated)
