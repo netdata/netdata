@@ -632,6 +632,9 @@ void rrdhost_update(RRDHOST *host
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
 
+        if (!host->rrdset_root_index)
+            rrdset_index_init(host);
+
         rrdhost_initialize_rrdpush(host,
                                    rrdpush_enabled,
                                    rrdpush_destination,
