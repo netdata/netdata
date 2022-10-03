@@ -31,15 +31,31 @@ extern int netdata_use_ssl_on_stream;
 extern char *netdata_ssl_ca_path;
 extern char *netdata_ssl_ca_file;
 
-// Collector thread starting a transmission
-void sender_start(struct sender_state *s) {
-    netdata_mutex_lock(&s->mutex);
-    buffer_flush(s->build);
+static __thread BUFFER *sender_thread_buffer = NULL;
+static __thread bool sender_thread_buffer_used = false;
+
+void sender_thread_buffer_free(void) {
+    if(sender_thread_buffer) {
+        buffer_free(sender_thread_buffer);
+        sender_thread_buffer = NULL;
+    }
 }
 
-void sender_cancel(struct sender_state *s) {
-    buffer_flush(s->build);
-    netdata_mutex_unlock(&s->mutex);
+// Collector thread starting a transmission
+BUFFER *sender_start(struct sender_state *s __maybe_unused) {
+    if(!sender_thread_buffer)
+        sender_thread_buffer = buffer_create(1024);
+
+    if(sender_thread_buffer_used)
+        fatal("STREAMING: thread buffer is used multiple times concurrently.");
+
+    sender_thread_buffer_used = true;
+    buffer_flush(sender_thread_buffer);
+    return sender_thread_buffer;
+}
+
+void sender_cancel(struct sender_state *s __maybe_unused) {
+    sender_thread_buffer_used = false;
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
@@ -53,79 +69,101 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 static inline void deactivate_compression(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
     error("STREAM_COMPRESSION: Compression returned error, disabling it.");
-    s->rrdpush_compression = 0;
+    s->flags &= ~SENDER_FLAG_COMPRESSION;
     error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
     rrdpush_sender_thread_close_socket(s->host);
 }
 #endif
 
 // Collector thread finishing a transmission
-void sender_commit(struct sender_state *s) {
-    char *src = (char *)buffer_tostring(s->host->sender->build);
-    size_t src_len = buffer_strlen(s->host->sender->build);
+void sender_commit(struct sender_state *s, BUFFER *wb) {
+
+    if(unlikely(wb != sender_thread_buffer))
+        fatal("STREAMING: sender is trying to commit a buffer that is not this thread's buffer.");
+
+    if(unlikely(!sender_thread_buffer_used))
+        fatal("STREAMING: sender is committing a buffer twice.");
+
+    sender_thread_buffer_used = false;
+
+    char *src = (char *)buffer_tostring(wb);
+    size_t src_len = buffer_strlen(wb);
+
+    if(unlikely(!src || !src_len))
+        return;
+
+    netdata_mutex_lock(&s->mutex);
+
 #ifdef ENABLE_COMPRESSION
-    if (src && src_len) {
-        if (s->compressor && s->rrdpush_compression) {
-            while(src_len) {
-                size_t size_to_compress = src_len;
+    if (s->flags & SENDER_FLAG_COMPRESSION && s->compressor) {
+        while(src_len) {
+            size_t size_to_compress = src_len;
 
-                if(size_to_compress > COMPRESSION_MAX_MSG_SIZE) {
-                    // we need to find the last newline
-                    // so that the decompressor will have a whole line to work with
+            if(size_to_compress > COMPRESSION_MAX_MSG_SIZE) {
+                // we need to find the last newline
+                // so that the decompressor will have a whole line to work with
 
-                    const char *t = &src[COMPRESSION_MAX_MSG_SIZE - 1];
-                    while(t-- > src)
-                        if(*t == '\n')
-                            break;
+                const char *t = &src[COMPRESSION_MAX_MSG_SIZE - 1];
+                while(t-- > src)
+                    if(*t == '\n')
+                        break;
 
-                    if(t == src)
-                        size_to_compress = COMPRESSION_MAX_MSG_SIZE;
-                    else
-                        size_to_compress = t - src + 1;
-                }
+                if(t == src)
+                    size_to_compress = COMPRESSION_MAX_MSG_SIZE;
+                else
+                    size_to_compress = t - src + 1;
+            }
 
-                char *dst;
-                size_t dst_len = s->compressor->compress(s->compressor, src, size_to_compress, &dst);
-                if (!dst_len) {
+            char *dst;
+            size_t dst_len = s->compressor->compress(s->compressor, src, size_to_compress, &dst);
+            if (!dst_len) {
+                error("STREAM %s [send to %s]: compression failed. Resetting compressor and re-trying",
+                      rrdhost_hostname(s->host), s->connected_to);
+
+                s->compressor->reset(s->compressor);
+                dst_len = s->compressor->compress(s->compressor, src, size_to_compress, &dst);
+                if(!dst_len) {
+                    error("STREAM %s [send to %s]: compression failed again. Deactivating compression",
+                          rrdhost_hostname(s->host), s->connected_to);
+
                     deactivate_compression(s);
-                    buffer_flush(s->build);
                     netdata_mutex_unlock(&s->mutex);
                     return;
                 }
-
-                if(cbuffer_add_unsafe(s->host->sender->buffer, dst, dst_len))
-                    s->overflow = 1;
-
-                src = src + size_to_compress;
-                src_len -= size_to_compress;
             }
+
+            if(cbuffer_add_unsafe(s->host->sender->buffer, dst, dst_len))
+                s->flags |= SENDER_FLAG_OVERFLOW;
+
+            src = src + size_to_compress;
+            src_len -= size_to_compress;
         }
-        else if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
-            s->overflow = 1;
     }
+    else if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+        s->flags |= SENDER_FLAG_OVERFLOW;
 #else
     if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
         s->overflow = 1;
 #endif
 
-    buffer_flush(s->build);
     netdata_mutex_unlock(&s->mutex);
+    rrdpush_signal_sender_to_wake_up(s);
 }
 
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
-    rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
-    __atomic_clear(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
-    if(host->rrdpush_sender_socket != -1) {
-        close(host->rrdpush_sender_socket);
-        host->rrdpush_sender_socket = -1;
+    if(host->sender->rrdpush_sender_socket != -1) {
+        close(host->sender->rrdpush_sender_socket);
+        host->sender->rrdpush_sender_socket = -1;
     }
 }
 
-static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
+static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
     buffer_sprintf(
-            host->sender->build
+            wb
             , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
             , rrdvar_name(rva)
             , rrdvar2number(rva)
@@ -135,34 +173,37 @@ static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *ho
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
-    if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && __atomic_load_n(&host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)) {
-        sender_start(host->sender);
-        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rva);
-        sender_commit(host->sender);
+    if(rrdhost_has_rrdpush_send_enabled(host) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+        BUFFER *wb = sender_start(host->sender);
+        rrdpush_sender_add_host_variable_to_buffer(wb, rva);
+        sender_commit(host->sender, wb);
     }
 }
 
+struct custom_host_variables_callback {
+    BUFFER *wb;
+};
 
-static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr __maybe_unused, void *host_ptr) {
+static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr __maybe_unused, void *struct_ptr) {
     const RRDVAR_ACQUIRED *rv = (const RRDVAR_ACQUIRED *)item;
-    RRDHOST *host = (RRDHOST *)host_ptr;
+    struct custom_host_variables_callback *tmp = struct_ptr;
+    BUFFER *wb = tmp->wb;
 
     if(unlikely(rrdvar_flags(rv) & RRDVAR_FLAG_CUSTOM_HOST_VAR && rrdvar_type(rv) == RRDVAR_TYPE_CALCULATED)) {
-        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
-
-        // return 1, so that the traversal will return the number of variables sent
+        rrdpush_sender_add_host_variable_to_buffer(wb, rv);
         return 1;
     }
-
-    // returning a negative number will break the traversal
     return 0;
 }
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
-    sender_start(host->sender);
-    int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, host);
+    BUFFER *wb = sender_start(host->sender);
+    struct custom_host_variables_callback tmp = {
+        .wb = wb
+    };
+    int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
     (void)ret;
-    sender_commit(host->sender);
+    sender_commit(host->sender, wb);
 
     debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
 }
@@ -324,8 +365,6 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     time_t delay = stream_responses[i].postpone_reconnect_seconds;
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
-        rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-        rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_LABELS_STOP);
         host->destination->last_error = NULL;
         host->destination->last_handshake = version;
         host->destination->postpone_reconnection_until = 0;
@@ -343,8 +382,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     return false;
 }
 
-static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
-    struct sender_state *s) {
+static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
     struct timeval tv = {
             .tv_sec = timeout,
@@ -354,7 +392,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     // make sure the socket is closed
     rrdpush_sender_thread_close_socket(host);
 
-    host->rrdpush_sender_socket = connect_to_one_of_destinations(
+    s->rrdpush_sender_socket = connect_to_one_of_destinations(
               host
             , default_port
             , &tv
@@ -364,7 +402,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
             , &host->destination
     );
 
-    if(unlikely(host->rrdpush_sender_socket == -1)) {
+    if(unlikely(s->rrdpush_sender_socket == -1)) {
         error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
         return false;
     }
@@ -387,8 +425,8 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
         if (host->ssl.conn)
         {
-            if (SSL_set_fd(host->ssl.conn, host->rrdpush_sender_socket) != 1) {
-                error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
+            if (SSL_set_fd(host->ssl.conn, s->rrdpush_sender_socket) != 1) {
+                error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             } else{
                 host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
@@ -404,10 +442,10 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     s->capabilities = STREAM_OUR_CAPABILITIES;
 
 #ifdef  ENABLE_COMPRESSION
-    // Negotiate stream VERSION_CLABELS if stream compression is not supported
-    if(!s->rrdpush_compression && stream_has_capability(s, STREAM_CAP_COMPRESSION))
+    // If we don't want compression, remove it from our capabilities
+    if(!(s->flags & SENDER_FLAG_COMPRESSION) && stream_has_capability(s, STREAM_CAP_COMPRESSION))
         s->capabilities &= ~STREAM_CAP_COMPRESSION;
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
@@ -557,7 +595,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #ifdef ENABLE_HTTPS
         &host->ssl,
 #endif
-        host->rrdpush_sender_socket,
+        s->rrdpush_sender_socket,
         http,
         strlen(http),
         0,
@@ -579,7 +617,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #ifdef ENABLE_HTTPS
         &host->ssl,
 #endif
-        host->rrdpush_sender_socket,
+        s->rrdpush_sender_socket,
         http,
         HTTP_HEADER_SIZE,
         0,
@@ -601,30 +639,31 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
 
 #ifdef ENABLE_COMPRESSION
-    // check if parent supports compression - and we do too
-    s->rrdpush_compression = (s->rrdpush_compression && stream_has_capability(s, STREAM_CAP_COMPRESSION));
+    // if the stream does not have compression capability,
+    // shut it down for us too.
+    // FIXME - this means that if there are multiple parents and one of them does not support compression
+    //         we are going to shut it down for all of them eventually...
+    if(!stream_has_capability(s, STREAM_CAP_COMPRESSION))
+        s->flags &= ~SENDER_FLAG_COMPRESSION;
 
-    if(s->rrdpush_compression) {
+    if(s->flags & SENDER_FLAG_COMPRESSION) {
         if(s->compressor)
             s->compressor->reset(s->compressor);
     }
-    else {
-        //parent does not support compression or has compression disabled
-        debug(D_STREAM, "Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, rrdhost_hostname(s->host));
-        infoerr("Stream is uncompressed! One of the agents (%s <-> %s) does not support compression OR compression is disabled.", s->connected_to, rrdhost_hostname(s->host));
-        s->capabilities &= ~STREAM_CAP_COMPRESSION;
-    }
+    else
+        info("STREAM %s [send to %s]: compression is disabled on this connection.", rrdhost_hostname(host), s->connected_to);
+
 #endif  //ENABLE_COMPRESSION
 
     log_sender_capabilities(s);
 
-    if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
+    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
 
-    if(sock_enlarge_out(host->rrdpush_sender_socket) < 0)
+    if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
 
-    debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_sender_socket);
+    debug(D_STREAM, "STREAM: Connected on fd %d...", s->rrdpush_sender_socket);
 
     return true;
 }
@@ -649,7 +688,7 @@ static bool attempt_to_connect(struct sender_state *state)
         state->sent_bytes_on_this_connection = 0;
 
         // let the data collection threads know we are ready
-        __atomic_test_and_set(&state->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+        rrdhost_flag_set(state->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
         return true;
     }
@@ -672,8 +711,6 @@ static bool attempt_to_connect(struct sender_state *state)
 static ssize_t attempt_to_send(struct sender_state *s) {
     ssize_t ret = 0;
 
-    rrdpush_send_labels(s->host);
-
 #ifdef NETDATA_INTERNAL_CHECKS
     struct circular_buffer *cb = s->buffer;
 #endif
@@ -688,7 +725,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     if(conn && !s->host->ssl.flags)
         ret = SSL_write(conn, chunk, outstanding);
     else
-        ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
+        ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #else
     ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #endif
@@ -743,7 +780,7 @@ static ssize_t attempt_read(struct sender_state *s) {
         return ret;
     }
 #endif
-    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
+    ret = recv(s->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
     if (ret > 0) {
         s->read_len += ret;
         return ret;
@@ -771,33 +808,32 @@ struct inflight_stream_function {
     usec_t received_ut;
 };
 
-void stream_execute_function_callback(BUFFER *wb, int code, void *data) {
+void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
     struct inflight_stream_function *tmp = data;
 
     struct sender_state *s = tmp->sender;
 
-    sender_start(s);
+    BUFFER *wb = sender_start(s);
 
-    pluginsd_function_result_begin_to_buffer(s->build
+    pluginsd_function_result_begin_to_buffer(wb
                                              , string2str(tmp->transaction)
                                              , code
-                                             , functions_content_type_to_format(wb->contenttype)
-                                             , wb->expires);
+                                             , functions_content_type_to_format(func_wb->contenttype)
+                                             , func_wb->expires);
 
-    buffer_fast_strcat(s->build, buffer_tostring(wb), buffer_strlen(wb));
-    pluginsd_function_result_end_to_buffer(s->build);
+    buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
+    pluginsd_function_result_end_to_buffer(wb);
 
-    sender_commit(s);
-    rrdpush_signal_sender_to_wake_up(s);
+    sender_commit(s, wb);
 
     internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
                    rrdhost_hostname(s->host), s->connected_to,
                    string2str(tmp->transaction),
-                   buffer_strlen(wb),
+                   buffer_strlen(func_wb),
                    now_realtime_usec() - tmp->received_ut);
 
     string_freez(tmp->transaction);
-    buffer_free(wb);
+    buffer_free(func_wb);
     freez(tmp);
 }
 
@@ -882,7 +918,7 @@ static size_t cbuffer_available_bytes_with_lock(struct rrdpush_sender_thread_dat
 
 static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
 
-    while(__atomic_load_n(&thread_data->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
+    while(rrdhost_flag_check(thread_data->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
            && thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE
            && cbuffer_available_bytes_with_lock(thread_data) > (thread_data->sender_state->buffer->max_size / 2)) {
 
@@ -943,14 +979,17 @@ static bool rrdpush_sender_pipe_close(RRDHOST *host, int *pipe_fds, bool reopen)
 }
 
 void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
+    if(unlikely(s->tid == gettid()))
+        return;
+
     RRDHOST *host = s->host;
 
-    int pipe_fd = host->rrdpush_sender_pipe[PIPE_WRITE];
+    int pipe_fd = s->rrdpush_sender_pipe[PIPE_WRITE];
 
     // signal the sender there are more data
     if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1) {
         error("STREAM %s [send]: cannot write to internal pipe.", rrdhost_hostname(host));
-        rrdpush_sender_pipe_close(host, host->rrdpush_sender_pipe, true);
+        rrdpush_sender_pipe_close(host, s->rrdpush_sender_pipe, true);
     }
 }
 
@@ -967,14 +1006,14 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     info("STREAM %s [send]: sending thread cleans up...", rrdhost_hostname(host));
 
     rrdpush_sender_thread_close_socket(host);
-    rrdpush_sender_pipe_close(host, host->rrdpush_sender_pipe, false);
+    rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
-    if(!host->rrdpush_sender_join) {
+    if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN)) {
         info("STREAM %s [send]: sending thread detaches itself.", rrdhost_hostname(host));
         netdata_thread_detach(netdata_thread_self());
     }
 
-    host->rrdpush_sender_spawn = 0;
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
 
     info("STREAM %s [send]: sending thread now exits.", rrdhost_hostname(host));
 
@@ -992,13 +1031,17 @@ void sender_init(RRDHOST *parent)
     parent->sender = callocz(1, sizeof(*parent->sender));
     parent->sender->host = parent;
     parent->sender->buffer = cbuffer_new(1024, 1024*1024);
-    parent->sender->build = buffer_create(1);
     parent->sender->capabilities = STREAM_OUR_CAPABILITIES;
 
+    parent->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
+    parent->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
+    parent->sender->rrdpush_sender_socket  = -1;
+
 #ifdef ENABLE_COMPRESSION
-    parent->sender->rrdpush_compression = default_compression_enabled;
-    if (default_compression_enabled)
+    if(default_compression_enabled) {
+        parent->sender->flags |= SENDER_FLAG_COMPRESSION;
         parent->sender->compressor = create_compressor();
+    }
 #endif
 
     netdata_mutex_init(&parent->sender->mutex);
@@ -1029,13 +1072,13 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENTAL);
 
     struct sender_state *s = ptr;
-    s->task_id = gettid();
+    s->tid = gettid();
 
-    if(!s->host->rrdpush_send_enabled || !s->host->rrdpush_send_destination ||
+    if(!rrdhost_has_rrdpush_send_enabled(s->host) || !s->host->rrdpush_send_destination ||
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
        !*s->host->rrdpush_send_api_key) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              rrdhost_hostname(s->host), s->task_id);
+              rrdhost_hostname(s->host), s->tid);
         return NULL;
     }
 
@@ -1046,7 +1089,7 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 #endif
 
-    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->task_id);
+    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->tid);
 
     s->timeout = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
@@ -1066,17 +1109,17 @@ void *rrdpush_sender_thread(void *ptr) {
         remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
 
     // initialize rrdpush globals
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
-    __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
     int pipe_buffer_size = 10 * 1024;
 #ifdef F_GETPIPE_SZ
-    pipe_buffer_size = fcntl(s->host->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
+    pipe_buffer_size = fcntl(s->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
 #endif
     if(pipe_buffer_size < 10 * 1024)
         pipe_buffer_size = 10 * 1024;
 
-    if(!rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true)) {
+    if(!rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true)) {
         error("STREAM %s [send]: cannot create inter-thread communication pipe. Disabling streaming.",
               rrdhost_hostname(s->host));
         return NULL;
@@ -1088,18 +1131,21 @@ void *rrdpush_sender_thread(void *ptr) {
     thread_data->host = s->host;
     thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
 
+    // reset our cleanup flags
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
+
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
-    for(; s->host->rrdpush_send_enabled && !netdata_exit ;) {
+    for(; rrdhost_has_rrdpush_send_enabled(s->host) && !netdata_exit ;) {
         // check for outstanding cancellation requests
         netdata_thread_testcancel();
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
-        if(unlikely(s->host->rrdpush_sender_socket == -1)) {
+        if(unlikely(s->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
             thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
-            rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
-            s->overflow = 0;
+            rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+            s->flags &= ~SENDER_FLAG_OVERFLOW;
             s->read_len = 0;
             s->buffer->read = 0;
             s->buffer->write = 0;
@@ -1109,11 +1155,13 @@ void *rrdpush_sender_thread(void *ptr) {
 
             if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
                 time_t now = now_realtime_sec();
-                sender_start(s);
-                buffer_sprintf(s->build, "TIMESTAMP %"PRId64"", (int64_t)now);
-                sender_commit(s);
+                BUFFER *wb = sender_start(s);
+                buffer_sprintf(wb, "TIMESTAMP %"PRId64"", (int64_t)now);
+                sender_commit(s, wb);
             }
+
             rrdpush_claimed_id(s->host);
+            rrdpush_send_host_labels(s->host);
 
             // TO PUSH METRICS WITH DEFINITIONS:
             //if(unlikely(s->host->rrdpush_sender_socket != -1 && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
@@ -1148,17 +1196,17 @@ void *rrdpush_sender_thread(void *ptr) {
             s->send_attempts++;
         else {
             if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE
-                         && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST)
-                         && !rrdhost_flag_check(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS)
+                         && rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
+                         && !rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS)
                              )) {
                 // let the data collection threads know we are ready to push metrics
-                rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
+                rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
                 info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
             }
         }
 
-        if(unlikely(s->host->rrdpush_sender_pipe[PIPE_READ] == -1)) {
-            if(!rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true)) {
+        if(unlikely(s->rrdpush_sender_pipe[PIPE_READ] == -1)) {
+            if(!rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true)) {
                 error("STREAM %s [send]: cannot create inter-thread communication pipe. Disabling streaming.",
                       rrdhost_hostname(s->host));
                 rrdpush_sender_thread_close_socket(s->host);
@@ -1173,12 +1221,12 @@ void *rrdpush_sender_thread(void *ptr) {
         };
         struct pollfd fds[2] = {
             [Collector] = {
-                .fd = s->host->rrdpush_sender_pipe[PIPE_READ],
+                .fd = s->rrdpush_sender_pipe[PIPE_READ],
                 .events = POLLIN,
                 .revents = 0,
             },
             [Socket] = {
-                .fd = s->host->rrdpush_sender_socket,
+                .fd = s->rrdpush_sender_socket,
                 .events = POLLIN | (outstanding ? POLLOUT : 0 ),
                 .revents = 0,
             }
@@ -1190,10 +1238,10 @@ void *rrdpush_sender_thread(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        internal_error(fds[Collector].fd != s->host->rrdpush_sender_pipe[PIPE_READ],
+        internal_error(fds[Collector].fd != s->rrdpush_sender_pipe[PIPE_READ],
             "STREAM %s [send to %s]: pipe changed after poll().", rrdhost_hostname(s->host), s->connected_to);
 
-        internal_error(fds[Socket].fd != s->host->rrdpush_sender_socket,
+        internal_error(fds[Socket].fd != s->rrdpush_sender_socket,
             "STREAM %s [send to %s]: socket changed after poll().", rrdhost_hostname(s->host), s->connected_to);
 
         // Spurious wake-ups without error - loop again
@@ -1206,7 +1254,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if(unlikely(poll_rc == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
             error("STREAM %s [send to %s]: failed to poll(). Closing socket.", rrdhost_hostname(s->host), s->connected_to);
-            rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true);
+            rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true);
             rrdpush_sender_thread_close_socket(s->host);
             continue;
         }
@@ -1252,7 +1300,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 error = "pipe is invalid (POLLNVAL)";
 
             if(error) {
-                rrdpush_sender_pipe_close(s->host, s->host->rrdpush_sender_pipe, true);
+                rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true);
                 error("STREAM %s [send to %s]: restarting internal pipe: %s.",
                       rrdhost_hostname(s->host), s->connected_to, error);
             }
@@ -1277,7 +1325,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // protection from overflow
-        if(unlikely(s->overflow)) {
+        if(unlikely(s->flags & SENDER_FLAG_OVERFLOW)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
             errno = 0;
             error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",

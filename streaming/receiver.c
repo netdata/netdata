@@ -742,15 +742,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
 */
 
 //    rpt->host->connected_senders++;
-    if(stream_has_capability(rpt, STREAM_CAP_HLABELS)) {
-        rrdhost_flag_set(rpt->host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_LABELS_STOP);
-    }
-    else {
-        rrdhost_flag_set(rpt->host, RRDHOST_FLAG_STREAM_LABELS_STOP);
-        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-    }
-
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             rpt->host->health_delay_up_to = now_realtime_sec() + alarms_delay;

@@ -212,16 +212,16 @@ static void rrdhost_initialize_rrdpush(RRDHOST *host,
     sender_init(host);
     netdata_mutex_init(&host->receiver_lock);
 
-    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
-    host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
+    if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
+        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+    else
+        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+
+    host->rrdpush_send_destination = rrdhost_has_rrdpush_send_enabled(host)?strdupz(rrdpush_destination):NULL;
     rrdpush_destinations_init(host);
 
-    host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
+    host->rrdpush_send_api_key = rrdhost_has_rrdpush_send_enabled(host)?strdupz(rrdpush_api_key):NULL;
     host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
-
-    host->rrdpush_sender_pipe[0] = -1;
-    host->rrdpush_sender_pipe[1] = -1;
-    host->rrdpush_sender_socket  = -1;
 
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
@@ -523,7 +523,7 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
-         , host->rrdpush_send_enabled?"enabled":"disabled"
+         , rrdhost_has_rrdpush_send_enabled(host)?"enabled":"disabled"
          , host->rrdpush_send_destination?host->rrdpush_send_destination:""
          , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
          , host->health_enabled?"enabled":"disabled"
@@ -1015,7 +1015,6 @@ void stop_streaming_sender(RRDHOST *host)
 
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
-    buffer_free(host->sender->build);
 #ifdef ENABLE_COMPRESSION
     if (host->sender->compressor)
         host->sender->compressor->destroy(&host->sender->compressor);

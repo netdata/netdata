@@ -494,7 +494,6 @@ typedef enum rrdset_flags {
                                                      // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
-//    RRDSET_FLAG_ACLK                    = (1 << 16), // not used anymore
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
@@ -550,9 +549,6 @@ struct rrdset {
 
     RRDSET_FLAGS flags;                             // flags
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
-
-    uuid_t hash_uuid;                               // hash_id for syncing with cloud
-                                                    // TODO - obsolete now - cleanup
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
@@ -704,12 +700,19 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 3), // send it to external databases
     RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 4), // don't send it to external databases
     RRDHOST_FLAG_ARCHIVED                       = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE           = (1 << 8),
-    RRDHOST_FLAG_STREAM_LABELS_STOP             = (1 << 9),
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 10), // when set, we should send ACLK stream context updates
+
+    // RRDPUSH sender
+    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 6), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 7), // When set, the host is connected to a parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 8), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 9), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_RRDPUSH_SENDER_JOIN            = (1 << 10), // When set, we want to join the sender thread
+
+    //
     RRDHOST_FLAG_INDEXED_MACHINE_GUID           = (1 << 11), // when set, we have indexed its machine guid
     RRDHOST_FLAG_INDEXED_HOSTNAME               = (1 << 12), // when set, we have indexed its hostname
-    RRDHOST_FLAG_STREAM_COLLECTED_METRICS       = (1 << 13), // when set, rrdset_done() should push metrics to parent
+
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 13), // when set, we should send ACLK stream context updates
     RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 14), // the host has initialized health structures
     RRDHOST_FLAG_INITIALIZED_RRDPUSH            = (1 << 15), // the host has initialized rrdpush structures
     RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
@@ -727,6 +730,17 @@ typedef enum rrdhost_flags {
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
+
+typedef enum {
+    RRDHOST_OPTION_SENDER_ENABLED = (1 << 0), // set when the host is configured to send metrics to a parent
+
+} RRDHOST_OPTIONS;
+
+#define rrdhost_option_check(host, flag) ((host)->flags & (flag))
+#define rrdhost_option_set(host, flag)   (host)->flags |= flag
+#define rrdhost_option_clear(host, flag) (host)->flags &= ~(flag)
+
+#define rrdhost_has_rrdpush_send_enabled(host) rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED)
 
 // ----------------------------------------------------------------------------
 // Health data
@@ -867,7 +881,8 @@ struct rrdhost {
 
     int32_t utc_offset;                             // the offset in seconds from utc
 
-    RRDHOST_FLAGS flags;                            // flags about this RRDHOST
+    RRDHOST_OPTIONS options;                        // configuration option for this RRDHOST (no atomics on this)
+    RRDHOST_FLAGS flags;                            // runtime flags about this RRDHOST (atomics on this)
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
     int rrd_update_every;                           // the update frequency of the host
@@ -882,28 +897,17 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data to remote hosts - rrdpush sender
 
-    unsigned int rrdpush_send_enabled;              // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
     struct rrdpush_destinations *destination;       // the current destination from the above list
+    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    volatile unsigned int rrdpush_sender_spawn;     // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
-
-    bool rrdpush_sender_connected;                  // 1 when the sender is ready to push metrics
-    int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
-
-    volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
-    volatile unsigned int rrdpush_sender_join;      // 1 when we have to join the sending thread
-
-    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
-
-    int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver

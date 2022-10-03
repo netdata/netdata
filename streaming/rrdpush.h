@@ -127,11 +127,17 @@ struct decompressor_state {
 // Thread-local storage
     // Metric transmission: collector threads asynchronously fill the buffer, sender thread uses it.
 
+typedef enum {
+    SENDER_FLAG_OVERFLOW    = (1 << 0), // The buffer has been overflown
+    SENDER_FLAG_COMPRESSION = (1 << 1), // The stream needs to have and has compression
+} SENDER_FLAGS;
+
 struct sender_state {
     RRDHOST *host;
-    pid_t task_id;
-    unsigned int overflow:1;
-    int timeout, default_port;
+    pid_t tid;                              // the thread id of the sender, from gettid()
+    SENDER_FLAGS flags;
+    int timeout;
+    int default_port;
     usec_t reconnect_delay;
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;
@@ -145,12 +151,14 @@ struct sender_state {
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
     netdata_mutex_t mutex;
     struct circular_buffer *buffer;
-    BUFFER *build;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
     STREAM_CAPABILITIES capabilities;
+
+    int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
+    int rrdpush_sender_socket;
+
 #ifdef ENABLE_COMPRESSION
-    unsigned int rrdpush_compression;
     struct compressor_state *compressor;
 #endif
 };
@@ -213,8 +221,8 @@ extern void rrdpush_destinations_init(RRDHOST *host);
 extern void rrdpush_destinations_free(RRDHOST *host);
 
 extern void sender_init(RRDHOST *parent);
-void sender_start(struct sender_state *s);
-void sender_commit(struct sender_state *s);
+BUFFER *sender_start(struct sender_state *s);
+void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
 extern int rrdpush_init();
 extern int configured_as_parent();
@@ -222,7 +230,7 @@ extern void rrdset_done_push(RRDSET *st);
 extern bool rrdset_push_chart_definition_now(RRDSET *st);
 extern bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
 extern void *rrdpush_sender_thread(void *ptr);
-extern void rrdpush_send_labels(RRDHOST *host);
+extern void rrdpush_send_host_labels(RRDHOST *host);
 extern void rrdpush_claimed_id(RRDHOST *host);
 
 extern int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
