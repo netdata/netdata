@@ -13,6 +13,12 @@ struct label_str {
     char uuid_str[UUID_STR_LEN];
 };
 
+struct scan_metadata_payload {
+    struct metadata_wc *wc;
+    bool have_more_work;
+    uint32_t max_count;
+};
+
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct label_str *lb = data;
     if (unlikely(!lb->count))
@@ -907,15 +913,48 @@ static void timer_cb(uv_timer_t* handle)
    }
 }
 
-static void metadata_scan_host(RRDHOST *host) {
+
+static void after_metadata_cleanup(uv_work_t *req, int status)
+{
+    UNUSED(status);
+
+    struct metadata_wc *wc = req->data;
+    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
+}
+static void start_metadata_cleanup(uv_work_t *req)
+{
+    struct metadata_wc *wc = req->data;
+    check_dimension_metadata(wc);
+}
+
+
+// Callback after scan of hosts is done
+static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
+{
+    struct scan_metadata_payload *data = req->data;
+    struct metadata_wc *wc = data->wc;
+
+    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+    internal_error(true, "METADATA: scanning hosts complete");
+    freez(data);
+}
+
+static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
     RRDSET *st;
     int rc;
 
+    bool more_to_do = false;
+    uint32_t scan_count = 0;
+
     rrdset_foreach_reentrant(st, host) {
+        if (scan_count == max_count) {
+            more_to_do = true;
+            break;
+        }
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
             rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
-
-            internal_error(true, "METADATA: Storing metadata for chart %s", string2str(st->id));
+            scan_count++;
+//            internal_error(true, "METADATA: Storing metadata for chart %s", string2str(st->id));
             rc = sql_store_chart(
                 &st->chart_uuid,
                 &st->rrdhost->host_uuid,
@@ -935,7 +974,6 @@ static void metadata_scan_host(RRDHOST *host) {
                 st->entries);
             if (rc)
                 internal_error(true, "METADATA: Failed to store chart metadata %s", string2str(st->id));
-
         }
 
         RRDDIM *rd;
@@ -943,7 +981,7 @@ static void metadata_scan_host(RRDHOST *host) {
             if(rrddim_flag_check(rd, RRDDIM_FLAG_METADATA_UPDATE)) {
                 rrddim_flag_clear(rd, RRDDIM_FLAG_METADATA_UPDATE);
 
-                internal_error(true, "METADATA:  Storing metadata for dimension %s", string2str(rd->id));
+//                internal_error(true, "METADATA:  Storing metadata for dimension %s", string2str(rd->id));
                 rc = sql_store_dimension(
                     &rd->metric_uuid,
                     &rd->rrdset->chart_uuid,
@@ -960,46 +998,34 @@ static void metadata_scan_host(RRDHOST *host) {
         rrddim_foreach_done(rd);
     }
     rrdset_foreach_done(st);
-}
-
-static void after_metadata_cleanup(uv_work_t *req, int status)
-{
-    UNUSED(status);
-
-    struct metadata_wc *wc = req->data;
-    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
-}
-static void start_metadata_cleanup(uv_work_t *req)
-{
-    struct metadata_wc *wc = req->data;
-    check_dimension_metadata(wc);
-}
-
-
-// Callback after scan of hosts is done
-static void after_metadata_hosts(uv_work_t *req, int status)
-{
-    UNUSED(status);
-
-    struct metadata_wc *wc = req->data;
-    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
-    internal_error(true, "METADATA: scanning hosts complete");
+    return more_to_do;
 }
 
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 {
     RRDHOST *host;
-//    struct metadata_wc *wc = req->data;
 
+    struct scan_metadata_payload *data = req->data;
+    struct metadata_wc *wc = data->wc;
+
+    bool run_again = false;
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) && !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
         internal_error(true, "METADATA: %d Scanning host %s", gettid(), rrdhost_hostname(host));
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
-        metadata_scan_host(host);
+        if (unlikely(metadata_scan_host(host, data->max_count))) {
+            run_again = true;
+            rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
+            info("METADATA: Rescheduling host %s to run; more charts to store", rrdhost_hostname(host));
+        }
     }
     dfe_done(host);
+    if (unlikely(run_again))
+        wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
+    else
+        wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
 }
 
 static void metadata_event_loop(void *arg)
@@ -1250,7 +1276,11 @@ static void metadata_event_loop(void *arg)
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
                         break;
 
-                    metadata_scan_hosts_worker.data = wc;
+                    struct scan_metadata_payload *data = mallocz(sizeof(*data));
+                    data->wc = wc;
+                    data->max_count = 1000;
+
+                    metadata_scan_hosts_worker.data = data;
                     metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
                     internal_error(true, "Starting metadata host check in a worker thread");
                     if (unlikely(

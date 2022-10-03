@@ -15,6 +15,7 @@ extern sqlite3 *db_meta;
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (30)        // Check host for pending metadata within 60 seconds
 #define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat host check every 60 seconds
+#define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
 
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
