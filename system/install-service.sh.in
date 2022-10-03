@@ -143,6 +143,10 @@ export_cmds() {
   return 0
 }
 
+save_cmds() {
+  dump_cmds > "${SAVE_CMDS_PATH}"
+}
+
 # =====================================================================
 # Help functions
 
@@ -605,6 +609,15 @@ parse_args() {
           shift 1
         fi
         ;;
+      "--save-cmds")
+        if [ -z "${2}" ]; then
+          info "No path specified to save command variables."
+          exit 1
+        else
+          SAVE_CMDS_PATH="${2}"
+          shift 1
+        fi
+        ;;
       "--cmds" | "-c") DUMP_CMDS=1 ;;
       "--cmds-only") INSTALL=0 ;;
       "--export-cmds") EXPORT_CMDS=1 ;;
@@ -668,6 +681,7 @@ main() {
 
   [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
   [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
+  [ -n "${SAVE_CMDS_PATH}" ] && save_cmds
   exit 0
 }
 

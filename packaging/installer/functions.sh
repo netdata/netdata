@@ -478,7 +478,11 @@ install_non_systemd_init() {
 install_netdata_service() {
   if [ "${UID}" -eq 0 ]; then
     if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-      run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds && return 0
+      # shellcheck disable=SC2154
+      save_path="${tmpdir}/netdata-service-cmds"
+      run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --cmds-only --save-cmds "${save_path}"
+      # shellcheck disable=SC1090
+      . "${save_path}"
 
       if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
         if [ -n "${NETDATA_START_CMD}" ]; then
@@ -654,7 +658,11 @@ stop_all_netdata() {
   stop_success=0
 
   if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-    "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds --cmds-only
+    # shellcheck disable=SC2154
+    save_path="${tmpdir}/netdata-service-cmds"
+    "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --cmds-only --save-cmds "${save_path}"
+    # shellcheck disable=SC1090
+    . "${save_path}"
   fi
 
   if [ "${UID}" -eq 0 ]; then
@@ -715,7 +723,11 @@ restart_netdata() {
   progress "Restarting netdata instance"
 
   if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-    "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --export-cmds --cmds-only
+    # shellcheck disable=SC2154
+    save_path="${tmpdir}/netdata-service-cmds"
+    "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --cmds-only --save-cmds "${save_path}"
+    # shellcheck disable=SC1090
+    . "${save_path}"
   fi
 
   if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
