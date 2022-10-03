@@ -600,6 +600,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         else
             host->rrdpush_sender_spawn = 1;
     }
+
     netdata_mutex_unlock(&host->sender->mutex);
 }
 

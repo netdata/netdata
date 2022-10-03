@@ -148,6 +148,54 @@ void buffer_print_ll(BUFFER *wb, long long value)
     buffer_print_llu(wb, value);
 }
 
+static unsigned char bits03_to_hex[16] = {
+    [0] = '0',
+    [1] = '1',
+    [2] = '2',
+    [3] = '3',
+    [4] = '4',
+    [5] = '5',
+    [6] = '6',
+    [7] = '7',
+    [8] = '8',
+    [9] = '9',
+    [10] = 'A',
+    [11] = 'B',
+    [12] = 'C',
+    [13] = 'D',
+    [14] = 'E',
+    [15] = 'F'
+};
+
+void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
+{
+    unsigned char buffer[sizeof(unsigned long long) * 2 + 2 + 1];   // 8 bytes * 2 + '0x' + '\0'
+    unsigned char *e = &buffer[sizeof(unsigned long long) * 2 + 2];
+    unsigned char *p = e;
+
+    *p-- = '\0';
+    *p-- = bits03_to_hex[value & 0xF];
+    value >>= 4;
+    if(value) {
+        *p-- = bits03_to_hex[value & 0xF];
+        value >>= 4;
+
+        while(value) {
+            *p-- = bits03_to_hex[value & 0xF];
+            value >>= 4;
+
+            if(value) {
+                *p-- = bits03_to_hex[value & 0xF];
+                value >>= 4;
+            }
+        }
+    }
+    *p-- = 'x';
+    *p   = '0';
+
+    buffer_fast_strcat(wb, (char *)p, e - p);
+}
+
 void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 

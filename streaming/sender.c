@@ -236,7 +236,7 @@ struct {
 } stream_responses[] = {
     {
         .response = START_STREAMING_PROMPT_VN,
-        .length = strlen(START_STREAMING_PROMPT_VN),
+        .length = sizeof(START_STREAMING_PROMPT_VN) - 1,
         .version = STREAM_HANDSHAKE_OK_V3, // and above
         .dynamic = true,                 // dynamic = we will parse the version / capabilities
         .error = NULL,
@@ -245,7 +245,7 @@ struct {
     },
     {
         .response = START_STREAMING_PROMPT_V2,
-        .length = strlen(START_STREAMING_PROMPT_V2),
+        .length = sizeof(START_STREAMING_PROMPT_V2) - 1,
         .version = STREAM_HANDSHAKE_OK_V2,
         .dynamic = false,
         .error = NULL,
@@ -254,7 +254,7 @@ struct {
     },
     {
         .response = START_STREAMING_PROMPT_V1,
-        .length = strlen(START_STREAMING_PROMPT_V1),
+        .length = sizeof(START_STREAMING_PROMPT_V1) - 1,
         .version = STREAM_HANDSHAKE_OK_V1,
         .dynamic = false,
         .error = NULL,
@@ -263,7 +263,7 @@ struct {
     },
     {
         .response = START_STREAMING_ERROR_SAME_LOCALHOST,
-        .length = strlen(START_STREAMING_ERROR_SAME_LOCALHOST),
+        .length = sizeof(START_STREAMING_ERROR_SAME_LOCALHOST) - 1,
         .version = STREAM_HANDSHAKE_ERROR_LOCALHOST,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
@@ -272,7 +272,7 @@ struct {
     },
     {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
-        .length = strlen(START_STREAMING_ERROR_ALREADY_STREAMING),
+        .length = sizeof(START_STREAMING_ERROR_ALREADY_STREAMING) - 1,
         .version = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
@@ -281,7 +281,7 @@ struct {
     },
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
-        .length = strlen(START_STREAMING_ERROR_NOT_PERMITTED),
+        .length = sizeof(START_STREAMING_ERROR_NOT_PERMITTED) - 1,
         .version = STREAM_HANDSHAKE_ERROR_DENIED,
         .dynamic = false,
         .error = "remote server denied access, probably we don't have the right API key?",
@@ -1069,7 +1069,10 @@ void *rrdpush_sender_thread(void *ptr) {
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
     __atomic_clear(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST);
 
-    int pipe_buffer_size = fcntl(s->host->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
+    int pipe_buffer_size = 10 * 1024;
+#ifdef F_GETPIPE_SZ
+    pipe_buffer_size = fcntl(s->host->rrdpush_sender_pipe[PIPE_READ], F_GETPIPE_SZ);
+#endif
     if(pipe_buffer_size < 10 * 1024)
         pipe_buffer_size = 10 * 1024;
 
