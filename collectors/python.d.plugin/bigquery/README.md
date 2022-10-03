@@ -25,7 +25,7 @@ to the `pandas-gbq` [approach](https://pandas-gbq.readthedocs.io/en/latest/howto
 
 ## Configuration
 
-Below is an example configuration to just query some random data from BigQuery (two times) and plot each 
+Below is an example configuration to query some random data from BigQuery (two times) and plot each 
 query data as a seperate chart.
 
 ```yaml
