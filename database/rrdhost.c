@@ -1306,10 +1306,26 @@ static void rrdhost_load_auto_labels(void) {
     health_add_host_labels();
 
     rrdlabels_add(
-        labels, "_is_parent", (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false", RRDLABEL_SRC_AUTO);
+        labels, "_is_parent", (localhost->senders_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     if (localhost->rrdpush_send_destination)
         rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
+}
+
+void rrdhost_set_is_parent_label(int count) {
+    DICTIONARY *labels = localhost->rrdlabels;
+
+    if (count == 0 || count == 1) {
+        rrdlabels_add(
+                      labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+        //queue a node info
+#ifdef ENABLE_ACLK
+        if (netdata_cloud_setting) {
+            aclk_queue_node_info(localhost);
+        }
+#endif
+    }
 }
 
 static void rrdhost_load_config_labels(void) {
