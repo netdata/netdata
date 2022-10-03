@@ -4322,8 +4322,6 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     time_t expires = now_realtime_sec() + update_every;
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
-    char buffer[PLUGINSD_LINE_MAX + 1];
-
     if(unlikely(!func_processes_fields)) {
         func_processes_fields = buffer_create(1000);
 
@@ -4351,7 +4349,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(func_processes_fields, "Uid", "User ID", false, "integer", NULL, "ascending");
         add_table_field(func_processes_fields, "Group", "Group Owner", true, "string", NULL, "ascending");
         add_table_field(func_processes_fields, "Gid", "Group ID", false, "integer", NULL, "ascending");
-        add_table_field(func_processes_fields, "Procs", "Processes", true, "bar-with-integer", "processes", "descending");
+        add_table_field(func_processes_fields, "Processes", "Processes", true, "bar-with-integer", "processes", "descending");
         add_table_field(func_processes_fields, "Threads", "Threads", true, "bar-with-integer", "threads", "descending");
         add_table_field(func_processes_fields, "Uptime", "Uptime in seconds", true, "duration", "seconds", "descending");
 
@@ -4410,77 +4408,69 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
             func_processes_fields,
                 ""
                 "\n   },"
-                "\n   \"default sort column\": \"category\","
+                "\n   \"default sort column\": \"CPU\","
                 "\n   \"charts\": {"
-                "\n      \"cpu\": {"
+                "\n      \"CPU\": {"
                 "\n         \"name\":\"CPU Utilization\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"utime\", \"stime\", \"gtime\", \"cutime\", \"cstime\", \"cgtime\" ]"
+                "\n         \"columns\": [ \"UserCPU\", \"SysCPU\", \"GuestCPU\", \"CUserCPU\", \"CSysCPU\", \"CGuestCPU\" ]"
                 "\n      },"
-                "\n      \"memory\": {"
+                "\n      \"Memory\": {"
                 "\n         \"name\":\"Memory\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"vmsize\", \"vmrss\", \"vmshared\", \"vmswap\" ]"
+                "\n         \"columns\": [ \"VMSize\", \"RSS\", \"Shared\", \"Swap\" ]"
                 "\n      },"
-                "\n      \"reads\": {"
+#ifndef __FreeBSD__
+                "\n      \"Reads\": {"
                 "\n         \"name\":\"I/O Reads\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ "
-#ifndef __FreeBSD__
-                                "\"lreads\", "
-#endif
-                                "\"preads\" ]"
+                "\n         \"columns\": [ \"LReads\", \"PReads\" ]"
                 "\n      },"
-                "\n      \"writes\": {"
+                "\n      \"Writes\": {"
                 "\n         \"name\":\"I/O Writes\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ "
-#ifndef __FreeBSD__
-                                "\"lwrites\", "
-#endif
-                                "\"pwrites\" ]"
+                "\n         \"columns\": [ \"LWrites\", \"PWrites\" ]"
                 "\n      },"
-#ifndef __FreeBSD__
-                "\n      \"logical_io\": {"
+                "\n      \"LogicalIO\": {"
                 "\n         \"name\":\"Logical I/O\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"lreads\", \"lwrites\" ]"
+                "\n         \"columns\": [ \"LReads\", \"LWrites\" ]"
                 "\n      },"
 #endif
-                "\n      \"physical_io\": {"
+                "\n      \"PhysicalIO\": {"
                 "\n         \"name\":\"Physical I/O\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"preads\", \"pwrites\" ]"
+                "\n         \"columns\": [ \"PReads\", \"PWrites\" ]"
                 "\n      },"
-                "\n      \"io_calls\": {"
+                "\n      \"IOCalls\": {"
                 "\n         \"name\":\"I/O Calls\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"readcalls\", \"writecalls\" ]"
+                "\n         \"columns\": [ \"RCalls\", \"WCalls\" ]"
                 "\n      },"
-                "\n      \"minflt\": {"
+                "\n      \"MinFlt\": {"
                 "\n         \"name\":\"Minor Page Faults\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"minflt\", \"cminflt\" ]"
+                "\n         \"columns\": [ \"MinFlt\", \"CMinFlt\" ]"
                 "\n      },"
-                "\n      \"majflt\": {"
+                "\n      \"MajFlt\": {"
                 "\n         \"name\":\"Major Page Faults\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"majflt\", \"cmajflt\" ]"
+                "\n         \"columns\": [ \"MajFlt\", \"CMajFlt\" ]"
                 "\n      },"
-                "\n      \"threads\": {"
+                "\n      \"Threads\": {"
                 "\n         \"name\":\"Threads\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"threads\" ]"
+                "\n         \"columns\": [ \"Threads\" ]"
                 "\n      },"
-                "\n      \"procs\": {"
+                "\n      \"Processes\": {"
                 "\n         \"name\":\"Processes\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"procs\" ]"
+                "\n         \"columns\": [ \"Processes\" ]"
                 "\n      },"
-                "\n      \"fds\": {"
+                "\n      \"FDs\": {"
                 "\n         \"name\":\"File Descriptors\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"fds\", \"pipefds\", \"socketfds\", \"inotifyfds\", \"eventfds\", \"timerfds\", \"signalfds\", \"eventpolls\", \"otherfds\" ]"
+                "\n         \"columns\": [ \"Files\", \"Pipes\", \"Sockets\", \"iNotiFDs\", \"EventFDs\", \"TimerFDs\", \"SigFDs\", \"EvPollFDs\", \"OtherFDs\" ]"
                 "\n      }"
                 "\n   },"
                 "\n   \"data\":["
@@ -4490,9 +4480,11 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
     fwrite(buffer_tostring(func_processes_fields), buffer_strlen(func_processes_fields), 1, stdout);
 
-    NETDATA_DOUBLE cpu_divisor = (NETDATA_DOUBLE)(time_factor * RATES_DETAIL / 100);
-    NETDATA_DOUBLE memory_divisor = 1024.0;
-    unsigned long long io_divisor = 1024LLU * RATES_DETAIL;
+    unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
+    unsigned int memory_divisor = 1024;
+    unsigned int io_divisor = 1024 * RATES_DETAIL;
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX);
 
     int rows= 0;
     for(p = root_of_pids; p ; p = p->next) {
@@ -4520,108 +4512,118 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         if(filter_gid && p->gid != gid)
             continue;
 
-        if(rows) fprintf(stdout, ",\n");
+        if(rows) buffer_fast_strcat(wb, ",\n", 2);
         rows++;
 
-        fprintf(stdout, "      [");
+        buffer_strcat(wb, "      [");
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
 
         // pid
-        fprintf(stdout, "%d", p->pid);
+        buffer_print_llu(wb, p->pid);
 
         // cmd
-        json_escape_string(buffer, p->comm, PLUGINSD_LINE_MAX);
-        fprintf(stdout, ", \"%s\"", buffer);
+        buffer_fast_strcat(wb, ",\"", 2);
+        buffer_strcat_jsonescape(wb, p->comm);
+        buffer_fast_strcat(wb, "\"", 1);
 
         // cmdline
-        json_escape_string(buffer, p->cmdline && *p->cmdline?p->cmdline:p->comm, PLUGINSD_LINE_MAX);
-        fprintf(stdout, ", \"%s\"", buffer);
+        buffer_fast_strcat(wb, ",\"", 2);
+        buffer_strcat_jsonescape(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
+        buffer_fast_strcat(wb, "\"", 1);
 
         // ppid
-        fprintf(stdout, ", %d", p->ppid);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->pid);
 
         // category
-        json_escape_string(buffer, p->target?p->target->name:"-", PLUGINSD_LINE_MAX);
-        fprintf(stdout, ", \"%s\"", buffer);
+        buffer_fast_strcat(wb, ",\"", 2);
+        buffer_strcat_jsonescape(wb, p->target ? p->target->name : "-");
+        buffer_fast_strcat(wb, "\"", 1);
 
         // user
-        json_escape_string(buffer, p->user_target?p->user_target->name:"-", PLUGINSD_LINE_MAX);
-        fprintf(stdout, ", \"%s\"", buffer);
+        buffer_fast_strcat(wb, ",\"", 2);
+        buffer_strcat_jsonescape(wb, p->user_target ? p->user_target->name : "-");
+        buffer_fast_strcat(wb, "\"", 1);
 
         // uid
-        fprintf(stdout, ", %u", (unsigned)p->uid);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->uid);
 
         // group
-        json_escape_string(buffer, p->group_target?p->group_target->name:"-", PLUGINSD_LINE_MAX);
-        fprintf(stdout, ", \"%s\"", buffer);
+        buffer_fast_strcat(wb, ",\"", 2);
+        buffer_strcat_jsonescape(wb, p->group_target ? p->group_target->name : "-");
+        buffer_fast_strcat(wb, "\"", 1);
 
         // gid
-        fprintf(stdout, ", %u", (unsigned)p->gid);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->gid);
 
         // procs
-        fprintf(stdout, ", %d", p->children_count);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->children_count);
 
         // threads
-        fprintf(stdout, ", %d", p->num_threads);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->num_threads);
 
         // uptime
-        fprintf(stdout, ", %zu", (size_t)p->uptime);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->uptime);
 
         // minor page faults
-        fprintf(stdout, ", %llu", p->minflt / RATES_DETAIL);
-        fprintf(stdout, ", %llu", p->cminflt / RATES_DETAIL);
-        fprintf(stdout, ", %llu", (p->minflt + p->cminflt) / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->minflt / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->cminflt / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, (p->minflt + p->cminflt) / RATES_DETAIL);
 
         // major page faults
-        fprintf(stdout, ", %llu", p->majflt / RATES_DETAIL);
-        fprintf(stdout, ", %llu", p->cmajflt / RATES_DETAIL);
-        fprintf(stdout, ", %llu", (p->majflt + p->cmajflt) / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->majflt / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->cmajflt / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, (p->majflt + p->cmajflt) / RATES_DETAIL);
 
         // CPU utilization %
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->utime) / cpu_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->stime) / cpu_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->gtime) / cpu_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->cutime) / cpu_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->cstime) / cpu_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)(p->cgtime) / cpu_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)((p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime)) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->utime) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->stime) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->gtime) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->cutime) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->cstime) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->cgtime) / cpu_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime) / cpu_divisor);
 
         // memory MiB
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmsize / memory_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmrss / memory_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmshared / memory_divisor);
-        fprintf(stdout, ", %0.2f", (NETDATA_DOUBLE)p->status_vmswap / memory_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)p->status_vmsize / memory_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)p->status_vmrss / memory_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)p->status_vmshared / memory_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_rrd_value(wb, (NETDATA_DOUBLE)p->status_vmswap / memory_divisor);
 
         // Logical I/O
 #ifndef __FreeBSD__
-        fprintf(stdout, ", %llu", p->io_logical_bytes_read / io_divisor);
-        fprintf(stdout, ", %llu", p->io_logical_bytes_written / io_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->io_logical_bytes_read / io_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->io_logical_bytes_written / io_divisor);
 #endif
 
         // Physical I/O
-        fprintf(stdout, ", %llu", p->io_storage_bytes_read / io_divisor);
-        fprintf(stdout, ", %llu", p->io_storage_bytes_written / io_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->io_storage_bytes_read / io_divisor);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->io_storage_bytes_written / io_divisor);
 
         // I/O calls
-        fprintf(stdout, ", %llu", p->io_read_calls / RATES_DETAIL);
-        fprintf(stdout, ", %llu", p->io_write_calls / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->io_read_calls / RATES_DETAIL);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->io_write_calls / RATES_DETAIL);
 
         // open file descriptors
-        fprintf(stdout, ", %zu", (size_t)p->openfds.files);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.pipes);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.sockets);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.inotifies);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.eventfds);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.timerfds);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.signalfds);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.eventpolls);
-        fprintf(stdout, ", %zu", (size_t)p->openfds.other);
-        fprintf(stdout, ", %zu", (size_t)(p->openfds.files + p->openfds.pipes + p->openfds.sockets + p->openfds.inotifies + p->openfds.eventfds + p->openfds.timerfds + p->openfds.signalfds + p->openfds.eventpolls + p->openfds.other));
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.files);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.pipes);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.sockets);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.inotifies);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.eventfds);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.timerfds);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.signalfds);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.eventpolls);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.other);
+        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->openfds.files + p->openfds.pipes + p->openfds.sockets + p->openfds.inotifies + p->openfds.eventfds + p->openfds.timerfds + p->openfds.signalfds + p->openfds.eventpolls + p->openfds.other);
 
-        fprintf(stdout, "]");
+        buffer_fast_strcat(wb, "]", 1);
+
+        fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+        buffer_flush(wb);
     }
+
+    buffer_free(wb);
 
     fprintf(stdout, "\n   ]");
     fprintf(stdout, ",\n   \"expires\":%ld", expires);
