@@ -475,12 +475,14 @@ install_non_systemd_init() {
   return 1
 }
 
-install_netdata_service() {
-  if [ "${UID}" -eq 0 ]; then
-    if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-      # shellcheck disable=SC2154
-      save_path="${tmpdir}/netdata-service-cmds"
-      run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}"
+run_install_service_script() {
+  # shellcheck disable=SC2154
+  save_path="${tmpdir}/netdata-service-cmds"
+  # shellcheck disable=SC2068
+  run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
+
+  case $? in
+    0)
       if [ -r "${save_path}" ]; then
         # shellcheck disable=SC1090
         . "${save_path}"
@@ -493,6 +495,44 @@ install_netdata_service() {
           NETDATA_INSTALLER_START_CMD="netdata"
         fi
       fi
+      ;;
+    1)
+      if [ -z "${NETDATA_SERVICE_WARNED_1}" ]; then
+        warning "Intenral error encountered while attempting to install or manage Netdata as a system service. This is probably a bug."
+        NETDATA_SERVICE_WARNED_1=1
+      fi
+      ;;
+    2)
+      if [ -z "${NETDATA_SERVICE_WARNED_2}" ]; then
+        warning "Failed to detect system service manager type. Cannot cleanly install or manage Netdata as a system service. If you are running this script in a container, this is expected and can safely be ignored."
+        NETDATA_SERVICE_WARNED_2=1
+      fi
+      ;;
+    3)
+      if [ -z "${NETDATA_SERVICE_WARNED_3}" ]; then
+        warning "Detected an unsupported system service manager. Manual setup will be required to manage Netdata as a system service."
+        NETDATA_SERVICE_WARNED_3=1
+      fi
+      ;;
+    4)
+      if [ -z "${NETDATA_SERVICE_WARNED_4}" ]; then
+        warning "Detected a supported system service manager, but failed to install Netdata as a system service. Usually this is a result of incorrect permissions. Manually running ${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh may provide more information about the exact issue."
+        NETDATA_SERVICE_WARNED_4=1
+      fi
+      ;;
+    5)
+      if [ -z "${NETDATA_SERVICE_WARNED_5}" ]; then
+        warning "We do not support managing Netdata as a system service on this platform. Manual setup will be required."
+        NETDATA_SERVICE_WARNED_5=1
+      fi
+      ;;
+  esac
+}
+
+install_netdata_service() {
+  if [ "${UID}" -eq 0 ]; then
+    if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+      run_install_service_script
     else
       # This is used by netdata-installer.sh
       # shellcheck disable=SC2034
@@ -660,13 +700,7 @@ stop_all_netdata() {
   stop_success=0
 
   if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-    # shellcheck disable=SC2154
-    save_path="${tmpdir}/netdata-service-cmds"
-    run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --cmds-only --save-cmds "${save_path}"
-    if [ -r "${save_path}" ]; then
-      # shellcheck disable=SC1090
-      . "${save_path}"
-    fi
+    run_install_service_script --cmds-only
   fi
 
   if [ "${UID}" -eq 0 ]; then
@@ -727,13 +761,7 @@ restart_netdata() {
   progress "Restarting netdata instance"
 
   if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-    # shellcheck disable=SC2154
-    save_path="${tmpdir}/netdata-service-cmds"
-    run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --cmds-only --save-cmds "${save_path}"
-    if [ -r "${save_path}" ]; then
-      # shellcheck disable=SC1090
-      . "${save_path}"
-    fi
+    run_install_service_script --cmds-only
   fi
 
   if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
