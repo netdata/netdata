@@ -14,7 +14,7 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
     // wrapper for ACLK only which loads ACLK specific proxy settings
     // then only calls https_request
     struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
+    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
 
     if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
         request->proxy_host = (char*)proxy_conf.host; // TODO make it const as well
@@ -23,6 +23,8 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
 
     rc = https_request(request, response);
     freez((char*)proxy_conf.host);
+    freez((char*)proxy_conf.username);
+    freez((char*)proxy_conf.password);
     return rc;
 }
 
