@@ -197,15 +197,17 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
 }
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
-    BUFFER *wb = sender_start(host->sender);
-    struct custom_host_variables_callback tmp = {
-        .wb = wb
-    };
-    int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
-    (void)ret;
-    sender_commit(host->sender, wb);
+    if(rrdhost_flag_check(tmp->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+        BUFFER *wb = sender_start(host->sender);
+        struct custom_host_variables_callback tmp = {
+            .wb = wb
+        };
+        int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
+        (void)ret;
+        sender_commit(host->sender, wb);
 
-    debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
+        debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
+    }
 }
 
 // resets all the chart, so that their definitions
@@ -808,25 +810,26 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
 
     struct sender_state *s = tmp->sender;
 
-    BUFFER *wb = sender_start(s);
+    if(rrdhost_flag_check(tmp->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+        BUFFER *wb = sender_start(s);
 
-    pluginsd_function_result_begin_to_buffer(wb
-                                             , string2str(tmp->transaction)
-                                             , code
-                                             , functions_content_type_to_format(func_wb->contenttype)
-                                             , func_wb->expires);
+        pluginsd_function_result_begin_to_buffer(wb
+                                                 , string2str(tmp->transaction)
+                                                 , code
+                                                 , functions_content_type_to_format(func_wb->contenttype)
+                                                 , func_wb->expires);
 
-    buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
-    pluginsd_function_result_end_to_buffer(wb);
+        buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
+        pluginsd_function_result_end_to_buffer(wb);
 
-    sender_commit(s, wb);
+        sender_commit(s, wb);
 
-    internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
-                   rrdhost_hostname(s->host), s->connected_to,
-                   string2str(tmp->transaction),
-                   buffer_strlen(func_wb),
-                   now_realtime_usec() - tmp->received_ut);
-
+        internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
+                       rrdhost_hostname(s->host), s->connected_to,
+                       string2str(tmp->transaction),
+                       buffer_strlen(func_wb),
+                       now_realtime_usec() - tmp->received_ut);
+    }
     string_freez(tmp->transaction);
     buffer_free(func_wb);
     freez(tmp);
@@ -1178,8 +1181,6 @@ void *rrdpush_sender_thread(void *ptr) {
         if(unlikely(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE))
             rrdpush_queue_incremental_definitions(thread_data);
 
-        worker_is_idle();
-
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
@@ -1208,6 +1209,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 break;
             }
         }
+
+        worker_is_idle();
 
         // Wait until buffer opens in the socket or a rrdset_done_push wakes us
         enum {

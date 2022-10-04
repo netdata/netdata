@@ -369,9 +369,7 @@ void rrdset_done_push(RRDSET *st) {
         );
 
     // check if we are not connected
-    if(unlikely(!(flags & (RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED
-                          |RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
-                          |RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))) {
+    if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
 
         if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
             rrdpush_sender_thread_spawn(host);
@@ -408,7 +406,9 @@ static int send_labels_callback(const char *name, const char *value, RRDLABEL_SR
     return 1;
 }
 void rrdpush_send_host_labels(RRDHOST *host) {
-    if(!stream_has_capability(host->sender, STREAM_CAP_HLABELS))
+    if(unlikely(!rrdhost_has_rrdpush_send_enabled(host)
+                 || !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
+                 || !stream_has_capability(host->sender, STREAM_CAP_HLABELS)))
         return;
 
     BUFFER *wb = sender_start(host->sender);
