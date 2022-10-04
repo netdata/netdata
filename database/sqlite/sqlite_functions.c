@@ -134,7 +134,7 @@ static void add_stmt_to_list(sqlite3_stmt *res)
 static void release_statement(void *statement)
 {
     int rc;
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_DEV_MODE
     info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
 #endif
     if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
@@ -155,7 +155,7 @@ int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement)
     if (likely(rc == SQLITE_OK)) {
         if (likely(key)) {
             ret = pthread_setspecific(*key, *statement);
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_DEV_MODE
             info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
 #endif
         }
