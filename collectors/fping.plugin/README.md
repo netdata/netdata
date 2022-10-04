@@ -9,7 +9,12 @@ The fping plugin supports monitoring latency, packet loss and uptime of any numb
 by pinging them with `fping`.
 
 A recent version of `fping` is required (one that supports option `-N`).
-The supplied plugin can install it, by running:
+
+## Install fping
+
+### Compile from source
+
+If you have a C compiler, the supplied plugin can install it, by running:
 
 ```sh
 /usr/libexec/netdata/plugins.d/fping.plugin install
@@ -17,7 +22,26 @@ The supplied plugin can install it, by running:
 
 The above will download, build and install the right version as `/usr/local/bin/fping`.
 
-Then you need to edit `/etc/netdata/fping.conf` (to edit it on your system run
+
+### Debian/Ubuntu
+
+`sudo apt install fping`
+
+### CentOS/RHEL
+
+`sudo yum install fping`
+
+### Fedora
+
+`sudo dnf install fping`
+
+### Arch Linux
+
+`sudo pacman -S fping`
+
+## Configuration
+
+Edit `/etc/netdata/fping.conf` (to edit it on your system run
 `/etc/netdata/edit-config fping.conf`) like this:
 
 ```sh
