@@ -143,7 +143,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
         s->flags |= SENDER_FLAG_OVERFLOW;
 #else
     if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
-        s->overflow = 1;
+        s->flags |= SENDER_FLAG_OVERFLOW;
 #endif
 
     netdata_mutex_unlock(&s->mutex);
