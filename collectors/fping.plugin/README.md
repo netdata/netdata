@@ -8,13 +8,14 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/fping
 The fping plugin supports monitoring latency, packet loss and uptime of any number of network end points,
 by pinging them with `fping`.
 
-A recent version of `fping` is required (one that supports option `-N`).
-
 ## Install fping
 
-### Compile from source
+The required version is 4.3 and above.
 
-If you have a C compiler, the supplied plugin can install it, by running:
+### Distributions that don't have 4.3+
+
+Ensure your system has C compiler (e.g. `gcc`).
+Then the supplied plugin can install it, by running:
 
 ```sh
 /usr/libexec/netdata/plugins.d/fping.plugin install
