@@ -322,12 +322,12 @@ void simple_connector_worker(void *instance_p)
                 CONNECTED_TO_MAX);
 #ifdef ENABLE_HTTPS
             if (exporting_tls_is_enabled(instance->config.type, options) && sock != -1) {
-                if (netdata_exporting_ctx) {
+                if (netdata_ssl_exporting_ctx) {
                     if (sock_delnonblock(sock) < 0)
                         error("Exporting cannot remove the non-blocking flag from socket %d", sock);
 
                     if (connector_specific_data->conn == NULL) {
-                        connector_specific_data->conn = SSL_new(netdata_exporting_ctx);
+                        connector_specific_data->conn = SSL_new(netdata_ssl_exporting_ctx);
                         if (connector_specific_data->conn == NULL) {
                             error("Failed to allocate SSL structure to socket %d.", sock);
                             connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;

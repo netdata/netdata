@@ -101,9 +101,9 @@ int rrdpush_init() {
     bool invalid_certificate = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", CONFIG_BOOLEAN_NO);
 
     if(invalid_certificate == CONFIG_BOOLEAN_YES){
-        if(netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
+        if(netdata_ssl_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
             info("Netdata is configured to accept invalid SSL certificate.");
-            netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
+            netdata_ssl_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
         }
     }
 
@@ -362,8 +362,7 @@ void rrdset_done_push(RRDSET *st) {
 
     // fetch the flags we need to check with one atomic operation
     RRDHOST_FLAGS flags = rrdhost_flag_check(host,
-              RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED
-            | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
+              RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
             | RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS
             | RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN
         );
@@ -552,6 +551,8 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     netdata_thread_t thr = 0;
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+
         info("STREAM %s [send]: signaling sending thread to stop...", rrdhost_hostname(host));
 
         // signal the thread that we want to join it
@@ -573,8 +574,6 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
         netdata_thread_join(thr, &result);
         info("STREAM %s [send]: sending thread has exited.", rrdhost_hostname(host));
     }
-
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
 }
 
 

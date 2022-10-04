@@ -714,7 +714,7 @@ typedef enum rrdhost_flags {
 
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 13), // when set, we should send ACLK stream context updates
     RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 14), // the host has initialized health structures
-    RRDHOST_FLAG_INITIALIZED_RRDPUSH            = (1 << 15), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_INITIALIZED_RRDPUSH_SENDER = (1 << 15), // the host has initialized rrdpush structures
     RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
     RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 17), // the host has pending dimension obsoletions
     RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 18), // contains charts and dims with uninitialized variables
@@ -983,11 +983,6 @@ struct rrdhost {
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
-
-#ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                         //Structure used to encrypt the connection
-    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
-#endif
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;

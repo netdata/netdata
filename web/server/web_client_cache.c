@@ -9,7 +9,7 @@
 #ifdef ENABLE_HTTPS
 
 static void web_client_reuse_ssl(struct web_client *w) {
-    if (netdata_srv_ctx) {
+    if (netdata_ssl_srv_ctx) {
         if (w->ssl.conn) {
             SSL_clear(w->ssl.conn);
         }
@@ -48,7 +48,7 @@ static void web_client_free(struct web_client *w) {
     buffer_free(w->response.data);
     freez(w->user_agent);
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )) {
+    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
         if (w->ssl.conn) {
             SSL_free(w->ssl.conn);
             w->ssl.conn = NULL;

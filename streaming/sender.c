@@ -407,31 +407,31 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
 #ifdef ENABLE_HTTPS
-    if( netdata_client_ctx ){
-        host->ssl.flags = NETDATA_SSL_START;
-        if (!host->ssl.conn){
-            host->ssl.conn = SSL_new(netdata_client_ctx);
-            if(!host->ssl.conn){
+    if(netdata_ssl_client_ctx){
+        host->sender->ssl.flags = NETDATA_SSL_START;
+        if (!host->sender->ssl.conn){
+            host->sender->ssl.conn = SSL_new(netdata_ssl_client_ctx);
+            if(!host->sender->ssl.conn){
                 error("Failed to allocate SSL structure.");
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
         else{
-            SSL_clear(host->ssl.conn);
+            SSL_clear(host->sender->ssl.conn);
         }
 
-        if (host->ssl.conn)
+        if (host->sender->ssl.conn)
         {
-            if (SSL_set_fd(host->ssl.conn, s->rrdpush_sender_socket) != 1) {
+            if (SSL_set_fd(host->sender->ssl.conn, s->rrdpush_sender_socket) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", s->rrdpush_sender_socket);
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             } else{
-                host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                host->sender->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
             }
         }
     }
     else {
-        host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+        host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 
@@ -549,13 +549,13 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
-    if (!host->ssl.flags) {
+    if (!host->sender->ssl.flags) {
         ERR_clear_error();
-        SSL_set_connect_state(host->ssl.conn);
-        int err = SSL_connect(host->ssl.conn);
+        SSL_set_connect_state(host->sender->ssl.conn);
+        int err = SSL_connect(host->sender->ssl.conn);
         if (err != 1){
-            err = SSL_get_error(host->ssl.conn, err);
-            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+            err = SSL_get_error(host->sender->ssl.conn, err);
+            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->sender->ssl.conn,err),NULL));
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                 rrdpush_sender_thread_close_socket(host);
@@ -565,13 +565,13 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                 return false;
             }
             else {
-                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                host->sender->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
         else {
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
-                if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
-                    if ( security_test_certificate(host->ssl.conn)) {
+                if (netdata_ssl_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
+                    if ( security_test_certificate(host->sender->ssl.conn)) {
                         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
                         error("Closing the stream connection, because the server SSL certificate is not valid.");
                         rrdpush_sender_thread_close_socket(host);
@@ -590,7 +590,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     bytes = send_timeout(
 #ifdef ENABLE_HTTPS
-        &host->ssl,
+        &host->sender->ssl,
 #endif
         s->rrdpush_sender_socket,
         http,
@@ -612,7 +612,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     bytes = recv_timeout(
 #ifdef ENABLE_HTTPS
-        &host->ssl,
+        &host->sender->ssl,
 #endif
         s->rrdpush_sender_socket,
         http,
@@ -718,8 +718,8 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
 #ifdef ENABLE_HTTPS
-    SSL *conn = s->host->ssl.conn ;
-    if(conn && !s->host->ssl.flags)
+    SSL *conn = s->host->sender->ssl.conn ;
+    if(conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
         ret = SSL_write(conn, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
@@ -754,15 +754,15 @@ static ssize_t attempt_read(struct sender_state *s) {
     ssize_t ret = 0;
 
 #ifdef ENABLE_HTTPS
-    if (s->host->ssl.conn && !s->host->stream_ssl.flags) {
+    if (s->host->sender->ssl.conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         ERR_clear_error();
         int desired = sizeof(s->read_buffer) - s->read_len - 1;
-        ret = SSL_read(s->host->ssl.conn, s->read_buffer, desired);
+        ret = SSL_read(s->host->sender->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += ret;
             return ret;
         }
-        int sslerrno = SSL_get_error(s->host->ssl.conn, desired);
+        int sslerrno = SSL_get_error(s->host->sender->ssl.conn, desired);
         if (sslerrno == SSL_ERROR_WANT_READ || sslerrno == SSL_ERROR_WANT_WRITE)
             return ret;
 
@@ -1083,7 +1083,7 @@ void *rrdpush_sender_thread(void *ptr) {
 #ifdef ENABLE_HTTPS
     if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
         security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
-        security_location_for_context(netdata_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+        ssl_security_location_for_context(netdata_ssl_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
     }
 #endif
 

@@ -110,8 +110,8 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
             (int64_t)remote_time);
         int ret;
 #ifdef ENABLE_HTTPS
-        SSL *conn = host->stream_ssl.conn ;
-        if(conn && !host->stream_ssl.flags) {
+        SSL *conn = host->receiver->ssl.conn ;
+        if(conn && !host->receiver->ssl.flags) {
             ret = SSL_write(conn, message, strlen(message));
         } else {
             ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
@@ -528,8 +528,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 #ifdef ENABLE_HTTPS
-        rpt->host->stream_ssl.conn = rpt->ssl.conn;
-        rpt->host->stream_ssl.flags = rpt->ssl.flags;
         if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
         if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
@@ -677,9 +675,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V1);
     }
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-    #ifdef ENABLE_HTTPS
-    rpt->host->stream_ssl.conn = rpt->ssl.conn;
-    rpt->host->stream_ssl.flags = rpt->ssl.flags;
+#ifdef ENABLE_HTTPS
     if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
     if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {

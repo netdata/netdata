@@ -200,33 +200,31 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
-static void rrdhost_initialize_rrdpush(RRDHOST *host,
+static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
                                        unsigned int rrdpush_enabled,
                                        char *rrdpush_destination,
                                        char *rrdpush_api_key,
                                        char *rrdpush_send_charts_matching
 ) {
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH)) return;
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH_SENDER)) return;
 
     if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) {
-        rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH);
+        rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH_SENDER);
 
         sender_init(host);
-        netdata_mutex_init(&host->receiver_lock);
-        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
-        
-        host->rrdpush_send_destination = rrdhost_has_rrdpush_sender_enabled(host)?strdupz(rrdpush_destination):NULL;
-        rrdpush_destinations_init(host);
-
-        host->rrdpush_send_api_key = rrdhost_has_rrdpush_sender_enabled(host)?strdupz(rrdpush_api_key):NULL;
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
 
 #ifdef ENABLE_HTTPS
-        host->ssl.conn = NULL;
-        host->ssl.flags = NETDATA_SSL_START;
-        host->stream_ssl.conn = NULL;
-        host->stream_ssl.flags = NETDATA_SSL_START;
+        host->sender->ssl.conn = NULL;
+        host->sender->ssl.flags = NETDATA_SSL_START;
 #endif
+
+        host->rrdpush_send_destination = strdupz(rrdpush_destination);
+        rrdpush_destinations_init(host);
+
+        host->rrdpush_send_api_key = strdupz(rrdpush_api_key);
+        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+
+        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
     }
     else
         rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
@@ -353,11 +351,13 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (likely(!archived)) {
         rrdfunctions_init(host);
         host->rrdlabels = rrdlabels_create();
-        rrdhost_initialize_rrdpush(host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+        rrdhost_initialize_rrdpush_sender(
+            host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
     }
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_mutex_init(&host->aclk_state_lock);
+    netdata_mutex_init(&host->receiver_lock);
 
     host->system_info = system_info;
 
@@ -571,10 +571,6 @@ void rrdhost_update(RRDHOST *host
 )
 {
     UNUSED(guid);
-    UNUSED(rrdpush_enabled);
-    UNUSED(rrdpush_destination);
-    UNUSED(rrdpush_api_key);
-    UNUSED(rrdpush_send_charts_matching);
 
     host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
     //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
@@ -631,14 +627,10 @@ void rrdhost_update(RRDHOST *host
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
 
-        rrdhost_initialize_rrdpush(host,
-                                   rrdpush_enabled,
-                                   rrdpush_destination,
-                                   rrdpush_api_key,
-                                   rrdpush_send_charts_matching);
+        rrdhost_initialize_rrdpush_sender(host, rrdpush_enabled, rrdpush_destination,
+                                          rrdpush_api_key, rrdpush_send_charts_matching);
 
-        rrdhost_initialize_health(host,
-                                  host == localhost);
+        rrdhost_initialize_health(host, host == localhost);
 
         rrd_hosts_available++;
         ml_new_host(host);

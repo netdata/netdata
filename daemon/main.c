@@ -379,10 +379,10 @@ int help(int exitcode) {
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+    ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
