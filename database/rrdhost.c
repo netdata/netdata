@@ -213,7 +213,8 @@ static void rrdhost_initialize_rrdpush(RRDHOST *host,
 
         sender_init(host);
         netdata_mutex_init(&host->receiver_lock);
-
+        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+        
         host->rrdpush_send_destination = rrdhost_has_rrdpush_sender_enabled(host)?strdupz(rrdpush_destination):NULL;
         rrdpush_destinations_init(host);
 
@@ -226,7 +227,6 @@ static void rrdhost_initialize_rrdpush(RRDHOST *host,
         host->stream_ssl.conn = NULL;
         host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
-        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
     }
     else
         rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
@@ -524,8 +524,7 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
-         ,
-        rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
+         , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
          , host->rrdpush_send_destination?host->rrdpush_send_destination:""
          , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
          , host->health_enabled?"enabled":"disabled"
