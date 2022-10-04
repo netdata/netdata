@@ -74,9 +74,9 @@ inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
 static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
     RRDHOST *ret_machine_guid = dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
     if(ret_machine_guid == host)
-        rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
+        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
     else {
-        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
+        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
         error("RRDHOST: %s() host with machine guid '%s' is already indexed", __FUNCTION__, host->machine_guid);
     }
 
@@ -84,11 +84,11 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
 }
 
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID)) {
+    if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID)) {
         if(!dictionary_del(rrdhost_root_index, host->machine_guid))
             error("RRDHOST: %s() failed to delete machine guid '%s' from index", __FUNCTION__, host->machine_guid);
 
-        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_MACHINE_GUID);
+        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
     }
 }
 
@@ -107,9 +107,9 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
 
     RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
     if(ret_hostname == host)
-        rrdhost_flag_set(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
+        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     else {
-        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
+        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
         error("RRDHOST: %s() host with hostname '%s' is already indexed", __FUNCTION__, rrdhost_hostname(host));
     }
 
@@ -119,11 +119,11 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
 static inline void rrdhost_index_del_hostname(RRDHOST *host) {
     if(unlikely(!host->hostname)) return;
 
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_INDEXED_HOSTNAME)) {
+    if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_HOSTNAME)) {
         if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
             error("RRDHOST: %s() failed to delete hostname '%s' from index", __FUNCTION__, rrdhost_hostname(host));
 
-        rrdhost_flag_clear(host, RRDHOST_FLAG_INDEXED_HOSTNAME);
+        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     }
 }
 
@@ -206,10 +206,10 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
                                        char *rrdpush_api_key,
                                        char *rrdpush_send_charts_matching
 ) {
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH_SENDER)) return;
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED)) return;
 
     if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) {
-        rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH_SENDER);
+        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 
         sender_init(host);
 
@@ -364,10 +364,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdset_index_init(host);
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
-        rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
+        rrdhost_option_set(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
 
     if(config_get_boolean(CONFIG_SECTION_DB, "delete orphan hosts files", 1) && !is_localhost)
-        rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
+        rrdhost_option_set(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST);
 
     char filename[FILENAME_MAX + 1];
     if(is_localhost) {
@@ -1366,7 +1366,7 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
     info("Cleaning up database of host '%s'...", rrdhost_hostname(host));
 
     RRDSET *st;
-    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
+    uint32_t rrdhost_delete_obsolete_charts = rrdhost_option_check(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
 
     // we get a write lock
     // to ensure only one thread is saving the database
@@ -1411,7 +1411,7 @@ void rrdhost_cleanup_all(void) {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if (host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST) && !host->receiver
+        if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
 #ifdef ENABLE_DBENGINE
             /* don't delete multi-host DB host files */
             && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))

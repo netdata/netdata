@@ -694,30 +694,30 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                         = (1 << 0), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS         = (1 << 1), // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST             = (1 << 2), // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 3), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 4), // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED                       = (1 << 5), // The host is archived, no collected charts yet
+    // Orphan, Archived and Obsolete flags
+    RRDHOST_FLAG_ORPHAN                         = (1 << 10), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_ARCHIVED                       = (1 << 11), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 12), // the host has pending chart obsoletions
+    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 13), // the host has pending dimension obsoletions
 
-    // RRDPUSH sender
-    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 6), // When set, the sender thread is running
-    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 7), // When set, the host is connected to a parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 8), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 9), // when set, we have logged the status of metrics streaming
-    RRDHOST_FLAG_RRDPUSH_SENDER_JOIN            = (1 << 10), // When set, we want to join the sender thread
+    // Streaming sender
+    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 14), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 15), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 16), // When set, the host is connected to a parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 17), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 18), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_RRDPUSH_SENDER_JOIN            = (1 << 19), // When set, we want to join the sender thread
 
-    //
-    RRDHOST_FLAG_INDEXED_MACHINE_GUID           = (1 << 11), // when set, we have indexed its machine guid
-    RRDHOST_FLAG_INDEXED_HOSTNAME               = (1 << 12), // when set, we have indexed its hostname
+    // Health
+    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 20), // contains charts and dims with uninitialized variables
+    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 21), // the host has initialized health structures
 
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 13), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 14), // the host has initialized health structures
-    RRDHOST_FLAG_INITIALIZED_RRDPUSH_SENDER = (1 << 15), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
-    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 17), // the host has pending dimension obsoletions
-    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 18), // contains charts and dims with uninitialized variables
+    // Exporting
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 22), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 23), // don't send it to external databases
+
+    // ACLK
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -732,13 +732,21 @@ typedef enum rrdhost_flags {
 #endif
 
 typedef enum {
-    RRDHOST_OPTION_SENDER_ENABLED = (1 << 0), // set when the host is configured to send metrics to a parent
+    // Indexing
+    RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
+    RRDHOST_OPTION_INDEXED_HOSTNAME         = (1 << 1), // when set, we have indexed its hostname
 
+    // Streaming configuration
+    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 2), // set when the host is configured to send metrics to a parent
+
+    // Configuration options
+    RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS   = (1 << 3), // delete files of obsolete charts
+    RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
 } RRDHOST_OPTIONS;
 
-#define rrdhost_option_check(host, flag) ((host)->flags & (flag))
-#define rrdhost_option_set(host, flag)   (host)->flags |= flag
-#define rrdhost_option_clear(host, flag) (host)->flags &= ~(flag)
+#define rrdhost_option_check(host, flag) ((host)->options & (flag))
+#define rrdhost_option_set(host, flag)   (host)->options |= flag
+#define rrdhost_option_clear(host, flag) (host)->options &= ~(flag)
 
 #define rrdhost_has_rrdpush_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
 

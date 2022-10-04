@@ -105,7 +105,7 @@ static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
     rrdvar_delete_all(st->rrdvars);
 
     if(st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-        if(rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS)) {
+        if(rrdhost_option_check(st->rrdhost, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS)) {
             worker_is_busy(WORKER_JOB_DELETE_CHART);
             rrdset_delete_files(st);
         }
@@ -200,7 +200,7 @@ restart_after_removal:
         if(rrdhost_should_be_removed(host, protected_host, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
-            if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
+            if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
 #ifdef ENABLE_DBENGINE
                 /* don't delete multi-host DB host files */
                 && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
