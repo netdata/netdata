@@ -588,7 +588,7 @@ install_linux_service() {
     exit 2
   fi
 
-  "install_$(t)_service"
+  "install_${t}_service"
 }
 
 linux_cmds() {
@@ -598,7 +598,7 @@ linux_cmds() {
     exit 2
   fi
 
-  "$(t)_cmds"
+  "${t}_cmds"
 }
 
 # =====================================================================
