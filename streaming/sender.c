@@ -1254,8 +1254,8 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        // If we have data and have seen the TCP window open then try to close it by a transmission.
-        if(likely(outstanding && fds[Socket].revents & POLLOUT)) {
+         // If we have data and have seen the TCP window open then try to close it by a transmission.
+        if(likely(outstanding && (fds[Socket].revents & POLLOUT))) {
             worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
             ssize_t bytes = attempt_to_send(s);
             if(bytes > 0)
