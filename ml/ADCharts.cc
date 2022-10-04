@@ -106,7 +106,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
             IdSS.str().c_str(), // id
             NameSS.str().c_str(), // name
             "anomaly_detection", // family
-            "anomaly_detection.anomaly_detection", // ctx
+            "anomaly_detection.detector_events", // ctx
             "Anomaly detection events", // title
             "percentage", // units
             "netdata", // plugin
