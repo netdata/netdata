@@ -42,16 +42,25 @@ The above will download, build and install the right version as `/usr/local/bin/
 ## Configuration
 
 Edit `/etc/netdata/fping.conf` (to edit it on your system run
-`/etc/netdata/edit-config fping.conf`) like this:
+`/etc/netdata/edit-config fping.conf`):
+
+Uncomment the following line and enter the location of the fping binary on your system (you can find it with `which fping`).
+
+`fping="/usr/local/bin/fping"`
+
+Add the hosts you need to ping:
 
 ```sh
-# uncomment the following line - it should already be there
-fping="/usr/local/bin/fping"
-
 # set here all the hosts you need to ping
 # I suggest to use hostnames and put their IPs in /etc/hosts
 hosts="host1 host2 host3"
+```
 
+And then restart netdata.
+
+You can also configure some other options:
+
+```sh
 # override the chart update frequency - the default is inherited from Netdata
 update_every=1
 
