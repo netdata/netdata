@@ -4377,7 +4377,10 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         add_table_field(func_processes_fields, "Pid", "Process ID", true, "integer", NULL, NAN, "ascending");
         add_table_field(func_processes_fields, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending");
+
+#ifdef NETDATA_DEV_MODE
         add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:cmd", NULL, NAN, "ascending");
+#endif
         add_table_field(func_processes_fields, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending");
         add_table_field(func_processes_fields, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending");
         add_table_field(func_processes_fields, "User", "User Owner", true, "string", NULL, NAN, "ascending");
@@ -4472,7 +4475,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                 );
 
         buffer_strcat(
-            func_processes_fields,
+            func_processes_fields, ""
 #ifndef __FreeBSD__
                 "\n      \"Reads\": {"
                 "\n         \"name\":\"I/O Reads\","
@@ -4591,10 +4594,12 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         buffer_strcat_jsonescape(wb, p->comm);
         buffer_fast_strcat(wb, "\"", 1);
 
+#ifdef NETDATA_DEV_MODE
         // cmdline
         buffer_fast_strcat(wb, ",\"", 2);
         buffer_strcat_jsonescape(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
         buffer_fast_strcat(wb, "\"", 1);
+#endif
 
         // ppid
         buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->ppid);
