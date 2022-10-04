@@ -4700,12 +4700,13 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     pluginsd_function_result_end_to_stdout();
 }
 
-void *reader_main(void *arg __maybe_unused) {
-    netdata_thread_detach(netdata_thread_self());
+bool apps_plugin_exit = false;
 
+void *reader_main(void *arg __maybe_unused) {
     char buffer[PLUGINSD_LINE_MAX + 1];
 
-    while(fgets(buffer, PLUGINSD_LINE_MAX, stdin)) {
+    char *s = NULL;
+    while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
         pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
@@ -4745,7 +4746,12 @@ void *reader_main(void *arg __maybe_unused) {
             error("Received unknown command: %s", words[0]?words[0]:"(unset)");
     }
 
-    fatal("Received error on read pipe.");
+    if(!s || feof(stdin) || ferror(stdin)) {
+        apps_plugin_exit = true;
+        error("Received error on stdin.");
+    }
+
+    exit(1);
     return NULL;
 }
 
@@ -4852,7 +4858,7 @@ int main(int argc, char **argv) {
     global_iterations_counter = 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(;1; global_iterations_counter++) {
+    for(; !apps_plugin_exit ; global_iterations_counter++) {
         netdata_mutex_unlock(&mutex);
 
 #ifdef NETDATA_PROFILING
