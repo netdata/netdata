@@ -627,8 +627,14 @@ void rrdhost_update(RRDHOST *host
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
 
-        rrdhost_initialize_rrdpush_sender(host, rrdpush_enabled, rrdpush_destination,
-                                          rrdpush_api_key, rrdpush_send_charts_matching);
+        if (!host->rrdset_root_index)
+            rrdset_index_init(host);
+
+        rrdhost_initialize_rrdpush(host,
+                                   rrdpush_enabled,
+                                   rrdpush_destination,
+                                   rrdpush_api_key,
+                                   rrdpush_send_charts_matching);
 
         rrdhost_initialize_health(host, host == localhost);
 

@@ -23,7 +23,7 @@
 static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED | RRDDIM_FLAG_ACLK) || !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED) || !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
         return;
 
     worker_is_busy(WORKER_JOB_ARCHIVE_DIMENSION);
