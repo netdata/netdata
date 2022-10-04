@@ -19,6 +19,8 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
     if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
         request->proxy_host = (char*)proxy_conf.host; // TODO make it const as well
         request->proxy_port = proxy_conf.port;
+        request->proxy_username = proxy_conf.username;
+        request->proxy_password = proxy_conf.password;
     }
 
     rc = https_request(request, response);
@@ -302,25 +304,6 @@ inline static int base64_decode_helper(unsigned char *out, int *outl, const unsi
         error("Unexpected data at EVP_DecodeFinal");
         return 1;
     }
-    return 0;
-}
-
-inline static int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
-{
-    int len;
-    unsigned char *str = out;
-    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
-    EVP_EncodeInit(ctx);
-    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
-    str += *outl;
-    EVP_EncodeFinal(ctx, str, &len);
-    *outl += len;
-    // if we ever expect longer output than what OpenSSL would pack into single line
-    // we would have to skip the endlines, until then we can just cut the string short
-    str = (unsigned char*)strchr((char*)out, '\n');
-    if (str)
-        *str = 0;
-    EVP_ENCODE_CTX_free(ctx);
     return 0;
 }
 
