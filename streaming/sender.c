@@ -227,12 +227,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->mutex);
-
-    size_t len = cbuffer_next_unsafe(host->sender->buffer, NULL);
-    if (len)
-        error("STREAM %s [send]: discarding %zu bytes of metrics already in the buffer.", rrdhost_hostname(host), len);
-
-    cbuffer_remove_unsafe(host->sender->buffer, len);
+    cbuffer_flush(host->sender->buffer);
     netdata_mutex_unlock(&host->sender->mutex);
 
     rrdpush_sender_thread_reset_all_charts(host);
@@ -727,7 +722,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #else
-    ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
+    ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #endif
 
     if (likely(ret > 0)) {
@@ -1164,7 +1159,7 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_send_host_labels(s->host);
 
             // TO PUSH METRICS WITH DEFINITIONS:
-            //if(unlikely(s->host->rrdpush_sender_socket != -1 && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
+            //if(unlikely(s->rrdpush_sender_socket != -1 && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
             //    thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
             //    rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
             //}
@@ -1259,6 +1254,14 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
+        // If we have data and have seen the TCP window open then try to close it by a transmission.
+        if(likely(outstanding && fds[Socket].revents & POLLOUT)) {
+            worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
+            ssize_t bytes = attempt_to_send(s);
+            if(bytes > 0)
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, bytes);
+        }
+
         // If the collector woke us up then empty the pipe to remove the signal
         if (fds[Collector].revents & (POLLIN|POLLPRI)) {
             worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
@@ -1279,14 +1282,6 @@ void *rrdpush_sender_thread(void *ptr) {
         if(unlikely(s->read_len)) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
             execute_commands(s);
-        }
-
-        // If we have data and have seen the TCP window open then try to close it by a transmission.
-        if(likely(outstanding && fds[Socket].revents & POLLOUT)) {
-            worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
-            ssize_t bytes = attempt_to_send(s);
-            if(bytes > 0)
-                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, bytes);
         }
 
         if(unlikely(fds[Collector].revents & (POLLERR|POLLHUP|POLLNVAL))) {

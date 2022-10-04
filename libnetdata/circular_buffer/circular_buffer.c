@@ -89,3 +89,8 @@ size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start) {
     }
     return buf->size - buf->read;
 }
+
+void cbuffer_flush(struct circular_buffer*buf) {
+    buf->write = 0;
+    buf->read = 0;
+}
