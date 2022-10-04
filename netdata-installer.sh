@@ -747,14 +747,12 @@ detect_libc() {
     echo >&2 " Detected musl"
     libc="musl"
   else
-    ln_path=$(command -v ln)
-    if [ -n "${ln_path}" ] ; then
-      cmd=$(ldd "$ln_path" | grep -w libc | cut -d" " -f 3)
+      cmd=$(ldd /bin/sh | grep -w libc | cut -d" " -f 3)
+      echo >&2 "${cmd}"
       if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
         echo >&2 " Detected GLIBC"
         libc="glibc"
       fi
-    fi
   fi
 
   if [ -z "$libc" ]; then
