@@ -207,28 +207,29 @@ static void rrdhost_initialize_rrdpush(RRDHOST *host,
                                        char *rrdpush_send_charts_matching
 ) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH)) return;
-    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH);
 
-    sender_init(host);
-    netdata_mutex_init(&host->receiver_lock);
+    if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) {
+        rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_RRDPUSH);
 
-    if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
-        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
-    else
-        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+        sender_init(host);
+        netdata_mutex_init(&host->receiver_lock);
 
-    host->rrdpush_send_destination = rrdhost_has_rrdpush_send_enabled(host)?strdupz(rrdpush_destination):NULL;
-    rrdpush_destinations_init(host);
+        host->rrdpush_send_destination = rrdhost_has_rrdpush_sender_enabled(host)?strdupz(rrdpush_destination):NULL;
+        rrdpush_destinations_init(host);
 
-    host->rrdpush_send_api_key = rrdhost_has_rrdpush_send_enabled(host)?strdupz(rrdpush_api_key):NULL;
-    host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
+        host->rrdpush_send_api_key = rrdhost_has_rrdpush_sender_enabled(host)?strdupz(rrdpush_api_key):NULL;
+        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
 
 #ifdef ENABLE_HTTPS
-    host->ssl.conn = NULL;
-    host->ssl.flags = NETDATA_SSL_START;
-    host->stream_ssl.conn = NULL;
-    host->stream_ssl.flags = NETDATA_SSL_START;
+        host->ssl.conn = NULL;
+        host->ssl.flags = NETDATA_SSL_START;
+        host->stream_ssl.conn = NULL;
+        host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
+        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+    }
+    else
+        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
 }
 
 static void rrdhost_initialize_health(RRDHOST *host,
@@ -523,7 +524,8 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
-         , rrdhost_has_rrdpush_send_enabled(host)?"enabled":"disabled"
+         ,
+        rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
          , host->rrdpush_send_destination?host->rrdpush_send_destination:""
          , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
          , host->health_enabled?"enabled":"disabled"
@@ -1010,6 +1012,8 @@ void destroy_receiver_state(struct receiver_state *rpt);
 
 void stop_streaming_sender(RRDHOST *host)
 {
+    rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+
     if (unlikely(!host->sender))
         return;
 
@@ -1338,12 +1342,7 @@ void reload_host_labels(void) {
 
     health_label_log_save(localhost);
 
-/*  TODO-GAPS - fix this so that it looks properly at the state and version of the sender
-    if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
-        localhost->labels.labels_flag |= RRDHOST_FLAG_STREAM_LABELS_UPDATE;
-        rrdpush_send_labels(localhost);
-    }
-*/
+    rrdpush_send_host_labels(localhost);
     health_reload();
 }
 

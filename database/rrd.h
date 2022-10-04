@@ -740,7 +740,9 @@ typedef enum {
 #define rrdhost_option_set(host, flag)   (host)->flags |= flag
 #define rrdhost_option_clear(host, flag) (host)->flags &= ~(flag)
 
-#define rrdhost_has_rrdpush_send_enabled(host) rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED)
+#define rrdhost_has_rrdpush_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
+
+#define rrdhost_can_send_definitions_to_parent(host) (rrdhost_has_rrdpush_sender_enabled(host) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
 
 // ----------------------------------------------------------------------------
 // Health data

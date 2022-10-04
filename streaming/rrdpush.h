@@ -48,7 +48,7 @@ typedef enum {
 
 #define STREAM_OUR_CAPABILITIES (STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS)
 
-#define stream_has_capability(rpt, capability) ((rpt)->capabilities & (capability))
+#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
 
 // ----------------------------------------------------------------------------
 // stream handshake

@@ -1487,7 +1487,7 @@ void rrdset_done(RRDSET *st) {
 after_first_database_work:
     st->counter_done++;
 
-    if(unlikely(rrdhost_has_rrdpush_send_enabled(st->rrdhost)))
+    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         rrdset_done_push(st);
 
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);

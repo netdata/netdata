@@ -315,7 +315,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host);
 bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_has_rrdpush_send_enabled(host) || !should_send_chart_matching(st)))
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host) || !should_send_chart_matching(st)))
         return false;
 
     BUFFER *wb = sender_start(host->sender);
@@ -406,8 +406,7 @@ static int send_labels_callback(const char *name, const char *value, RRDLABEL_SR
     return 1;
 }
 void rrdpush_send_host_labels(RRDHOST *host) {
-    if(unlikely(!rrdhost_has_rrdpush_send_enabled(host)
-                 || !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
                  || !stream_has_capability(host->sender, STREAM_CAP_HLABELS)))
         return;
 
@@ -424,7 +423,7 @@ void rrdpush_claimed_id(RRDHOST *host)
     if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
         return;
 
-    if(unlikely(!rrdhost_has_rrdpush_send_enabled(host) || !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)))
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
         return;
     
     BUFFER *wb = sender_start(host->sender);
@@ -574,6 +573,8 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
         netdata_thread_join(thr, &result);
         info("STREAM %s [send]: sending thread has exited.", rrdhost_hostname(host));
     }
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
 }
 
 

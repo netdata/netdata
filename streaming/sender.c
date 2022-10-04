@@ -173,7 +173,7 @@ static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const 
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
-    if(rrdhost_has_rrdpush_send_enabled(host) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+    if(rrdhost_can_send_definitions_to_parent(host)) {
         BUFFER *wb = sender_start(host->sender);
         rrdpush_sender_add_host_variable_to_buffer(wb, rva);
         sender_commit(host->sender, wb);
@@ -197,7 +197,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
 }
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+    if(rrdhost_can_send_definitions_to_parent(host)) {
         BUFFER *wb = sender_start(host->sender);
         struct custom_host_variables_callback tmp = {
             .wb = wb
@@ -810,7 +810,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
 
     struct sender_state *s = tmp->sender;
 
-    if(rrdhost_flag_check(tmp->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+    if(rrdhost_can_send_definitions_to_parent(s->host)) {
         BUFFER *wb = sender_start(s);
 
         pluginsd_function_result_begin_to_buffer(wb
@@ -1072,7 +1072,7 @@ void *rrdpush_sender_thread(void *ptr) {
     struct sender_state *s = ptr;
     s->tid = gettid();
 
-    if(!rrdhost_has_rrdpush_send_enabled(s->host) || !s->host->rrdpush_send_destination ||
+    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush_send_destination ||
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
        !*s->host->rrdpush_send_api_key) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
@@ -1134,7 +1134,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
-    for(; rrdhost_has_rrdpush_send_enabled(s->host) && !netdata_exit ;) {
+    for(; rrdhost_has_rrdpush_sender_enabled(s->host) && !netdata_exit ;) {
         // check for outstanding cancellation requests
         netdata_thread_testcancel();
 
