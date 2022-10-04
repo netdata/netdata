@@ -3,7 +3,6 @@
 # Author: Andrew Maguire (andrewm4894)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from google.oauth2 import service_account
 import pandas as pd
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -39,17 +38,7 @@ class Service(SimpleService):
                     'lines': []
                     }
                 self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
-        
-        for chart_config in self.chart_configs:
-            
-            # get data and add dims to charts
-            if chart_config['source_format'] == 'csv':
-                df = pd.read_csv(chart_config['url'], storage_options={'User-Agent': 'netdata'})
-            elif chart_config['source_format'] == 'json':
-                df = pd.read_json(chart_config['url'], storage_options={'User-Agent': 'netdata'})
-            else:
-                raise ValueError('unsupported source_format')
-
+                
             exec(chart_config['processing_code'])
 
             for dim in data:
@@ -61,14 +50,6 @@ class Service(SimpleService):
         """get data for each chart config"""
 
         for chart_config in self.chart_configs:
-
-            # get data and add dims to charts
-            if chart_config['source_format'] == 'csv':
-                df = pd.read_csv(chart_config['url'], storage_options={'User-Agent': 'netdata'})
-            elif chart_config['source_format'] == 'json':
-                df = pd.read_json(chart_config['url'], storage_options={'User-Agent': 'netdata'})
-            else:
-                raise ValueError('unsupported source_format')
 
             exec(chart_config['processing_code'])
 
