@@ -306,7 +306,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
         internal_error(true, "read_stream() failed (1).");
         return 1;
     }
-    
+
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
     if (!is_compressed_data(r->read_buffer, ret)) {

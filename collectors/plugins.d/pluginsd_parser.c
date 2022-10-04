@@ -4,24 +4,6 @@
 
 #define LOG_FUNCTIONS false
 
-/*
- * This is the action defined for the FLUSH command
- */
-PARSER_RC pluginsd_set_action(void *user, RRDSET *st, RRDDIM *rd, long long int value)
-{
-    UNUSED(user);
-
-    rrddim_set_by_pointer(st, rd, value);
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_flush_action(void *user, RRDSET *st)
-{
-    UNUSED(user);
-    UNUSED(st);
-    return PARSER_RC_OK;
-}
-
 PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations)
 {
     UNUSED(user);
@@ -34,15 +16,6 @@ PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, int
         } else
             rrdset_next(st);
     }
-    return PARSER_RC_OK;
-}
-
-
-PARSER_RC pluginsd_end_action(void *user, RRDSET *st)
-{
-    UNUSED(user);
-
-    rrdset_done(st);
     return PARSER_RC_OK;
 }
 
@@ -86,17 +59,6 @@ PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, ch
 
     return PARSER_RC_OK;
 }
-
-
-PARSER_RC pluginsd_disable_action(void *user)
-{
-    UNUSED(user);
-
-    info("called DISABLE. Disabling it.");
-    ((PARSER_USER_OBJECT *) user)->enabled = 0;
-    return PARSER_RC_ERROR;
-}
-
 
 PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value)
 {
@@ -189,7 +151,7 @@ PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_h
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *dimension = words[1];
     char *value = words[2];
@@ -222,12 +184,8 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
                 "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
                 dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
             goto disable;
-        } else {
-            if (plugins_action->set_action) {
-                return plugins_action->set_action(
-                    user, st, rd, strtoll(value, NULL, 0));
-            }
-        }
+        } else
+            rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
     }
     return PARSER_RC_OK;
 
@@ -270,7 +228,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
@@ -287,9 +245,7 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
-    if (plugins_action->end_action) {
-        return plugins_action->end_action(user, st);
-    }
+    rrdset_done(st);
     return PARSER_RC_OK;
 }
 
@@ -758,26 +714,21 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
     debug(D_PLUGINSD, "requested a FLUSH");
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     ((PARSER_USER_OBJECT *) user)->st = NULL;
-    if (plugins_action->flush_action) {
-        return plugins_action->flush_action(user, st);
-    }
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(user);
     UNUSED(words);
 
-    if (plugins_action->disable_action) {
-        return plugins_action->disable_action(user);
-    }
+    info("called DISABLE. Disabling it.");
+    ((PARSER_USER_OBJECT *) user)->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
