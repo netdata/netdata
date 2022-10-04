@@ -197,7 +197,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
 }
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
-    if(rrdhost_flag_check(tmp->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
         BUFFER *wb = sender_start(host->sender);
         struct custom_host_variables_callback tmp = {
             .wb = wb
