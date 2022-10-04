@@ -120,7 +120,7 @@ struct rrdset_constructor {
 static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
     static STRING *anomaly_rates_chart = NULL;
 
-    if(!unlikely(!anomaly_rates_chart))
+    if(unlikely(!anomaly_rates_chart))
         anomaly_rates_chart = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
 
     struct rrdset_constructor *ctr = constructor_data;
