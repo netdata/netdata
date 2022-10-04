@@ -573,7 +573,6 @@ detect_linux_svc_type() {
 
     if [ "${SVC_TYPE}" = "detect" ]; then
       error "Failed to detect what type of service manager is in use."
-      exit 2
     else
       echo "${SVC_TYPE}"
     fi
@@ -583,11 +582,23 @@ detect_linux_svc_type() {
 }
 
 install_linux_service() {
-  "install_$(detect_linux_svc_type)_service"
+  t="$(detect_linux_svc_type)"
+
+  if [ -z "${t}" ]; then
+    exit 2
+  fi
+
+  "install_$(t)_service"
 }
 
 linux_cmds() {
-  "$(detect_linux_svc_type)_cmds"
+  t="$(detect_linux_svc_type)"
+
+  if [ -z "${t}" ]; then
+    exit 2
+  fi
+
+  "$(t)_cmds"
 }
 
 # =====================================================================
