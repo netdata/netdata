@@ -38,7 +38,7 @@ database](MISSING LINK FOR METRIC EXPORTING REFERENCES), and then you can procee
 
 3. Save the file but keep it open, as you will edit it again to enable specific connectors.
 
-## Example: Enable the OpenTSDB connector
+### Example: Enable the OpenTSDB connector
 
 Use the following configuration as a starting point. Copy and paste it into `exporting.conf`.
 
@@ -60,7 +60,7 @@ Use the following configuration as a starting point. Copy and paste it into `exp
 <!--Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the
 [OpenTSDB connector doc](/exporting/opentsdb/README.md)-->
 
-## Example: Enable the Graphite connector
+### Example: Enable the Graphite connector
 
 Use the following configuration as a starting point. Copy and paste it into `exporting.conf`.
 
@@ -80,7 +80,3 @@ Use the following configuration as a starting point. Copy and paste it into `exp
 
 <!--Any further configuration is optional, based on your needs and the configuration of your Graphite-supported database.
 See [exporting engine reference](/exporting/README.md#configuration) for details.-->
-
-## Related topics
-
-List of reference docs user needs to be aware of.
