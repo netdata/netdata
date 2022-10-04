@@ -748,7 +748,6 @@ detect_libc() {
     libc="musl"
   else
       cmd=$(ldd /bin/sh | grep -w libc | cut -d" " -f 3)
-      echo >&2 "${cmd}"
       if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
         echo >&2 " Detected GLIBC"
         libc="glibc"
