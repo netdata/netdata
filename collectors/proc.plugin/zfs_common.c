@@ -246,7 +246,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS ARC Hits Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_HITS + 1
@@ -312,7 +312,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS Demand Hits Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_DHITS + 1
@@ -378,7 +378,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS Prefetch Hits Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_PHITS + 1
@@ -444,7 +444,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS Metadata Hits Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_MHITS + 1
@@ -510,7 +510,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS L2 Hits Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_L2HITS + 1
@@ -783,7 +783,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS Actual Cache Hits Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_ACTUAL_HITS + 1
@@ -849,7 +849,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS Data Demand Efficiency Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_DEMAND_DATA_HITS + 1
@@ -916,7 +916,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
                     , ZFS_FAMILY_EFFICIENCY
                     , NULL
                     , "ZFS Data Prefetch Efficiency Rate"
-                    , "events"
+                    , "events/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_PREFETCH_DATA_HITS + 1
