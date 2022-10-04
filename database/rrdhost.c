@@ -630,7 +630,7 @@ void rrdhost_update(RRDHOST *host
         if (!host->rrdset_root_index)
             rrdset_index_init(host);
 
-        rrdhost_initialize_rrdpush(host,
+        rrdhost_initialize_rrdpush_sender(host,
                                    rrdpush_enabled,
                                    rrdpush_destination,
                                    rrdpush_api_key,
