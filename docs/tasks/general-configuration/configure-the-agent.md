@@ -8,54 +8,79 @@ learn_rel_path: "general-configuration"
 learn_docs_purpose: "demonstrate an edit-config, reference to the ref-doc of netdata.conf, plus add an admonition in case user want to change metric retention to follow the corresponding doc"
 -->
 
-**********************************************************************
-Template:
+In this task you will learn how to edit the configuration files of the Agent, and also how to use **Host labels**.  
+All of our configuration Tasks point to this one for editing the configurtion files correctly.
 
-Small intro, give some context to the user
+## Prerequisites
 
-## Prerequisite
+- A node with the Agent installed
+- Terminal access to that node
 
-Unordered list of what you will need. 
+## Edit configuration files using the `edit-config` script
 
-## Steps
+:::tip
+The most reliable method of finding your Netdata config directory is loading your `netdata.conf` on your browser. Open a
+tab and navigate to `http://HOST:19999/netdata.conf`, replacing `HOST` with your node's IP address, or if you want to
+access the node you are locally using, you can also use `localhost`.
 
-Exact list of steps the user must follow
+Look for the line that begins with `# config directory =` . The text after that will be the path to your Netdata config
+directory.
+:::
 
-## Expected result
+Inside your Netdata config directory there is a helper script called `edit-config`. We made that script to help you in
+properly editing configuration files. The script takes as an argument a configuration file, and it will check for that
+in the stock configuration directory and in the user directory. If you haven't edited the configuration file before,
+upon saving, the script will copy the file and place it in the user configuration directory, which will in turn override
+the stock configuration.
 
-What you expect to see when you complete the steps above
+:::tip
+you can run:
 
-## Example
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory if different.
+sudo ./edit-config
+```
 
-Example configuration/actions of the task
+to get a list of all the available stock configuration files that you can edit.
+:::
 
-## Related topics
+This is the preferred method for editing Netdata's configuration, and making sure the changes are valid.
 
-List of reference docs user needs to be aware of.
+So, in short, to edit configuration files, for example `netdata.conf`, you can run:
 
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Use host labels to organize systems, metrics, and alarms"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/using-host-labels.md
--->
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory if different.
+sudo ./edit-config netdata.conf
+```
 
-# Use host labels to organize systems, metrics, and alarms
+You should now see `netdata.conf` in your editor!
+
+:::caution
+After making changes to the Netdata configuration files you need
+to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md#restarting-the-agent)
+for these changes to take effect! This action though isn't necessary for health configuration files, in which you just
+need to
+[reload the health configuration](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md#reload-health-configuration)
+between changes.
+:::
+
+## Use host labels to organize systems, metrics, and alarms
 
 When you use Netdata to monitor and troubleshoot an entire infrastructure, whether that's dozens or hundreds of systems,
 you need sophisticated ways of keeping everything organized. You need alarms that adapt to the system's purpose, or
-whether the parent or child in a streaming setup. You need properly-labeled metrics archiving so you can sort,
+whether the parent or child are in a streaming setup. You need properly-labeled metrics archiving so you can sort,
 correlate, and mash-up your data to your heart's content. You need to keep tabs on ephemeral Docker containers in a
 Kubernetes cluster.
 
-You need **host labels**: a powerful new way of organizing your Netdata-monitored systems. We introduced host labels in
-[v1.20 of Netdata](https://blog.netdata.cloud/posts/release-1.20/), and they come pre-configured out of the box.
+You need **host labels**: a powerful way of organizing your Netdata-monitored systems.
 
 Let's take a peek into how to create host labels and apply them across a few of Netdata's features to give you more
 organization power over your infrastructure.
 
-## Create unique host labels
+### Create unique host labels
 
-Host labels are defined in `netdata.conf`. To create host labels, open that file using `edit-config`.
+Host labels are defined in `netdata.conf`. To create host labels, open that file
+using [`edit-config`](#edit-configuration-files-using-the-edit-config-script).
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -63,7 +88,16 @@ sudo ./edit-config netdata.conf
 ```
 
 Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
-to violate any of the [host label naming rules](/docs/configure/common-changes.md#organize-nodes-with-host-labels).
+to violate any of the host label naming rules.
+
+The following restrictions apply to host label names:
+
+- Names cannot start with `_`, but it can be present in other parts of the name.
+- Names only accept alphabet letters, numbers, dots, and dashes.
+
+The policy for values is more flexible, but you **cannot** use exclamation marks (`!`), whitespaces (` `), single quotes
+(`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alarms and
+templates.
 
 ```conf
 [host labels]
@@ -114,18 +148,18 @@ parent-child status, and more.
 
 They capture the following:
 
--   Kernel version
--   Operating system name and version
--   CPU architecture, system cores, CPU frequency, RAM, and disk space
--   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
--   Whether Netdata is running inside K8s node 
--   What virtualization layer the system runs on top of, if any
--   Whether the system is a streaming parent or child
+- Kernel version
+- Operating system name and version
+- CPU architecture, system cores, CPU frequency, RAM, and disk space
+- Whether Netdata is running inside a container, and if so, the OS and hardware details about the container's host
+- Whether Netdata is running inside K8s node
+- What virtualization layer the system runs on top of, if any
+- Whether the system is a streaming parent or child
 
-If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
-features below.
+If you want to organize your systems without manually creating host labels, try the automatic labels in the features
+below.
 
-## Host labels in streaming
+### Host labels in streaming
 
 You may have noticed the `_is_parent` and `_is_child` automatic labels from above. Host labels are also now
 streamed from a child to its parent node, which concentrates an entire infrastructure's OS, hardware, container,
@@ -135,21 +169,24 @@ Now, if you'd like to remind yourself of how much RAM a certain child node has, 
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info` and reference the automatically-generated host labels from the
 child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
-> ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
-> kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
-> documentation](/streaming/README.md#securing-streaming-communications) for details. You may also want to use
-> [access lists](/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
-> connections](/docs/netdata-security.md#expose-netdata-only-in-a-private-lan).
+:::caution
+Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
+kernel and operating system versions, you should secure streaming connections with SSL. See
+the [Configure streaming](https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-streaming.md#enable-tlsssl-on-streaming-optional)
+Task for details. You may also want to use
+[access lists](MISSING LINK) or [expose the API only to LAN/localhost
+connections](MISSING LINK).
+:::
 
 You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
 exporting. Speaking of which...
 
-## Host labels in health entities
+### Host labels in health entities
 
 You can use host labels to logically organize your systems by their type, purpose, or location, and then apply specific
 alarms to them.
 
-For example, let's use configuration example from earlier:
+For example, let's use the configuration example from earlier:
 
 ```conf
 [host labels]
@@ -158,16 +195,16 @@ For example, let's use configuration example from earlier:
     installed = 20200218
 ```
 
-You could now create a new health entity (checking if disk space will run out soon) that applies only to any host
+You can now create a new health entity (checking if disk space will run out soon) that applies only to any host
 labeled `webserver`:
 
 ```yaml
     template: disk_fill_rate
-          on: disk.space
+      on: disk.space
       lookup: max -1s at -30m unaligned of avail
         calc: ($this - $avail) / (30 * 60)
-       every: 15s
- host labels: type = webserver
+        every: 15s
+    host labels: type = webserver
 ```
 
 Or, by using one of the automatic labels, for only webserver systems running a specific OS:
@@ -190,11 +227,12 @@ Or when ephemeral Docker nodes are involved:
 ```
 
 Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
-documentation](/health/REFERENCE.md#alarm-line-host-labels) for more details, and then get creative!
+Reference](MISSING LINK/ no file in the repo yet) documentation for more details, and then get creative!
 
-## Host labels in metrics exporting
+### Host labels in metrics exporting
 
-If you have enabled any metrics exporting via our experimental [exporters](/exporting/README.md), any new host
+If you have enabled any metrics exporting via our
+experimental [exporters](https://github.com/netdata/netdata/blob/master/exporting/README.md), any new host
 labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
 editing `exporting.conf`, and you can even send automatically-generated labels on with exported metrics.
 
@@ -219,31 +257,5 @@ send automatic labels = yes
 ```
 
 By applying labels to exported metrics, you can more easily parse historical metrics with the labels applied. To learn
-more about exporting, read the [documentation](/exporting/README.md).
-
-## What's next?
-
-Host labels are a brand-new feature to Netdata, and yet they've already propagated deeply into some of its core
-functionality. We're just getting started with labels, and will keep the community apprised of additional functionality
-as it's made available. You can also track [issue #6503](https://github.com/netdata/netdata/issues/6503), which is where
-the Netdata team first kicked off this work.
-
-It should be noted that while the Netdata dashboard does not expose either user-configured or automatic host labels, API
-queries _do_ showcase this information. As always, we recommend you secure Netdata 
-
--   [Expose Netdata only in a private LAN](/docs/netdata-security.md#expose-netdata-only-in-a-private-lan)
--   [Enable TLS/SSL for web/API requests](/web/server/README.md#enabling-tls-support)
--   Put Netdata behind a proxy
-    -   [Use an authenticating web server in proxy
-        mode](/docs/netdata-security.md#use-an-authenticating-web-server-in-proxy-mode)
-    -   [Nginx proxy](/docs/Running-behind-nginx.md)
-    -   [Apache proxy](/docs/Running-behind-apache.md)
-    -   [Lighttpd](/docs/Running-behind-lighttpd.md)
-    -   [Caddy](/docs/Running-behind-caddy.md)
-
-If you have issues or questions around using host labels, don't hesitate to [file an
-issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) on GitHub. We're
-excited to make host labels even more valuable to our users, which we can only do with your input.
-
-
-*******************************************************************************
+more about exporting, read the [Exporting Reference](https://github.com/netdata/netdata/blob/master/exporting/README.md)
+documentation.
