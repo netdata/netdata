@@ -19,6 +19,20 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.chart_configs = self.configuration.get('chart_configs', None)
 
+    def run_code(self, processing_code):
+        """eval() each line of code and ensure the result is a pandas dataframe"""
+
+        for line in processing_code.split(';'):
+            line_clean = line.strip('\n').strip(' ')
+            if line_clean != '':
+                df = eval(line_clean)
+                assert isinstance(df, pd.DataFrame)
+        
+        # take top row of final df as data to be collected by netdata
+        data = df.to_dict(orient='records')[0]
+
+        return data
+
     def check(self):
         """ensure charts and dims all confugured and that we can get data"""
 
@@ -40,11 +54,7 @@ class Service(SimpleService):
                     }
                 self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
                 
-            for line in chart_config['processing_code'].split(';'):
-                line_clean = line.strip('\n').strip(' ')
-                if line_clean != '':
-                    df = eval(line_clean)
-            data_tmp = df.to_dict(orient='records')[0]
+            data_tmp = self.run_code(chart_config['processing_code'])
             data.update(data_tmp)
 
             for dim in data_tmp:
@@ -54,16 +64,10 @@ class Service(SimpleService):
 
     def get_data(self):
         """get data for each chart config"""
-        
         data = dict()
 
         for chart_config in self.chart_configs:
-
-            for line in chart_config['processing_code'].split(';'):
-                line_clean = line.strip('\n').strip(' ')
-                if line_clean != '':
-                    df = eval(line_clean)
-            data_tmp = df.to_dict(orient='records')[0]
+            data_tmp = self.run_code(chart_config['processing_code'])
             data.update(data_tmp)
 
         return data
