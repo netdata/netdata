@@ -25,7 +25,6 @@ typedef struct pluginsd_action {
      RRD_ALGORITHM algorithm_type);
 
     PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
-    PARSER_RC (*overwrite_action)(void *user, RRDHOST *host, DICTIONARY *new_labels);
 
     PARSER_RC (*guid_action)(void *user, uuid_t *uuid);
     PARSER_RC (*context_action)(void *user, uuid_t *uuid);

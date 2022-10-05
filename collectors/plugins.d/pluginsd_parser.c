@@ -123,19 +123,6 @@ PARSER_RC pluginsd_label_action(void *user, char *key, char *value, RRDLABEL_SRC
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_host_labels)
-{
-    UNUSED(user);
-
-    if(!host->rrdlabels)
-        host->rrdlabels = rrdlabels_create();
-
-    rrdlabels_migrate_to_these(host->rrdlabels, new_host_labels);
-    sql_store_host_labels(host);
-
-    return PARSER_RC_OK;
-}
-
 PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *dimension = words[1];
@@ -764,22 +751,22 @@ PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
 
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
-    PARSER_RC rc = PARSER_RC_OK;
+    if(!host->rrdlabels)
+        host->rrdlabels = rrdlabels_create();
 
-    if (plugins_action->overwrite_action)
-        rc = plugins_action->overwrite_action(user, host, ((PARSER_USER_OBJECT *)user)->new_host_labels);
+    rrdlabels_migrate_to_these(host->rrdlabels, (DICTIONARY *) (((PARSER_USER_OBJECT *)user)->new_host_labels));
+    sql_store_host_labels(host);
 
     rrdlabels_destroy(((PARSER_USER_OBJECT *)user)->new_host_labels);
     ((PARSER_USER_OBJECT *)user)->new_host_labels = NULL;
-
-    return rc;
+    return PARSER_RC_OK;
 }
 
 
