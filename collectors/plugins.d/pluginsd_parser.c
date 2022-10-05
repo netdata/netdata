@@ -4,21 +4,6 @@
 
 #define LOG_FUNCTIONS false
 
-PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations)
-{
-    UNUSED(user);
-    if (likely(st->counter_done)) {
-        if (likely(microseconds)) {
-            if (trust_durations)
-                rrdset_next_usec_unfiltered(st, microseconds);
-            else
-                rrdset_next_usec(st, microseconds);
-        } else
-            rrdset_next(st);
-    }
-    return PARSER_RC_OK;
-}
-
 PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,
            char *module, int priority, int update_every, RRDSET_TYPE chart_type, char *options)
 {
@@ -194,7 +179,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *id = words[1];
     char *microseconds_txt = words[2];
@@ -218,10 +203,16 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     if (microseconds_txt && *microseconds_txt)
         microseconds = str2ull(microseconds_txt);
 
-    if (plugins_action->begin_action) {
-        return plugins_action->begin_action(user, st, microseconds,
-                                            ((PARSER_USER_OBJECT *)user)->trust_durations);
+    if (likely(st->counter_done)) {
+        if (likely(microseconds)) {
+            if (((PARSER_USER_OBJECT *)user)->trust_durations)
+                rrdset_next_usec_unfiltered(st, microseconds);
+            else
+                rrdset_next_usec(st, microseconds);
+        } else
+            rrdset_next(st);
     }
+
     return PARSER_RC_OK;
 disable:
     ((PARSER_USER_OBJECT *)user)->enabled = 0;
