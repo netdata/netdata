@@ -3,60 +3,12 @@
 #ifndef ML_DIMENSION_H
 #define ML_DIMENSION_H
 
-#include "BitBufferCounter.h"
+#include "Query.h"
 #include "Config.h"
 
 #include "ml-private.h"
 
 namespace ml {
-
-class RrdDimension {
-public:
-    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->tiers[0]->query_ops) { }
-
-    RRDDIM *getRD() const { return RD; }
-
-    time_t latestTime() { return Ops->latest_time(RD->tiers[0]->db_metric_handle); }
-
-    time_t oldestTime() { return Ops->oldest_time(RD->tiers[0]->db_metric_handle); }
-
-    unsigned updateEvery() const { return RD->update_every; }
-
-    const std::string getID() const {
-        RRDSET *RS = RD->rrdset;
-
-        std::stringstream SS;
-        SS << rrdset_context(RS) << "|" << rrdset_id(RS) << "|" << rrddim_name(RD);
-        return SS.str();
-    }
-
-    bool isActive() const {
-        if (rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE))
-            return false;
-
-        if (rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE))
-            return false;
-
-        return true;
-    }
-
-    void setAnomalyRateRD(RRDDIM *ARRD) { AnomalyRateRD = ARRD; }
-    RRDDIM *getAnomalyRateRD() const { return AnomalyRateRD; }
-
-    void setAnomalyRateRDName(const char *Name) const {
-        rrddim_reset_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
-    }
-
-    virtual ~RrdDimension() {}
-
-private:
-    RRDDIM *RD;
-    RRDDIM *AnomalyRateRD;
-
-    struct rrddim_query_ops *Ops;
-
-    std::string ID;
-};
 
 enum class MLResult {
     Success = 0,
@@ -64,93 +16,92 @@ enum class MLResult {
     NaN,
 };
 
-class TrainableDimension : public RrdDimension {
+static inline std::string getMLDimensionID(RRDDIM *RD) {
+    RRDSET *RS = RD->rrdset;
+
+    std::stringstream SS;
+    SS << rrdset_context(RS) << "|" << rrdset_id(RS) << "|" << rrddim_name(RD);
+    return SS.str();
+}
+
+class Dimension {
 public:
-    TrainableDimension(RRDDIM *RD) :
-        RrdDimension(RD), TrainEvery(Cfg.TrainEvery * updateEvery()) {}
+    Dimension(RRDDIM *RD, RRDSET *AnomalyRateRS) :
+        RD(RD),
+        AnomalyRateRD(rrddim_add(AnomalyRateRS, ml::getMLDimensionID(RD).c_str(), NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE)),
+        LastTrainedAt(Seconds(0)),
+        Trained(false),
+        ConstantModel(false),
+        AnomalyScore(0.0),
+        AnomalyBit(0),
+        AnomalyBitCounter(0)
+    { }
+
+    RRDDIM *getRD() const {
+        return RD;
+    }
+
+    unsigned updateEvery() const {
+        return RD->update_every;
+    }
+
+    time_t latestTime() const {
+        return Query(RD).latestTime();
+    }
+
+    time_t oldestTime() const {
+        return Query(RD).oldestTime();
+    }
+
+    void setAnomalyRateRDName(const char *Name) const {
+        rrddim_reset_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
+    }
+
+    RRDDIM *getAnomalyRateRD() const {
+        return AnomalyRateRD;
+    }
+
+    bool isTrained() const {
+        return Trained;
+    }
+
+    bool isAnomalous() const {
+        return AnomalyBit;
+    }
+
+    bool shouldTrain(const TimePoint &TP) const;
+
+    bool isActive() const;
 
     MLResult trainModel();
 
-    CalculatedNumber computeAnomalyScore(SamplesBuffer &SB) {
-        return Trained ? KM.anomalyScore(SB) : 0.0;
-    }
+    bool predict(CalculatedNumber Value, bool Exists);
 
-    bool shouldTrain(const TimePoint &TP) const {
-        if (ConstantModel)
-            return false;
+    void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous);
 
-        return (LastTrainedAt + TrainEvery) < TP;
-    }
+    std::pair<bool, double> detect(size_t WindowLength, bool Reset);
 
-    bool isTrained() const { return Trained; }
+    std::array<KMeans, 1> getModels();
 
 private:
     std::pair<CalculatedNumber *, size_t> getCalculatedNumbers();
 
 public:
-    TimePoint LastTrainedAt{Seconds{0}};
+    RRDDIM *RD;
+    RRDDIM *AnomalyRateRD;
 
-protected:
-    std::atomic<bool> ConstantModel{false};
+    TimePoint LastTrainedAt;
+    std::atomic<bool> Trained;
+    std::atomic<bool> ConstantModel;
 
-private:
-    Seconds TrainEvery;
-    KMeans KM;
-
-    std::atomic<bool> Trained{false};
-};
-
-class PredictableDimension : public TrainableDimension {
-public:
-    PredictableDimension(RRDDIM *RD) : TrainableDimension(RD) {}
-
-    std::pair<MLResult, bool> predict();
-
-    void addValue(CalculatedNumber Value, bool Exists);
-
-    bool isAnomalous() { return AnomalyBit; }
-
-    void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous) {
-        AnomalyBitCounter += IsAnomalous;
-
-        if (Elapsed == Cfg.DBEngineAnomalyRateEvery) {
-            double AR = static_cast<double>(AnomalyBitCounter) / Cfg.DBEngineAnomalyRateEvery;
-            rrddim_set_by_pointer(RS, getAnomalyRateRD(), AR * 1000);
-            AnomalyBitCounter = 0;
-        }
-    }
-
-private:
-    CalculatedNumber AnomalyScore{0.0};
-    std::atomic<bool> AnomalyBit{false};
-    unsigned AnomalyBitCounter{0};
+    CalculatedNumber AnomalyScore;
+    std::atomic<bool> AnomalyBit;
+    unsigned AnomalyBitCounter;
 
     std::vector<CalculatedNumber> CNs;
+    std::array<KMeans, 1> Models;
+    std::mutex Mutex;
 };
-
-class DetectableDimension : public PredictableDimension {
-public:
-    DetectableDimension(RRDDIM *RD) : PredictableDimension(RD) {}
-
-    std::pair<bool, double> detect(size_t WindowLength, bool Reset) {
-        bool AnomalyBit = isAnomalous();
-
-        if (Reset)
-            NumSetBits = BBC.numSetBits();
-
-        NumSetBits += AnomalyBit;
-        BBC.insert(AnomalyBit);
-
-        double AnomalyRate = static_cast<double>(NumSetBits) / WindowLength;
-        return { AnomalyBit, AnomalyRate };
-    }
-
-private:
-    BitBufferCounter BBC{static_cast<size_t>(Cfg.ADMinWindowSize)};
-    size_t NumSetBits{0};
-};
-
-using Dimension = DetectableDimension;
 
 } // namespace ml
 

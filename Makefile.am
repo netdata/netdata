@@ -38,7 +38,7 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
-    ml/kmeans/dlib \
+    ml/dlib \
     README.md \
     LICENSE \
     REDISTRIBUTED.md \
@@ -109,7 +109,6 @@ SUBDIRS += \
     claim \
     parser \
     spawn \
-    ml \
     $(NULL)
 
 AM_CFLAGS = \
@@ -237,39 +236,34 @@ ML_FILES = \
 if ENABLE_ML
 
 ML_FILES += \
-    ml/BitBufferCounter.h \
-    ml/BitBufferCounter.cc \
-    ml/BitRateWindow.h \
-    ml/BitRateWindow.cc \
+    ml/ADCharts.h \
+    ml/ADCharts.cc \
     ml/Config.h \
     ml/Config.cc \
-    ml/Database.h \
-    ml/Database.cc \
     ml/Dimension.cc \
     ml/Dimension.h \
     ml/Host.h \
     ml/Host.cc \
     ml/Query.h \
-    ml/kmeans/KMeans.h \
-    ml/kmeans/KMeans.cc \
-    ml/kmeans/SamplesBuffer.h \
-    ml/kmeans/SamplesBuffer.cc \
-    ml/kmeans/dlib/dlib/all/source.cpp \
+    ml/KMeans.h \
+    ml/KMeans.cc \
+    ml/SamplesBuffer.h \
+    ml/SamplesBuffer.cc \
+    ml/dlib/dlib/all/source.cpp \
     ml/json/single_include/nlohmann/json.hpp \
     ml/ml.cc \
     ml/ml-private.h \
     $(NULL)
 
 # Disable warnings from dlib library
-ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
+ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
 
 endif
 
 
 if ENABLE_ML_TESTS
 ML_TESTS_FILES = \
-    ml/kmeans/Tests.cc \
-    ml/Tests.cc \
+    ml/SamplesBufferTests.cc \
     $(NULL)
 endif
 

@@ -1329,92 +1329,6 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 }
 
 #if defined(ENABLE_ML)
-int web_client_api_request_v1_anomaly_events(RRDHOST *host, struct web_client *w, char *url) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    uint32_t after = 0, before = 0;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "after"))
-            after = (uint32_t) (strtoul(value, NULL, 0) / 1000);
-        else if (!strcmp(name, "before"))
-            before = (uint32_t) (strtoul(value, NULL, 0) / 1000);
-    }
-
-    char *s;
-    if (!before || !after)
-        s = strdupz("{\"error\": \"missing after/before parameters\" }\n");
-    else {
-        s = ml_get_anomaly_events(host, "AD1", 1, after, before);
-        if (!s)
-            s = strdupz("{\"error\": \"json string is empty\" }\n");
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-
-    wb->contenttype = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
-    buffer_no_cacheable(wb);
-
-    freez(s);
-
-    return HTTP_RESP_OK;
-}
-
-int web_client_api_request_v1_anomaly_event_info(RRDHOST *host, struct web_client *w, char *url) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    uint32_t after = 0, before = 0;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "after"))
-            after = (uint32_t) strtoul(value, NULL, 0);
-        else if (!strcmp(name, "before"))
-            before = (uint32_t) strtoul(value, NULL, 0);
-    }
-
-    char *s;
-    if (!before || !after)
-        s = strdupz("{\"error\": \"missing after/before parameters\" }\n");
-    else {
-        s = ml_get_anomaly_event_info(host, "AD1", 1, after, before);
-        if (!s)
-            s = strdupz("{\"error\": \"json string is empty\" }\n");
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
-    buffer_no_cacheable(wb);
-
-    freez(s);
-    return HTTP_RESP_OK;
-}
-
 int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
     (void) url;
 
@@ -1435,7 +1349,26 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     return HTTP_RESP_OK;
 }
 
-#endif // defined(ENABLE_ML)
+int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, char *url) {
+    (void) url;
+
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    char *s = ml_get_host_models(host);
+    if (!s)
+        s = strdupz("{\"error\": \"json string is empty\" }\n");
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez(s);
+    return HTTP_RESP_OK;
+}
+#endif
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -1680,9 +1613,8 @@ static struct api_command {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
 
 #if defined(ENABLE_ML)
-        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events     },
-        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info },
-        { "ml_info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
+        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health         },

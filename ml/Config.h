@@ -14,6 +14,7 @@ public:
     unsigned MaxTrainSamples;
     unsigned MinTrainSamples;
     unsigned TrainEvery;
+    unsigned NumModelsToUse;
 
     unsigned DBEngineAnomalyRateEvery;
 
@@ -25,13 +26,10 @@ public:
     unsigned MaxKMeansIters;
 
     double DimensionAnomalyScoreThreshold;
-    double HostAnomalyRateThreshold;
 
-    double ADMinWindowSize;
-    double ADMaxWindowSize;
-    double ADIdleWindowSize;
-    double ADWindowRateThreshold;
-    double ADDimensionRateThreshold;
+    double HostAnomalyRateThreshold;
+    RRDR_GROUPING AnomalyDetectionGroupingMethod;
+    time_t AnomalyDetectionQueryDuration;
 
     bool StreamADCharts;
 
@@ -41,7 +39,6 @@ public:
     std::string ChartsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
-    std::string AnomalyDBPath;
     std::vector<uint32_t> RandomNums;
 
     void readMLConfig();

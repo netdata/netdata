@@ -1109,7 +1109,7 @@ fi
 
 # Check if submodules have not been fetched. Fail if ML was explicitly requested.
 AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
-if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+if test -f "ml/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
     AC_MSG_RESULT([yes])
     have_ml_submodules="yes"
 else
@@ -1149,7 +1149,7 @@ fi
 AM_CONDITIONAL([ENABLE_ML], [test "${build_ml}" = "yes"])
 if test "${build_ml}" = "yes"; then
     AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
-    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
+    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/dlib"
     OPTIONAL_ML_LIBS=""
 fi
 
@@ -1695,8 +1695,6 @@ AC_CONFIG_FILES([
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
-    ml/Makefile
-    ml/kmeans/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
