@@ -18,10 +18,11 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.chart_configs = self.configuration.get('chart_configs', None)
-        self.credentials = self.configuration.get('credentials', None)
 
     def check(self):
         """ensure charts and dims all confugured and that we can get data"""
+
+        data = dict()
 
         # add each chart as defined by the config
         for chart_config in self.chart_configs:
@@ -40,17 +41,23 @@ class Service(SimpleService):
                 self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
                 
             exec(chart_config['processing_code'])
+            data_tmp = locals()['data_tmp']
+            data.update(data_tmp)
 
-            for dim in data:
+            for dim in data_tmp:
                 self.charts[chart_config['chart_name']].add_dimension([dim, dim, 'absolute', 1, 1])
 
         return True
 
     def get_data(self):
         """get data for each chart config"""
+        
+        data = dict()
 
         for chart_config in self.chart_configs:
 
             exec(chart_config['processing_code'])
+            data_tmp = locals()['data_tmp']
+            data.update(data_tmp)
 
         return data
