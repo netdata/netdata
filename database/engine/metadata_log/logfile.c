@@ -369,7 +369,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         .obsolete = 0,
         .started_t = INVALID_TIME,
         .next = NULL,
-        .version = 0,
+        .capabilities = 0,
     };
 
     struct metalog_pluginsd_state metalog_parser_state;
@@ -383,7 +383,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         .private = &metalog_parser_state
     };
 
-    PARSER *parser = parser_init(metalog_parser_object.host, &metalog_parser_object, NULL, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(metalog_parser_object.host, &metalog_parser_object, NULL, NULL, PARSER_INPUT_SPLIT|PARSER_NO_ACTION_INIT);
     parser_add_keyword(parser, PLUGINSD_KEYWORD_HOST, metalog_pluginsd_host);
     parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid);
     parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);

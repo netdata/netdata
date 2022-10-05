@@ -10,18 +10,21 @@
 #endif
 
 typedef enum web_client_acl {
-    WEB_CLIENT_ACL_NONE        = 0,
-    WEB_CLIENT_ACL_NOCHECK     = 0,
-    WEB_CLIENT_ACL_DASHBOARD   = 1 << 0,
-    WEB_CLIENT_ACL_REGISTRY    = 1 << 1,
-    WEB_CLIENT_ACL_BADGE       = 1 << 2,
-    WEB_CLIENT_ACL_MGMT        = 1 << 3,
-    WEB_CLIENT_ACL_STREAMING   = 1 << 4,
-    WEB_CLIENT_ACL_NETDATACONF = 1 << 5,
+    WEB_CLIENT_ACL_NONE         = 0,
+    WEB_CLIENT_ACL_NOCHECK      = 0,
+    WEB_CLIENT_ACL_DASHBOARD    = 1 << 0,
+    WEB_CLIENT_ACL_REGISTRY     = 1 << 1,
+    WEB_CLIENT_ACL_BADGE        = 1 << 2,
+    WEB_CLIENT_ACL_MGMT         = 1 << 3,
+    WEB_CLIENT_ACL_STREAMING    = 1 << 4,
+    WEB_CLIENT_ACL_NETDATACONF  = 1 << 5,
     WEB_CLIENT_ACL_SSL_OPTIONAL = 1 << 6,
-    WEB_CLIENT_ACL_SSL_FORCE = 1 << 7,
-    WEB_CLIENT_ACL_SSL_DEFAULT = 1 << 8
+    WEB_CLIENT_ACL_SSL_FORCE    = 1 << 7,
+    WEB_CLIENT_ACL_SSL_DEFAULT  = 1 << 8,
+    WEB_CLIENT_ACL_ACLK         = 1 << 9,
 } WEB_CLIENT_ACL;
+
+#define WEB_CLIENT_ACL_ALL 0xFFFF
 
 #define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD)
 #define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY)
@@ -54,9 +57,12 @@ extern char *strdup_client_description(int family, const char *protocol, const c
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
+extern void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data);
+extern int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
 extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
-int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
+extern int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
+
 
 #ifdef ENABLE_HTTPS
 extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);

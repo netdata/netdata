@@ -940,21 +940,21 @@ void *tc_main(void *ptr) {
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
     while(!netdata_exit) {
-        FILE *fp;
+        FILE *fp_child_input, *fp_child_output;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
 
         snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
         debug(D_TC_LOOP, "executing '%s'", command);
 
-        fp = mypopen(command, (pid_t *)&tc_child_pid);
-        if(unlikely(!fp)) {
+        fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
+        if(unlikely(!fp_child_output)) {
             error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
         }
 
         char buffer[TC_LINE_MAX+1] = "";
-        while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
+        while(fgets(buffer, TC_LINE_MAX, fp_child_output) != NULL) {
             if(unlikely(netdata_exit)) break;
 
             buffer[TC_LINE_MAX] = '\0';
@@ -1163,7 +1163,7 @@ void *tc_main(void *ptr) {
         }
 
         // fgets() failed or loop broke
-        int code = mypclose(fp, (pid_t)tc_child_pid);
+        int code = netdata_pclose(fp_child_input, fp_child_output, (pid_t)tc_child_pid);
         tc_child_pid = 0;
 
         if(unlikely(device)) {

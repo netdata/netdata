@@ -388,6 +388,15 @@ typedef struct bitmap256 {
 extern bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
 extern void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 
+#define COMPRESSION_MAX_MSG_SIZE 0x4000
+#define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
+extern int config_isspace(char c);
+extern int pluginsd_space(char c);
+int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
+extern int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);
+
+extern bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
+
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;

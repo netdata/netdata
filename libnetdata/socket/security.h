@@ -42,15 +42,15 @@ struct netdata_ssl{
     uint32_t flags; //The flags for SSL connection
 };
 
-extern SSL_CTX *netdata_exporting_ctx;
-extern SSL_CTX *netdata_client_ctx;
-extern SSL_CTX *netdata_srv_ctx;
-extern const char *security_key;
-extern const char *security_cert;
+extern SSL_CTX *netdata_ssl_exporting_ctx;
+extern SSL_CTX *netdata_ssl_client_ctx;
+extern SSL_CTX *netdata_ssl_srv_ctx;
+extern const char *ssl_security_key;
+extern const char *ssl_security_cert;
 extern const char *tls_version;
 extern const char *tls_ciphers;
-extern int netdata_validate_server;
-extern int security_location_for_context(SSL_CTX *ctx,char *file,char *path);
+extern int netdata_ssl_validate_server;
+extern int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
 void security_openssl_library();
 void security_clean_openssl();

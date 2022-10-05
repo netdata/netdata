@@ -4,6 +4,8 @@
 #include "rrd.h"
 #include <sched.h>
 
+// ----------------------------------------------------------------------------
+
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", rrdset_id(st));
 
@@ -118,7 +120,7 @@ struct rrdset_constructor {
 static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
     static STRING *anomaly_rates_chart = NULL;
 
-    if(!unlikely(!anomaly_rates_chart))
+    if(unlikely(!anomaly_rates_chart))
         anomaly_rates_chart = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
 
     struct rrdset_constructor *ctr = constructor_data;
@@ -179,16 +181,11 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
 
-    if(host->health_enabled) {
-        st->green = NAN;
-        st->red = NAN;
-        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
-        st->rrdvars = rrdvariables_create();
-        rrddimvar_index_init(st);
-    }
-
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
+
+    st->green = NAN;
+    st->red = NAN;
 
     ctr->react_action = RRDSET_REACT_NEW;
 }
@@ -202,6 +199,9 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
+
+    // release the collector info
+    dictionary_destroy(st->functions_view);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 
@@ -346,15 +346,9 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
-    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
-        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
-
-        rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching_templates_to_rrdset(st);
+    if((host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) && !rrdset_is_ar_chart(st)) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
@@ -1093,6 +1087,7 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rrdcontext_collected_rrddim(rd);
 }
 
+// caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through
 struct rda_item {
     const DICTIONARY_ITEM *item;
     RRDDIM *rd;
@@ -1492,7 +1487,7 @@ void rrdset_done(RRDSET *st) {
 after_first_database_work:
     st->counter_done++;
 
-    if(unlikely(st->rrdhost->rrdpush_send_enabled))
+    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         rrdset_done_push(st);
 
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
@@ -1771,7 +1766,7 @@ after_first_database_work:
     rrdset_done_interpolate(
             st
             , rda_base
-            ,rda_slots
+            , rda_slots
             , update_every_ut
             , last_stored_ut
             , next_store_ut

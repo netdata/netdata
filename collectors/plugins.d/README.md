@@ -116,17 +116,19 @@ For example, if your plugin wants to monitor `squid`, you can search for it on p
 
 Any program that can print a few values to its standard output can become a Netdata external plugin.
 
-Netdata parses 9 lines starting with:
+Netdata parses lines starting with:
 
 -    `CHART` - create or update a chart
 -    `DIMENSION` - add or update a dimension to the chart just created
+-    `VARIABLE` - define a variable (to be used in health calculations)
+-    `CLABEL` - add a label to a chart
+-    `CLABEL_COMMIT` - commit added labels to the chart
+-    `FUNCTION` - define a function that can be called later to execute it
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `CLABEL` - add a label to a chart
--    `CLABEL_COMMIT` - commit added labels to the chart.
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -362,6 +364,80 @@ The `source` is an integer field that can have the following values:
 
 `CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
 
+#### FUNCTION
+
+> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users"
+
+A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
+
+- per node
+- per chart
+
+Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context sensitive menu of functions related to the chart the user is using.
+
+A function is identified by a string. The allowed characters in the function definition are:
+
+| Character         | Symbol | In Functions |
+|-------------------|:------:|:------------:|
+| UTF-8 character   | UTF-8  |     keep     |
+| Lower case letter | [a-z]  |     keep     |
+| Upper case letter | [A-Z]  |     keep     |
+| Digit             | [0-9]  |     keep     |
+| Underscore        |   _    |     keep     |
+| Comma             |   ,    |     keep     |
+| Minus             |   -    |     keep     |
+| Period            |   .    |     keep     |
+| Colon             |   :    |     keep     |
+| Slash             |   /    |     keep     |
+| Space             |  ' '   |     keep     |
+| Semicolon         |   ;    |      :       |
+| Equal             |   =    |      :       |
+| Backslash         |   \    |      /       |
+| Anything else     |        |      _       |
+
+Uses can get a list of all the registered functions using the `/api/v1/functions` end point of Netdata.
+
+Users can call functions using the `/api/v1/function` end point of Netdata.
+Once a function is called, the plugin will receive at its standard input a command that looks like this:
+
+> FUNCTION transaction_id timeout "name and parameters of the function"
+
+The plugin is expected to parse and validate `name and parameters of the function`. Netdata allows users to edit this string, append more parameters or even change the ones the plugin originally exposed. To minimize the security risk, Netdata guarantees that only the characters shown above are accepted in function definitions, but still the plugin should carefully inspect the `name and parameters of the function` to ensure that it is valid and not harmful.
+
+If the plugin rejects the request, it should respond with this:
+
+```
+FUNCTION_RESULT_BEGIN transaction_id 400 application/json
+{
+   "status": 400,
+   "error_message": "description of the rejection reasons"
+}
+FUNCTION_RESULT_END
+```
+
+If the plugin prepares a response, it should send (via its standard output, together with the collected data, but not interleaved with them):
+
+> FUNCTION_RESULT_BEGIN transaction_id http_error_code content_type expiration
+
+Where:
+
+  - `transaction_id` is the transaction id that Netdata sent for this function execution
+  - `http_error` is the http error code Netdata should respond with, 200 is the "ok" response
+  - `content_type` is the content type of the response
+  - `expiration` is the absolute timestamp (number, unix epoch) this response expires
+
+Immediately after this, all text is assumed to be the response content.
+The content is text and line oriented. The maximum line length accepted is 15kb. Longer lines will be truncated.
+The type of the context itself depends on the plugin and the UI.
+
+To terminate the message, Netdata seeks a line with just this:
+
+> FUNCTION_RESULT_END
+
+This defines the end of the message. `FUNCTION_RESULT_END` should appear in a line alone, without any other text, so it is wise to add `\n` before and after it.
+
+After this line, Netdata resumes processing collected metrics from the plugin.
+
 ## Data collection
 
 data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
@@ -463,7 +539,7 @@ There are a few rules for writing plugins properly:
    readConfiguration();
 
    if(!verifyWeCanCollectValues()) {
-      print "DISABLE";
+      print("DISABLE");
       exit(1);
    }
 
@@ -475,7 +551,7 @@ There are a few rules for writing plugins properly:
    var dt_since_last_run = 0;
    var now = 0;
 
-   FOREVER {
+   while(true) {
        /* find the current time in milliseconds */
        now = currentTimeStampInMilliseconds();
 

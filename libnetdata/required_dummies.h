@@ -34,6 +34,7 @@ int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE 
 #endif
 
 void rrdset_thread_rda_free(void){};
+void sender_thread_buffer_free(void){};
 
 // required by get_system_cpus()
 char *netdata_configured_host_prefix = "";

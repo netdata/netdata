@@ -2,6 +2,8 @@
 
 #include "pluginsd_parser.h"
 
+#define LOG_FUNCTIONS false
+
 /*
  * This is the action defined for the FLUSH command
  */
@@ -170,29 +172,6 @@ PARSER_RC pluginsd_label_action(void *user, char *key, char *value, RRDLABEL_SRC
         ((PARSER_USER_OBJECT *) user)->new_host_labels = rrdlabels_create();
 
     rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels, key, value, source);
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, RRDLABEL_SRC source)
-{
-    if(unlikely(!((PARSER_USER_OBJECT *) user)->new_chart_labels))
-        ((PARSER_USER_OBJECT *) user)->new_chart_labels = rrdlabels_create();
-
-    rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_chart_labels, key, value, source);
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, DICTIONARY *new_chart_labels)
-{
-    RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
-    if (unlikely(!st)) {
-        error("requested CLABEL_COMMIT on host '%s', without a BEGIN, ignoring it.", rrdhost_hostname(host));
-        return PARSER_RC_OK;
-    }
-
-    rrdset_update_rrdlabels(st, new_chart_labels);
 
     return PARSER_RC_OK;
 }
@@ -474,6 +453,248 @@ disable:
     return PARSER_RC_ERROR;
 }
 
+// ----------------------------------------------------------------------------
+// execution of functions
+
+struct inflight_function {
+    int code;
+    int timeout;
+    BUFFER *destination_wb;
+    STRING *function;
+    void (*callback)(BUFFER *wb, int code, void *callback_data);
+    void *callback_data;
+    usec_t timeout_ut;
+    usec_t started_ut;
+    usec_t sent_ut;
+};
+
+static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
+    struct inflight_function *pf = func;
+
+    PARSER  *parser = parser_ptr;
+    FILE *fp = parser->output;
+
+    // leave this code as default, so that when the dictionary is destroyed this will be sent back to the caller
+    pf->code = HTTP_RESP_GATEWAY_TIMEOUT;
+
+    // send the command to the plugin
+    int ret = fprintf(fp, "FUNCTION %s %d \"%s\"\n",
+            dictionary_acquired_item_name(item),
+            pf->timeout,
+            string2str(pf->function));
+
+    pf->sent_ut = now_realtime_usec();
+
+    if(ret < 0) {
+        error("FUNCTION: failed to send function to plugin, fprintf() returned error %d", ret);
+        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
+    }
+    else {
+        fflush(fp);
+
+        internal_error(LOG_FUNCTIONS,
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
+                       string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
+                       pf->sent_ut - pf->started_ut);
+    }
+}
+
+static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
+    struct inflight_function *pf = new_func;
+
+    error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
+    pf->code = rrd_call_function_error(pf->destination_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
+    pf->callback(pf->destination_wb, pf->code, pf->callback_data);
+    string_freez(pf->function);
+
+    return false;
+}
+static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
+    struct inflight_function *pf = func;
+
+    internal_error(LOG_FUNCTIONS,
+                   "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %llu usec, response %llu usec)",
+                   string2str(pf->function), dictionary_acquired_item_name(item),
+                   buffer_strlen(pf->destination_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
+
+    pf->callback(pf->destination_wb, pf->code, pf->callback_data);
+    string_freez(pf->function);
+}
+
+void inflight_functions_init(PARSER *parser) {
+    parser->inflight.functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
+    dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
+    dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);
+}
+
+static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
+    parser->inflight.smaller_timeout = 0;
+    struct inflight_function *pf;
+    dfe_start_write(parser->inflight.functions, pf) {
+        if (pf->timeout_ut < now) {
+            internal_error(true,
+                           "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
+                           string2str(pf->function), pf_dfe.name, now - pf->started_ut);
+
+            if(!buffer_strlen(pf->destination_wb) || pf->code == HTTP_RESP_OK)
+                pf->code = rrd_call_function_error(pf->destination_wb,
+                                                   "Timeout waiting for collector response.",
+                                                   HTTP_RESP_GATEWAY_TIMEOUT);
+
+            dictionary_del(parser->inflight.functions, pf_dfe.name);
+        }
+
+        else if(!parser->inflight.smaller_timeout || pf->timeout_ut < parser->inflight.smaller_timeout)
+            parser->inflight.smaller_timeout = pf->timeout_ut;
+    }
+    dfe_done(pf);
+}
+
+// this is the function that is called from
+// rrd_call_function_and_wait() and rrd_call_function_async()
+static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+    PARSER  *parser = collector_data;
+
+    usec_t now = now_realtime_usec();
+
+    struct inflight_function tmp = {
+        .started_ut = now,
+        .timeout_ut = now + timeout * USEC_PER_SEC,
+        .destination_wb = destination_wb,
+        .timeout = timeout,
+        .function = string_strdupz(function),
+        .callback = callback,
+        .callback_data = callback_data,
+    };
+
+    uuid_t uuid;
+    uuid_generate_time(uuid);
+
+    char key[UUID_STR_LEN];
+    uuid_unparse_lower(uuid, key);
+
+    dictionary_write_lock(parser->inflight.functions);
+
+    // if there is any error, our dictionary callbacks will call the caller callback to notify
+    // the caller about the error - no need for error handling here.
+    dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
+
+    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
+        parser->inflight.smaller_timeout = tmp.timeout_ut;
+
+    // garbage collect stale inflight functions
+    if(parser->inflight.smaller_timeout < now)
+        inflight_functions_garbage_collect(parser, now);
+
+    dictionary_write_unlock(parser->inflight.functions);
+
+    return HTTP_RESP_OK;
+}
+
+PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+{
+    bool global = false;
+    int i = 1;
+    if(strcmp(words[i], "GLOBAL") == 0) {
+        i++;
+        global = true;
+    }
+
+    char *name      = words[i++];
+    char *timeout_s = words[i++];
+    char *help      = words[i++];
+
+    RRDSET *st = (global)?NULL:((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!host || !timeout_s || !name || !help || (!global && !st))) {
+        error("requested a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', help = '%s'), host '%s', chart '%s'. Ignoring it.",
+              global?"yes":"no",
+              name?name:"(unset)",
+              timeout_s?timeout_s:"(unset)",
+              help?help:"(unset)",
+              host?rrdhost_hostname(host):"(unset)",
+              st?rrdset_id(st):"(unset)");
+        return PARSER_RC_OK;
+    }
+
+    int timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+    if (timeout_s && *timeout_s) {
+        timeout = str2i(timeout_s);
+        if (unlikely(timeout <= 0))
+            timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+    }
+
+    PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
+    rrd_collector_add_function(host, st, name, timeout, help, false, pluginsd_execute_function_callback, parser);
+
+    return PARSER_RC_OK;
+}
+
+static void pluginsd_function_result_end(struct parser *parser, void *action_data) {
+    STRING *key = action_data;
+    if(key)
+        dictionary_del(parser->inflight.functions, string2str(key));
+    string_freez(key);
+}
+
+PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+{
+    char *key = words[1];
+    char *status = words[2];
+    char *format = words[3];
+    char *expires = words[4];
+
+    if (unlikely(!key || !*key || !status || !*status || !format || !*format || !expires || !*expires)) {
+        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s', format = '%s', expires = '%s')."
+              , key ? key : "(unset)"
+              , status ? status : "(unset)"
+              , format ? format : "(unset)"
+              , expires ? expires : "(unset)"
+              );
+    }
+
+    int code = (status && *status) ? str2i(status) : 0;
+    if (code <= 0)
+        code = HTTP_RESP_BACKEND_RESPONSE_INVALID;
+
+    time_t expiration = (expires && *expires) ? str2l(expires) : 0;
+
+    PARSER  *parser = ((PARSER_USER_OBJECT *) user)->parser;
+
+    struct inflight_function *pf = NULL;
+
+    if(key && *key)
+        pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
+
+    if(!pf) {
+        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key?key:"(unset)");
+    }
+    else {
+        if(format && *format)
+            pf->destination_wb->contenttype = functions_format_to_content_type(format);
+
+        pf->code = code;
+
+        pf->destination_wb->expires = expiration;
+        if(expiration <= now_realtime_sec())
+            buffer_no_cacheable(pf->destination_wb);
+        else
+            buffer_cacheable(pf->destination_wb);
+    }
+
+    parser->defer.response = (pf) ? pf->destination_wb : NULL;
+    parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
+    parser->defer.action = pluginsd_function_result_end;
+    parser->defer.action_data = string_strdupz(key); // it is ok is key is NULL
+    parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
+
+    return PARSER_RC_OK;
+}
+
+// ----------------------------------------------------------------------------
+
 PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *name = words[1];
@@ -603,39 +824,6 @@ PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
-{
-    if (!words[1] || !words[2] || !words[3]) {
-        error("Ignoring malformed or empty CHART LABEL command.");
-        return PARSER_RC_OK;
-    }
-
-    if (plugins_action->clabel_action) {
-        PARSER_RC rc = plugins_action->clabel_action(user, words[1], words[2], strtol(words[3], NULL, 10));
-        return rc;
-    }
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
-{
-    UNUSED(words);
-
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    debug(D_PLUGINSD, "requested to commit chart labels");
-
-    PARSER_RC rc = PARSER_RC_OK;
-
-    if (plugins_action->clabel_commit_action)
-        rc = plugins_action->clabel_commit_action(user, host, ((PARSER_USER_OBJECT *)user)->new_chart_labels);
-
-    rrdlabels_destroy(((PARSER_USER_OBJECT *)user)->new_chart_labels);
-    ((PARSER_USER_OBJECT *)user)->new_chart_labels = NULL;
-
-    return rc;
-}
-
 PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     UNUSED(words);
@@ -652,6 +840,42 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
     ((PARSER_USER_OBJECT *)user)->new_host_labels = NULL;
 
     return rc;
+}
+
+
+PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+{
+    if (!words[1] || !words[2] || !words[3]) {
+        error("Ignoring malformed or empty CHART LABEL command.");
+        return PARSER_RC_OK;
+    }
+
+    if(unlikely(!((PARSER_USER_OBJECT *) user)->chart_rrdlabels_linked_temporarily)) {
+        ((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily = ((PARSER_USER_OBJECT *)user)->st->rrdlabels;
+        rrdlabels_unmark_all(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
+    }
+
+    rrdlabels_add(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily, words[1], words[2], strtol(words[3], NULL, 10));
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+{
+    UNUSED(words);
+
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    debug(D_PLUGINSD, "requested to commit chart labels");
+
+    if(!((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily) {
+        error("requested CLABEL_COMMIT on host '%s', without a BEGIN, ignoring it.", rrdhost_hostname(host));
+        return PARSER_RC_OK;
+    }
+
+    rrdlabels_remove_all_unmarked(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
+
+    ((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily = NULL;
+    return PARSER_RC_OK;
 }
 
 PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_action)
@@ -749,26 +973,35 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
 
 static void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
+    rrd_collector_finished();
     parser_destroy(parser);
 }
 
 // New plugins.d parser
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
     int enabled = cd->enabled;
 
-    if (!fp || !enabled) {
+    if (!fp_plugin_input || !fp_plugin_output || !enabled) {
         cd->enabled = 0;
         return 0;
     }
 
-    if (unlikely(fileno(fp) == -1)) {
-        error("file descriptor given is not a valid stream");
+    if (unlikely(fileno(fp_plugin_input) == -1)) {
+        error("input file descriptor given is not a valid stream");
         cd->serial_failures++;
         return 0;
     }
-    clearerr(fp);
+
+    if (unlikely(fileno(fp_plugin_output) == -1)) {
+        error("output file descriptor given is not a valid stream");
+        cd->serial_failures++;
+        return 0;
+    }
+
+    clearerr(fp_plugin_input);
+    clearerr(fp_plugin_output);
 
     PARSER_USER_OBJECT user = {
         .enabled = cd->enabled,
@@ -777,24 +1010,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         .trust_durations = trust_durations
     };
 
-    PARSER *parser = parser_init(host, &user, fp, PARSER_INPUT_SPLIT);
+    // fp_plugin_output = our input; fp_plugin_input = our output
+    PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT);
+
+    rrd_collector_started();
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
-
-    parser->plugins_action->begin_action          = &pluginsd_begin_action;
-    parser->plugins_action->flush_action          = &pluginsd_flush_action;
-    parser->plugins_action->end_action            = &pluginsd_end_action;
-    parser->plugins_action->disable_action        = &pluginsd_disable_action;
-    parser->plugins_action->variable_action       = &pluginsd_variable_action;
-    parser->plugins_action->dimension_action      = &pluginsd_dimension_action;
-    parser->plugins_action->label_action          = &pluginsd_label_action;
-    parser->plugins_action->overwrite_action      = &pluginsd_overwrite_action;
-    parser->plugins_action->chart_action          = &pluginsd_chart_action;
-    parser->plugins_action->set_action            = &pluginsd_set_action;
-    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
-    parser->plugins_action->clabel_action         = &pluginsd_clabel_action;
 
     user.parser = parser;
 

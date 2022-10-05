@@ -506,21 +506,21 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     info("running: %s", command);
 
     pid_t cgroup_pid;
-    FILE *fp;
+    FILE *fp_child_input, *fp_child_output;
 
     if(cgroup) {
-        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
+        (void)netdata_popen_raw_default_flags(&cgroup_pid, environment, &fp_child_input, &fp_child_output, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
     }
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        (void)mypopen_raw_default_flags(&cgroup_pid, environment, &fp, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
+        (void)netdata_popen_raw_default_flags(&cgroup_pid, environment, &fp_child_input, &fp_child_output, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
     }
 
-    if(fp) {
+    if(fp_child_output) {
         char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
         char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp_child_output))) {
             trim(s);
 
             if(*s && *s != '\n') {
@@ -536,7 +536,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
             }
         }
 
-        mypclose(fp, cgroup_pid);
+        netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
     }
     else
         error("cannot execute cgroup-network helper script: %s", command);

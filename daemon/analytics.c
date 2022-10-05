@@ -337,11 +337,12 @@ void analytics_alarms_notifications(void)
 
     BUFFER *b = buffer_create(1000);
     int cnt = 0;
-    FILE *fp = mypopen(script, &command_pid);
-    if (fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if (fp_child_output) {
         char line[200 + 1];
 
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *end = line;
             while (*end && *end != '\n')
                 end++;
@@ -354,7 +355,7 @@ void analytics_alarms_notifications(void)
 
             cnt++;
         }
-        mypclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
 
@@ -384,8 +385,8 @@ void analytics_https(void)
     BUFFER *b = buffer_create(30);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
-    buffer_strcat(b, netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE && __atomic_load_n(&localhost->rrdpush_sender_connected, __ATOMIC_SEQ_CST) ? "streaming|" : "|");
-    buffer_strcat(b, netdata_srv_ctx ? "web" : "");
+    buffer_strcat(b, netdata_ssl_client_ctx && rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) && localhost->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ? "streaming|" : "|");
+    buffer_strcat(b, netdata_ssl_srv_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");
 #endif
@@ -1016,11 +1017,12 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
-    FILE *fp = mypopen(command_to_run, &command_pid);
-    if (fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(command_to_run, &command_pid, &fp_child_input);
+    if (fp_child_output) {
         char buffer[4 + 1];
-        char *s = fgets(buffer, 4, fp);
-        int exit_code = mypclose(fp, command_pid);
+        char *s = fgets(buffer, 4, fp_child_output);
+        int exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
         if (exit_code)
             error("Execution of anonymous statistics script returned %d.", exit_code);
         if (s && strncmp(buffer, "200", 3))

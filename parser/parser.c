@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "parser.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
 
-static inline int find_keyword(char *str, char *keyword, int max_size, int (*custom_isspace)(char))
+inline int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char))
 {
-    char *s = str, *keyword_start;
+    const char *s = str, *keyword_start;
 
     while (unlikely(custom_isspace(*s))) s++;
     keyword_start = s;
@@ -28,7 +29,7 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags)
+PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags)
 {
     PARSER *parser;
 
@@ -36,9 +37,11 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
     parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
     parser->user = user;
     parser->input = input;
+    parser->output = output;
     parser->flags = flags;
     parser->host = host;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
+    inflight_functions_init(parser);
 
 #ifdef ENABLE_HTTPS
     parser->bytesleft = 0;
@@ -46,18 +49,34 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
 #endif
 
     if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-        parser_add_keyword(parser, "CLABEL_COMMIT", pluginsd_clabel_commit);
-        parser_add_keyword(parser, "CLABEL", pluginsd_clabel);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-        parser_add_keyword(parser, "SET", pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL,          pluginsd_label);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE,      pluginsd_overwrite);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END,            pluginsd_end);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT,  pluginsd_clabel_commit);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
+        //parser_add_keyword(parser, PLUGINSD_KEYWORD_GAPS_REQUEST,   pluginsd_gaps_request);
+    }
+
+    if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
+        parser->plugins_action->begin_action            = &pluginsd_begin_action;
+        parser->plugins_action->flush_action            = &pluginsd_flush_action;
+        parser->plugins_action->end_action              = &pluginsd_end_action;
+        parser->plugins_action->disable_action          = &pluginsd_disable_action;
+        parser->plugins_action->variable_action         = &pluginsd_variable_action;
+        parser->plugins_action->dimension_action        = &pluginsd_dimension_action;
+        parser->plugins_action->label_action            = &pluginsd_label_action;
+        parser->plugins_action->overwrite_action        = &pluginsd_overwrite_action;
+        parser->plugins_action->chart_action            = &pluginsd_chart_action;
+        parser->plugins_action->set_action              = &pluginsd_set_action;
     }
 
     return parser;
@@ -155,6 +174,8 @@ void parser_destroy(PARSER *parser)
     if (unlikely(!parser))
         return;
 
+    dictionary_destroy(parser->inflight.functions);
+
     PARSER_KEYWORD  *tmp_keyword, *tmp_keyword_next;
     PARSER_DATA     *tmp_parser_data, *tmp_parser_data_next;
     
@@ -237,32 +258,65 @@ int parser_next(PARSER *parser)
 
 inline int parser_action(PARSER *parser, char *input)
 {
-    PARSER_RC   rc = PARSER_RC_OK;
+    PARSER_RC rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     char command[PLUGINSD_LINE_MAX + 1];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
 
-    if (unlikely(!parser))
+    if (unlikely(!parser)) {
+        internal_error(true, "parser is NULL");
         return 1;
+    }
+
     parser->recover_location[0] = 0x0;
 
     // if not direct input check if we have reprocessed this
     if (unlikely(!input && parser->flags & PARSER_INPUT_PROCESSED))
         return 0;
 
-    PARSER_KEYWORD  *tmp_keyword = parser->keyword;
+    PARSER_KEYWORD *tmp_keyword = parser->keyword;
     if (unlikely(!tmp_keyword)) {
+        internal_error(true, "called without a keyword");
         return 1;
     }
 
     if (unlikely(!input))
         input = parser->buffer;
 
-    if (unlikely(!find_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
+    if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
+        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
+
+        if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
+            if(parser->defer.response) {
+                buffer_strcat(parser->defer.response, input);
+                if(buffer_strlen(parser->defer.response) > 10 * 1024 * 1024) {
+                    // more than 10MB of data
+                    // a bad plugin that did not send the end_keyword
+                    internal_error(true, "Deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        else {
+            // call the action
+            parser->defer.action(parser, parser->defer.action_data);
+
+            // empty everything
+            parser->defer.action = NULL;
+            parser->defer.action_data = NULL;
+            parser->defer.end_keyword = NULL;
+            parser->defer.response = NULL;
+            parser->flags &= ~PARSER_DEFER_UNTIL_KEYWORD;
+        }
+        return 0;
+    }
+
+    if (unlikely(!find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
         return 0;
 
-    if ((parser->flags & PARSER_INPUT_ORIGINAL) == PARSER_INPUT_ORIGINAL)
+    if ((parser->flags & PARSER_INPUT_KEEP_ORIGINAL) == PARSER_INPUT_KEEP_ORIGINAL)
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
@@ -285,16 +339,17 @@ inline int parser_action(PARSER *parser, char *input)
             rc = parser->unknown_function(words, parser->user, NULL);
         else
             rc = PARSER_RC_ERROR;
-#ifdef NETDATA_INTERNAL_CHECKS
-        error("Unknown keyword [%s]", input);
-#endif
+
+        internal_error(rc != PARSER_RC_OK, "Unknown keyword [%s]", input);
     }
     else {
         worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
                 rc = action_function(words, parser->user, parser->plugins_action);
-                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
-                    break;                
+                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
+                    internal_error(true, "action_function() failed with rc = %u", rc);
+                    break;
+                }
                 action_function_list++;
         }
         worker_is_idle();
@@ -303,6 +358,7 @@ inline int parser_action(PARSER *parser, char *input)
     if (likely(input == parser->buffer))
         parser->flags |= PARSER_INPUT_PROCESSED;
 
+    internal_error(rc == PARSER_RC_ERROR, "parser_action() failed.");
     return (rc == PARSER_RC_ERROR);
 }
 

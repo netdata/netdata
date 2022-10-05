@@ -72,9 +72,8 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     time_t remote_time = 0;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (cd->version < VERSION_GAP_FILLING ) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd,
-               cd->version);
+    if (!(cd->capabilities & STREAM_CAP_GAP_FILLING)) {
+        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd, cd->capabilities);
         return PARSER_RC_OK;    // Ignore error and continue stream
     }
     if (remote_time_txt && *remote_time_txt) {
@@ -111,8 +110,8 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
             (int64_t)remote_time);
         int ret;
 #ifdef ENABLE_HTTPS
-        SSL *conn = host->stream_ssl.conn ;
-        if(conn && !host->stream_ssl.flags) {
+        SSL *conn = host->receiver->ssl.conn ;
+        if(conn && !host->receiver->ssl.flags) {
             ret = SSL_write(conn, message, strlen(message));
         } else {
             ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
@@ -292,8 +291,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
         size_t available = sizeof(r->read_buffer) - r->read_len;
         if (available) {
             size_t len = r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, available);
-            if (!len)
+            if (!len) {
+                internal_error(true, "decompressor returned zero length");
                 return 1;
+            }
 
             r->read_len += len;
         }
@@ -301,8 +302,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     }
 
     int ret = 0;
-    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret))
+    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret)) {
+        internal_error(true, "read_stream() failed (1).");
         return 1;
+    }
     
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
@@ -320,8 +323,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     // we're unable to decompress incomplete block
     char compressed[bytes_to_read];
     do {
-        if (read_stream(r, fp, compressed, bytes_to_read, &ret))
+        if (read_stream(r, fp, compressed, bytes_to_read, &ret)) {
+            internal_error(true, "read_stream() failed (2).");
             return 1;
+        }
 
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
 
@@ -334,8 +339,10 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
 
     // Decompress
     size_t bytes_to_parse = r->decompressor->decompress(r->decompressor);
-    if (!bytes_to_parse)
+    if (!bytes_to_parse) {
+        internal_error(true, "no bytes to parse.");
         return 1;
+    }
 
     // Fill read buffer with decompressed data
     r->read_len = r->decompressor->get(r->decompressor, r->read_buffer, sizeof(r->read_buffer));
@@ -347,30 +354,56 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
  */
-static char *receiver_next_line(struct receiver_state *r, int *pos) {
-    int start = *pos, scan = *pos;
-    if (scan >= r->read_len) {
+static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t buffer_length, size_t *pos) {
+    size_t start = *pos;
+
+    char *ss = &r->read_buffer[start];
+    char *se = &r->read_buffer[r->read_len];
+    char *ds = buffer;
+    char *de = &buffer[buffer_length - 2];
+
+    if(ss >= se) {
         r->read_len = 0;
         return NULL;
     }
-    while (scan < r->read_len && r->read_buffer[scan] != '\n')
-        scan++;
-    if (scan < r->read_len && r->read_buffer[scan] == '\n') {
-        *pos = scan+1;
-        r->read_buffer[scan] = 0;
-        return &r->read_buffer[start];
+
+    // copy all bytes to buffer
+    while(ss < se && ds < de && *ss != '\n')
+        *ds++ = *ss++;
+
+    // if we have a newline, return the buffer
+    if(ss < se && ds < de && *ss == '\n') {
+        // newline found in the r->read_buffer
+
+        *ds++ = *ss++; // copy the newline too
+        *ds = '\0';
+
+        *pos = ss - r->read_buffer;
+        return buffer;
     }
+
+    // if the destination is full, oops!
+    if(ds == de) {
+        error("STREAM: received line exceeds %d bytes. Truncating it.", PLUGINSD_LINE_MAX);
+        *ds = '\0';
+        *pos = ss - r->read_buffer;
+        return buffer;
+    }
+
+    // no newline found in the r->read_buffer
+    // move everything to the beginning
     memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
-    r->read_len -= start;
+    r->read_len -= (int)start;
     return NULL;
 }
 
 static void streaming_parser_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
+    rrd_collector_finished();
     parser_destroy(parser);
 }
 
-size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
+size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
@@ -381,7 +414,9 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, fp, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT);
+
+    rrd_collector_started();
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
@@ -390,19 +425,6 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
-    parser->plugins_action->begin_action     = &pluginsd_begin_action;
-    parser->plugins_action->flush_action     = &pluginsd_flush_action;
-    parser->plugins_action->end_action       = &pluginsd_end_action;
-    parser->plugins_action->disable_action   = &pluginsd_disable_action;
-    parser->plugins_action->variable_action  = &pluginsd_variable_action;
-    parser->plugins_action->dimension_action = &pluginsd_dimension_action;
-    parser->plugins_action->label_action     = &pluginsd_label_action;
-    parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
-    parser->plugins_action->chart_action     = &pluginsd_chart_action;
-    parser->plugins_action->set_action       = &pluginsd_set_action;
-    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
-    parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
-
     user.parser = parser;
 
 #ifdef ENABLE_COMPRESSION
@@ -410,15 +432,26 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         rpt->decompressor->reset(rpt->decompressor);
 #endif
 
-    do{
-        if (receiver_read(rpt, fp))
-            break;
-        int pos = 0;
-        char *line;
-        while ((line = receiver_next_line(rpt, &pos))) {
-            if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
+    char buffer[PLUGINSD_LINE_MAX + 2];
+    do {
+        if(receiver_read(rpt, fp_in)) break;
+
+        size_t pos = 0;
+        while(receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &pos)) {
+            if(unlikely(netdata_exit)) {
+                internal_error(true, "exiting...");
                 goto done;
+            }
+            if(unlikely(rpt->shutdown)) {
+                internal_error(true, "parser shutdown...");
+                goto done;
+            }
+            if (unlikely(parser_action(parser,  buffer))) {
+                internal_error(true, "parser_action() failed...");
+                goto done;
+            }
         }
+
         rpt->last_msg_t = now_realtime_sec();
     }
     while(!netdata_exit);
@@ -495,8 +528,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 #ifdef ENABLE_HTTPS
-        rpt->host->stream_ssl.conn = rpt->ssl.conn;
-        rpt->host->stream_ssl.flags = rpt->ssl.flags;
         if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
         if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
@@ -611,7 +642,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
             .obsolete = 0,
             .started_t = now_realtime_sec(),
             .next = NULL,
-            .version = 0,
+            .capabilities = 0,
     };
 
     // put the client IP and port into the buffers used by plugins.d
@@ -620,32 +651,31 @@ static int rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
+#ifdef ENABLE_COMPRESSION
+    if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
+        if (!rpt->rrdpush_compression)
+            rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
+    }
+#endif
+
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     char initial_response[HTTP_HEADER_SIZE];
-    if (rpt->stream_version > 1) {
-        if(rpt->stream_version >= STREAM_VERSION_COMPRESSION){
-#ifdef ENABLE_COMPRESSION
-            if(!rpt->rrdpush_compression)
-                rpt->stream_version = STREAM_VERSION_CLABELS;
-#else
-            if(STREAMING_PROTOCOL_CURRENT_VERSION < rpt->stream_version) {
-                rpt->stream_version =  STREAMING_PROTOCOL_CURRENT_VERSION;               
-            }
-#endif
-        }
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
-        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->stream_version);
-    } else if (rpt->stream_version == 1) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->stream_version);
+    if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
+        log_receiver_capabilities(rpt);
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->capabilities);
+    }
+    else if (stream_has_capability(rpt, STREAM_CAP_VN)) {
+        log_receiver_capabilities(rpt);
+        sprintf(initial_response, "%s%d", START_STREAMING_PROMPT_VN, stream_capabilities_to_vn(rpt->capabilities));
+    } else if (stream_has_capability(rpt, STREAM_CAP_V2)) {
+        log_receiver_capabilities(rpt);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
-    } else {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-        sprintf(initial_response, "%s", START_STREAMING_PROMPT);
+    } else { // stream_has_capability(rpt, STREAM_CAP_V1)
+        log_receiver_capabilities(rpt);
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT_V1);
     }
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-    #ifdef ENABLE_HTTPS
-    rpt->host->stream_ssl.conn = rpt->ssl.conn;
-    rpt->host->stream_ssl.flags = rpt->ssl.flags;
+#ifdef ENABLE_HTTPS
     if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
     if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
@@ -667,11 +697,33 @@ static int rrdpush_receive(struct receiver_state *rpt)
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     // convert the socket to a FILE *
-    FILE *fp = fdopen(rpt->fd, "r");
-    if(!fp) {
+    // It seems that the same FILE * cannot be used for both reading and writing.
+    // (reads and writes seem to interfere with each other, with undefined results).
+
+    int fd_in = rpt->fd;
+    int fd_out = fcntl(rpt->fd, F_DUPFD_CLOEXEC, 0);
+    if(fd_out == -1) {
+        error("STREAM %s [receive from [%s]:%s]: failed to duplicate FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
-        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
-        close(rpt->fd);
+        close(fd_in);
+        return 0;
+    }
+
+    FILE *fp_out = fdopen(fd_out, "w");
+    if(!fp_out) {
+        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for fd_out %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
+        close(fd_in);
+        close(fd_out);
+        return 0;
+    }
+
+    FILE *fp_in  = fdopen(fd_in, "r");
+    if(!fp_in) {
+        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for fd_in %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
+        close(fd_in);
+        fclose(fp_out);
         return 0;
     }
 
@@ -686,15 +738,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
 */
 
 //    rpt->host->connected_senders++;
-    if(rpt->stream_version > 0) {
-        rrdhost_flag_set(rpt->host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_LABELS_STOP);
-    }
-    else {
-        rrdhost_flag_set(rpt->host, RRDHOST_FLAG_STREAM_LABELS_STOP);
-        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_LABELS_UPDATE);
-    }
-
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             rpt->host->health_delay_up_to = now_realtime_sec() + alarms_delay;
@@ -713,7 +756,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
 
-    cd.version = rpt->stream_version;
+    cd.capabilities = rpt->capabilities;
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
@@ -724,7 +767,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdcontext_host_child_connected(rpt->host);
 
-    size_t count = streaming_parser(rpt, &cd, fp);
+    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out);
 
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
                           "DISCONNECTED");
@@ -762,7 +805,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 
     // cleanup
-    fclose(fp);
+    fclose(fp_in);
+    fclose(fp_out);
     return (int)count;
 }
 

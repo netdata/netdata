@@ -32,8 +32,6 @@ typedef struct pluginsd_action {
     PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
     PARSER_RC (*label_action)(void *user, char *key, char *value, RRDLABEL_SRC source);
     PARSER_RC (*overwrite_action)(void *user, RRDHOST *host, DICTIONARY *new_labels);
-    PARSER_RC (*clabel_action)(void *user, char *key, char *value, RRDLABEL_SRC source);
-    PARSER_RC (*clabel_commit_action)(void *user, RRDHOST *host, DICTIONARY *new_labels);
 
     PARSER_RC (*guid_action)(void *user, uuid_t *uuid);
     PARSER_RC (*context_action)(void *user, uuid_t *uuid);
@@ -43,11 +41,12 @@ typedef struct pluginsd_action {
 } PLUGINSD_ACTION;
 
 typedef enum parser_input_type {
-    PARSER_INPUT_SPLIT       = 1 << 1,
-    PARSER_INPUT_ORIGINAL    = 1 << 2,
-    PARSER_INPUT_PROCESSED   = 1 << 3,
-    PARSER_NO_PARSE_INIT     = 1 << 4,
-    PARSER_NO_ACTION_INIT    = 1 << 5,
+    PARSER_INPUT_SPLIT          = (1 << 1),
+    PARSER_INPUT_KEEP_ORIGINAL  = (1 << 2),
+    PARSER_INPUT_PROCESSED      = (1 << 3),
+    PARSER_NO_PARSE_INIT        = (1 << 4),
+    PARSER_NO_ACTION_INIT       = (1 << 5),
+    PARSER_DEFER_UNTIL_KEYWORD  = (1 << 6),
 } PARSER_INPUT_TYPE;
 
 #define PARSER_INPUT_FULL   (PARSER_INPUT_SPLIT|PARSER_INPUT_ORIGINAL)
@@ -73,6 +72,7 @@ typedef struct parser {
     uint8_t version;                // Parser version
     RRDHOST *host;
     void *input;                    // Input source e.g. stream
+    void *output;                   // Stream to send commands to plugin
     PARSER_DATA    *data;           // extra input
     PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
     PLUGINSD_ACTION *plugins_action;
@@ -90,9 +90,24 @@ typedef struct parser {
     char tmpbuffer[PLUGINSD_LINE_MAX];
     char *readfrom;
 #endif
+
+    struct {
+        const char *end_keyword;
+        BUFFER *response;
+        void (*action)(struct parser *parser, void *action_data);
+        void *action_data;
+    } defer;
+
+    struct {
+        DICTIONARY *functions;
+        usec_t smaller_timeout;
+    } inflight;
+
 } PARSER;
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags);
+extern int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
+
+PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser);
 int parser_action(PARSER *working_parser, char *input);
@@ -100,7 +115,7 @@ int parser_push(PARSER *working_parser, char *line);
 void parser_destroy(PARSER *working_parser);
 int parser_recover_input(PARSER *working_parser);
 
-extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
+extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
 extern PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);

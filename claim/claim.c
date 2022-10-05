@@ -58,7 +58,7 @@ void claim_agent(char *claiming_arguments)
     int exit_code;
     pid_t command_pid;
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
-    FILE *fp;
+    FILE *fp_child_output, *fp_child_input;
 
     // This is guaranteed to be set early in main via post_conf_load()
     char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
@@ -84,14 +84,14 @@ void claim_agent(char *claiming_arguments)
               claiming_arguments);
 
     info("Executing agent claiming command 'netdata-claim.sh'");
-    fp = mypopen(command_buffer, &command_pid);
-    if(!fp) {
+    fp_child_output = netdata_popen(command_buffer, &command_pid, &fp_child_input);
+    if(!fp_child_output) {
         error("Cannot popen(\"%s\").", command_buffer);
         return;
     }
     info("Waiting for claiming command to finish.");
-    while (fgets(command_buffer, CLAIMING_COMMAND_LENGTH, fp) != NULL) {;}
-    exit_code = mypclose(fp, command_pid);
+    while (fgets(command_buffer, CLAIMING_COMMAND_LENGTH, fp_child_output) != NULL) {;}
+    exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
     info("Agent claiming command returned with code %d", exit_code);
     if (0 == exit_code) {
         load_claiming_state();

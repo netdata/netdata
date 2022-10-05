@@ -1535,6 +1535,121 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
+inline int pluginsd_space(char c) {
+    switch(c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+        case '=':
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+inline int config_isspace(char c)
+{
+    switch (c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+        case ',':
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+// split a text into words, respecting quotes
+inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
+{
+    char *s = str, quote = 0;
+    int i = 0, rec = 0;
+    char *recover = recover_input;
+
+    // skip all white space
+    while (unlikely(custom_isspace(*s)))
+        s++;
+
+    // check for quote
+    if (unlikely(*s == '\'' || *s == '"')) {
+        quote = *s; // remember the quote
+        s++;        // skip the quote
+    }
+
+    // store the first word
+    words[i++] = s;
+
+    // while we have something
+    while (likely(*s)) {
+        // if it is escape
+        if (unlikely(*s == '\\' && s[1])) {
+            s += 2;
+            continue;
+        }
+
+        // if it is quote
+        else if (unlikely(*s == quote)) {
+            quote = 0;
+            if (recover && rec < max_recover) {
+                recover_location[rec++] = s;
+                *recover++ = *s;
+            }
+            *s = ' ';
+            continue;
+        }
+
+        // if it is a space
+        else if (unlikely(quote == 0 && custom_isspace(*s))) {
+            // terminate the word
+            if (recover && rec < max_recover) {
+                if (!rec || recover_location[rec-1] != s) {
+                    recover_location[rec++] = s;
+                    *recover++ = *s;
+                }
+            }
+            *s++ = '\0';
+
+            // skip all white space
+            while (likely(custom_isspace(*s)))
+                s++;
+
+            // check for quote
+            if (unlikely(*s == '\'' || *s == '"')) {
+                quote = *s; // remember the quote
+                s++;        // skip the quote
+            }
+
+            // if we reached the end, stop
+            if (unlikely(!*s))
+                break;
+
+            // store the next word
+            if (likely(i < max_words))
+                words[i++] = s;
+            else
+                break;
+        }
+
+        // anything else
+        else
+            s++;
+    }
+
+    // terminate the words
+    memset(&words[i], 0, (max_words - i) * sizeof (char *));
+
+    return i;
+}
+
+inline int pluginsd_split_words(char *str, char **words, int max_words, char *recover_input, char **recover_location, int max_recover)
+{
+    return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
+}
 
 bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
     if (unlikely(!ptr))
@@ -1549,4 +1664,22 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
         ptr->data[idx / 64] |= (1ULL << (idx % 64));
     else
         ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
+}
+
+bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
+    pid_t pid;
+    FILE *fp = netdata_popen(command, &pid, NULL);
+
+    if(fp) {
+        char buffer[max_line_length + 1];
+        while (fgets(buffer, max_line_length, fp))
+            fprintf(stdout, "%s", buffer);
+    }
+    else {
+        error("Failed to execute command '%s'.", command);
+        return false;
+    }
+
+    netdata_pclose(NULL, fp, pid);
+    return true;
 }

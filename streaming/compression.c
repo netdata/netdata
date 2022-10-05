@@ -66,8 +66,8 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
     if(unlikely(!state || !size || !out))
         return 0;
 
-    if(unlikely(size > LZ4_MAX_MSG_SIZE)) {
-        error("%s: Compression Failed - Message size %lu above compression buffer limit: %d", STREAM_COMPRESSION_MSG, (long unsigned int) size, LZ4_MAX_MSG_SIZE);
+    if(unlikely(size > COMPRESSION_MAX_MSG_SIZE)) {
+        error("%s: Compression Failed - Message size %lu above compression buffer limit: %d", STREAM_COMPRESSION_MSG, (long unsigned int)size, COMPRESSION_MAX_MSG_SIZE);
         return 0;
     }
 
@@ -103,7 +103,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
 
     // update the next writing position of the ring buffer
     state->data->input_ring_buffer_pos += size;
-    if(unlikely(state->data->input_ring_buffer_pos >= state->data->input_ring_buffer_size - LZ4_MAX_MSG_SIZE))
+    if(unlikely(state->data->input_ring_buffer_pos >= state->data->input_ring_buffer_size - COMPRESSION_MAX_MSG_SIZE))
         state->data->input_ring_buffer_pos = 0;
 
     // update the signature header
@@ -128,7 +128,7 @@ struct compressor_state *create_compressor()
 
     state->data = callocz(1, sizeof(struct compressor_data));
     state->data->stream = LZ4_createStream();
-    state->data->input_ring_buffer_size = LZ4_DECODER_RING_BUFFER_SIZE(LZ4_MAX_MSG_SIZE * 2);
+    state->data->input_ring_buffer_size = LZ4_DECODER_RING_BUFFER_SIZE(COMPRESSION_MAX_MSG_SIZE * 2);
     state->data->input_ring_buffer = callocz(1, state->data->input_ring_buffer_size);
     state->compression_result_buffer_size = 0;
     state->reset(state);
@@ -280,7 +280,7 @@ static size_t lz4_decompressor_decompress(struct decompressor_state *state)
 
     state->out_buffer = state->data->stream_buffer + state->data->stream_buffer_pos;
     state->data->stream_buffer_pos += decompressed_size;
-    if (state->data->stream_buffer_pos >= state->data->stream_buffer_size - LZ4_MAX_MSG_SIZE)
+    if (state->data->stream_buffer_pos >= state->data->stream_buffer_size - COMPRESSION_MAX_MSG_SIZE)
         state->data->stream_buffer_pos = 0;
     state->out_buffer_len = decompressed_size;
     state->out_buffer_pos = 0;
@@ -358,7 +358,7 @@ struct decompressor_state *create_decompressor()
     state->data = callocz(1, sizeof(struct decompressor_data));
     fatal_assert(state->data);
     state->data->stream = LZ4_createStreamDecode();
-    state->data->stream_buffer_size = LZ4_decoderRingBufferSize(LZ4_MAX_MSG_SIZE);
+    state->data->stream_buffer_size = LZ4_decoderRingBufferSize(COMPRESSION_MAX_MSG_SIZE);
     state->data->stream_buffer = mallocz(state->data->stream_buffer_size);
     fatal_assert(state->data->stream_buffer);
     state->reset(state);

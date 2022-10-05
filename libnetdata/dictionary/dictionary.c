@@ -249,6 +249,9 @@ void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_cal
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
+    internal_error(!(dict->options & DICT_OPTION_DONT_OVERWRITE_VALUE), "DICTIONARY: registering conflict callback without DICT_OPTION_DONT_OVERWRITE_VALUE");
+    dict->options |= DICT_OPTION_DONT_OVERWRITE_VALUE;
+
     dictionary_hooks_allocate(dict);
     dict->hooks->conflict_callback = conflict_callback;
     dict->hooks->conflict_callback_data = data;
@@ -457,6 +460,10 @@ static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY
         return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
 }
 
+static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET_SOLE(DICTIONARY_ITEM *item) {
+    return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
+}
+
 // ----------------------------------------------------------------------------
 // callbacks execution
 
@@ -617,6 +624,12 @@ static void ll_recursive_unlock(DICTIONARY *dict, char rw) {
     }
 }
 
+void dictionary_write_lock(DICTIONARY *dict) {
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+}
+void dictionary_write_unlock(DICTIONARY *dict) {
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+}
 
 static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
@@ -1494,7 +1507,9 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 #endif
 
     // destroy the index
+    dictionary_index_lock_wrlock(dict);
     index_size += hashtable_destroy_unsafe(dict);
+    dictionary_index_lock_unlock(dict);
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *item = dict->items.list;
@@ -1797,6 +1812,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     if(!dict) return 0;
 
+    dict_flag_set(dict, DICT_FLAG_DESTROYED);
     DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict);
 
     size_t referenced_items = dictionary_referenced_items(dict);
@@ -1936,18 +1952,21 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
 // get the name/value of an item
 
 const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    api_internal_check(NULL, item, true, false);
     return item_get_name(item);
 }
 
 void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    // we allow the item to be NULL here
-    api_internal_check(NULL, item, true, true);
-
     if(likely(item))
         return item->shared->value;
 
     return NULL;
+}
+
+size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+    if(likely(item))
+        return DICTIONARY_ITEM_REFCOUNT_GET_SOLE(item);
+
+    return 0;
 }
 
 // ----------------------------------------------------------------------------

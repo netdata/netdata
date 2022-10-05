@@ -178,20 +178,21 @@ typedef enum rrddim_options {
     // this is 8-bit
 } RRDDIM_OPTIONS;
 
-#define rrddim_option_check(rd, flag) ((rd)->flags & (flag))
-#define rrddim_option_set(rd, flag)   (rd)->flags |= (flag)
-#define rrddim_option_clear(rd, flag) (rd)->flags &= ~(flag)
+#define rrddim_option_check(rd, option) ((rd)->options & (option))
+#define rrddim_option_set(rd, option)   (rd)->options |= (option)
+#define rrddim_option_clear(rd, option) (rd)->options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
+    RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
+
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
-    RRDDIM_FLAG_PENDING_FOREACH_ALARMS          = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 
     // this is 8 bit
@@ -215,6 +216,8 @@ typedef enum rrdlabel_source {
 } RRDLABEL_SRC;
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT)
+
+extern size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length);
 
 extern DICTIONARY *rrdlabels_create(void);
 extern void rrdlabels_destroy(DICTIONARY *labels_dict);
@@ -491,13 +494,12 @@ typedef enum rrdset_flags {
                                                      // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
-//    RRDSET_FLAG_ACLK                    = (1 << 16), // not used anymore
-    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
 
     RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 22),
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -548,9 +550,6 @@ struct rrdset {
     RRDSET_FLAGS flags;                             // flags
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
 
-    uuid_t hash_uuid;                               // hash_id for syncing with cloud
-                                                    // TODO - obsolete now - cleanup
-
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
@@ -582,6 +581,8 @@ struct rrdset {
     total_number last_collected_total;              // used internally to calculate percentages
 
     size_t rrdlabels_last_saved_version;
+
+    DICTIONARY *functions_view;                     // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
@@ -684,6 +685,8 @@ extern void rrdset_memory_file_update(RRDSET *st);
 extern const char *rrdset_cache_filename(RRDSET *st);
 extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
 
+#include "rrdfunctions.h"
+
 // ----------------------------------------------------------------------------
 // RRDHOST flags
 // use this for configuration flags, not for state control
@@ -691,23 +694,30 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                         = (1 << 0), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS         = (1 << 1), // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST             = (1 << 2), // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 3), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 4), // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED                       = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS         = (1 << 7), // contains dims with uninitialized foreach alarms
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE           = (1 << 8),
-    RRDHOST_FLAG_STREAM_LABELS_STOP             = (1 << 9),
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 10), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_INDEXED_MACHINE_GUID           = (1 << 11), // when set, we have indexed its machine guid
-    RRDHOST_FLAG_INDEXED_HOSTNAME               = (1 << 12), // when set, we have indexed its hostname
-    RRDHOST_FLAG_STREAM_COLLECTED_METRICS       = (1 << 13), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 14), // the host has initialized health structures
-    RRDHOST_FLAG_INITIALIZED_RRDPUSH            = (1 << 15), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
-    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 17), // the host has pending dimension obsoletions
+    // Orphan, Archived and Obsolete flags
+    RRDHOST_FLAG_ORPHAN                         = (1 << 10), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_ARCHIVED                       = (1 << 11), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 12), // the host has pending chart obsoletions
+    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 13), // the host has pending dimension obsoletions
+
+    // Streaming sender
+    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 14), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 15), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 16), // When set, the host is connected to a parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 17), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 18), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_RRDPUSH_SENDER_JOIN            = (1 << 19), // When set, we want to join the sender thread
+
+    // Health
+    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 20), // contains charts and dims with uninitialized variables
+    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 21), // the host has initialized health structures
+
+    // Exporting
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 22), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 23), // don't send it to external databases
+
+    // ACLK
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -720,6 +730,27 @@ typedef enum rrdhost_flags {
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
+
+typedef enum {
+    // Indexing
+    RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
+    RRDHOST_OPTION_INDEXED_HOSTNAME         = (1 << 1), // when set, we have indexed its hostname
+
+    // Streaming configuration
+    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 2), // set when the host is configured to send metrics to a parent
+
+    // Configuration options
+    RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS   = (1 << 3), // delete files of obsolete charts
+    RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
+} RRDHOST_OPTIONS;
+
+#define rrdhost_option_check(host, flag) ((host)->options & (flag))
+#define rrdhost_option_set(host, flag)   (host)->options |= flag
+#define rrdhost_option_clear(host, flag) (host)->options &= ~(flag)
+
+#define rrdhost_has_rrdpush_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
+
+#define rrdhost_can_send_definitions_to_parent(host) (rrdhost_has_rrdpush_sender_enabled(host) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
 
 // ----------------------------------------------------------------------------
 // Health data
@@ -860,7 +891,8 @@ struct rrdhost {
 
     int32_t utc_offset;                             // the offset in seconds from utc
 
-    RRDHOST_FLAGS flags;                            // flags about this RRDHOST
+    RRDHOST_OPTIONS options;                        // configuration option for this RRDHOST (no atomics on this)
+    RRDHOST_FLAGS flags;                            // runtime flags about this RRDHOST (atomics on this)
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
     int rrd_update_every;                           // the update frequency of the host
@@ -873,36 +905,22 @@ struct rrdhost {
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
-    // streaming of data to remote hosts - rrdpush
+    // streaming of data to remote hosts - rrdpush sender
 
-    unsigned int rrdpush_send_enabled;            // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
     struct rrdpush_destinations *destination;       // the current destination from the above list
+    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    volatile unsigned int rrdpush_sender_spawn;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
 
-    bool rrdpush_sender_connected;                  // 1 when the sender is ready to push metrics
-    int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
-
-    volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
-    volatile unsigned int rrdpush_sender_join;    // 1 when we have to join the sending thread
-
-    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
-
-    int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
-    //BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
-
-    //uint32_t stream_version;                             //Set the current version of the stream.
-
     // ------------------------------------------------------------------------
-    // streaming of data from remote hosts - rrdpush
+    // streaming of data from remote hosts - rrdpush receiver
 
     time_t senders_connect_time;                    // the time the last sender was connected
     time_t senders_last_chart_command;              // the time of the last CHART streaming command
@@ -916,25 +934,21 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // health monitoring options
 
-    unsigned int health_enabled;                  // 1 when this host has health enabled
-    time_t health_delay_up_to;                    // a timestamp to delay alarms processing up to
-    STRING *health_default_exec;                  // the full path of the alarms notifications program
-    STRING *health_default_recipient;             // the default recipient for all alarms
-    char *health_log_filename;                    // the alarms event log filename
-    size_t health_log_entries_written;            // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                          // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;    // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;    // the default value for the interval between repeating critical notifications
+    unsigned int health_enabled;                    // 1 when this host has health enabled
+    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                    // the full path of the alarms notifications program
+    STRING *health_default_recipient;               // the default recipient for all alarms
+    char *health_log_filename;                      // the alarms event log filename
+    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
 
 
     // all RRDCALCs are primarily allocated and linked here
-    // RRDCALCs may be linked to charts at any point
-    // (charts may or may not exist when these are loaded)
     DICTIONARY *rrdcalc_root_index;
 
     // templates of alarms
-    // these are used to create alarms when charts
-    // are created or renamed, that match them
     DICTIONARY *rrdcalctemplate_root_index;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
@@ -956,6 +970,10 @@ struct rrdhost {
     DICTIONARY *rrdlabels;
 
     // ------------------------------------------------------------------------
+    // Support for functions
+    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
+
+    // ------------------------------------------------------------------------
     // indexes
 
     DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
@@ -973,11 +991,6 @@ struct rrdhost {
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
-
-#ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                         //Structure used to encrypt the connection
-    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
-#endif
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;

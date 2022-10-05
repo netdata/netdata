@@ -80,7 +80,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
     w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
-    w->acl = 0x1f;
+    w->acl = WEB_CLIENT_ACL_ACLK;
 
     buffer_strcat(log_buffer, query->data.http_api_v2.query);
     size_t size = 0;

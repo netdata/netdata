@@ -42,24 +42,12 @@ static inline uint32_t simple_uhash(const char *name) {
     return hval;
 }
 
-static inline int simple_hash_strcmp(const char *name, const char *b, uint32_t *hash) {
-    unsigned char *s = (unsigned char *) name;
-    uint32_t hval = 0x811c9dc5;
-    int ret = 0;
-    while (*s) {
-        if(!ret) ret = *s - *b++;
-        hval *= 16777619;
-        hval ^= (uint32_t) *s++;
-    }
-    *hash = hval;
-    return ret;
-}
-
 static inline int str2i(const char *s) {
     int n = 0;
-    char c, negative = (*s == '-');
+    char c, negative = (char)(*s == '-');
+    const char *e = &s[30]; // max number of character to iterate
 
-    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' ; c = *(++s)) {
+    for(c = (char)((negative)?*(++s):*s); c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }
@@ -73,8 +61,9 @@ static inline int str2i(const char *s) {
 static inline long str2l(const char *s) {
     long n = 0;
     char c, negative = (*s == '-');
+    const char *e = &s[30]; // max number of character to iterate
 
-    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' ; c = *(++s)) {
+    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }
@@ -88,7 +77,9 @@ static inline long str2l(const char *s) {
 static inline uint32_t str2uint32_t(const char *s) {
     uint32_t n = 0;
     char c;
-    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+    const char *e = &s[30]; // max number of character to iterate
+
+    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }
@@ -98,7 +89,9 @@ static inline uint32_t str2uint32_t(const char *s) {
 static inline uint64_t str2uint64_t(const char *s) {
     uint64_t n = 0;
     char c;
-    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+    const char *e = &s[30]; // max number of character to iterate
+
+    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }
@@ -108,7 +101,9 @@ static inline uint64_t str2uint64_t(const char *s) {
 static inline unsigned long str2ul(const char *s) {
     unsigned long n = 0;
     char c;
-    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+    const char *e = &s[30]; // max number of character to iterate
+
+    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }
@@ -118,7 +113,9 @@ static inline unsigned long str2ul(const char *s) {
 static inline unsigned long long str2ull(const char *s) {
     unsigned long long n = 0;
     char c;
-    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+    const char *e = &s[30]; // max number of character to iterate
+
+    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }
@@ -137,7 +134,9 @@ static inline long long str2ll(const char *s, char **endptr) {
 
     long long n = 0;
     char c;
-    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+    const char *e = &s[30]; // max number of character to iterate
+
+    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
         n *= 10;
         n += c - '0';
     }

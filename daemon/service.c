@@ -5,6 +5,9 @@
 /* Run service jobs every X seconds */
 #define SERVICE_HEARTBEAT 10
 
+#define TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT (3600 / 2)
+#define ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT 60
+
 #define WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK     1
 #define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS          2
 #define WORKER_JOB_ARCHIVE_CHART                    3
@@ -69,35 +72,45 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     rrddim_free(st, rd);
 }
 
-static void svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
+static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
     worker_is_busy(WORKER_JOB_ARCHIVE_CHART_DIMENSIONS);
 
     RRDDIM *rd;
     time_t now = now_realtime_sec();
 
-    dfe_start_reentrant(st->rrddim_root_index, rd) {
+    bool done_all_dimensions = true;
+
+    dfe_start_write(st->rrddim_root_index, rd) {
         if(unlikely(
                 all_dimensions ||
                 (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))
                     )) {
 
-            info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
-            svc_rrddim_obsolete_to_archive(rd);
-
+            if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
+                info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
+                svc_rrddim_obsolete_to_archive(rd);
+            }
+            else
+                done_all_dimensions = false;
         }
+        else
+            done_all_dimensions = false;
     }
     dfe_done(rd);
+
+    return done_all_dimensions;
 }
 
 static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
     worker_is_busy(WORKER_JOB_ARCHIVE_CHART);
 
+    if(!svc_rrdset_archive_obsolete_dimensions(st, true))
+        return;
+
     rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
-
-    svc_rrdset_archive_obsolete_dimensions(st, true);
 
     rrdsetvar_release_and_delete_all(st);
 
@@ -105,7 +118,7 @@ static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
     rrdvar_delete_all(st->rrdvars);
 
     if(st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-        if(rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS)) {
+        if(rrdhost_option_check(st->rrdhost, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS)) {
             worker_is_busy(WORKER_JOB_DELETE_CHART);
             rrdset_delete_files(st);
         }
@@ -148,7 +161,10 @@ static void svc_rrdset_check_obsoletion(RRDHOST *host) {
     rrdset_foreach_read(st, host) {
         last_entry_t = rrdset_last_entry_t(st);
 
-        if(last_entry_t && last_entry_t < host->senders_connect_time)
+        if(last_entry_t && last_entry_t < host->senders_connect_time && host->senders_connect_time
+         + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
+             < now_realtime_sec())
+
             rrdset_is_obsolete(st);
 
     }
@@ -175,12 +191,11 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
                     host->senders_last_chart_command
                  && host->senders_last_chart_command + host->health_delay_up_to < now_realtime_sec()
                    )
-                || (host->senders_connect_time + 300 < now_realtime_sec())
+                || (host->senders_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
                 )
             ) {
             svc_rrdset_check_obsoletion(host);
             host->trigger_chart_obsoletion_check = 0;
-
         }
     }
 
@@ -200,7 +215,7 @@ restart_after_removal:
         if(rrdhost_should_be_removed(host, protected_host, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
-            if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
+            if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
 #ifdef ENABLE_DBENGINE
                 /* don't delete multi-host DB host files */
                 && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))

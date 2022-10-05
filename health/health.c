@@ -2,6 +2,22 @@
 
 #include "health.h"
 
+#define WORKER_HEALTH_JOB_RRD_LOCK              0
+#define WORKER_HEALTH_JOB_HOST_LOCK             1
+#define WORKER_HEALTH_JOB_DB_QUERY              2
+#define WORKER_HEALTH_JOB_CALC_EVAL             3
+#define WORKER_HEALTH_JOB_WARNING_EVAL          4
+#define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
+#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
+#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   8
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   9
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
+#endif
+
+
 unsigned int default_health_enabled = 1;
 char *silencers_filename;
 
@@ -659,22 +675,48 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 0;
 }
 
-// Create alarms for dimensions that have been added to charts
-// since the previous iteration.
-static void health_execute_pending_updates(RRDHOST *host) {
+static void health_execute_delayed_initializations(RRDHOST *host) {
     RRDSET *st;
 
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS))
-        return;
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     rrdset_foreach_reentrant(st, host) {
-        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS))
+        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+
+        if(unlikely(rrdset_is_ar_chart(st)))
             continue;
+
+        worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
+
+        if(!st->rrdfamily)
+            st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
+
+        if(!st->rrdvars)
+            st->rrdvars = rrdvariables_create();
+
+        rrddimvar_index_init(st);
+
+        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
+        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
+
+        rrdcalc_link_matching_alerts_to_rrdset(st);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS))
-                continue;
+            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
+            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+
+            worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM);
+
+            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
 
             RRDCALCTEMPLATE *rt;
             foreach_rrdcalctemplate_read(host, rt) {
@@ -685,14 +727,10 @@ static void health_execute_pending_updates(RRDHOST *host) {
                     rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
             }
             foreach_rrdcalctemplate_done(rt);
-
-            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
         }
         rrddim_foreach_done(rd);
-        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
     }
     rrdset_foreach_done(st);
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
 }
 
 /**
@@ -705,19 +743,6 @@ static void health_execute_pending_updates(RRDHOST *host) {
  * @return It always returns NULL
  */
 
-#define WORKER_HEALTH_JOB_RRD_LOCK           0
-#define WORKER_HEALTH_JOB_HOST_LOCK          1
-#define WORKER_HEALTH_JOB_DB_QUERY           2
-#define WORKER_HEALTH_JOB_CALC_EVAL          3
-#define WORKER_HEALTH_JOB_WARNING_EVAL       4
-#define WORKER_HEALTH_JOB_CRITICAL_EVAL      5
-#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY    6
-#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS  7
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
-#endif
-
 void *health_main(void *ptr) {
     worker_register("HEALTH");
     worker_register_job_name(WORKER_HEALTH_JOB_RRD_LOCK, "rrd lock");
@@ -728,6 +753,8 @@ void *health_main(void *ptr) {
     worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
     worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alarm log entry");
     worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alarm log process");
+    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
+    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
 
     netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
@@ -809,7 +836,7 @@ void *health_main(void *ptr) {
             if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
 
-            health_execute_pending_updates(host);
+            health_execute_delayed_initializations(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
 

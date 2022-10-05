@@ -369,12 +369,15 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 
 }
 
-static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty) {
+size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
     if(unlikely(!dst_size)) return 0;
+
     if(unlikely(!src || !*src)) {
         strncpyz((char *)dst, empty, dst_size);
         dst[dst_size - 1] = '\0';
-        return strlen((char *)dst);
+        size_t len = strlen((char *)dst);
+        if(multibyte_length) *multibyte_length = len;
+        return len;
     }
 
     unsigned char *d = dst;
@@ -385,7 +388,9 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
     // copy while converting, but keep only one white space
     // we start wil last_is_space = 1 to skip leading spaces
     int last_is_space = 1;
+
     size_t mblen = 0;
+
     while(*src && d < end) {
         unsigned char c = *src;
 
@@ -446,28 +451,34 @@ static size_t rrdlabels_sanitize(unsigned char *dst, const unsigned char *src, s
     *d = '\0';
 
     // check if dst is all underscores and empty it if it is
-    d = dst;
-    while(*d == '_') d++;
-    if(unlikely(*d == '\0')) {
-        *dst = '\0';
-        mblen = 0;
+    if(*dst == '_') {
+        unsigned char *t = dst;
+        while (*t == '_') t++;
+        if (unlikely(*t == '\0')) {
+            *dst = '\0';
+            mblen = 0;
+        }
     }
 
     if(unlikely(*dst == '\0')) {
         strncpyz((char *)dst, empty, dst_size);
         dst[dst_size - 1] = '\0';
-        return strlen((char *)dst);
+        mblen = strlen((char *)dst);
+        if(multibyte_length) *multibyte_length = mblen;
+        return mblen;
     }
 
-    return mblen;
+    if(multibyte_length) *multibyte_length = mblen;
+
+    return d - dst;
 }
 
 static inline size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "");
+    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "", NULL);
 }
 
 static inline size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size) {
-    return rrdlabels_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[none]");
+    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[none]", NULL);
 }
 
 // ----------------------------------------------------------------------------
@@ -1153,12 +1164,14 @@ int rrdlabels_unittest_simple_pattern() {
 
 int rrdlabels_unittest_sanitize_value(const char *src, const char *expected) {
     char buf[RRDLABELS_MAX_VALUE_LENGTH + 1];
-    size_t mblen = rrdlabels_sanitize_value(buf, src, RRDLABELS_MAX_VALUE_LENGTH);
+    size_t len = rrdlabels_sanitize_value(buf, src, RRDLABELS_MAX_VALUE_LENGTH);
+    size_t expected_len = strlen(expected);
 
     int err = 0;
     if(strcmp(buf, expected) != 0) err = 1;
+    if(len != expected_len) err = 1;
 
-    fprintf(stderr, "%s(%s): %s, expected '%s', got '%s', mblen = %zu, bytes = %zu\n", __FUNCTION__, src, (err==1)?"FAILED":"OK", expected, buf, mblen, strlen(buf));
+    fprintf(stderr, "%s(%s): %s, expected '%s', got '%s', expected bytes = %zu, got bytes = %zu\n", __FUNCTION__, src, (err==1)?"FAILED":"OK", expected, buf, expected_len, strlen(buf));
     return err;
 }
 

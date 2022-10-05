@@ -1200,6 +1200,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t},\n");
 
+    buffer_strcat(wb, "\t\"functions\": {\n");
+    host_functions2json(host, wb, 2, "\"", "\"");
+    buffer_strcat(wb, "\t},\n");
+
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);
     buffer_strcat(wb, "\n\t],\n");
@@ -1250,7 +1254,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef  ENABLE_COMPRESSION
     if(host->sender){
         buffer_strcat(wb, "\t\"stream-compression\": ");
-        buffer_strcat(wb, (host->sender->rrdpush_compression ? "true" : "false"));
+        buffer_strcat(wb, (host->sender->flags & SENDER_FLAG_COMPRESSION) ? "true" : "false");
         buffer_strcat(wb, ",\n");
     }else{
         buffer_strcat(wb, "\t\"stream-compression\": null,\n");
@@ -1483,6 +1487,53 @@ int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char 
     return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
 }
 
+int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    int timeout = 0;
+    const char *function = NULL;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+
+        if (!strcmp(name, "function"))
+            function = value;
+
+        else if (!strcmp(name, "timeout"))
+            timeout = (int) strtoul(value, NULL, 0);
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
+
+    return rrd_call_function_and_wait(host, wb, timeout, function);
+}
+
+int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
+
+    buffer_strcat(wb, "{\n");
+    host_functions2json(host, wb, 1, "\"", "\"");
+    buffer_strcat(wb, "}");
+
+    return HTTP_RESP_OK;
+}
+
 #ifndef ENABLE_DBENGINE
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host, struct web_client *w, char *url) {
     return HTTP_RESP_NOT_FOUND;
@@ -1585,47 +1636,57 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#ifdef NETDATA_DEV_MODE
+#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
+#else
+#define ACL_DEV_OPEN_ACCESS 0
+#endif
+
 static struct api_command {
     const char *command;
     uint32_t hash;
     WEB_CLIENT_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
 } api_commands[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
-        { "context",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_context         },
-        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_contexts        },
-        { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_archivedcharts  },
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_info                       },
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_data                       },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_chart                      },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_charts                     },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_context                    },
+        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_contexts                   },
+        { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_archivedcharts             },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,   web_client_api_request_v1_registry        },
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_badge },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
-        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms_values   },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
-        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms                     },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms_values             },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_log                 },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_variables           },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_count               },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
-        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_anomaly_events         },
+        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_anomaly_event_info     },
+        { "ml_info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info                },
 #endif
 
-        { "manage/health",       0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health         },
-        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state          },
-        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_metric_correlations },
-        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_weights },
+        { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
+        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_aclk_state            },
+        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_metric_correlations   },
+        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_weights               },
 
-        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_dbengine_stats },
+        { "function",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
+        { "functions",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+
+        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_dbengine_stats },
 
         // terminator
-        { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
+        { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
 };
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {

@@ -379,10 +379,10 @@ int help(int exitcode) {
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+    ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
@@ -795,12 +795,13 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     info("Executing %s", script);
 
-    FILE *fp = mypopen(script, &command_pid);
-    if(fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if(fp_child_output) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -821,7 +822,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        mypclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
     return 0;
