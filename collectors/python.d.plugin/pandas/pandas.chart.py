@@ -40,8 +40,11 @@ class Service(SimpleService):
                     }
                 self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
                 
-            exec(chart_config['processing_code'])
-            data_tmp = locals()['data_tmp']
+            for line in chart_config['processing_code'].split(';'):
+                line_clean = line.strip('\n').strip(' ')
+                if line_clean != '':
+                    df = eval(line_clean)
+            data_tmp = df.to_dict(orient='records')[0]
             data.update(data_tmp)
 
             for dim in data_tmp:
@@ -56,8 +59,11 @@ class Service(SimpleService):
 
         for chart_config in self.chart_configs:
 
-            exec(chart_config['processing_code'])
-            data_tmp = locals()['data_tmp']
+            for line in chart_config['processing_code'].split(';'):
+                line_clean = line.strip('\n').strip(' ')
+                if line_clean != '':
+                    df = eval(line_clean)
+            data_tmp = df.to_dict(orient='records')[0]
             data.update(data_tmp)
 
         return data
