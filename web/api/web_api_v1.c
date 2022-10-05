@@ -1670,9 +1670,8 @@ static struct api_command {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_anomaly_events         },
-        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_anomaly_event_info     },
-        { "ml_info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info                },
+      { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
+      { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
