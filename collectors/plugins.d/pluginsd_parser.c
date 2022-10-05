@@ -28,17 +28,6 @@ PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_label_action(void *user, char *key, char *value, RRDLABEL_SRC source)
-{
-
-    if(unlikely(!((PARSER_USER_OBJECT *) user)->new_host_labels))
-        ((PARSER_USER_OBJECT *) user)->new_host_labels = rrdlabels_create();
-
-    rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels, key, value, source);
-
-    return PARSER_RC_OK;
-}
-
 PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *dimension = words[1];
