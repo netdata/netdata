@@ -5,8 +5,8 @@
 SSL_CTX *netdata_ssl_exporting_ctx =NULL;
 SSL_CTX *netdata_ssl_client_ctx =NULL;
 SSL_CTX *netdata_ssl_srv_ctx =NULL;
-const char *ssl_security_key =NULL;
-const char *ssl_security_cert =NULL;
+const char *netdata_ssl_security_key =NULL;
+const char *netdata_ssl_security_cert =NULL;
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
 int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
@@ -169,11 +169,11 @@ static SSL_CTX * security_initialize_openssl_server() {
         return NULL;
     }
 
-    SSL_CTX_use_certificate_chain_file(ctx, ssl_security_cert);
+    SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
 #endif
     security_openssl_common_options(ctx, 0);
 
-    SSL_CTX_use_PrivateKey_file(ctx, ssl_security_key,SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx, netdata_ssl_security_key,SSL_FILETYPE_PEM);
 
     if (!SSL_CTX_check_private_key(ctx)) {
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
@@ -207,7 +207,7 @@ void security_start_ssl(int selector) {
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
             struct stat statbuf;
-            if (stat(ssl_security_key, &statbuf) || stat(ssl_security_cert, &statbuf)) {
+            if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf)) {
                 info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 return;
             }

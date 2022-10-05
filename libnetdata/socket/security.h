@@ -45,8 +45,8 @@ struct netdata_ssl{
 extern SSL_CTX *netdata_ssl_exporting_ctx;
 extern SSL_CTX *netdata_ssl_client_ctx;
 extern SSL_CTX *netdata_ssl_srv_ctx;
-extern const char *ssl_security_key;
-extern const char *ssl_security_cert;
+extern const char *netdata_ssl_security_key;
+extern const char *netdata_ssl_security_cert;
 extern const char *tls_version;
 extern const char *tls_ciphers;
 extern int netdata_ssl_validate_server;
