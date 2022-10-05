@@ -404,6 +404,9 @@ static int handle_http_request(https_req_ctx_t *ctx) {
         strcpy(ptr, ctx->request->proxy_password);
 
         int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
+        // OpenSSL encoder puts newline every 64 output bytes
+        // we remove those but during encoding we need that space in the buffer
+        creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
         char *creds_base64 = callocz(1, creds_base64_len + 1);
         base64_encode_helper((unsigned char*)creds_base64, &creds_base64_len, (unsigned char*)creds_plain, creds_plain_len);
         buffer_sprintf(hdr, "Proxy-Authorization: Basic %s\x0D\x0A", creds_base64);
