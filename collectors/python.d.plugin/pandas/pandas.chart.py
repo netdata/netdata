@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import pandas as pd
+import requests
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
