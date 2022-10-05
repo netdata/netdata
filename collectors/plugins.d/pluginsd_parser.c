@@ -723,7 +723,7 @@ PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_a
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *store;
 
@@ -754,12 +754,10 @@ PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_act
         }
     }
 
-    if (plugins_action->label_action) {
-        PARSER_RC rc = plugins_action->label_action(user, words[1], store, strtol(words[2], NULL, 10));
-        if (store != words[3])
-            freez(store);
-        return rc;
-    }
+    if(unlikely(!((PARSER_USER_OBJECT *) user)->new_host_labels))
+        ((PARSER_USER_OBJECT *) user)->new_host_labels = rrdlabels_create();
+
+    rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels, words[1], store, strtol(words[2], NULL, 10));
 
     if (store != words[3])
         freez(store);
