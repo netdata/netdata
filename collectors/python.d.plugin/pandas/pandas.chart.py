@@ -23,7 +23,8 @@ class Service(SimpleService):
     def run_code(self, processing_code):
         """eval() each line of code and ensure the result is a pandas dataframe"""
 
-        for line in processing_code.split(';'):
+        lines = processing_code.split(';')
+        for line in lines:
             line_clean = line.strip('\n').strip(' ')
             if line_clean != '':
                 df = eval(line_clean)
