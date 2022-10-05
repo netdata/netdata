@@ -4,30 +4,6 @@
 
 #define LOG_FUNCTIONS false
 
-PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value)
-{
-    UNUSED(user);
-
-    if (global) {
-        const RRDVAR_ACQUIRED *rva = rrdvar_custom_host_variable_add_and_acquire(host, name);
-        if (rva) {
-            rrdvar_custom_host_variable_set(host, rva, value);
-            rrdvar_custom_host_variable_release(host, rva);
-        }
-        else
-            error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, rrdhost_hostname(host));
-    } else {
-        const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_custom_chart_variable_add_and_acquire(st, name);
-        if (rsa) {
-            rrdsetvar_custom_chart_variable_set(st, rsa, value);
-            rrdsetvar_custom_chart_variable_release(st, rsa);
-        }
-        else
-            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
-    }
-    return PARSER_RC_OK;
-}
-
 PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *dimension = words[1];
@@ -256,7 +232,7 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *id = words[1];
     char *name = words[2];
@@ -307,12 +283,6 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
             "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
             rrdset_id(st), id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
             options ? options : "");
-
-    if (plugins_action->dimension_action) {
-        return plugins_action->dimension_action(
-                user, st, id, name, algorithm,
-            multiplier, divisor, (options && *options)?options:NULL, rrd_algorithm_id(algorithm));
-    }
 
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
     int unhide_dimension = 1;
@@ -595,7 +565,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 
 // ----------------------------------------------------------------------------
 
-PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *name = words[1];
     char *value = words[2];
@@ -651,9 +621,24 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
                 endptr);
     }
 
-    if (plugins_action->variable_action) {
-        return plugins_action->variable_action(user, host, st, name, global, v);
+    if (global) {
+        const RRDVAR_ACQUIRED *rva = rrdvar_custom_host_variable_add_and_acquire(host, name);
+        if (rva) {
+            rrdvar_custom_host_variable_set(host, rva, v);
+            rrdvar_custom_host_variable_release(host, rva);
+        }
+        else
+            error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, rrdhost_hostname(host));
+    } else {
+        const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_custom_chart_variable_add_and_acquire(st, name);
+        if (rsa) {
+            rrdsetvar_custom_chart_variable_set(st, rsa, v);
+            rrdsetvar_custom_chart_variable_release(st, rsa);
+        }
+        else
+            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }
+
 
     return PARSER_RC_OK;
 }

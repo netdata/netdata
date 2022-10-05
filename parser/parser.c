@@ -66,10 +66,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         //parser_add_keyword(parser, PLUGINSD_KEYWORD_GAPS_REQUEST,   pluginsd_gaps_request);
     }
 
-    if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
-        parser->plugins_action->variable_action         = &pluginsd_variable_action;
-    }
-
     return parser;
 }
 

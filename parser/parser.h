@@ -17,12 +17,6 @@ typedef enum parser_rc {
 } PARSER_RC;
 
 typedef struct pluginsd_action {
-    PARSER_RC (*dimension_action)
-    (void *user, RRDSET *st, char *id, char *name, char *algorithm, long multiplier, long divisor, char *options,
-     RRD_ALGORITHM algorithm_type);
-
-    PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
-
     PARSER_RC (*guid_action)(void *user, uuid_t *uuid);
     PARSER_RC (*context_action)(void *user, uuid_t *uuid);
     PARSER_RC (*tombstone_action)(void *user, uuid_t *uuid);

@@ -22,11 +22,6 @@ typedef struct parser_user_object {
     void *private; // the user can set this for private use
 } PARSER_USER_OBJECT;
 
-extern PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
-extern PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name, char *algorithm,
-                                           long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type);
-extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, DICTIONARY *new_host_labels);
-
 extern PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern void inflight_functions_init(PARSER *parser);
