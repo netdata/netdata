@@ -211,6 +211,7 @@ extern DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY 
 extern const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item);
 extern void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
+extern size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
 // ----------------------------------------------------------------------------
 // Traverse (walk through) the items of the dictionary.

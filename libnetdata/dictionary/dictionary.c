@@ -460,6 +460,10 @@ static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY
         return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
 }
 
+static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET_SOLE(DICTIONARY_ITEM *item) {
+    return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
+}
+
 // ----------------------------------------------------------------------------
 // callbacks execution
 
@@ -1956,6 +1960,13 @@ void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
         return item->shared->value;
 
     return NULL;
+}
+
+size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+    if(likely(item))
+        return DICTIONARY_ITEM_REFCOUNT_GET_SOLE(item);
+
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
