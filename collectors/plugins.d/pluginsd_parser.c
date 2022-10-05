@@ -4,47 +4,6 @@
 
 #define LOG_FUNCTIONS false
 
-PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,
-           char *module, int priority, int update_every, RRDSET_TYPE chart_type, char *options)
-{
-    RRDSET *st = NULL;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    st = rrdset_create(
-        host, type, id, name, family, context, title, units,
-        plugin, module, priority, update_every,
-        chart_type);
-
-    if (options && *options) {
-        if (strstr(options, "obsolete"))
-            rrdset_is_obsolete(st);
-        else
-            rrdset_isnot_obsolete(st);
-
-        if (strstr(options, "detail"))
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-
-        if (strstr(options, "hidden"))
-            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
-
-        if (strstr(options, "store_first"))
-            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-    } else {
-        rrdset_isnot_obsolete(st);
-        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-    }
-    ((PARSER_USER_OBJECT *)user)->st = st;
-
-    return PARSER_RC_OK;
-}
-
 PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value)
 {
     UNUSED(user);
@@ -227,7 +186,7 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
@@ -247,8 +206,6 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     char *options = words[10];
     char *plugin = words[11];
     char *module = words[12];
-
-    int have_action = ((plugins_action->chart_action) != NULL);
 
     // parse the id from type
     char *id = NULL;
@@ -313,12 +270,42 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
         type, id, name ? name : "", family ? family : "", context ? context : "", rrdset_type_name(chart_type),
         priority, update_every);
 
-    if (have_action) {
-        return plugins_action->chart_action(
-            user, type, id, name, family, context, title, units,
-            (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *)user)->cd->filename, module, priority, update_every,
-            chart_type, options);
+    RRDSET *st = NULL;
+
+    st = rrdset_create(
+        host, type, id, name, family, context, title, units,
+        (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *)user)->cd->filename,
+        module, priority, update_every,
+        chart_type);
+
+    if (likely(st)) {
+        if (options && *options) {
+            if (strstr(options, "obsolete"))
+                rrdset_is_obsolete(st);
+            else
+                rrdset_isnot_obsolete(st);
+
+            if (strstr(options, "detail"))
+                rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+            else
+                rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+
+            if (strstr(options, "hidden"))
+                rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+            else
+                rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
+
+            if (strstr(options, "store_first"))
+                rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+            else
+                rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+        } else {
+            rrdset_isnot_obsolete(st);
+            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+        }
     }
+    ((PARSER_USER_OBJECT *)user)->st = st;
 
     return PARSER_RC_OK;
 }

@@ -22,9 +22,6 @@ typedef struct parser_user_object {
     void *private; // the user can set this for private use
 } PARSER_USER_OBJECT;
 
-extern PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context,
-                                       char *title, char *units, char *plugin, char *module, int priority,
-                                       int update_every, RRDSET_TYPE chart_type, char *options);
 extern PARSER_RC pluginsd_variable_action(void *user, RRDHOST *host, RRDSET *st, char *name, int global, NETDATA_DOUBLE value);
 extern PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name, char *algorithm,
                                            long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type);

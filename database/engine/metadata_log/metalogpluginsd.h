@@ -17,10 +17,6 @@ struct metalog_pluginsd_state {
 };
 
 extern void metalog_pluginsd_state_init(struct metalog_pluginsd_state *state, struct metalog_instance *ctx);
-
-extern PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family,
-                                               char *context, char *title, char *units, char *plugin, char *module,
-                                               int priority, int update_every, RRDSET_TYPE chart_type, char *options);
 extern PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name, char *algorithm,
                                                    long multiplier, long divisor, char *options,
                                                    RRD_ALGORITHM algorithm_type);

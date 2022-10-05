@@ -44,30 +44,6 @@ PARSER_RC metalog_pluginsd_host_action(
     return PARSER_RC_OK;
 }
 
-PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context,
-                                        char *title, char *units, char *plugin, char *module, int priority,
-                                        int update_every, RRDSET_TYPE chart_type, char *options)
-{
-    UNUSED(options);
-
-    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    if (unlikely(uuid_is_null(state->host_uuid))) {
-        debug(D_METADATALOG, "Ignoring chart belonging to missing or ignored host.");
-        return PARSER_RC_OK;
-    }
-    uuid_copy(state->chart_uuid, state->uuid);
-    uuid_clear(state->uuid); /* Consume UUID */
-    (void) sql_store_chart(&state->chart_uuid, &state->host_uuid,
-        type, id, name, family, context, title, units,
-        plugin, module, priority, update_every,
-        chart_type, RRD_MEMORY_MODE_DBENGINE, host ? host->rrd_history_entries : 1);
-    ((PARSER_USER_OBJECT *)user)->st_exists = 1;
-
-    return PARSER_RC_OK;
-}
-
 PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name, char *algorithm,
                                             long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type)
 {

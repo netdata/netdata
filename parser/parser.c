@@ -69,7 +69,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
     if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
         parser->plugins_action->variable_action         = &pluginsd_variable_action;
         parser->plugins_action->dimension_action        = &pluginsd_dimension_action;
-        parser->plugins_action->chart_action            = &pluginsd_chart_action;
     }
 
     return parser;
