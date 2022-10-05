@@ -82,7 +82,7 @@ void ml_new_dimension(RRDDIM *RD) {
     if (rrdset_is_ar_chart(RS))
         return;
 
-    Dimension *D = new Dimension(RD);
+    Dimension *D = new Dimension(RD, H->getAnomalyRateRS());
     RD->ml_dimension = static_cast<ml_dimension_t>(D);
     H->addDimension(D);
 }
@@ -127,59 +127,24 @@ char *ml_get_host_runtime_info(RRDHOST *RH) {
     return strdup(ConfigJson.dump(1, '\t').c_str());
 }
 
+char *ml_get_host_models(RRDHOST *RH) {
+    nlohmann::json ModelsJson;
+
+    if (RH && RH->ml_host) {
+        Host *H = static_cast<Host *>(RH->ml_host);
+        H->getModelsAsJson(ModelsJson);
+        return strdup(ModelsJson.dump(2, '\t').c_str());
+    }
+
+    return nullptr;
+}
+
 bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
         return false;
 
-    D->addValue(Value, Exists);
-    bool Result = D->predict().second;
-    return Result;
-}
-
-char *ml_get_anomaly_events(RRDHOST *RH, const char *AnomalyDetectorName,
-                            int AnomalyDetectorVersion, time_t After, time_t Before) {
-    if (!RH || !RH->ml_host) {
-        error("No host");
-        return nullptr;
-    }
-
-    Host *H = static_cast<Host *>(RH->ml_host);
-    std::vector<std::pair<time_t, time_t>> TimeRanges;
-
-    bool Res = H->getAnomaliesInRange(TimeRanges, AnomalyDetectorName,
-                                                  AnomalyDetectorVersion,
-                                                  H->getUUID(),
-                                                  After, Before);
-    if (!Res) {
-        error("DB result is empty");
-        return nullptr;
-    }
-
-    nlohmann::json Json = TimeRanges;
-    return strdup(Json.dump(4).c_str());
-}
-
-char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
-                                int AnomalyDetectorVersion, time_t After, time_t Before) {
-    if (!RH || !RH->ml_host) {
-        error("No host");
-        return nullptr;
-    }
-
-    Host *H = static_cast<Host *>(RH->ml_host);
-
-    nlohmann::json Json;
-    bool Res = H->getAnomalyInfo(Json, AnomalyDetectorName,
-                                       AnomalyDetectorVersion,
-                                       H->getUUID(),
-                                       After, Before);
-    if (!Res) {
-        error("DB result is empty");
-        return nullptr;
-    }
-
-    return strdup(Json.dump(4, '\t').c_str());
+    return D->predict(Value, Exists);
 }
 
 void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {

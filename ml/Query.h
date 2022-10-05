@@ -7,7 +7,7 @@ namespace ml {
 
 class Query {
 public:
-    Query(RRDDIM *RD) : RD(RD) {
+    Query(RRDDIM *RD) : RD(RD), Initialized(false) {
         Ops = &RD->tiers[0]->query_ops;
     }
 
@@ -21,10 +21,16 @@ public:
 
     void init(time_t AfterT, time_t BeforeT) {
         Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT, TIER_QUERY_FETCH_SUM);
+        Initialized = true;
     }
 
     bool isFinished() {
         return Ops->is_finished(&Handle);
+    }
+
+    ~Query() {
+        if (Initialized)
+            Ops->finalize(&Handle);
     }
 
     std::pair<time_t, CalculatedNumber> nextMetric() {
@@ -32,12 +38,9 @@ public:
         return { sp.start_time, sp.sum / sp.count };
     }
 
-    ~Query() {
-        Ops->finalize(&Handle);
-    }
-
 private:
     RRDDIM *RD;
+    bool Initialized;
 
     struct rrddim_query_ops *Ops;
     struct rrddim_query_handle Handle;

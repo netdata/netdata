@@ -28,17 +28,12 @@ void ml_delete_host(RRDHOST *RH);
 
 char *ml_get_host_info(RRDHOST *RH);
 char *ml_get_host_runtime_info(RRDHOST *RH);
+char *ml_get_host_models(RRDHOST *RH);
 
 void ml_new_dimension(RRDDIM *RD);
 void ml_delete_dimension(RRDDIM *RD);
 
 bool ml_is_anomalous(RRDDIM *RD, double value, bool exists);
-
-char *ml_get_anomaly_events(RRDHOST *RH, const char *AnomalyDetectorName,
-                            int AnomalyDetectorVersion, time_t After, time_t Before);
-
-char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
-                                int AnomalyDetectorVersion, time_t After, time_t Before);
 
 void ml_process_rrdr(RRDR *R, int MaxAnomalyRates);
 

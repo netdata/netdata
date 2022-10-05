@@ -36,7 +36,8 @@ TEST(SamplesBufferTest, NS_8_NDPS_1_DN_1_SN_3_LN_1) {
     CNs[6] = 0.2684839023122384;
     CNs[7] = 0.851332948637479;
 
-    SamplesBuffer SB(CNs, NumSamples, NumDimsPerSample, DiffN, SmoothN, LagN);
+    std::vector<uint32_t> RandNums(NumSamples, std::numeric_limits<uint32_t>::max());
+    SamplesBuffer SB(CNs, NumSamples, NumDimsPerSample, DiffN, SmoothN, LagN, 1.0, RandNums);
     SB.preprocess();
 
     std::vector<Sample> Samples = SB.getPreprocessedSamples();
@@ -76,7 +77,8 @@ TEST(SamplesBufferTest, NS_8_NDPS_1_DN_2_SN_3_LN_2) {
     CNs[6] = 0.15552559051428083;
     CNs[7] = 0.6309750314597955;
 
-    SamplesBuffer SB(CNs, NumSamples, NumDimsPerSample, DiffN, SmoothN, LagN);
+    std::vector<uint32_t> RandNums(NumSamples, std::numeric_limits<uint32_t>::max());
+    SamplesBuffer SB(CNs, NumSamples, NumDimsPerSample, DiffN, SmoothN, LagN, 1.0, RandNums);
     SB.preprocess();
 
     std::vector<Sample> Samples = SB.getPreprocessedSamples();
@@ -114,7 +116,8 @@ TEST(SamplesBufferTest, NS_8_NDPS_3_DN_2_SN_4_LN_1) {
     CNs[18] = 0.9394494507088997; CNs[19] =0.17567223681734334; CNs[20] = 0.42732886195446984;
     CNs[21] = 0.9460522396152958; CNs[22] =0.23462747016780894; CNs[23] = 0.35983249900892145;
 
-    SamplesBuffer SB(CNs, NumSamples, NumDimsPerSample, DiffN, SmoothN, LagN);
+    std::vector<uint32_t> RandNums(NumSamples, std::numeric_limits<uint32_t>::max());
+    SamplesBuffer SB(CNs, NumSamples, NumDimsPerSample, DiffN, SmoothN, LagN, 1.0, RandNums);
     SB.preprocess();
 
     std::vector<Sample> Samples = SB.getPreprocessedSamples();
