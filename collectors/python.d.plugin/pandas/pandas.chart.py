@@ -19,12 +19,13 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.chart_configs = self.configuration.get('chart_configs', None)
+        self.line_sep = self.configuration.get('line_sep', ';')
 
     def run_code(self, df_steps):
         """eval() each line of code and ensure the result is a pandas dataframe"""
 
         # process each line of code
-        lines = df_steps.split(';')
+        lines = df_steps.split(self.line_sep)
         for line in lines:
             line_clean = line.strip('\n').strip(' ')
             if line_clean != '':
