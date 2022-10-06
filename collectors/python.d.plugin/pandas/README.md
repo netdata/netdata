@@ -47,4 +47,5 @@ that will control how the results will look in netdata.
 
 ## Notes
   - Each line in `df_steps` must return a pandas [DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) object that is called `df` at each step.
+  - You can use [this colab notebook](https://colab.research.google.com/drive/1VYrddSegZqGtkWGFuiUbMbUk5f3rW6Hi?usp=sharing) to mock up and work on your `df_steps` iterativley before adding them to your config.
   - This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken as the most recent values for each dimension on each chart using (`df.to_dict(orient='records')[0]`). See [pd.to_dict()](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_dict.html).
