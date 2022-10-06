@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix bad merge [\#13764](https://github.com/netdata/netdata/pull/13764) ([ktsaou](https://github.com/ktsaou))
 - add 1m delay for tcp reset alarms [\#13761](https://github.com/netdata/netdata/pull/13761) ([ilyam8](https://github.com/ilyam8))
 - Use /bin/sh instead of ls to detect glibc [\#13758](https://github.com/netdata/netdata/pull/13758) ([MrZammler](https://github.com/MrZammler))
 - Add ZFS rate charts [\#13757](https://github.com/netdata/netdata/pull/13757) ([vlvkobal](https://github.com/vlvkobal))
@@ -20,6 +21,7 @@
 - CMake - add possibility to build without ACLK [\#13736](https://github.com/netdata/netdata/pull/13736) ([underhood](https://github.com/underhood))
 - Change cast to remove coverity warnings [\#13735](https://github.com/netdata/netdata/pull/13735) ([thiagoftsm](https://github.com/thiagoftsm))
 - Do not try to start an archived host in dbengine if dbengine is not compiled [\#13724](https://github.com/netdata/netdata/pull/13724) ([stelfrag](https://github.com/stelfrag))
+- Allow netdata plugins to expose functions for querying more information about specific charts [\#13720](https://github.com/netdata/netdata/pull/13720) ([ktsaou](https://github.com/ktsaou))
 - feat\(health\): add new Redis alarms [\#13715](https://github.com/netdata/netdata/pull/13715) ([ilyam8](https://github.com/ilyam8))
 - Faster streaming by 25% on the child [\#13708](https://github.com/netdata/netdata/pull/13708) ([ktsaou](https://github.com/ktsaou))
 - Do not create train/predict dimensions meant for tracking anomaly rates. [\#13707](https://github.com/netdata/netdata/pull/13707) ([vkalintiris](https://github.com/vkalintiris))
@@ -49,6 +51,7 @@
 - bump go.d.plugin to v0.39.0 [\#13662](https://github.com/netdata/netdata/pull/13662) ([ilyam8](https://github.com/ilyam8))
 - update Postgres dashboard info [\#13661](https://github.com/netdata/netdata/pull/13661) ([ilyam8](https://github.com/ilyam8))
 - Use mmap if possible during startup for journal replay [\#13660](https://github.com/netdata/netdata/pull/13660) ([stelfrag](https://github.com/stelfrag))
+- Remove anomaly detector [\#13657](https://github.com/netdata/netdata/pull/13657) ([vkalintiris](https://github.com/vkalintiris))
 - Update dashboard to version v2.29.0. [\#13654](https://github.com/netdata/netdata/pull/13654) ([netdatabot](https://github.com/netdatabot))
 - Fix container virtualization info [\#13653](https://github.com/netdata/netdata/pull/13653) ([vlvkobal](https://github.com/vlvkobal))
 - Do not free AR dimensions from within ML. [\#13651](https://github.com/netdata/netdata/pull/13651) ([vkalintiris](https://github.com/vkalintiris))
@@ -337,7 +340,6 @@
 - Temporarily disable updates for static builds. [\#13100](https://github.com/netdata/netdata/pull/13100) ([Ferroin](https://github.com/Ferroin))
 - docs\(statsd.plugin\): fix indentation [\#13096](https://github.com/netdata/netdata/pull/13096) ([ilyam8](https://github.com/ilyam8))
 - Statistics on bytes recvd and sent [\#13091](https://github.com/netdata/netdata/pull/13091) ([underhood](https://github.com/underhood))
-- fix virtualization detection on FreeBSD [\#13087](https://github.com/netdata/netdata/pull/13087) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
