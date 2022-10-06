@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
+#include "../storage_engine.h"
 
 /* Default global database instance */
 struct rrdengine_instance multidb_ctx_storage_tier0;
