@@ -197,9 +197,10 @@ issystemd() {
   # if pid 1 is systemd, it is systemd
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
 
-  # if systemd is not running, it is not systemd
+  # it ‘is’ systemd at this point, but systemd might not be running
+  # if not, return 2 to indicate ‘systemd, but not running’
   pids=$(safe_pidof systemd 2> /dev/null)
-  [ -z "${pids}" ] && return 1
+  [ -z "${pids}" ] && return 2
 
   # check if the running systemd processes are not in our namespace
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
@@ -259,18 +260,24 @@ install_systemd_service() {
     exit 4
   fi
 
-  if ! systemctl daemon-reload; then
-    warning "Failed to reload systemd unit files."
-  fi
+  if check_systemd; then
+    if ! systemctl daemon-reload; then
+        warning "Failed to reload systemd unit files."
+    fi
 
-  if ! systemctl ${ENABLE} netdata; then
-    warning "Failed to ${ENABLE} Netdata service."
+    if ! systemctl ${ENABLE} netdata; then
+        warning "Failed to ${ENABLE} Netdata service."
+    fi
   fi
 }
 
 systemd_cmds() {
-  NETDATA_START_CMD='systemctl start netdata'
-  NETDATA_STOP_CMD='systemctl stop netdata'
+  if check_systemd; then
+    NETDATA_START_CMD='systemctl start netdata'
+    NETDATA_STOP_CMD='systemctl stop netdata'
+  else # systemd is not running, use external defaults by providing no commands
+    warning "Detected systemd, but not booted using systemd. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
 }
 
 # =====================================================================
@@ -289,14 +296,14 @@ isopenrc() {
   # If /run/openrc/softlevel exists, it's OpenRC
   [ -f /run/openrc/softlevel ] && return 0
 
-  # if there is an openrc command, it's OpenRC
-  command -v openrc > /dev/null 2>&1 && return 0
-
-  # if /etc/init.d/local exists and has `openrc-run` in it's shebang line, it’s OpenRC
-  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && return 0
-
   # if PID 1 is openrc-init, it's OpenRC
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && return 0
+
+  # if there is an openrc command, it's OpenRC, but not booted as such
+  command -v openrc > /dev/null 2>&1 && return 2
+
+  # if /etc/init.d/local exists and has `openrc-run` in it's shebang line, it’s OpenRC, but not booted as such
+  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && return 2
 
   # Otherwise, it’s not OpenRC
   return 1
@@ -335,8 +342,12 @@ install_openrc_service() {
 }
 
 openrc_cmds() {
-  NETDATA_START_CMD='rc-service netdata start'
-  NETDATA_STOP_CMD='rc-service netdata stop'
+  if check_openrc; then
+    NETDATA_START_CMD='rc-service netdata start'
+    NETDATA_STOP_CMD='rc-service netdata stop'
+  else # Not booted using OpenRC, use external defaults by not providing commands.
+    warning "Detected OpenRC, but the system is not booted using OpenRC. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
 }
 
 # =====================================================================
@@ -570,15 +581,33 @@ darwin_cmds() {
 
 detect_linux_svc_type() {
   if [ "${SVC_TYPE}" = "detect" ]; then
+    found_types=''
+
     for t in ${LINUX_INIT_TYPES}; do
-      if "check_${t}"; then
-        SVC_TYPE="${t}"
-        break
-      fi
+      "check_${t}"
+      case "$?" in
+        1) continue ;;
+        0)
+          SVC_TYPE="${t}"
+          break
+          ;;
+        2)
+          if [ -z "${found_types}" ]; then
+            found_types="${t}"
+          else
+            found_types="${found_types} ${t}"
+          fi
+          ;;
+      esac
     done
 
     if [ "${SVC_TYPE}" = "detect" ]; then
-      error "Failed to detect what type of service manager is in use."
+      if [ -z "${found_types}" ]; then
+        error "Failed to detect what type of service manager is in use."
+      else
+        SVC_TYPE="$(echo "${found_types}" | cut -f 1 -d ' ')"
+        warning "Failed to detect a running service manager, using detected (but not running) ${SVC_TYPE}."
+      fi
     elif [ "${SVC_TYPE}" = "wsl" ] && check_systemd; then
       # Support for systemd in WSL.
       SVC_TYPE="systemd"
