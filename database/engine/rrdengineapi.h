@@ -63,8 +63,8 @@ extern unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, t
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 
 extern void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
-                                    time_t start_time, time_t end_time);
-extern STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle);
+                                    time_t start_time_s, time_t end_time_s);
+extern STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle);
 
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);

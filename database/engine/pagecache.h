@@ -60,8 +60,8 @@ struct rrdeng_page_descr {
     volatile unsigned long pg_cache_descr_state;
 
     /* page information */
-    usec_t start_time;
-    usec_t end_time;
+    usec_t start_time_ut;
+    usec_t end_time_ut;
     uint32_t update_every_s:24;
     uint8_t type;
     uint32_t page_length;
@@ -223,19 +223,19 @@ static inline void
     if (NULL == descr->extent) {
         /* this page is currently being modified, get consistent info locklessly */
         do {
-            end_time = descr->end_time;
+            end_time = descr->end_time_ut;
             __sync_synchronize();
             old_end_time = end_time;
             page_length = descr->page_length;
             __sync_synchronize();
-            end_time = descr->end_time;
+            end_time = descr->end_time_ut;
             __sync_synchronize();
         } while ((end_time != old_end_time || (end_time & 1) != 0));
 
         *end_timep = end_time;
         *page_lengthp = page_length;
     } else {
-        *end_timep = descr->end_time;
+        *end_timep = descr->end_time_ut;
         *page_lengthp = descr->page_length;
     }
 }
@@ -245,11 +245,11 @@ static inline void pg_cache_atomic_set_pg_info(struct rrdeng_page_descr *descr, 
 {
     fatal_assert(!(end_time & 1));
     __sync_synchronize();
-    descr->end_time |= 1; /* mark start of uncertainty period by adding 1 microsecond */
+    descr->end_time_ut |= 1; /* mark start of uncertainty period by adding 1 microsecond */
     __sync_synchronize();
     descr->page_length = page_length;
     __sync_synchronize();
-    descr->end_time = end_time; /* mark end of uncertainty period */
+    descr->end_time_ut = end_time; /* mark end of uncertainty period */
 }
 
 #endif /* NETDATA_PAGECACHE_H */

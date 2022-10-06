@@ -392,9 +392,9 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
     if (perfect_page_alignment)
         page_index->alignment->page_length = descr->page_length;
-    if (unlikely(INVALID_TIME == descr->start_time)) {
+    if (unlikely(INVALID_TIME == descr->start_time_ut)) {
         unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
-        descr->start_time = point_in_time;
+        descr->start_time_ut = point_in_time;
 
         new_metric_API_producers = rrd_atomic_add_fetch(&ctx->stats.metric_API_producers, 1);
         while (unlikely(new_metric_API_producers > (old_metric_API_max_producers = ctx->metric_API_max_producers))) {
@@ -412,6 +412,19 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     } else {
         pg_cache_add_new_metric_time(page_index, descr);
     }
+
+//    {
+//        unsigned char u[16] = { 0x0C, 0x0A, 0x40, 0xD6, 0x2A, 0x43, 0x4A, 0x7C, 0x95, 0xF7, 0xD1, 0x1E, 0x0C, 0x9E, 0x8A, 0xE7 };
+//        if(uuid_compare(u, page_index->id) == 0) {
+//            char buffer[100];
+//            snprintfz(buffer, 100, "store system.cpu, collect:%u, page_index first:%u, last:%u",
+//                      (uint32_t)(point_in_time / USEC_PER_SEC),
+//                      (uint32_t)(page_index->oldest_time / USEC_PER_SEC),
+//                      (uint32_t)(page_index->latest_time / USEC_PER_SEC));
+//
+//            print_page_cache_descr(descr, buffer, false);
+//        }
+//    }
 }
 
 /*
@@ -461,7 +474,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
 {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
     struct rrdengine_instance *ctx = page_index->ctx;
@@ -474,32 +487,32 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
     if(!page_index->latest_update_every_s)
         page_index->latest_update_every_s = default_rrd_update_every;
 
-    rrdimm_handle->start_time = start_time;
-    rrdimm_handle->end_time = end_time;
+    rrdimm_handle->start_time_s = start_time_s;
+    rrdimm_handle->end_time_s = end_time_s;
 
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
-    handle->next_page_time = start_time;
-    handle->now = start_time;
+    handle->wanted_start_time_s = start_time_s;
+    handle->now_s = start_time_s;
     handle->position = 0;
     handle->ctx = ctx;
     handle->descr = NULL;
     handle->dt_s = page_index->latest_update_every_s;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    pages_nr = pg_cache_preload(ctx, &page_index->id, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
+    pages_nr = pg_cache_preload(ctx, &page_index->id, start_time_s * USEC_PER_SEC, end_time_s * USEC_PER_SEC,
                                 NULL, &handle->page_index);
     if (unlikely(NULL == handle->page_index || 0 == pages_nr))
         // there are no metrics to load
-        handle->next_page_time = INVALID_TIME;
+        handle->wanted_start_time_s = INVALID_TIME;
 }
 
-static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
+static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdengine_instance *ctx = handle->ctx;
     struct rrdeng_page_descr *descr = handle->descr;
 
     uint32_t page_length;
-    usec_t page_end_time;
+    usec_t page_end_time_ut;
     unsigned position;
 
     if (likely(descr)) {
@@ -511,14 +524,15 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 
         pg_cache_put(ctx, descr);
         handle->descr = NULL;
-        handle->next_page_time = (handle->page_end_time / USEC_PER_SEC) + 1;
+        handle->wanted_start_time_s = (time_t)((handle->page_end_time_ut / USEC_PER_SEC) + handle->dt_s);
 
-        if (unlikely(handle->next_page_time > rrdimm_handle->end_time))
+        if (unlikely(handle->wanted_start_time_s > rrdimm_handle->end_time_s))
             return 1;
     }
 
-    usec_t next_page_time = handle->next_page_time * USEC_PER_SEC;
-    descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id, next_page_time, rrdimm_handle->end_time * USEC_PER_SEC);
+    usec_t wanted_start_time_ut = handle->wanted_start_time_s * USEC_PER_SEC;
+    descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
+        wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
     if (NULL == descr)
         return 1;
 
@@ -527,27 +541,42 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 #endif
 
     handle->descr = descr;
-    pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
-    if (unlikely(INVALID_TIME == descr->start_time || INVALID_TIME == page_end_time || 0 == descr->update_every_s)) {
+    pg_cache_atomic_get_pg_info(descr, &page_end_time_ut, &page_length);
+    if (unlikely(INVALID_TIME == descr->start_time_ut || INVALID_TIME == page_end_time_ut || 0 == descr->update_every_s)) {
         error("DBENGINE: discarding invalid page descriptor (start_time = %llu, end_time = %llu, update_every_s = %d)",
-              descr->start_time, page_end_time, descr->update_every_s);
+              descr->start_time_ut, page_end_time_ut, descr->update_every_s);
         return 1;
     }
 
-    if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
+    if (unlikely(descr->start_time_ut != page_end_time_ut && wanted_start_time_ut > descr->start_time_ut)) {
         // we're in the middle of the page somewhere
         unsigned entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
-        position = ((uint64_t)(next_page_time - descr->start_time)) * (entries - 1) /
-                   (page_end_time - descr->start_time);
+        position = ((uint64_t)(wanted_start_time_ut - descr->start_time_ut)) * (entries - 1) /
+                   (page_end_time_ut - descr->start_time_ut);
     }
     else
         position = 0;
 
-    handle->page_end_time = page_end_time;
+    handle->page_end_time_ut = page_end_time_ut;
     handle->page_length = page_length;
+    handle->entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
     handle->page = descr->pg_cache_descr->page;
     handle->dt_s = descr->update_every_s;
     handle->position = position;
+
+//    if(debug_this)
+//        info("DBENGINE: rrdeng_load_page_next(), "
+//             "position:%d, "
+//             "start_time_ut:%llu, "
+//             "page_end_time_ut:%llu, "
+//             "next_page_time_ut:%llu, "
+//             "in_out:%s"
+//             , position
+//             , descr->start_time_ut
+//             , page_end_time_ut
+//             ,
+//            wanted_start_time_ut, in_out?"true":"false"
+//             );
 
     return 0;
 }
@@ -555,43 +584,73 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
+STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
-    STORAGE_POINT sp;
     struct rrdeng_page_descr *descr = handle->descr;
+    time_t now = handle->now_s + handle->dt_s;
+
+//    bool debug_this = false;
+//    {
+//        unsigned char u[16] = { 0x0C, 0x0A, 0x40, 0xD6, 0x2A, 0x43, 0x4A, 0x7C, 0x95, 0xF7, 0xD1, 0x1E, 0x0C, 0x9E, 0x8A, 0xE7 };
+//        if(uuid_compare(u, handle->page_index->id) == 0) {
+//            char buffer[100];
+//            snprintfz(buffer, 100, "load system.cpu, now:%u, dt:%u, position:%u page_index first:%u, last:%u",
+//                      (uint32_t)(now),
+//                      (uint32_t)(handle->dt_s),
+//                      (uint32_t)(handle->position),
+//                      (uint32_t)(handle->page_index->oldest_time / USEC_PER_SEC),
+//                      (uint32_t)(handle->page_index->latest_time / USEC_PER_SEC));
+//
+//            print_page_cache_descr(descr, buffer, false);
+//            debug_this = true;
+//        }
+//    }
+
+    STORAGE_POINT sp;
     unsigned position = handle->position + 1;
-    time_t now = handle->now + handle->dt_s;
     storage_number_tier1_t tier1_value;
 
-    if (unlikely(INVALID_TIME == handle->next_page_time)) {
-        handle->next_page_time = INVALID_TIME;
-        handle->now = now;
+    if (unlikely(INVALID_TIME == handle->wanted_start_time_s)) {
+        handle->wanted_start_time_s = INVALID_TIME;
+        handle->now_s = now;
         storage_point_empty(sp, now - handle->dt_s, now);
         return sp;
     }
 
     if (unlikely(!descr || position >= handle->entries)) {
         // We need to get a new page
-        if(rrdeng_load_page_next(rrdimm_handle)) {
+        if(rrdeng_load_page_next(rrddim_handle, false)) {
             // next calls will not load any more metrics
-            handle->next_page_time = INVALID_TIME;
-            handle->now = now;
+            handle->wanted_start_time_s = INVALID_TIME;
+            handle->now_s = now;
             storage_point_empty(sp, now - handle->dt_s, now);
             return sp;
         }
 
         descr = handle->descr;
         position = handle->position;
-        now = (time_t)((descr->start_time + position * (descr->update_every_s * USEC_PER_SEC)) / USEC_PER_SEC);
+        now = (time_t)((descr->start_time_ut / USEC_PER_SEC) + position * descr->update_every_s);
+
+//        if(debug_this) {
+//            char buffer[100];
+//            snprintfz(buffer, 100, "NEW PAGE system.cpu, now:%u, dt:%u, position:%u page_index first:%u, last:%u",
+//                      (uint32_t)(now),
+//                      (uint32_t)(handle->dt_s),
+//                      (uint32_t)(handle->position),
+//                      (uint32_t)(handle->page_index->oldest_time / USEC_PER_SEC),
+//                      (uint32_t)(handle->page_index->latest_time / USEC_PER_SEC));
+//
+//            print_page_cache_descr(descr, buffer, false);
+//        }
     }
 
     sp.start_time = now - handle->dt_s;
     sp.end_time = now;
 
     handle->position = position;
-    handle->now = now;
+    handle->now_s = now;
 
     switch(descr->type) {
         case PAGE_METRICS: {
@@ -626,10 +685,18 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
         break;
     }
 
-    if (unlikely(now >= rrdimm_handle->end_time)) {
+    if (unlikely(now >= rrddim_handle->end_time_s)) {
         // next calls will not load any more metrics
-        handle->next_page_time = INVALID_TIME;
+        handle->wanted_start_time_s = INVALID_TIME;
     }
+
+//    if(debug_this)
+//        info("DBENGINE: returning point: "
+//             "time from %ld to %ld   //  query from %ld to %ld   //   wanted_start_time_s %ld"
+//             , sp.start_time, sp.end_time
+//             , rrddim_handle->start_time_s, rrddim_handle->end_time_s
+//             , handle->wanted_start_time_s
+//             );
 
     return sp;
 }
@@ -637,7 +704,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
 int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
-    return (INVALID_TIME == handle->next_page_time);
+    return (INVALID_TIME == handle->wanted_start_time_s);
 }
 
 /*
@@ -1065,13 +1132,13 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
                 size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
 
                 if(likely(points > 1))
-                    update_every_usec = (descr->end_time - descr->start_time) / (points - 1);
+                    update_every_usec = (descr->end_time_ut - descr->start_time_ut) / (points - 1);
                 else {
                     update_every_usec = default_rrd_update_every * get_tier_grouping(ctx->tier) * USEC_PER_SEC;
                     stats.single_point_pages++;
                 }
 
-                time_t duration_secs = (time_t)((descr->end_time - descr->start_time + update_every_usec)/USEC_PER_SEC);
+                time_t duration_secs = (time_t)((descr->end_time_ut - descr->start_time_ut + update_every_usec)/USEC_PER_SEC);
 
                 stats.extents_pages++;
                 stats.pages_uncompressed_bytes += descr->page_length;
@@ -1083,11 +1150,11 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
                 stats.page_types[descr->type].pages_duration_secs += duration_secs;
                 stats.page_types[descr->type].points += points;
 
-                if(!stats.first_t || (descr->start_time - update_every_usec) < stats.first_t)
-                    stats.first_t = (descr->start_time - update_every_usec) / USEC_PER_SEC;
+                if(!stats.first_t || (descr->start_time_ut - update_every_usec) < stats.first_t)
+                    stats.first_t = (descr->start_time_ut - update_every_usec) / USEC_PER_SEC;
 
-                if(!stats.last_t || descr->end_time > stats.last_t)
-                    stats.last_t = descr->end_time / USEC_PER_SEC;
+                if(!stats.last_t || descr->end_time_ut > stats.last_t)
+                    stats.last_t = descr->end_time_ut / USEC_PER_SEC;
             }
         }
     }

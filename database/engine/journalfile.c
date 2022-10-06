@@ -351,8 +351,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         descr = pg_cache_create_descr();
         descr->page_length = jf_metric_data->descr[i].page_length;
-        descr->start_time = start_time;
-        descr->end_time = end_time;
+        descr->start_time_ut = start_time;
+        descr->end_time_ut = end_time;
         descr->update_every_s = (entries > 1) ? ((end_time - start_time) / (entries - 1)) : (page_index->latest_update_every_s);
         descr->id = &page_index->id;
         descr->extent = extent;
@@ -360,7 +360,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
 
-        if(page_index->latest_time == descr->end_time)
+        if(page_index->latest_time == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
     }
 

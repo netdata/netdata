@@ -206,8 +206,8 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
             /* care, we don't hold the descriptor mutex */
             if (!uuid_compare(*extent->pages[j]->id, *descr->id) &&
                 extent->pages[j]->page_length == descr->page_length &&
-                extent->pages[j]->start_time == descr->start_time &&
-                extent->pages[j]->end_time == descr->end_time) {
+                extent->pages[j]->start_time_ut == descr->start_time_ut &&
+                extent->pages[j]->end_time_ut == descr->end_time_ut) {
                 break;
             }
             page_offset += extent->pages[j]->page_length;
@@ -378,8 +378,8 @@ after_crc_check:
             /* care, we don't hold the descriptor mutex */
             if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
                 header->descr[i].page_length == descrj->page_length &&
-                header->descr[i].start_time == descrj->start_time &&
-                header->descr[i].end_time == descrj->end_time) {
+                header->descr[i].start_time == descrj->start_time_ut &&
+                header->descr[i].end_time == descrj->end_time_ut) {
                 descr = descrj;
                 break;
             }
@@ -820,8 +820,8 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         header->descr[i].type = descr->type;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
-        header->descr[i].start_time = descr->start_time;
-        header->descr[i].end_time = descr->end_time;
+        header->descr[i].start_time = descr->start_time_ut;
+        header->descr[i].end_time = descr->end_time_ut;
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {

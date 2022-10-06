@@ -41,7 +41,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_un
 STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, STORAGE_METRICS_GROUP *smg __maybe_unused) {
     RRDDIM *rd = NULL;
     netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
-    Pvoid_t *PValue = JudyHSGet(&rrddim_JudyHS_array, uuid, sizeof(uuid_t));
+    Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
     if (likely(NULL != PValue))
         rd = *PValue;
     netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
@@ -189,8 +189,8 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_qu
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;
-    handle->start_time = start_time;
-    handle->end_time = end_time;
+    handle->start_time_s = start_time;
+    handle->end_time_s = end_time;
     struct mem_query_handle* h = calloc(1, sizeof(struct mem_query_handle));
     h->slot           = rrddim_time2slot(rd, start_time);
     h->last_slot      = rrddim_time2slot(rd, end_time);
@@ -249,7 +249,7 @@ STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
 
 int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
-    return (h->next_timestamp > handle->end_time);
+    return (h->next_timestamp > handle->end_time_s);
 }
 
 void rrddim_query_finalize(struct rrddim_query_handle *handle) {

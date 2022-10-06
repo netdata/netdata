@@ -356,8 +356,8 @@ typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 // iterator state for RRD dimension data queries
 struct rrddim_query_handle {
     RRDDIM *rd;
-    time_t start_time;
-    time_t end_time;
+    time_t start_time_s;
+    time_t end_time_s;
     STORAGE_QUERY_HANDLE* handle;
 };
 

@@ -4,9 +4,9 @@
 #define BUFSIZE (512)
 
 /* Caller must hold descriptor lock */
-void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool debug)
+void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug)
 {
-    if(debug && !(debug_flags & D_RRDENGINE))
+    if(log_debug && !(debug_flags & D_RRDENGINE))
         return;
 
     BUFFER *wb = buffer_create(512);
@@ -19,13 +19,16 @@ void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bo
         char uuid_str[UUID_STR_LEN];
 
         uuid_unparse_lower(*descr->id, uuid_str);
-        buffer_sprintf(wb, "DBENGINE: %s : descr(%p), page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64" xt_offset:",
+        buffer_sprintf(wb, "DBENGINE: %s : descr(%p), page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
                        msg,
                        descr,
                        pg_cache_descr->page, uuid_str,
                        descr->page_length,
-                       (uint64_t)descr->start_time,
-                       (uint64_t)descr->end_time);
+                       (uint64_t)descr->start_time_ut,
+                       (uint64_t)descr->end_time_ut,
+                       (uint32_t)descr->update_every_s,
+                       (uint32_t)descr->type
+                       );
         if (!descr->extent) {
             buffer_strcat(wb, "N/A");
         } else {
@@ -35,7 +38,7 @@ void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bo
         buffer_sprintf(wb, ", flags:0x%2.2lX refcnt:%u", pg_cache_descr->flags, pg_cache_descr->refcnt);
     }
 
-    if(debug)
+    if(log_debug)
         debug(D_RRDENGINE, "%s", buffer_tostring(wb));
     else
         info("%s", buffer_tostring(wb));
@@ -54,8 +57,8 @@ void print_page_descr(struct rrdeng_page_descr *descr)
                                      "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
                      uuid_str,
                      descr->page_length,
-                     (uint64_t)descr->start_time,
-                     (uint64_t)descr->end_time);
+                     (uint64_t)descr->start_time_ut,
+                     (uint64_t)descr->end_time_ut);
     if (!descr->extent) {
         pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
     } else {

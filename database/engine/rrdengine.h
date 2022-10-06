@@ -48,12 +48,12 @@ struct rrdeng_query_handle {
     struct rrdeng_page_descr *descr;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
-    time_t next_page_time;
-    time_t now;
+    time_t wanted_start_time_s;
+    time_t now_s;
     unsigned position;
     unsigned entries;
     storage_number *page;
-    usec_t page_end_time;
+    usec_t page_end_time_ut;
     uint32_t page_length;
     time_t dt_s;
 };
