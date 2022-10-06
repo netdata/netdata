@@ -1655,7 +1655,7 @@ static RRDDIM *create_rrdim_entry(ONEWAYALLOC *owa, RRDSET *st, char *id, char *
         rd->tiers[tier]->query_ops.finalize = rrdeng_load_metric_finalize;
         rd->tiers[tier]->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->tiers[tier]->query_ops.oldest_time = rrdeng_metric_oldest_time;
-        rd->tiers[tier]->db_metric_handle = eng->api.init(rd, st->rrdhost->storage_instance[tier]);
+        rd->tiers[tier]->db_metric_handle = eng->api.metric_get_or_create(rd, st->rrdhost->storage_instance[tier], st->storage_metrics_groups[tier]);
     }
 
     return rd;

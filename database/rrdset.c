@@ -3,6 +3,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 #include <sched.h>
+#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 
@@ -109,7 +110,7 @@ struct rrdset_constructor {
     enum {
         RRDSET_REACT_NONE                   = 0,
         RRDSET_REACT_NEW                    = (1 << 0),
-        RRDSET_REACT_CHART_ARCHIVED_TO_LIVE = (1 << 1),
+        RRDSET_REACT_UPDATED                = (1 << 1),
         RRDSET_REACT_PLUGIN_UPDATED         = (1 << 2),
         RRDSET_REACT_MODULE_UPDATED         = (1 << 3),
         RRDSET_REACT_CHART_ACTIVATED        = (1 << 4),
@@ -176,6 +177,17 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         uuid_generate(st->chart_uuid);
     update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
 
+    // initialize the db tiers
+    {
+        RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
+        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+            if(!eng) continue;
+
+            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->storage_instance[tier], &st->chart_uuid);
+        }
+    }
+
     rrddim_index_init(st);
 
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
@@ -196,6 +208,17 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
+
+    // cleanup storage engines
+    {
+        RRD_MEMORY_MODE wanted_mode = st->rrd_memory_mode;
+        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+            if(!eng) continue;
+
+            eng->api.collect_ops.metrics_group_release(host->storage_instance[tier], st->storage_metrics_groups[tier]);
+        }
+    }
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
@@ -275,15 +298,27 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     }
 
     if (rrdset_reset_name(st, (ctr->name && *ctr->name) ? ctr->name : ctr->id) == 2)
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
     if (unlikely(st->priority != ctr->priority)) {
         st->priority = ctr->priority;
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        ctr->react_action |= RRDSET_REACT_UPDATED;
     }
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != ctr->update_every)) {
+
+    if (unlikely(st->update_every != ctr->update_every)) {
         st->update_every = ctr->update_every;
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+
+        // switch update every to the storage engine
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            for (int tier = 0; tier < storage_tiers; tier++) {
+                if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
+                    rd->tiers[tier]->collect_ops.change_collection_frequency(rd->tiers[tier]->db_collection_handle, st->update_every);
+            }
+        }
+        rrddim_foreach_done(rd);
+
+        ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
     if(ctr->plugin && *ctr->plugin) {
@@ -306,7 +341,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         STRING *old_title = st->title;
         st->title = rrd_string_strdupz(ctr->title);
         if(old_title != st->title)
-            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+            ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_title);
     }
 
@@ -314,7 +349,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         STRING *old_units = st->units;
         st->units = rrd_string_strdupz(ctr->units);
         if(old_units != st->units)
-            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+            ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_units);
     }
 
@@ -322,13 +357,13 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         STRING *old_context = st->context;
         st->context = rrd_string_strdupz(ctr->context);
         if(old_context != st->context)
-            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+            ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_context);
     }
 
     if(st->chart_type != ctr->chart_type) {
         st->chart_type = ctr->chart_type;
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
     rrdset_update_permanent_labels(st);
@@ -351,7 +386,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
-    if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
+    if(ctr->react_action & (RRDSET_REACT_UPDATED | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
         if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");

@@ -37,16 +37,14 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
 struct rrdeng_collect_handle {
-    struct rrdeng_metric_handle *metric_handle;
+    struct pg_cache_page_index *page_index;
     struct rrdeng_page_descr *descr;
     unsigned long page_correlation_id;
-    struct rrdengine_instance *ctx;
     // set to 1 when this dimension is not page aligned with the other dimensions in the chart
     uint8_t unaligned_page;
 };
 
 struct rrdeng_query_handle {
-    struct rrdeng_metric_handle *metric_handle;
     struct rrdeng_page_descr *descr;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
@@ -54,12 +52,10 @@ struct rrdeng_query_handle {
     time_t now;
     unsigned position;
     unsigned entries;
-    TIER_QUERY_FETCH tier_query_fetch_type;
     storage_number *page;
     usec_t page_end_time;
     uint32_t page_length;
-    usec_t dt;
-    time_t dt_sec;
+    time_t dt_s;
 };
 
 typedef enum {

@@ -3,17 +3,42 @@
 #include "rrddim_mem.h"
 
 // ----------------------------------------------------------------------------
+// metrics groups
+
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+    // FIXME
+    return NULL;
+}
+
+void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
+    if(!smg) return;
+
+    // FIXME
+}
+
+// ----------------------------------------------------------------------------
 // RRDDIM legacy data collection functions
 
-STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused) {
+STORAGE_METRIC_HANDLE *
+rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg) {
     return (STORAGE_METRIC_HANDLE *)rd;
 }
 
-void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {
+STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
+    // FIXME
     ;
 }
 
-STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
+void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {
+    // FIXME
+    ;
+}
+
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
+    // FIXME
+}
+
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
     struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
@@ -134,9 +159,7 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type) {
-    UNUSED(tier_query_fetch_type);
-
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;

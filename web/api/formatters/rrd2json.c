@@ -27,7 +27,7 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
         if(archive_mode) {
             STORAGE_ENGINE *eng = storage_engine_get(temp_rd->tiers[tier]->mode);
             if (eng)
-                eng->api.free(temp_rd->tiers[tier]->db_metric_handle);
+                eng->api.metric_release(temp_rd->tiers[tier]->db_metric_handle);
         }
 
         onewayalloc_freez(owa, temp_rd->tiers[tier]);

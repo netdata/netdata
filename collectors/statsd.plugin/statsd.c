@@ -1421,7 +1421,10 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     app->default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
             }
             else if (!strcmp(name, "memory mode")) {
-                app->rrd_memory_mode = rrd_memory_mode_id(value);
+                // this is not supported anymore
+                // with the implementation of storage engines, all charts have the same storage engine always
+                // app->rrd_memory_mode = rrd_memory_mode_id(value);
+                ;
             }
             else if (!strcmp(name, "history")) {
                 app->rrd_history_entries = atol(value);

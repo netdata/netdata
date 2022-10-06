@@ -1192,7 +1192,11 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
     page_index->latest_time = INVALID_TIME;
     page_index->prev = NULL;
     page_index->page_count = 0;
+    page_index->refcount = 0;
     page_index->writers = 0;
+    page_index->ctx = NULL;
+    page_index->alignment = NULL;
+    page_index->latest_update_every_s = default_rrd_update_every;
 
     return page_index;
 }

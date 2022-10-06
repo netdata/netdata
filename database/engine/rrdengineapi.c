@@ -35,14 +35,41 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
+
+// ----------------------------------------------------------------------------
+// helpers
+
 static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier) {
     if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
     if(!host->storage_instance[tier]) tier = 0;
     return (struct rrdengine_instance *)host->storage_instance[tier];
 }
 
+// ----------------------------------------------------------------------------
+// metrics groups
+
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+    return callocz(1, sizeof(struct pg_alignment));
+}
+
+void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
+    if(!smg) return;
+
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct pg_alignment *pa = (struct pg_alignment *)smg;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    if(pa->refcount == 0)
+        freez(pa);
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+}
+
+// ----------------------------------------------------------------------------
+// metric handle for legacy dbs
+
 /* This UUID is not unique across hosts */
-void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret_uuid)
+void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
 {
     EVP_MD_CTX *evpctx;
     unsigned char hash_value[EVP_MAX_MD_SIZE];
@@ -75,97 +102,118 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-struct rrdeng_metric_handle {
-    RRDDIM *rd;
-    struct rrdengine_instance *ctx;
-    uuid_t *rrdeng_uuid;                            // database engine metric UUID
-    struct pg_cache_page_index *page_index;
-};
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id, STORAGE_METRICS_GROUP *smg) {
+    uuid_t legacy_uuid;
+    rrdeng_generate_legacy_uuid(rd_id, st_id, &legacy_uuid);
+    return rrdeng_metric_get(db_instance, &legacy_uuid, smg);
+}
 
-void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle) {
+// ----------------------------------------------------------------------------
+// metric handle
+
+void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    struct rrdengine_instance *ctx = page_index->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    page_index->refcount--;
+    if(page_index->alignment && page_index->refcount == 0) {
+        page_index->alignment->refcount--;
+        page_index->alignment = NULL;
+    }
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
     freez(db_metric_handle);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
-    struct page_cache *pg_cache;
-    uuid_t legacy_uuid;
-    uuid_t multihost_legacy_uuid;
-    Pvoid_t *PValue;
+    struct pg_alignment *pa = (struct pg_alignment *)smg;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     struct pg_cache_page_index *page_index = NULL;
-    int is_multihost_child = 0;
-    RRDHOST *host = rd->rrdset->rrdhost;
-
-    pg_cache = &ctx->pg_cache;
-
-    rrdeng_generate_legacy_uuid(rrddim_id(rd), (char *)rrdset_id(rd->rrdset), &legacy_uuid);
-    if (host != localhost && is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
-        is_multihost_child = 1;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &legacy_uuid, sizeof(uuid_t));
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
     if (likely(NULL != PValue)) {
         page_index = *PValue;
+        page_index->refcount++;
+
+        if(page_index->ctx && page_index->ctx != ctx)
+            fatal("DBENGINE: page_index has a different ctx.");
+
+        if(!page_index->ctx)
+            page_index->ctx = ctx;
+
+        if(pa) {
+            if(page_index->alignment && page_index->alignment != pa)
+                fatal("DBENGINE: page_index has a different alignment.");
+
+            if(!page_index->alignment) {
+                page_index->alignment = pa;
+                pa->refcount++;
+            }
+        }
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (is_multihost_child || NULL == PValue) {
-        /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
-         * Drop legacy support, normal path */
 
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &rd->metric_uuid, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-        if (NULL == PValue) {
-            uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
-            fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(&rd->metric_uuid);
-            page_index->prev = pg_cache->metrics_index.last_page_index;
-            pg_cache->metrics_index.last_page_index = page_index;
-            uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
-        }
-    } else {
-        /* There are legacy UUIDs in the database, implement backward compatibility */
-
-        rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
-                                                &multihost_legacy_uuid);
-
-        int need_to_store = uuid_compare(rd->metric_uuid, multihost_legacy_uuid);
-
-        uuid_copy(rd->metric_uuid, multihost_legacy_uuid);
-
-        if (unlikely(need_to_store && !ctx->tier))
-            (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
-    }
-
-    struct rrdeng_metric_handle *mh = mallocz(sizeof(struct rrdeng_metric_handle));
-    mh->rd = rd;
-    mh->ctx = ctx;
-    mh->rrdeng_uuid = &page_index->id;
-    mh->page_index = page_index;
-    return (STORAGE_METRIC_HANDLE *)mh;
+    return (STORAGE_METRIC_HANDLE *)page_index;
 }
+
+STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct pg_alignment *pa = (struct pg_alignment *)smg;
+    struct pg_cache_page_index *page_index;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t), PJE0);
+    fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
+    *PValue = page_index = create_page_index(uuid);
+    page_index->ctx = ctx;
+    page_index->prev = pg_cache->metrics_index.last_page_index;
+    pg_cache->metrics_index.last_page_index = page_index;
+    page_index->alignment = pa;
+    if(pa)
+        pa->refcount++;
+    uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
+
+    return (STORAGE_METRIC_HANDLE *)page_index;
+}
+
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
+    STORAGE_METRIC_HANDLE *db_metric_handle;
+
+    db_metric_handle = rrdeng_metric_get(db_instance, &rd->metric_uuid, smg);
+    if(!db_metric_handle)
+        db_metric_handle = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset), smg);
+    if(!db_metric_handle)
+        db_metric_handle = rrdeng_metric_create(db_instance, &rd->metric_uuid, smg);
+
+    return db_metric_handle;
+}
+
+
+// ----------------------------------------------------------------------------
+// collect ops
 
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
-
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every) {
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
     struct rrdeng_collect_handle *handle;
-    struct pg_cache_page_index *page_index;
+
+    if(!page_index->alignment)
+        fatal("DBENGINE: metric group is required for collect operations");
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
-    handle->metric_handle = metric_handle;
-    handle->ctx = metric_handle->ctx;
+    handle->page_index = page_index;
     handle->descr = NULL;
     handle->unaligned_page = 0;
+    page_index->latest_update_every_s = update_every;
 
-    page_index = metric_handle->page_index;
     uv_rwlock_wrlock(&page_index->lock);
     ++page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);
@@ -213,7 +261,7 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     // struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
-    struct rrdengine_instance *ctx = handle->ctx;
+    struct rrdengine_instance *ctx = handle->page_index->ctx;
     struct rrdeng_page_descr *descr = handle->descr;
 
     if (unlikely(!ctx)) return;
@@ -251,11 +299,10 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                               SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
-    struct rrdengine_instance *ctx = handle->ctx;
+    struct pg_cache_page_index *page_index = handle->page_index;
+    struct rrdengine_instance *ctx = handle->page_index->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = handle->descr;
-    RRDDIM *rd = metric_handle->rd;
 
     void *page;
     uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
@@ -263,12 +310,12 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     if (descr) {
         /* Make alignment decisions */
 
-        if (descr->page_length == rd->rrdset->rrddim_page_alignment) {
+        if (descr->page_length == page_index->alignment->page_length) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = 1;
         }
         /* is the metric far enough out of alignment with the others? */
-        if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < rd->rrdset->rrddim_page_alignment)) {
+        if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < page_index->alignment->page_length)) {
             handle->unaligned_page = 1;
             debug(D_RRDENGINE, "Metric page is not aligned with chart:");
             if (unlikely(debug_flags & D_RRDENGINE))
@@ -276,7 +323,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         }
         if (unlikely(handle->unaligned_page &&
                      /* did the other metrics change page? */
-                     rd->rrdset->rrddim_page_alignment <= PAGE_POINT_SIZE_BYTES(descr))) {
+                     page_index->alignment->page_length <= PAGE_POINT_SIZE_BYTES(descr))) {
             debug(D_RRDENGINE, "Flushing unaligned metric page.");
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
@@ -287,14 +334,14 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                  must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(collection_handle);
 
-        page = rrdeng_create_page(ctx, &metric_handle->page_index->id, &descr);
+        page = rrdeng_create_page(ctx, &page_index->id, &descr);
         fatal_assert(page);
 
         handle->descr = descr;
 
         handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
-        if (0 == rd->rrdset->rrddim_page_alignment) {
+        if (0 == page_index->alignment->page_length) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = 1;
         }
@@ -332,7 +379,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + PAGE_POINT_SIZE_BYTES(descr));
 
     if (perfect_page_alignment)
-        rd->rrdset->rrddim_page_alignment = descr->page_length;
+        page_index->alignment->page_length = descr->page_length;
     if (unlikely(INVALID_TIME == descr->start_time)) {
         unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
         descr->start_time = point_in_time;
@@ -349,9 +396,9 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
             }
         }
 
-        pg_cache_insert(ctx, metric_handle->page_index, descr);
+        pg_cache_insert(ctx, page_index, descr);
     } else {
-        pg_cache_add_new_metric_time(metric_handle->page_index, descr);
+        pg_cache_add_new_metric_time(page_index, descr);
     }
 }
 
@@ -361,8 +408,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
  */
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)handle->metric_handle;
-    struct pg_cache_page_index *page_index = metric_handle->page_index;
+    struct pg_cache_page_index *page_index = handle->page_index;
 
     uint8_t can_delete_metric = 0;
 
@@ -376,6 +422,18 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
 
     return can_delete_metric;
 }
+
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    struct pg_cache_page_index *page_index = handle->page_index;
+    rrdeng_store_metric_flush_current_page(collection_handle);
+    uv_rwlock_rdlock(&page_index->lock);
+    page_index->latest_update_every_s = update_every;
+    uv_rwlock_rdunlock(&page_index->lock);
+}
+
+// ----------------------------------------------------------------------------
+// query ops
 
 //static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
 //{
@@ -391,16 +449,18 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time, time_t end_time)
 {
-    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
-    struct rrdengine_instance *ctx = metric_handle->ctx;
-    RRDDIM *rd = metric_handle->rd;
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    struct rrdengine_instance *ctx = page_index->ctx;
 
     // fprintf(stderr, "%s: %s/%s start time %ld, end time %ld\n", __FUNCTION__ , rd->rrdset->name, rd->name, start_time, end_time);
 
     struct rrdeng_query_handle *handle;
     unsigned pages_nr;
+
+    if(!page_index->latest_update_every_s)
+        page_index->latest_update_every_s = default_rrd_update_every;
 
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
@@ -408,18 +468,12 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->next_page_time = start_time;
     handle->now = start_time;
-    handle->tier_query_fetch_type = tier_query_fetch_type;
-    // TODO we should store the dt of each page in each page
-    // this will produce wrong values for dt in case the user changes
-    // the update every of the charts or the tier grouping iterations
-    handle->dt_sec = get_tier_grouping(ctx->tier) * (time_t)rd->update_every;
-    handle->dt = handle->dt_sec * USEC_PER_SEC;
     handle->position = 0;
     handle->ctx = ctx;
-    handle->metric_handle = metric_handle;
     handle->descr = NULL;
+    handle->dt_s = page_index->latest_update_every_s;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    pages_nr = pg_cache_preload(ctx, metric_handle->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
+    pages_nr = pg_cache_preload(ctx, &page_index->id, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
                                 NULL, &handle->page_index);
     if (unlikely(NULL == handle->page_index || 0 == pages_nr))
         // there are no metrics to load
@@ -462,8 +516,11 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
 
     handle->descr = descr;
     pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
-    if (unlikely(INVALID_TIME == descr->start_time || INVALID_TIME == page_end_time))
+    if (unlikely(INVALID_TIME == descr->start_time || INVALID_TIME == page_end_time || 0 == descr->update_every_s)) {
+        error("DBENGINE: discarding invalid page descriptor (start_time = %llu, end_time = %llu, update_every_s = %d)",
+              descr->start_time, page_end_time, descr->update_every_s);
         return 1;
+    }
 
     if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
         // we're in the middle of the page somewhere
@@ -477,16 +534,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle) {
     handle->page_end_time = page_end_time;
     handle->page_length = page_length;
     handle->page = descr->pg_cache_descr->page;
-    usec_t entries = handle->entries = page_length / PAGE_POINT_SIZE_BYTES(descr);
-    if (likely(entries > 1))
-        handle->dt = (page_end_time - descr->start_time) / (entries - 1);
-    else {
-        // TODO we should store the dt of each page in each page
-        // now we keep the dt of whatever was before
-        ;
-    }
-
-    handle->dt_sec = (time_t)(handle->dt / USEC_PER_SEC);
+    handle->dt_s = descr->update_every_s;
     handle->position = position;
 
     return 0;
@@ -502,32 +550,36 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
     STORAGE_POINT sp;
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
-    time_t now = handle->now + handle->dt_sec;
     storage_number_tier1_t tier1_value;
 
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
         handle->next_page_time = INVALID_TIME;
-        handle->now = now;
-        storage_point_empty(sp, now - handle->dt_sec, now);
+        handle->now = handle->now + handle->dt_s;
+        storage_point_empty(sp, handle->now - handle->dt_s, handle->now);
         return sp;
     }
 
+    time_t now;
     if (unlikely(!descr || position >= handle->entries)) {
         // We need to get a new page
         if(rrdeng_load_page_next(rrdimm_handle)) {
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
-            handle->now = now;
-            storage_point_empty(sp, now - handle->dt_sec, now);
+            handle->now = handle->now + handle->dt_s;
+            storage_point_empty(sp, handle->now - handle->dt_s, handle->now);
             return sp;
         }
 
         descr = handle->descr;
         position = handle->position;
-        now = (time_t)((descr->start_time + position * handle->dt) / USEC_PER_SEC);
+        now = (time_t)((descr->start_time + position * (descr->update_every_s * USEC_PER_SEC)) / USEC_PER_SEC);
+    }
+    else {
+        // the current page is good to use
+        now = handle->now + handle->dt_s;
     }
 
-    sp.start_time = now - handle->dt_sec;
+    sp.start_time = now - handle->dt_s;
     sp.end_time = now;
 
     handle->position = position;
@@ -602,16 +654,12 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
 }
 
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
-
-    struct pg_cache_page_index *page_index = metric_handle->page_index;
-    return page_index->latest_time / USEC_PER_SEC;
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    return (time_t)(page_index->latest_time / USEC_PER_SEC);
 }
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    struct rrdeng_metric_handle *metric_handle = (struct rrdeng_metric_handle *)db_metric_handle;
-
-    struct pg_cache_page_index *page_index = metric_handle->page_index;
-    return page_index->oldest_time / USEC_PER_SEC;
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    return (time_t)(page_index->oldest_time / USEC_PER_SEC);
 }
 
 int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t, int tier)
@@ -1071,7 +1119,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         }
     }
 
-    stats.sizeof_metric = struct_natural_alignment(sizeof(struct pg_cache_page_index));
+    stats.sizeof_metric = struct_natural_alignment(sizeof(struct pg_cache_page_index) + sizeof(struct pg_alignment));
     stats.sizeof_page = struct_natural_alignment(sizeof(struct rrdeng_page_descr));
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = struct_natural_alignment(sizeof(struct page_cache_descr));

@@ -11,6 +11,7 @@ extern "C" {
 // to enable type checking at compile time
 typedef struct storage_instance STORAGE_INSTANCE;
 typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
+typedef struct storage_alignment STORAGE_METRICS_GROUP;
 
 // forward typedefs
 typedef struct rrdhost RRDHOST;
@@ -400,7 +401,7 @@ typedef struct storage_point {
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle);
+    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every);
 
     // run this to store each metric into the database
     void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
@@ -412,12 +413,17 @@ struct rrddim_collect_ops {
     // a finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
     int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
+
+    void (*change_collection_frequency)(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+
+    STORAGE_METRICS_GROUP *(*metrics_group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+    void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
 };
 
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
     STORAGE_POINT (*next_metric)(struct rrddim_query_handle *handle);
@@ -555,6 +561,8 @@ struct rrdset {
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
                                                     // TODO - use the global - all charts have the same value
+
+    STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents

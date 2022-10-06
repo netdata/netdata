@@ -62,8 +62,9 @@ struct rrdeng_page_descr {
     /* page information */
     usec_t start_time;
     usec_t end_time;
-    uint32_t page_length;
+    uint32_t update_every_s:24;
     uint8_t type;
+    uint32_t page_length;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)
@@ -80,6 +81,11 @@ typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
 #define PAGE_CACHE_MAX_PRELOAD_PAGES    (256)
 
+struct pg_alignment {
+    uint32_t page_length;
+    uint32_t refcount;
+};
+
 /* maps time ranges to pages */
 struct pg_cache_page_index {
     uuid_t id;
@@ -89,6 +95,7 @@ struct pg_cache_page_index {
      */
     Pvoid_t JudyL_array;
     Word_t page_count;
+    unsigned short refcount;
     unsigned short writers;
     uv_rwlock_t lock;
 
@@ -103,6 +110,10 @@ struct pg_cache_page_index {
      * It's also written by the data deletion workqueue when data collection is disabled for this metric.
      */
     usec_t latest_time;
+
+    struct rrdengine_instance *ctx;
+    struct pg_alignment *alignment;
+    int latest_update_every_s;
 
     struct pg_cache_page_index *prev;
 };

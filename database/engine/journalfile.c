@@ -313,18 +313,21 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         }
         uint64_t start_time = jf_metric_data->descr[i].start_time;
         uint64_t end_time = jf_metric_data->descr[i].end_time;
+        size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
 
         if (unlikely(start_time > end_time)) {
             error("Invalid page encountered, start time %"PRIu64" > end time %"PRIu64"", start_time , end_time);
             continue;
         }
 
-        if (unlikely(start_time == end_time)) {
-            size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
-            if (unlikely(entries > 1)) {
-                error("Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found", start_time, entries);
-                continue;
-            }
+        if (unlikely(start_time == end_time && entries != 1)) {
+            error("Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found", start_time, entries);
+            continue;
+        }
+
+        if (unlikely(!entries)) {
+            error("Invalid page encountered, entries is zero");
+            continue;
         }
 
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
@@ -350,11 +353,15 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->page_length = jf_metric_data->descr[i].page_length;
         descr->start_time = start_time;
         descr->end_time = end_time;
+        descr->update_every_s = (entries > 1) ? ((end_time - start_time) / (entries - 1)) : (page_index->latest_update_every_s);
         descr->id = &page_index->id;
         descr->extent = extent;
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
+
+        if(page_index->latest_time == descr->end_time)
+            page_index->latest_update_every_s = descr->update_every_s;
     }
 
     extent->number_of_pages = valid_pages;

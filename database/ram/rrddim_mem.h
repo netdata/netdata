@@ -20,10 +20,15 @@ struct mem_query_handle {
     size_t last_slot;
 };
 
-extern STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
-extern void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle);
+extern STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+extern STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg);
+extern void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
 
-extern STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle);
+extern STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+extern void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+
+extern STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every);
+extern void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
 extern void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
                                  NETDATA_DOUBLE min_value,
                                  NETDATA_DOUBLE max_value,
@@ -33,7 +38,7 @@ extern void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handl
 extern void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
 extern int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
-extern void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
+extern void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 extern STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle);
 extern int rrddim_query_is_finished(struct rrddim_query_handle *handle);
 extern void rrddim_query_finalize(struct rrddim_query_handle *handle);
