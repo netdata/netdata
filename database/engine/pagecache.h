@@ -113,7 +113,7 @@ struct pg_cache_page_index {
 
     struct rrdengine_instance *ctx;
     struct pg_alignment *alignment;
-    int latest_update_every_s;
+    uint32_t latest_update_every_s;
 
     struct pg_cache_page_index *prev;
 };

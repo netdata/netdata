@@ -130,7 +130,6 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 {
     UNUSED(plugins_action);
 
-    int i;
     uuid_t uuid;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 

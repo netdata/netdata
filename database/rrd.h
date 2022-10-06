@@ -401,7 +401,7 @@ typedef struct storage_point {
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every);
+    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every);
 
     // run this to store each metric into the database
     void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,

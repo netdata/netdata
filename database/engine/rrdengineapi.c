@@ -201,7 +201,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every) {
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every) {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
     struct rrdeng_collect_handle *handle;
 

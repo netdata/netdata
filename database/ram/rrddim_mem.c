@@ -38,7 +38,7 @@ void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
     // FIXME
 }
 
-STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, int update_every) {
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
     struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
