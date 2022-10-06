@@ -20,11 +20,11 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.chart_configs = self.configuration.get('chart_configs', None)
 
-    def run_code(self, processing_code):
+    def run_code(self, df_steps):
         """eval() each line of code and ensure the result is a pandas dataframe"""
 
         # process each line of code
-        lines = processing_code.split(';')
+        lines = df_steps.split(';')
         for line in lines:
             line_clean = line.strip('\n').strip(' ')
             if line_clean != '':
@@ -57,7 +57,7 @@ class Service(SimpleService):
                     }
                 self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
                 
-            data_tmp = self.run_code(chart_config['processing_code'])
+            data_tmp = self.run_code(chart_config['df_steps'])
             data.update(data_tmp)
 
             for dim in data_tmp:
@@ -67,11 +67,11 @@ class Service(SimpleService):
 
     def get_data(self):
         """get data for each chart config"""
-        
+
         data = dict()
 
         for chart_config in self.chart_configs:
-            data_tmp = self.run_code(chart_config['processing_code'])
+            data_tmp = self.run_code(chart_config['df_steps'])
             data.update(data_tmp)
 
         return data
