@@ -1025,7 +1025,11 @@ set(ML_FILES
     ml/ml-dummy.c
 )
 
+# -----------------------------------------------------------------------------
+# ML
+
 IF(ENABLE_ML)
+    message(STATUS "ML: enabled")
     list(APPEND ML_FILES
             ml/Config.h
             ml/Config.cc
@@ -1043,6 +1047,8 @@ IF(ENABLE_ML)
             ml/ml.cc
             ml/ml-private.h
     )
+ELSE()
+    message(STATUS "ML: disabled")
 ENDIF()
 
 set(NETDATA_FILES
