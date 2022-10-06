@@ -20,7 +20,7 @@ public:
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT, TIER_QUERY_FETCH_SUM);
+        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT);
         Initialized = true;
     }
 
