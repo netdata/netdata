@@ -40,7 +40,7 @@ example_csv:
           df.rename(columns={0:'average_user_system_ratio'});
 ```
 
-`chart_configs` is a list of dictionary objects where each one defines the sequence of `df_steps` to be run using `[pandas](https://pandas.pydata.org/)`, 
+`chart_configs` is a list of dictionary objects where each one defines the sequence of `df_steps` to be run using [`pandas`](https://pandas.pydata.org/), 
 and the `chart_name`, `chart_title` etc to define the 
 [CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) 
 that will control how the results will look in netdata.
