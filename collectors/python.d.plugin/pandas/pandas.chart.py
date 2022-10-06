@@ -43,25 +43,25 @@ class Service(SimpleService):
 
         # add each chart as defined by the config
         for chart_config in self.chart_configs:
-            if chart_config['chart_name'] not in self.charts:
+            if chart_config['name'] not in self.charts:
                 chart_template = {
                     'options': [
-                        chart_config['chart_name'],
-                        chart_config['chart_title'],
-                        chart_config['chart_units'],
-                        chart_config['chart_family'],
-                        chart_config['chart_context'],
-                        chart_config['chart_type']
+                        chart_config['name'],
+                        chart_config['title'],
+                        chart_config['units'],
+                        chart_config['family'],
+                        chart_config['context'],
+                        chart_config['type']
                         ],
                     'lines': []
                     }
-                self.charts.add_chart([chart_config['chart_name']] + chart_template['options'])
+                self.charts.add_chart([chart_config['name']] + chart_template['options'])
                 
             data_tmp = self.run_code(chart_config['df_steps'])
             data.update(data_tmp)
 
             for dim in data_tmp:
-                self.charts[chart_config['chart_name']].add_dimension([dim, dim, 'absolute', 1, 1])
+                self.charts[chart_config['name']].add_dimension([dim, dim, 'absolute', 1, 1])
 
         return True
 
