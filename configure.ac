@@ -1540,6 +1540,7 @@ configdir="${sysconfdir}/netdata"
 libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
+libsysdir="${libdir}/netdata/system"
 
 AC_SUBST([varlibdir])
 AC_SUBST([registrydir])
@@ -1551,6 +1552,7 @@ AC_SUBST([libconfigdir])
 AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+AC_SUBST([libsysdir])
 
 CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} \
     ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \

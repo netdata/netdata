@@ -10,6 +10,7 @@
 		-e 's#[@]registrydir_POST@#$(registrydir)#g' \
 		-e 's#[@]varlibdir_POST@#$(varlibdir)#g' \
 		-e 's#[@]webdir_POST@#$(webdir)#g' \
+		-e 's#[@]libsysdir_POST@#$(libsysdir)#g' \
 		-e 's#[@]enable_aclk_POST@#$(enable_aclk)#g' \
 		-e 's#[@]enable_cloud_POST@#$(enable_cloud)#g' \
 		$< > $@.tmp; then \
