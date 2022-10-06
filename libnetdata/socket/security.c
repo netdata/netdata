@@ -161,7 +161,7 @@ static SSL_CTX * security_initialize_openssl_server() {
         return NULL;
     }
 
-    SSL_CTX_use_certificate_file(ctx, ssl_security_cert, SSL_FILETYPE_PEM);
+    SSL_CTX_use_certificate_file(ctx, netdata_ssl_security_cert, SSL_FILETYPE_PEM);
 #else
     ctx = SSL_CTX_new(TLS_server_method());
     if (!ctx) {
