@@ -449,8 +449,8 @@ initd_cmds() {
 # Currently not supported, this exists to provide useful error messages.
 
 isrunit() {
-  # if there is no /lib/rc/sv.d, then it's not runit
-  [ ! -d /lib/rc/sv.d ] && return 1
+  # if there is no runsvdir command, then it's not runit
+  command -v runsvdir >/dev/null 2>&1 || return 1
 
   # if there is no runit command, then it's not runit
   command -v runit >/dev/null 2>&1 || return 1
