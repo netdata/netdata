@@ -23,15 +23,17 @@ class Service(SimpleService):
     def run_code(self, processing_code):
         """eval() each line of code and ensure the result is a pandas dataframe"""
 
-        lines = processing_code.split(';')
-        for line in lines:
-            line_clean = line.strip('\n').strip(' ')
-            if line_clean != '':
-                df = eval(line_clean)
-                assert isinstance(df, pd.DataFrame)
+        data = dict()
+        exec(processing_code)
+        #lines = processing_code.split(';')
+        #for line in lines:
+        #    line_clean = line.strip('\n').strip(' ')
+        #    if line_clean != '':
+        #        df = eval(line_clean)
+        #        assert isinstance(df, pd.DataFrame)
         
         # take top row of final df as data to be collected by netdata
-        data = df.to_dict(orient='records')[0]
+        #data = df.to_dict(orient='records')[0]
 
         return data
 
