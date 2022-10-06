@@ -23,22 +23,21 @@ class Service(SimpleService):
     def run_code(self, processing_code):
         """eval() each line of code and ensure the result is a pandas dataframe"""
 
-        data = dict()
-        exec(processing_code)
-        #lines = processing_code.split(';')
-        #for line in lines:
-        #    line_clean = line.strip('\n').strip(' ')
-        #    if line_clean != '':
-        #        df = eval(line_clean)
-        #        assert isinstance(df, pd.DataFrame)
+        # process each line of code
+        lines = processing_code.split(';')
+        for line in lines:
+            line_clean = line.strip('\n').strip(' ')
+            if line_clean != '':
+                df = eval(line_clean)
+                assert isinstance(df, pd.DataFrame), 'The result of each line of code must be of type `pd.DataFrame`'
         
         # take top row of final df as data to be collected by netdata
-        #data = df.to_dict(orient='records')[0]
+        data = df.to_dict(orient='records')[0]
 
         return data
 
     def check(self):
-        """ensure charts and dims all confugured and that we can get data"""
+        """ensure charts and dims all configured and that we can get data"""
 
         data = dict()
 
@@ -68,6 +67,7 @@ class Service(SimpleService):
 
     def get_data(self):
         """get data for each chart config"""
+        
         data = dict()
 
         for chart_config in self.chart_configs:
