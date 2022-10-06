@@ -1052,10 +1052,10 @@ static int handle_mqtt(mqtt_wss_client client)
 }
 
 #define SEC_TO_MSEC 1000
-static inline long int t_till_next_keepalive_ms(mqtt_wss_client client)
+static inline long long int t_till_next_keepalive_ms(mqtt_wss_client client)
 {
     time_t last_send = client->internal_mqtt ? mqtt_ng_last_send_time(client->mqtt.mqtt_ctx) : client->mqtt.mqtt_c->mqtt_client->time_of_last_send;
-    long int next_mqtt_keep_alive = (last_send * SEC_TO_MSEC)
+    long long int next_mqtt_keep_alive = (last_send * SEC_TO_MSEC)
         + (client->mqtt_keepalive * (SEC_TO_MSEC * 0.75 /* SEND IN ADVANCE */));
     return(next_mqtt_keep_alive - (MQTT_PAL_TIME() * SEC_TO_MSEC));
 }
@@ -1076,10 +1076,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     // Check user requested TO doesn't interfere with MQTT keep alives
-    long int till_next_keep_alive = t_till_next_keepalive_ms(client);
+    long long int till_next_keep_alive = t_till_next_keepalive_ms(client);
     if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
         #ifdef DEBUG_ULTRA_VERBOSE
-            mws_debug(client->log, "Shortening Timeout requested %d to %d to ensure keep-alive can be sent", timeout_ms, till_next_keep_alive);
+            mws_debug(client->log, "Shortening Timeout requested %d to %lld to ensure keep-alive can be sent", timeout_ms, till_next_keep_alive);
         #endif
         timeout_ms = till_next_keep_alive;
         send_keepalive = 1;
