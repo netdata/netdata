@@ -4,28 +4,43 @@
 #define BUFSIZE (512)
 
 /* Caller must hold descriptor lock */
-void print_page_cache_descr(struct rrdeng_page_descr *descr)
+void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool debug)
 {
-    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
-    char uuid_str[UUID_STR_LEN];
-    char str[BUFSIZE + 1];
-    int pos = 0;
+    if(debug && !(debug_flags & D_RRDENGINE))
+        return;
 
-    uuid_unparse_lower(*descr->id, uuid_str);
-    pos += snprintfz(str, BUFSIZE - pos, "page(%p) id=%s\n"
-                                    "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
-                    pg_cache_descr->page, uuid_str,
-                    descr->page_length,
-                    (uint64_t)descr->start_time,
-                    (uint64_t)descr->end_time);
-    if (!descr->extent) {
-        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
-    } else {
-        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
+    BUFFER *wb = buffer_create(512);
+
+    if(!descr) {
+        buffer_sprintf(wb, "DBENGINE: %s : descr is NULL", msg);
+    }
+    else {
+        struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+        char uuid_str[UUID_STR_LEN];
+
+        uuid_unparse_lower(*descr->id, uuid_str);
+        buffer_sprintf(wb, "DBENGINE: %s : descr(%p), page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64" xt_offset:",
+                       msg,
+                       descr,
+                       pg_cache_descr->page, uuid_str,
+                       descr->page_length,
+                       (uint64_t)descr->start_time,
+                       (uint64_t)descr->end_time);
+        if (!descr->extent) {
+            buffer_strcat(wb, "N/A");
+        } else {
+            buffer_sprintf(wb, "%"PRIu64, descr->extent->offset);
+        }
+
+        buffer_sprintf(wb, ", flags:0x%2.2lX refcnt:%u", pg_cache_descr->flags, pg_cache_descr->refcnt);
     }
 
-    snprintfz(str + pos, BUFSIZE - pos, " flags:0x%2.2lX refcnt:%u\n\n", pg_cache_descr->flags, pg_cache_descr->refcnt);
-    debug(D_RRDENGINE, "%s", str);
+    if(debug)
+        debug(D_RRDENGINE, "%s", buffer_tostring(wb));
+    else
+        info("%s", buffer_tostring(wb));
+
+    buffer_free(wb);
 }
 
 void print_page_descr(struct rrdeng_page_descr *descr)

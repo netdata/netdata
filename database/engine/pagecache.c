@@ -133,6 +133,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     descr->extent = NULL;
     descr->pg_cache_descr_state = 0;
     descr->pg_cache_descr = NULL;
+    descr->update_every_s = 0;
 
     return descr;
 }
@@ -506,7 +507,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         while (!pg_cache_try_get_unsafe(descr, 1)) {
             debug(D_RRDENGINE, "%s: Waiting for locked page:", __func__);
             if (unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
+                print_page_cache_descr(descr, "", true);
             pg_cache_wait_event_unsafe(descr);
         }
     }
@@ -517,7 +518,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
             debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
             if (unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
+                print_page_cache_descr(descr, "", true);
             pg_cache_wait_event_unsafe(descr);
         }
     }
@@ -1038,7 +1039,7 @@ struct rrdeng_page_descr *
 
             debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
             if(unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
+                print_page_cache_descr(descr, "", true);
             while (!(pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
                 pg_cache_wait_event_unsafe(descr);
             }
@@ -1053,7 +1054,7 @@ struct rrdeng_page_descr *
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
         if(unlikely(debug_flags & D_RRDENGINE))
-            print_page_cache_descr(descr);
+            print_page_cache_descr(descr, "", true);
         if (!(flags & RRD_PAGE_POPULATED))
             page_not_in_cache = 1;
         pg_cache_wait_event_unsafe(descr);
@@ -1140,7 +1141,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
 
             debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
             if(unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
+                print_page_cache_descr(descr, "", true);
             while (!(pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
                 pg_cache_wait_event_unsafe(descr);
             }
@@ -1155,7 +1156,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
         if(unlikely(debug_flags & D_RRDENGINE))
-            print_page_cache_descr(descr);
+            print_page_cache_descr(descr, "", true);
         if (!(flags & RRD_PAGE_POPULATED))
             page_not_in_cache = 1;
 

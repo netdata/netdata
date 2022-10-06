@@ -191,6 +191,16 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     if(!db_metric_handle)
         db_metric_handle = rrdeng_metric_create(db_instance, &rd->metric_uuid, smg);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    {
+        struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+        if(page_index) {
+            if(uuid_compare(rd->metric_uuid, page_index->id) != 0)
+                fatal("DBENGINE: uuids do not match");
+        }
+    }
+#endif
+
     return db_metric_handle;
 }
 
@@ -275,9 +285,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 
         page_is_empty = page_has_only_empty_metrics(descr);
         if (page_is_empty) {
-            debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
-            if (unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
+            print_page_cache_descr(descr, "Page has empty metrics only, deleting", true);
             pg_cache_put(ctx, descr);
             pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
         } else
@@ -318,14 +326,12 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         /* is the metric far enough out of alignment with the others? */
         if (unlikely(descr->page_length + PAGE_POINT_SIZE_BYTES(descr) < page_index->alignment->page_length)) {
             handle->unaligned_page = 1;
-            debug(D_RRDENGINE, "Metric page is not aligned with chart:");
-            if (unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
+            print_page_cache_descr(descr, "Metric page is not aligned with chart", true);
         }
         if (unlikely(handle->unaligned_page &&
                      /* did the other metrics change page? */
                      page_index->alignment->page_length <= PAGE_POINT_SIZE_BYTES(descr))) {
-            debug(D_RRDENGINE, "Flushing unaligned metric page.");
+            print_page_cache_descr(descr, "must_flush_unaligned_page = 1", true);
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
@@ -333,11 +339,16 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     if (unlikely(NULL == descr ||
                  descr->page_length + PAGE_POINT_SIZE_BYTES(descr) > RRDENG_BLOCK_SIZE ||
                  must_flush_unaligned_page)) {
-        rrdeng_store_metric_flush_current_page(collection_handle);
+
+        if(descr) {
+            print_page_cache_descr(descr, "flushing metric", true);
+            rrdeng_store_metric_flush_current_page(collection_handle);
+        }
 
         page = rrdeng_create_page(ctx, &page_index->id, &descr);
         fatal_assert(page);
 
+        descr->update_every_s = page_index->latest_update_every_s;
         handle->descr = descr;
 
         handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
@@ -551,33 +562,29 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
     STORAGE_POINT sp;
     struct rrdeng_page_descr *descr = handle->descr;
     unsigned position = handle->position + 1;
+    time_t now = handle->now + handle->dt_s;
     storage_number_tier1_t tier1_value;
 
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
         handle->next_page_time = INVALID_TIME;
-        handle->now = handle->now + handle->dt_s;
-        storage_point_empty(sp, handle->now - handle->dt_s, handle->now);
+        handle->now = now;
+        storage_point_empty(sp, now - handle->dt_s, now);
         return sp;
     }
 
-    time_t now;
     if (unlikely(!descr || position >= handle->entries)) {
         // We need to get a new page
         if(rrdeng_load_page_next(rrdimm_handle)) {
             // next calls will not load any more metrics
             handle->next_page_time = INVALID_TIME;
-            handle->now = handle->now + handle->dt_s;
-            storage_point_empty(sp, handle->now - handle->dt_s, handle->now);
+            handle->now = now;
+            storage_point_empty(sp, now - handle->dt_s, now);
             return sp;
         }
 
         descr = handle->descr;
         position = handle->position;
         now = (time_t)((descr->start_time + position * (descr->update_every_s * USEC_PER_SEC)) / USEC_PER_SEC);
-    }
-    else {
-        // the current page is good to use
-        now = handle->now + handle->dt_s;
     }
 
     sp.start_time = now - handle->dt_s;
@@ -743,7 +750,7 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
 
     debug(D_RRDENGINE, "Created new page:");
     if (unlikely(debug_flags & D_RRDENGINE))
-        print_page_cache_descr(descr);
+        print_page_cache_descr(descr, "", true);
     rrdeng_page_descr_mutex_unlock(ctx, descr);
     *ret_descr = descr;
     return page;
