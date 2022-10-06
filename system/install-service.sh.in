@@ -579,12 +579,13 @@ detect_linux_svc_type() {
 
     if [ "${SVC_TYPE}" = "detect" ]; then
       error "Failed to detect what type of service manager is in use."
-    else
-      echo "${SVC_TYPE}"
+    elif [ "${SVC_TYPE}" = "wsl" ] && check_systemd; then
+      # Support for systemd in WSL.
+      SVC_TYPE="systemd"
     fi
-  else
-    echo "${SVC_TYPE}"
   fi
+
+  echo "${SVC_TYPE}"
 }
 
 install_linux_service() {
