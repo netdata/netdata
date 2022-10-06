@@ -283,14 +283,20 @@ isopenrc() {
   # if there is no /etc/init.d, it's not OpenRC
   [ ! -d /etc/init.d ] && return 1
 
-  # if PID 1 is openrc-init, it's OpenRC
-  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && return 0
+  # if there is no rc-update command, it's not OpenRC
+  command -v rc-update > /dev/null 2>&1 || return 1
 
   # If /run/openrc/softlevel exists, it's OpenRC
   [ -f /run/openrc/softlevel ] && return 0
 
   # if there is an openrc command, it's OpenRC
   command -v openrc > /dev/null 2>&1 && return 0
+
+  # if /etc/init.d/local exists and has `openrc-run` in it's shebang line, it’s OpenRC
+  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && return 0
+
+  # if PID 1 is openrc-init, it's OpenRC
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && return 0
 
   # Otherwise, it’s not OpenRC
   return 1
