@@ -31,7 +31,7 @@ example_csv:
         chart_family: "london_system_cpu"
         chart_context: "london_system_cpu"
         chart_type: "line"
-        chart_units: "%"
+        chart_units: "n"
         df_steps: >
           pd.read_csv('https://london.my-netdata.io/api/v1/data?chart=system.cpu&format=csv&after=-60', storage_options={'User-Agent': 'netdata'});
           df.drop('time', axis=1);
