@@ -476,6 +476,10 @@ install_non_systemd_init() {
 }
 
 run_install_service_script() {
+  if [ -z "${tmpdir}" ]; then
+    tmpdir="${TMPDIR:-/tmp}"
+  fi
+
   # shellcheck disable=SC2154
   save_path="${tmpdir}/netdata-service-cmds"
   # shellcheck disable=SC2068
