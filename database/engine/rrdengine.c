@@ -378,8 +378,8 @@ after_crc_check:
             /* care, we don't hold the descriptor mutex */
             if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
                 header->descr[i].page_length == descrj->page_length &&
-                header->descr[i].start_time == descrj->start_time_ut &&
-                header->descr[i].end_time == descrj->end_time_ut) {
+                header->descr[i].start_time_ut == descrj->start_time_ut &&
+                header->descr[i].end_time_ut == descrj->end_time_ut) {
                 descr = descrj;
                 break;
             }
@@ -387,7 +387,7 @@ after_crc_check:
         is_prefetched_page = 0;
         if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
             descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid,
-                                                         header->descr[i].start_time);
+                                                         header->descr[i].start_time_ut);
             if (!descr)
                 continue; /* Failed to reserve a suitable page */
             is_prefetched_page = 1;
@@ -820,8 +820,8 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         header->descr[i].type = descr->type;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
-        header->descr[i].start_time = descr->start_time_ut;
-        header->descr[i].end_time = descr->end_time_ut;
+        header->descr[i].start_time_ut = descr->start_time_ut;
+        header->descr[i].end_time_ut = descr->end_time_ut;
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {

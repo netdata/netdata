@@ -593,14 +593,14 @@ static inline struct rrdeng_page_descr *
 /* Update metric oldest and latest timestamps efficiently when adding new values */
 void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
 {
-    usec_t oldest_time = page_index->oldest_time;
-    usec_t latest_time = page_index->latest_time;
+    usec_t oldest_time = page_index->oldest_time_ut;
+    usec_t latest_time = page_index->latest_time_ut;
 
     if (unlikely(oldest_time == INVALID_TIME || descr->start_time_ut < oldest_time)) {
-        page_index->oldest_time = descr->start_time_ut;
+        page_index->oldest_time_ut = descr->start_time_ut;
     }
     if (likely(descr->end_time_ut > latest_time || latest_time == INVALID_TIME)) {
-        page_index->latest_time = descr->end_time_ut;
+        page_index->latest_time_ut = descr->end_time_ut;
     }
 }
 
@@ -631,11 +631,11 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
 
     if (unlikely(NULL == firstPValue)) {
         fatal_assert(NULL == lastPValue);
-        page_index->oldest_time = page_index->latest_time = INVALID_TIME;
+        page_index->oldest_time_ut = page_index->latest_time_ut = INVALID_TIME;
         return;
     }
-    page_index->oldest_time = oldest_time;
-    page_index->latest_time = latest_time;
+    page_index->oldest_time_ut = oldest_time;
+    page_index->latest_time_ut = latest_time;
 }
 
 /* If index is NULL lookup by UUID (descr->id) */
@@ -682,7 +682,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
 
-usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time)
+usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
@@ -700,7 +700,7 @@ usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
     }
 
     uv_rwlock_rdlock(&page_index->lock);
-    descr = find_first_page_in_time_range(page_index, start_time, end_time);
+    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
     if (NULL == descr) {
         uv_rwlock_rdunlock(&page_index->lock);
         return INVALID_TIME;
@@ -713,12 +713,12 @@ usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
  * Return page information for the first page before point_in_time that satisfies the filter.
  * @param ctx DB context
  * @param page_index page index of a metric
- * @param point_in_time the pages that are searched must be older than this timestamp
+ * @param point_in_time_ut the pages that are searched must be older than this timestamp
  * @param filter decides if the page satisfies the caller's criteria
  * @param page_info the result of the search is set in this pointer
  */
 void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
-                                     usec_t point_in_time, pg_cache_page_info_filter_t *filter,
+                                     usec_t point_in_time_ut, pg_cache_page_info_filter_t *filter,
                                      struct rrdeng_page_info *page_info)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
@@ -729,7 +729,7 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
     (void)pg_cache;
     fatal_assert(NULL != page_index);
 
-    Index = (Word_t)(point_in_time / USEC_PER_SEC);
+    Index = (Word_t)(point_in_time_ut / USEC_PER_SEC);
     uv_rwlock_rdlock(&page_index->lock);
     do {
         PValue = JudyLPrev(page_index->JudyL_array, &Index, PJE0);
@@ -737,12 +737,12 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
     } while (descr != NULL && !filter(descr));
     if (unlikely(NULL == descr)) {
         page_info->page_length = 0;
-        page_info->start_time = INVALID_TIME;
-        page_info->end_time = INVALID_TIME;
+        page_info->start_time_ut = INVALID_TIME;
+        page_info->end_time_ut = INVALID_TIME;
     } else {
         page_info->page_length = descr->page_length;
-        page_info->start_time = descr->start_time_ut;
-        page_info->end_time = descr->end_time_ut;
+        page_info->start_time_ut = descr->start_time_ut;
+        page_info->end_time_ut = descr->end_time_ut;
     }
     uv_rwlock_rdunlock(&page_index->lock);
 }
@@ -751,7 +751,7 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
  * Searches for an unallocated page without triggering disk I/O. Attempts to reserve the page and get a reference.
  * @param ctx DB context
  * @param id lookup by UUID
- * @param start_time exact starting time in usec
+ * @param start_time_ut exact starting time in usec
  * @param ret_page_indexp Sets the page index pointer (*ret_page_indexp) for the given UUID.
  * @return the page descriptor or NULL on failure. It can fail if:
  *         1. The page is already allocated to the page cache.
@@ -759,7 +759,7 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
  *         3. It did not succeed to reserve a spot in the page cache.
  */
 struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t *id,
-                                                               usec_t start_time)
+                                                               usec_t start_time_ut)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
@@ -782,7 +782,7 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_
     }
 
     uv_rwlock_rdlock(&page_index->lock);
-    Index = (Word_t)(start_time / USEC_PER_SEC);
+    Index = (Word_t)(start_time_ut / USEC_PER_SEC);
     PValue = JudyLGet(page_index->JudyL_array, Index, PJE0);
     if (likely(NULL != PValue)) {
         descr = *PValue;
@@ -819,15 +819,15 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_
  * Does not get a reference.
  * @param ctx DB context
  * @param id UUID
- * @param start_time inclusive starting time in usec
- * @param end_time inclusive ending time in usec
+ * @param start_time_ut inclusive starting time in usec
+ * @param end_time_ut inclusive ending time in usec
  * @param page_info_arrayp It allocates (*page_arrayp) and populates it with information of pages that overlap
  *        with the time range [start_time,end_time]. The caller must free (*page_info_arrayp) with freez().
  *        If page_info_arrayp is set to NULL nothing was allocated.
  * @param ret_page_indexp Sets the page index pointer (*ret_page_indexp) for the given UUID.
  * @return the number of pages that overlap with the time range [start_time,end_time].
  */
-unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time,
+unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut,
                           struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
@@ -855,7 +855,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     }
 
     uv_rwlock_rdlock(&page_index->lock);
-    descr = find_first_page_in_time_range(page_index, start_time, end_time);
+    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
     if (NULL == descr) {
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
@@ -870,7 +870,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     }
 
     for (count = 0, preload_count = 0 ;
-         descr != NULL && is_page_in_time_range(descr, start_time, end_time) ;
+         descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
          PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         /* Iterate all pages in range */
@@ -882,8 +882,8 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
                 page_info_array_max_size += PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
                 *page_info_arrayp = reallocz(*page_info_arrayp, page_info_array_max_size);
             }
-            (*page_info_arrayp)[count].start_time = descr->start_time_ut;
-            (*page_info_arrayp)[count].end_time = descr->end_time_ut;
+            (*page_info_arrayp)[count].start_time_ut = descr->start_time_ut;
+            (*page_info_arrayp)[count].end_time_ut = descr->end_time_ut;
             (*page_info_arrayp)[count].page_length = descr->page_length;
         }
         ++count;
@@ -975,7 +975,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
  */
 struct rrdeng_page_descr *
         pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                        usec_t point_in_time)
+                        usec_t point_in_time_ut)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
@@ -1004,15 +1004,15 @@ struct rrdeng_page_descr *
     page_not_in_cache = 0;
     uv_rwlock_rdlock(&page_index->lock);
     while (1) {
-        Index = (Word_t)(point_in_time / USEC_PER_SEC);
+        Index = (Word_t)(point_in_time_ut / USEC_PER_SEC);
         PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
         if (likely(NULL != PValue)) {
             descr = *PValue;
         }
         if (NULL == PValue ||
             0 == descr->page_length ||
-            (INVALID_TIME != point_in_time &&
-             !is_point_in_time_in_page(descr, point_in_time))) {
+            (INVALID_TIME != point_in_time_ut &&
+             !is_point_in_time_in_page(descr, point_in_time_ut))) {
             /* non-empty page not found */
             uv_rwlock_rdunlock(&page_index->lock);
 
@@ -1082,7 +1082,7 @@ struct rrdeng_page_descr *
  */
 struct rrdeng_page_descr *
 pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                     usec_t start_time, usec_t end_time)
+                     usec_t start_time_ut, usec_t end_time_ut)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
@@ -1111,7 +1111,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     uv_rwlock_rdlock(&page_index->lock);
     int retry_count = 0;
     while (1) {
-        descr = find_first_page_in_time_range(page_index, start_time, end_time);
+        descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
         if (NULL == descr || 0 == descr->page_length || retry_count == default_rrdeng_page_fetch_retries) {
             /* non-empty page not found */
             if (retry_count == default_rrdeng_page_fetch_retries)
@@ -1189,8 +1189,8 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
     page_index->JudyL_array = (Pvoid_t) NULL;
     uuid_copy(page_index->id, *id);
     fatal_assert(0 == uv_rwlock_init(&page_index->lock));
-    page_index->oldest_time = INVALID_TIME;
-    page_index->latest_time = INVALID_TIME;
+    page_index->oldest_time_ut = INVALID_TIME;
+    page_index->latest_time_ut = INVALID_TIME;
     page_index->prev = NULL;
     page_index->page_count = 0;
     page_index->refcount = 0;

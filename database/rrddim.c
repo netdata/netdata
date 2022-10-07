@@ -117,7 +117,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (int tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier]) {
-                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every);
+                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every * storage_tiers_grouping_iterations[tier]);
                 initialized++;
             }
         }
@@ -250,7 +250,7 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         for(int tier = 0; tier < storage_tiers ;tier++) {
             if (rd->tiers[tier])
                 rd->tiers[tier]->db_collection_handle =
-                    rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every);
+                    rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every * storage_tiers_grouping_iterations[tier]);
         }
 
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);

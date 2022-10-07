@@ -311,22 +311,35 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             }
             continue;
         }
-        uint64_t start_time = jf_metric_data->descr[i].start_time;
-        uint64_t end_time = jf_metric_data->descr[i].end_time;
+        uint64_t start_time_ut = jf_metric_data->descr[i].start_time_ut;
+        uint64_t end_time_ut = jf_metric_data->descr[i].end_time_ut;
         size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
+        time_t update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
 
-        if (unlikely(start_time > end_time)) {
-            error("Invalid page encountered, start time %"PRIu64" > end time %"PRIu64"", start_time , end_time);
+        if (unlikely(start_time_ut > end_time_ut)) {
+            error("DBENGINE: Invalid page encountered, start time %"PRIu64" > end time %"PRIu64"", start_time_ut, end_time_ut);
             continue;
         }
 
-        if (unlikely(start_time == end_time && entries != 1)) {
-            error("Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found", start_time, entries);
+        if (unlikely(start_time_ut == end_time_ut && entries != 1)) {
+            error("DBENGINE: Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found",
+                start_time_ut, entries);
             continue;
         }
 
         if (unlikely(!entries)) {
-            error("Invalid page encountered, entries is zero");
+            error("DBENGINE: Invalid page encountered, entries is zero");
+            continue;
+        }
+
+        if(entries > 1 && update_every_s == 0) {
+            error("DBENGINE: Invalid page encountered, update every is zero, but entries is %zu", entries);
+            continue;
+        }
+
+        if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
+            end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
+            error("DBENGINE: Invalid page encountered, timestamps do not match, end_time_ut = %lu, start_time_ut = %lu, entries = %zu, update_every = %ld", end_time_ut, start_time_ut, entries, update_every_s);
             continue;
         }
 
@@ -351,17 +364,20 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         descr = pg_cache_create_descr();
         descr->page_length = jf_metric_data->descr[i].page_length;
-        descr->start_time_ut = start_time;
-        descr->end_time_ut = end_time;
-        descr->update_every_s = (entries > 1) ? ((end_time - start_time) / (entries - 1)) : (page_index->latest_update_every_s);
+        descr->start_time_ut = start_time_ut;
+        descr->end_time_ut = end_time_ut;
+        descr->update_every_s = (update_every_s > 0) ? update_every_s : (page_index->latest_update_every_s);
         descr->id = &page_index->id;
         descr->extent = extent;
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
 
-        if(page_index->latest_time == descr->end_time_ut)
+        if(page_index->latest_time_ut == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
+
+        if(descr->update_every_s == 0)
+            fatal("DBENGINE: page descriptor update every is zero, end_time_ut = %lu, start_time_ut = %lu, entries = %zu", end_time_ut, start_time_ut, entries);
     }
 
     extent->number_of_pages = valid_pages;
