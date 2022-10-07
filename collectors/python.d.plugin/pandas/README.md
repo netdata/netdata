@@ -45,7 +45,7 @@ temperature:
                 ('paris', 48.8567, 2.3510),
                 ]
             }
-            );
+            );                                                         # use dictionary comprehension to make multiple requests;
           df.describe();                                               # get aggregate stats for each city;
           df.transpose()[['mean', 'max', 'min']].reset_index();        # just take mean, min, max;
           df.rename(columns={'index':'city'});                         # some column renaming;
