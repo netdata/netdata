@@ -128,7 +128,6 @@ skip_execution:
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when deleting dimension UUID, rc = %d", rc);
-    return;
 }
 
 //
@@ -278,8 +277,6 @@ static void sql_store_host_system_info_key_value(uuid_t *host_id, const char *na
 skip_store:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing  host system information");
-
-    return;
 }
 
 
@@ -365,8 +362,6 @@ static void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_sys
 
     if (system_info->is_k8s_node)
         sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node);
-
-    return;
 }
 
 
@@ -689,7 +684,6 @@ skip_run:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading dimensions");
-    return;
 }
 
 
