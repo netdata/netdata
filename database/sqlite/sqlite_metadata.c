@@ -6,9 +6,12 @@
 extern DICTIONARY *rrdhost_root_index;
 
 // Metadata functions
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
+
+
 
 struct label_str {
-    BUFFER  *sql;
+    BUFFER *sql;
     int count;
     char uuid_str[UUID_STR_LEN];
 };
@@ -18,6 +21,17 @@ struct scan_metadata_payload {
     bool have_more_work;
     uint32_t max_count;
 };
+
+static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    struct label_str *lb = data;
+    if (unlikely(!lb->count))
+        buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES ");
+    else
+        buffer_strcat(lb->sql, ", ");
+    buffer_sprintf(lb->sql, "(u2h('%s'), %d,'%s','%s', unixepoch())", lb->uuid_str, (int)ls & ~(RRDLABEL_FLAG_INTERNAL), name, value);
+    lb->count++;
+    return 1;
+}
 
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct label_str *lb = data;
@@ -42,90 +56,6 @@ void migrate_localhost(uuid_t *host_uuid)
         db_execute("DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);");
 
 }
-
-static int sql_store_label(sqlite3_stmt *res, uuid_t *uuid, int source_type, const char *label, const char *value)
-{
-    int rc;
-
-    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind UUID parameter to store label information");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_int(res, 2, source_type);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind type parameter to store label information");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_text(res, 3, label, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind label parameter to store label information");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_text(res, 4, value, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind value parameter to store label information");
-        goto skip_store;
-    }
-
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store label entry, rc = %d", rc);
-
-skip_store:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when storing label information");
-
-    return rc != SQLITE_DONE;
-}
-
-#define SQL_INS_HOST_LABEL "INSERT OR REPLACE INTO host_label " \
-    "(host_id, source_type, label_key, label_value, date_created) " \
-    "values (@chart, @source, @label, @value, unixepoch());"
-
-static void sql_store_host_label(uuid_t *host_uuid, int source_type, const char *label, const char *value)
-{
-    static __thread sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
-
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_INS_HOST_LABEL, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement store chart labels");
-            return;
-        }
-    }
-
-    (void) sql_store_label(res, host_uuid, source_type, label, value);
-}
-
-
-static int save_host_label_callback(const char *name, const char *value, RRDLABEL_SRC label_source, void *data)
-{
-    RRDHOST *host = (RRDHOST *)data;
-    sql_store_host_label(&host->host_uuid, (int)label_source & ~(RRDLABEL_FLAG_INTERNAL), name, value);
-    return 0;
-}
-
-#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
-static void sql_store_host_labels(RRDHOST *host)
-{
-    int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
-    if (rc != SQLITE_OK)
-        error_report("Failed to remove old host labels for host %s", rrdhost_hostname(host));
-
-    rrdlabels_walkthrough_read(host->rrdlabels, save_host_label_callback, host);
-}
-
 
 #define SQL_STORE_CLAIM_ID  "insert into node_instance " \
     "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
@@ -170,8 +100,6 @@ static void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing node instance information");
-
-    return;
 }
 
 #define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
@@ -1044,6 +972,7 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_STORE_HOST_LABELS,    "host labels");
     worker_register_job_name(METADATA_MAINTENANCE,          "maintenance");
 
+
     int ret;
     uv_loop_t *loop;
     unsigned cmd_batch_size;
@@ -1148,11 +1077,7 @@ static void metadata_event_loop(void *arg)
 
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
-                    /* the command queue was empty, do nothing */
-                    break;
                 case METADATA_DATABASE_TIMER:
-                    /* the command queue was empty, do nothing */
-                    //info("Metadata timer tick!");
                     break;
                 case METADATA_ADD_CHART:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
@@ -1268,7 +1193,16 @@ static void metadata_event_loop(void *arg)
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     host = (RRDHOST *) dictionary_acquired_item_value(dict_item);
 //                    info("METADATA: Storing HOST LABELS %s", string2str(host->hostname));
-                    sql_store_host_labels(host);
+
+                    rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
+                    if (likely(rc == SQLITE_OK)) {
+                        buffer_flush(work_buffer);
+                        struct label_str tmp = {.sql = work_buffer, .count = 0};
+                        uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
+                        rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
+                        db_execute(buffer_tostring(work_buffer));
+                    }
+
                     dictionary_acquired_item_release(rrdhost_root_index, dict_item);
                     break;
 
@@ -1440,7 +1374,7 @@ void metadata_sync_init(void)
 
 //  Helpers
 
-static inline void _queue_metadata_cmd(enum metadata_opcode opcode, const void *param0, const void *param1)
+static inline void queue_metadata_cmd(enum metadata_opcode opcode, const void *param0, const void *param1)
 {
     struct metadata_cmd cmd;
     cmd.opcode = opcode;
@@ -1455,7 +1389,7 @@ static inline void _queue_metadata_cmd(enum metadata_opcode opcode, const void *
 void queue_chart_update_metadata(RRDSET *st)
 {
     const DICTIONARY_ITEM *acquired_st = dictionary_get_and_acquire_item(st->rrdhost->rrdset_root_index, string2str(st->id));
-    _queue_metadata_cmd(METADATA_ADD_CHART, acquired_st, NULL);
+    queue_metadata_cmd(METADATA_ADD_CHART, acquired_st, NULL);
 }
 
 //
@@ -1472,33 +1406,33 @@ void queue_dimension_update_metadata(RRDDIM *rd)
     }
 //    info("DEBUG: QUEUE DIMENSION %s", string2str(rd->id));
 
-    _queue_metadata_cmd(METADATA_ADD_DIMENSION, acquired_rd, NULL);
+    queue_metadata_cmd(METADATA_ADD_DIMENSION, acquired_rd, NULL);
 }
 
 void queue_dimension_update_flags(RRDDIM *rd)
 {
     const DICTIONARY_ITEM *acquired_rd =
         dictionary_get_and_acquire_item(rd->rrdset->rrddim_root_index, string2str(rd->id));
-    _queue_metadata_cmd(METADATA_ADD_DIMENSION_OPTION, acquired_rd, NULL);
+    queue_metadata_cmd(METADATA_ADD_DIMENSION_OPTION, acquired_rd, NULL);
 }
 
 void queue_host_update_system_info(const char *machine_guid)
 {
     const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
-    _queue_metadata_cmd(METADATA_ADD_HOST_SYSTEM_INFO, acquired_host, NULL);
+    queue_metadata_cmd(METADATA_ADD_HOST_SYSTEM_INFO, acquired_host, NULL);
 }
 
 void queue_host_update_info(const char *machine_guid)
 {
     const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
-    _queue_metadata_cmd(METADATA_ADD_HOST_INFO, acquired_host, NULL);
+    queue_metadata_cmd(METADATA_ADD_HOST_INFO, acquired_host, NULL);
 }
 
 void queue_delete_dimension_uuid(uuid_t *uuid)
 {
     uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
-    _queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
+    queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
 }
 
 void queue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
@@ -1514,24 +1448,24 @@ void queue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
         local_claim_uuid = mallocz(sizeof(*claim_uuid));
         uuid_copy(*local_claim_uuid, *claim_uuid);
     }
-    _queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
+    queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
 }
 
 void queue_store_host_labels(const char *machine_guid)
 {
     const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
-    _queue_metadata_cmd(METADATA_STORE_HOST_LABELS, acquired_host, NULL);
+    queue_metadata_cmd(METADATA_STORE_HOST_LABELS, acquired_host, NULL);
 }
 
 void queue_metadata_buffer(BUFFER *buffer)
 {
-    _queue_metadata_cmd(METADATA_STORE_BUFFER, buffer, NULL);
+    queue_metadata_cmd(METADATA_STORE_BUFFER, buffer, NULL);
 }
 
 void queue_chart_labels(RRDSET *st)
 {
     const DICTIONARY_ITEM *acquired_st = dictionary_get_and_acquire_item(st->rrdhost->rrdset_root_index, string2str(st->id));
-    _queue_metadata_cmd(METADATA_ADD_CHART_LABEL, acquired_st, NULL);
+    queue_metadata_cmd(METADATA_ADD_CHART_LABEL, acquired_st, NULL);
 }
 
 
@@ -1617,7 +1551,7 @@ static void *metadata_unittest_threads(int items __maybe_unused)
 
     sleep_usec(5 * USEC_PER_SEC);
     // Do immediate shutdown / Drains queue
-    _queue_metadata_cmd(METADATA_SYNC_SHUTDOWN, NULL, NULL);
+    queue_metadata_cmd(METADATA_SYNC_SHUTDOWN, NULL, NULL);
 
     fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
 
