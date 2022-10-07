@@ -15,7 +15,6 @@ declare -a package_tree=(
   libtool
   pkgconfig
   cmake
-  nmap-ncat
   zlib-devel
   libuuid-devel
   libmnl-devel

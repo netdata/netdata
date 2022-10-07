@@ -16,7 +16,6 @@ declare -a package_tree=(
   automake
   libtool
   cmake
-  gnu-netcat
   zlib
   util-linux
   libmnl
