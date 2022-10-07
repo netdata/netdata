@@ -1282,16 +1282,17 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
-    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
-        appconfig_set_default(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
-    }
 
     if(!config_loaded)
     {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
         load_cloud_conf(0);
+    }
+
+    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
+    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
+        appconfig_set_default(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
     }
 
 
