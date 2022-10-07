@@ -33,7 +33,9 @@ temperature:
         units: "Celsius"
         df_steps: >
           pd.DataFrame.from_dict(
-            {city: requests.get(f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&hourly=temperature_2m').json()['hourly']['temperature_2m'] 
+            {city: requests.get(
+                f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&hourly=temperature_2m'
+                ).json()['hourly']['temperature_2m'] 
             for (city,lat,lng) 
             in [
                 ('dublin', 53.3441, -6.2675),
