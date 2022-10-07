@@ -940,7 +940,7 @@ config_option() {
   key="${2}"
   value="${3}"
 
-  if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
+  if [ -x "${NETDATA_PREFIX}/usr/sbin/netdata" ] && [ -r "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
     "${NETDATA_PREFIX}/usr/sbin/netdata" \
       -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
       -W get "${section}" "${key}" "${value}" ||
