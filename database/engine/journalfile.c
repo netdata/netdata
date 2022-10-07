@@ -339,7 +339,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         }
 
         if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
-            end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
+            // end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
             invalid[4]++;
             // let this be
         }
