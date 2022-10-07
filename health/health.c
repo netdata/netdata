@@ -947,7 +947,7 @@ void *health_main(void *ptr) {
         if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
             sql_health_alarm_log_cleanup(host);
 
-        health_execute_pending_updates(host);
+        health_execute_delayed_initializations(host);
 
         worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
 
