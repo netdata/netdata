@@ -29,6 +29,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_un
         Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
         fatal_assert(NULL == *PValue);
         *PValue = rd;
+        t = (STORAGE_METRIC_HANDLE *)rd;
         netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
     }
 
