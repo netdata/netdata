@@ -283,8 +283,6 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     /* persistent structures */
     struct rrdeng_jf_store_data *jf_metric_data;
 
-    size_t invalid[5] = { 0, 0, 0, 0, 0};
-
     jf_metric_data = buf;
     count = jf_metric_data->number_of_pages;
     descr_size = sizeof(*jf_metric_data->descr) * count;
@@ -319,29 +317,40 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         time_t update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
 
         if (unlikely(start_time_ut > end_time_ut)) {
-            invalid[0]++;
+            ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut = end_time_ut;
             continue;
         }
 
         if (unlikely(start_time_ut == end_time_ut && entries != 1)) {
-            invalid[1]++;
+            ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut = end_time_ut;
             continue;
         }
 
         if (unlikely(!entries)) {
-            invalid[2]++;
+            ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut = end_time_ut;
             continue;
         }
 
         if(entries > 1 && update_every_s == 0) {
-            invalid[3]++;
+            ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut = end_time_ut;
             continue;
         }
 
         if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
-            // end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
-            invalid[4]++;
+            ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut = end_time_ut;
+
             // let this be
+            // end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
         }
 
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
@@ -383,21 +392,12 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
     extent->number_of_pages = valid_pages;
 
-    if(invalid[0])
-        error("DBENGINE: %zu invalid pages encountered in extent, they had start time > end time", invalid[0]);
-    if(invalid[1])
-        error("DBENGINE: %zu invalid pages encountered in extent, they had start time = end time with more than 1 entries", invalid[1]);
-    if(invalid[2])
-        error("DBENGINE: %zu invalid pages encountered in extent, they had zero entries", invalid[2]);
-    if(invalid[3])
-        error("DBENGINE: %zu invalid pages encountered in extent, they had update every == 0 with entries > 1", invalid[3]);
-
-    internal_error(invalid[4], "DBENGINE: %zu invalid page encountered in extent, their points duration did not match", invalid[4]);
-
     if (likely(valid_pages))
         df_extent_insert(extent);
-    else
+    else {
         freez(extent);
+        ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter++;
+    }
 }
 
 /*

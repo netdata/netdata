@@ -226,6 +226,15 @@ extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of dele
 #define SET_QUIESCE (1) /* set it before shutting down the instance, quiesce long running operations */
 #define QUIESCED    (2) /* is set after all threads have finished running */
 
+typedef enum {
+    LOAD_ERRORS_PAGE_FLIPPED_TIME = 0,
+    LOAD_ERRORS_PAGE_EQUAL_TIME = 1,
+    LOAD_ERRORS_PAGE_ZERO_ENTRIES = 2,
+    LOAD_ERRORS_PAGE_UPDATE_ZERO = 3,
+    LOAD_ERRORS_PAGE_FLEXY_TIME = 4,
+    LOAD_ERRORS_DROPPED_EXTENT = 5,
+} INVALID_PAGE_ID;
+
 struct rrdengine_instance {
     struct metalog_instance *metalog_ctx;
     struct rrdengine_worker_config worker_config;
@@ -250,6 +259,11 @@ struct rrdengine_instance {
     uint8_t page_type; /* Default page type for this context */
 
     struct rrdengine_statistics stats;
+
+    struct {
+        size_t counter;
+        usec_t latest_end_time_ut;
+    } load_errors[6];
 };
 
 extern void *dbengine_page_alloc(void);

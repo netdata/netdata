@@ -454,25 +454,31 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     struct pg_cache_page_index *page_index = handle->page_index;
     struct rrdeng_page_descr *descr = handle->descr;
 
-    if(descr) {
+    if(likely(descr)) {
         usec_t last_point_in_time_ut = descr->end_time_ut;
-
-        if(unlikely(point_in_time_ut <= last_point_in_time_ut)) {
-            error("DBENGINE: collected point is in the past, last stored point %llu, new point %llu.",
-                  last_point_in_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC);
-            return;
-        }
-
         usec_t update_every_ut = page_index->latest_update_every_s * USEC_PER_SEC;
-        size_t points_gap = (point_in_time_ut - last_point_in_time_ut) / update_every_ut;
+        size_t points_gap = (point_in_time_ut <= last_point_in_time_ut) ?
+                                (size_t)0 :
+                                (size_t)((point_in_time_ut - last_point_in_time_ut) / update_every_ut);
 
-        if (points_gap > 1) {
+        if(unlikely(points_gap != 1)) {
+            if (unlikely(points_gap <= 0)) {
+                error("DBENGINE: collected point is in the past, last stored point %llu, new point %llu.",
+                      last_point_in_time_ut / USEC_PER_SEC,
+                      point_in_time_ut / USEC_PER_SEC);
+                return;
+            }
+
             size_t point_size = PAGE_POINT_SIZE_BYTES(descr);
             size_t page_size_in_points = RRDENG_BLOCK_SIZE / point_size;
             size_t used_points = descr->page_length / point_size;
             size_t remaining_points_in_page = page_size_in_points - used_points;
 
-            if (points_gap > remaining_points_in_page) {
+            bool new_point_is_aligned = true;
+            if(unlikely((point_in_time_ut - last_point_in_time_ut) / points_gap != update_every_ut))
+                new_point_is_aligned = false;
+
+            if(unlikely(points_gap > remaining_points_in_page || !new_point_is_aligned)) {
 //                char buffer[200];
 //                snprintfz(buffer, 200, "data collection skipped %zu points, last stored point %llu, new point %llu, update every %d. Cutting page.",
 //                      points_gap, last_point_in_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC, page_index->latest_update_every_s);
@@ -490,11 +496,10 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                 usec_t step_ut = page_index->latest_update_every_s * USEC_PER_SEC;
                 usec_t last_point_filled_ut = last_point_in_time_ut + step_ut;
 
-                while(last_point_filled_ut < point_in_time_ut) {
-
+                while (last_point_filled_ut < point_in_time_ut) {
                     rrdeng_store_metric_next_internal(
-                        collection_handle, last_point_filled_ut,
-                        NAN, NAN, NAN, 1, 0, SN_EMPTY_SLOT);
+                        collection_handle, last_point_filled_ut, NAN, NAN, NAN,
+                        1, 0, SN_EMPTY_SLOT);
 
                     last_point_filled_ut += step_ut;
                 }

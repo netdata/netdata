@@ -1043,7 +1043,70 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 /* return 0 on success */
 int init_rrd_files(struct rrdengine_instance *ctx)
 {
-    return init_data_files(ctx);
+    int ret = init_data_files(ctx);
+
+    BUFFER *wb = buffer_create(1000);
+    size_t all_errors = 0;
+    usec_t now = now_realtime_usec();
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had start time > end time (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut) / USEC_PER_SEC
+                       );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had start time = end time with more than 1 entries (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter) {
+        buffer_sprintf(wb, "%s%zu pages had zero points (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter) {
+        buffer_sprintf(wb, "%s%zu pages had update every == 0 with entries > 1 (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had a different number of points compared to their timestamps (latest: %llu secs ago; these page have been loaded)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter) {
+        buffer_sprintf(wb, "%s%zu extents have been dropped because they didn't have any valid pages"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter;
+    }
+
+    if(all_errors)
+        info("DBENGINE: tier %d: %s", ctx->tier, buffer_tostring(wb));
+
+    buffer_free(wb);
+    return ret;
 }
 
 void finalize_rrd_files(struct rrdengine_instance *ctx)
