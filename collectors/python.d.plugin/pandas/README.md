@@ -5,7 +5,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Pandas Netdata Collector
 
-<img src="https://pandas.pydata.org/docs/_static/pandas.svg" alt="Pandas" width="100px" height="50px" />
+<a href="https://pandas.pydata.org/" target="_blank">
+  <img src="https://pandas.pydata.org/docs/_static/pandas.svg" alt="Pandas" width="100px" height="50px" />
+ </a>
 
 A python collector using [pandas](https://pandas.pydata.org/) to pull data and do pandas based 
 preprocessing before feeding to Netdata.
