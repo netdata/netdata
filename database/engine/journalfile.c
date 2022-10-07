@@ -283,6 +283,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     /* persistent structures */
     struct rrdeng_jf_store_data *jf_metric_data;
 
+    size_t invalid[5] = { 0, 0, 0, 0, 0};
+
     jf_metric_data = buf;
     count = jf_metric_data->number_of_pages;
     descr_size = sizeof(*jf_metric_data->descr) * count;
@@ -317,30 +319,29 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         time_t update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
 
         if (unlikely(start_time_ut > end_time_ut)) {
-            error("DBENGINE: Invalid page encountered, start time %"PRIu64" > end time %"PRIu64"", start_time_ut, end_time_ut);
+            invalid[0]++;
             continue;
         }
 
         if (unlikely(start_time_ut == end_time_ut && entries != 1)) {
-            error("DBENGINE: Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found",
-                start_time_ut, entries);
+            invalid[1]++;
             continue;
         }
 
         if (unlikely(!entries)) {
-            error("DBENGINE: Invalid page encountered, entries is zero");
+            invalid[2]++;
             continue;
         }
 
         if(entries > 1 && update_every_s == 0) {
-            error("DBENGINE: Invalid page encountered, update every is zero, but entries is %zu", entries);
+            invalid[3]++;
             continue;
         }
 
         if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
             end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
-            error("DBENGINE: Invalid page encountered, timestamps do not match, end_time_ut = %lu, start_time_ut = %lu, entries = %zu, update_every = %ld", end_time_ut, start_time_ut, entries, update_every_s);
-            continue;
+            invalid[4]++;
+            // let this be
         }
 
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
@@ -381,6 +382,17 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     }
 
     extent->number_of_pages = valid_pages;
+
+    if(invalid[0])
+        error("DBENGINE: %zu invalid pages encountered in extent, they had start time > end time", invalid[0]);
+    if(invalid[1])
+        error("DBENGINE: %zu invalid pages encountered in extent, they had start time = end time with more than 1 entries", invalid[1]);
+    if(invalid[2])
+        error("DBENGINE: %zu invalid pages encountered in extent, they had zero entries", invalid[2]);
+    if(invalid[3])
+        error("DBENGINE: %zu invalid pages encountered in extent, they had update every == 0 with entries > 1", invalid[3]);
+
+    internal_error(invalid[4], "DBENGINE: %zu invalid page encountered in extent, their points duration did not match", invalid[4]);
 
     if (likely(valid_pages))
         df_extent_insert(extent);

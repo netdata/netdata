@@ -323,8 +323,8 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
         if(descr->end_time_ut + page_index->latest_update_every_s * USEC_PER_SEC != point_in_time_ut) {
             char buffer[200];
             snprintfz(buffer, 200,
-                      "DBENGINE: metrics collected are %s, end_time_ut = %llu, point_in_time_ut = %llu, update_every = %u, delta = %llu",
-                      (point_in_time_ut / USEC_PER_SEC - descr->end_time_ut / USEC_PER_SEC > page_index->latest_update_every_s)?"far apart":"overlapping",
+                      "metrics collected are %s, end_time_ut = %llu, point_in_time_ut = %llu, update_every = %u, delta = %llu",
+                      (point_in_time_ut / USEC_PER_SEC - descr->end_time_ut / USEC_PER_SEC > page_index->latest_update_every_s)?"far apart":"not aligned",
                       descr->end_time_ut / USEC_PER_SEC,
                       point_in_time_ut / USEC_PER_SEC,
                       page_index->latest_update_every_s,
@@ -473,18 +473,18 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
             size_t remaining_points_in_page = page_size_in_points - used_points;
 
             if (points_gap > remaining_points_in_page) {
-                char buffer[200];
-                snprintfz(buffer, 200, "DBENGINE: data collection skipped %zu points, last stored point %llu, new point %llu, update every %d. Cutting page.",
-                      points_gap, last_point_in_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC, page_index->latest_update_every_s);
-                print_page_cache_descr(descr, buffer, false);
+//                char buffer[200];
+//                snprintfz(buffer, 200, "data collection skipped %zu points, last stored point %llu, new point %llu, update every %d. Cutting page.",
+//                      points_gap, last_point_in_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC, page_index->latest_update_every_s);
+//                print_page_cache_descr(descr, buffer, false);
 
                 rrdeng_store_metric_flush_current_page(collection_handle);
             }
             else {
-                char buffer[200];
-                snprintfz(buffer, 200, "DBENGINE: data collection skipped %zu points, last stored point %llu, new point %llu, update every %d. Filling the gap.",
-                      points_gap, last_point_in_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC, page_index->latest_update_every_s);
-                print_page_cache_descr(descr, buffer, false);
+//                char buffer[200];
+//                snprintfz(buffer, 200, "data collection skipped %zu points, last stored point %llu, new point %llu, update every %d. Filling the gap.",
+//                      points_gap, last_point_in_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC, page_index->latest_update_every_s);
+//                print_page_cache_descr(descr, buffer, false);
 
                 // loop to fill the gap
                 usec_t step_ut = page_index->latest_update_every_s * USEC_PER_SEC;

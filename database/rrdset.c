@@ -1027,9 +1027,37 @@ static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, tim
     return now + loop - ((now + loop) % loop);
 }
 
-void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut) {
+void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
     if (unlikely(!t->next_point_time))
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+
+    if(unlikely(sp.start_time > t->next_point_time)) {
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                t->next_point_time * USEC_PER_SEC,
+                t->virtual_point.sum,
+                t->virtual_point.min,
+                t->virtual_point.max,
+                t->virtual_point.count,
+                t->virtual_point.anomaly_count,
+                t->virtual_point.flags);
+        }
+        else {
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                t->next_point_time * USEC_PER_SEC,
+                NAN,
+                NAN,
+                NAN,
+                0,
+                0, SN_FLAG_NONE);
+        }
+
+        t->virtual_point.count = 0; // make the point unset
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+    }
 
     // merge the dates into our virtual point
     if (unlikely(sp.start_time < t->virtual_point.start_time))
@@ -1056,34 +1084,6 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
             t->virtual_point = sp;
         }
     }
-
-    if(unlikely(sp.end_time >= t->next_point_time)) {
-        if (likely(!storage_point_is_unset(t->virtual_point))) {
-
-            t->collect_ops.store_metric(
-                t->db_collection_handle,
-                now_ut,
-                t->virtual_point.sum,
-                t->virtual_point.min,
-                t->virtual_point.max,
-                t->virtual_point.count,
-                t->virtual_point.anomaly_count,
-                t->virtual_point.flags);
-        }
-        else {
-            t->collect_ops.store_metric(
-                t->db_collection_handle,
-                now_ut,
-                NAN,
-                NAN,
-                NAN,
-                0,
-                0, SN_FLAG_NONE);
-        }
-
-        t->virtual_point.count = 0;
-        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
-    }
 }
 
 static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
@@ -1091,29 +1091,29 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     // store the metric on tier 0
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
+    time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
+
+    STORAGE_POINT sp = {
+        .start_time = now - rd->update_every,
+        .end_time = now,
+        .min = n,
+        .max = n,
+        .sum = n,
+        .count = 1,
+        .anomaly_count = (flags & SN_FLAG_NOT_ANOMALOUS) ? 0 : 1,
+        .flags = flags
+    };
+
     for(int tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
         struct rrddim_tier *t = rd->tiers[tier];
-
-        time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
         if(!t->last_collected_ut) {
             // we have not collected this tier before
             // let's fill any gap that may exist
             rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
         }
-
-        STORAGE_POINT sp = {
-            .start_time = now - rd->update_every,
-            .end_time = now,
-            .min = n,
-            .max = n,
-            .sum = n,
-            .count = 1,
-            .anomaly_count = (flags & SN_FLAG_NOT_ANOMALOUS) ? 0 : 1,
-            .flags = flags
-        };
 
         t->last_collected_ut = point_end_time_ut;
         store_metric_at_tier(rd, t, sp, point_end_time_ut);
