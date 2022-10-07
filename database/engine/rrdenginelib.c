@@ -19,9 +19,8 @@ void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bo
         char uuid_str[UUID_STR_LEN];
 
         uuid_unparse_lower(*descr->id, uuid_str);
-        buffer_sprintf(wb, "DBENGINE: %s : descr(%p), page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
+        buffer_sprintf(wb, "DBENGINE: %s : page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
                        msg,
-                       descr,
                        pg_cache_descr->page, uuid_str,
                        descr->page_length,
                        (uint64_t)descr->start_time_ut,

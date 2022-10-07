@@ -319,9 +319,19 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
     if (descr) {
         /* Make alignment decisions */
 
-        internal_error(descr->end_time_ut + page_index->latest_update_every_s * USEC_PER_SEC != point_in_time_ut,
-                       "DBENGINE: metrics collected are not in sequence, end_time_ut = %llu, point_in_time_ut = %llu, update_every = %u"
-                       , descr->end_time_ut / USEC_PER_SEC, point_in_time_ut / USEC_PER_SEC, page_index->latest_update_every_s);
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(descr->end_time_ut + page_index->latest_update_every_s * USEC_PER_SEC != point_in_time_ut) {
+            char buffer[200];
+            snprintfz(buffer, 200,
+                      "DBENGINE: metrics collected are %s, end_time_ut = %llu, point_in_time_ut = %llu, update_every = %u, delta = %llu",
+                      (point_in_time_ut / USEC_PER_SEC - descr->end_time_ut / USEC_PER_SEC > page_index->latest_update_every_s)?"far apart":"overlapping",
+                      descr->end_time_ut / USEC_PER_SEC,
+                      point_in_time_ut / USEC_PER_SEC,
+                      page_index->latest_update_every_s,
+                      point_in_time_ut / USEC_PER_SEC - descr->end_time_ut / USEC_PER_SEC);
+            print_page_cache_descr(descr, buffer, false);
+        }
+#endif
 
         if (descr->page_length == page_index->alignment->page_length) {
             /* this is the leading dimension that defines chart alignment */
