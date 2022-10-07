@@ -31,7 +31,7 @@ class Service(SimpleService):
             if line_clean != '' and line_clean[0] != '#':
                 df = eval(line_clean)
                 assert isinstance(df, pd.DataFrame), 'The result of each evaluated line of `df_steps` must be of type `pd.DataFrame`'
-        
+
         # take top row of final df as data to be collected by netdata
         data = df.to_dict(orient='records')[0]
 

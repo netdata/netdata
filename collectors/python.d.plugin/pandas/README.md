@@ -5,19 +5,22 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Pandas Netdata Collector
 
-A python collector using [pandas](https://pandas.pydata.org/) to pull data and do pandas based preprocessing before feeding to Netdata.
+A python collector using [pandas](https://pandas.pydata.org/) to pull data and do pandas based 
+preprocessing before feeding to Netdata.
 
 ## Requirements
 
 This collector depends on some Python (Python 3 only) packages that can usually be installed via `pip` or `pip3`.
 
 ```bash
-$ sudo pip install pandas requests
+sudo pip install pandas requests
 ```
 
 ## Configuration
 
-Below is an example configuration to query some csv data from [london Netdata demo server](http://london.my-netdata.io/#after=-420;before=0;=undefined;theme=slate;utc=Europe%2FLondon), do some data wrangling on it and save in format as expected by Netdata.
+Below is an example configuration to query some csv data from 
+[london Netdata demo server](http://london.my-netdata.io/), do some data wrangling on it and save in 
+format as expected by Netdata.
 
 ```yaml
 # example pulling some hourly temperature data
@@ -74,6 +77,11 @@ Which, given the above configuration would end up as a chart like below in Netda
 ![image](https://user-images.githubusercontent.com/2178292/194553559-c436df13-b20e-4258-9122-52e5e119bf0d.png)
 
 ## Notes
-  - Each line in `df_steps` must return a pandas [DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) object that is called `df` at each step.
-  - You can use [this colab notebook](https://colab.research.google.com/drive/1VYrddSegZqGtkWGFuiUbMbUk5f3rW6Hi?usp=sharing) to mock up and work on your `df_steps` iteratively before adding them to your config.
-  - This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken as the most recent values for each dimension on each chart using (`df.to_dict(orient='records')[0]`). See [pd.to_dict()](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_dict.html).
+-  Each line in `df_steps` must return a pandas 
+[DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) object (`df`) at each step.
+-  You can use 
+[this colab notebook](https://colab.research.google.com/drive/1VYrddSegZqGtkWGFuiUbMbUk5f3rW6Hi?usp=sharing) 
+to mock up and work on your `df_steps` iteratively before adding them to your config.
+-  This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken 
+as the most recent values for each dimension on each chart using (`df.to_dict(orient='records')[0]`). 
+See [pd.to_dict()](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_dict.html).
