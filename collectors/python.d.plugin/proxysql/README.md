@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "proxysql-python.d.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Databases"
+learn_rel_path: "Collectors References/Databases"
 -->
 
 # ProxySQL monitoring with Netdata

@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/maco
 sidebar_label: "macos.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "System metrics"
+learn_rel_path: "Collectors References/System metrics"
 -->
 
 # macos.plugin

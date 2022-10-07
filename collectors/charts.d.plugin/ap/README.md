@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/char
 sidebar_label: "Access points"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Remotes/Devices"
+learn_rel_path: "Collectors References/Remotes/Devices"
 -->
 
 # Access point monitoring with Netdata

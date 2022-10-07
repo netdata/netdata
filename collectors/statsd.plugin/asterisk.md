@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/stat
 sidebar_label: "Asterisk"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "APM/StatsD"
+learn_rel_path: "Collectors References/APM/StatsD"
 -->
 
 # Asterisk monitoring with Netdata

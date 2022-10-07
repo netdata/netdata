@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/proc
 sidebar_label: "proc.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "System Metrics"
+learn_rel_path: "Collectors References/System Metrics"
 -->
 
 # proc.plugin

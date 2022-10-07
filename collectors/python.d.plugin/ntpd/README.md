@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "NTP daemon"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "QoS"
+learn_rel_path: "Collectors References/QoS"
 -->
 
 # NTP daemon monitoring with Netdata

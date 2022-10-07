@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Puppet"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Provisioning Tools"
+learn_rel_path: "Collectors References/Provisioning Tools"
 -->
 
 # Puppet monitoring with Netdata

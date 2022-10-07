@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "zscores"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Uncategorized"
+learn_rel_path: "Collectors References/Uncategorized"
 -->
 
 # Z-Scores - basic anomaly detection for your key metrics and charts
