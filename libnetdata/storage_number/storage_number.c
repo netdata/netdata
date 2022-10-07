@@ -176,7 +176,8 @@ int print_netdata_double(char *str, NETDATA_DOUBLE value) {
 #ifdef STORAGE_WITH_MATH
     fractional = modfndd(value, &integral) * 10000000.0;
 #else
-    fractional = ((unsigned long long)(value * 10000000ULL) % 10000000ULL);
+    integral = (NETDATA_DOUBLE)((unsigned long long)(value * 10000000ULL) / 10000000ULL);
+    fractional = (NETDATA_DOUBLE)((unsigned long long)(value * 10000000ULL) % 10000000ULL);
 #endif
 
     unsigned long long integral_int = (unsigned long long)integral;
