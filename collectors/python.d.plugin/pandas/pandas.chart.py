@@ -28,7 +28,7 @@ class Service(SimpleService):
         lines = df_steps.split(self.line_sep)
         for line in lines:
             line_clean = line.strip('\n').strip(' ')
-            if line_clean != '':
+            if line_clean != '' and line_clean[0] != '#':
                 df = eval(line_clean)
                 assert isinstance(df, pd.DataFrame), 'The result of each evaluated line of `df_steps` must be of type `pd.DataFrame`'
         

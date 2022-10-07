@@ -20,23 +20,40 @@ $ sudo pip install pandas requests
 Below is an example configuration to query some csv data from [london Netdata demo server](http://london.my-netdata.io/#after=-420;before=0;=undefined;theme=slate;utc=Europe%2FLondon), do some data wrangling on it and save in format as expected by Netdata.
 
 ```yaml
-example_csv:
-    name: "example_csv"
-    update_every: 2
+# example pulling some hourly temperature data
+temperature:
+    name: "temperature"
+    update_every: 3
     chart_configs:
-      - name: "london_system_cpu"
-        title: "London System CPU - Ratios"
-        family: "london_system_cpu"
-        context: "pandas"
+      - name: "temperature_by_city"
+        title: "Temperature By City"
+        family: "temperature.today"
+        context: "temperature"
         type: "line"
-        units: "n"
+        units: "Celsius"
         df_steps: >
-          pd.read_csv('https://london.my-netdata.io/api/v1/data?chart=system.cpu&format=csv&after=-60', storage_options={'User-Agent': 'netdata'});
-          df.drop('time', axis=1);
-          df.mean().to_frame().transpose();
-          df.apply(lambda row: (row.user / row.system), axis = 1).to_frame();
-          df.rename(columns={0:'average_user_system_ratio'});
-          df*100;
+          pd.DataFrame.from_dict(
+            {city: requests.get(f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&hourly=temperature_2m').json()['hourly']['temperature_2m'] 
+            for (city,lat,lng) 
+            in [
+                ('dublin', 53.3441, -6.2675),
+                ('athens', 37.9792, 23.7166),
+                ('london', 51.5002, -0.1262),
+                ('berlin', 52.5235, 13.4115),
+                ('paris', 48.8567, 2.3510),
+                ]
+            }
+            );
+          df.describe();                                               # get aggregate stats for each city;
+          df.transpose()[['mean', 'max', 'min']].reset_index();        # just take mean, min, max;
+          df.rename(columns={'index':'city'});                         # some column renaming;
+          df.pivot(columns='city').mean().to_frame().reset_index();    # force to be one row per city;
+          df.rename(columns={0:'degrees'});                            # some column renaming;
+          pd.concat([df, df['city']+'_'+df['level_0']], axis=1);       # add new column combining city and summary measuement label;
+          df.rename(columns={0:'measurement'});                        # some column renaming;
+          df[['measurement', 'degrees']].set_index('measurement');     # just take two columns we want;
+          df.sort_index();                                             # sort by city name;
+          df.transpose();                                              # transpose so its just one wide row;
 ```
 
 `chart_configs` is a list of dictionary objects where each one defines the sequence of `df_steps` to be run using [`pandas`](https://pandas.pydata.org/), 
