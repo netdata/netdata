@@ -87,8 +87,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 #endif
 
     if (unlikely(find_dimension_uuid(st, rd, &(rd->metric_uuid)))) {
-//        info("METADATA: NOT FOUND dimension UUID for %s (chart %s) (host %s)",
-//             string2str(rd->id), string2str(rd->rrdset->id), string2str(rd->rrdset->rrdhost->hostname));
         uuid_generate(rd->metric_uuid);
     }
 
@@ -201,7 +199,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
-            queue_delete_dimension_uuid(&rd->metric_uuid);
+            metaqueue_delete_dimension_uuid(&rd->metric_uuid);
         }
     }
 
@@ -486,7 +484,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
         rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
-        queue_dimension_update_flags(rd);
+        metaqueue_dimension_update_flags(rd);
     }
 
     rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
@@ -505,7 +503,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
-        queue_dimension_update_flags(rd);
+        metaqueue_dimension_update_flags(rd);
     }
 
     rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);

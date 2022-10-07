@@ -6,9 +6,7 @@
 #include "sqlite3.h"
 #include "sqlite_functions.h"
 
-extern sqlite3 *db_meta;
-
-#define METADATA_CMD_Q_MAX_SIZE (100000)            // Max queue size; callers will block until there is room
+#define METADATA_CMD_Q_MAX_SIZE (16384)            // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running Or last run did actual work
 #define METADATA_MAINTENANCE_INTERVAL (3600)        // Repeat maintenance after latest successful
@@ -59,7 +57,6 @@ struct metadata_database_cmdqueue {
 };
 
 typedef enum {
-    METADATA_FLAG_CLEAR             = 0,
     METADATA_FLAG_CLEANUP           = (1 << 0), // Cleanup is running
     METADATA_FLAG_SCANNING_HOSTS    = (1 << 1), // Scanning of hosts in worker thread
     METADATA_FLAG_SHUTDOWN          = (1 << 2), // Shutting down
@@ -82,13 +79,11 @@ struct metadata_wc {
     uv_thread_t thread;
     time_t check_metadata_after;
     time_t check_hosts_after;
-    unsigned max_commands_in_queue;
     volatile unsigned queue_size;
     uv_loop_t *loop;
     uv_async_t async;
     METADATA_FLAG flags;
     uint64_t row_id;
-    unsigned batch_size;
     uv_timer_t timer_req;
     struct completion init_complete;
     /* FIFO command queue */
@@ -102,17 +97,17 @@ void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
 void metadata_sync_shutdown_prepare(void);
 
-void queue_dimension_update_metadata(RRDDIM *rd);
-void queue_chart_update_metadata(RRDSET *st);
-void queue_dimension_update_flags(RRDDIM *rd);
-void queue_host_update_system_info(const char *machine_guid);
-void queue_host_update_info(const char *machine_guid);
-void queue_delete_dimension_uuid(uuid_t *uuid);
-void queue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid);
-void queue_store_host_labels(const char *machine_guid);
-void queue_metadata_buffer(BUFFER *buffer);
+void metaqueue_dimension_update(RRDDIM *rd);
+void metaqueue_chart_update(RRDSET *st);
+void metaqueue_dimension_update_flags(RRDDIM *rd);
+void metaqueue_host_update_system_info(const char *machine_guid);
+void metaqueue_host_update_info(const char *machine_guid);
+void metaqueue_delete_dimension_uuid(uuid_t *uuid);
+void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid);
+void metaqueue_store_host_labels(const char *machine_guid);
+void metaqueue_chart_labels(RRDSET *st);
 void migrate_localhost(uuid_t *host_uuid);
-void queue_chart_labels(RRDSET *st);
+void metaqueue_buffer(BUFFER *buffer);
 
 // UNIT TEST
 int metadata_unittest(int);

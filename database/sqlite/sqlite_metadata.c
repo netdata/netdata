@@ -8,18 +8,10 @@ extern DICTIONARY *rrdhost_root_index;
 // Metadata functions
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 
-
-
 struct label_str {
     BUFFER *sql;
     int count;
     char uuid_str[UUID_STR_LEN];
-};
-
-struct scan_metadata_payload {
-    struct metadata_wc *wc;
-    bool have_more_work;
-    uint32_t max_count;
 };
 
 static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
@@ -216,7 +208,7 @@ static int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 15, host->health_enabled);
+    rc = sqlite3_bind_int(res, 15, (int ) host->health_enabled);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -498,7 +490,7 @@ static int sql_store_chart(
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_int(res, 12, priority);
+    rc = sqlite3_bind_int(res, 12, (int) priority);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -518,7 +510,7 @@ static int sql_store_chart(
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_int(res, 16, history_entries);
+    rc = sqlite3_bind_int(res, 16, (int) history_entries);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -584,11 +576,11 @@ static int sql_store_dimension(
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 5, multiplier);
+    rc = sqlite3_bind_int(res, 5, (int) multiplier);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 6, divisor);
+    rc = sqlite3_bind_int(res, 6, (int ) divisor);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -647,7 +639,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         return;
     }
 
-    rc = sqlite3_bind_int64(res, 1, wc->row_id);
+    rc = sqlite3_bind_int64(res, 1,  (sqlite3_int64) wc->row_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to row parameter");
         goto skip_run;
@@ -835,7 +827,6 @@ static void timer_cb(uv_timer_t* handle)
    }
 }
 
-
 static void after_metadata_cleanup(uv_work_t *req, int status)
 {
     UNUSED(status);
@@ -849,6 +840,10 @@ static void start_metadata_cleanup(uv_work_t *req)
     check_dimension_metadata(wc);
 }
 
+struct scan_metadata_payload {
+    struct metadata_wc *wc;
+    uint32_t max_count;
+};
 
 // Callback after scan of hosts is done
 static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
@@ -876,7 +871,6 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
             rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
             scan_count++;
-//            internal_error(true, "METADATA: Storing metadata for chart %s", string2str(st->id));
             rc = sql_store_chart(
                 &st->chart_uuid,
                 &st->rrdhost->host_uuid,
@@ -894,7 +888,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
                 st->chart_type,
                 st->rrd_memory_mode,
                 st->entries);
-            if (rc)
+            if (unlikely(rc))
                 internal_error(true, "METADATA: Failed to store chart metadata %s", string2str(st->id));
         }
 
@@ -903,7 +897,6 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
             if(rrddim_flag_check(rd, RRDDIM_FLAG_METADATA_UPDATE)) {
                 rrddim_flag_clear(rd, RRDDIM_FLAG_METADATA_UPDATE);
 
-//                internal_error(true, "METADATA:  Storing metadata for dimension %s", string2str(rd->id));
                 rc = sql_store_dimension(
                     &rd->metric_uuid,
                     &rd->rrdset->chart_uuid,
@@ -1009,7 +1002,6 @@ static void metadata_event_loop(void *arg)
     wc->check_metadata_after = now_realtime_sec() + METADATA_MAINTENANCE_FIRST_CHECK;
     wc->check_hosts_after    = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
-    unsigned int max_commands_in_queue = 0;
     int shutdown = 0;
     int in_transaction = 0;
     int commands_in_transaction = 0;
@@ -1057,17 +1049,8 @@ static void metadata_event_loop(void *arg)
                 commands_in_transaction++;
             }
 
-//            if (wc->max_commands_in_queue > max_commands_in_queue) {
-//                max_commands_in_queue = wc->max_commands_in_queue;
-//                info("Maximum commands in metadata queue = %u", max_commands_in_queue);
-//            }
-
-            if (likely(opcode != METADATA_DATABASE_NOOP)) {
-//                if (opcode == METADATA_STORE_BUFFER)
-//                    worker_is_busy(METADATA_ADD_CHART_LABEL);
-//                else
+            if (likely(opcode != METADATA_DATABASE_NOOP))
                     worker_is_busy(opcode);
-            }
 
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
@@ -1076,7 +1059,6 @@ static void metadata_event_loop(void *arg)
                 case METADATA_ADD_CHART:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     st = (RRDSET *) dictionary_acquired_item_value(dict_item);
-//                    info("METADATA: Storing CHART %s", string2str(st->id));
 
                     rc = sql_store_chart(
                         &st->chart_uuid,
@@ -1245,10 +1227,8 @@ static void metadata_event_loop(void *arg)
                     };
 
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
-                    //if (!shutdown)
-                        usleep(1000); // processing takes 1ms
+                    usleep(1000); // processing takes 1ms
                     __atomic_fetch_add(&tu->processed, 1, __ATOMIC_SEQ_CST);
-//                    tu->processed++;
                     break;
                 default:
                     break;
@@ -1290,7 +1270,7 @@ static void metadata_event_loop(void *arg)
     worker_unregister();
 
     buffer_free(work_buffer);
-    info("METADATA: Shutting down metadata event loop. Maximum commands in queue %u", max_commands_in_queue);
+    info("METADATA: Shutting down event loop");
     completion_mark_complete(&wc->init_complete);
     return;
 
@@ -1362,7 +1342,6 @@ void metadata_sync_init(void)
     completion_destroy(&wc->init_complete);
 
     info("SQLite metadata sync initialization complete");
-    return;
 }
 
 
@@ -1380,7 +1359,7 @@ static inline void queue_metadata_cmd(enum metadata_opcode opcode, const void *p
 }
 
 // Public
-void queue_chart_update_metadata(RRDSET *st)
+void metaqueue_chart_update(RRDSET *st)
 {
     const DICTIONARY_ITEM *acquired_st = dictionary_get_and_acquire_item(st->rrdhost->rrdset_root_index, string2str(st->id));
     queue_metadata_cmd(METADATA_ADD_CHART, acquired_st, NULL);
@@ -1388,48 +1367,46 @@ void queue_chart_update_metadata(RRDSET *st)
 
 //
 // RD may not be collected, so we may store it needlessly
-void queue_dimension_update_metadata(RRDDIM *rd)
+void metaqueue_dimension_update(RRDDIM *rd)
 {
     const DICTIONARY_ITEM *acquired_rd =
         dictionary_get_and_acquire_item(rd->rrdset->rrddim_root_index, string2str(rd->id));
 
     if (unlikely(rrdset_flag_check(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE))) {
-        queue_chart_update_metadata(rd->rrdset);
+        metaqueue_chart_update(rd->rrdset);
         rrdset_flag_clear(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
-//        info("DEBUG:   QUEUE PENDING CHART %s because dimension %s arrived", string2str(rd->rrdset->id), string2str(rd->id));
     }
-//    info("DEBUG: QUEUE DIMENSION %s", string2str(rd->id));
 
     queue_metadata_cmd(METADATA_ADD_DIMENSION, acquired_rd, NULL);
 }
 
-void queue_dimension_update_flags(RRDDIM *rd)
+void metaqueue_dimension_update_flags(RRDDIM *rd)
 {
     const DICTIONARY_ITEM *acquired_rd =
         dictionary_get_and_acquire_item(rd->rrdset->rrddim_root_index, string2str(rd->id));
     queue_metadata_cmd(METADATA_ADD_DIMENSION_OPTION, acquired_rd, NULL);
 }
 
-void queue_host_update_system_info(const char *machine_guid)
+void metaqueue_host_update_system_info(const char *machine_guid)
 {
     const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
     queue_metadata_cmd(METADATA_ADD_HOST_SYSTEM_INFO, acquired_host, NULL);
 }
 
-void queue_host_update_info(const char *machine_guid)
+void metaqueue_host_update_info(const char *machine_guid)
 {
     const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
     queue_metadata_cmd(METADATA_ADD_HOST_INFO, acquired_host, NULL);
 }
 
-void queue_delete_dimension_uuid(uuid_t *uuid)
+void metaqueue_delete_dimension_uuid(uuid_t *uuid)
 {
     uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
     queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
 }
 
-void queue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
+void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
 {
     if (unlikely(!host_uuid))
         return;
@@ -1445,25 +1422,27 @@ void queue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
     queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
 }
 
-void queue_store_host_labels(const char *machine_guid)
+void metaqueue_store_host_labels(const char *machine_guid)
 {
     const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
     queue_metadata_cmd(METADATA_STORE_HOST_LABELS, acquired_host, NULL);
 }
 
-void queue_metadata_buffer(BUFFER *buffer)
+void metaqueue_buffer(BUFFER *buffer)
 {
     queue_metadata_cmd(METADATA_STORE_BUFFER, buffer, NULL);
 }
 
-void queue_chart_labels(RRDSET *st)
+void metaqueue_chart_labels(RRDSET *st)
 {
     const DICTIONARY_ITEM *acquired_st = dictionary_get_and_acquire_item(st->rrdhost->rrdset_root_index, string2str(st->id));
     queue_metadata_cmd(METADATA_ADD_CHART_LABEL, acquired_st, NULL);
 }
 
 
+//
 // unitests
+//
 
 struct thread_unittest {
     int join;
@@ -1483,13 +1462,11 @@ static void *unittest_queue_metadata(void *arg) {
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     do {
-        //usleep(1000);
         __atomic_fetch_add(&tu->added, 1, __ATOMIC_SEQ_CST);
         if (metadata_database_enq_cmd_noblock(&metasync_worker, &cmd))
             break;
         usleep(10000);
     } while (!__atomic_load_n(&tu->join, __ATOMIC_RELAXED));
-//    fprintf(stderr, "%d: Thread done\n", gettid());
     return arg;
 }
 
@@ -1507,15 +1484,12 @@ static void *metadata_unittest_threads(int items __maybe_unused)
 
     // Queue messages / Time it
     time_t seconds_to_run = 5;
-    int threads_to_create = 10;
+    int threads_to_create = 4;
     fprintf(
         stderr,
         "\nChecking metadata queue using %d threads for %ld seconds...\n",
         threads_to_create,
         seconds_to_run);
-
-    // Ok unlimited run, wakeup
-    metasync_worker.batch_size = 2000000;
 
     netdata_thread_t threads[threads_to_create];
     tu.join = 0;
@@ -1539,13 +1513,9 @@ static void *metadata_unittest_threads(int items __maybe_unused)
     }
     fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
 
-    // Ok unlimited run, wakeup
-    metasync_worker.batch_size = 2000000;
     uv_async_send(&metasync_worker.async);
 
     sleep_usec(5 * USEC_PER_SEC);
-    // Do immediate shutdown / Drains queue
-    queue_metadata_cmd(METADATA_SYNC_SHUTDOWN, NULL, NULL);
 
     fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
 
@@ -1556,15 +1526,11 @@ int metadata_unittest(int items)
 {
     metadata_sync_init();
 
-    // Stop the timer to avoid processing commands
-//    uv_timer_stop(&metasync_worker.timer_req);
-//    uv_close((uv_handle_t *)&metasync_worker.timer_req, NULL);
-
     // Queue items
     metadata_unittest_threads(items);
 
     fprintf(stderr, "Items still in queue %u\n", metasync_worker.queue_size);
-    //metadata_sync_shutdown();
+    metadata_sync_shutdown();
 
     return 0;
 }

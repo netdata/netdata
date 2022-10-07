@@ -959,7 +959,7 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
-    queue_chart_labels(st);
+    metaqueue_chart_labels(st);
 }
 
 

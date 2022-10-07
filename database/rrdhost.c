@@ -417,7 +417,7 @@ int is_legacy = 1;
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
         if(!archived)
-            queue_host_update_info(host->machine_guid);
+            metaqueue_host_update_info(host->machine_guid);
         sql_load_node_id(host);
     }
     else
@@ -537,7 +537,7 @@ int is_legacy = 1;
          , string2str(host->health_default_exec)
          , string2str(host->health_default_recipient)
     );
-    queue_host_update_system_info(host->machine_guid);
+    metaqueue_host_update_system_info(host->machine_guid);
 
     rrd_hosts_available++;
 
@@ -580,7 +580,7 @@ void rrdhost_update(RRDHOST *host
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
-    queue_host_update_system_info(host->machine_guid);
+    metaqueue_host_update_system_info(host->machine_guid);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
@@ -918,6 +918,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     health_init();
 
 unittest:
+    metadata_sync_init();
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     rrd_wrlock();
     localhost = rrdhost_create(
@@ -1381,7 +1382,7 @@ void reload_host_labels(void) {
     rrdhost_load_auto_labels();
 
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
-    queue_store_host_labels(localhost->machine_guid);
+    metaqueue_store_host_labels(localhost->machine_guid);
 
     health_label_log_save(localhost);
 

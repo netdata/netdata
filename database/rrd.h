@@ -1306,7 +1306,6 @@ void set_host_properties(
     const char *program_name, const char *program_version);
 
 int get_tier_grouping(int tier);
-int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

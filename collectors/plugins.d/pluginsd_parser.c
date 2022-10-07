@@ -80,7 +80,6 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
         } else
             rrdset_next(st);
     }
-
     return PARSER_RC_OK;
 disable:
     ((PARSER_USER_OBJECT *)user)->enabled = 0;
@@ -639,7 +638,6 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
             error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }
 
-
     return PARSER_RC_OK;
 }
 
@@ -752,8 +750,7 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
 
     rrdlabels_remove_all_unmarked(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
 
-    queue_chart_labels(((PARSER_USER_OBJECT *)user)->st);
-
+    metaqueue_chart_labels(((PARSER_USER_OBJECT *)user)->st);
 
     ((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily = NULL;
     return PARSER_RC_OK;

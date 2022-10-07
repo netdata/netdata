@@ -85,7 +85,7 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
         rc = sqlite3_step(stmt);
         switch (rc) {
             case SQLITE_DONE:
-                sqlite3_query_completed(rc == SQLITE_DONE, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+                sqlite3_query_completed(1, 0, 0);
                 break;
             case SQLITE_ROW:
                 sqlite3_row_completed();
@@ -246,7 +246,6 @@ static void rebuild_chart()
             sqlite3_free(err_msg);
         }
     }
-    return;
 }
 
 const char *rebuild_dimension_commands[] = {
@@ -279,7 +278,6 @@ void rebuild_dimension()
             sqlite3_free(err_msg);
         }
     }
-    return;
 }
 
 static int attempt_database_fix()
@@ -317,7 +315,7 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
     return 0;
 }
 
-static void _uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
 {
     uuid_t  uuid;
 
@@ -454,7 +452,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
         (void)pthread_key_create(&key_pool[i], release_statement);
 
-    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, _uuid_parse, 0, 0);
+    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to register internal u2h function");
     return 0;
@@ -477,7 +475,6 @@ void sql_close_database(void)
     rc = sqlite3_close_v2(db_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
-    return;
 }
 
 
@@ -819,8 +816,6 @@ failed:
     rc = sqlite3_finalize(res_chart);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived charts");
-
-    return;
 }
 
 void db_execute(const char *cmd)
@@ -906,7 +901,7 @@ void add_migrated_file(char *path, uint64_t file_size)
         return;
     }
 
-    rc = sqlite3_bind_int64(res, 2, file_size);
+    rc = sqlite3_bind_int64(res, 2, (sqlite_int64) file_size);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind size parameter to store migration information");
         return;
@@ -918,8 +913,6 @@ void add_migrated_file(char *path, uint64_t file_size)
 
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
-
-    return;
 }
 
 
@@ -992,7 +985,6 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         sql_create_aclk_table(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
-    return;
 }
 
 #define SQL_UPDATE_NODE_ID  "update node_instance set node_id = @node_id where host_id = @host_id;"
@@ -1309,8 +1301,6 @@ void sql_load_node_id(RRDHOST *host)
 failed:
     if (unlikely(sqlite3_reset(res) != SQLITE_OK))
         error_report("Failed to reset the prepared statement when loading node instance information");
-
-    return;
 };
 
 
@@ -1331,7 +1321,7 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter host information");
-        goto skip_loading;
+        goto skip;
     }
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
@@ -1339,10 +1329,9 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
                                          (char *) sqlite3_column_text(res, 1));
     }
 
-skip_loading:
+skip:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading host information");
-    return;
 }
 
 #define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
@@ -1364,7 +1353,7 @@ DICTIONARY *sql_load_host_labels(uuid_t *host_id)
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter host information");
-        goto skip_loading;
+        goto skip;
     }
 
     labels = rrdlabels_create();
@@ -1377,7 +1366,7 @@ DICTIONARY *sql_load_host_labels(uuid_t *host_id)
             sqlite3_column_int(res, 2));
     }
 
-skip_loading:
+skip:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading host information");
     return labels;
