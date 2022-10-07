@@ -257,7 +257,9 @@ void signals_handle(void) {
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
                                 error_log_limit_unlimited();
                                 info("SIGNAL: Received %s. Cleaning up to exit...", name);
+#if 0
                                 commands_exit();
+#endif
                                 netdata_cleanup_and_exit(0);
                                 exit(0);
                                 break;
