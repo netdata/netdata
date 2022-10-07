@@ -1303,6 +1303,8 @@ static void rrdhost_load_auto_labels(void) {
 
     add_aclk_host_labels();
 
+    health_add_host_labels();
+
     rrdlabels_add(
         labels, "_is_parent", (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
