@@ -3,9 +3,9 @@ title: "Pandas"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/pandas/README.md
 -->
 
-<img src="https://pandas.pydata.org/docs/_static/pandas.svg" alt="Pandas" width="200px" height="200px" />
-
 # Pandas Netdata Collector
+
+<img src="https://pandas.pydata.org/docs/_static/pandas.svg" alt="Pandas" width="100px" height="50px" />
 
 A python collector using [pandas](https://pandas.pydata.org/) to pull data and do pandas based 
 preprocessing before feeding to Netdata.
