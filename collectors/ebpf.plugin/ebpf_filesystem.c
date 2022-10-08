@@ -30,9 +30,17 @@ static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NET
                                        .type = NETDATA_EBPF_MAP_CONTROLLER,
                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
-                                                   NULL, NULL, 1, NULL,
-                                                   NULL, NULL };
+struct netdata_static_thread filesystem_threads = {
+                                 .name = "EBPF FS READ",
+                                 .config_section = NULL,
+                                 .config_name = NULL,
+                                 .env_name = NULL,
+                                 .enabled = 1,
+                                 .thread = NULL,
+                                 .init_routine = NULL,
+                                 .start_routine = NULL
+};
+
 static enum ebpf_threads_status ebpf_fs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];

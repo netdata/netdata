@@ -34,9 +34,16 @@ struct config vfs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
     .rwlock = AVL_LOCK_INITIALIZER } };
 
-struct netdata_static_thread vfs_threads = {"VFS KERNEL",
-                                            NULL, NULL, 1, NULL,
-                                            NULL,  NULL};
+struct netdata_static_thread vfs_threads = {
+    .name = "VFS KERNEL",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD_TRAMPOLINE},

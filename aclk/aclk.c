@@ -686,7 +686,7 @@ void *aclk_main(void *ptr)
     // that send JSON payloads of 10 MB as single messages
     mqtt_wss_set_max_buf_size(mqttwss_client, 25*1024*1024);
 
-    aclk_stats_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "statistics", CONFIG_BOOLEAN_YES);
+    aclk_stats_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "statistics", global_statistics_enabled);
     if (aclk_stats_enabled) {
         stats_thread = callocz(1, sizeof(struct aclk_stats_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));

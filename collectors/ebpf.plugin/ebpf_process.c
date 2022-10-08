@@ -53,8 +53,16 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
-                                                    1, NULL, NULL,  NULL};
+static struct netdata_static_thread cgroup_thread = {
+                                        .name = "EBPF CGROUP",
+                                        .config_section = NULL,
+                                        .config_name = NULL,
+                                        .env_name = NULL,
+                                        .enabled = 1,
+                                        .thread = NULL,
+                                        .init_routine = NULL,
+                                        .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};

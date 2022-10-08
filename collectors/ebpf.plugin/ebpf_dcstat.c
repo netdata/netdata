@@ -20,8 +20,13 @@ struct config dcstat_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
-                                               NULL, NULL, 1, NULL,
-                                               NULL,  NULL};
+                                               .config_section = NULL,
+                                               .config_name = NULL,
+                                               .env_name = NULL,
+                                               .enabled = 1,
+                                               .thread = NULL,
+                                               .init_routine = NULL,
+                                               .start_routine = NULL};
 static enum ebpf_threads_status ebpf_dcstat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,

@@ -1405,8 +1405,13 @@ int main(int argc, char **argv) {
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
-        }
 
+            if(st->env_name)
+                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+
+            if(st->global_variable)
+                *st->global_variable = (st->enabled && st->init_routine) ? true : false;
+        }
 
         // --------------------------------------------------------------------
         // create the listening sockets

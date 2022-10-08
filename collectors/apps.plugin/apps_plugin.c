@@ -4777,6 +4777,13 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    bool send_resource_usage = true;
+    {
+        const char *s = getenv("NETDATA_INTERNALS_MONITORING");
+        if(s && *s && strcmp(s, "NO") == 0)
+            send_resource_usage = false;
+    }
+
     // since apps.plugin runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
 
@@ -4904,7 +4911,8 @@ int main(int argc, char **argv) {
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
 
-        send_resource_usage_to_netdata(dt);
+        if(send_resource_usage)
+            send_resource_usage_to_netdata(dt);
 
 #ifndef __FreeBSD__
         send_proc_states_count(dt);
