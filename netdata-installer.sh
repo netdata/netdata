@@ -237,6 +237,7 @@ USAGE: ${PROGRAM} [options]
   --enable-lto               Enable link-time optimization. Default: disabled.
   --disable-lto              Explicitly disable link-time optimization.
   --enable-ml                Enable anomaly detection with machine learning. Default: autodetect.
+  --enable-tests             Enable tests
   --disable-ml               Explicitly disable anomaly detection with machine learning.
   --disable-x86-sse          Disable SSE instructions & optimizations. Default: enabled.
   --use-system-protobuf      Use a system copy of libprotobuf instead of bundled copy. Default: bundled.
@@ -332,6 +333,9 @@ while [ -n "${1}" ]; do
     "--enable-ml")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml)}" | sed 's/$/ --enable-ml/g')"
       NETDATA_ENABLE_ML=1
+      ;;
+    "--enable-tests")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-tests)}" | sed 's/$/ --enable-tests/g')"
       ;;
     "--disable-ml")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"

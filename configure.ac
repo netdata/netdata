@@ -207,12 +207,20 @@ AC_ARG_ENABLE(
     ,
     [enable_ml="detect"]
 )
+
 AC_ARG_ENABLE(
     [ml_tests],
     [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
     [enable_ml_tests="yes"],
     [enable_ml_tests="no"]
 )
+AC_ARG_ENABLE(
+    [tests],
+    [AS_HELP_STRING([--enable-tests], [Enable tests  @<:@default disabled@:>@])],
+    [enable_tests="yes"],
+    [enable_tests="no"]
+)
+
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -1105,14 +1113,39 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 AC_MSG_CHECKING([if gtest and gmock can be found])
 
 PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
-PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
 
-if test "${have_gtest}" = "yes" -a "${have_gmock}" = "yes"; then
-    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS} ${GMOCK_CFLAGS}"
-    OPTIONAL_GTEST_LIBS="${GTEST_LIBS} ${GMOCK_LIBS}"
+if test "${have_gtest}" = "yes"; then
+    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS}"
+    OPTIONAL_GTEST_LIBS="${GTEST_LIBS}"
     have_gtest="yes"
 else
     have_gtest="no"
+fi
+
+PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
+
+if test "${have_gmock}" = "yes"; then
+    OPTIONAL_GMOCK_CFLAGS="${GMOCK_CFLAGS} ${GMOCK_CFLAGS}"
+    OPTIONAL_GMOCK_LIBS="${GMOCK_LIBS} ${GMOCK_LIBS}"
+    have_gmock="yes"
+else
+    have_gmock="no"
+fi
+
+# Decide if we should build tests.
+if test "${enable_tests}" = "yes" -a "${have_gtest}" = "yes"; then
+    build_tests="yes"
+else
+    build_tests="no"
+fi
+
+if test "${enable_tests}" = "yes" -a "${build_tests}" = "no"; then
+    AC_MSG_ERROR([Can not build tests because google test framework is missing])
+fi
+
+AM_CONDITIONAL([ENABLE_TESTS], [test "${build_tests}" = "yes"])
+if test "${build_tests}" = "yes"; then
+    AC_DEFINE([ENABLE_TESTS], [1], [tests])
 fi
 
 # -----------------------------------------------------------------------------

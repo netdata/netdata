@@ -1026,6 +1026,11 @@ int main(int argc, char **argv) {
                             return test_ml(argc, argv);
                         }
 #endif
+#ifdef ENABLE_TESTS
+                        else if(strcmp(optarg, "tests") == 0) {
+                            return netdata_tests(argc, argv);
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             return mc_unittest();

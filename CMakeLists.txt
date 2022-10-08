@@ -18,6 +18,8 @@ include(CheckLibraryExists)
 # set this to see the compilation commands
 #set(CMAKE_VERBOSE_MAKEFILE 1)
 
+set(ENABLE_TESTS "enable tests" On)
+
 # -----------------------------------------------------------------------------
 # Set compilation options according to build type
 
@@ -457,6 +459,8 @@ set(LIBNETDATA_FILES
         libnetdata/arrayalloc/arrayalloc.h
         libnetdata/avl/avl.c
         libnetdata/avl/avl.h
+        libnetdata/bitmap/bitmap.h
+        libnetdata/bitmap/bitmap.cc
         libnetdata/buffer/buffer.c
         libnetdata/buffer/buffer.h
         libnetdata/circular_buffer/circular_buffer.c
@@ -1032,6 +1036,8 @@ set(ML_FILES
 IF(ENABLE_ML)
     message(STATUS "ML: enabled")
     list(APPEND ML_FILES
+            ml/ADCharts.cc
+            ml/ADCharts.h
             ml/Config.h
             ml/Config.cc
             ml/Dimension.cc
@@ -1052,6 +1058,35 @@ ELSE()
     message(STATUS "ML: disabled")
 ENDIF()
 
+# -----------------------------------------------------------------------------
+# Unit tests
+
+set(TESTS_FILES tests/netdata/testrunner.h
+                tests/netdata/testrunner.cc)
+
+if(ENABLE_TESTS)
+    find_package(GTest REQUIRED)
+
+    list(APPEND TESTS_FILES tests/netdata/collectors/cgroups.plugin/tests.cc
+                            tests/netdata/libnetdata/tests.cc
+                            tests/netdata/libnetdata/arrayalloc/tests.cc
+                            tests/netdata/libnetdata/bitmap/tests.cc
+                            tests/netdata/libnetdata/buffer/tests.cc
+                            tests/netdata/libnetdata/eval/tests.cc
+                            tests/netdata/libnetdata/storage_number/tests.cc
+                            tests/netdata/libnetdata/string/string.cc
+                            tests/netdata/daemon/tests.cc
+                            tests/netdata/database/tests.cc
+                            tests/netdata/database/sqlite/tests.cc
+                            tests/netdata/database/rrdlabels.cc
+                            tests/netdata/web/api/queries/weights.cc)
+
+    list(APPEND NETDATA_FILES ${TESTS_FILES})
+    list(APPEND NETDATA_COMMON_LIBRARIES ${GTEST_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${GTEST_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${GTEST_CFLAGS_OTHER})
+endif()
+
 set(NETDATA_FILES
         collectors/all.h
         ${DAEMON_FILES}
@@ -1070,6 +1105,7 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
         ${PARSER_PLUGIN_FILES}
+        ${TESTS_FILES}
 )
 
 set(NETDATACLI_FILES

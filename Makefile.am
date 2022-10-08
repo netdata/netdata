@@ -910,9 +910,23 @@ DAEMON_FILES = \
     daemon/unit_test.h \
     $(NULL)
 
+TESTS_FILES = \
+    tests/netdata/testrunner.cc \
+    tests/netdata/testrunner.h \
+    $(NULL)
+
+if ENABLE_TESTS
+
+TESTS_FILES += \
+    tests/netdata/database/tests.cc \
+    $(NULL)
+
+endif
+
 NETDATA_FILES = \
     collectors/all.h \
     $(DAEMON_FILES) \
+    $(TESTS_FILES) \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
@@ -1009,6 +1023,11 @@ endif
 
 if ENABLE_ML_TESTS
     netdata_LDADD += $(OPTIONAL_ML_TESTS_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_TESTS
+    netdata_LDADD += $(OPTIONAL_GTEST_LIBS) \
         $(NULL)
 endif
 
