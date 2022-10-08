@@ -368,11 +368,7 @@ static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, NETDATA_DOUBLE *arr, si
     return added;
 }
 
-static double ks_2samp(
-        DIFFS_NUMBERS baseline_diffs[], int base_size,
-        DIFFS_NUMBERS highlight_diffs[], int high_size,
-        uint32_t base_shifts) {
-
+double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMBERS highlight_diffs[], int high_size, uint32_t base_shifts) {
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
 
@@ -1006,101 +1002,3 @@ cleanup:
 
     return resp;
 }
-
-// ----------------------------------------------------------------------------
-// unittest
-
-/*
-
-Unit tests against the output of this:
-
-https://github.com/scipy/scipy/blob/4cf21e753cf937d1c6c2d2a0e372fbc1dbbeea81/scipy/stats/_stats_py.py#L7275-L7449
-
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-import scipy as sp
-from scipy import stats
-
-data1 = np.array([ 1111, -2222, 33, 100, 100, 15555, -1, 19999, 888, 755, -1, -730 ])
-data2 = np.array([365, -123, 0])
-data1 = np.sort(data1)
-data2 = np.sort(data2)
-n1 = data1.shape[0]
-n2 = data2.shape[0]
-data_all = np.concatenate([data1, data2])
-cdf1 = np.searchsorted(data1, data_all, side='right') / n1
-cdf2 = np.searchsorted(data2, data_all, side='right') / n2
-print(data_all)
-print("\ndata1", data1, cdf1)
-print("\ndata2", data2, cdf2)
-cddiffs = cdf1 - cdf2
-print("\ncddiffs", cddiffs)
-minS = np.clip(-np.min(cddiffs), 0, 1)
-maxS = np.max(cddiffs)
-print("\nmin", minS)
-print("max", maxS)
-m, n = sorted([float(n1), float(n2)], reverse=True)
-en = m * n / (m + n)
-d = max(minS, maxS)
-prob = stats.distributions.kstwo.sf(d, np.round(en))
-print("\nprob", prob)
-
-*/
-
-static int double_expect(double v, const char *str, const char *descr) {
-    char buf[100 + 1];
-    snprintfz(buf, 100, "%0.6f", v);
-    int ret = strcmp(buf, str) ? 1 : 0;
-
-    fprintf(stderr, "%s %s, expected %s, got %s\n", ret?"FAILED":"OK", descr, str, buf);
-    return ret;
-}
-
-static int mc_unittest1(void) {
-    int bs = 3, hs = 3;
-    DIFFS_NUMBERS base[3] = { 1, 2, 3 };
-    DIFFS_NUMBERS high[3] = { 3, 4, 6 };
-
-    double prob = ks_2samp(base, bs, high, hs, 0);
-    return double_expect(prob, "0.222222", "3x3");
-}
-
-static int mc_unittest2(void) {
-    int bs = 6, hs = 3;
-    DIFFS_NUMBERS base[6] = { 1, 2, 3, 10, 10, 15 };
-    DIFFS_NUMBERS high[3] = { 3, 4, 6 };
-
-    double prob = ks_2samp(base, bs, high, hs, 1);
-    return double_expect(prob, "0.500000", "6x3");
-}
-
-static int mc_unittest3(void) {
-    int bs = 12, hs = 3;
-    DIFFS_NUMBERS base[12] = { 1, 2, 3, 10, 10, 15, 111, 19999, 8, 55, -1, -73 };
-    DIFFS_NUMBERS high[3] = { 3, 4, 6 };
-
-    double prob = ks_2samp(base, bs, high, hs, 2);
-    return double_expect(prob, "0.347222", "12x3");
-}
-
-static int mc_unittest4(void) {
-    int bs = 12, hs = 3;
-    DIFFS_NUMBERS base[12] = { 1111, -2222, 33, 100, 100, 15555, -1, 19999, 888, 755, -1, -730 };
-    DIFFS_NUMBERS high[3] = { 365, -123, 0 };
-
-    double prob = ks_2samp(base, bs, high, hs, 2);
-    return double_expect(prob, "0.777778", "12x3");
-}
-
-int mc_unittest(void) {
-    int errors = 0;
-
-    errors += mc_unittest1();
-    errors += mc_unittest2();
-    errors += mc_unittest3();
-    errors += mc_unittest4();
-
-    return errors;
-}
-

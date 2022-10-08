@@ -5,6 +5,10 @@
 
 #include "common.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct netdata_static_thread {
     // the name of the thread as it should appear in the logs
     char *name;
@@ -48,5 +52,9 @@ static_threads_concat(const struct netdata_static_thread *lhs,
                       const struct netdata_static_thread *rhs);
 
 struct netdata_static_thread *static_threads_get();
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* NETDATA_STATIC_THREADS_H */

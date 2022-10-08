@@ -1100,9 +1100,8 @@ static void update_strings_charts() {
     static RRDDIM *rd_entries_entries = NULL, *rd_entries_refs = NULL;
     static RRDDIM *rd_mem = NULL;
 
-    size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
-
-    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
+    struct string_statistics string_stats;
+    string_get_statistics(&string_stats);
 
     if (unlikely(!st_ops)) {
         st_ops = rrdset_create_localhost(
@@ -1127,11 +1126,11 @@ static void update_strings_charts() {
     } else
         rrdset_next(st_ops);
 
-    rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number)inserts);
-    rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number)deletes);
-    rrddim_set_by_pointer(st_ops, rd_ops_searches,     (collected_number)searches);
-    rrddim_set_by_pointer(st_ops, rd_ops_duplications, (collected_number)duplications);
-    rrddim_set_by_pointer(st_ops, rd_ops_releases,     (collected_number)releases);
+    rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number) string_stats.inserts);
+    rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number) string_stats.deletes);
+    rrddim_set_by_pointer(st_ops, rd_ops_searches,     (collected_number) string_stats.searches);
+    rrddim_set_by_pointer(st_ops, rd_ops_duplications, (collected_number) string_stats.duplications);
+    rrddim_set_by_pointer(st_ops, rd_ops_releases,     (collected_number) string_stats.releases);
     rrdset_done(st_ops);
 
     if (unlikely(!st_entries)) {
@@ -1154,8 +1153,8 @@ static void update_strings_charts() {
     } else
         rrdset_next(st_entries);
 
-    rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number)entries);
-    rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
+    rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number) string_stats.entries);
+    rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number) string_stats.references);
     rrdset_done(st_entries);
 
     if (unlikely(!st_mem)) {
@@ -1177,7 +1176,7 @@ static void update_strings_charts() {
     } else
         rrdset_next(st_mem);
 
-    rrddim_set_by_pointer(st_mem, rd_mem, (collected_number)memory);
+    rrddim_set_by_pointer(st_mem, rd_mem, (collected_number) string_stats.memory);
     rrdset_done(st_mem);
 }
 

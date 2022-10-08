@@ -149,9 +149,6 @@ static void thread_set_name_np(NETDATA_THREAD *nt) {
 
         if (ret != 0)
             error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
-        else
-            info("set name of thread %d to %s", gettid(), threadname);
-
     }
 }
 

@@ -1903,21 +1903,6 @@ inline size_t pluginsd_split_words(char *str, char **words, size_t max_words, ch
     return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
 }
 
-bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
-    if (unlikely(!ptr))
-        return false;
-    return (ptr->data[idx / 64] & (1ULL << (idx % 64)));
-}
-
-void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
-    if (unlikely(!ptr))
-        return;
-    if (likely(value))
-        ptr->data[idx / 64] |= (1ULL << (idx % 64));
-    else
-        ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
-}
-
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
     pid_t pid;
     FILE *fp = netdata_popen(command, &pid, NULL);

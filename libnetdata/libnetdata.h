@@ -394,13 +394,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
-typedef struct bitmap256 {
-    uint64_t data[4];
-} BITMAP256;
-
-bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
-void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
-
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
 int config_isspace(char c);
@@ -421,6 +414,8 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
+
+#include "bitmap/bitmap.h"
 #include "os.h"
 #include "storage_number/storage_number.h"
 #include "threads/threads.h"

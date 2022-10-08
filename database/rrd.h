@@ -250,7 +250,8 @@ void reload_host_labels(void);
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
 void rrdset_save_rrdlabels_to_sql(RRDSET *st);
 void rrdhost_set_is_parent_label(int count);
-int rrdlabels_unittest(void);
+
+extern size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size);
 
 // unfortunately this break when defined in exporting_engine.h
 bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);

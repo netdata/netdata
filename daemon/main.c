@@ -982,14 +982,6 @@ int main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
-                            if (unit_test_static_threads())
-                                return 1;
-                            if (unit_test_buffer())
-                                return 1;
-                            if (unit_test_str2ld())
-                                return 1;
-                            if (unit_test_bitmap256())
-                                return 1;
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
@@ -1003,18 +995,10 @@ int main(int argc, char **argv) {
                                 return 1;
                             }
                             default_rrdpush_enabled = 0;
-                            if(run_all_mockup_tests()) return 1;
-                            if(unit_test_storage()) return 1;
 #ifdef ENABLE_DBENGINE
                             if(test_dbengine()) return 1;
 #endif
-                            if(test_sqlite()) return 1;
-                            if(string_unittest(10000)) return 1;
                             if (dictionary_unittest(10000))
-                                return 1;
-                            if(aral_unittest(10000))
-                                return 1;
-                            if (rrdlabels_unittest())
                                 return 1;
                             if (ctx_unittest())
                                 return 1;
@@ -1028,27 +1012,28 @@ int main(int argc, char **argv) {
 #endif
 #ifdef ENABLE_TESTS
                         else if(strcmp(optarg, "tests") == 0) {
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_rrd_update_every = 1;
+                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+                            default_health_enabled = 0;
+                            storage_tiers = 1;
+                            registry_init();
+                            if(rrd_init("unittest", NULL)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
+                            default_rrdpush_enabled = 0;
+
                             return netdata_tests(argc, argv);
                         }
 #endif
 #ifdef ENABLE_DBENGINE
-                        else if(strcmp(optarg, "mctest") == 0) {
-                            return mc_unittest();
-                        }
                         else if(strcmp(optarg, "ctxtest") == 0) {
                             return ctx_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             return dictionary_unittest(10000);
-                        }
-                        else if(strcmp(optarg, "araltest") == 0) {
-                            return aral_unittest(10000);
-                        }
-                        else if(strcmp(optarg, "stringtest") == 0) {
-                            return string_unittest(10000);
-                        }
-                        else if(strcmp(optarg, "rrdlabelstest") == 0) {
-                            return rrdlabels_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
                             return metadata_unittest();

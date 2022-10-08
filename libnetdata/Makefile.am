@@ -29,7 +29,6 @@ SUBDIRS = \
     threads \
     url \
     worker_utilization \
-    tests \
     $(NULL)
 
 dist_noinst_DATA = \

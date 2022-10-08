@@ -28,6 +28,11 @@ int web_api_v1_weights (RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHT
 
 WEIGHTS_METHOD weights_string_to_method(const char *method);
 const char *weights_method_to_string(WEIGHTS_METHOD method);
-int mc_unittest(void);
+
+typedef long int DIFFS_NUMBERS;
+
+double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size,
+                DIFFS_NUMBERS highlight_diffs[], int high_size,
+                uint32_t base_shifts);
 
 #endif //NETDATA_API_WEIGHTS_H

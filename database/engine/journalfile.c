@@ -272,10 +272,10 @@ static int check_journal_file_superblock(uv_file file)
     return ret;
 }
 
+
 static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
-                                    void *buf, unsigned max_size)
+                                    void *buf, unsigned max_size, bitmap_t page_error_map)
 {
-    static BITMAP256 page_error_map;
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned i, count, payload_length, descr_size, valid_pages;
     struct rrdeng_page_descr *descr;
@@ -305,9 +305,9 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > PAGE_TYPE_MAX) {
-            if (!bitmap256_get_bit(&page_error_map, page_type)) {
+            if (!bitmap_get(page_error_map, page_type)) {
                 error("Unknown page type %d encountered.", page_type);
-                bitmap256_set_bit(&page_error_map, page_type, 1);
+                bitmap_set(&page_error_map, page_type, true);
             }
             continue;
         }
@@ -408,7 +408,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
  * Returns size of transaction record or 0 for unknown size.
  */
 static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
-                                   void *buf, uint64_t *id, unsigned max_size)
+                                   void *buf, uint64_t *id, unsigned max_size, bitmap_t page_error_map)
 {
     unsigned payload_length, size_bytes;
     int ret;
@@ -446,7 +446,7 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
     switch (jf_header->type) {
     case STORE_DATA:
         debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
-        restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
+        restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length, page_error_map);
         break;
     default:
         error("Unknown transaction type. Skipping record.");
@@ -487,6 +487,9 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     }
     else
         buf = journalfile->data +  sizeof(struct rrdeng_jf_sb);
+
+    bitmap_t page_error_map = bitmap_new(256);
+
     for (pos = sizeof(struct rrdeng_jf_sb) ; pos < file_size ; pos += READAHEAD_BYTES) {
         size_bytes = MIN(READAHEAD_BYTES, file_size - pos);
         if (unlikely(!journal_is_mmapped)) {
@@ -507,7 +510,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
             unsigned max_size;
 
             max_size = pos + size_bytes - pos_i;
-            ret = replay_transaction(ctx, journalfile, buf + pos_i, &id, max_size);
+            ret = replay_transaction(ctx, journalfile, buf + pos_i, &id, max_size, page_error_map);
             if (!ret) /* TODO: support transactions bigger than 4K */
                 /* unknown transaction size, move on to the next block */
                 pos_i = ALIGN_BYTES_FLOOR(pos_i + RRDENG_BLOCK_SIZE);
@@ -518,9 +521,12 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
         if (likely(journal_is_mmapped))
             buf += size_bytes;
     }
+
 skip_file:
     if (unlikely(!journal_is_mmapped))
         posix_memfree(buf);
+
+    bitmap_delete(page_error_map);
     return max_id;
 }
 
