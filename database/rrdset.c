@@ -1972,7 +1972,7 @@ void rrdset_memory_file_free(RRDSET *st) {
     rrdset_memory_file_update(st);
 
     struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
-    munmap(st_on_file, st_on_file->memsize);
+    netdata_munmap(st_on_file, st_on_file->memsize);
 
     // remove the pointers from the RRDDIM
     st->st_on_file = NULL;

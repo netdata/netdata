@@ -527,7 +527,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 
     info("Journal file \"%s\" loaded (size:%"PRIu64").", path, file_size);
     if (likely(journalfile->data))
-        munmap(journalfile->data, file_size);
+        netdata_munmap(journalfile->data, file_size);
     return 0;
 
     error:

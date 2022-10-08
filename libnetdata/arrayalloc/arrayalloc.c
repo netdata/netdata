@@ -162,7 +162,11 @@ static inline ARAL_PAGE *find_page_with_allocation(ARAL *ar, void *ptr) {
     return page;
 }
 
-static void arrayalloc_increase(ARAL *ar) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+static void arrayalloc_add_page(ARAL *ar, const char *file, const char *function, size_t line) {
+#else
+static void arrayalloc_add_page(ARAL *ar) {
+#endif
     if(unlikely(!ar->internal.initialized))
         arrayalloc_init(ar);
 
@@ -182,8 +186,13 @@ static void arrayalloc_increase(ARAL *ar) {
         if (unlikely(!page->data))
             fatal("Cannot allocate arrayalloc buffer of size %zu on filename '%s'", page->size, page->filename);
     }
-    else
+    else {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        page->data = mallocz_int(page->size, file, function, line);
+#else
         page->data = mallocz(page->size);
+#endif
+    }
 
     // link the free space to its page
     ARAL_FREE *fr = (ARAL_FREE *)page->data;
@@ -217,14 +226,23 @@ ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filena
     return ar;
 }
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+void *arrayalloc_mallocz_int(ARAL *ar, const char *file, const char *function, size_t line) {
+#else
 void *arrayalloc_mallocz(ARAL *ar) {
+#endif
     if(unlikely(!ar->internal.initialized))
         arrayalloc_init(ar);
 
     arrayalloc_lock(ar);
 
-    if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list))
-        arrayalloc_increase(ar);
+    if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list)) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        arrayalloc_add_page(ar, file, function, line);
+#else
+        arrayalloc_add_page(ar);
+#endif
+    }
 
     ARAL_PAGE *page = ar->internal.first_page;
     ARAL_FREE *fr = page->free_list;
@@ -266,7 +284,11 @@ void *arrayalloc_mallocz(ARAL *ar) {
     return (void *)fr;
 }
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *function, size_t line) {
+#else
 void arrayalloc_freez(ARAL *ar, void *ptr) {
+#endif
     if(!ptr) return;
     arrayalloc_lock(ar);
 
@@ -319,13 +341,18 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 
         // free it
         if(ar->internal.mmap) {
-            munmap(page->data, page->size);
+            netdata_munmap(page->data, page->size);
             if (unlikely(unlink(page->filename) == 1))
                 error("Cannot delete file '%s'", page->filename);
             freez((void *)page->filename);
         }
-        else
+        else {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+            freez_int(page->data, file, function, line);
+#else
             freez(page->data);
+#endif
+        }
 
         freez(page);
     }

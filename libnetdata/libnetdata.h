@@ -296,34 +296,34 @@ extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 
 // memory allocation functions that handle failures
-#ifdef NETDATA_LOG_ALLOCATIONS
-extern __thread size_t log_thread_memory_allocations;
-#define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
-#define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
-#define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
-#define reallocz(ptr, size) reallocz_int(__FILE__, __FUNCTION__, __LINE__, ptr, size)
-#define freez(ptr) freez_int(__FILE__, __FUNCTION__, __LINE__, ptr)
-#define log_allocations() log_allocations_int(__FILE__, __FUNCTION__, __LINE__)
+#ifdef NETDATA_TRACE_ALLOCATIONS
+extern int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data);
 
-extern char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s);
-extern void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size);
-extern void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
-extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
-extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
-extern void log_allocations_int(const char *file, const char *function, const unsigned long line);
+#define strdupz(s) strdupz_int(s, __FILE__, __FUNCTION__, __LINE__)
+#define callocz(nmemb, size) callocz_int(nmemb, size, __FILE__, __FUNCTION__, __LINE__)
+#define mallocz(size) mallocz_int(size, __FILE__, __FUNCTION__, __LINE__)
+#define reallocz(ptr, size) reallocz_int(ptr, size, __FILE__, __FUNCTION__, __LINE__)
+#define freez(ptr) freez_int(ptr, __FILE__, __FUNCTION__, __LINE__)
 
-#else // NETDATA_LOG_ALLOCATIONS
+extern char *strdupz_int(const char *s, const char *file, const char *function, size_t line);
+extern void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line);
+extern void *mallocz_int(size_t size, const char *file, const char *function, size_t line);
+extern void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line);
+extern void freez_int(void *ptr, const char *file, const char *function, size_t line);
+
+#else // NETDATA_TRACE_ALLOCATIONS
 extern char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
 extern void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
 extern void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
 extern void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
 extern void freez(void *ptr);
-#endif // NETDATA_LOG_ALLOCATIONS
+#endif // NETDATA_TRACE_ALLOCATIONS
 
 extern void json_escape_string(char *dst, const char *src, size_t size);
 extern void json_fix_string(char *s);
 
 extern void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
+extern int netdata_munmap(void *ptr, size_t size);
 extern int memory_file_save(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
@@ -449,6 +449,33 @@ static inline size_t struct_natural_alignment(size_t size) {
 
     return size;
 }
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+struct malloc_trace {
+    avl_t avl;
+
+    const char *function;
+    const char *file;
+    size_t line;
+
+    size_t malloc_calls;
+    size_t calloc_calls;
+    size_t realloc_calls;
+    size_t strdup_calls;
+    size_t free_calls;
+
+    size_t mmap_calls;
+    size_t munmap_calls;
+
+    size_t allocations;
+    size_t bytes;
+
+    struct rrddim *rd_bytes;
+    struct rrddim *rd_allocations;
+    struct rrddim *rd_avg_alloc;
+    struct rrddim *rd_ops;
+};
+#endif // NETDATA_TRACE_ALLOCATIONS
 
 # ifdef __cplusplus
 }

@@ -27,6 +27,12 @@ struct rrddim_constructor {
 
 };
 
+// isolated call to appear
+// separate in statistics
+static void *rrddim_alloc_db(size_t entries) {
+    return callocz(entries, sizeof(storage_number));
+}
+
 static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
     struct rrddim_constructor *ctr = constructor_data;
     RRDDIM *rd = rrddim;
@@ -73,7 +79,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->entries;
         if(entries < 5) entries = 5;
 
-        rd->db = callocz(entries, sizeof(storage_number));
+        rd->db = rrddim_alloc_db(entries);
         rd->memsize = entries * sizeof(storage_number);
     }
 
@@ -222,7 +228,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if(rd->db) {
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
-            munmap(rd->db, rd->memsize);
+            netdata_munmap(rd->db, rd->memsize);
         else
             freez(rd->db);
     }
@@ -641,7 +647,7 @@ void rrddim_memory_file_free(RRDDIM *rd) {
 
     struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
     freez(rd_on_file->cache_filename);
-    munmap(rd_on_file, rd_on_file->memsize);
+    netdata_munmap(rd_on_file, rd_on_file->memsize);
 
     // remove the pointers from the RRDDIM
     rd->rd_on_file = NULL;
