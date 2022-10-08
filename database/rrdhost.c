@@ -754,22 +754,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
-    rrdhost_init();
-
-    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            fatal("Failed to initialize SQLite");
-        info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
-    }
-
-    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
-        error_report("Failed to initialize context metadata database");
-    }
-
-    if (unlikely(!system_info))
-        goto unittest;
-
+void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
@@ -857,7 +842,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", hostname, tier, tier);
             break;
         }
-        
+
         internal_error(true, "DBENGINE tier %d grouping iterations is set to %d", tier, storage_tiers_grouping_iterations[tier]);
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
@@ -885,9 +870,34 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 #endif
+}
+
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+    rrdhost_init();
+
+    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            fatal("Failed to initialize SQLite");
+        info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
+    }
+
+    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
+        error_report("Failed to initialize context metadata database");
+    }
+
+    if (unlikely(!system_info))
+        goto unittest;
+
+    rrdpush_init();
+
+    if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || storage_tiers > 1 || rrdpush_needs_dbengine()) {
+        info("Initializing dbengine...");
+        dbengine_init(hostname);
+    }
+    else
+        info("Not initializing dbengine...");
 
     health_init();
-    rrdpush_init();
 
 unittest:
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);

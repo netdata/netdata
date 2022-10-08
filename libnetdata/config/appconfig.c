@@ -473,7 +473,7 @@ NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, con
     return str2ndd(s, NULL);
 }
 
-static inline int appconfig_test_boolean_value(char *s) {
+inline int appconfig_test_boolean_value(char *s) {
     if(!strcasecmp(s, "yes") || !strcasecmp(s, "true") || !strcasecmp(s, "on")
        || !strcasecmp(s, "auto") || !strcasecmp(s, "on demand"))
         return 1;

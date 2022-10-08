@@ -228,6 +228,7 @@ BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
 extern int rrdpush_init();
+extern bool rrdpush_needs_dbengine();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
 extern bool rrdset_push_chart_definition_now(RRDSET *st);

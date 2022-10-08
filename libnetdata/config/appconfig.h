@@ -199,6 +199,8 @@ extern struct section *appconfig_get_section(struct config *root, const char *na
 extern void appconfig_wrlock(struct config *root);
 extern void appconfig_unlock(struct config *root);
 
+extern int appconfig_test_boolean_value(char *s);
+
 struct connector_instance {
     char instance_name[CONFIG_MAX_NAME + 1];
     char connector_name[CONFIG_MAX_NAME + 1];
