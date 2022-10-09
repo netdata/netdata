@@ -66,6 +66,31 @@ static void load_stream_conf() {
     freez(filename);
 }
 
+bool rrdpush_receiver_needs_dbengine() {
+    struct section *co;
+
+    for(co = stream_config.first_section; co; co = co->next) {
+        if(strcmp(co->name, "stream") == 0)
+            continue; // the first section is not relevant
+
+        char *s;
+
+        s = appconfig_get_by_section(co, "enabled", NULL);
+        if(!s || !appconfig_test_boolean_value(s))
+            continue;
+
+        s = appconfig_get_by_section(co, "default memory mode", NULL);
+        if(s && strcmp(s, "dbengine") == 0)
+            return true;
+
+        s = appconfig_get_by_section(co, "memory mode", NULL);
+        if(s && strcmp(s, "dbengine") == 0)
+            return true;
+    }
+
+    return false;
+}
+
 int rrdpush_init() {
     // --------------------------------------------------------------------
     // load stream.conf

@@ -30,7 +30,7 @@ void dbengine_page_free(void *page) {
     if (unlikely(db_engine_use_malloc))
         freez(page);
     else
-        munmap(page, RRDENG_BLOCK_SIZE);
+        netdata_munmap(page, RRDENG_BLOCK_SIZE);
 }
 
 static void sanity_check(void)

@@ -16,7 +16,7 @@ void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
-    struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
+    struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
     ch->rd = rd;
     return (STORAGE_COLLECT_HANDLE *)ch;
 }
@@ -46,7 +46,7 @@ void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
 }
 
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
-    free(collection_handle);
+    freez(collection_handle);
     return 0;
 }
 
@@ -142,7 +142,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_qu
     handle->rd = rd;
     handle->start_time = start_time;
     handle->end_time = end_time;
-    struct mem_query_handle* h = calloc(1, sizeof(struct mem_query_handle));
+    struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->slot           = rrddim_time2slot(rd, start_time);
     h->last_slot      = rrddim_time2slot(rd, end_time);
     h->dt = rd->rrdset->update_every;

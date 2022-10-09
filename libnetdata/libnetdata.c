@@ -30,128 +30,237 @@ const char *program_version = VERSION;
 // its lifetime), these can be used to override the default system allocation
 // routines.
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-#warning NETDATA_LOG_ALLOCATIONS ENABLED - set log_thread_memory_allocations=1 on any thread to log all its allocations - or use log_allocations() to log them on demand
+#ifdef NETDATA_TRACE_ALLOCATIONS
+#warning NETDATA_TRACE_ALLOCATIONS ENABLED
+#include "Judy.h"
 
-static __thread struct memory_statistics {
-    volatile ssize_t malloc_calls_made;
-    volatile ssize_t calloc_calls_made;
-    volatile ssize_t realloc_calls_made;
-    volatile ssize_t strdup_calls_made;
-    volatile ssize_t free_calls_made;
-    volatile ssize_t memory_calls_made;
-    volatile ssize_t allocated_memory;
-    volatile ssize_t mmapped_memory;
-} memory_statistics = { 0, 0, 0, 0, 0, 0, 0, 0 };
+Word_t JudyMalloc(Word_t Words) {
+    Word_t Addr;
 
-__thread size_t log_thread_memory_allocations = 0;
+    Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+    return(Addr);
+}
+void JudyFree(void * PWord, Word_t Words) {
+    (void)Words;
+    freez(PWord);
+}
+Word_t JudyMallocVirtual(Word_t Words) {
+    Word_t Addr;
 
-inline void log_allocations_int(const char *file, const char *function, const unsigned long line) {
-    static __thread struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
-
-    fprintf(stderr, "%s MEMORY ALLOCATIONS: (%04lu@%s:%s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
-            netdata_thread_tag(),
-            line, file, function,
-            (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
-            (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
-            memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
-            memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
-            memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
-            memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
-            memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
-    );
-
-    memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
+    Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+    return(Addr);
+}
+void JudyFreeVirtual(void * PWord, Word_t Words) {
+    (void)Words;
+    freez(PWord);
 }
 
-static inline void mmap_accounting(size_t size) {
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.mmapped_memory += size;
+#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
+#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
+#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - (size % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
+
+struct malloc_header_signature {
+    uint32_t magic;
+    uint32_t size;
+    struct malloc_trace *trace;
+};
+
+struct malloc_header {
+    struct malloc_header_signature signature;
+    uint8_t padding[(sizeof(struct malloc_header_signature) % MALLOC_ALIGNMENT) ? MALLOC_ALIGNMENT - (sizeof(struct malloc_header_signature) % MALLOC_ALIGNMENT) : 0];
+    uint8_t data[];
+};
+
+static size_t malloc_header_size = sizeof(struct malloc_header);
+
+int malloc_trace_compare(void *A, void *B) {
+    struct malloc_trace *a = A;
+    struct malloc_trace *b = B;
+    return strcmp(a->function, b->function);
+}
+
+static avl_tree_lock malloc_trace_index = {
+    .avl_tree = {
+        .root = NULL,
+        .compar = malloc_trace_compare},
+    .rwlock = NETDATA_RWLOCK_INITIALIZER
+};
+
+int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data) {
+    return avl_traverse_lock(&malloc_trace_index, callback, data);
+}
+
+NEVERNULL WARNUNUSED
+static struct malloc_trace *malloc_trace_find_or_create(const char *file, const char *function, size_t line) {
+    struct malloc_trace tmp = {
+        .line = line,
+        .function = function,
+        .file = file,
+    };
+
+    struct malloc_trace *t = (struct malloc_trace *)avl_search_lock(&malloc_trace_index, (avl_t *)&tmp);
+    if(!t) {
+        t = calloc(1, sizeof(struct malloc_trace));
+        if(!t) fatal("No memory");
+        t->line = line;
+        t->function = function;
+        t->file = file;
+
+        struct malloc_trace *t2 = (struct malloc_trace *)avl_insert_lock(&malloc_trace_index, (avl_t *)t);
+        if(t2 != t)
+            free(t);
+
+        t = t2;
     }
-}
 
-void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
-    memory_statistics.memory_calls_made++;
-    memory_statistics.malloc_calls_made++;
-    memory_statistics.allocated_memory += size;
+    if(!t)
+        fatal("Cannot insert to AVL");
 
-    if(log_thread_memory_allocations)
-        log_allocations_int(file, function, line);
-
-    size_t *n = (size_t *)malloc(sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("mallocz() cannot allocate %zu bytes of memory.", size);
-    *n = size;
-    return (void *)&n[1];
-}
-
-void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
-    size = nmemb * size;
-
-    memory_statistics.memory_calls_made++;
-    memory_statistics.calloc_calls_made++;
-    memory_statistics.allocated_memory += size;
-    if(log_thread_memory_allocations)
-        log_allocations_int(file, function, line);
-
-    size_t *n = (size_t *)calloc(1, sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("callocz() cannot allocate %zu bytes of memory.", size);
-    *n = size;
-    return (void *)&n[1];
-}
-
-void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
-    if(!ptr) return mallocz_int(file, function, line, size);
-
-    size_t *n = (size_t *)ptr;
-    n--;
-    size_t old_size = *n;
-
-    n = realloc(n, sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("reallocz() cannot allocate %zu bytes of memory (from %zu bytes).", size, old_size);
-
-    memory_statistics.memory_calls_made++;
-    memory_statistics.realloc_calls_made++;
-    memory_statistics.allocated_memory += (size - old_size);
-    if(log_thread_memory_allocations)
-        log_allocations_int(file, function, line);
-
-    *n = size;
-    return (void *)&n[1];
-}
-
-char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
-    size_t size = strlen(s) + 1;
-
-    memory_statistics.memory_calls_made++;
-    memory_statistics.strdup_calls_made++;
-    memory_statistics.allocated_memory += size;
-    if(log_thread_memory_allocations)
-        log_allocations_int(file, function, line);
-
-    size_t *n = (size_t *)malloc(sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("strdupz() cannot allocate %zu bytes of memory.", size);
-
-    *n = size;
-    char *t = (char *)&n[1];
-    strcpy(t, s);
     return t;
 }
 
-void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
+void malloc_trace_mmap(size_t size) {
+    struct malloc_trace *p = malloc_trace_find_or_create("unknown", "netdata_mmap", 1);
+    size_t_atomic_count(add, p->mmap_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+}
+
+void malloc_trace_munmap(size_t size) {
+    struct malloc_trace *p = malloc_trace_find_or_create("unknown", "netdata_mmap", 1);
+    size_t_atomic_count(add, p->munmap_calls, 1);
+    size_t_atomic_count(sub, p->allocations, 1);
+    size_t_atomic_bytes(sub, p->bytes, size);
+}
+
+void *mallocz_int(size_t size, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+
+    size_t_atomic_count(add, p->malloc_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)malloc(malloc_header_size + size);
+    if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    return (void *)&t->data;
+}
+
+void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size = nmemb * size;
+
+    size_t_atomic_count(add, p->calloc_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)calloc(1, malloc_header_size + size);
+    if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    return &t->data;
+}
+
+char *strdupz_int(const char *s, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size_t size = strlen(s) + 1;
+
+    size_t_atomic_count(add, p->strdup_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)malloc(malloc_header_size + size);
+    if (unlikely(!t)) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    strcpy((char *)&t->data, s);
+    return (char *)&t->data;
+}
+
+static struct malloc_header *malloc_get_header(void *ptr, const char *caller, const char *file, const char *function, size_t line) {
+    uint8_t *ret = (uint8_t *)ptr - malloc_header_size;
+    struct malloc_header *t = (struct malloc_header *)ret;
+
+    if(t->signature.magic != 0x0BADCAFE) {
+        error("pointer %p is not our pointer (called %s() from %zu@%s, %s()).", ptr, caller, line, file, function);
+        return NULL;
+    }
+
+    return t;
+}
+
+void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line) {
+    if(!ptr) return mallocz_int(size, file, function, line);
+
+    struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
+    if(!t)
+        return realloc(ptr, size);
+
+    if(t->signature.size == size) return ptr;
+    size_t_atomic_count(add, t->signature.trace->free_calls, 1);
+    size_t_atomic_count(sub, t->signature.trace->allocations, 1);
+    size_t_atomic_bytes(sub, t->signature.trace->bytes, t->signature.size);
+
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size_t_atomic_count(add, p->realloc_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    t = (struct malloc_header *)realloc(t, malloc_header_size + size);
+    if (unlikely(!t)) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    return (void *)&t->data;
+}
+
+void freez_int(void *ptr, const char *file, const char *function, size_t line) {
     if(unlikely(!ptr)) return;
 
-    size_t *n = (size_t *)ptr;
-    n--;
-    size_t size = *n;
+    struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
+    if(!t) {
+        free(ptr);
+        return;
+    }
 
-    memory_statistics.memory_calls_made++;
-    memory_statistics.free_calls_made++;
-    memory_statistics.allocated_memory -= size;
-    if(log_thread_memory_allocations)
-        log_allocations_int(file, function, line);
+    size_t_atomic_count(add, t->signature.trace->free_calls, 1);
+    size_t_atomic_count(sub, t->signature.trace->allocations, 1);
+    size_t_atomic_bytes(sub, t->signature.trace->bytes, t->signature.size);
 
-    free(n);
+#ifdef NETDATA_INTERNAL_CHECKS
+    // it should crash if it is used after freeing it
+    memset(t, 0, malloc_header_size + t->signature.size);
+#endif
+
+    free(t);
 }
 #else
 
@@ -1031,8 +1140,8 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
     if (mem != MAP_FAILED) {
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-        mmap_accounting(size);
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        malloc_trace_mmap(size);
 #endif
 
         // if we have a file open, but we didn't give it to mmap(),
@@ -1057,6 +1166,13 @@ cleanup:
     if(mem == MAP_FAILED) return NULL;
     errno = 0;
     return mem;
+}
+
+int netdata_munmap(void *ptr, size_t size) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+    malloc_trace_munmap(size);
+#endif
+    return munmap(ptr, size);
 }
 
 int memory_file_save(const char *filename, void *mem, size_t size) {
