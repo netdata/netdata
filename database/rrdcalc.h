@@ -218,24 +218,24 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-extern void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
+void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
 
-extern void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
+void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
 
-extern const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name);
-extern void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);
-extern RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
+const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name);
+void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);
+RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
 
-extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
+const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
-extern void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
+void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 
-extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
-extern void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
-extern int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
+void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
+int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
 
-extern void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
-extern void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
+void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
+void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
@@ -244,11 +244,11 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     return 0;
 }
 
-extern void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st);
-extern void rrdcalc_delete_all(RRDHOST *host);
+void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st);
+void rrdcalc_delete_all(RRDHOST *host);
 
-extern void rrdcalc_rrdhost_index_init(RRDHOST *host);
-extern void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
+void rrdcalc_rrdhost_index_init(RRDHOST *host);
+void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
 
 #define RRDCALC_VAR_MAX 100
 #define RRDCALC_VAR_FAMILY "$family"

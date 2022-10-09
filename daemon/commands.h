@@ -76,7 +76,7 @@ typedef struct command_info {
 typedef void (command_lock_t) (unsigned index);
 
 cmd_status_t execute_command(cmd_t idx, char *args, char **message);
-extern void commands_init(void);
-extern void commands_exit(void);
+void commands_init(void);
+void commands_exit(void);
 
 #endif //NETDATA_COMMANDS_H

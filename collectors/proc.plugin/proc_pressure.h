@@ -38,6 +38,6 @@ struct pressure {
     } some, full;
 };
 
-extern void update_pressure_charts(struct pressure_charts *charts);
+void update_pressure_charts(struct pressure_charts *charts);
 
 #endif //NETDATA_PROC_PRESSURE_H

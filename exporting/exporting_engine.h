@@ -271,7 +271,7 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int rrdset_is_exportable(struct instance *instance, RRDSET *st);
 
-extern EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS exporting_options);
+EXPORTING_OPTIONS exporting_parse_data_source(const char *source, EXPORTING_OPTIONS exporting_options);
 
 NETDATA_DOUBLE
 exporting_calculate_value_from_stored_data(
@@ -300,7 +300,7 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
 void send_internal_metrics(struct instance *instance);
 
-extern void clean_instance(struct instance *ptr);
+void clean_instance(struct instance *ptr);
 void simple_connector_cleanup(struct instance *instance);
 
 static inline void disable_instance(struct instance *instance)

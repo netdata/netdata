@@ -105,7 +105,7 @@ typedef struct parser {
 
 } PARSER;
 
-extern int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
+int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
 
 PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
@@ -115,22 +115,22 @@ int parser_push(PARSER *working_parser, char *line);
 void parser_destroy(PARSER *working_parser);
 int parser_recover_input(PARSER *working_parser);
 
-extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
+size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
-extern PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-extern PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 
 #endif

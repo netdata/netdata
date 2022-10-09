@@ -5,6 +5,6 @@
 
 #include "../rrd2json.h"
 
-extern NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate, RRDDIM *temp_rd);
+NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate, RRDDIM *temp_rd);
 
 #endif //NETDATA_API_FORMATTER_VALUE_H

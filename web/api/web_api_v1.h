@@ -10,30 +10,30 @@
 #include "web/api/queries/weights.h"
 
 #define MAX_CHART_LABELS_FILTER (32)
-extern RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
-extern void web_client_api_request_v1_data_options_to_string(BUFFER *wb, RRDR_OPTIONS options);
+RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
+void web_client_api_request_v1_data_options_to_string(BUFFER *wb, RRDR_OPTIONS options);
 
-extern uint32_t web_client_api_request_v1_data_format(char *name);
-extern uint32_t web_client_api_request_v1_data_google_format(char *name);
+uint32_t web_client_api_request_v1_data_format(char *name);
+uint32_t web_client_api_request_v1_data_google_format(char *name);
 
-extern int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf));
-extern int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
-extern void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
+int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf));
+int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
+void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
 
-extern void web_client_api_v1_init(void);
-extern void web_client_api_v1_management_init(void);
+void web_client_api_v1_init(void);
+void web_client_api_v1_management_init(void);
 
 extern char *api_secret;
 
