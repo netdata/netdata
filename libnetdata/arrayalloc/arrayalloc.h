@@ -23,8 +23,7 @@ typedef struct arrayalloc {
         size_t allocation_multiplier;
         size_t max_alloc_size;
         netdata_mutex_t mutex;
-        struct arrayalloc_page *first_page;
-        struct arrayalloc_page *last_page;
+        struct arrayalloc_page *pages;
     } internal;
 } ARAL;
 
