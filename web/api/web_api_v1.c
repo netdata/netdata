@@ -1621,9 +1621,14 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
+
+    if(!dbengine_enabled) {
+        buffer_strcat(wb, "dbengine is not enabled");
+        return HTTP_RESP_NOT_FOUND;
+    }
+
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
-
     buffer_strcat(wb, "{");
     for(int tier = 0; tier < storage_tiers ;tier++) {
         buffer_sprintf(wb, "%s\n\t\"tier%d\": {", tier?",":"", tier);

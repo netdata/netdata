@@ -15,6 +15,13 @@
 // version for aclk legacy (old cloud arch)
 #define ACLK_VERSION 2
 
+static void freez_aclk_publish5a(void *ptr) {
+    freez(ptr);
+}
+static void freez_aclk_publish5b(void *ptr) {
+    freez(ptr);
+}
+
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
@@ -29,7 +36,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     }
 
     if (use_mqtt_5)
-        mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+        mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
     else
         mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
 
@@ -81,7 +88,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     }
 
     if (use_mqtt_5)
-        mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
+        mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez_aclk_publish5b : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
     else {
         rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
         freez(full_msg);

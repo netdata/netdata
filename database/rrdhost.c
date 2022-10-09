@@ -3,6 +3,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 int storage_tiers = 1;
 int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
@@ -328,12 +329,18 @@ RRDHOST *rrdhost_create(const char *hostname,
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
+    rrd_check_wrlock();
+
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled) {
+        error("memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'", hostname);
+        memory_mode = RRD_MEMORY_MODE_ALLOC;
+    }
+
 #ifdef ENABLE_DBENGINE
     int is_legacy = (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
 #else
-    int is_legacy = 1;
+int is_legacy = 1;
 #endif
-    rrd_check_wrlock();
 
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
@@ -384,8 +391,8 @@ RRDHOST *rrdhost_create(const char *hostname,
             host->cache_dir = strdupz(filename);
         }
 
-        if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || (
-           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
+        if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
+             (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->cache_dir);
@@ -754,22 +761,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
-    rrdhost_init();
-
-    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            fatal("Failed to initialize SQLite");
-        info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
-    }
-
-    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
-        error_report("Failed to initialize context metadata database");
-    }
-
-    if (unlikely(!system_info))
-        goto unittest;
-
+void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
@@ -857,7 +849,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", hostname, tier, tier);
             break;
         }
-        
+
         internal_error(true, "DBENGINE tier %d grouping iterations is set to %d", tier, storage_tiers_grouping_iterations[tier]);
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
@@ -877,6 +869,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
+    dbengine_enabled = true;
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {
@@ -885,9 +878,48 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 #endif
+}
+
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+    rrdhost_init();
+
+    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            fatal("Failed to initialize SQLite");
+        info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
+    }
+
+    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
+        error_report("Failed to initialize context metadata database");
+    }
+
+    if (unlikely(strcmp(hostname, "unittest") == 0)) {
+        dbengine_enabled = true;
+        goto unittest;
+    }
+
+    rrdpush_init();
+
+    if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || storage_tiers > 1 || rrdpush_receiver_needs_dbengine()) {
+        info("Initializing dbengine...");
+        dbengine_init(hostname);
+    }
+    else
+        info("Not initializing dbengine...");
+
+    if(!dbengine_enabled) {
+        if (storage_tiers > 1) {
+            error("dbengine is not enabled, but %d tiers have been requested. Resetting tiers to 1", storage_tiers);
+            storage_tiers = 1;
+        }
+
+        if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            error("dbengine is not enabled, but it has been given as the default db mode. Resetting db mode to alloc");
+            default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+        }
+    }
 
     health_init();
-    rrdpush_init();
 
 unittest:
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
@@ -1418,10 +1450,8 @@ void rrdhost_cleanup_all(void) {
     RRDHOST *host;
     rrdhost_foreach_read(host) {
         if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
-#ifdef ENABLE_DBENGINE
             /* don't delete multi-host DB host files */
             && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
-#endif
         )
             rrdhost_delete_charts(host);
         else

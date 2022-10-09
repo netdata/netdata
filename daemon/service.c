@@ -216,10 +216,8 @@ restart_after_removal:
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
             if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
-#ifdef ENABLE_DBENGINE
                 /* don't delete multi-host DB host files */
                 && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
-#endif
             ) {
                 worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
                 rrdhost_delete_charts(host);

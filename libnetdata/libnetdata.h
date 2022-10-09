@@ -11,6 +11,14 @@ extern "C" {
 #include <config.h>
 #endif
 
+#if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
+#define NETDATA_INTERNAL_CHECKS 1
+#endif
+
+#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
+#define NETDATA_TRACE_ALLOCATIONS 1
+#endif
+
 #define OS_LINUX   1
 #define OS_FREEBSD 2
 #define OS_MACOS   3
@@ -296,34 +304,34 @@ int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 
 // memory allocation functions that handle failures
-#ifdef NETDATA_LOG_ALLOCATIONS
-extern __thread size_t log_thread_memory_allocations;
-#define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
-#define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
-#define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
-#define reallocz(ptr, size) reallocz_int(__FILE__, __FUNCTION__, __LINE__, ptr, size)
-#define freez(ptr) freez_int(__FILE__, __FUNCTION__, __LINE__, ptr)
-#define log_allocations() log_allocations_int(__FILE__, __FUNCTION__, __LINE__)
+#ifdef NETDATA_TRACE_ALLOCATIONS
+int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data);
 
-char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s);
-void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size);
-void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
-void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
-void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
-void log_allocations_int(const char *file, const char *function, const unsigned long line);
+#define strdupz(s) strdupz_int(s, __FILE__, __FUNCTION__, __LINE__)
+#define callocz(nmemb, size) callocz_int(nmemb, size, __FILE__, __FUNCTION__, __LINE__)
+#define mallocz(size) mallocz_int(size, __FILE__, __FUNCTION__, __LINE__)
+#define reallocz(ptr, size) reallocz_int(ptr, size, __FILE__, __FUNCTION__, __LINE__)
+#define freez(ptr) freez_int(ptr, __FILE__, __FUNCTION__, __LINE__)
 
-#else // NETDATA_LOG_ALLOCATIONS
+char *strdupz_int(const char *s, const char *file, const char *function, size_t line);
+void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line);
+void *mallocz_int(size_t size, const char *file, const char *function, size_t line);
+void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line);
+void freez_int(void *ptr, const char *file, const char *function, size_t line);
+
+#else // NETDATA_TRACE_ALLOCATIONS
 char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
 void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
 void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
 void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
 void freez(void *ptr);
-#endif // NETDATA_LOG_ALLOCATIONS
+#endif // NETDATA_TRACE_ALLOCATIONS
 
 void json_escape_string(char *dst, const char *src, size_t size);
 void json_fix_string(char *s);
 
 void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
+int netdata_munmap(void *ptr, size_t size);
 int memory_file_save(const char *filename, void *mem, size_t size);
 
 int fd_is_valid(int fd);
@@ -449,6 +457,33 @@ static inline size_t struct_natural_alignment(size_t size) {
 
     return size;
 }
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+struct malloc_trace {
+    avl_t avl;
+
+    const char *function;
+    const char *file;
+    size_t line;
+
+    size_t malloc_calls;
+    size_t calloc_calls;
+    size_t realloc_calls;
+    size_t strdup_calls;
+    size_t free_calls;
+
+    size_t mmap_calls;
+    size_t munmap_calls;
+
+    size_t allocations;
+    size_t bytes;
+
+    struct rrddim *rd_bytes;
+    struct rrddim *rd_allocations;
+    struct rrddim *rd_avg_alloc;
+    struct rrddim *rd_ops;
+};
+#endif // NETDATA_TRACE_ALLOCATIONS
 
 # ifdef __cplusplus
 }

@@ -2200,7 +2200,7 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
         max_last_time_t = rrddim_last_entry_t(rm->rrddim);
     }
 #ifdef ENABLE_DBENGINE
-    else {
+    else if (dbengine_enabled) {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
         for (int tier = 0; tier < storage_tiers; tier++) {
             if(!rrdhost->storage_instance[tier]) continue;
@@ -2214,6 +2214,10 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
                     max_last_time_t = last_time_t;
             }
         }
+    }
+    else {
+        // cannot get retention
+        return;
     }
 #endif
 

@@ -934,6 +934,34 @@ if [ "$have_autotools" ]; then
   fi
 fi
 
+# function to extract values from the config file
+config_option() {
+  section="${1}"
+  key="${2}"
+  value="${3}"
+
+  if [ -x "${NETDATA_PREFIX}/usr/sbin/netdata" ] && [ -r "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
+    "${NETDATA_PREFIX}/usr/sbin/netdata" \
+      -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
+      -W get "${section}" "${key}" "${value}" ||
+      echo "${value}"
+  else
+    echo "${value}"
+  fi
+}
+
+# the user netdata will run as
+if [ "$(id -u)" = "0" ]; then
+  NETDATA_USER="$(config_option "global" "run as user" "netdata")"
+  ROOT_USER="root"
+else
+  NETDATA_USER="${USER}"
+  ROOT_USER="${USER}"
+fi
+NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
+[ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
+echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
+
 # shellcheck disable=SC2086
 if ! run ./configure \
          --prefix="${NETDATA_PREFIX}/usr" \
@@ -943,7 +971,7 @@ if ! run ./configure \
          --libdir="${NETDATA_PREFIX}/usr/lib" \
          --with-zlib \
          --with-math \
-         --with-user=netdata \
+         --with-user="${NETDATA_USER}" \
          ${NETDATA_CONFIGURE_OPTIONS} \
          CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}"; then
   fatal "Failed to configure Netdata sources." I000A
@@ -1076,34 +1104,6 @@ progress "Read installation options from netdata.conf"
 # create an empty config if it does not exist
 [ ! -f "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ] &&
   touch "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
-
-# function to extract values from the config file
-config_option() {
-  section="${1}"
-  key="${2}"
-  value="${3}"
-
-  if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
-    "${NETDATA_PREFIX}/usr/sbin/netdata" \
-      -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
-      -W get "${section}" "${key}" "${value}" ||
-      echo "${value}"
-  else
-    echo "${value}"
-  fi
-}
-
-# the user netdata will run as
-if [ "$(id -u)" = "0" ]; then
-  NETDATA_USER="$(config_option "global" "run as user" "netdata")"
-  ROOT_USER="root"
-else
-  NETDATA_USER="${USER}"
-  ROOT_USER="${USER}"
-fi
-NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
-[ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
-echo >&2 "Netdata user and group is finally set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
 # port
 defport=19999

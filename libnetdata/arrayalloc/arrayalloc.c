@@ -162,7 +162,11 @@ static inline ARAL_PAGE *find_page_with_allocation(ARAL *ar, void *ptr) {
     return page;
 }
 
-static void arrayalloc_increase(ARAL *ar) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+static void arrayalloc_add_page(ARAL *ar, const char *file, const char *function, size_t line) {
+#else
+static void arrayalloc_add_page(ARAL *ar) {
+#endif
     if(unlikely(!ar->internal.initialized))
         arrayalloc_init(ar);
 
@@ -182,8 +186,13 @@ static void arrayalloc_increase(ARAL *ar) {
         if (unlikely(!page->data))
             fatal("Cannot allocate arrayalloc buffer of size %zu on filename '%s'", page->size, page->filename);
     }
-    else
+    else {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        page->data = mallocz_int(page->size, file, function, line);
+#else
         page->data = mallocz(page->size);
+#endif
+    }
 
     // link the free space to its page
     ARAL_FREE *fr = (ARAL_FREE *)page->data;
@@ -217,14 +226,23 @@ ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filena
     return ar;
 }
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+void *arrayalloc_mallocz_int(ARAL *ar, const char *file, const char *function, size_t line) {
+#else
 void *arrayalloc_mallocz(ARAL *ar) {
+#endif
     if(unlikely(!ar->internal.initialized))
         arrayalloc_init(ar);
 
     arrayalloc_lock(ar);
 
-    if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list))
-        arrayalloc_increase(ar);
+    if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list)) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        arrayalloc_add_page(ar, file, function, line);
+#else
+        arrayalloc_add_page(ar);
+#endif
+    }
 
     ARAL_PAGE *page = ar->internal.first_page;
     ARAL_FREE *fr = page->free_list;
@@ -266,7 +284,11 @@ void *arrayalloc_mallocz(ARAL *ar) {
     return (void *)fr;
 }
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *function, size_t line) {
+#else
 void arrayalloc_freez(ARAL *ar, void *ptr) {
+#endif
     if(!ptr) return;
     arrayalloc_lock(ar);
 
@@ -319,13 +341,18 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 
         // free it
         if(ar->internal.mmap) {
-            munmap(page->data, page->size);
+            netdata_munmap(page->data, page->size);
             if (unlikely(unlink(page->filename) == 1))
                 error("Cannot delete file '%s'", page->filename);
             freez((void *)page->filename);
         }
-        else
+        else {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+            freez_int(page->data, file, function, line);
+#else
             freez(page->data);
+#endif
+        }
 
         freez(page);
     }
@@ -335,4 +362,90 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
     }
 
     arrayalloc_unlock(ar);
+}
+
+int aral_unittest(size_t elements) {
+    char *cache_dir = "/tmp/";
+    ARAL *ar = arrayalloc_create(20, 10, "test-aral", &cache_dir);
+    ar->use_mmap = false;
+
+    void *pointers[elements];
+
+    for(size_t i = 0; i < elements ;i++) {
+        pointers[i] = arrayalloc_mallocz(ar);
+    }
+
+    for(size_t div = 5; div >= 2 ;div--) {
+        for (size_t i = 0; i < elements / div; i++) {
+            arrayalloc_freez(ar, pointers[i]);
+        }
+
+        for (size_t i = 0; i < elements / div; i++) {
+            pointers[i] = arrayalloc_mallocz(ar);
+        }
+    }
+
+    for(size_t step = 50; step >= 10 ;step -= 10) {
+        for (size_t i = 0; i < elements; i += step) {
+            arrayalloc_freez(ar, pointers[i]);
+        }
+
+        for (size_t i = 0; i < elements; i += step) {
+            pointers[i] = arrayalloc_mallocz(ar);
+        }
+    }
+
+    for(size_t i = 0; i < elements ;i++) {
+        arrayalloc_freez(ar, pointers[i]);
+    }
+
+    if(ar->internal.first_page) {
+        fprintf(stderr, "ARAL leftovers detected (1)");
+        return 1;
+    }
+
+    size_t ops = 0;
+    size_t increment = elements / 10;
+    size_t allocated = 0;
+    for(size_t all = increment; all <= elements ; all += increment) {
+
+        for(; allocated < all ; allocated++) {
+            pointers[allocated] = arrayalloc_mallocz(ar);
+            ops++;
+        }
+
+        size_t to_free = now_realtime_usec() % all;
+        size_t free_list[to_free];
+        for(size_t i = 0; i < to_free ;i++) {
+            size_t pos;
+            do {
+                pos = now_realtime_usec() % all;
+            } while(!pointers[pos]);
+
+            arrayalloc_freez(ar, pointers[pos]);
+            pointers[pos] = NULL;
+            free_list[i] = pos;
+            ops++;
+        }
+
+        for(size_t i = 0; i < to_free ;i++) {
+            size_t pos = free_list[i];
+            pointers[pos] = arrayalloc_mallocz(ar);
+            ops++;
+        }
+    }
+
+    for(size_t i = 0; i < allocated - 1 ;i++) {
+        arrayalloc_freez(ar, pointers[i]);
+        ops++;
+    }
+
+    arrayalloc_freez(ar, pointers[allocated - 1]);
+
+    if(ar->internal.first_page) {
+        fprintf(stderr, "ARAL leftovers detected (2)");
+        return 1;
+    }
+
+    return 0;
 }

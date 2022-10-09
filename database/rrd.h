@@ -53,6 +53,7 @@ struct pg_cache_page_index;
 #include "sqlite/sqlite_health.h"
 #include "rrdcontext.h"
 
+extern bool dbengine_enabled;
 extern int storage_tiers;
 extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
