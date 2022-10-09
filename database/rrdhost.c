@@ -888,8 +888,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         error_report("Failed to initialize context metadata database");
     }
 
-    if (unlikely(!system_info))
+    if (unlikely(strcmp(hostname, "unittest"))) {
+        dbengine_enabled = true;
         goto unittest;
+    }
 
     rrdpush_init();
 
