@@ -142,7 +142,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_qu
     handle->rd = rd;
     handle->start_time = start_time;
     handle->end_time = end_time;
-    struct mem_query_handle* h = callocz(1, sizeof(struct mem_query_handle));
+    struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->slot           = rrddim_time2slot(rd, start_time);
     h->last_slot      = rrddim_time2slot(rd, end_time);
     h->dt = rd->rrdset->update_every;

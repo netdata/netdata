@@ -2553,8 +2553,10 @@ void *global_statistics_main(void *ptr)
         worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
 
-        worker_is_busy(WORKER_JOB_DBENGINE);
-        dbengine_statistics_charts();
+        if(dbengine_enabled) {
+            worker_is_busy(WORKER_JOB_DBENGINE);
+            dbengine_statistics_charts();
+        }
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);
         update_heartbeat_charts();
