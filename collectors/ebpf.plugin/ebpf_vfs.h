@@ -168,8 +168,8 @@ enum netdata_vfs_calls_name {
 
 extern netdata_publish_vfs_t **vfs_pid;
 
-extern void *ebpf_vfs_thread(void *ptr);
-extern void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
+void *ebpf_vfs_thread(void *ptr);
+void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern netdata_ebpf_targets_t vfs_targets[];
 
 extern struct config vfs_config;

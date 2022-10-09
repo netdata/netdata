@@ -5,6 +5,6 @@
 
 #include "../rrd2json.h"
 
-extern void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable, struct context_param *context_param_list);
+void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable, struct context_param *context_param_list);
 
 #endif //NETDATA_API_FORMATTER_JSON_H

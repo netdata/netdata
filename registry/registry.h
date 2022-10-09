@@ -55,29 +55,29 @@
 
 // initialize the registry
 // should only happen when netdata starts
-extern int registry_init(void);
+int registry_init(void);
 
 // free all data held by the registry
 // should only happen when netdata exits
-extern void registry_free(void);
+void registry_free(void);
 
 // HTTP requests handled by the registry
-extern int registry_request_access_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when);
-extern int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
-extern int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
-extern int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when);
-extern int registry_request_hello_json(RRDHOST *host, struct web_client *w);
+int registry_request_access_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when);
+int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
+int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
+int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when);
+int registry_request_hello_json(RRDHOST *host, struct web_client *w);
 
 // update the registry config
-extern void registry_update_cloud_base_url();
+void registry_update_cloud_base_url();
 
 // update the registry monitoring charts
-extern void registry_statistics(void);
+void registry_statistics(void);
 
-extern char *registry_get_this_machine_guid(void);
-extern char *registry_get_mgmt_api_key(void);
-extern char *registry_get_this_machine_hostname(void);
+char *registry_get_this_machine_guid(void);
+char *registry_get_mgmt_api_key(void);
+char *registry_get_this_machine_hostname(void);
 
-extern int regenerate_guid(const char *guid, char *result);
+int regenerate_guid(const char *guid, char *result);
 
 #endif /* NETDATA_REGISTRY_H */

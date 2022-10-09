@@ -29,6 +29,6 @@ typedef struct sofirq_val {
 } softirq_val_t;
 
 extern struct config softirq_config;
-extern void *ebpf_softirq_thread(void *ptr);
+void *ebpf_softirq_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_SOFTIRQ_H */

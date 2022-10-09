@@ -71,20 +71,20 @@ struct registry {
 extern struct registry registry;
 
 // REGISTRY LOW-LEVEL REQUESTS (in registry-internals.c)
-extern REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
-extern REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
-extern REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
+REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
+REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
+REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
 
 // REGISTRY LOG (in registry_log.c)
-extern void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name);
-extern int registry_log_open(void);
-extern void registry_log_close(void);
-extern void registry_log_recreate(void);
-extern ssize_t registry_log_load(void);
+void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name);
+int registry_log_open(void);
+void registry_log_close(void);
+void registry_log_recreate(void);
+ssize_t registry_log_load(void);
 
 // REGISTRY DB (in registry_db.c)
-extern int registry_db_save(void);
-extern size_t registry_db_load(void);
-extern int registry_db_should_be_saved(void);
+int registry_db_save(void);
+size_t registry_db_load(void);
+int registry_db_should_be_saved(void);
 
 #endif //NETDATA_REGISTRY_INTERNALS_H_H

@@ -14,18 +14,18 @@ typedef enum {
     WORKER_METRIC_INCREMENTAL = 3,
 } WORKER_METRIC_TYPE;
 
-extern void worker_register(const char *workname);
-extern void worker_register_job_name(size_t job_id, const char *name);
-extern void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);
-extern void worker_unregister(void);
+void worker_register(const char *workname);
+void worker_register_job_name(size_t job_id, const char *name);
+void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);
+void worker_unregister(void);
 
-extern void worker_is_idle(void);
-extern void worker_is_busy(size_t job_id);
-extern void worker_set_metric(size_t job_id, NETDATA_DOUBLE value);
+void worker_is_idle(void);
+void worker_is_busy(size_t job_id);
+void worker_set_metric(size_t job_id, NETDATA_DOUBLE value);
 
 // statistics interface
 
-extern void workers_foreach(const char *workname, void (*callback)(
+void workers_foreach(const char *workname, void (*callback)(
                                                       void *data
                                                       , pid_t pid
                                                       , const char *thread_tag

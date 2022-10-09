@@ -184,9 +184,9 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 
 extern sqlite3 *db_meta;
 
-extern int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
-extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
-extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
+int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
+void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
+void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd);
 void sql_aclk_sync_init(void);
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);

@@ -81,7 +81,7 @@ typedef struct netdata_publish_cachestat {
     netdata_cachestat_pid_t prev;
 } netdata_publish_cachestat_t;
 
-extern void *ebpf_cachestat_thread(void *ptr);
+void *ebpf_cachestat_thread(void *ptr);
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];

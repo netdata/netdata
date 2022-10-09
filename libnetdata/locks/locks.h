@@ -51,38 +51,38 @@ typedef struct netdata_rwlock_t {
 
 #endif // NETDATA_TRACE_RWLOCKS
 
-extern int __netdata_mutex_init(netdata_mutex_t *mutex);
-extern int __netdata_mutex_destroy(netdata_mutex_t *mutex);
-extern int __netdata_mutex_lock(netdata_mutex_t *mutex);
-extern int __netdata_mutex_trylock(netdata_mutex_t *mutex);
-extern int __netdata_mutex_unlock(netdata_mutex_t *mutex);
+int __netdata_mutex_init(netdata_mutex_t *mutex);
+int __netdata_mutex_destroy(netdata_mutex_t *mutex);
+int __netdata_mutex_lock(netdata_mutex_t *mutex);
+int __netdata_mutex_trylock(netdata_mutex_t *mutex);
+int __netdata_mutex_unlock(netdata_mutex_t *mutex);
 
-extern int __netdata_rwlock_destroy(netdata_rwlock_t *rwlock);
-extern int __netdata_rwlock_init(netdata_rwlock_t *rwlock);
-extern int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock);
-extern int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock);
-extern int __netdata_rwlock_unlock(netdata_rwlock_t *rwlock);
-extern int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock);
-extern int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_destroy(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_init(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_unlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock);
 
-extern void netdata_thread_disable_cancelability(void);
-extern void netdata_thread_enable_cancelability(void);
+void netdata_thread_disable_cancelability(void);
+void netdata_thread_enable_cancelability(void);
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
-extern int netdata_mutex_init_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
-extern int netdata_mutex_destroy_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
-extern int netdata_mutex_lock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
-extern int netdata_mutex_trylock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
-extern int netdata_mutex_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
+int netdata_mutex_init_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
+int netdata_mutex_destroy_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
+int netdata_mutex_lock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
+int netdata_mutex_trylock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
+int netdata_mutex_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);
 
-extern int netdata_rwlock_destroy_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-extern int netdata_rwlock_init_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-extern int netdata_rwlock_rdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-extern int netdata_rwlock_wrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-extern int netdata_rwlock_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-extern int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-extern int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_destroy_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_init_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_rdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_wrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 
 #define netdata_mutex_init(mutex)    netdata_mutex_init_debug(__FILE__, __FUNCTION__, __LINE__, mutex)
 #define netdata_mutex_destroy(mutex) netdata_mutex_init_debug(__FILE__, __FUNCTION__, __LINE__, mutex)

@@ -22,10 +22,10 @@ typedef enum prometheus_output_flags {
 	PROMETHEUS_OUTPUT_HIDEUNITS  = (1 << 6)
 } PROMETHEUS_OUTPUT_OPTIONS;
 
-extern void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     RRDHOST *host, const char *filter_string, BUFFER *wb, const char *server, const char *prefix,
     EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
-extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     RRDHOST *host, const char *filter_string, BUFFER *wb, const char *server, const char *prefix,
     EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 
@@ -36,6 +36,6 @@ char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldun
 
 void format_host_labels_prometheus(struct instance *instance, RRDHOST *host);
 
-extern void prometheus_clean_server_root();
+void prometheus_clean_server_root();
 
 #endif //NETDATA_EXPORTING_PROMETHEUS_H

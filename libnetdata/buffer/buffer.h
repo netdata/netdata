@@ -49,37 +49,37 @@ typedef struct web_buffer {
 #define buffer_no_cacheable(wb) do { (wb)->options |= WB_CONTENT_NO_CACHEABLE; if((wb)->options & WB_CONTENT_CACHEABLE)    (wb)->options &= ~WB_CONTENT_CACHEABLE;  (wb)->expires = 0; } while(0)
 
 #define buffer_strlen(wb) ((wb)->len)
-extern const char *buffer_tostring(BUFFER *wb);
+const char *buffer_tostring(BUFFER *wb);
 
 #define buffer_flush(wb) wb->buffer[(wb)->len = 0] = '\0'
-extern void buffer_reset(BUFFER *wb);
+void buffer_reset(BUFFER *wb);
 
-extern void buffer_strcat(BUFFER *wb, const char *txt);
-extern void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len);
-extern void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value);
+void buffer_strcat(BUFFER *wb, const char *txt);
+void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len);
+void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value);
 
-extern void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
-extern void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
+void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
+void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 
-extern BUFFER *buffer_create(size_t size);
-extern void buffer_free(BUFFER *b);
-extern void buffer_increase(BUFFER *b, size_t free_size_required);
+BUFFER *buffer_create(size_t size);
+void buffer_free(BUFFER *b);
+void buffer_increase(BUFFER *b, size_t free_size_required);
 
-extern void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...) PRINTFLIKE(3, 4);
-extern void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
-extern void buffer_sprintf(BUFFER *wb, const char *fmt, ...) PRINTFLIKE(2,3);
-extern void buffer_strcat_jsonescape(BUFFER *wb, const char *txt);
-extern void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
+void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...) PRINTFLIKE(3, 4);
+void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
+void buffer_sprintf(BUFFER *wb, const char *fmt, ...) PRINTFLIKE(2,3);
+void buffer_strcat_jsonescape(BUFFER *wb, const char *txt);
+void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 
-extern void buffer_char_replace(BUFFER *wb, char from, char to);
+void buffer_char_replace(BUFFER *wb, char from, char to);
 
-extern char *print_number_lu_r(char *str, unsigned long uvalue);
-extern char *print_number_llu_r(char *str, unsigned long long uvalue);
-extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
+char *print_number_lu_r(char *str, unsigned long uvalue);
+char *print_number_llu_r(char *str, unsigned long long uvalue);
+char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
-extern void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
-extern void buffer_print_ll(BUFFER *wb, long long value);
-extern void buffer_print_llu_hex(BUFFER *wb, unsigned long long value);
+void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
+void buffer_print_ll(BUFFER *wb, long long value);
+void buffer_print_llu_hex(BUFFER *wb, unsigned long long value);
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->size - buffer->len < needed_free_size))
