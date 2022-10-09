@@ -55,13 +55,17 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
-        for(int tier = 0; tier < storage_tiers ; tier++)
-            rrdeng_prepare_exit(multidb_ctx[tier]);
+        if(dbengine_enabled) {
+            for (int tier = 0; tier < storage_tiers; tier++)
+                rrdeng_prepare_exit(multidb_ctx[tier]);
+        }
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
-        for(int tier = 0; tier < storage_tiers ; tier++)
-            rrdeng_exit(multidb_ctx[tier]);
+        if(dbengine_enabled) {
+            for (int tier = 0; tier < storage_tiers; tier++)
+                rrdeng_exit(multidb_ctx[tier]);
+        }
 #endif
     }
     sql_close_context_database();
