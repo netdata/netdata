@@ -11,6 +11,14 @@ extern "C" {
 #include <config.h>
 #endif
 
+#if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
+#define NETDATA_INTERNAL_CHECKS 1
+#endif
+
+#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
+#define NETDATA_TRACE_ALLOCATIONS 1
+#endif
+
 #define OS_LINUX   1
 #define OS_FREEBSD 2
 #define OS_MACOS   3
