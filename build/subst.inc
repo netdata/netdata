@@ -13,6 +13,7 @@
 		-e 's#[@]libsysdir_POST@#$(libsysdir)#g' \
 		-e 's#[@]enable_aclk_POST@#$(enable_aclk)#g' \
 		-e 's#[@]enable_cloud_POST@#$(enable_cloud)#g' \
+		-e 's#[@]netdata_user_POST@#$(netdata_user)#g' \
 		$< > $@.tmp; then \
 		mv "$@.tmp" "$@"; \
 	else \
