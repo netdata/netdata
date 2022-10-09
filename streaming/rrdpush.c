@@ -66,7 +66,7 @@ static void load_stream_conf() {
     freez(filename);
 }
 
-bool rrdpush_needs_dbengine() {
+bool rrdpush_receiver_needs_dbengine() {
     struct section *co;
 
     for(co = stream_config.first_section; co; co = co->next) {

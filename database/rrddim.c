@@ -2,9 +2,6 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
-#ifdef ENABLE_DBENGINE
-#include "database/engine/rrdengineapi.h"
-#endif
 #include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
