@@ -336,7 +336,12 @@ RRDHOST *rrdhost_create(const char *hostname,
         memory_mode = RRD_MEMORY_MODE_ALLOC;
     }
 
+#ifdef ENABLE_DBENGINE
     int is_legacy = (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
+#else
+int is_legacy = 1;
+#endif
+
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 

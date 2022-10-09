@@ -199,7 +199,7 @@ struct section *appconfig_get_section(struct config *root, const char *name);
 void appconfig_wrlock(struct config *root);
 void appconfig_unlock(struct config *root);
 
-extern int appconfig_test_boolean_value(char *s);
+int appconfig_test_boolean_value(char *s);
 
 struct connector_instance {
     char instance_name[CONFIG_MAX_NAME + 1];
