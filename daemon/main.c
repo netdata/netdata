@@ -259,7 +259,8 @@ void cancel_main_threads() {
 
     for (i = 0; static_threads[i].name != NULL ; i++)
         freez(static_threads[i].thread);
-    free(static_threads);
+
+    freez(static_threads);
 }
 
 struct option_def option_definitions[] = {
