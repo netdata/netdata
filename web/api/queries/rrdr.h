@@ -128,20 +128,20 @@ typedef struct rrdresult {
 #define rrdr_rows(r) ((r)->rows)
 
 #include "database/rrd.h"
-extern void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
-extern RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list);
-extern RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points);
+void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
+RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list);
+RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(
+RRDR *rrd2rrdr(
     ONEWAYALLOC *owa,
     RRDSET *st, long points_wanted, long long after_wanted, long long before_wanted,
     RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
     struct context_param *context_param_list, const char *group_options, int timeout, int tier);
 
-extern int rrdr_relative_window_to_absolute(long long *after, long long *before);
+int rrdr_relative_window_to_absolute(long long *after, long long *before);
 
 #ifdef __cplusplus
 }

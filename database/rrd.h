@@ -132,8 +132,8 @@ typedef enum rrd_memory_mode {
 
 extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
-extern const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
-extern RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
+RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 
 
 // ----------------------------------------------------------------------------
@@ -153,17 +153,17 @@ typedef enum rrd_algorithm {
 #define RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
 #define RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
 
-extern RRD_ALGORITHM rrd_algorithm_id(const char *name);
-extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
+RRD_ALGORITHM rrd_algorithm_id(const char *name);
+const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 // ----------------------------------------------------------------------------
 // RRD FAMILY
 
-extern const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
-extern void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
-extern void rrdfamily_index_init(RRDHOST *host);
-extern void rrdfamily_index_destroy(RRDHOST *host);
-extern DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
+const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
+void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
+void rrdfamily_index_init(RRDHOST *host);
+void rrdfamily_index_destroy(RRDHOST *host);
+DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 
 
 // ----------------------------------------------------------------------------
@@ -217,37 +217,37 @@ typedef enum rrdlabel_source {
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT)
 
-extern size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length);
+size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length);
 
-extern DICTIONARY *rrdlabels_create(void);
-extern void rrdlabels_destroy(DICTIONARY *labels_dict);
-extern void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
-extern void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
-extern void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
-extern void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key);
+DICTIONARY *rrdlabels_create(void);
+void rrdlabels_destroy(DICTIONARY *labels_dict);
+void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
+void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
+void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
+void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key);
 
-extern void rrdlabels_unmark_all(DICTIONARY *labels);
-extern void rrdlabels_remove_all_unmarked(DICTIONARY *labels);
+void rrdlabels_unmark_all(DICTIONARY *labels);
+void rrdlabels_remove_all_unmarked(DICTIONARY *labels);
 
-extern int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
-extern int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
 
-extern void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
-extern bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
-extern bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
-extern int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
+bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
+bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
+int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
 
-extern void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
-extern void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
+void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
+void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 
 void reload_host_labels(void);
-extern void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
-extern void rrdset_save_rrdlabels_to_sql(RRDSET *st);
+void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
+void rrdset_save_rrdlabels_to_sql(RRDSET *st);
 
-extern int rrdlabels_unittest(void);
+int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h
-extern bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
+bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -328,20 +328,20 @@ struct rrddim {
 #define rrddim_name(rd) string2str((rd) ->name)
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
-extern const char *rrddim_cache_filename(RRDDIM *rd);
+const char *rrddim_cache_filename(RRDDIM *rd);
 
 // updated the header with the latest RRDDIM value, for memory mode MAP and SAVE
-extern void rrddim_memory_file_update(RRDDIM *rd);
+void rrddim_memory_file_update(RRDDIM *rd);
 
 // free the memory file structures for memory mode MAP and SAVE
-extern void rrddim_memory_file_free(RRDDIM *rd);
+void rrddim_memory_file_free(RRDDIM *rd);
 
-extern bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
+bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
 
 // return the v019 header size of RRDDIM files
-extern size_t rrddim_memory_file_header_size(void);
+size_t rrddim_memory_file_header_size(void);
 
-extern void rrddim_memory_file_save(RRDDIM *rd);
+void rrddim_memory_file_save(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -451,7 +451,7 @@ struct rrddim_tier {
     struct rrddim_query_ops query_ops;
 };
 
-extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -659,7 +659,7 @@ struct rrdset {
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
 #define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
 
-extern STRING *rrd_string_strdupz(const char *s);
+STRING *rrd_string_strdupz(const char *s);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -679,11 +679,11 @@ extern STRING *rrd_string_strdupz(const char *s);
 #define rrdset_number_of_dimensions(st) \
     dictionary_entries((st)->rrddim_root_index)
 
-extern void rrdset_memory_file_save(RRDSET *st);
-extern void rrdset_memory_file_free(RRDSET *st);
-extern void rrdset_memory_file_update(RRDSET *st);
-extern const char *rrdset_cache_filename(RRDSET *st);
-extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
+void rrdset_memory_file_save(RRDSET *st);
+void rrdset_memory_file_free(RRDSET *st);
+void rrdset_memory_file_update(RRDSET *st);
+const char *rrdset_cache_filename(RRDSET *st);
+bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
 
 #include "rrdfunctions.h"
 
@@ -1016,7 +1016,7 @@ extern RRDHOST *localhost;
 #define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
 #define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
-extern long rrdhost_hosts_available(void);
+long rrdhost_hosts_available(void);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -1039,24 +1039,24 @@ extern netdata_rwlock_t rrd_rwlock;
 
 // ----------------------------------------------------------------------------
 
-extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
-extern void rrdset_index_init(RRDHOST *host);
-extern void rrdset_index_destroy(RRDHOST *host);
+bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
+void rrdset_index_init(RRDHOST *host);
+void rrdset_index_destroy(RRDHOST *host);
 
-extern void rrddim_index_init(RRDSET *st);
-extern void rrddim_index_destroy(RRDSET *st);
+void rrddim_index_init(RRDSET *st);
+void rrddim_index_destroy(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 
 extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
-extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
-extern RRDHOST *rrdhost_find_by_hostname(const char *hostname);
-extern RRDHOST *rrdhost_find_by_guid(const char *guid);
+RRDHOST *rrdhost_find_by_hostname(const char *hostname);
+RRDHOST *rrdhost_find_by_guid(const char *guid);
 
-extern RRDHOST *rrdhost_find_or_create(
+RRDHOST *rrdhost_find_or_create(
         const char *hostname
         , const char *registry_hostname
         , const char *guid
@@ -1079,7 +1079,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , bool is_archived
 );
 
-extern void rrdhost_update(RRDHOST *host
+void rrdhost_update(RRDHOST *host
     , const char *hostname
     , const char *registry_hostname
     , const char *guid
@@ -1101,15 +1101,15 @@ extern void rrdhost_update(RRDHOST *host
     , struct rrdhost_system_info *system_info
 );
 
-extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
+int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
-extern void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-extern void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-extern void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-extern void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-extern void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
-extern void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line);
+void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
+void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
+void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
+void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line);
 
 #define rrdhost_check_rdlock(host) __rrdhost_check_rdlock(host, __FILE__, __FUNCTION__, __LINE__)
 #define rrdhost_check_wrlock(host) __rrdhost_check_wrlock(host, __FILE__, __FUNCTION__, __LINE__)
@@ -1130,9 +1130,9 @@ extern void __rrd_check_wrlock(const char *file, const char *function, const uns
 // ----------------------------------------------------------------------------
 // RRDSET functions
 
-extern int rrdset_reset_name(RRDSET *st, const char *name);
+int rrdset_reset_name(RRDSET *st, const char *name);
 
-extern RRDSET *rrdset_create_custom(RRDHOST *host
+RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *type
                              , const char *id
                              , const char *name
@@ -1154,20 +1154,20 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
 
-extern void rrdhost_free_all(void);
-extern void rrdhost_save_all(void);
-extern void rrdhost_cleanup_all(void);
+void rrdhost_free_all(void);
+void rrdhost_save_all(void);
+void rrdhost_cleanup_all(void);
 
-extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
-extern void rrdhost_free(RRDHOST *host, bool force);
-extern void rrdhost_save_charts(RRDHOST *host);
-extern void rrdhost_delete_charts(RRDHOST *host);
+void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
+void rrdhost_free(RRDHOST *host, bool force);
+void rrdhost_save_charts(RRDHOST *host);
+void rrdhost_delete_charts(RRDHOST *host);
 
-extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
+int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
 
-extern void rrdset_update_heterogeneous_flag(RRDSET *st);
+void rrdset_update_heterogeneous_flag(RRDSET *st);
 
-extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
+RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
@@ -1178,7 +1178,7 @@ static inline RRDSET *rrdset_find_active_localhost(const char *id)
     return st;
 }
 
-extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
+RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
 #define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
@@ -1189,7 +1189,7 @@ static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, cons
     return st;
 }
 
-extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
+RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 #define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
@@ -1200,30 +1200,30 @@ static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
     return st;
 }
 
-extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
-extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
+void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
+void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
-extern void rrdset_done(RRDSET *st);
+void rrdset_done(RRDSET *st);
 
-extern void rrdset_is_obsolete(RRDSET *st);
-extern void rrdset_isnot_obsolete(RRDSET *st);
+void rrdset_is_obsolete(RRDSET *st);
+void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
 #define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 
-extern time_t rrddim_first_entry_t(RRDDIM *rd);
-extern time_t rrddim_last_entry_t(RRDDIM *rd);
-extern time_t rrdset_last_entry_t(RRDSET *st);
-extern time_t rrdset_first_entry_t(RRDSET *st);
-extern time_t rrdhost_last_entry_t(RRDHOST *h);
+time_t rrddim_first_entry_t(RRDDIM *rd);
+time_t rrddim_last_entry_t(RRDDIM *rd);
+time_t rrdset_last_entry_t(RRDSET *st);
+time_t rrdset_first_entry_t(RRDSET *st);
+time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-extern RRDDIM *rrddim_add_custom(RRDSET *st
+RRDDIM *rrddim_add_custom(RRDSET *st
                                  , const char *id
                                  , const char *name
                                  , collected_number multiplier
@@ -1235,49 +1235,49 @@ extern RRDDIM *rrddim_add_custom(RRDSET *st
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
     rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
-extern int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
-extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
-extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
-extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
+int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
+int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
+int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
+int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
 
-extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
-extern RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
+RRDDIM *rrddim_find(RRDSET *st, const char *id);
+RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 
-extern int rrddim_hide(RRDSET *st, const char *id);
-extern int rrddim_unhide(RRDSET *st, const char *id);
+int rrddim_hide(RRDSET *st, const char *id);
+int rrddim_unhide(RRDSET *st, const char *id);
 
-extern void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd);
-extern void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
+void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd);
+void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
-extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
-extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
+collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
+collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 #ifdef ENABLE_ACLK
-extern time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
+time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 #endif
-extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
+long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
+char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions
 
-extern void rrdset_delete_files(RRDSET *st);
-extern void rrdset_save(RRDSET *st);
-extern void rrdset_free(RRDSET *st);
+void rrdset_delete_files(RRDSET *st);
+void rrdset_save(RRDSET *st);
+void rrdset_free(RRDSET *st);
 
 #ifdef NETDATA_RRD_INTERNALS
 
-extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
+char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
-extern void rrddim_free(RRDSET *st, RRDDIM *rd);
+void rrddim_free(RRDSET *st, RRDDIM *rd);
 
-extern void rrdset_reset(RRDSET *st);
-extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
+void rrdset_reset(RRDSET *st);
+void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
-extern RRDHOST *rrdhost_create(
+RRDHOST *rrdhost_create(
     const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
     const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
     int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
@@ -1286,12 +1286,12 @@ extern RRDHOST *rrdhost_create(
 
 #endif /* NETDATA_RRD_INTERNALS */
 
-extern void set_host_properties(
+void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
 
-extern int get_tier_grouping(int tier);
+int get_tier_grouping(int tier);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

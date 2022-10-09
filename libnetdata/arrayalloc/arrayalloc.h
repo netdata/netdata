@@ -28,8 +28,8 @@ typedef struct arrayalloc {
     } internal;
 } ARAL;
 
-extern ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir);
-extern void *arrayalloc_mallocz(ARAL *ar);
-extern void arrayalloc_freez(ARAL *ar, void *ptr);
+ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir);
+void *arrayalloc_mallocz(ARAL *ar);
+void arrayalloc_freez(ARAL *ar, void *ptr);
 
 #endif // ARRAYALLOC_H

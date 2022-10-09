@@ -22,11 +22,11 @@ struct storage_engine {
     STORAGE_ENGINE_API api;
 };
 
-extern STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
-extern STORAGE_ENGINE* storage_engine_find(const char* name);
+STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
+STORAGE_ENGINE* storage_engine_find(const char* name);
 
 // Iterator over existing engines
-extern STORAGE_ENGINE* storage_engine_foreach_init();
-extern STORAGE_ENGINE* storage_engine_foreach_next(STORAGE_ENGINE* it);
+STORAGE_ENGINE* storage_engine_foreach_init();
+STORAGE_ENGINE* storage_engine_foreach_next(STORAGE_ENGINE* it);
 
 #endif

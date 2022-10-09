@@ -256,14 +256,14 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-extern void *dbengine_page_alloc(void);
-extern void dbengine_page_free(void *page);
+void *dbengine_page_alloc(void);
+void dbengine_page_free(void *page);
 
-extern int init_rrd_files(struct rrdengine_instance *ctx);
-extern void finalize_rrd_files(struct rrdengine_instance *ctx);
-extern void rrdeng_test_quota(struct rrdengine_worker_config* wc);
-extern void rrdeng_worker(void* arg);
-extern void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);
-extern struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc);
+int init_rrd_files(struct rrdengine_instance *ctx);
+void finalize_rrd_files(struct rrdengine_instance *ctx);
+void rrdeng_test_quota(struct rrdengine_worker_config* wc);
+void rrdeng_worker(void* arg);
+void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);
+struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc);
 
 #endif /* NETDATA_RRDENGINE_H */

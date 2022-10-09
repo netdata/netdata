@@ -270,25 +270,25 @@ typedef struct ebpf_module {
     struct bpf_object *objects;
 } ebpf_module_t;
 
-extern int ebpf_get_kernel_version();
-extern int get_redhat_release();
-extern int has_condition_to_run(int version);
-extern char *ebpf_kernel_suffix(int version, int isrh);
-extern struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
+int ebpf_get_kernel_version();
+int get_redhat_release();
+int has_condition_to_run(int version);
+char *ebpf_kernel_suffix(int version, int isrh);
+struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
                                            struct bpf_object **obj);
 
-extern void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
-extern int ebpf_load_config(struct config *config, char *filename);
-extern void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file);
-extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
-extern void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode);
-extern char *ebpf_find_symbol(char *search);
-extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
-extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
-extern char **ebpf_fill_histogram_dimension(size_t maximum);
-extern void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em);
-extern void ebpf_update_controller(int fd, ebpf_module_t *em);
-extern void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name);
+void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
+int ebpf_load_config(struct config *config, char *filename);
+void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file);
+void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
+void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode);
+char *ebpf_find_symbol(char *search);
+void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
+void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
+char **ebpf_fill_histogram_dimension(size_t maximum);
+void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em);
+void ebpf_update_controller(int fd, ebpf_module_t *em);
+void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name);
 
 // Histogram
 #define NETDATA_EBPF_HIST_MAX_BINS 24UL
@@ -339,13 +339,13 @@ typedef struct ebpf_sync_syscalls {
 #endif
 } ebpf_sync_syscalls_t;
 
-extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
+void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 
 // Tracepoint helpers
 // For more information related to tracepoints read https://www.kernel.org/doc/html/latest/trace/tracepoints.html
-extern int ebpf_is_tracepoint_enabled(char *subsys, char *eventname);
-extern int ebpf_enable_tracing_values(char *subsys, char *eventname);
-extern int ebpf_disable_tracing_values(char *subsys, char *eventname);
+int ebpf_is_tracepoint_enabled(char *subsys, char *eventname);
+int ebpf_enable_tracing_values(char *subsys, char *eventname);
+int ebpf_disable_tracing_values(char *subsys, char *eventname);
 
 // BTF Section
 #define EBPF_DEFAULT_BTF_FILE "vmlinux"
@@ -355,14 +355,14 @@ extern int ebpf_disable_tracing_values(char *subsys, char *eventname);
 // BTF helpers
 #define NETDATA_EBPF_MAX_SYSCALL_LENGTH 255
 
-extern netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str);
-extern netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode_t lmode);
-extern void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver);
+netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str);
+netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode_t lmode);
+void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver);
 #ifdef LIBBPF_MAJOR_VERSION
-extern void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
-extern struct btf *ebpf_parse_btf_file(const char *filename);
-extern struct btf *ebpf_load_btf_file(char *path, char *filename);
-extern int ebpf_is_function_inside_btf(struct btf *file, char *function);
+void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
+struct btf *ebpf_parse_btf_file(const char *filename);
+struct btf *ebpf_load_btf_file(char *path, char *filename);
+int ebpf_is_function_inside_btf(struct btf *file, char *function);
 #endif
 
 #endif /* NETDATA_EBPF_H */

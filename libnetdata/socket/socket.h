@@ -52,40 +52,40 @@ typedef struct listen_sockets {
     WEB_CLIENT_ACL fds_acl_flags[MAX_LISTEN_FDS];  // the acl to apply to the open sockets (dashboard, badges, streaming, netdata.conf, management)
 } LISTEN_SOCKETS;
 
-extern char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port);
+char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port);
 
-extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
-extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
+int listen_sockets_setup(LISTEN_SOCKETS *sockets);
+void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
-extern void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data);
-extern int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
-extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
-extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
-extern int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
+void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data);
+int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
+int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
+int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
+int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
 
 #ifdef ENABLE_HTTPS
-extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-extern ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 #else
-extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-extern ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 #endif
 
-extern int sock_setnonblock(int fd);
-extern int sock_delnonblock(int fd);
-extern int sock_setreuse(int fd, int reuse);
-extern int sock_setreuse_port(int fd, int reuse);
-extern int sock_enlarge_in(int fd);
-extern int sock_enlarge_out(int fd);
+int sock_setnonblock(int fd);
+int sock_delnonblock(int fd);
+int sock_setreuse(int fd, int reuse);
+int sock_setreuse_port(int fd, int reuse);
+int sock_enlarge_in(int fd);
+int sock_enlarge_out(int fd);
 
-extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
+int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
                               SIMPLE_PATTERN *access_list, const char *patname, int allow_dns);
-extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
+int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
                          char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list, int allow_dns);
 
 #ifndef HAVE_ACCEPT4
-extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
+int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
 
 #ifndef SOCK_NONBLOCK
 #define SOCK_NONBLOCK 00004000
@@ -173,12 +173,12 @@ struct poll {
 
 #define pollinfo_from_slot(p, slot) (&((p)->inf[(slot)]))
 
-extern int poll_default_snd_callback(POLLINFO *pi, short int *events);
-extern int poll_default_rcv_callback(POLLINFO *pi, short int *events);
-extern void poll_default_del_callback(POLLINFO *pi);
-extern void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data);
+int poll_default_snd_callback(POLLINFO *pi, short int *events);
+int poll_default_rcv_callback(POLLINFO *pi, short int *events);
+void poll_default_del_callback(POLLINFO *pi);
+void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data);
 
-extern POLLINFO *poll_add_fd(POLLJOB *p
+POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
                              , WEB_CLIENT_ACL port_acl
@@ -192,9 +192,9 @@ extern POLLINFO *poll_add_fd(POLLJOB *p
                              , int   (*snd_callback)(POLLINFO *pi, short int *events)
                              , void *data
 );
-extern void poll_close_fd(POLLINFO *pi);
+void poll_close_fd(POLLINFO *pi);
 
-extern void poll_events(LISTEN_SOCKETS *sockets
+void poll_events(LISTEN_SOCKETS *sockets
         , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
         , void  (*del_callback)(POLLINFO *pi)
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)

@@ -8,7 +8,7 @@
 #endif
 #include "../rrdengine.h"
 
-extern int compaction_failure_recovery(struct metalog_instance *ctx, struct metadata_logfile **metalogfiles,
+int compaction_failure_recovery(struct metalog_instance *ctx, struct metadata_logfile **metalogfiles,
                                        unsigned *matched_files);
 
 #endif /* NETDATA_COMPACTION_H */

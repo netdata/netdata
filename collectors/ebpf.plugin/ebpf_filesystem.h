@@ -43,7 +43,7 @@ enum netdata_filesystem_table {
     NETDATA_ADDR_FS_TABLE
 };
 
-extern void *ebpf_filesystem_thread(void *ptr);
+void *ebpf_filesystem_thread(void *ptr);
 extern struct config fs_config;
 
 #endif /* NETDATA_EBPF_FILESYSTEM_H */

@@ -51,11 +51,11 @@ struct mountinfo {
     struct mountinfo *next;
 };
 
-extern struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor, char *device);
-extern struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *root, const char *filesystem, const char *mount_source);
-extern struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *root, const char *filesystem, const char *super_options);
+struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor, char *device);
+struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *root, const char *filesystem, const char *mount_source);
+struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *root, const char *filesystem, const char *super_options);
 
-extern void mountinfo_free_all(struct mountinfo *mi);
-extern struct mountinfo *mountinfo_read(int do_statvfs);
+void mountinfo_free_all(struct mountinfo *mi);
+struct mountinfo *mountinfo_read(int do_statvfs);
 
 #endif /* NETDATA_PROC_SELF_MOUNTINFO_H */
