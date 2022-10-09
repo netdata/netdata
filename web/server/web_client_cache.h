@@ -21,10 +21,10 @@ struct clients_cache {
 
 extern __thread struct clients_cache web_clients_cache;
 
-extern void web_client_release(struct web_client *w);
-extern struct web_client *web_client_get_from_cache_or_allocate();
-extern void web_client_cache_destroy(void);
-extern void web_client_cache_verify(int force);
+void web_client_release(struct web_client *w);
+struct web_client *web_client_get_from_cache_or_allocate();
+void web_client_cache_destroy(void);
+void web_client_cache_verify(int force);
 
 #include "web_server.h"
 

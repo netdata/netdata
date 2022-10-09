@@ -60,10 +60,10 @@ typedef struct ebpf_cgroup_target {
     struct ebpf_cgroup_target *next;
 } ebpf_cgroup_target_t;
 
-extern void ebpf_map_cgroup_shared_memory();
-extern void ebpf_parse_cgroup_shm_data();
-extern void ebpf_close_cgroup_shm();
-extern void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *family, char *charttype, int order,
+void ebpf_map_cgroup_shared_memory();
+void ebpf_parse_cgroup_shm_data();
+void ebpf_close_cgroup_shm();
+void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *family, char *charttype, int order,
                                           char *algorithm, char *context, char *module, int update_every);
 
 #endif /* NETDATA_EBPF_CGROUP_H */

@@ -28,20 +28,20 @@ typedef struct arrayalloc {
     } internal;
 } ARAL;
 
-extern ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir);
+ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 
 #define arrayalloc_mallocz(ar) arrayalloc_mallocz_int(ar, __FILE__, __FUNCTION__, __LINE__)
 #define arrayalloc_freez(ar, ptr) arrayalloc_freez_int(ar, ptr, __FILE__, __FUNCTION__, __LINE__)
 
-extern void *arrayalloc_mallocz_int(ARAL *ar, const char *file, const char *function, size_t line);
-extern void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *function, size_t line);
+void *arrayalloc_mallocz_int(ARAL *ar, const char *file, const char *function, size_t line);
+void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
 
-extern void *arrayalloc_mallocz(ARAL *ar);
-extern void arrayalloc_freez(ARAL *ar, void *ptr);
+void *arrayalloc_mallocz(ARAL *ar);
+void arrayalloc_freez(ARAL *ar, void *ptr);
 
 #endif // NETDATA_TRACE_ALLOCATIONS
 

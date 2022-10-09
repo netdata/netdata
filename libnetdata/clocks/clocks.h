@@ -82,7 +82,7 @@ typedef struct heartbeat {
  * make systems without clock_gettime() support sensitive
  * to time jumps or hibernation/suspend side effects.
  */
-extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
+int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
 
 /*
@@ -111,50 +111,50 @@ extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
  * All now_*_usec() functions return the time in microseconds from the appropriate clock, or 0 on error.
  *
  */
-extern int now_realtime_timeval(struct timeval *tv);
-extern time_t now_realtime_sec(void);
-extern usec_t now_realtime_usec(void);
+int now_realtime_timeval(struct timeval *tv);
+time_t now_realtime_sec(void);
+usec_t now_realtime_usec(void);
 
-extern int now_monotonic_timeval(struct timeval *tv);
-extern time_t now_monotonic_sec(void);
-extern usec_t now_monotonic_usec(void);
-extern int now_monotonic_high_precision_timeval(struct timeval *tv);
-extern time_t now_monotonic_high_precision_sec(void);
-extern usec_t now_monotonic_high_precision_usec(void);
+int now_monotonic_timeval(struct timeval *tv);
+time_t now_monotonic_sec(void);
+usec_t now_monotonic_usec(void);
+int now_monotonic_high_precision_timeval(struct timeval *tv);
+time_t now_monotonic_high_precision_sec(void);
+usec_t now_monotonic_high_precision_usec(void);
 
-extern int now_boottime_timeval(struct timeval *tv);
-extern time_t now_boottime_sec(void);
-extern usec_t now_boottime_usec(void);
+int now_boottime_timeval(struct timeval *tv);
+time_t now_boottime_sec(void);
+usec_t now_boottime_usec(void);
 
-extern usec_t timeval_usec(struct timeval *tv);
-extern msec_t timeval_msec(struct timeval *tv);
+usec_t timeval_usec(struct timeval *tv);
+msec_t timeval_msec(struct timeval *tv);
 
-extern usec_t dt_usec(struct timeval *now, struct timeval *old);
-extern susec_t dt_usec_signed(struct timeval *now, struct timeval *old);
+usec_t dt_usec(struct timeval *now, struct timeval *old);
+susec_t dt_usec_signed(struct timeval *now, struct timeval *old);
 
-extern void heartbeat_init(heartbeat_t *hb);
+void heartbeat_init(heartbeat_t *hb);
 
 /* Sleeps until next multiple of tick using monotonic clock.
  * Returns elapsed time in microseconds since previous heartbeat
  */
-extern usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
+usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
 
-extern void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr, size_t *count_ptr);
+void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr, size_t *count_ptr);
 
-extern void sleep_usec(usec_t usec);
+void sleep_usec(usec_t usec);
 
-extern void clocks_init(void);
+void clocks_init(void);
 
 // lower level functions - avoid using directly
-extern time_t now_sec(clockid_t clk_id);
-extern usec_t now_usec(clockid_t clk_id);
-extern int now_timeval(clockid_t clk_id, struct timeval *tv);
+time_t now_sec(clockid_t clk_id);
+usec_t now_usec(clockid_t clk_id);
+int now_timeval(clockid_t clk_id, struct timeval *tv);
 
-extern collected_number uptime_msec(char *filename);
+collected_number uptime_msec(char *filename);
 
 extern usec_t clock_monotonic_resolution;
 extern usec_t clock_realtime_resolution;
 
-extern void sleep_to_absolute_time(usec_t usec);
+void sleep_to_absolute_time(usec_t usec);
 
 #endif /* NETDATA_CLOCKS_H */

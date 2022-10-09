@@ -11,11 +11,11 @@
 // This means, there will be no speed penalty for using
 // these variables
 
-extern void rrddimvar_rename_all(RRDDIM *rd);
-extern void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS flags);
-extern void rrddimvar_delete_all(RRDDIM *rd);
+void rrddimvar_rename_all(RRDDIM *rd);
+void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_FLAGS flags);
+void rrddimvar_delete_all(RRDDIM *rd);
 
-extern void rrddimvar_index_init(RRDSET *st);
-extern void rrddimvar_index_destroy(RRDSET *st);
+void rrddimvar_index_init(RRDSET *st);
+void rrddimvar_index_destroy(RRDSET *st);
 
 #endif //NETDATA_RRDDIMVAR_H

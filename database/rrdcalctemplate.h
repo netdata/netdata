@@ -110,19 +110,19 @@ struct rrdcalctemplate {
 
 #define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
 
-extern void rrdcalctemplate_link_matching_templates_to_rrdset(RRDSET *st);
+void rrdcalctemplate_link_matching_templates_to_rrdset(RRDSET *st);
 
-extern void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt);
-extern void rrdcalctemplate_delete_all(RRDHOST *host);
-extern void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt);
+void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt);
+void rrdcalctemplate_delete_all(RRDHOST *host);
+void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt);
 
-extern void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
+void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
 
-extern bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
-extern void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host);
+bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host);
+void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host);
 
 
-extern void rrdcalctemplate_index_init(RRDHOST *host);
-extern void rrdcalctemplate_index_destroy(RRDHOST *host);
+void rrdcalctemplate_index_init(RRDHOST *host);
+void rrdcalctemplate_index_destroy(RRDHOST *host);
 
 #endif //NETDATA_RRDCALCTEMPLATE_H

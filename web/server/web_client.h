@@ -190,21 +190,21 @@ struct web_client {
 #endif
 };
 
-extern int web_client_permission_denied(struct web_client *w);
+int web_client_permission_denied(struct web_client *w);
 
-extern ssize_t web_client_send(struct web_client *w);
-extern ssize_t web_client_receive(struct web_client *w);
-extern ssize_t web_client_read_file(struct web_client *w);
+ssize_t web_client_send(struct web_client *w);
+ssize_t web_client_receive(struct web_client *w);
+ssize_t web_client_read_file(struct web_client *w);
 
-extern void web_client_process_request(struct web_client *w);
-extern void web_client_request_done(struct web_client *w);
+void web_client_process_request(struct web_client *w);
+void web_client_request_done(struct web_client *w);
 
-extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
+void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
-extern int mysendfile(struct web_client *w, char *filename);
+int mysendfile(struct web_client *w, char *filename);
 
-extern void web_client_build_http_header(struct web_client *w);
-extern char *strip_control_characters(char *url);
+void web_client_build_http_header(struct web_client *w);
+char *strip_control_characters(char *url);
 
 #include "daemon/common.h"
 

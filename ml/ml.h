@@ -12,7 +12,7 @@ extern "C" {
 
 // This is a DBEngine function redeclared here so that we can free
 // the anomaly rate dimension, whenever its backing dimension is freed.
-extern void rrddim_free(RRDSET *st, RRDDIM *rd);
+void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 typedef void* ml_host_t;
 typedef void* ml_dimension_t;

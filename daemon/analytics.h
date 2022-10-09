@@ -69,18 +69,18 @@ struct analytics_data {
     uint8_t dashboard_hits;
 };
 
-extern void analytics_get_data(char *name, BUFFER *wb);
-extern void set_late_global_environment(void);
-extern void analytics_free_data(void);
-extern void set_global_environment(void);
-extern void send_statistics(const char *action, const char *action_result, const char *action_data);
-extern void analytics_log_shell(void);
-extern void analytics_log_json(void);
-extern void analytics_log_prometheus(void);
-extern void analytics_log_dashboard(void);
-extern void analytics_gather_mutable_meta_data(void);
-extern void analytics_report_oom_score(long long int score);
-extern void get_system_timezone(void);
+void analytics_get_data(char *name, BUFFER *wb);
+void set_late_global_environment(void);
+void analytics_free_data(void);
+void set_global_environment(void);
+void send_statistics(const char *action, const char *action_result, const char *action_data);
+void analytics_log_shell(void);
+void analytics_log_json(void);
+void analytics_log_prometheus(void);
+void analytics_log_dashboard(void);
+void analytics_gather_mutable_meta_data(void);
+void analytics_report_oom_score(long long int score);
+void get_system_timezone(void);
 
 extern struct analytics_data analytics_data;
 

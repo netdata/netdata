@@ -284,20 +284,20 @@ extern "C" {
 // ---------------------------------------------------------------------------------------------
 
 
-extern void netdata_fix_chart_id(char *s);
-extern void netdata_fix_chart_name(char *s);
+void netdata_fix_chart_id(char *s);
+void netdata_fix_chart_name(char *s);
 
-extern void strreverse(char* begin, char* end);
-extern char *mystrsep(char **ptr, char *s);
-extern char *trim(char *s); // remove leading and trailing spaces; may return NULL
-extern char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
+void strreverse(char* begin, char* end);
+char *mystrsep(char **ptr, char *s);
+char *trim(char *s); // remove leading and trailing spaces; may return NULL
+char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
 
-extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
-extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
+int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
+int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 
 // memory allocation functions that handle failures
 #ifdef NETDATA_TRACE_ALLOCATIONS
-extern int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data);
+int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data);
 
 #define strdupz(s) strdupz_int(s, __FILE__, __FUNCTION__, __LINE__)
 #define callocz(nmemb, size) callocz_int(nmemb, size, __FILE__, __FUNCTION__, __LINE__)
@@ -305,47 +305,47 @@ extern int malloc_trace_walkthrough(int (*callback)(void *item, void *data), voi
 #define reallocz(ptr, size) reallocz_int(ptr, size, __FILE__, __FUNCTION__, __LINE__)
 #define freez(ptr) freez_int(ptr, __FILE__, __FUNCTION__, __LINE__)
 
-extern char *strdupz_int(const char *s, const char *file, const char *function, size_t line);
-extern void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line);
-extern void *mallocz_int(size_t size, const char *file, const char *function, size_t line);
-extern void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line);
-extern void freez_int(void *ptr, const char *file, const char *function, size_t line);
+char *strdupz_int(const char *s, const char *file, const char *function, size_t line);
+void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line);
+void *mallocz_int(size_t size, const char *file, const char *function, size_t line);
+void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line);
+void freez_int(void *ptr, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
-extern char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
-extern void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
-extern void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
-extern void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
-extern void freez(void *ptr);
+char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
+void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
+void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
+void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
+void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
 
-extern void json_escape_string(char *dst, const char *src, size_t size);
-extern void json_fix_string(char *s);
+void json_escape_string(char *dst, const char *src, size_t size);
+void json_fix_string(char *s);
 
-extern void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
-extern int netdata_munmap(void *ptr, size_t size);
-extern int memory_file_save(const char *filename, void *mem, size_t size);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
+int netdata_munmap(void *ptr, size_t size);
+int memory_file_save(const char *filename, void *mem, size_t size);
 
-extern int fd_is_valid(int fd);
+int fd_is_valid(int fd);
 
 extern struct rlimit rlimit_nofile;
 
 extern int enable_ksm;
 
-extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
+char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
-extern int verify_netdata_host_prefix();
+int verify_netdata_host_prefix();
 
-extern int recursively_delete_dir(const char *path, const char *reason);
+int recursively_delete_dir(const char *path, const char *reason);
 
 extern volatile sig_atomic_t netdata_exit;
 
 extern const char *program_version;
 
-extern char *strdupz_path_subpath(const char *path, const char *subpath);
-extern int path_is_dir(const char *path, const char *subpath);
-extern int path_is_file(const char *path, const char *subpath);
-extern void recursive_config_double_dir_load(
+char *strdupz_path_subpath(const char *path, const char *subpath);
+int path_is_dir(const char *path, const char *subpath);
+int path_is_file(const char *path, const char *subpath);
+void recursive_config_double_dir_load(
         const char *user_path
         , const char *stock_path
         , const char *subpath
@@ -353,8 +353,8 @@ extern void recursive_config_double_dir_load(
         , void *data
         , size_t depth
 );
-extern char *read_by_filename(char *filename, long *file_size);
-extern char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
+char *read_by_filename(char *filename, long *file_size);
+char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
@@ -385,20 +385,20 @@ typedef struct bitmap256 {
     uint64_t data[4];
 } BITMAP256;
 
-extern bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
-extern void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
+bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
+void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
-extern int config_isspace(char c);
-extern int pluginsd_space(char c);
+int config_isspace(char c);
+int pluginsd_space(char c);
 int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
-extern int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);
+int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);
 
-extern bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
+bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 
-extern void netdata_cleanup_and_exit(int ret) NORETURN;
-extern void send_statistics(const char *action, const char *action_result, const char *action_data);
+void netdata_cleanup_and_exit(int ret) NORETURN;
+void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
 #include "os.h"
 #include "storage_number/storage_number.h"

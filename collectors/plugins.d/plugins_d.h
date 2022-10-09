@@ -67,9 +67,9 @@ struct plugind {
 
 extern struct plugind *pluginsd_root;
 
-extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
+size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
-extern int pluginsd_initialize_plugin_directories();
+int pluginsd_initialize_plugin_directories();
 
 
 
