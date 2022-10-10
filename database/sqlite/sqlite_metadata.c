@@ -933,14 +933,14 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         if (unlikely(metadata_scan_host(host, data->max_count))) {
             run_again = true;
             rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
-            info("METADATA: Rescheduling host %s to run; more charts to store", rrdhost_hostname(host));
+            internal_error(true,"METADATA: Rescheduling host %s to run; more charts to store", rrdhost_hostname(host));
         }
     }
     dfe_done(host);
     if (unlikely(run_again))
-        wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
-    else
         wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
+    else
+        wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
 }
 
 static void metadata_event_loop(void *arg)
