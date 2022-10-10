@@ -1238,7 +1238,7 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
     DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size);
 
     // we return the memory we actually freed
-    return item_size + (dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)?0:value_size;
+    return item_size + ((dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE) ? 0 : value_size);
 }
 
 // ----------------------------------------------------------------------------
