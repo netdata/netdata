@@ -8,8 +8,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/conf
 # How to optimize the Netdata Agent's performance
 
 We designed the Netdata Agent to be incredibly lightweight, even when it's collecting a few thousand dimensions every
-second and visualizing that data into hundreds of charts. When properly configured for a production node, the Agent itself should 
-never use more than 1% of a single CPU core, roughly 50-100 MiB of RAM, and minimal disk I/O to collect, store, and visualize all this data.
+second and visualizing that data into hundreds of charts. When properly configured for a production node, the Agent 
+itself should never use more than 1% of a single CPU core, roughly 50-100 MiB of RAM, and minimal disk I/O to collect, 
+store, and visualize all this data.
   
 We take this scalability seriously. We have one user [running
 Netdata](https://github.com/netdata/netdata/issues/1323#issuecomment-266427841) on a system with 144 cores and 288
@@ -21,8 +22,9 @@ only 512 MiB of RAM, or an IoT device like a [Raspberry Pi](/docs/guides/monitor
 cases, reducing Netdata's footprint beyond its already diminutive size can pay big dividends, giving your services more
 horsepower while still monitoring the health and the performance of the node, OS, hardware, and applications.
 
-The default settings of the Netdata Agent are not optimized for performance, but for a simple standalone setup. We want the first install
-to give you something you can run without any configuration. Most of the settings and options are enabled, since we want you to experience the full thing.
+The default settings of the Netdata Agent are not optimized for performance, but for a simple standalone setup. We want 
+the first install to give you something you can run without any configuration. Most of the settings and options are 
+enabled, since we want you to experience the full thing.
 
 
 ## Prerequisites
@@ -169,12 +171,14 @@ Metric retention is not important in certain use cases, such as:
  - Data collection nodes stream collected metrics collected to a centralization point.
  - Data collection nodes export their metrics to another time series DB, or are scraped by Prometheus
  - Netdata installed only during incidents, to get richer information.
-In such cases, you may not want to use the dbengine at all and instead opt for memory mode `memory mode = ram` or `memory mode = none`.
+In such cases, you may not want to use the dbengine at all and instead opt for memory mode 
+`memory mode = alloc` or `memory mode = none`.
 
 ## Disable machine learning
 
-Automated anomaly detection may be a powerful tool, but we recommend it to only be enabled on Netdata parents that sit outside your production 
-infrastructure, or if you have cpu and memory to spare. You can disable ML with the following:
+Automated anomaly detection may be a powerful tool, but we recommend it to only be enabled on Netdata parents 
+that sit outside your production infrastructure, or if you have cpu and memory to spare. You can disable ML 
+with the following:
 
 ```conf
 [ml]
