@@ -174,6 +174,12 @@ netdataDashboard.menu = {
         info: 'Readings of the configured system sensors.'
     },
 
+    'bluetooth': {
+        title: 'Bluetooth',
+        icon: '<i class="fas fa-signal"></i>',
+        info: 'Metrics of Bluetooth devices via dbus.'
+    },
+
     'ipmi': {
         title: 'IPMI',
         icon: '<i class="fas fa-leaf"></i>',
