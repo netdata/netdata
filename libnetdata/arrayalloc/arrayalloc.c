@@ -142,7 +142,7 @@ static inline void arrayalloc_free_validate_internal_check(ARAL *ar, ARAL_FREE *
         fatal("ARRAYALLOC: free item of size %zu is not multiple to element size %zu", fr->size, ar->internal.element_size);
 }
 #else
-#define arrayalloc_free_checks(ar, fr) debug_dummy()
+#define arrayalloc_free_validate_internal_check(ar, fr) debug_dummy()
 #endif
 
 // ----------------------------------------------------------------------------
