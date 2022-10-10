@@ -42,7 +42,7 @@ char *procfile_filename(procfile *ff) {
 // ----------------------------------------------------------------------------
 // An array of words
 
-static inline void pfwords_add(procfile *ff, char *str) {
+static inline void procfile_words_add(procfile *ff, char *str) {
     // debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
@@ -60,7 +60,7 @@ static inline void pfwords_add(procfile *ff, char *str) {
 }
 
 NEVERNULL
-static inline pfwords *pfwords_new(void) {
+static inline pfwords *procfile_words_create(void) {
     // debug(D_PROCFILE, PF_PREFIX ":   initializing words");
 
     size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFWORDS_INCREASE_STEP;
@@ -71,12 +71,12 @@ static inline pfwords *pfwords_new(void) {
     return new;
 }
 
-static inline void pfwords_reset(pfwords *fw) {
+static inline void procfile_words_reset(pfwords *fw) {
     // debug(D_PROCFILE, PF_PREFIX ":   resetting words");
     fw->len = 0;
 }
 
-static inline void pfwords_free(pfwords *fw) {
+static inline void procfile_words_free(pfwords *fw) {
     // debug(D_PROCFILE, PF_PREFIX ":   freeing words");
 
     freez(fw);
@@ -87,7 +87,7 @@ static inline void pfwords_free(pfwords *fw) {
 // An array of lines
 
 NEVERNULL
-static inline size_t *pflines_add(procfile *ff) {
+static inline size_t *procfile_lines_add(procfile *ff) {
     // debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
@@ -109,7 +109,7 @@ static inline size_t *pflines_add(procfile *ff) {
 }
 
 NEVERNULL
-static inline pflines *pflines_new(void) {
+static inline pflines *procfile_lines_create(void) {
     // debug(D_PROCFILE, PF_PREFIX ":   initializing lines");
 
     size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_words : PFLINES_INCREASE_STEP;
@@ -120,13 +120,13 @@ static inline pflines *pflines_new(void) {
     return new;
 }
 
-static inline void pflines_reset(pflines *fl) {
+static inline void procfile_lines_reset(pflines *fl) {
     // debug(D_PROCFILE, PF_PREFIX ":   resetting lines");
 
     fl->len = 0;
 }
 
-static inline void pflines_free(pflines *fl) {
+static inline void procfile_lines_free(pflines *fl) {
     // debug(D_PROCFILE, PF_PREFIX ":   freeing lines");
 
     freez(fl);
@@ -141,8 +141,8 @@ void procfile_close(procfile *ff) {
 
     debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", procfile_filename(ff));
 
-    if(likely(ff->lines)) pflines_free(ff->lines);
-    if(likely(ff->words)) pfwords_free(ff->words);
+    if(likely(ff->lines)) procfile_lines_free(ff->lines);
+    if(likely(ff->words)) procfile_words_free(ff->words);
 
     if(likely(ff->fd != -1)) close(ff->fd);
     freez(ff);
@@ -162,7 +162,7 @@ static void procfile_parser(procfile *ff) {
     char quote = 0;                     // the quote character - only when in quoted string
     size_t opened = 0;                  // counts the number of open parenthesis
 
-    size_t *line_words = pflines_add(ff);
+    size_t *line_words = procfile_lines_add(ff);
 
     while(s < e) {
         PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
@@ -177,7 +177,7 @@ static void procfile_parser(procfile *ff) {
                 if (s != t) {
                     // separator, but we have word before it
                     *s = '\0';
-                    pfwords_add(ff, t);
+                    procfile_words_add(ff, t);
                     (*line_words)++;
                     t = ++s;
                 }
@@ -196,13 +196,13 @@ static void procfile_parser(procfile *ff) {
             // end of line
 
             *s = '\0';
-            pfwords_add(ff, t);
+            procfile_words_add(ff, t);
             (*line_words)++;
             t = ++s;
 
             // debug(D_PROCFILE, PF_PREFIX ":   ended line %d with %d words", l, ff->lines->lines[l].words);
 
-            line_words = pflines_add(ff);
+            line_words = procfile_lines_add(ff);
         }
         else if(likely(ct == PF_CHAR_IS_QUOTE)) {
             if(unlikely(!quote && s == t)) {
@@ -215,7 +215,7 @@ static void procfile_parser(procfile *ff) {
                 quote = 0;
 
                 *s = '\0';
-                pfwords_add(ff, t);
+                procfile_words_add(ff, t);
                 (*line_words)++;
                 t = ++s;
             }
@@ -240,7 +240,7 @@ static void procfile_parser(procfile *ff) {
 
                 if(!opened) {
                     *s = '\0';
-                    pfwords_add(ff, t);
+                    procfile_words_add(ff, t);
                     (*line_words)++;
                     t = ++s;
                 }
@@ -262,7 +262,7 @@ static void procfile_parser(procfile *ff) {
         }
 
         *s = '\0';
-        pfwords_add(ff, t);
+        procfile_words_add(ff, t);
         (*line_words)++;
         // t = ++s;
     }
@@ -305,8 +305,8 @@ procfile *procfile_readall(procfile *ff) {
         return NULL;
     }
 
-    pflines_reset(ff->lines);
-    pfwords_reset(ff->words);
+    procfile_lines_reset(ff->lines);
+    procfile_words_reset(ff->words);
     procfile_parser(ff);
 
     if(unlikely(procfile_adaptive_initial_allocation)) {
@@ -423,8 +423,8 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     ff->len = 0;
     ff->flags = flags;
 
-    ff->lines = pflines_new();
-    ff->words = pfwords_new();
+    ff->lines = procfile_lines_create();
+    ff->words = procfile_words_create();
 
     procfile_set_separators(ff, separators);
 

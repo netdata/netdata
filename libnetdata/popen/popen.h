@@ -22,19 +22,19 @@
 #define netdata_popen_raw_default_flags(pidptr, env, fpp_child_input, fpp_child_output, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, env, POPEN_FLAGS_DEFAULT, fpp_child_input, fpp_child_output, command, command, ##args, NULL)
 #define netdata_popen_raw(pidptr, env, flags, fpp_child_input, fpp_child_output, command, args...) netdata_popene_variadic_internal_dont_use_directly(pidptr, env, flags, fpp_child_input, fpp_child_output, command, command, ##args, NULL)
 
-extern FILE *netdata_popen(const char *command, volatile pid_t *pidptr, FILE **fp_child_input);
-extern FILE *netdata_popene(const char *command, volatile pid_t *pidptr, char **env, FILE **fp_child_input);
-extern int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp_child_input, FILE **fpp_child_output, const char *command, ...);
-extern int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid);
+FILE *netdata_popen(const char *command, volatile pid_t *pidptr, FILE **fp_child_input);
+FILE *netdata_popene(const char *command, volatile pid_t *pidptr, char **env, FILE **fp_child_input);
+int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp_child_input, FILE **fpp_child_output, const char *command, ...);
+int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid);
 
-extern int netdata_spawn(const char *command, volatile pid_t *pidptr);
-extern int netdata_spawn_waitpid(pid_t pid);
+int netdata_spawn(const char *command, volatile pid_t *pidptr);
+int netdata_spawn_waitpid(pid_t pid);
 
-extern void netdata_popen_tracking_init(void);
-extern void netdata_popen_tracking_cleanup(void);
-extern int netdata_popen_tracking_pid_shoud_be_reaped(pid_t pid);
+void netdata_popen_tracking_init(void);
+void netdata_popen_tracking_cleanup(void);
+int netdata_popen_tracking_pid_shoud_be_reaped(pid_t pid);
 
-extern void signals_unblock(void);
-extern void signals_reset(void);
+void signals_unblock(void);
+void signals_reset(void);
 
 #endif /* NETDATA_POPEN_H */

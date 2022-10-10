@@ -27,14 +27,14 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 // ----------------------------------------------------------------------------
 // public API for rrdhost
 
-extern void rrdhost_load_rrdcontext_data(RRDHOST *host);
-extern void rrdhost_create_rrdcontexts(RRDHOST *host);
-extern void rrdhost_destroy_rrdcontexts(RRDHOST *host);
+void rrdhost_load_rrdcontext_data(RRDHOST *host);
+void rrdhost_create_rrdcontexts(RRDHOST *host);
+void rrdhost_destroy_rrdcontexts(RRDHOST *host);
 
-extern void rrdcontext_host_child_connected(RRDHOST *host);
-extern void rrdcontext_host_child_disconnected(RRDHOST *host);
+void rrdcontext_host_child_connected(RRDHOST *host);
+void rrdcontext_host_child_disconnected(RRDHOST *host);
 
-extern int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char *context, int (*callback)(RRDSET *st, void *data), void *data);
+int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char *context, int (*callback)(RRDSET *st, void *data), void *data);
 
 typedef enum {
     RRDCONTEXT_OPTION_NONE               = 0,
@@ -52,41 +52,41 @@ typedef enum {
 
 #define RRDCONTEXT_OPTIONS_ALL (RRDCONTEXT_OPTION_SHOW_METRICS|RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_LABELS|RRDCONTEXT_OPTION_SHOW_QUEUED|RRDCONTEXT_OPTION_SHOW_FLAGS|RRDCONTEXT_OPTION_SHOW_DELETED|RRDCONTEXT_OPTION_SHOW_UUIDS|RRDCONTEXT_OPTION_SHOW_HIDDEN)
 
-extern int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions);
-extern int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions);
+int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions);
+int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions);
 
 // ----------------------------------------------------------------------------
 // public API for rrddims
 
-extern void rrdcontext_updated_rrddim(RRDDIM *rd);
-extern void rrdcontext_removed_rrddim(RRDDIM *rd);
-extern void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd);
-extern void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd);
-extern void rrdcontext_updated_rrddim_divisor(RRDDIM *rd);
-extern void rrdcontext_updated_rrddim_flags(RRDDIM *rd);
-extern void rrdcontext_collected_rrddim(RRDDIM *rd);
+void rrdcontext_updated_rrddim(RRDDIM *rd);
+void rrdcontext_removed_rrddim(RRDDIM *rd);
+void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd);
+void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd);
+void rrdcontext_updated_rrddim_divisor(RRDDIM *rd);
+void rrdcontext_updated_rrddim_flags(RRDDIM *rd);
+void rrdcontext_collected_rrddim(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 // public API for rrdsets
 
-extern void rrdcontext_updated_rrdset(RRDSET *st);
-extern void rrdcontext_removed_rrdset(RRDSET *st);
-extern void rrdcontext_updated_rrdset_name(RRDSET *st);
-extern void rrdcontext_updated_rrdset_flags(RRDSET *st);
-extern void rrdcontext_collected_rrdset(RRDSET *st);
+void rrdcontext_updated_rrdset(RRDSET *st);
+void rrdcontext_removed_rrdset(RRDSET *st);
+void rrdcontext_updated_rrdset_name(RRDSET *st);
+void rrdcontext_updated_rrdset_flags(RRDSET *st);
+void rrdcontext_collected_rrdset(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // public API for ACLK
 
-extern void rrdcontext_hub_checkpoint_command(void *cmd);
-extern void rrdcontext_hub_stop_streaming_command(void *cmd);
+void rrdcontext_hub_checkpoint_command(void *cmd);
+void rrdcontext_hub_stop_streaming_command(void *cmd);
 
 
 // ----------------------------------------------------------------------------
 // public API for threads
 
-extern void rrdcontext_db_rotation(void);
-extern void *rrdcontext_main(void *);
+void rrdcontext_db_rotation(void);
+void *rrdcontext_main(void *);
 
 #endif // NETDATA_RRDCONTEXT_H
 

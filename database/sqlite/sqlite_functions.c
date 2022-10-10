@@ -1408,8 +1408,10 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ; tier++)
-        host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+    if(dbengine_enabled) {
+        for (int tier = 0; tier < storage_tiers; tier++)
+            host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+    }
 #endif
 
 failed:

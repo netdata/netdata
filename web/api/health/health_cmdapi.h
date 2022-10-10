@@ -24,7 +24,7 @@
 #define HEALTH_CMDAPI_MSG_STYPEWARNING "WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command.\n"
 #define HEALTH_CMDAPI_MSG_NOSELECTORWARNING "WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors.\n"
 
-extern int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url);
 
 #include "web/api/web_api_v1.h"
 

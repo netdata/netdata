@@ -220,28 +220,29 @@ extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
-extern void rrdpush_destinations_init(RRDHOST *host);
-extern void rrdpush_destinations_free(RRDHOST *host);
+void rrdpush_destinations_init(RRDHOST *host);
+void rrdpush_destinations_free(RRDHOST *host);
 
-extern void sender_init(RRDHOST *parent);
+void sender_init(RRDHOST *parent);
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
-extern int rrdpush_init();
-extern int configured_as_parent();
-extern void rrdset_done_push(RRDSET *st);
-extern bool rrdset_push_chart_definition_now(RRDSET *st);
-extern bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
-extern void *rrdpush_sender_thread(void *ptr);
-extern void rrdpush_send_host_labels(RRDHOST *host);
-extern void rrdpush_claimed_id(RRDHOST *host);
+int rrdpush_init();
+bool rrdpush_receiver_needs_dbengine();
+int configured_as_parent();
+void rrdset_done_push(RRDSET *st);
+bool rrdset_push_chart_definition_now(RRDSET *st);
+bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
+void *rrdpush_sender_thread(void *ptr);
+void rrdpush_send_host_labels(RRDHOST *host);
+void rrdpush_claimed_id(RRDHOST *host);
 
-extern int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
-extern void rrdpush_sender_thread_stop(RRDHOST *host);
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
+void rrdpush_sender_thread_stop(RRDHOST *host);
 
-extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
-extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
-extern int connect_to_one_of_destinations(
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
+void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
+int connect_to_one_of_destinations(
     RRDHOST *host,
     int default_port,
     struct timeval *timeout,
@@ -250,7 +251,7 @@ extern int connect_to_one_of_destinations(
     size_t connected_to_size,
     struct rrdpush_destinations **destination);
 
-extern void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
+void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
@@ -258,9 +259,9 @@ struct decompressor_state *create_decompressor();
 size_t is_compressed_data(const char *data, size_t data_size);
 #endif
 
-extern void log_receiver_capabilities(struct receiver_state *rpt);
-extern void log_sender_capabilities(struct sender_state *s);
-extern STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
-extern int32_t stream_capabilities_to_vn(uint32_t caps);
+void log_receiver_capabilities(struct receiver_state *rpt);
+void log_sender_capabilities(struct sender_state *s);
+STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
+int32_t stream_capabilities_to_vn(uint32_t caps);
 
 #endif //NETDATA_RRDPUSH_H

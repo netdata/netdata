@@ -264,13 +264,6 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     system_info->hops = str2i((const char *) argv[IDX_HOPS]);
-    RRD_MEMORY_MODE memory_mode;
-
-#ifdef ENABLE_DBENGINE
-    memory_mode = RRD_MEMORY_MODE_DBENGINE;
-#else
-    memory_mode = RRD_MEMORY_MODE_RAM;
-#endif
 
     sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
 
@@ -287,7 +280,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
         , argv[3] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
         , argv[13] ? str2i(argv[IDX_ENTRIES]) : 0
-        , memory_mode
+        , default_rrd_memory_mode
         , 0 // health
         , 0 // rrdpush enabled
         , NULL  //destination

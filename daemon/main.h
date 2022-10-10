@@ -22,9 +22,9 @@ struct option_def {
     const char *default_value;
 };
 
-extern void cancel_main_threads(void);
-extern int killpid(pid_t pid);
-extern void netdata_cleanup_and_exit(int ret) NORETURN;
-extern void send_statistics(const char *action, const char *action_result, const char *action_data);
+void cancel_main_threads(void);
+int killpid(pid_t pid);
+void netdata_cleanup_and_exit(int ret) NORETURN;
+void send_statistics(const char *action, const char *action_result, const char *action_data);
 
 #endif /* NETDATA_MAIN_H */

@@ -23,13 +23,13 @@ struct registry_url {
 typedef struct registry_url REGISTRY_URL;
 
 // REGISTRY_URL INDEX
-extern int registry_url_compare(void *a, void *b);
-extern REGISTRY_URL *registry_url_index_del(REGISTRY_URL *u) WARNUNUSED;
-extern REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) NEVERNULL WARNUNUSED;
+int registry_url_compare(void *a, void *b);
+REGISTRY_URL *registry_url_index_del(REGISTRY_URL *u) WARNUNUSED;
+REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) NEVERNULL WARNUNUSED;
 
 // REGISTRY_URL MANAGEMENT
-extern REGISTRY_URL *registry_url_get(const char *url, size_t urllen) NEVERNULL;
-extern void registry_url_link(REGISTRY_URL *u);
-extern void registry_url_unlink(REGISTRY_URL *u);
+REGISTRY_URL *registry_url_get(const char *url, size_t urllen) NEVERNULL;
+void registry_url_link(REGISTRY_URL *u);
+void registry_url_unlink(REGISTRY_URL *u);
 
 #endif //NETDATA_REGISTRY_URL_H

@@ -13,21 +13,21 @@
 #include <sys/sysctl.h>
 
 #define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))
-extern int getsysctl_by_name(const char *name, void *ptr, size_t len);
+int getsysctl_by_name(const char *name, void *ptr, size_t len);
 
 #define GETSYSCTL_MIB(name, mib) getsysctl_mib(name, mib, sizeof(mib)/sizeof(int))
 
-extern int getsysctl_mib(const char *name, int *mib, size_t len);
+int getsysctl_mib(const char *name, int *mib, size_t len);
 
 #define GETSYSCTL_SIMPLE(name, mib, var) getsysctl_simple(name, mib, sizeof(mib)/sizeof(int), &(var), sizeof(var))
 #define GETSYSCTL_WSIZE(name, mib, var, size) getsysctl_simple(name, mib, sizeof(mib)/sizeof(int), var, size)
 
-extern int getsysctl_simple(const char *name, int *mib, size_t miblen, void *ptr, size_t len);
+int getsysctl_simple(const char *name, int *mib, size_t miblen, void *ptr, size_t len);
 
 #define GETSYSCTL_SIZE(name, mib, size) getsysctl(name, mib, sizeof(mib)/sizeof(int), NULL, &(size))
 #define GETSYSCTL(name, mib, var, size) getsysctl(name, mib, sizeof(mib)/sizeof(int), &(var), &(size))
 
-extern int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_t *len);
+int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_t *len);
 
 #endif
 
@@ -39,7 +39,7 @@ extern int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_
 #include <sys/sysctl.h>
 
 #define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))
-extern int getsysctl_by_name(const char *name, void *ptr, size_t len);
+int getsysctl_by_name(const char *name, void *ptr, size_t len);
 
 #endif
 
@@ -49,13 +49,13 @@ extern int getsysctl_by_name(const char *name, void *ptr, size_t len);
 extern const char *os_type;
 
 extern int processors;
-extern long get_system_cpus(void);
+long get_system_cpus(void);
 
 extern pid_t pid_max;
-extern pid_t get_system_pid_max(void);
+pid_t get_system_pid_max(void);
 
 extern unsigned int system_hz;
-extern void get_system_HZ(void);
+void get_system_HZ(void);
 
 #include <sys/timex.h>
 #if defined(__FreeBSD__) || defined(__APPLE__)
