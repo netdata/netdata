@@ -45,6 +45,8 @@ service_start() {
 		mkdir -p $PIDFILE_PATH
 	fi
 	
+	chown @netdata_user_POST@:@netdata_user_POST@ $PIDFILE_PATH
+	
 	log_daemon_msg "Starting real-time performance monitoring" "netdata"
 	start_daemon -p $PIDFILE $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?
