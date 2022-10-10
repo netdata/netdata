@@ -6,7 +6,9 @@
 #define ARAL_MAX_PAGE_SIZE_MMAP (1*1024*1024*1024)
 
 // max malloc size
-#define ARAL_MAX_PAGE_SIZE_MALLOC (10*1024*1024)
+// optimal at current versions of libc is up to 256k
+// ideal to have the same overhead as libc is 4k
+#define ARAL_MAX_PAGE_SIZE_MALLOC (64*1024)
 
 typedef struct arrayalloc_free {
     size_t size;
