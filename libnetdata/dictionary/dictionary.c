@@ -1627,7 +1627,7 @@ static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_IT
             item->dict->creation_function,
             item->dict->creation_line,
             item->dict->creation_file);
-        fatal("DICTIONARY: attempted to %s() but item is NULL", function);
+        fatal("DICTIONARY: attempted to %s() but dict is NULL", function);
     }
 
     if(!allow_null_item && !item) {
