@@ -21,7 +21,6 @@ declare -a package_tree=(
   libtool
   pkg-config
   cmake
-  netcat-openbsd
   zlib-devel
   libuuid-devel
   libmnl-devel
