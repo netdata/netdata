@@ -181,6 +181,12 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
 
+    if (host->health_enabled) {
+        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
+        st->rrdvars = rrdvariables_create();
+        rrddimvar_index_init(st);
+    }
+
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
