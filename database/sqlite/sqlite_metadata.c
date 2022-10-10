@@ -36,6 +36,22 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
     return 1;
 }
 
+static void check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
+{
+    size_t old_version = st->rrdlabels_last_saved_version;
+    size_t new_version = dictionary_version(st->rrdlabels);
+
+    if(new_version != old_version) {
+        buffer_flush(work_buffer);
+        struct label_str tmp = {.sql = work_buffer, .count = 0};
+        uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
+        rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
+        st->rrdlabels_last_saved_version = new_version;
+        db_execute(buffer_tostring(work_buffer));
+    }
+}
+
+
 // Migrate all hosts with hops zero to this host_uuid
 void migrate_localhost(uuid_t *host_uuid)
 {
@@ -862,6 +878,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
 
     bool more_to_do = false;
     uint32_t scan_count = 0;
+    BUFFER *work_buffer = buffer_create(1024);
 
     rrdset_foreach_reentrant(st, host) {
         if (scan_count == max_count) {
@@ -871,6 +888,9 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
             rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
             scan_count++;
+
+            check_and_update_chart_labels(st, work_buffer);
+
             rc = sql_store_chart(
                 &st->chart_uuid,
                 &st->rrdhost->host_uuid,
@@ -913,6 +933,8 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
         rrddim_foreach_done(rd);
     }
     rrdset_foreach_done(st);
+
+    buffer_free(work_buffer);
     return more_to_do;
 }
 
@@ -1086,25 +1108,7 @@ static void metadata_event_loop(void *arg)
                 case METADATA_ADD_CHART_LABEL:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     st = (RRDSET *) dictionary_acquired_item_value(dict_item);
-
-                    struct label_str {
-                        BUFFER  *sql;
-                        int count;
-                        char uuid_str[UUID_STR_LEN];
-                    };
-
-                    size_t old_version = st->rrdlabels_last_saved_version;
-                    size_t new_version = dictionary_version(st->rrdlabels);
-
-                    if(new_version != old_version) {
-                        buffer_flush(work_buffer);
-                        struct label_str tmp = {.sql = work_buffer, .count = 0};
-                        uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
-                        rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-                        st->rrdlabels_last_saved_version = new_version;
-                        db_execute(buffer_tostring(work_buffer));
-                    }
-
+                    check_and_update_chart_labels(st, work_buffer);
                     dictionary_acquired_item_release(st->rrdhost->rrdset_root_index, dict_item);
                     break;
                 case METADATA_ADD_DIMENSION:

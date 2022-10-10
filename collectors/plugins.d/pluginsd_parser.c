@@ -741,6 +741,11 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
     UNUSED(words);
 
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
+
+    if (unlikely(!st))
+        return PARSER_RC_OK;
+
     debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily) {
@@ -750,7 +755,8 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
 
     rrdlabels_remove_all_unmarked(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
 
-    metaqueue_chart_labels(((PARSER_USER_OBJECT *)user)->st);
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
 
     ((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily = NULL;
     return PARSER_RC_OK;
