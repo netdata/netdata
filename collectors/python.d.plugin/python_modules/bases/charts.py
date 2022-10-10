@@ -3,6 +3,8 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import os
+
 from bases.collection import safe_print
 
 CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type', 'hidden']
@@ -34,6 +36,8 @@ RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time' 'ms
                        "CLABEL_COMMIT\n" \
                        "DIMENSION run_time 'run time' absolute 1 1\n"
 
+ND_INTERNAL_MONITORING_DISABLED = os.getenv("NETDATA_INTERNALS_MONITORING") == "NO"
+
 
 def create_runtime_chart(func):
     """
@@ -49,13 +53,14 @@ def create_runtime_chart(func):
 
     def wrapper(*args, **kwargs):
         self = args[0]
-        chart = RUNTIME_CHART_CREATE.format(
-            job_name=self.name,
-            actual_job_name=self.actual_job_name,
-            update_every=self._runtime_counters.update_every,
-            module_name=self.module_name,
-        )
-        safe_print(chart)
+        if not ND_INTERNAL_MONITORING_DISABLED:
+            chart = RUNTIME_CHART_CREATE.format(
+                job_name=self.name,
+                actual_job_name=self.actual_job_name,
+                update_every=self._runtime_counters.update_every,
+                module_name=self.module_name,
+            )
+            safe_print(chart)
         ok = func(*args, **kwargs)
         return ok
 
