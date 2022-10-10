@@ -376,7 +376,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->page_length = jf_metric_data->descr[i].page_length;
         descr->start_time_ut = start_time_ut;
         descr->end_time_ut = end_time_ut;
-        descr->update_every_s = (update_every_s > 0) ? update_every_s : (page_index->latest_update_every_s);
+        descr->update_every_s = (update_every_s > 0) ? (uint32_t)update_every_s : (page_index->latest_update_every_s);
         descr->id = &page_index->id;
         descr->extent = extent;
         descr->type = page_type;
@@ -387,7 +387,9 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             page_index->latest_update_every_s = descr->update_every_s;
 
         if(descr->update_every_s == 0)
-            fatal("DBENGINE: page descriptor update every is zero, end_time_ut = %lu, start_time_ut = %lu, entries = %zu", end_time_ut, start_time_ut, entries);
+            fatal(
+                "DBENGINE: page descriptor update every is zero, end_time_ut = %llu, start_time_ut = %llu, entries = %zu",
+                (unsigned long long)end_time_ut, (unsigned long long)start_time_ut, entries);
     }
 
     extent->number_of_pages = valid_pages;
