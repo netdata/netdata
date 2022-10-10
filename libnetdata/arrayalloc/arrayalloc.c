@@ -32,6 +32,33 @@ static inline size_t natural_alignment(size_t size, size_t alignment) {
     return size;
 }
 
+static void arrayalloc_delete_leftover_files(const char *path, const char *required_prefix) {
+    DIR *dir = opendir(path);
+    if(!dir) return;
+
+    char fullpath[FILENAME_MAX + 1];
+    size_t len = strlen(required_prefix);
+
+    struct dirent *de = NULL;
+    while((de = readdir(dir))) {
+        if(de->d_type == DT_DIR)
+            continue;
+
+        if(strncmp(de->d_name, required_prefix, len) != 0)
+            continue;
+
+        snprintfz(fullpath, FILENAME_MAX, "%s/%s", path, de->d_name);
+        info("ARRAYALLOC: removing left-over file '%s'", fullpath);
+        if(unlikely(unlink(fullpath) == -1))
+            error("Cannot delete file '%s'", fullpath);
+    }
+
+    closedir(dir);
+}
+
+// ----------------------------------------------------------------------------
+// arrayalloc_init()
+
 static void arrayalloc_init(ARAL *ar) {
     static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
     netdata_mutex_lock(&mutex);
@@ -47,7 +74,7 @@ static void arrayalloc_init(ARAL *ar) {
 
         // we need to add a page pointer after the element
         // so, first align the element size to the pointer size
-        ar->internal.element_size = natural_alignment(ar->element_size, sizeof(uintptr_t));
+        ar->internal.element_size = natural_alignment(ar->requested_element_size, sizeof(uintptr_t));
 
         // then add the size of a pointer to it
         ar->internal.element_size += sizeof(uintptr_t);
@@ -59,18 +86,18 @@ static void arrayalloc_init(ARAL *ar) {
         // and finally align it to the natural alignment
         ar->internal.element_size = natural_alignment(ar->internal.element_size, ARAL_NATURAL_ALIGNMENT);
 
-        // this is where we should write the pointer
+        // we write the page pointer just after each element
         ar->internal.page_ptr_offset = ar->internal.element_size - sizeof(uintptr_t);
 
-        if(ar->element_size + sizeof(uintptr_t) > ar->internal.element_size)
+        if(ar->requested_element_size + sizeof(uintptr_t) > ar->internal.element_size)
             fatal("ARRAYALLOC: failed to calculate properly page_ptr_offset: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
-                  ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
+                  ar->requested_element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
 
         //info("ARRAYALLOC: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
         //      ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
 
-        if (ar->elements < 10)
-            ar->elements = 10;
+        if (ar->initial_elements < 10)
+            ar->initial_elements = 10;
 
         ar->internal.mmap = (ar->use_mmap && ar->cache_dir && *ar->cache_dir) ? true : false;
         ar->internal.max_alloc_size = ar->internal.mmap ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
@@ -81,17 +108,20 @@ static void arrayalloc_init(ARAL *ar) {
         if(ar->internal.max_alloc_size % ar->internal.element_size)
             ar->internal.max_alloc_size -= ar->internal.max_alloc_size % ar->internal.element_size;
 
-        ar->internal.first_page = NULL;
-        ar->internal.last_page = NULL;
+        ar->internal.pages = NULL;
         ar->internal.allocation_multiplier = 1;
         ar->internal.file_number = 0;
 
         if(ar->internal.mmap) {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap", *ar->cache_dir);
-            int r = mkdir(filename, 0775);
+            char directory_name[FILENAME_MAX + 1];
+            snprintfz(directory_name, FILENAME_MAX, "%s/array_alloc.mmap", *ar->cache_dir);
+            int r = mkdir(directory_name, 0775);
             if (r != 0 && errno != EEXIST)
-                fatal("Cannot create directory '%s'", filename);
+                fatal("Cannot create directory '%s'", directory_name);
+
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s.", ar->filename);
+            arrayalloc_delete_leftover_files(directory_name, filename);
         }
 
         ar->internal.initialized = true;
@@ -100,8 +130,11 @@ static void arrayalloc_init(ARAL *ar) {
     netdata_mutex_unlock(&mutex);
 }
 
+// ----------------------------------------------------------------------------
+// check a free slot
+
 #ifdef NETDATA_INTERNAL_CHECKS
-static inline void arrayalloc_free_checks(ARAL *ar, ARAL_FREE *fr) {
+static inline void arrayalloc_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
     if(fr->size < ar->internal.element_size)
         fatal("ARRAYALLOC: free item of size %zu, less than the expected element size %zu", fr->size, ar->internal.element_size);
 
@@ -109,58 +142,47 @@ static inline void arrayalloc_free_checks(ARAL *ar, ARAL_FREE *fr) {
         fatal("ARRAYALLOC: free item of size %zu is not multiple to element size %zu", fr->size, ar->internal.element_size);
 }
 #else
-#define arrayalloc_free_checks(ar, fr) debug_dummy()
+#define arrayalloc_free_validate_internal_check(ar, fr) debug_dummy()
 #endif
 
-static inline void unlink_page(ARAL *ar, ARAL_PAGE *page) {
-    if(unlikely(!page)) return;
+// ----------------------------------------------------------------------------
+// find the page a pointer belongs to
 
-    if(page->next)
-        page->next->prev = page->prev;
-
-    if(page->prev)
-        page->prev->next = page->next;
-
-    if(page == ar->internal.first_page)
-        ar->internal.first_page = page->next;
-
-    if(page == ar->internal.last_page)
-        ar->internal.last_page = page->prev;
-}
-
-static inline void link_page_first(ARAL *ar, ARAL_PAGE *page) {
-    page->prev = NULL;
-    page->next = ar->internal.first_page;
-    if(page->next) page->next->prev = page;
-
-    ar->internal.first_page = page;
-
-    if(!ar->internal.last_page)
-        ar->internal.last_page = page;
-}
-
-static inline void link_page_last(ARAL *ar, ARAL_PAGE *page) {
-    page->next = NULL;
-    page->prev = ar->internal.last_page;
-    if(page->prev) page->prev->next = page;
-
-    ar->internal.last_page = page;
-
-    if(!ar->internal.first_page)
-        ar->internal.first_page = page;
-}
-
-static inline ARAL_PAGE *find_page_with_allocation(ARAL *ar, void *ptr) {
+#ifdef NETDATA_INTERNAL_CHECKS
+static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void *ptr) {
     uintptr_t seeking = (uintptr_t)ptr;
     ARAL_PAGE *page;
 
-    for(page = ar->internal.first_page; page ; page = page->next) {
+    for(page = ar->internal.pages; page ; page = page->next) {
         if(unlikely(seeking >= (uintptr_t)page->data && seeking < (uintptr_t)page->data + page->size))
             break;
     }
 
     return page;
 }
+#endif
+
+// ----------------------------------------------------------------------------
+// find a page with a free slot (there shouldn't be any)
+
+#ifdef NETDATA_INTERNAL_CHECKS
+static inline ARAL_PAGE *find_page_with_free_slots_internal_check(ARAL *ar) {
+    ARAL_PAGE *page;
+
+    for(page = ar->internal.pages; page ; page = page->next) {
+        if(page->free_list)
+            break;
+
+        internal_fatal(page->size - page->used_elements * ar->internal.element_size >= ar->internal.element_size,
+                       "ARRAYALLOC: a page is marked full, but it is not!");
+
+        internal_fatal(page->size < page->used_elements * ar->internal.element_size,
+                       "ARRAYALLOC: a page has been overflown!");
+    }
+
+    return page;
+}
+#endif
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 static void arrayalloc_add_page(ARAL *ar, const char *file, const char *function, size_t line) {
@@ -171,7 +193,7 @@ static void arrayalloc_add_page(ARAL *ar) {
         arrayalloc_init(ar);
 
     ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
-    page->size = ar->elements * ar->internal.element_size * ar->internal.allocation_multiplier;
+    page->size = ar->initial_elements * ar->internal.element_size * ar->internal.allocation_multiplier;
     if(page->size > ar->internal.max_alloc_size)
         page->size = ar->internal.max_alloc_size;
     else
@@ -202,9 +224,9 @@ static void arrayalloc_add_page(ARAL *ar) {
     page->free_list = fr;
 
     // link the new page at the front of the list of pages
-    link_page_first(ar, page);
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ar->internal.pages, page, prev, next);
 
-    arrayalloc_free_checks(ar, fr);
+    arrayalloc_free_validate_internal_check(ar, fr);
 }
 
 static void arrayalloc_lock(ARAL *ar) {
@@ -217,12 +239,13 @@ static void arrayalloc_unlock(ARAL *ar) {
         netdata_mutex_unlock(&ar->internal.mutex);
 }
 
-ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir) {
+ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap) {
     ARAL *ar = callocz(1, sizeof(ARAL));
-    ar->element_size = element_size;
-    ar->elements = elements;
+    ar->requested_element_size = element_size;
+    ar->initial_elements = elements;
     ar->filename = filename;
     ar->cache_dir = cache_dir;
+    ar->use_mmap = mmap;
     return ar;
 }
 
@@ -236,7 +259,10 @@ void *arrayalloc_mallocz(ARAL *ar) {
 
     arrayalloc_lock(ar);
 
-    if(unlikely(!ar->internal.first_page || !ar->internal.first_page->free_list)) {
+    if(unlikely(!ar->internal.pages || !ar->internal.pages->free_list)) {
+            internal_fatal(find_page_with_free_slots_internal_check(ar) != NULL,
+                           "ARRAYALLOC: first page does not have any free slots, but there is another that has!");
+
 #ifdef NETDATA_TRACE_ALLOCATIONS
         arrayalloc_add_page(ar, file, function, line);
 #else
@@ -244,44 +270,53 @@ void *arrayalloc_mallocz(ARAL *ar) {
 #endif
     }
 
-    ARAL_PAGE *page = ar->internal.first_page;
-    ARAL_FREE *fr = page->free_list;
+    ARAL_PAGE *page = ar->internal.pages;
+    ARAL_FREE *found_fr = page->free_list;
 
-    if(unlikely(!fr))
-        fatal("ARRAYALLOC: free item cannot be NULL.");
+    internal_fatal(!found_fr,
+                   "ARRAYALLOC: free item to use, cannot be NULL.");
 
-    if(unlikely(fr->size < ar->internal.element_size))
-        fatal("ARRAYALLOC: free item size %zu is smaller than %zu", fr->size, ar->internal.element_size);
+    internal_fatal(found_fr->size < ar->internal.element_size,
+                   "ARRAYALLOC: free item size %zu, cannot be smaller than %zu",
+                   found_fr->size, ar->internal.element_size);
 
-    if(fr->size - ar->internal.element_size <= ar->internal.element_size) {
-        // we are done with this page
-        page->free_list = NULL;
+    if(unlikely(found_fr->size - ar->internal.element_size < ar->internal.element_size)) {
+        // we can use the entire free space entry
 
-        if(page != ar->internal.last_page) {
-            unlink_page(ar, page);
-            link_page_last(ar, page);
+        page->free_list = found_fr->next;
+
+        if(unlikely(!page->free_list)) {
+            // we are done with this page
+            // move the full page last
+            // so that pages with free items remain first in the list
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->internal.pages, page, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_UNSAFE(ar->internal.pages, page, prev, next);
         }
     }
     else {
-        uint8_t *data = (uint8_t *)fr;
-        ARAL_FREE *fr2 = (ARAL_FREE *)&data[ar->internal.element_size];
-        fr2->page = fr->page;
-        fr2->size = fr->size - ar->internal.element_size;
-        fr2->next = fr->next;
-        page->free_list = fr2;
+        // we can split the free space entry
 
-        arrayalloc_free_checks(ar, fr2);
+        uint8_t *data = (uint8_t *)found_fr;
+        ARAL_FREE *fr = (ARAL_FREE *)&data[ar->internal.element_size];
+        fr->page = page;
+        fr->size = found_fr->size - ar->internal.element_size;
+
+        // link the free slot first in the page
+        fr->next = found_fr->next;
+        page->free_list = fr;
+
+        arrayalloc_free_validate_internal_check(ar, fr);
     }
 
-    fr->page->used_elements++;
+    page->used_elements++;
 
     // put the page pointer after the element
-    uint8_t *data = (uint8_t *)fr;
+    uint8_t *data = (uint8_t *)found_fr;
     ARAL_PAGE **page_ptr = (ARAL_PAGE **)&data[ar->internal.page_ptr_offset];
     *page_ptr = page;
 
     arrayalloc_unlock(ar);
-    return (void *)fr;
+    return (void *)found_fr;
 }
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
@@ -289,7 +324,7 @@ void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *fun
 #else
 void arrayalloc_freez(ARAL *ar, void *ptr) {
 #endif
-    if(!ptr) return;
+    if(unlikely(!ptr)) return;
     arrayalloc_lock(ar);
 
     // get the page pointer
@@ -310,7 +345,7 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 #ifdef NETDATA_INTERNAL_CHECKS
     {
         // find the page ptr belongs
-        ARAL_PAGE *page2 = find_page_with_allocation(ar, ptr);
+        ARAL_PAGE *page2 = find_page_with_allocation_internal_check(ar, ptr);
 
         if(unlikely(page != page2))
             fatal("ARRAYALLOC: page pointers do not match!");
@@ -337,7 +372,7 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 
     // if the page is empty, release it
     if(!page->used_elements) {
-        unlink_page(ar, page);
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->internal.pages, page, prev, next);
 
         // free it
         if(ar->internal.mmap) {
@@ -356,9 +391,11 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 
         freez(page);
     }
-    else if(page != ar->internal.first_page) {
-        unlink_page(ar, page);
-        link_page_first(ar, page);
+    else if(page != ar->internal.pages) {
+        // move the page with free item first
+        // so that the next allocation will use this page
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->internal.pages, page, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ar->internal.pages, page, prev, next);
     }
 
     arrayalloc_unlock(ar);
@@ -366,8 +403,7 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 
 int aral_unittest(size_t elements) {
     char *cache_dir = "/tmp/";
-    ARAL *ar = arrayalloc_create(20, 10, "test-aral", &cache_dir);
-    ar->use_mmap = false;
+    ARAL *ar = arrayalloc_create(20, 10, "test-aral", &cache_dir, false);
 
     void *pointers[elements];
 
@@ -399,7 +435,7 @@ int aral_unittest(size_t elements) {
         arrayalloc_freez(ar, pointers[i]);
     }
 
-    if(ar->internal.first_page) {
+    if(ar->internal.pages) {
         fprintf(stderr, "ARAL leftovers detected (1)");
         return 1;
     }
@@ -442,7 +478,7 @@ int aral_unittest(size_t elements) {
 
     arrayalloc_freez(ar, pointers[allocated - 1]);
 
-    if(ar->internal.first_page) {
+    if(ar->internal.pages) {
         fprintf(stderr, "ARAL leftovers detected (2)");
         return 1;
     }
