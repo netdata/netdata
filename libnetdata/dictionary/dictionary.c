@@ -1621,7 +1621,7 @@ void cleanup_destroyed_dictionaries(void) {
 static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *function, bool allow_null_dict, bool allow_null_item) {
     if(!allow_null_dict && !dict) {
         internal_error(
-            true,
+            item,
             "DICTIONARY: attempted to %s() with a NULL dictionary, passing an item created from %s() %zu@%s.",
             function,
             item->dict->creation_function,
