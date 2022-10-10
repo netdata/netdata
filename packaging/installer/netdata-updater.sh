@@ -85,9 +85,17 @@ exit_reason() {
     EXIT_REASON="${1}"
     EXIT_CODE="${2}"
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
-      export EXIT_REASON
-      export EXIT_CODE
-      export NETDATA_WARNINGS
+      if [ -n "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
+        {
+          echo "EXIT_REASON=\"${EXIT_REASON}\""
+          echo "EXIT_CODE=\"${EXIT_CODE}\""
+          echo "NETDATA_WARNINGS=\"${NETDATA_WARNINGS}\""
+        } >> "${NETDATA_SCRIPT_STATUS_PATH}"
+      else
+        export EXIT_REASON
+        export EXIT_CODE
+        export NETDATA_WARNINGS
+      fi
     fi
   fi
 }
@@ -602,15 +610,20 @@ update_build() {
     export NETDATA_SAVE_WARNINGS=1
     export NETDATA_PROPAGATE_WARNINGS=1
     export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
+    export NETDATA_SCRIPT_STATUS_PATH="${NETDATA_SCRIPT_STATUS_PATH}"
     # shellcheck disable=SC2086
     if ! ${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start} >&3 2>&3; then
+      if [ -r "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
+        # shellcheck disable=SC1090
+        . "${NETDATA_SCRIPT_STATUS_PATH}"
+        rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
+      fi
       if [ -n "${EXIT_REASON}" ]; then
         fatal "Failed to rebuild existing netdata install: ${EXIT_REASON}" "U${EXIT_CODE}"
       else
         fatal "Failed to rebuild existing netdata reinstall." UI0000
       fi
     fi
-    eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA" U0009
 
     # We no longer store checksum info here. but leave this so that we clean up all environment files upon next update.
     sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"

@@ -253,9 +253,17 @@ exit_reason() {
     EXIT_REASON="${1}"
     EXIT_CODE="${2}"
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
-      export EXIT_REASON
-      export EXIT_CODE
-      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+      if [ -n "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
+        {
+          echo "EXIT_REASON=\"${EXIT_REASON}\""
+          echo "EXIT_CODE=\"${EXIT_CODE}\""
+          echo "NETDATA_WARNINGS=\"${NETDATA_WARNINGS}${SAVED_WARNINGS}\""
+        } >> "${NETDATA_SCRIPT_STATUS_PATH}"
+      else
+        export EXIT_REASON
+        export EXIT_CODE
+        export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+      fi
     fi
   fi
 }
