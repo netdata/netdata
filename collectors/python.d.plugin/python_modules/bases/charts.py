@@ -52,16 +52,15 @@ def create_runtime_chart(func):
     """
 
     def wrapper(*args, **kwargs):
-        if ND_INTERNAL_MONITORING_DISABLED:
-            return True
         self = args[0]
-        chart = RUNTIME_CHART_CREATE.format(
-            job_name=self.name,
-            actual_job_name=self.actual_job_name,
-            update_every=self._runtime_counters.update_every,
-            module_name=self.module_name,
-        )
-        safe_print(chart)
+        if not ND_INTERNAL_MONITORING_DISABLED:
+            chart = RUNTIME_CHART_CREATE.format(
+                job_name=self.name,
+                actual_job_name=self.actual_job_name,
+                update_every=self._runtime_counters.update_every,
+                module_name=self.module_name,
+            )
+            safe_print(chart)
         ok = func(*args, **kwargs)
         return ok
 
