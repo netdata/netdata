@@ -4,12 +4,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 try:
-    import csv
-    import btmgmt
+    import dbus
 
-    HAS_BTMGMT = True
+    HAS_DBUS = True
 except ImportError:
-    HAS_BTMGMT = False
+    HAS_DBUS = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -21,41 +20,31 @@ CHARTS = {
     'bluetooth': {
         'options': [None, 'Connected Devices', 'number', 'connected', 'bluetooth.con', 'line'],
         'lines': [
-            ['connected']
+            ['connected', 'Connected', 'absolute', 1, 1]
         ]
     }
 }
 
 
 class Service(SimpleService):
-    def __init__(self, configuration=None, name=None):
+    def __init__(self, configuration=None, name=None, bus=None, manager=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        # self.random = SystemRandom()
-        # self.num_lines = self.configuration.get('num_lines', 4)
-        # self.lower = self.configuration.get('lower', 0)
-        # self.upper = self.configuration.get('upper', 100)
+        self.bus=dbus.SystemBus()
+        self.manager=dbus.Interface(self.bus.get_object('org.bluez','/'),'org.freedesktop.DBus.ObjectManager')
+    
+    def get_connected(self):
+        objs=self.manager.GetManagedObjects()
+        return [str(props['org.bluez.Device1']['Address']) for path,props in objs.items() if 'org.bluez.Device1' in props and props['org.bluez.Device1']['Connected']]
 
     def check(self):
-        if not HAS_BTMGMT:
-            self.error("Could not find btmgmt library")
-            return False
-
-        response = btmgmt.command_str("con")
-        if response[0] != 0:
-            self.error("Could not use btmgmt with correct privileges")
+        if not HAS_DBUS:
+            self.error("Could not find dbus library")
             return False
 
         return True
 
     def get_data(self):
-        response = btmgmt.command_str("con")
-
-        lines = response[1].splitlines()
-        reader = csv.reader(lines, delimiter=' ')
-
-        # print("lines:", response[1])
-
-        return {'connected': int(len(lines))}
+        return {'connected': len(self.get_connected())}
 
