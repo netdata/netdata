@@ -690,6 +690,14 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
+        if(!st->rrdfamily)
+            st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
+
+        if(!st->rrdvars)
+            st->rrdvars = rrdvariables_create();
+
+        rrddimvar_index_init(st);
+
         rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
