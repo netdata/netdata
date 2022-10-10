@@ -1621,13 +1621,13 @@ void cleanup_destroyed_dictionaries(void) {
 static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *function, bool allow_null_dict, bool allow_null_item) {
     if(!allow_null_dict && !dict) {
         internal_error(
-            item,
+            true,
             "DICTIONARY: attempted to %s() with a NULL dictionary, passing an item created from %s() %zu@%s.",
             function,
             item->dict->creation_function,
             item->dict->creation_line,
             item->dict->creation_file);
-        fatal("DICTIONARY: attempted to %s() but item is NULL", function);
+        fatal("DICTIONARY: attempted to %s() but dict is NULL", function);
     }
 
     if(!allow_null_item && !item) {
