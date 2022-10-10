@@ -4,8 +4,8 @@
 #include "rrdengine.h"
 
 ARAL page_descr_aral = {
-    .element_size = sizeof(struct rrdeng_page_descr),
-    .elements = 20000,
+    .requested_element_size = sizeof(struct rrdeng_page_descr),
+    .initial_elements = 20000,
     .filename = "page_descriptors",
     .cache_dir = &netdata_configured_cache_dir,
     .use_mmap = false,

@@ -878,26 +878,6 @@ declare -A pkg_make=(
   ['default']="make"
 )
 
-declare -A pkg_netcat=(
-  ['alpine']="netcat-openbsd"
-  ['arch']="netcat"
-  ['centos']="nmap-ncat"
-  ['debian']="netcat"
-  ['gentoo']="net-analyzer/netcat"
-  ['sabayon']="net-analyzer/gnu-netcat"
-  ['rhel']="nmap-ncat"
-  ['ol']="nmap-ncat"
-  ['suse']="netcat-openbsd"
-  ['clearlinux']="sysadmin-basic"
-  ['arch']="gnu-netcat"
-  ['macos']="NOTREQUIRED"
-  ['default']="netcat"
-
-  # exceptions
-  ['centos-6']="nc"
-  ['rhel-6']="nc"
-)
-
 declare -A pkg_nginx=(
   ['gentoo']="www-servers/nginx"
   ['default']="nginx"
@@ -1253,7 +1233,6 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
-    require_cmd nc || suitable_package netcat
   fi
 
   # -------------------------------------------------------------------------

@@ -5,8 +5,8 @@
 #include "../libnetdata.h"
 
 typedef struct arrayalloc {
-    size_t element_size;
-    size_t elements;
+    size_t requested_element_size;
+    size_t initial_elements;
     const char *filename;
     char **cache_dir;
     bool use_mmap;
@@ -23,12 +23,11 @@ typedef struct arrayalloc {
         size_t allocation_multiplier;
         size_t max_alloc_size;
         netdata_mutex_t mutex;
-        struct arrayalloc_page *first_page;
-        struct arrayalloc_page *last_page;
+        struct arrayalloc_page *pages;
     } internal;
 } ARAL;
 
-ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir);
+ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap);
 int aral_unittest(size_t elements);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

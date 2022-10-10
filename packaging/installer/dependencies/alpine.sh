@@ -22,7 +22,6 @@ package_tree="
   tar
   curl
   gzip
-  netcat-openbsd
   libuv-dev
   lz4-dev
   openssl-dev

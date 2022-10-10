@@ -66,19 +66,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         //parser_add_keyword(parser, PLUGINSD_KEYWORD_GAPS_REQUEST,   pluginsd_gaps_request);
     }
 
-    if(unlikely(!(flags & PARSER_NO_ACTION_INIT))) {
-        parser->plugins_action->begin_action            = &pluginsd_begin_action;
-        parser->plugins_action->flush_action            = &pluginsd_flush_action;
-        parser->plugins_action->end_action              = &pluginsd_end_action;
-        parser->plugins_action->disable_action          = &pluginsd_disable_action;
-        parser->plugins_action->variable_action         = &pluginsd_variable_action;
-        parser->plugins_action->dimension_action        = &pluginsd_dimension_action;
-        parser->plugins_action->label_action            = &pluginsd_label_action;
-        parser->plugins_action->overwrite_action        = &pluginsd_overwrite_action;
-        parser->plugins_action->chart_action            = &pluginsd_chart_action;
-        parser->plugins_action->set_action              = &pluginsd_set_action;
-    }
-
     return parser;
 }
 
