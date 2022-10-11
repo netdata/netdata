@@ -1307,3 +1307,13 @@ void *health_main(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
+
+void health_add_host_labels(void) {
+    DICTIONARY *labels = localhost->rrdlabels;
+
+    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "is ephemeral", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_CONFIG);
+
+    int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "has unstable connection", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_CONFIG);
+}

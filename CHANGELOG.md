@@ -6,9 +6,21 @@
 
 **Merged pull requests:**
 
+- ARAL optimal alloc size [\#13804](https://github.com/netdata/netdata/pull/13804) ([ktsaou](https://github.com/ktsaou))
+- internal log error, when passing NULL dictionary [\#13803](https://github.com/netdata/netdata/pull/13803) ([ktsaou](https://github.com/ktsaou))
+- Return memory freed properly [\#13799](https://github.com/netdata/netdata/pull/13799) ([stelfrag](https://github.com/stelfrag))
+- Use string\_freez instead of freez in rrdhost\_init\_timezone [\#13798](https://github.com/netdata/netdata/pull/13798) ([MrZammler](https://github.com/MrZammler))
+- Fix minor typo in systemdunits.conf alert [\#13796](https://github.com/netdata/netdata/pull/13796) ([tkatsoulas](https://github.com/tkatsoulas))
+- Also enable rrdvars from health [\#13795](https://github.com/netdata/netdata/pull/13795) ([MrZammler](https://github.com/MrZammler))
+- feat\(python.d\): respect NETDATA\_INTERNALS\_MONITORING [\#13793](https://github.com/netdata/netdata/pull/13793) ([ilyam8](https://github.com/ilyam8))
+- Array Allocator Memory Leak Fix [\#13792](https://github.com/netdata/netdata/pull/13792) ([ktsaou](https://github.com/ktsaou))
 - Remove extern from function declared in headers. [\#13790](https://github.com/netdata/netdata/pull/13790) ([vkalintiris](https://github.com/vkalintiris))
 - full memory tracking and profiling of Netdata Agent [\#13789](https://github.com/netdata/netdata/pull/13789) ([ktsaou](https://github.com/ktsaou))
+- Stop pulling in netcat as a mandatory dependency. [\#13787](https://github.com/netdata/netdata/pull/13787) ([Ferroin](https://github.com/Ferroin))
+- Initialize st-\>rrdvars from rrdset insert callback [\#13786](https://github.com/netdata/netdata/pull/13786) ([MrZammler](https://github.com/MrZammler))
+- Parser cleanup  [\#13782](https://github.com/netdata/netdata/pull/13782) ([stelfrag](https://github.com/stelfrag))
 - allow netdata installer to install and run netdata as any user [\#13780](https://github.com/netdata/netdata/pull/13780) ([ktsaou](https://github.com/ktsaou))
+- Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump websockets submodule [\#13776](https://github.com/netdata/netdata/pull/13776) ([underhood](https://github.com/underhood))
 - Rename variable for old CentOS version [\#13775](https://github.com/netdata/netdata/pull/13775) ([thiagoftsm](https://github.com/thiagoftsm))
 - bump go.d.plugin v0.40.3 [\#13771](https://github.com/netdata/netdata/pull/13771) ([ilyam8](https://github.com/ilyam8))
@@ -141,8 +153,6 @@
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
 - Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
-- Fix telegram-bot rate limit [\#13119](https://github.com/netdata/netdata/pull/13119) ([MAH69IK](https://github.com/MAH69IK))
-- feat: disable cloud if `NETDATA_DISABLE_CLOUD` is set to 1 [\#13106](https://github.com/netdata/netdata/pull/13106) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -336,15 +346,6 @@
 - allow label names to have slashes [\#13125](https://github.com/netdata/netdata/pull/13125) ([ktsaou](https://github.com/ktsaou))
 - fixed coveriry 379136 379135 379134 379133 [\#13123](https://github.com/netdata/netdata/pull/13123) ([ktsaou](https://github.com/ktsaou))
 - buffer overflow detected by the compiler [\#13120](https://github.com/netdata/netdata/pull/13120) ([ktsaou](https://github.com/ktsaou))
-- Ci coverage [\#13118](https://github.com/netdata/netdata/pull/13118) ([maneamarius](https://github.com/maneamarius))
-- Add missing control to streaming [\#13112](https://github.com/netdata/netdata/pull/13112) ([thiagoftsm](https://github.com/thiagoftsm))
-- Removes Legacy JSON Cloud Protocol Support In Agent [\#13111](https://github.com/netdata/netdata/pull/13111) ([underhood](https://github.com/underhood))
-- Re-enable updates for systems using static builds. [\#13110](https://github.com/netdata/netdata/pull/13110) ([Ferroin](https://github.com/Ferroin))
-- Add user netdata to secondary group in DEB package [\#13109](https://github.com/netdata/netdata/pull/13109) ([iigorkarpov](https://github.com/iigorkarpov))
-- Remove pinned page reference [\#13108](https://github.com/netdata/netdata/pull/13108) ([stelfrag](https://github.com/stelfrag))
-- 73x times faster metrics correlations at the agent [\#13107](https://github.com/netdata/netdata/pull/13107) ([ktsaou](https://github.com/ktsaou))
-- fix\(updater\): fix updating when using `--force-update` and new version of the updater script is available [\#13104](https://github.com/netdata/netdata/pull/13104) ([ilyam8](https://github.com/ilyam8))
-- Remove unnescesary ‘cleanup’ code. [\#13103](https://github.com/netdata/netdata/pull/13103) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
