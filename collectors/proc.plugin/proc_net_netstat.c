@@ -493,7 +493,148 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         }
     }
 
-    // IpExt charts
+    // parse /proc/net/snmp
+
+    if(unlikely(!ff_snmp)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/snmp");
+        ff_snmp = procfile_open(config_get("plugin:proc:/proc/net/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff_snmp)) return 1;
+    }
+
+    ff_snmp = procfile_readall(ff_snmp);
+    if(unlikely(!ff_snmp)) return 0; // we return 0, so that we will retry to open it next time
+
+    size_t lines = procfile_lines(ff_snmp), l;
+    size_t words, w;
+
+    for(l = 0; l < lines ;l++) {
+        char *key = procfile_lineword(ff_snmp, l, 0);
+        uint32_t hash = simple_hash(key);
+
+        if(unlikely(hash == hash_ip && strcmp(key, "Ip") == 0)) {
+            size_t h = l++;
+
+            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Ip") != 0) {
+                error("Cannot read Ip line from /proc/net/snmp.");
+                break;
+            }
+
+            words = procfile_linewords(ff_snmp, l);
+            if(words < 3) {
+                error("Cannot read /proc/net/snmp Ip line. Expected 3+ params, read %zu.", words);
+                continue;
+            }
+
+            arl_begin(arl_ip);
+            for(w = 1; w < words ; w++) {
+                if (unlikely(arl_check(arl_ip, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                    break;
+            }
+        }
+        else if(unlikely(hash == hash_icmp && strcmp(key, "Icmp") == 0)) {
+            size_t h = l++;
+
+            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Icmp") != 0) {
+                error("Cannot read Icmp line from /proc/net/snmp.");
+                break;
+            }
+
+            words = procfile_linewords(ff_snmp, l);
+            if(words < 3) {
+                error("Cannot read /proc/net/snmp Icmp line. Expected 3+ params, read %zu.", words);
+                continue;
+            }
+
+            arl_begin(arl_icmp);
+            for(w = 1; w < words ; w++) {
+                if (unlikely(arl_check(arl_icmp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                    break;
+            }
+        }
+        else if(unlikely(hash == hash_icmpmsg && strcmp(key, "IcmpMsg") == 0)) {
+            size_t h = l++;
+
+            if(strcmp(procfile_lineword(ff_snmp, l, 0), "IcmpMsg") != 0) {
+                error("Cannot read IcmpMsg line from /proc/net/snmp.");
+                break;
+            }
+
+            words = procfile_linewords(ff_snmp, l);
+            if(words < 2) {
+                error("Cannot read /proc/net/snmp IcmpMsg line. Expected 2+ params, read %zu.", words);
+                continue;
+            }
+
+            arl_begin(arl_icmpmsg);
+            for(w = 1; w < words ; w++) {
+                if (unlikely(arl_check(arl_icmpmsg, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                    break;
+            }
+        }
+        else if(unlikely(hash == hash_tcp && strcmp(key, "Tcp") == 0)) {
+            size_t h = l++;
+
+            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Tcp") != 0) {
+                error("Cannot read Tcp line from /proc/net/snmp.");
+                break;
+            }
+
+            words = procfile_linewords(ff_snmp, l);
+            if(words < 3) {
+                error("Cannot read /proc/net/snmp Tcp line. Expected 3+ params, read %zu.", words);
+                continue;
+            }
+
+            arl_begin(arl_tcp);
+            for(w = 1; w < words ; w++) {
+                if (unlikely(arl_check(arl_tcp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                    break;
+            }
+        }
+        else if(unlikely(hash == hash_udp && strcmp(key, "Udp") == 0)) {
+            size_t h = l++;
+
+            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Udp") != 0) {
+                error("Cannot read Udp line from /proc/net/snmp.");
+                break;
+            }
+
+            words = procfile_linewords(ff_snmp, l);
+            if(words < 3) {
+                error("Cannot read /proc/net/snmp Udp line. Expected 3+ params, read %zu.", words);
+                continue;
+            }
+
+            arl_begin(arl_udp);
+            for(w = 1; w < words ; w++) {
+                if (unlikely(arl_check(arl_udp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                    break;
+            }
+        }
+        else if(unlikely(hash == hash_udplite && strcmp(key, "UdpLite") == 0)) {
+            size_t h = l++;
+
+            if(strcmp(procfile_lineword(ff_snmp, l, 0), "UdpLite") != 0) {
+                error("Cannot read UdpLite line from /proc/net/snmp.");
+                break;
+            }
+
+            words = procfile_linewords(ff_snmp, l);
+            if(words < 3) {
+                error("Cannot read /proc/net/snmp UdpLite line. Expected 3+ params, read %zu.", words);
+                continue;
+            }
+
+            arl_begin(arl_udplite);
+            for(w = 1; w < words ; w++) {
+                if (unlikely(arl_check(arl_udplite, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                    break;
+            }
+        }
+    }
+
+    // netstat IpExt charts
 
     // --------------------------------------------------------------------
 
@@ -783,7 +924,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         rrdset_done(st_ecnpkts);
     }
 
-    // TcpExt charts
+    // netstat TcpExt charts
 
     // --------------------------------------------------------------------
 
