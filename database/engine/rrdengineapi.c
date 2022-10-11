@@ -474,8 +474,8 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                 static __thread time_t last_time_logged = 0;
                 counter++;
 
-                if((counter % 1000) == 0 || now - last_time_logged > 600 || !last_time_logged) {
-                    error("DBENGINE: collected point is in the past (repeated %zu times in the last %zu secs). Ignoring this point.",
+                if(now - last_time_logged > 600) {
+                    error("DBENGINE: collected point is in the past (repeated %zu times in the last %zu secs). Ignoring these data collection points.",
                           counter, (size_t)(last_time_logged?(now - last_time_logged):0));
 
                     last_time_logged = now;

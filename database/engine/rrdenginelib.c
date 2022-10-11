@@ -40,7 +40,7 @@ void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bo
     if(log_debug)
         debug(D_RRDENGINE, "%s", buffer_tostring(wb));
     else
-        info("%s", buffer_tostring(wb));
+        internal_error(true, "%s", buffer_tostring(wb));
 
     buffer_free(wb);
 }
