@@ -420,7 +420,7 @@ isinitd() {
   check_systemd ; [ $? = 1 ] || return 1
 
   # if it's not an LSB setup, it’s init.d
-  check_initd || return 0
+  check_lsb || return 0
 
   return 1
 }
