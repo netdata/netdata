@@ -111,7 +111,7 @@ char *ml_get_host_info(RRDHOST *RH) {
         ConfigJson["enabled"] = false;
     }
 
-    return strdup(ConfigJson.dump(2, '\t').c_str());
+    return strdupz(ConfigJson.dump(2, '\t').c_str());
 }
 
 char *ml_get_host_runtime_info(RRDHOST *RH) {

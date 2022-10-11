@@ -422,7 +422,7 @@ after_crc_check:
     if (xt_io_descr->completion)
         completion_mark_complete(xt_io_descr->completion);
     uv_fs_req_cleanup(req);
-    free(xt_io_descr->buf);
+    posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
 }
 
@@ -696,7 +696,7 @@ void flush_pages_cb(uv_fs_t* req)
     if (xt_io_descr->completion)
         completion_mark_complete(xt_io_descr->completion);
     uv_fs_req_cleanup(req);
-    free(xt_io_descr->buf);
+    posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
 
     uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);

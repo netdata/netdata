@@ -17,7 +17,7 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     }
 
     uv_fs_req_cleanup(req);
-    free(io_descr->buf);
+    posix_memfree(io_descr->buf);
     freez(io_descr);
 }
 
@@ -225,7 +225,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
     uv_fs_req_cleanup(&req);
-    free(superblock);
+    posix_memfree(superblock);
     if (ret < 0) {
         destroy_journal_file(journalfile, datafile);
         return ret;
@@ -268,7 +268,7 @@ static int check_journal_file_superblock(uv_file file)
         ret = 0;
     }
     error:
-    free(superblock);
+    posix_memfree(superblock);
     return ret;
 }
 
@@ -483,7 +483,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     }
 skip_file:
     if (unlikely(!journal_is_mmapped))
-        free(buf);
+        posix_memfree(buf);
     return max_id;
 }
 

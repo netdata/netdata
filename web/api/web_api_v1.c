@@ -1325,7 +1325,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\t\"ml-info\": ");
     buffer_strcat(wb, ml_info);
 
-    free(ml_info);
+    freez(ml_info);
 #endif
 
     buffer_strcat(wb, "\n}");
