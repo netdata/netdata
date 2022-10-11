@@ -3,14 +3,99 @@
 #include "plugin_proc.h"
 
 #define RRD_TYPE_NET_NETSTAT "ip"
+#define RRD_TYPE_NET_SNMP    "ipv4"
+#define RRD_TYPE_NET_SNMP6   "ipv6"
 #define PLUGIN_PROC_MODULE_NETSTAT_NAME "/proc/net/netstat"
 #define CONFIG_SECTION_PLUGIN_PROC_NETSTAT "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETSTAT_NAME
 
 unsigned long long tcpext_TCPSynRetrans = 0;
 
-static void parse_line_pair(procfile *ff, ARL_BASE *base, size_t header_line, size_t values_line) {
-    size_t hwords = procfile_linewords(ff, header_line);
-    size_t vwords = procfile_linewords(ff, values_line);
+static struct proc_net_snmp {
+    // kernel_uint_t ip_Forwarding;
+    kernel_uint_t ip_DefaultTTL;
+    kernel_uint_t ip_InReceives;
+    kernel_uint_t ip_InHdrErrors;
+    kernel_uint_t ip_InAddrErrors;
+    kernel_uint_t ip_ForwDatagrams;
+    kernel_uint_t ip_InUnknownProtos;
+    kernel_uint_t ip_InDiscards;
+    kernel_uint_t ip_InDelivers;
+    kernel_uint_t ip_OutRequests;
+    kernel_uint_t ip_OutDiscards;
+    kernel_uint_t ip_OutNoRoutes;
+    kernel_uint_t ip_ReasmTimeout;
+    kernel_uint_t ip_ReasmReqds;
+    kernel_uint_t ip_ReasmOKs;
+    kernel_uint_t ip_ReasmFails;
+    kernel_uint_t ip_FragOKs;
+    kernel_uint_t ip_FragFails;
+    kernel_uint_t ip_FragCreates;
+
+    kernel_uint_t icmp_InMsgs;
+    kernel_uint_t icmp_OutMsgs;
+    kernel_uint_t icmp_InErrors;
+    kernel_uint_t icmp_OutErrors;
+    kernel_uint_t icmp_InCsumErrors;
+
+    kernel_uint_t icmpmsg_InEchoReps;
+    kernel_uint_t icmpmsg_OutEchoReps;
+    kernel_uint_t icmpmsg_InDestUnreachs;
+    kernel_uint_t icmpmsg_OutDestUnreachs;
+    kernel_uint_t icmpmsg_InRedirects;
+    kernel_uint_t icmpmsg_OutRedirects;
+    kernel_uint_t icmpmsg_InEchos;
+    kernel_uint_t icmpmsg_OutEchos;
+    kernel_uint_t icmpmsg_InRouterAdvert;
+    kernel_uint_t icmpmsg_OutRouterAdvert;
+    kernel_uint_t icmpmsg_InRouterSelect;
+    kernel_uint_t icmpmsg_OutRouterSelect;
+    kernel_uint_t icmpmsg_InTimeExcds;
+    kernel_uint_t icmpmsg_OutTimeExcds;
+    kernel_uint_t icmpmsg_InParmProbs;
+    kernel_uint_t icmpmsg_OutParmProbs;
+    kernel_uint_t icmpmsg_InTimestamps;
+    kernel_uint_t icmpmsg_OutTimestamps;
+    kernel_uint_t icmpmsg_InTimestampReps;
+    kernel_uint_t icmpmsg_OutTimestampReps;
+
+    //kernel_uint_t tcp_RtoAlgorithm;
+    //kernel_uint_t tcp_RtoMin;
+    //kernel_uint_t tcp_RtoMax;
+    ssize_t tcp_MaxConn;
+    kernel_uint_t tcp_ActiveOpens;
+    kernel_uint_t tcp_PassiveOpens;
+    kernel_uint_t tcp_AttemptFails;
+    kernel_uint_t tcp_EstabResets;
+    kernel_uint_t tcp_CurrEstab;
+    kernel_uint_t tcp_InSegs;
+    kernel_uint_t tcp_OutSegs;
+    kernel_uint_t tcp_RetransSegs;
+    kernel_uint_t tcp_InErrs;
+    kernel_uint_t tcp_OutRsts;
+    kernel_uint_t tcp_InCsumErrors;
+
+    kernel_uint_t udp_InDatagrams;
+    kernel_uint_t udp_NoPorts;
+    kernel_uint_t udp_InErrors;
+    kernel_uint_t udp_OutDatagrams;
+    kernel_uint_t udp_RcvbufErrors;
+    kernel_uint_t udp_SndbufErrors;
+    kernel_uint_t udp_InCsumErrors;
+    kernel_uint_t udp_IgnoredMulti;
+
+    kernel_uint_t udplite_InDatagrams;
+    kernel_uint_t udplite_NoPorts;
+    kernel_uint_t udplite_InErrors;
+    kernel_uint_t udplite_OutDatagrams;
+    kernel_uint_t udplite_RcvbufErrors;
+    kernel_uint_t udplite_SndbufErrors;
+    kernel_uint_t udplite_InCsumErrors;
+    kernel_uint_t udplite_IgnoredMulti;
+} snmp_root = { 0 };
+
+static void parse_line_pair(procfile *ff_netstat, ARL_BASE *base, size_t header_line, size_t values_line) {
+    size_t hwords = procfile_linewords(ff_netstat, header_line);
+    size_t vwords = procfile_linewords(ff_netstat, values_line);
     size_t w;
 
     if(unlikely(vwords > hwords)) {
@@ -19,7 +104,7 @@ static void parse_line_pair(procfile *ff, ARL_BASE *base, size_t header_line, si
     }
 
     for(w = 1; w < vwords ;w++) {
-        if(unlikely(arl_check(base, procfile_lineword(ff, header_line, w), procfile_lineword(ff, values_line, w))))
+        if(unlikely(arl_check(base, procfile_lineword(ff_netstat, header_line, w), procfile_lineword(ff_netstat, values_line, w))))
             break;
     }
 }
@@ -31,11 +116,27 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcpext_reorder = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1, do_tcpext_memory = -1,
         do_tcpext_syn_queue = -1, do_tcpext_accept_queue = -1;
 
+    static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
+        do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcp_opens = -1,
+        do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1, do_udplite_packets = -1;
+    static uint32_t hash_ip = 0, hash_icmp = 0, hash_tcp = 0, hash_udp = 0, hash_icmpmsg = 0, hash_udplite = 0;
+
     static uint32_t hash_ipext = 0, hash_tcpext = 0;
-    static procfile *ff = NULL;
+    static procfile *ff_netstat = NULL;
+    static procfile *ff_snmp = NULL;
+    static procfile *ff_snmp6 = NULL;
 
     static ARL_BASE *arl_tcpext = NULL;
     static ARL_BASE *arl_ipext = NULL;
+
+    static ARL_BASE *arl_ip = NULL
+    static ARL_BASE *arl_icmp = NULL
+    static ARL_BASE *arl_icmpmsg = NULL
+    static ARL_BASE *arl_tcp = NULL
+    static ARL_BASE *arl_udp = NULL
+    static ARL_BASE *arl_udplite = NULL;
+
+    static const RRDVAR_ACQUIRED *tcp_max_connections_var = NULL;
 
     // --------------------------------------------------------------------
     // IP
@@ -113,6 +214,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     // shared: tcpext_TCPSynRetrans
 
+    // prepare for /proc/net/netstat parsing
 
     if(unlikely(!arl_ipext)) {
         hash_ipext = simple_hash("IpExt");
@@ -229,640 +331,761 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         arl_expect(arl_tcpext, "TCPSynRetrans", &tcpext_TCPSynRetrans);
     }
 
-    if(unlikely(!ff)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/netstat");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+    // prepare for /proc/net/snmp parsing
+
+    if(unlikely(!arl_ip)) {
+        do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip_errors        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 errors", CONFIG_BOOLEAN_AUTO);
+        do_tcp_sockets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP connections", CONFIG_BOOLEAN_AUTO);
+        do_tcp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP packets", CONFIG_BOOLEAN_AUTO);
+        do_tcp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP errors", CONFIG_BOOLEAN_AUTO);
+        do_tcp_opens        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP opens", CONFIG_BOOLEAN_AUTO);
+        do_tcp_handshake    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP handshake issues", CONFIG_BOOLEAN_AUTO);
+        do_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDP packets", CONFIG_BOOLEAN_AUTO);
+        do_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDP errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp_packets     = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 ICMP packets", CONFIG_BOOLEAN_AUTO);
+        do_icmpmsg          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 ICMP messages", CONFIG_BOOLEAN_AUTO);
+        do_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDPLite packets", CONFIG_BOOLEAN_AUTO);
+
+        hash_ip = simple_hash("Ip");
+        hash_tcp = simple_hash("Tcp");
+        hash_udp = simple_hash("Udp");
+        hash_icmp = simple_hash("Icmp");
+        hash_icmpmsg = simple_hash("IcmpMsg");
+        hash_udplite = simple_hash("UdpLite");
+
+        arl_ip = arl_create("snmp/Ip", arl_callback_str2kernel_uint_t, 60);
+        // arl_expect(arl_ip, "Forwarding", &snmp_root.ip_Forwarding);
+        arl_expect(arl_ip, "DefaultTTL", &snmp_root.ip_DefaultTTL);
+        arl_expect(arl_ip, "InReceives", &snmp_root.ip_InReceives);
+        arl_expect(arl_ip, "InHdrErrors", &snmp_root.ip_InHdrErrors);
+        arl_expect(arl_ip, "InAddrErrors", &snmp_root.ip_InAddrErrors);
+        arl_expect(arl_ip, "ForwDatagrams", &snmp_root.ip_ForwDatagrams);
+        arl_expect(arl_ip, "InUnknownProtos", &snmp_root.ip_InUnknownProtos);
+        arl_expect(arl_ip, "InDiscards", &snmp_root.ip_InDiscards);
+        arl_expect(arl_ip, "InDelivers", &snmp_root.ip_InDelivers);
+        arl_expect(arl_ip, "OutRequests", &snmp_root.ip_OutRequests);
+        arl_expect(arl_ip, "OutDiscards", &snmp_root.ip_OutDiscards);
+        arl_expect(arl_ip, "OutNoRoutes", &snmp_root.ip_OutNoRoutes);
+        arl_expect(arl_ip, "ReasmTimeout", &snmp_root.ip_ReasmTimeout);
+        arl_expect(arl_ip, "ReasmReqds", &snmp_root.ip_ReasmReqds);
+        arl_expect(arl_ip, "ReasmOKs", &snmp_root.ip_ReasmOKs);
+        arl_expect(arl_ip, "ReasmFails", &snmp_root.ip_ReasmFails);
+        arl_expect(arl_ip, "FragOKs", &snmp_root.ip_FragOKs);
+        arl_expect(arl_ip, "FragFails", &snmp_root.ip_FragFails);
+        arl_expect(arl_ip, "FragCreates", &snmp_root.ip_FragCreates);
+
+        arl_icmp = arl_create("snmp/Icmp", arl_callback_str2kernel_uint_t, 60);
+        arl_expect(arl_icmp, "InMsgs", &snmp_root.icmp_InMsgs);
+        arl_expect(arl_icmp, "OutMsgs", &snmp_root.icmp_OutMsgs);
+        arl_expect(arl_icmp, "InErrors", &snmp_root.icmp_InErrors);
+        arl_expect(arl_icmp, "OutErrors", &snmp_root.icmp_OutErrors);
+        arl_expect(arl_icmp, "InCsumErrors", &snmp_root.icmp_InCsumErrors);
+
+        arl_icmpmsg = arl_create("snmp/Icmpmsg", arl_callback_str2kernel_uint_t, 60);
+        arl_expect(arl_icmpmsg, "InType0", &snmp_root.icmpmsg_InEchoReps);
+        arl_expect(arl_icmpmsg, "OutType0", &snmp_root.icmpmsg_OutEchoReps);
+        arl_expect(arl_icmpmsg, "InType3", &snmp_root.icmpmsg_InDestUnreachs);
+        arl_expect(arl_icmpmsg, "OutType3", &snmp_root.icmpmsg_OutDestUnreachs);
+        arl_expect(arl_icmpmsg, "InType5", &snmp_root.icmpmsg_InRedirects);
+        arl_expect(arl_icmpmsg, "OutType5", &snmp_root.icmpmsg_OutRedirects);
+        arl_expect(arl_icmpmsg, "InType8", &snmp_root.icmpmsg_InEchos);
+        arl_expect(arl_icmpmsg, "OutType8", &snmp_root.icmpmsg_OutEchos);
+        arl_expect(arl_icmpmsg, "InType9", &snmp_root.icmpmsg_InRouterAdvert);
+        arl_expect(arl_icmpmsg, "OutType9", &snmp_root.icmpmsg_OutRouterAdvert);
+        arl_expect(arl_icmpmsg, "InType10", &snmp_root.icmpmsg_InRouterSelect);
+        arl_expect(arl_icmpmsg, "OutType10", &snmp_root.icmpmsg_OutRouterSelect);
+        arl_expect(arl_icmpmsg, "InType11", &snmp_root.icmpmsg_InTimeExcds);
+        arl_expect(arl_icmpmsg, "OutType11", &snmp_root.icmpmsg_OutTimeExcds);
+        arl_expect(arl_icmpmsg, "InType12", &snmp_root.icmpmsg_InParmProbs);
+        arl_expect(arl_icmpmsg, "OutType12", &snmp_root.icmpmsg_OutParmProbs);
+        arl_expect(arl_icmpmsg, "InType13", &snmp_root.icmpmsg_InTimestamps);
+        arl_expect(arl_icmpmsg, "OutType13", &snmp_root.icmpmsg_OutTimestamps);
+        arl_expect(arl_icmpmsg, "InType14", &snmp_root.icmpmsg_InTimestampReps);
+        arl_expect(arl_icmpmsg, "OutType14", &snmp_root.icmpmsg_OutTimestampReps);
+
+        arl_tcp = arl_create("snmp/Tcp", arl_callback_str2kernel_uint_t, 60);
+        // arl_expect(arl_tcp, "RtoAlgorithm", &snmp_root.tcp_RtoAlgorithm);
+        // arl_expect(arl_tcp, "RtoMin", &snmp_root.tcp_RtoMin);
+        // arl_expect(arl_tcp, "RtoMax", &snmp_root.tcp_RtoMax);
+        arl_expect_custom(arl_tcp, "MaxConn", arl_callback_ssize_t, &snmp_root.tcp_MaxConn);
+        arl_expect(arl_tcp, "ActiveOpens", &snmp_root.tcp_ActiveOpens);
+        arl_expect(arl_tcp, "PassiveOpens", &snmp_root.tcp_PassiveOpens);
+        arl_expect(arl_tcp, "AttemptFails", &snmp_root.tcp_AttemptFails);
+        arl_expect(arl_tcp, "EstabResets", &snmp_root.tcp_EstabResets);
+        arl_expect(arl_tcp, "CurrEstab", &snmp_root.tcp_CurrEstab);
+        arl_expect(arl_tcp, "InSegs", &snmp_root.tcp_InSegs);
+        arl_expect(arl_tcp, "OutSegs", &snmp_root.tcp_OutSegs);
+        arl_expect(arl_tcp, "RetransSegs", &snmp_root.tcp_RetransSegs);
+        arl_expect(arl_tcp, "InErrs", &snmp_root.tcp_InErrs);
+        arl_expect(arl_tcp, "OutRsts", &snmp_root.tcp_OutRsts);
+        arl_expect(arl_tcp, "InCsumErrors", &snmp_root.tcp_InCsumErrors);
+
+        arl_udp = arl_create("snmp/Udp", arl_callback_str2kernel_uint_t, 60);
+        arl_expect(arl_udp, "InDatagrams", &snmp_root.udp_InDatagrams);
+        arl_expect(arl_udp, "NoPorts", &snmp_root.udp_NoPorts);
+        arl_expect(arl_udp, "InErrors", &snmp_root.udp_InErrors);
+        arl_expect(arl_udp, "OutDatagrams", &snmp_root.udp_OutDatagrams);
+        arl_expect(arl_udp, "RcvbufErrors", &snmp_root.udp_RcvbufErrors);
+        arl_expect(arl_udp, "SndbufErrors", &snmp_root.udp_SndbufErrors);
+        arl_expect(arl_udp, "InCsumErrors", &snmp_root.udp_InCsumErrors);
+        arl_expect(arl_udp, "IgnoredMulti", &snmp_root.udp_IgnoredMulti);
+
+        arl_udplite = arl_create("snmp/Udplite", arl_callback_str2kernel_uint_t, 60);
+        arl_expect(arl_udplite, "InDatagrams", &snmp_root.udplite_InDatagrams);
+        arl_expect(arl_udplite, "NoPorts", &snmp_root.udplite_NoPorts);
+        arl_expect(arl_udplite, "InErrors", &snmp_root.udplite_InErrors);
+        arl_expect(arl_udplite, "OutDatagrams", &snmp_root.udplite_OutDatagrams);
+        arl_expect(arl_udplite, "RcvbufErrors", &snmp_root.udplite_RcvbufErrors);
+        arl_expect(arl_udplite, "SndbufErrors", &snmp_root.udplite_SndbufErrors);
+        arl_expect(arl_udplite, "InCsumErrors", &snmp_root.udplite_InCsumErrors);
+        arl_expect(arl_udplite, "IgnoredMulti", &snmp_root.udplite_IgnoredMulti);
+
+        tcp_max_connections_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_connections");
     }
 
-    ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    // parse /proc/net/netstat
 
-    size_t lines = procfile_lines(ff), l;
+    if(unlikely(!ff_netstat)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/netstat");
+        ff_netstat = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff_netstat)) return 1;
+    }
+
+    ff_netstat = procfile_readall(ff_netstat);
+    if(unlikely(!ff_netstat)) return 0; // we return 0, so that we will retry to open it next time
+
+    size_t lines = procfile_lines(ff_netstat), l;
     size_t words;
 
     arl_begin(arl_ipext);
     arl_begin(arl_tcpext);
 
     for(l = 0; l < lines ;l++) {
-        char *key = procfile_lineword(ff, l, 0);
+        char *key = procfile_lineword(ff_netstat, l, 0);
         uint32_t hash = simple_hash(key);
 
         if(unlikely(hash == hash_ipext && strcmp(key, "IpExt") == 0)) {
             size_t h = l++;
 
-            words = procfile_linewords(ff, l);
+            words = procfile_linewords(ff_netstat, l);
             if(unlikely(words < 2)) {
                 error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
-            parse_line_pair(ff, arl_ipext, h, l);
+            parse_line_pair(ff_netstat, arl_ipext, h, l);
 
-            // --------------------------------------------------------------------
-
-            if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                                                      (ipext_InOctets ||
-                                                       ipext_OutOctets ||
-                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_bandwidth = CONFIG_BOOLEAN_YES;
-                static RRDSET *st_system_ip = NULL;
-                static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-                if(unlikely(!st_system_ip)) {
-                    st_system_ip = rrdset_create_localhost(
-                            "system"
-                            , RRD_TYPE_NET_NETSTAT
-                            , NULL
-                            , "network"
-                            , NULL
-                            , "IP Bandwidth"
-                            , "kilobits/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_SYSTEM_IP
-                            , update_every
-                            , RRDSET_TYPE_AREA
-                    );
-
-                    rd_in  = rrddim_add(st_system_ip, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st_system_ip, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_system_ip);
-
-                rrddim_set_by_pointer(st_system_ip, rd_in,  ipext_InOctets);
-                rrddim_set_by_pointer(st_system_ip, rd_out, ipext_OutOctets);
-
-                rrdset_done(st_system_ip);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_inerrors == CONFIG_BOOLEAN_YES || (do_inerrors == CONFIG_BOOLEAN_AUTO &&
-                                                     (ipext_InNoRoutes ||
-                                                      ipext_InTruncatedPkts ||
-                                                      netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_inerrors = CONFIG_BOOLEAN_YES;
-                static RRDSET *st_ip_inerrors = NULL;
-                static RRDDIM *rd_noroutes = NULL, *rd_truncated = NULL, *rd_checksum = NULL;
-
-                if(unlikely(!st_ip_inerrors)) {
-                    st_ip_inerrors = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "inerrors"
-                            , NULL
-                            , "errors"
-                            , NULL
-                            , "IP Input Errors"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_ERRORS
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(st_ip_inerrors, RRDSET_FLAG_DETAIL);
-
-                    rd_noroutes  = rrddim_add(st_ip_inerrors, "InNoRoutes",      "noroutes",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_truncated = rrddim_add(st_ip_inerrors, "InTruncatedPkts", "truncated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_checksum  = rrddim_add(st_ip_inerrors, "InCsumErrors",    "checksum",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_ip_inerrors);
-
-                rrddim_set_by_pointer(st_ip_inerrors, rd_noroutes,  ipext_InNoRoutes);
-                rrddim_set_by_pointer(st_ip_inerrors, rd_truncated, ipext_InTruncatedPkts);
-                rrddim_set_by_pointer(st_ip_inerrors, rd_checksum,  ipext_InCsumErrors);
-
-                rrdset_done(st_ip_inerrors);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO &&
-                                                  (ipext_InMcastOctets ||
-                                                   ipext_OutMcastOctets ||
-                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_mcast = CONFIG_BOOLEAN_YES;
-                static RRDSET *st_ip_mcast = NULL;
-                static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-                if(unlikely(!st_ip_mcast)) {
-                    st_ip_mcast = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "mcast"
-                            , NULL
-                            , "multicast"
-                            , NULL
-                            , "IP Multicast Bandwidth"
-                            , "kilobits/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_MCAST
-                            , update_every
-                            , RRDSET_TYPE_AREA
-                    );
-
-                    rrdset_flag_set(st_ip_mcast, RRDSET_FLAG_DETAIL);
-
-                    rd_in  = rrddim_add(st_ip_mcast, "InMcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st_ip_mcast, "OutMcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_ip_mcast);
-
-                rrddim_set_by_pointer(st_ip_mcast, rd_in,  ipext_InMcastOctets);
-                rrddim_set_by_pointer(st_ip_mcast, rd_out, ipext_OutMcastOctets);
-
-                rrdset_done(st_ip_mcast);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO &&
-                                                  (ipext_InBcastOctets ||
-                                                   ipext_OutBcastOctets ||
-                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_bcast = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_ip_bcast = NULL;
-                static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-                if(unlikely(!st_ip_bcast)) {
-                    st_ip_bcast = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "bcast"
-                            , NULL
-                            , "broadcast"
-                            , NULL
-                            , "IP Broadcast Bandwidth"
-                            , "kilobits/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_BCAST
-                            , update_every
-                            , RRDSET_TYPE_AREA
-                    );
-
-                    rrdset_flag_set(st_ip_bcast, RRDSET_FLAG_DETAIL);
-
-                    rd_in  = rrddim_add(st_ip_bcast, "InBcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st_ip_bcast, "OutBcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_ip_bcast);
-
-                rrddim_set_by_pointer(st_ip_bcast, rd_in,  ipext_InBcastOctets);
-                rrddim_set_by_pointer(st_ip_bcast, rd_out, ipext_OutBcastOctets);
-
-                rrdset_done(st_ip_bcast);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO &&
-                                                    (ipext_InMcastPkts ||
-                                                     ipext_OutMcastPkts ||
-                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_mcast_p = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_ip_mcastpkts = NULL;
-                static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-                if(unlikely(!st_ip_mcastpkts)) {
-                    st_ip_mcastpkts = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "mcastpkts"
-                            , NULL
-                            , "multicast"
-                            , NULL
-                            , "IP Multicast Packets"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_MCAST_PACKETS
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(st_ip_mcastpkts, RRDSET_FLAG_DETAIL);
-
-                    rd_in  = rrddim_add(st_ip_mcastpkts, "InMcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st_ip_mcastpkts, "OutMcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st_ip_mcastpkts);
-
-                rrddim_set_by_pointer(st_ip_mcastpkts, rd_in,  ipext_InMcastPkts);
-                rrddim_set_by_pointer(st_ip_mcastpkts, rd_out, ipext_OutMcastPkts);
-
-                rrdset_done(st_ip_mcastpkts);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_bcast_p == CONFIG_BOOLEAN_YES || (do_bcast_p == CONFIG_BOOLEAN_AUTO &&
-                                                    (ipext_InBcastPkts ||
-                                                     ipext_OutBcastPkts ||
-                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_bcast_p = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_ip_bcastpkts = NULL;
-                static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-                if(unlikely(!st_ip_bcastpkts)) {
-                    st_ip_bcastpkts = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "bcastpkts"
-                            , NULL
-                            , "broadcast"
-                            , NULL
-                            , "IP Broadcast Packets"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_BCAST_PACKETS
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(st_ip_bcastpkts, RRDSET_FLAG_DETAIL);
-
-                    rd_in  = rrddim_add(st_ip_bcastpkts, "InBcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st_ip_bcastpkts, "OutBcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_ip_bcastpkts);
-
-                rrddim_set_by_pointer(st_ip_bcastpkts, rd_in,  ipext_InBcastPkts);
-                rrddim_set_by_pointer(st_ip_bcastpkts, rd_out, ipext_OutBcastPkts);
-
-                rrdset_done(st_ip_bcastpkts);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
-                                                (ipext_InCEPkts ||
-                                                 ipext_InECT0Pkts ||
-                                                 ipext_InECT1Pkts ||
-                                                 ipext_InNoECTPkts ||
-                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_ecn = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_ecnpkts = NULL;
-                static RRDDIM *rd_cep = NULL, *rd_noectp = NULL, *rd_ectp0 = NULL, *rd_ectp1 = NULL;
-
-                if(unlikely(!st_ecnpkts)) {
-                    st_ecnpkts = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "ecnpkts"
-                            , NULL
-                            , "ecn"
-                            , NULL
-                            , "IP ECN Statistics"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_ECN
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(st_ecnpkts, RRDSET_FLAG_DETAIL);
-
-                    rd_cep    = rrddim_add(st_ecnpkts, "InCEPkts",    "CEP",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_noectp = rrddim_add(st_ecnpkts, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_ectp0  = rrddim_add(st_ecnpkts, "InECT0Pkts",  "ECTP0",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_ectp1  = rrddim_add(st_ecnpkts, "InECT1Pkts",  "ECTP1",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st_ecnpkts);
-
-                rrddim_set_by_pointer(st_ecnpkts, rd_cep,    ipext_InCEPkts);
-                rrddim_set_by_pointer(st_ecnpkts, rd_noectp, ipext_InNoECTPkts);
-                rrddim_set_by_pointer(st_ecnpkts, rd_ectp0,  ipext_InECT0Pkts);
-                rrddim_set_by_pointer(st_ecnpkts, rd_ectp1,  ipext_InECT1Pkts);
-
-                rrdset_done(st_ecnpkts);
-            }
         }
         else if(unlikely(hash == hash_tcpext && strcmp(key, "TcpExt") == 0)) {
             size_t h = l++;
 
-            words = procfile_linewords(ff, l);
+            words = procfile_linewords(ff_netstat, l);
             if(unlikely(words < 2)) {
                 error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
-            parse_line_pair(ff, arl_tcpext, h, l);
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_memory == CONFIG_BOOLEAN_YES || (do_tcpext_memory == CONFIG_BOOLEAN_AUTO &&
-                                                          (tcpext_TCPMemoryPressures ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_memory = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_tcpmemorypressures = NULL;
-                static RRDDIM *rd_pressures = NULL;
-
-                if(unlikely(!st_tcpmemorypressures)) {
-                    st_tcpmemorypressures = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcpmemorypressures"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP Memory Pressures"
-                            , "events/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_MEM
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_pressures = rrddim_add(st_tcpmemorypressures, "TCPMemoryPressures",   "pressures",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_tcpmemorypressures);
-
-                rrddim_set_by_pointer(st_tcpmemorypressures, rd_pressures, tcpext_TCPMemoryPressures);
-
-                rrdset_done(st_tcpmemorypressures);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
-                                                              (tcpext_TCPAbortOnData ||
-                                                               tcpext_TCPAbortOnClose ||
-                                                               tcpext_TCPAbortOnMemory ||
-                                                               tcpext_TCPAbortOnTimeout ||
-                                                               tcpext_TCPAbortOnLinger ||
-                                                               tcpext_TCPAbortFailed ||
-                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_tcpconnaborts = NULL;
-                static RRDDIM *rd_baddata = NULL, *rd_userclosed = NULL, *rd_nomemory = NULL, *rd_timeout = NULL, *rd_linger = NULL, *rd_failed = NULL;
-
-                if(unlikely(!st_tcpconnaborts)) {
-                    st_tcpconnaborts = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcpconnaborts"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP Connection Aborts"
-                            , "connections/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_CONNABORTS
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_baddata    = rrddim_add(st_tcpconnaborts, "TCPAbortOnData",    "baddata",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_userclosed = rrddim_add(st_tcpconnaborts, "TCPAbortOnClose",   "userclosed",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_nomemory   = rrddim_add(st_tcpconnaborts, "TCPAbortOnMemory",  "nomemory",    1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_timeout    = rrddim_add(st_tcpconnaborts, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_linger     = rrddim_add(st_tcpconnaborts, "TCPAbortOnLinger",  "linger",      1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_failed     = rrddim_add(st_tcpconnaborts, "TCPAbortFailed",    "failed",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_tcpconnaborts);
-
-                rrddim_set_by_pointer(st_tcpconnaborts, rd_baddata,    tcpext_TCPAbortOnData);
-                rrddim_set_by_pointer(st_tcpconnaborts, rd_userclosed, tcpext_TCPAbortOnClose);
-                rrddim_set_by_pointer(st_tcpconnaborts, rd_nomemory,   tcpext_TCPAbortOnMemory);
-                rrddim_set_by_pointer(st_tcpconnaborts, rd_timeout,    tcpext_TCPAbortOnTimeout);
-                rrddim_set_by_pointer(st_tcpconnaborts, rd_linger,     tcpext_TCPAbortOnLinger);
-                rrddim_set_by_pointer(st_tcpconnaborts, rd_failed,     tcpext_TCPAbortFailed);
-
-                rrdset_done(st_tcpconnaborts);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_reorder == CONFIG_BOOLEAN_YES || (do_tcpext_reorder == CONFIG_BOOLEAN_AUTO &&
-                                                           (tcpext_TCPRenoReorder ||
-                                                            tcpext_TCPFACKReorder ||
-                                                            tcpext_TCPSACKReorder ||
-                                                            tcpext_TCPTSReorder ||
-                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_reorder = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_tcpreorders = NULL;
-                static RRDDIM *rd_timestamp = NULL, *rd_sack = NULL, *rd_fack = NULL, *rd_reno = NULL;
-
-                if(unlikely(!st_tcpreorders)) {
-                    st_tcpreorders = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcpreorders"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP Reordered Packets by Detection Method"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_REORDERS
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_timestamp = rrddim_add(st_tcpreorders, "TCPTSReorder",   "timestamp",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_sack      = rrddim_add(st_tcpreorders, "TCPSACKReorder", "sack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_fack      = rrddim_add(st_tcpreorders, "TCPFACKReorder", "fack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_reno      = rrddim_add(st_tcpreorders, "TCPRenoReorder", "reno",        1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_tcpreorders);
-
-                rrddim_set_by_pointer(st_tcpreorders, rd_timestamp, tcpext_TCPTSReorder);
-                rrddim_set_by_pointer(st_tcpreorders, rd_sack,      tcpext_TCPSACKReorder);
-                rrddim_set_by_pointer(st_tcpreorders, rd_fack,      tcpext_TCPFACKReorder);
-                rrddim_set_by_pointer(st_tcpreorders, rd_reno,      tcpext_TCPRenoReorder);
-
-                rrdset_done(st_tcpreorders);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
-                                                       (tcpext_TCPOFOQueue ||
-                                                        tcpext_TCPOFODrop ||
-                                                        tcpext_TCPOFOMerge ||
-                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_ofo = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_ip_tcpofo = NULL;
-                static RRDDIM *rd_inqueue = NULL, *rd_dropped = NULL, *rd_merged = NULL, *rd_pruned = NULL;
-
-                if(unlikely(!st_ip_tcpofo)) {
-
-                    st_ip_tcpofo = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcpofo"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP Out-Of-Order Queue"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_OFO
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_inqueue = rrddim_add(st_ip_tcpofo, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_dropped = rrddim_add(st_ip_tcpofo, "TCPOFODrop",  "dropped", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_merged  = rrddim_add(st_ip_tcpofo, "TCPOFOMerge", "merged",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_pruned  = rrddim_add(st_ip_tcpofo, "OfoPruned",   "pruned",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_ip_tcpofo);
-
-                rrddim_set_by_pointer(st_ip_tcpofo, rd_inqueue, tcpext_TCPOFOQueue);
-                rrddim_set_by_pointer(st_ip_tcpofo, rd_dropped, tcpext_TCPOFODrop);
-                rrddim_set_by_pointer(st_ip_tcpofo, rd_merged,  tcpext_TCPOFOMerge);
-                rrddim_set_by_pointer(st_ip_tcpofo, rd_pruned,  tcpext_OfoPruned);
-
-                rrdset_done(st_ip_tcpofo);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO &&
-                                                              (tcpext_SyncookiesSent ||
-                                                               tcpext_SyncookiesRecv ||
-                                                               tcpext_SyncookiesFailed ||
-                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_syscookies = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_syncookies = NULL;
-                static RRDDIM *rd_received = NULL, *rd_sent = NULL, *rd_failed = NULL;
-
-                if(unlikely(!st_syncookies)) {
-
-                    st_syncookies = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcpsyncookies"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP SYN Cookies"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_SYNCOOKIES
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_received = rrddim_add(st_syncookies, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_sent     = rrddim_add(st_syncookies, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_failed   = rrddim_add(st_syncookies, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_syncookies);
-
-                rrddim_set_by_pointer(st_syncookies, rd_received, tcpext_SyncookiesRecv);
-                rrddim_set_by_pointer(st_syncookies, rd_sent,     tcpext_SyncookiesSent);
-                rrddim_set_by_pointer(st_syncookies, rd_failed,   tcpext_SyncookiesFailed);
-
-                rrdset_done(st_syncookies);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_syn_queue == CONFIG_BOOLEAN_YES || (do_tcpext_syn_queue == CONFIG_BOOLEAN_AUTO &&
-                                                             (tcpext_TCPReqQFullDrop ||
-                                                              tcpext_TCPReqQFullDoCookies ||
-                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_syn_queue = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_syn_queue = NULL;
-                static RRDDIM
-                        *rd_TCPReqQFullDrop = NULL,
-                        *rd_TCPReqQFullDoCookies = NULL;
-
-                if(unlikely(!st_syn_queue)) {
-
-                    st_syn_queue = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcp_syn_queue"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP SYN Queue Issues"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_SYN_QUEUE
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_TCPReqQFullDrop      = rrddim_add(st_syn_queue, "TCPReqQFullDrop",      "drops",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_TCPReqQFullDoCookies = rrddim_add(st_syn_queue, "TCPReqQFullDoCookies", "cookies", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_syn_queue);
-
-                rrddim_set_by_pointer(st_syn_queue, rd_TCPReqQFullDrop,      tcpext_TCPReqQFullDrop);
-                rrddim_set_by_pointer(st_syn_queue, rd_TCPReqQFullDoCookies, tcpext_TCPReqQFullDoCookies);
-
-                rrdset_done(st_syn_queue);
-            }
-
-            // --------------------------------------------------------------------
-
-            if(do_tcpext_accept_queue == CONFIG_BOOLEAN_YES || (do_tcpext_accept_queue == CONFIG_BOOLEAN_AUTO &&
-                                                                (tcpext_ListenOverflows ||
-                                                                 tcpext_ListenDrops ||
-                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                do_tcpext_accept_queue = CONFIG_BOOLEAN_YES;
-
-                static RRDSET *st_accept_queue = NULL;
-                static RRDDIM *rd_overflows = NULL,
-                    *rd_drops = NULL;
-
-                if(unlikely(!st_accept_queue)) {
-
-                    st_accept_queue = rrdset_create_localhost(
-                            RRD_TYPE_NET_NETSTAT
-                            , "tcp_accept_queue"
-                            , NULL
-                            , "tcp"
-                            , NULL
-                            , "TCP Accept Queue Issues"
-                            , "packets/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                            , NETDATA_CHART_PRIO_IP_TCP_ACCEPT_QUEUE
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_overflows = rrddim_add(st_accept_queue, "ListenOverflows", "overflows", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_drops     = rrddim_add(st_accept_queue, "ListenDrops",     "drops",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else
-                    rrdset_next(st_accept_queue);
-
-                rrddim_set_by_pointer(st_accept_queue, rd_overflows, tcpext_ListenOverflows);
-                rrddim_set_by_pointer(st_accept_queue, rd_drops,     tcpext_ListenDrops);
-
-                rrdset_done(st_accept_queue);
-            }
-
+            parse_line_pair(ff_netstat, arl_tcpext, h, l);
         }
+    }
+
+    // IpExt charts
+
+    // --------------------------------------------------------------------
+
+    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                                                (ipext_InOctets ||
+                                                ipext_OutOctets ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_bandwidth = CONFIG_BOOLEAN_YES;
+        static RRDSET *st_system_ip = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_system_ip)) {
+            st_system_ip = rrdset_create_localhost(
+                    "system"
+                    , RRD_TYPE_NET_NETSTAT
+                    , NULL
+                    , "network"
+                    , NULL
+                    , "IP Bandwidth"
+                    , "kilobits/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_IP
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_system_ip, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_system_ip, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_system_ip);
+
+        rrddim_set_by_pointer(st_system_ip, rd_in,  ipext_InOctets);
+        rrddim_set_by_pointer(st_system_ip, rd_out, ipext_OutOctets);
+
+        rrdset_done(st_system_ip);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_inerrors == CONFIG_BOOLEAN_YES || (do_inerrors == CONFIG_BOOLEAN_AUTO &&
+                                                (ipext_InNoRoutes ||
+                                                ipext_InTruncatedPkts ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_inerrors = CONFIG_BOOLEAN_YES;
+        static RRDSET *st_ip_inerrors = NULL;
+        static RRDDIM *rd_noroutes = NULL, *rd_truncated = NULL, *rd_checksum = NULL;
+
+        if(unlikely(!st_ip_inerrors)) {
+            st_ip_inerrors = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "inerrors"
+                    , NULL
+                    , "errors"
+                    , NULL
+                    , "IP Input Errors"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_ERRORS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st_ip_inerrors, RRDSET_FLAG_DETAIL);
+
+            rd_noroutes  = rrddim_add(st_ip_inerrors, "InNoRoutes",      "noroutes",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_truncated = rrddim_add(st_ip_inerrors, "InTruncatedPkts", "truncated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_checksum  = rrddim_add(st_ip_inerrors, "InCsumErrors",    "checksum",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_ip_inerrors);
+
+        rrddim_set_by_pointer(st_ip_inerrors, rd_noroutes,  ipext_InNoRoutes);
+        rrddim_set_by_pointer(st_ip_inerrors, rd_truncated, ipext_InTruncatedPkts);
+        rrddim_set_by_pointer(st_ip_inerrors, rd_checksum,  ipext_InCsumErrors);
+
+        rrdset_done(st_ip_inerrors);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO &&
+                                            (ipext_InMcastOctets ||
+                                            ipext_OutMcastOctets ||
+                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_mcast = CONFIG_BOOLEAN_YES;
+        static RRDSET *st_ip_mcast = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_ip_mcast)) {
+            st_ip_mcast = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "mcast"
+                    , NULL
+                    , "multicast"
+                    , NULL
+                    , "IP Multicast Bandwidth"
+                    , "kilobits/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_MCAST
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rrdset_flag_set(st_ip_mcast, RRDSET_FLAG_DETAIL);
+
+            rd_in  = rrddim_add(st_ip_mcast, "InMcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_mcast, "OutMcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_ip_mcast);
+
+        rrddim_set_by_pointer(st_ip_mcast, rd_in,  ipext_InMcastOctets);
+        rrddim_set_by_pointer(st_ip_mcast, rd_out, ipext_OutMcastOctets);
+
+        rrdset_done(st_ip_mcast);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO &&
+                                            (ipext_InBcastOctets ||
+                                            ipext_OutBcastOctets ||
+                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_bcast = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_ip_bcast = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_ip_bcast)) {
+            st_ip_bcast = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "bcast"
+                    , NULL
+                    , "broadcast"
+                    , NULL
+                    , "IP Broadcast Bandwidth"
+                    , "kilobits/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_BCAST
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rrdset_flag_set(st_ip_bcast, RRDSET_FLAG_DETAIL);
+
+            rd_in  = rrddim_add(st_ip_bcast, "InBcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_bcast, "OutBcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_ip_bcast);
+
+        rrddim_set_by_pointer(st_ip_bcast, rd_in,  ipext_InBcastOctets);
+        rrddim_set_by_pointer(st_ip_bcast, rd_out, ipext_OutBcastOctets);
+
+        rrdset_done(st_ip_bcast);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO &&
+                                            (ipext_InMcastPkts ||
+                                                ipext_OutMcastPkts ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_mcast_p = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_ip_mcastpkts = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_ip_mcastpkts)) {
+            st_ip_mcastpkts = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "mcastpkts"
+                    , NULL
+                    , "multicast"
+                    , NULL
+                    , "IP Multicast Packets"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_MCAST_PACKETS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st_ip_mcastpkts, RRDSET_FLAG_DETAIL);
+
+            rd_in  = rrddim_add(st_ip_mcastpkts, "InMcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_mcastpkts, "OutMcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st_ip_mcastpkts);
+
+        rrddim_set_by_pointer(st_ip_mcastpkts, rd_in,  ipext_InMcastPkts);
+        rrddim_set_by_pointer(st_ip_mcastpkts, rd_out, ipext_OutMcastPkts);
+
+        rrdset_done(st_ip_mcastpkts);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_bcast_p == CONFIG_BOOLEAN_YES || (do_bcast_p == CONFIG_BOOLEAN_AUTO &&
+                                            (ipext_InBcastPkts ||
+                                                ipext_OutBcastPkts ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_bcast_p = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_ip_bcastpkts = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_ip_bcastpkts)) {
+            st_ip_bcastpkts = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "bcastpkts"
+                    , NULL
+                    , "broadcast"
+                    , NULL
+                    , "IP Broadcast Packets"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_BCAST_PACKETS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st_ip_bcastpkts, RRDSET_FLAG_DETAIL);
+
+            rd_in  = rrddim_add(st_ip_bcastpkts, "InBcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_bcastpkts, "OutBcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_ip_bcastpkts);
+
+        rrddim_set_by_pointer(st_ip_bcastpkts, rd_in,  ipext_InBcastPkts);
+        rrddim_set_by_pointer(st_ip_bcastpkts, rd_out, ipext_OutBcastPkts);
+
+        rrdset_done(st_ip_bcastpkts);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
+                                        (ipext_InCEPkts ||
+                                            ipext_InECT0Pkts ||
+                                            ipext_InECT1Pkts ||
+                                            ipext_InNoECTPkts ||
+                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_ecn = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_ecnpkts = NULL;
+        static RRDDIM *rd_cep = NULL, *rd_noectp = NULL, *rd_ectp0 = NULL, *rd_ectp1 = NULL;
+
+        if(unlikely(!st_ecnpkts)) {
+            st_ecnpkts = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "ecnpkts"
+                    , NULL
+                    , "ecn"
+                    , NULL
+                    , "IP ECN Statistics"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_ECN
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st_ecnpkts, RRDSET_FLAG_DETAIL);
+
+            rd_cep    = rrddim_add(st_ecnpkts, "InCEPkts",    "CEP",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_noectp = rrddim_add(st_ecnpkts, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ectp0  = rrddim_add(st_ecnpkts, "InECT0Pkts",  "ECTP0",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ectp1  = rrddim_add(st_ecnpkts, "InECT1Pkts",  "ECTP1",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st_ecnpkts);
+
+        rrddim_set_by_pointer(st_ecnpkts, rd_cep,    ipext_InCEPkts);
+        rrddim_set_by_pointer(st_ecnpkts, rd_noectp, ipext_InNoECTPkts);
+        rrddim_set_by_pointer(st_ecnpkts, rd_ectp0,  ipext_InECT0Pkts);
+        rrddim_set_by_pointer(st_ecnpkts, rd_ectp1,  ipext_InECT1Pkts);
+
+        rrdset_done(st_ecnpkts);
+    }
+
+    // TcpExt charts
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_memory == CONFIG_BOOLEAN_YES || (do_tcpext_memory == CONFIG_BOOLEAN_AUTO &&
+                                                    (tcpext_TCPMemoryPressures ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_memory = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_tcpmemorypressures = NULL;
+        static RRDDIM *rd_pressures = NULL;
+
+        if(unlikely(!st_tcpmemorypressures)) {
+            st_tcpmemorypressures = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcpmemorypressures"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP Memory Pressures"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_MEM
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_pressures = rrddim_add(st_tcpmemorypressures, "TCPMemoryPressures",   "pressures",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_tcpmemorypressures);
+
+        rrddim_set_by_pointer(st_tcpmemorypressures, rd_pressures, tcpext_TCPMemoryPressures);
+
+        rrdset_done(st_tcpmemorypressures);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
+                                                        (tcpext_TCPAbortOnData ||
+                                                        tcpext_TCPAbortOnClose ||
+                                                        tcpext_TCPAbortOnMemory ||
+                                                        tcpext_TCPAbortOnTimeout ||
+                                                        tcpext_TCPAbortOnLinger ||
+                                                        tcpext_TCPAbortFailed ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_tcpconnaborts = NULL;
+        static RRDDIM *rd_baddata = NULL, *rd_userclosed = NULL, *rd_nomemory = NULL, *rd_timeout = NULL, *rd_linger = NULL, *rd_failed = NULL;
+
+        if(unlikely(!st_tcpconnaborts)) {
+            st_tcpconnaborts = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcpconnaborts"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP Connection Aborts"
+                    , "connections/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_CONNABORTS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_baddata    = rrddim_add(st_tcpconnaborts, "TCPAbortOnData",    "baddata",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_userclosed = rrddim_add(st_tcpconnaborts, "TCPAbortOnClose",   "userclosed",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_nomemory   = rrddim_add(st_tcpconnaborts, "TCPAbortOnMemory",  "nomemory",    1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_timeout    = rrddim_add(st_tcpconnaborts, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_linger     = rrddim_add(st_tcpconnaborts, "TCPAbortOnLinger",  "linger",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed     = rrddim_add(st_tcpconnaborts, "TCPAbortFailed",    "failed",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_tcpconnaborts);
+
+        rrddim_set_by_pointer(st_tcpconnaborts, rd_baddata,    tcpext_TCPAbortOnData);
+        rrddim_set_by_pointer(st_tcpconnaborts, rd_userclosed, tcpext_TCPAbortOnClose);
+        rrddim_set_by_pointer(st_tcpconnaborts, rd_nomemory,   tcpext_TCPAbortOnMemory);
+        rrddim_set_by_pointer(st_tcpconnaborts, rd_timeout,    tcpext_TCPAbortOnTimeout);
+        rrddim_set_by_pointer(st_tcpconnaborts, rd_linger,     tcpext_TCPAbortOnLinger);
+        rrddim_set_by_pointer(st_tcpconnaborts, rd_failed,     tcpext_TCPAbortFailed);
+
+        rrdset_done(st_tcpconnaborts);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_reorder == CONFIG_BOOLEAN_YES || (do_tcpext_reorder == CONFIG_BOOLEAN_AUTO &&
+                                                    (tcpext_TCPRenoReorder ||
+                                                    tcpext_TCPFACKReorder ||
+                                                    tcpext_TCPSACKReorder ||
+                                                    tcpext_TCPTSReorder ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_reorder = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_tcpreorders = NULL;
+        static RRDDIM *rd_timestamp = NULL, *rd_sack = NULL, *rd_fack = NULL, *rd_reno = NULL;
+
+        if(unlikely(!st_tcpreorders)) {
+            st_tcpreorders = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcpreorders"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP Reordered Packets by Detection Method"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_REORDERS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_timestamp = rrddim_add(st_tcpreorders, "TCPTSReorder",   "timestamp",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sack      = rrddim_add(st_tcpreorders, "TCPSACKReorder", "sack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fack      = rrddim_add(st_tcpreorders, "TCPFACKReorder", "fack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_reno      = rrddim_add(st_tcpreorders, "TCPRenoReorder", "reno",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_tcpreorders);
+
+        rrddim_set_by_pointer(st_tcpreorders, rd_timestamp, tcpext_TCPTSReorder);
+        rrddim_set_by_pointer(st_tcpreorders, rd_sack,      tcpext_TCPSACKReorder);
+        rrddim_set_by_pointer(st_tcpreorders, rd_fack,      tcpext_TCPFACKReorder);
+        rrddim_set_by_pointer(st_tcpreorders, rd_reno,      tcpext_TCPRenoReorder);
+
+        rrdset_done(st_tcpreorders);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
+                                                (tcpext_TCPOFOQueue ||
+                                                tcpext_TCPOFODrop ||
+                                                tcpext_TCPOFOMerge ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_ofo = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_ip_tcpofo = NULL;
+        static RRDDIM *rd_inqueue = NULL, *rd_dropped = NULL, *rd_merged = NULL, *rd_pruned = NULL;
+
+        if(unlikely(!st_ip_tcpofo)) {
+
+            st_ip_tcpofo = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcpofo"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP Out-Of-Order Queue"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_OFO
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_inqueue = rrddim_add(st_ip_tcpofo, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_dropped = rrddim_add(st_ip_tcpofo, "TCPOFODrop",  "dropped", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_merged  = rrddim_add(st_ip_tcpofo, "TCPOFOMerge", "merged",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pruned  = rrddim_add(st_ip_tcpofo, "OfoPruned",   "pruned",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_ip_tcpofo);
+
+        rrddim_set_by_pointer(st_ip_tcpofo, rd_inqueue, tcpext_TCPOFOQueue);
+        rrddim_set_by_pointer(st_ip_tcpofo, rd_dropped, tcpext_TCPOFODrop);
+        rrddim_set_by_pointer(st_ip_tcpofo, rd_merged,  tcpext_TCPOFOMerge);
+        rrddim_set_by_pointer(st_ip_tcpofo, rd_pruned,  tcpext_OfoPruned);
+
+        rrdset_done(st_ip_tcpofo);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO &&
+                                                        (tcpext_SyncookiesSent ||
+                                                        tcpext_SyncookiesRecv ||
+                                                        tcpext_SyncookiesFailed ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_syscookies = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_syncookies = NULL;
+        static RRDDIM *rd_received = NULL, *rd_sent = NULL, *rd_failed = NULL;
+
+        if(unlikely(!st_syncookies)) {
+
+            st_syncookies = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcpsyncookies"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP SYN Cookies"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_SYNCOOKIES
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_received = rrddim_add(st_syncookies, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st_syncookies, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed   = rrddim_add(st_syncookies, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_syncookies);
+
+        rrddim_set_by_pointer(st_syncookies, rd_received, tcpext_SyncookiesRecv);
+        rrddim_set_by_pointer(st_syncookies, rd_sent,     tcpext_SyncookiesSent);
+        rrddim_set_by_pointer(st_syncookies, rd_failed,   tcpext_SyncookiesFailed);
+
+        rrdset_done(st_syncookies);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_syn_queue == CONFIG_BOOLEAN_YES || (do_tcpext_syn_queue == CONFIG_BOOLEAN_AUTO &&
+                                                        (tcpext_TCPReqQFullDrop ||
+                                                        tcpext_TCPReqQFullDoCookies ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_syn_queue = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_syn_queue = NULL;
+        static RRDDIM
+                *rd_TCPReqQFullDrop = NULL,
+                *rd_TCPReqQFullDoCookies = NULL;
+
+        if(unlikely(!st_syn_queue)) {
+
+            st_syn_queue = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcp_syn_queue"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP SYN Queue Issues"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_SYN_QUEUE
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_TCPReqQFullDrop      = rrddim_add(st_syn_queue, "TCPReqQFullDrop",      "drops",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_TCPReqQFullDoCookies = rrddim_add(st_syn_queue, "TCPReqQFullDoCookies", "cookies", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_syn_queue);
+
+        rrddim_set_by_pointer(st_syn_queue, rd_TCPReqQFullDrop,      tcpext_TCPReqQFullDrop);
+        rrddim_set_by_pointer(st_syn_queue, rd_TCPReqQFullDoCookies, tcpext_TCPReqQFullDoCookies);
+
+        rrdset_done(st_syn_queue);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcpext_accept_queue == CONFIG_BOOLEAN_YES || (do_tcpext_accept_queue == CONFIG_BOOLEAN_AUTO &&
+                                                        (tcpext_ListenOverflows ||
+                                                            tcpext_ListenDrops ||
+                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcpext_accept_queue = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_accept_queue = NULL;
+        static RRDDIM *rd_overflows = NULL,
+            *rd_drops = NULL;
+
+        if(unlikely(!st_accept_queue)) {
+
+            st_accept_queue = rrdset_create_localhost(
+                    RRD_TYPE_NET_NETSTAT
+                    , "tcp_accept_queue"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "TCP Accept Queue Issues"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IP_TCP_ACCEPT_QUEUE
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_overflows = rrddim_add(st_accept_queue, "ListenOverflows", "overflows", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_drops     = rrddim_add(st_accept_queue, "ListenDrops",     "drops",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_accept_queue);
+
+        rrddim_set_by_pointer(st_accept_queue, rd_overflows, tcpext_ListenOverflows);
+        rrddim_set_by_pointer(st_accept_queue, rd_drops,     tcpext_ListenDrops);
+
+        rrdset_done(st_accept_queue);
     }
 
     return 0;
