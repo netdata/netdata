@@ -70,7 +70,9 @@ and the `name`, `title` etc to define the
 [CHART variables](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#global-variables-order-and-chart) 
 that will control how the results will look in netdata.
 
-The example configuration above would result in a `data` dictionary like the below being collected by Netdata at each time step. They keys in this dictionary will be the [dimension](https://learn.netdata.cloud/docs/agent/web#dimensions) names on the chart.
+The example configuration above would result in a `data` dictionary like the below being collected by Netdata 
+at each time step. They keys in this dictionary will be the 
+[dimension](https://learn.netdata.cloud/docs/agent/web#dimensions) names on the chart.
 
 ```javascript
 {'athens_max': 26.2, 'athens_mean': 19.45952380952381, 'athens_min': 12.2, 'berlin_max': 17.4, 'berlin_mean': 10.764285714285714, 'berlin_min': 5.7, 'dublin_max': 15.3, 'dublin_mean': 12.008928571428571, 'dublin_min': 6.6, 'london_max': 18.9, 'london_mean': 12.510714285714286, 'london_min': 5.2, 'paris_max': 19.4, 'paris_mean': 12.054166666666665, 'paris_min': 4.8}
@@ -78,14 +80,14 @@ The example configuration above would result in a `data` dictionary like the bel
 
 Which, given the above configuration would end up as a chart like below in Netdata.
 
-![image](https://user-images.githubusercontent.com/2178292/194553559-c436df13-b20e-4258-9122-52e5e119bf0d.png)
+![pandas collector temperature example chart](https://user-images.githubusercontent.com/2178292/195075312-8ce8cf68-5172-48e3-af09-104ffecfcdd6.png)
 
 ## Notes
--  Each line in `df_steps` must return a pandas 
+ -  Each line in `df_steps` must return a pandas 
 [DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) object (`df`) at each step.
--  You can use 
+ -  You can use 
 [this colab notebook](https://colab.research.google.com/drive/1VYrddSegZqGtkWGFuiUbMbUk5f3rW6Hi?usp=sharing) 
 to mock up and work on your `df_steps` iteratively before adding them to your config.
--  This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken 
+ -  This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken 
 as the most recent values for each dimension on each chart using (`df.to_dict(orient='records')[0]`). 
 See [pd.to_dict()](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_dict.html).

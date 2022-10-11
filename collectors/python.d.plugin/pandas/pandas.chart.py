@@ -57,7 +57,7 @@ class Service(SimpleService):
                     'lines': []
                     }
                 self.charts.add_chart([chart_config['name']] + chart_template['options'])
-                
+
             data_tmp = self.run_code(chart_config['df_steps'])
             data.update(data_tmp)
 
