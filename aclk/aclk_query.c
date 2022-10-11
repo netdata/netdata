@@ -99,7 +99,6 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         }
     }
 
-    RRDHOST *temp_host = NULL;
     if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
         char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
         char nodeid[UUID_STR_LEN];
@@ -114,14 +113,11 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
         query_host = node_id_2_rrdhost(nodeid);
         if (!query_host) {
-            temp_host = sql_create_host_by_uuid(nodeid);
-            if (!temp_host) {
-                error_report("Host with node_id \"%s\" not found! Returning 404 to Cloud!", nodeid);
-                retval = 1;
-                w->response.code = 404;
-                aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_NODE_NOT_FOUND, CLOUD_EMSG_NODE_NOT_FOUND, NULL, 0);
-                goto cleanup;
-            }
+            error_report("Host with node_id \"%s\" not found! Returning 404 to Cloud!", nodeid);
+            retval = 1;
+            w->response.code = 404;
+            aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_NODE_NOT_FOUND, CLOUD_EMSG_NODE_NOT_FOUND, NULL, 0);
+            goto cleanup;
         }
     }
 
@@ -142,8 +138,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     }
 
     // execute the query
-    t = aclk_web_api_v1_request(query_host ? query_host : temp_host, w, mysep ? mysep + 1 : "noop");
-    free_temporary_host(temp_host);
+    t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
     size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
     sent = size;
 
