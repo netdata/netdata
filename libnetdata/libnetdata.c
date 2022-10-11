@@ -170,6 +170,9 @@ static struct malloc_trace *malloc_trace_find_or_create(const char *file, const 
 
     struct malloc_trace *t = (struct malloc_trace *)avl_search_lock(&malloc_trace_index, (avl_t *)&tmp);
     if(!t) {
+        if(unlikely(!libc_calloc))
+            initialize_malloc_trace();
+
         t = libc_calloc(1, sizeof(struct malloc_trace));
         if(!t) fatal("No memory");
         t->line = line;
