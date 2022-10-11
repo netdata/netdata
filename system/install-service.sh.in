@@ -419,6 +419,9 @@ isinitd() {
   # if there is _any_ systemd, it’s not init.d
   check_systemd ; [ $? = 1 ] || return 1
 
+  # if there is _any_ openrc, it’s not init.d
+  check_openrc ; [ $? = 1 ] || return 1
+
   # if it's not an LSB setup, it’s init.d
   check_lsb || return 0
 
