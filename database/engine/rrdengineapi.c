@@ -187,13 +187,19 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
         db_metric_handle = rrdeng_metric_create(db_instance, &rd->metric_uuid, smg);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    {
-        struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
-        if(page_index) {
-            if(uuid_compare(rd->metric_uuid, page_index->id) != 0)
-                fatal("DBENGINE: uuids do not match");
-        }
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    if(uuid_compare(rd->metric_uuid, page_index->id) != 0) {
+        char uuid1[UUID_STR_LEN + 1];
+        char uuid2[UUID_STR_LEN + 1];
+
+        uuid_unparse(rd->metric_uuid, uuid1);
+        uuid_unparse(page_index->id, uuid2);
+        fatal("DBENGINE: uuids do not match, asked for metric '%s', but got page_index of metric '%s'", uuid1, uuid2);
     }
+
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    if(page_index->ctx != ctx)
+        fatal("DBENGINE: mixed up rrdengine instances, asked for metric from %p, got from %p", ctx, page_index->ctx);
 #endif
 
     return db_metric_handle;
