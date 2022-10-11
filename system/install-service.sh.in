@@ -360,6 +360,9 @@ islsb() {
   # If it's an OpenRC system, then it's not an LSB system
   check_openrc && return 1
 
+  # if there is _any_ systemd, it’s not an LSB system
+  check_systemd ; [ $? = 1 ] || return 1
+
   # If /lib/lsb/init-functions exists, it’s an LSB system
   [ -f /lib/lsb/init-functions ] && return 0
 
@@ -412,6 +415,9 @@ isinitd() {
 
   # if there is no chkconfig command, it's not a (usable) init.d system
   command -v chkconfig >/dev/null 2>&1 || return 1
+
+  # if there is _any_ systemd, it’s not init.d
+  check_systemd ; [ $? = 1 ] || return 1
 
   # if it's not an LSB setup, it’s init.d
   check_initd || return 0
