@@ -83,11 +83,11 @@ Which, given the above configuration would end up as a chart like below in Netda
 ![pandas collector temperature example chart](https://user-images.githubusercontent.com/2178292/195075312-8ce8cf68-5172-48e3-af09-104ffecfcdd6.png)
 
 ## Notes
- -  Each line in `df_steps` must return a pandas 
+- Each line in `df_steps` must return a pandas 
 [DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) object (`df`) at each step.
- -  You can use 
+- You can use 
 [this colab notebook](https://colab.research.google.com/drive/1VYrddSegZqGtkWGFuiUbMbUk5f3rW6Hi?usp=sharing) 
 to mock up and work on your `df_steps` iteratively before adding them to your config.
- -  This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken 
+- This collector is expecting one row in the final pandas DataFrame. It is that first row that will be taken 
 as the most recent values for each dimension on each chart using (`df.to_dict(orient='records')[0]`). 
 See [pd.to_dict()](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_dict.html).
