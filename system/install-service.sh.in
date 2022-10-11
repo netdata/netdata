@@ -33,6 +33,7 @@ LINUX_INIT_TYPES="wsl systemd openrc lsb initd runit"
 PLATFORM="$(uname -s)"
 SVC_SOURCE="@libsysdir_POST@"
 SVC_TYPE="detect"
+WSL_ERROR_MSG="We appear to be running in WSL and were unable to find a usable service manager. We currently support systemd, LSB init scripts, and traditional init.d style init scripts when running under WSL."
 
 # =====================================================================
 # Utility functions
@@ -353,18 +354,24 @@ openrc_cmds() {
 # =====================================================================
 # LSB init script support functions
 
-islsb() {
+islsb_ignore_systemd() {
   # if there is no /etc/init.d directory, it’s not an LSB system
   [ ! -d /etc/init.d ] && return 1
 
   # If it's an OpenRC system, then it's not an LSB system
-  check_openrc && return 1
-
-  # if there is _any_ systemd, it’s not an LSB system
-  check_systemd ; [ $? = 1 ] || return 1
+  check_openrc ; [ $? = 1 ] || return 1
 
   # If /lib/lsb/init-functions exists, it’s an LSB system
   [ -f /lib/lsb/init-functions ] && return 0
+
+  return 1
+}
+
+islsb() {
+  # if there is _any_ systemd, it’s not an LSB system
+  check_systemd ; [ $? = 1 ] || return 1
+
+  islsb_ignore_systemd && return 0
 
   return 1
 }
@@ -534,12 +541,12 @@ check_wsl() {
 }
 
 install_wsl_service() {
-  error "We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
+  error "${WSL_ERROR_MSG}"
   exit 3
 }
 
 wsl_cmds() {
-  error "We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
+  error "${WSL_ERROR_MSG}"
   exit 3
 }
 
@@ -625,6 +632,9 @@ detect_linux_svc_type() {
       if check_systemd; then
         # Support for systemd in WSL.
         SVC_TYPE="systemd"
+      elif islsb_ignore_systemd; then
+        # Support for LSB init.d in WSL.
+        SVC_TYPE="lsb"
       elif isinitd_ignore_systemd; then
         # Support for ‘generic’ init.d in WSL.
         SVC_TYPE="initd"
