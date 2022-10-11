@@ -8,8 +8,6 @@
 #define PLUGIN_PROC_MODULE_NETSTAT_NAME "/proc/net/netstat"
 #define CONFIG_SECTION_PLUGIN_PROC_NETSTAT "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETSTAT_NAME
 
-unsigned long long tcpext_TCPSynRetrans = 0;
-
 static struct proc_net_snmp {
     // kernel_uint_t ip_Forwarding;
     kernel_uint_t ip_DefaultTTL;
@@ -222,7 +220,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static unsigned long long tcpext_TCPReqQFullDrop = 0;
     static unsigned long long tcpext_TCPReqQFullDoCookies = 0;
 
-    // shared: tcpext_TCPSynRetrans
+    static unsigned long long tcpext_TCPSynRetrans = 0;
 
     // IPv6
     static unsigned long long Ip6InReceives = 0ULL;
@@ -431,7 +429,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             arl_expect(arl_tcpext, "TCPReqQFullDoCookies", &tcpext_TCPReqQFullDoCookies);
         }
 
-        // shared metrics
         arl_expect(arl_tcpext, "TCPSynRetrans", &tcpext_TCPSynRetrans);
     }
 
