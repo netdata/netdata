@@ -93,7 +93,6 @@ void add_migrated_file(char *path, uint64_t file_size);
 void db_unlock(void);
 void db_lock(void);
 void delete_dimension_uuid(uuid_t *dimension_uuid);
-void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **param_list, RRDHOST *host, char *context, char *chart);
 void store_claim_id(uuid_t *host_id, uuid_t *claim_id);
 int update_node_id(uuid_t *host_id, uuid_t *node_id);
 int get_node_id(uuid_t *host_id, uuid_t *node_id);
