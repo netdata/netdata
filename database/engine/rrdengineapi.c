@@ -469,9 +469,18 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
         if(unlikely(points_gap != 1)) {
             if (unlikely(points_gap <= 0)) {
-                error("DBENGINE: collected point is in the past, last stored point %llu, new point %llu.",
-                      last_point_in_time_ut / USEC_PER_SEC,
-                      point_in_time_ut / USEC_PER_SEC);
+                time_t now = now_realtime_sec();
+                static __thread size_t counter = 0;
+                static __thread time_t last_time_logged = 0;
+                counter++;
+
+                if((counter % 1000) == 0 || now - last_time_logged > 600 || !last_time_logged) {
+                    error("DBENGINE: collected point is in the past (repeated %zu times in the last %zu secs). Ignoring this point.",
+                          counter, (size_t)(last_time_logged?(now - last_time_logged):0));
+
+                    last_time_logged = now;
+                    counter = 0;
+                }
                 return;
             }
 
