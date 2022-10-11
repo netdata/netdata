@@ -1181,7 +1181,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     return descr;
 }
 
-struct pg_cache_page_index *create_page_index(uuid_t *id)
+struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx)
 {
     struct pg_cache_page_index *page_index;
 
@@ -1195,7 +1195,7 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
     page_index->page_count = 0;
     page_index->refcount = 0;
     page_index->writers = 0;
-    page_index->ctx = NULL;
+    page_index->ctx = ctx;
     page_index->alignment = NULL;
     page_index->latest_update_every_s = default_rrd_update_every;
 

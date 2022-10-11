@@ -197,7 +197,7 @@ struct rrdeng_page_descr *
 struct rrdeng_page_descr *
         pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
                      usec_t start_time_ut, usec_t end_time_ut);
-struct pg_cache_page_index *create_page_index(uuid_t *id);
+struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx);
 void init_page_cache(struct rrdengine_instance *ctx);
 void free_page_cache(struct rrdengine_instance *ctx);
 void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr);

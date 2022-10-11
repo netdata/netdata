@@ -140,12 +140,6 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
         page_index = *PValue;
         page_index->refcount++;
 
-        if(page_index->ctx && page_index->ctx != ctx)
-            fatal("DBENGINE: page_index has a different ctx.");
-
-        if(!page_index->ctx)
-            page_index->ctx = ctx;
-
         if(pa) {
             if(page_index->alignment && page_index->alignment != pa)
                 fatal("DBENGINE: page_index has a different alignment.");
@@ -162,6 +156,8 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 }
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!db_instance, "DBENGINE: db_instance is NULL");
+
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     struct pg_alignment *pa = (struct pg_alignment *)smg;
     struct pg_cache_page_index *page_index;
@@ -170,8 +166,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_
     uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
     Pvoid_t *PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t), PJE0);
     fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-    *PValue = page_index = create_page_index(uuid);
-    page_index->ctx = ctx;
+    *PValue = page_index = create_page_index(uuid, ctx);
     page_index->prev = pg_cache->metrics_index.last_page_index;
     pg_cache->metrics_index.last_page_index = page_index;
     page_index->alignment = pa;
