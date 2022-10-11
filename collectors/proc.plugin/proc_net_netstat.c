@@ -1228,6 +1228,785 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         rrdset_done(st_accept_queue);
     }
+    
+    // snmp Ip charts
+
+    // --------------------------------------------------------------------
+
+    if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.ip_OutRequests ||
+                                                snmp_root.ip_InReceives ||
+                                                snmp_root.ip_ForwDatagrams ||
+                                                snmp_root.ip_InDelivers ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_ip_packets = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InReceives = NULL,
+                        *rd_OutRequests = NULL,
+                        *rd_ForwDatagrams = NULL,
+                        *rd_InDelivers = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "packets"
+                    , NULL
+                    , "packets"
+                    , NULL
+                    , "IPv4 Packets"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_PACKETS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InReceives    = rrddim_add(st, "InReceives",    "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutRequests   = rrddim_add(st, "OutRequests",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ForwDatagrams = rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InDelivers    = rrddim_add(st, "InDelivers",    "delivered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_OutRequests,   (collected_number)snmp_root.ip_OutRequests);
+        rrddim_set_by_pointer(st, rd_InReceives,    (collected_number)snmp_root.ip_InReceives);
+        rrddim_set_by_pointer(st, rd_ForwDatagrams, (collected_number)snmp_root.ip_ForwDatagrams);
+        rrddim_set_by_pointer(st, rd_InDelivers,    (collected_number)snmp_root.ip_InDelivers);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.ip_FragOKs ||
+                                                    snmp_root.ip_FragFails ||
+                                                    snmp_root.ip_FragCreates ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_ip_fragsout = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_FragOKs = NULL,
+                        *rd_FragFails = NULL,
+                        *rd_FragCreates = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "fragsout"
+                    , NULL
+                    , "fragments"
+                    , NULL
+                    , "IPv4 Fragments Sent"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_FragOKs     = rrddim_add(st, "FragOKs",     "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_FragFails   = rrddim_add(st, "FragFails",   "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_FragCreates = rrddim_add(st, "FragCreates", "created", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_FragOKs,     (collected_number)snmp_root.ip_FragOKs);
+        rrddim_set_by_pointer(st, rd_FragFails,   (collected_number)snmp_root.ip_FragFails);
+        rrddim_set_by_pointer(st, rd_FragCreates, (collected_number)snmp_root.ip_FragCreates);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.ip_ReasmOKs ||
+                                                snmp_root.ip_ReasmFails ||
+                                                snmp_root.ip_ReasmReqds ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_ip_fragsin = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_ReasmOKs = NULL,
+                        *rd_ReasmFails = NULL,
+                        *rd_ReasmReqds = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "fragsin"
+                    , NULL
+                    , "fragments"
+                    , NULL
+                    , "IPv4 Fragments Reassembly"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS + 1
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_ReasmOKs   = rrddim_add(st, "ReasmOKs",   "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ReasmFails = rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ReasmReqds = rrddim_add(st, "ReasmReqds", "all",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_ReasmOKs,   (collected_number)snmp_root.ip_ReasmOKs);
+        rrddim_set_by_pointer(st, rd_ReasmFails, (collected_number)snmp_root.ip_ReasmFails);
+        rrddim_set_by_pointer(st, rd_ReasmReqds, (collected_number)snmp_root.ip_ReasmReqds);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.ip_InDiscards ||
+                                                snmp_root.ip_OutDiscards ||
+                                                snmp_root.ip_InHdrErrors ||
+                                                snmp_root.ip_InAddrErrors ||
+                                                snmp_root.ip_InUnknownProtos ||
+                                                snmp_root.ip_OutNoRoutes ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_ip_errors = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InDiscards = NULL,
+                        *rd_OutDiscards = NULL,
+                        *rd_InHdrErrors = NULL,
+                        *rd_OutNoRoutes = NULL,
+                        *rd_InAddrErrors = NULL,
+                        *rd_InUnknownProtos = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "errors"
+                    , NULL
+                    , "errors"
+                    , NULL
+                    , "IPv4 Errors"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_ERRORS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_InDiscards      = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutDiscards     = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rd_InHdrErrors     = rrddim_add(st, "InHdrErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutNoRoutes     = rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rd_InAddrErrors    = rrddim_add(st, "InAddrErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InUnknownProtos = rrddim_add(st, "InUnknownProtos", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_InDiscards,      (collected_number)snmp_root.ip_InDiscards);
+        rrddim_set_by_pointer(st, rd_OutDiscards,     (collected_number)snmp_root.ip_OutDiscards);
+        rrddim_set_by_pointer(st, rd_InHdrErrors,     (collected_number)snmp_root.ip_InHdrErrors);
+        rrddim_set_by_pointer(st, rd_InAddrErrors,    (collected_number)snmp_root.ip_InAddrErrors);
+        rrddim_set_by_pointer(st, rd_InUnknownProtos, (collected_number)snmp_root.ip_InUnknownProtos);
+        rrddim_set_by_pointer(st, rd_OutNoRoutes,     (collected_number)snmp_root.ip_OutNoRoutes);
+        rrdset_done(st);
+    }
+
+    // snmp Icmp charts
+
+    // --------------------------------------------------------------------
+
+    if(do_icmp_packets == CONFIG_BOOLEAN_YES || (do_icmp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                    (snmp_root.icmp_InMsgs ||
+                                                    snmp_root.icmp_OutMsgs ||
+                                                    snmp_root.icmp_InErrors ||
+                                                    snmp_root.icmp_OutErrors ||
+                                                    snmp_root.icmp_InCsumErrors ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_icmp_packets = CONFIG_BOOLEAN_YES;
+
+        {
+            static RRDSET *st_packets = NULL;
+            static RRDDIM *rd_InMsgs = NULL,
+                            *rd_OutMsgs = NULL;
+
+            if(unlikely(!st_packets)) {
+                st_packets = rrdset_create_localhost(
+                        RRD_TYPE_NET_SNMP
+                        , "icmp"
+                        , NULL
+                        , "icmp"
+                        , NULL
+                        , "IPv4 ICMP Packets"
+                        , "packets/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                        , NETDATA_CHART_PRIO_IPV4_ICMP
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_InMsgs  = rrddim_add(st_packets, "InMsgs",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_OutMsgs = rrddim_add(st_packets, "OutMsgs", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else rrdset_next(st_packets);
+
+            rrddim_set_by_pointer(st_packets, rd_InMsgs,  (collected_number)snmp_root.icmp_InMsgs);
+            rrddim_set_by_pointer(st_packets, rd_OutMsgs, (collected_number)snmp_root.icmp_OutMsgs);
+
+            rrdset_done(st_packets);
+        }
+
+        {
+            static RRDSET *st_errors = NULL;
+            static RRDDIM *rd_InErrors = NULL,
+                            *rd_OutErrors = NULL,
+                            *rd_InCsumErrors = NULL;
+
+            if(unlikely(!st_errors)) {
+                st_errors = rrdset_create_localhost(
+                        RRD_TYPE_NET_SNMP
+                        , "icmp_errors"
+                        , NULL
+                        , "icmp"
+                        , NULL
+                        , "IPv4 ICMP Errors"
+                        , "packets/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                        , NETDATA_CHART_PRIO_IPV4_ICMP + 1
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_InErrors     = rrddim_add(st_errors, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_OutErrors    = rrddim_add(st_errors, "OutErrors",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_InCsumErrors = rrddim_add(st_errors, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else rrdset_next(st_errors);
+
+            rrddim_set_by_pointer(st_errors, rd_InErrors,     (collected_number)snmp_root.icmp_InErrors);
+            rrddim_set_by_pointer(st_errors, rd_OutErrors,    (collected_number)snmp_root.icmp_OutErrors);
+            rrddim_set_by_pointer(st_errors, rd_InCsumErrors, (collected_number)snmp_root.icmp_InCsumErrors);
+
+            rrdset_done(st_errors);
+        }
+    }
+
+    // snmp IcmpMsg charts
+
+    // --------------------------------------------------------------------
+
+    if(do_icmpmsg == CONFIG_BOOLEAN_YES || (do_icmpmsg == CONFIG_BOOLEAN_AUTO &&
+                                            (snmp_root.icmpmsg_InEchoReps ||
+                                                snmp_root.icmpmsg_OutEchoReps ||
+                                                snmp_root.icmpmsg_InDestUnreachs ||
+                                                snmp_root.icmpmsg_OutDestUnreachs ||
+                                                snmp_root.icmpmsg_InRedirects ||
+                                                snmp_root.icmpmsg_OutRedirects ||
+                                                snmp_root.icmpmsg_InEchos ||
+                                                snmp_root.icmpmsg_OutEchos ||
+                                                snmp_root.icmpmsg_InRouterAdvert ||
+                                                snmp_root.icmpmsg_OutRouterAdvert ||
+                                                snmp_root.icmpmsg_InRouterSelect ||
+                                                snmp_root.icmpmsg_OutRouterSelect ||
+                                                snmp_root.icmpmsg_InTimeExcds ||
+                                                snmp_root.icmpmsg_OutTimeExcds ||
+                                                snmp_root.icmpmsg_InParmProbs ||
+                                                snmp_root.icmpmsg_OutParmProbs ||
+                                                snmp_root.icmpmsg_InTimestamps ||
+                                                snmp_root.icmpmsg_OutTimestamps ||
+                                                snmp_root.icmpmsg_InTimestampReps ||
+                                                snmp_root.icmpmsg_OutTimestampReps ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_icmpmsg = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st                  = NULL;
+        static RRDDIM *rd_InEchoReps       = NULL,
+                        *rd_OutEchoReps      = NULL,
+                        *rd_InDestUnreachs   = NULL,
+                        *rd_OutDestUnreachs  = NULL,
+                        *rd_InRedirects      = NULL,
+                        *rd_OutRedirects     = NULL,
+                        *rd_InEchos          = NULL,
+                        *rd_OutEchos         = NULL,
+                        *rd_InRouterAdvert   = NULL,
+                        *rd_OutRouterAdvert  = NULL,
+                        *rd_InRouterSelect   = NULL,
+                        *rd_OutRouterSelect  = NULL,
+                        *rd_InTimeExcds      = NULL,
+                        *rd_OutTimeExcds     = NULL,
+                        *rd_InParmProbs      = NULL,
+                        *rd_OutParmProbs     = NULL,
+                        *rd_InTimestamps     = NULL,
+                        *rd_OutTimestamps    = NULL,
+                        *rd_InTimestampReps  = NULL,
+                        *rd_OutTimestampReps = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "icmpmsg"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv4 ICMP Messages"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_ICMP + 2
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InEchoReps       = rrddim_add(st, "InType0", "InEchoReps", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutEchoReps      = rrddim_add(st, "OutType0", "OutEchoReps", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InDestUnreachs   = rrddim_add(st, "InType3", "InDestUnreachs", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutDestUnreachs  = rrddim_add(st, "OutType3", "OutDestUnreachs", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InRedirects      = rrddim_add(st, "InType5", "InRedirects", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutRedirects     = rrddim_add(st, "OutType5", "OutRedirects", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InEchos          = rrddim_add(st, "InType8", "InEchos", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutEchos         = rrddim_add(st, "OutType8", "OutEchos", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InRouterAdvert   = rrddim_add(st, "InType9", "InRouterAdvert", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutRouterAdvert  = rrddim_add(st, "OutType9", "OutRouterAdvert", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InRouterSelect   = rrddim_add(st, "InType10", "InRouterSelect", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutRouterSelect  = rrddim_add(st, "OutType10", "OutRouterSelect", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTimeExcds      = rrddim_add(st, "InType11", "InTimeExcds", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutTimeExcds     = rrddim_add(st, "OutType11", "OutTimeExcds", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InParmProbs      = rrddim_add(st, "InType12", "InParmProbs", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutParmProbs     = rrddim_add(st, "OutType12", "OutParmProbs", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTimestamps     = rrddim_add(st, "InType13", "InTimestamps", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutTimestamps    = rrddim_add(st, "OutType13", "OutTimestamps", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTimestampReps  = rrddim_add(st, "InType14", "InTimestampReps", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutTimestampReps = rrddim_add(st, "OutType14", "OutTimestampReps", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_InEchoReps, (collected_number)snmp_root.icmpmsg_InEchoReps);
+        rrddim_set_by_pointer(st, rd_OutEchoReps, (collected_number)snmp_root.icmpmsg_OutEchoReps);
+        rrddim_set_by_pointer(st, rd_InDestUnreachs, (collected_number)snmp_root.icmpmsg_InDestUnreachs);
+        rrddim_set_by_pointer(st, rd_OutDestUnreachs, (collected_number)snmp_root.icmpmsg_OutDestUnreachs);
+        rrddim_set_by_pointer(st, rd_InRedirects, (collected_number)snmp_root.icmpmsg_InRedirects);
+        rrddim_set_by_pointer(st, rd_OutRedirects, (collected_number)snmp_root.icmpmsg_OutRedirects);
+        rrddim_set_by_pointer(st, rd_InEchos, (collected_number)snmp_root.icmpmsg_InEchos);
+        rrddim_set_by_pointer(st, rd_OutEchos, (collected_number)snmp_root.icmpmsg_OutEchos);
+        rrddim_set_by_pointer(st, rd_InRouterAdvert, (collected_number)snmp_root.icmpmsg_InRouterAdvert);
+        rrddim_set_by_pointer(st, rd_OutRouterAdvert, (collected_number)snmp_root.icmpmsg_OutRouterAdvert);
+        rrddim_set_by_pointer(st, rd_InRouterSelect, (collected_number)snmp_root.icmpmsg_InRouterSelect);
+        rrddim_set_by_pointer(st, rd_OutRouterSelect, (collected_number)snmp_root.icmpmsg_OutRouterSelect);
+        rrddim_set_by_pointer(st, rd_InTimeExcds, (collected_number)snmp_root.icmpmsg_InTimeExcds);
+        rrddim_set_by_pointer(st, rd_OutTimeExcds, (collected_number)snmp_root.icmpmsg_OutTimeExcds);
+        rrddim_set_by_pointer(st, rd_InParmProbs, (collected_number)snmp_root.icmpmsg_InParmProbs);
+        rrddim_set_by_pointer(st, rd_OutParmProbs, (collected_number)snmp_root.icmpmsg_OutParmProbs);
+        rrddim_set_by_pointer(st, rd_InTimestamps, (collected_number)snmp_root.icmpmsg_InTimestamps);
+        rrddim_set_by_pointer(st, rd_OutTimestamps, (collected_number)snmp_root.icmpmsg_OutTimestamps);
+        rrddim_set_by_pointer(st, rd_InTimestampReps, (collected_number)snmp_root.icmpmsg_InTimestampReps);
+        rrddim_set_by_pointer(st, rd_OutTimestampReps, (collected_number)snmp_root.icmpmsg_OutTimestampReps);
+
+        rrdset_done(st);
+    }
+
+    // snmp Tcp charts
+
+    // --------------------------------------------------------------------
+
+    // this is smart enough to update it, only when it is changed
+    rrdvar_custom_host_variable_set(localhost, tcp_max_connections_var, snmp_root.tcp_MaxConn);
+
+    // --------------------------------------------------------------------
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
+    if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.tcp_CurrEstab ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcp_sockets = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_CurrEstab = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "tcpsock"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "IPv4 TCP Connections"
+                    , "active connections"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_TCP
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_CurrEstab = rrddim_add(st, "CurrEstab", "connections", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_CurrEstab, (collected_number)snmp_root.tcp_CurrEstab);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcp_packets == CONFIG_BOOLEAN_YES || (do_tcp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.tcp_InSegs ||
+                                                    snmp_root.tcp_OutSegs ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcp_packets = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InSegs = NULL,
+                        *rd_OutSegs = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "tcppackets"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "IPv4 TCP Packets"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_TCP + 4
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InSegs  = rrddim_add(st, "InSegs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutSegs = rrddim_add(st, "OutSegs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_InSegs,  (collected_number)snmp_root.tcp_InSegs);
+        rrddim_set_by_pointer(st, rd_OutSegs, (collected_number)snmp_root.tcp_OutSegs);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcp_errors == CONFIG_BOOLEAN_YES || (do_tcp_errors == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.tcp_InErrs ||
+                                                snmp_root.tcp_InCsumErrors ||
+                                                snmp_root.tcp_RetransSegs ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcp_errors = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InErrs = NULL,
+                        *rd_InCsumErrors = NULL,
+                        *rd_RetransSegs = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "tcperrors"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "IPv4 TCP Errors"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_TCP + 20
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_InErrs       = rrddim_add(st, "InErrs",       NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_RetransSegs  = rrddim_add(st, "RetransSegs",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_InErrs,       (collected_number)snmp_root.tcp_InErrs);
+        rrddim_set_by_pointer(st, rd_InCsumErrors, (collected_number)snmp_root.tcp_InCsumErrors);
+        rrddim_set_by_pointer(st, rd_RetransSegs,  (collected_number)snmp_root.tcp_RetransSegs);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcp_opens == CONFIG_BOOLEAN_YES || (do_tcp_opens == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.tcp_ActiveOpens ||
+                                                snmp_root.tcp_PassiveOpens ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcp_opens = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_ActiveOpens = NULL,
+                        *rd_PassiveOpens = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "tcpopens"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "IPv4 TCP Opens"
+                    , "connections/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_TCP + 5
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_ActiveOpens   = rrddim_add(st, "ActiveOpens",   "active", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_PassiveOpens  = rrddim_add(st, "PassiveOpens",  "passive", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_ActiveOpens,   (collected_number)snmp_root.tcp_ActiveOpens);
+        rrddim_set_by_pointer(st, rd_PassiveOpens,  (collected_number)snmp_root.tcp_PassiveOpens);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_tcp_handshake == CONFIG_BOOLEAN_YES || (do_tcp_handshake == CONFIG_BOOLEAN_AUTO &&
+                                                    (snmp_root.tcp_EstabResets ||
+                                                    snmp_root.tcp_OutRsts ||
+                                                    snmp_root.tcp_AttemptFails ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_tcp_handshake = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_EstabResets = NULL,
+                        *rd_OutRsts = NULL,
+                        *rd_AttemptFails = NULL,
+                        *rd_TCPSynRetrans = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "tcphandshake"
+                    , NULL
+                    , "tcp"
+                    , NULL
+                    , "IPv4 TCP Handshake Issues"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_TCP + 30
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_EstabResets     = rrddim_add(st, "EstabResets",          NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutRsts         = rrddim_add(st, "OutRsts",              NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_AttemptFails    = rrddim_add(st, "AttemptFails",         NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_TCPSynRetrans   = rrddim_add(st, "TCPSynRetrans",        "SynRetrans",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_EstabResets,     (collected_number)snmp_root.tcp_EstabResets);
+        rrddim_set_by_pointer(st, rd_OutRsts,         (collected_number)snmp_root.tcp_OutRsts);
+        rrddim_set_by_pointer(st, rd_AttemptFails,    (collected_number)snmp_root.tcp_AttemptFails);
+        rrddim_set_by_pointer(st, rd_TCPSynRetrans,   tcpext_TCPSynRetrans);
+        rrdset_done(st);
+    }
+
+    // snmp Udp charts
+
+    // --------------------------------------------------------------------
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
+    if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.udp_InDatagrams ||
+                                                    snmp_root.udp_OutDatagrams ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_udp_packets = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InDatagrams = NULL,
+                        *rd_OutDatagrams = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "udppackets"
+                    , NULL
+                    , "udp"
+                    , NULL
+                    , "IPv4 UDP Packets"
+                    , "packets/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_UDP
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InDatagrams  = rrddim_add(st, "InDatagrams",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutDatagrams = rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_InDatagrams,  (collected_number)snmp_root.udp_InDatagrams);
+        rrddim_set_by_pointer(st, rd_OutDatagrams, (collected_number)snmp_root.udp_OutDatagrams);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO &&
+                                                (snmp_root.udp_InErrors ||
+                                                snmp_root.udp_NoPorts ||
+                                                snmp_root.udp_RcvbufErrors ||
+                                                snmp_root.udp_SndbufErrors ||
+                                                snmp_root.udp_InCsumErrors ||
+                                                snmp_root.udp_IgnoredMulti ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_udp_errors = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_RcvbufErrors = NULL,
+                        *rd_SndbufErrors = NULL,
+                        *rd_InErrors = NULL,
+                        *rd_NoPorts = NULL,
+                        *rd_InCsumErrors = NULL,
+                        *rd_IgnoredMulti = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP
+                    , "udperrors"
+                    , NULL
+                    , "udp"
+                    , NULL
+                    , "IPv4 UDP Errors"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_UDP + 10
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_IgnoredMulti = rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_InErrors,     (collected_number)snmp_root.udp_InErrors);
+        rrddim_set_by_pointer(st, rd_NoPorts,      (collected_number)snmp_root.udp_NoPorts);
+        rrddim_set_by_pointer(st, rd_RcvbufErrors, (collected_number)snmp_root.udp_RcvbufErrors);
+        rrddim_set_by_pointer(st, rd_SndbufErrors, (collected_number)snmp_root.udp_SndbufErrors);
+        rrddim_set_by_pointer(st, rd_InCsumErrors, (collected_number)snmp_root.udp_InCsumErrors);
+        rrddim_set_by_pointer(st, rd_IgnoredMulti, (collected_number)snmp_root.udp_IgnoredMulti);
+        rrdset_done(st);
+    }
+
+    // snmp UdpLite charts
+
+    // --------------------------------------------------------------------
+
+    if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO &&
+                                                    (snmp_root.udplite_InDatagrams ||
+                                                        snmp_root.udplite_OutDatagrams ||
+                                                        snmp_root.udplite_NoPorts ||
+                                                        snmp_root.udplite_InErrors ||
+                                                        snmp_root.udplite_InCsumErrors ||
+                                                        snmp_root.udplite_RcvbufErrors ||
+                                                        snmp_root.udplite_SndbufErrors ||
+                                                        snmp_root.udplite_IgnoredMulti ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        do_udplite_packets = CONFIG_BOOLEAN_YES;
+
+        {
+            static RRDSET *st = NULL;
+            static RRDDIM *rd_InDatagrams = NULL,
+                            *rd_OutDatagrams = NULL;
+
+            if(unlikely(!st)) {
+                st = rrdset_create_localhost(
+                        RRD_TYPE_NET_SNMP
+                        , "udplite"
+                        , NULL
+                        , "udplite"
+                        , NULL
+                        , "IPv4 UDPLite Packets"
+                        , "packets/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                        , NETDATA_CHART_PRIO_IPV4_UDPLITE
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_InDatagrams  = rrddim_add(st, "InDatagrams",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_OutDatagrams = rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set_by_pointer(st, rd_InDatagrams,  (collected_number)snmp_root.udplite_InDatagrams);
+            rrddim_set_by_pointer(st, rd_OutDatagrams, (collected_number)snmp_root.udplite_OutDatagrams);
+            rrdset_done(st);
+        }
+
+        {
+            static RRDSET *st = NULL;
+            static RRDDIM *rd_RcvbufErrors = NULL,
+                            *rd_SndbufErrors = NULL,
+                            *rd_InErrors = NULL,
+                            *rd_NoPorts = NULL,
+                            *rd_InCsumErrors = NULL,
+                            *rd_IgnoredMulti = NULL;
+
+            if(unlikely(!st)) {
+                st = rrdset_create_localhost(
+                        RRD_TYPE_NET_SNMP
+                        , "udplite_errors"
+                        , NULL
+                        , "udplite"
+                        , NULL
+                        , "IPv4 UDPLite Errors"
+                        , "packets/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                        , NETDATA_CHART_PRIO_IPV4_UDPLITE + 10
+                        , update_every
+                        , RRDSET_TYPE_LINE);
+
+                rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_IgnoredMulti = rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set_by_pointer(st, rd_NoPorts,      (collected_number)snmp_root.udplite_NoPorts);
+            rrddim_set_by_pointer(st, rd_InErrors,     (collected_number)snmp_root.udplite_InErrors);
+            rrddim_set_by_pointer(st, rd_InCsumErrors, (collected_number)snmp_root.udplite_InCsumErrors);
+            rrddim_set_by_pointer(st, rd_RcvbufErrors, (collected_number)snmp_root.udplite_RcvbufErrors);
+            rrddim_set_by_pointer(st, rd_SndbufErrors, (collected_number)snmp_root.udplite_SndbufErrors);
+            rrddim_set_by_pointer(st, rd_IgnoredMulti, (collected_number)snmp_root.udplite_IgnoredMulti);
+            rrdset_done(st);
+        }
+    }
 
     return 0;
 }
