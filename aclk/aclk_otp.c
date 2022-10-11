@@ -380,7 +380,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
     base64_decode_helper(*challenge, challenge_bytes, (const unsigned char*)challenge_base64, strlen(challenge_base64));
     if (*challenge_bytes != CHALLENGE_LEN) {
         error("Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
-        freez(challenge);
+        freez(*challenge);
         *challenge = NULL;
         goto cleanup_json;
     }
@@ -490,7 +490,7 @@ int aclk_get_mqtt_otp(EVP_PKEY *p_key, char **mqtt_id, char **mqtt_usr, char **m
 int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
 #endif
 {
-    unsigned char *challenge;
+    unsigned char *challenge = NULL;
     int challenge_bytes;
 
     char *agent_id = get_agent_claimid();
