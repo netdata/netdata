@@ -184,7 +184,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     if(!db_metric_handle) {
         db_metric_handle = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset), smg);
         if(db_metric_handle) {
-            struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_instance;
+            struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
             uuid_copy(rd->metric_uuid, page_index->id);
         }
     }
