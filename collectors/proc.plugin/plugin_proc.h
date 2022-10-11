@@ -14,8 +14,6 @@ void *netdev_main(void *ptr);
 int do_proc_net_wireless(int update_every, usec_t dt);
 int do_proc_diskstats(int update_every, usec_t dt);
 int do_proc_mdstat(int update_every, usec_t dt);
-int do_proc_net_snmp(int update_every, usec_t dt);
-int do_proc_net_snmp6(int update_every, usec_t dt);
 int do_proc_net_netstat(int update_every, usec_t dt);
 int do_proc_net_stat_conntrack(int update_every, usec_t dt);
 int do_proc_net_ip_vs_stats(int update_every, usec_t dt);
