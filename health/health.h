@@ -90,4 +90,6 @@ void health_label_log_save(RRDHOST *host);
 char *health_edit_command_from_source(const char *source);
 void sql_refresh_hashes(void);
 
+void health_add_host_labels(void);
+
 #endif //NETDATA_HEALTH_H
