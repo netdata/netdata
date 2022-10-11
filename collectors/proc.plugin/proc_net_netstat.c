@@ -119,9 +119,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcp_opens = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1, do_udplite_packets = -1;
-    static uint32_t hash_ip = 0, hash_icmp = 0, hash_tcp = 0, hash_udp = 0, hash_icmpmsg = 0, hash_udplite = 0;
+
+    static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1, do_udplite_packets = -1,
+               do_udplite_errors = -1, do_udp_packets = -1, do_udp_errors = -1, do_bandwidth = -1, do_mcast = -1,
+               do_bcast = -1, do_mcast_p = -1, do_icmp = -1, do_icmp_redir = -1, do_icmp_errors = -1,
+               do_icmp_echos = -1, do_icmp_groupmemb = -1, do_icmp_router = -1, do_icmp_neighbor = -1,
+               do_icmp_mldv2 = -1, do_icmp_types = -1, do_ect = -1;
 
     static uint32_t hash_ipext = 0, hash_tcpext = 0;
+    static uint32_t hash_ip = 0, hash_icmp = 0, hash_tcp = 0, hash_udp = 0, hash_icmpmsg = 0, hash_udplite = 0;
+
     static procfile *ff_netstat = NULL;
     static procfile *ff_snmp = NULL;
     static procfile *ff_snmp6 = NULL;
@@ -135,6 +142,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static ARL_BASE *arl_tcp = NULL
     static ARL_BASE *arl_udp = NULL
     static ARL_BASE *arl_udplite = NULL;
+
+    static ARL_BASE *arl_ipv6 = NULL;
 
     static const RRDVAR_ACQUIRED *tcp_max_connections_var = NULL;
 
@@ -213,6 +222,100 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static unsigned long long tcpext_TCPReqQFullDoCookies = 0;
 
     // shared: tcpext_TCPSynRetrans
+
+    // IPv6
+    static unsigned long long Ip6InReceives = 0ULL;
+    static unsigned long long Ip6InHdrErrors = 0ULL;
+    static unsigned long long Ip6InTooBigErrors = 0ULL;
+    static unsigned long long Ip6InNoRoutes = 0ULL;
+    static unsigned long long Ip6InAddrErrors = 0ULL;
+    static unsigned long long Ip6InUnknownProtos = 0ULL;
+    static unsigned long long Ip6InTruncatedPkts = 0ULL;
+    static unsigned long long Ip6InDiscards = 0ULL;
+    static unsigned long long Ip6InDelivers = 0ULL;
+    static unsigned long long Ip6OutForwDatagrams = 0ULL;
+    static unsigned long long Ip6OutRequests = 0ULL;
+    static unsigned long long Ip6OutDiscards = 0ULL;
+    static unsigned long long Ip6OutNoRoutes = 0ULL;
+    static unsigned long long Ip6ReasmTimeout = 0ULL;
+    static unsigned long long Ip6ReasmReqds = 0ULL;
+    static unsigned long long Ip6ReasmOKs = 0ULL;
+    static unsigned long long Ip6ReasmFails = 0ULL;
+    static unsigned long long Ip6FragOKs = 0ULL;
+    static unsigned long long Ip6FragFails = 0ULL;
+    static unsigned long long Ip6FragCreates = 0ULL;
+    static unsigned long long Ip6InMcastPkts = 0ULL;
+    static unsigned long long Ip6OutMcastPkts = 0ULL;
+    static unsigned long long Ip6InOctets = 0ULL;
+    static unsigned long long Ip6OutOctets = 0ULL;
+    static unsigned long long Ip6InMcastOctets = 0ULL;
+    static unsigned long long Ip6OutMcastOctets = 0ULL;
+    static unsigned long long Ip6InBcastOctets = 0ULL;
+    static unsigned long long Ip6OutBcastOctets = 0ULL;
+    static unsigned long long Ip6InNoECTPkts = 0ULL;
+    static unsigned long long Ip6InECT1Pkts = 0ULL;
+    static unsigned long long Ip6InECT0Pkts = 0ULL;
+    static unsigned long long Ip6InCEPkts = 0ULL;
+    static unsigned long long Icmp6InMsgs = 0ULL;
+    static unsigned long long Icmp6InErrors = 0ULL;
+    static unsigned long long Icmp6OutMsgs = 0ULL;
+    static unsigned long long Icmp6OutErrors = 0ULL;
+    static unsigned long long Icmp6InCsumErrors = 0ULL;
+    static unsigned long long Icmp6InDestUnreachs = 0ULL;
+    static unsigned long long Icmp6InPktTooBigs = 0ULL;
+    static unsigned long long Icmp6InTimeExcds = 0ULL;
+    static unsigned long long Icmp6InParmProblems = 0ULL;
+    static unsigned long long Icmp6InEchos = 0ULL;
+    static unsigned long long Icmp6InEchoReplies = 0ULL;
+    static unsigned long long Icmp6InGroupMembQueries = 0ULL;
+    static unsigned long long Icmp6InGroupMembResponses = 0ULL;
+    static unsigned long long Icmp6InGroupMembReductions = 0ULL;
+    static unsigned long long Icmp6InRouterSolicits = 0ULL;
+    static unsigned long long Icmp6InRouterAdvertisements = 0ULL;
+    static unsigned long long Icmp6InNeighborSolicits = 0ULL;
+    static unsigned long long Icmp6InNeighborAdvertisements = 0ULL;
+    static unsigned long long Icmp6InRedirects = 0ULL;
+    static unsigned long long Icmp6InMLDv2Reports = 0ULL;
+    static unsigned long long Icmp6OutDestUnreachs = 0ULL;
+    static unsigned long long Icmp6OutPktTooBigs = 0ULL;
+    static unsigned long long Icmp6OutTimeExcds = 0ULL;
+    static unsigned long long Icmp6OutParmProblems = 0ULL;
+    static unsigned long long Icmp6OutEchos = 0ULL;
+    static unsigned long long Icmp6OutEchoReplies = 0ULL;
+    static unsigned long long Icmp6OutGroupMembQueries = 0ULL;
+    static unsigned long long Icmp6OutGroupMembResponses = 0ULL;
+    static unsigned long long Icmp6OutGroupMembReductions = 0ULL;
+    static unsigned long long Icmp6OutRouterSolicits = 0ULL;
+    static unsigned long long Icmp6OutRouterAdvertisements = 0ULL;
+    static unsigned long long Icmp6OutNeighborSolicits = 0ULL;
+    static unsigned long long Icmp6OutNeighborAdvertisements = 0ULL;
+    static unsigned long long Icmp6OutRedirects = 0ULL;
+    static unsigned long long Icmp6OutMLDv2Reports = 0ULL;
+    static unsigned long long Icmp6InType1 = 0ULL;
+    static unsigned long long Icmp6InType128 = 0ULL;
+    static unsigned long long Icmp6InType129 = 0ULL;
+    static unsigned long long Icmp6InType136 = 0ULL;
+    static unsigned long long Icmp6OutType1 = 0ULL;
+    static unsigned long long Icmp6OutType128 = 0ULL;
+    static unsigned long long Icmp6OutType129 = 0ULL;
+    static unsigned long long Icmp6OutType133 = 0ULL;
+    static unsigned long long Icmp6OutType135 = 0ULL;
+    static unsigned long long Icmp6OutType143 = 0ULL;
+    static unsigned long long Udp6InDatagrams = 0ULL;
+    static unsigned long long Udp6NoPorts = 0ULL;
+    static unsigned long long Udp6InErrors = 0ULL;
+    static unsigned long long Udp6OutDatagrams = 0ULL;
+    static unsigned long long Udp6RcvbufErrors = 0ULL;
+    static unsigned long long Udp6SndbufErrors = 0ULL;
+    static unsigned long long Udp6InCsumErrors = 0ULL;
+    static unsigned long long Udp6IgnoredMulti = 0ULL;
+    static unsigned long long UdpLite6InDatagrams = 0ULL;
+    static unsigned long long UdpLite6NoPorts = 0ULL;
+    static unsigned long long UdpLite6InErrors = 0ULL;
+    static unsigned long long UdpLite6OutDatagrams = 0ULL;
+    static unsigned long long UdpLite6RcvbufErrors = 0ULL;
+    static unsigned long long UdpLite6SndbufErrors = 0ULL;
+    static unsigned long long UdpLite6InCsumErrors = 0ULL;
 
     // prepare for /proc/net/netstat parsing
 
@@ -446,6 +549,127 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         tcp_max_connections_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_connections");
     }
 
+    // prepare for /proc/net/snmp6 parsing
+
+    if(unlikely(!arl_ipv6)) {
+        do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip_errors        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 errors", CONFIG_BOOLEAN_AUTO);
+        do_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP packets", CONFIG_BOOLEAN_AUTO);
+        do_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP errors", CONFIG_BOOLEAN_AUTO);
+        do_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite packets", CONFIG_BOOLEAN_AUTO);
+        do_udplite_errors   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite errors", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_mcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_bcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_mcast_p          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast packets", CONFIG_BOOLEAN_AUTO);
+        do_icmp             = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp", CONFIG_BOOLEAN_AUTO);
+        do_icmp_redir       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp redirects", CONFIG_BOOLEAN_AUTO);
+        do_icmp_errors      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp_echos       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp echos", CONFIG_BOOLEAN_AUTO);
+        do_icmp_groupmemb   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp group membership", CONFIG_BOOLEAN_AUTO);
+        do_icmp_router      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp router", CONFIG_BOOLEAN_AUTO);
+        do_icmp_neighbor    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp neighbor", CONFIG_BOOLEAN_AUTO);
+        do_icmp_mldv2       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp mldv2", CONFIG_BOOLEAN_AUTO);
+        do_icmp_types       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_BOOLEAN_AUTO);
+        do_ect              = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ect", CONFIG_BOOLEAN_AUTO);
+
+        arl_ipv6 = arl_create("snmp6", NULL, 60);
+        arl_expect(arl_ipv6, "Ip6InReceives", &Ip6InReceives);
+        arl_expect(arl_ipv6, "Ip6InHdrErrors", &Ip6InHdrErrors);
+        arl_expect(arl_ipv6, "Ip6InTooBigErrors", &Ip6InTooBigErrors);
+        arl_expect(arl_ipv6, "Ip6InNoRoutes", &Ip6InNoRoutes);
+        arl_expect(arl_ipv6, "Ip6InAddrErrors", &Ip6InAddrErrors);
+        arl_expect(arl_ipv6, "Ip6InUnknownProtos", &Ip6InUnknownProtos);
+        arl_expect(arl_ipv6, "Ip6InTruncatedPkts", &Ip6InTruncatedPkts);
+        arl_expect(arl_ipv6, "Ip6InDiscards", &Ip6InDiscards);
+        arl_expect(arl_ipv6, "Ip6InDelivers", &Ip6InDelivers);
+        arl_expect(arl_ipv6, "Ip6OutForwDatagrams", &Ip6OutForwDatagrams);
+        arl_expect(arl_ipv6, "Ip6OutRequests", &Ip6OutRequests);
+        arl_expect(arl_ipv6, "Ip6OutDiscards", &Ip6OutDiscards);
+        arl_expect(arl_ipv6, "Ip6OutNoRoutes", &Ip6OutNoRoutes);
+        arl_expect(arl_ipv6, "Ip6ReasmTimeout", &Ip6ReasmTimeout);
+        arl_expect(arl_ipv6, "Ip6ReasmReqds", &Ip6ReasmReqds);
+        arl_expect(arl_ipv6, "Ip6ReasmOKs", &Ip6ReasmOKs);
+        arl_expect(arl_ipv6, "Ip6ReasmFails", &Ip6ReasmFails);
+        arl_expect(arl_ipv6, "Ip6FragOKs", &Ip6FragOKs);
+        arl_expect(arl_ipv6, "Ip6FragFails", &Ip6FragFails);
+        arl_expect(arl_ipv6, "Ip6FragCreates", &Ip6FragCreates);
+        arl_expect(arl_ipv6, "Ip6InMcastPkts", &Ip6InMcastPkts);
+        arl_expect(arl_ipv6, "Ip6OutMcastPkts", &Ip6OutMcastPkts);
+        arl_expect(arl_ipv6, "Ip6InOctets", &Ip6InOctets);
+        arl_expect(arl_ipv6, "Ip6OutOctets", &Ip6OutOctets);
+        arl_expect(arl_ipv6, "Ip6InMcastOctets", &Ip6InMcastOctets);
+        arl_expect(arl_ipv6, "Ip6OutMcastOctets", &Ip6OutMcastOctets);
+        arl_expect(arl_ipv6, "Ip6InBcastOctets", &Ip6InBcastOctets);
+        arl_expect(arl_ipv6, "Ip6OutBcastOctets", &Ip6OutBcastOctets);
+        arl_expect(arl_ipv6, "Ip6InNoECTPkts", &Ip6InNoECTPkts);
+        arl_expect(arl_ipv6, "Ip6InECT1Pkts", &Ip6InECT1Pkts);
+        arl_expect(arl_ipv6, "Ip6InECT0Pkts", &Ip6InECT0Pkts);
+        arl_expect(arl_ipv6, "Ip6InCEPkts", &Ip6InCEPkts);
+        arl_expect(arl_ipv6, "Icmp6InMsgs", &Icmp6InMsgs);
+        arl_expect(arl_ipv6, "Icmp6InErrors", &Icmp6InErrors);
+        arl_expect(arl_ipv6, "Icmp6OutMsgs", &Icmp6OutMsgs);
+        arl_expect(arl_ipv6, "Icmp6OutErrors", &Icmp6OutErrors);
+        arl_expect(arl_ipv6, "Icmp6InCsumErrors", &Icmp6InCsumErrors);
+        arl_expect(arl_ipv6, "Icmp6InDestUnreachs", &Icmp6InDestUnreachs);
+        arl_expect(arl_ipv6, "Icmp6InPktTooBigs", &Icmp6InPktTooBigs);
+        arl_expect(arl_ipv6, "Icmp6InTimeExcds", &Icmp6InTimeExcds);
+        arl_expect(arl_ipv6, "Icmp6InParmProblems", &Icmp6InParmProblems);
+        arl_expect(arl_ipv6, "Icmp6InEchos", &Icmp6InEchos);
+        arl_expect(arl_ipv6, "Icmp6InEchoReplies", &Icmp6InEchoReplies);
+        arl_expect(arl_ipv6, "Icmp6InGroupMembQueries", &Icmp6InGroupMembQueries);
+        arl_expect(arl_ipv6, "Icmp6InGroupMembResponses", &Icmp6InGroupMembResponses);
+        arl_expect(arl_ipv6, "Icmp6InGroupMembReductions", &Icmp6InGroupMembReductions);
+        arl_expect(arl_ipv6, "Icmp6InRouterSolicits", &Icmp6InRouterSolicits);
+        arl_expect(arl_ipv6, "Icmp6InRouterAdvertisements", &Icmp6InRouterAdvertisements);
+        arl_expect(arl_ipv6, "Icmp6InNeighborSolicits", &Icmp6InNeighborSolicits);
+        arl_expect(arl_ipv6, "Icmp6InNeighborAdvertisements", &Icmp6InNeighborAdvertisements);
+        arl_expect(arl_ipv6, "Icmp6InRedirects", &Icmp6InRedirects);
+        arl_expect(arl_ipv6, "Icmp6InMLDv2Reports", &Icmp6InMLDv2Reports);
+        arl_expect(arl_ipv6, "Icmp6OutDestUnreachs", &Icmp6OutDestUnreachs);
+        arl_expect(arl_ipv6, "Icmp6OutPktTooBigs", &Icmp6OutPktTooBigs);
+        arl_expect(arl_ipv6, "Icmp6OutTimeExcds", &Icmp6OutTimeExcds);
+        arl_expect(arl_ipv6, "Icmp6OutParmProblems", &Icmp6OutParmProblems);
+        arl_expect(arl_ipv6, "Icmp6OutEchos", &Icmp6OutEchos);
+        arl_expect(arl_ipv6, "Icmp6OutEchoReplies", &Icmp6OutEchoReplies);
+        arl_expect(arl_ipv6, "Icmp6OutGroupMembQueries", &Icmp6OutGroupMembQueries);
+        arl_expect(arl_ipv6, "Icmp6OutGroupMembResponses", &Icmp6OutGroupMembResponses);
+        arl_expect(arl_ipv6, "Icmp6OutGroupMembReductions", &Icmp6OutGroupMembReductions);
+        arl_expect(arl_ipv6, "Icmp6OutRouterSolicits", &Icmp6OutRouterSolicits);
+        arl_expect(arl_ipv6, "Icmp6OutRouterAdvertisements", &Icmp6OutRouterAdvertisements);
+        arl_expect(arl_ipv6, "Icmp6OutNeighborSolicits", &Icmp6OutNeighborSolicits);
+        arl_expect(arl_ipv6, "Icmp6OutNeighborAdvertisements", &Icmp6OutNeighborAdvertisements);
+        arl_expect(arl_ipv6, "Icmp6OutRedirects", &Icmp6OutRedirects);
+        arl_expect(arl_ipv6, "Icmp6OutMLDv2Reports", &Icmp6OutMLDv2Reports);
+        arl_expect(arl_ipv6, "Icmp6InType1", &Icmp6InType1);
+        arl_expect(arl_ipv6, "Icmp6InType128", &Icmp6InType128);
+        arl_expect(arl_ipv6, "Icmp6InType129", &Icmp6InType129);
+        arl_expect(arl_ipv6, "Icmp6InType136", &Icmp6InType136);
+        arl_expect(arl_ipv6, "Icmp6OutType1", &Icmp6OutType1);
+        arl_expect(arl_ipv6, "Icmp6OutType128", &Icmp6OutType128);
+        arl_expect(arl_ipv6, "Icmp6OutType129", &Icmp6OutType129);
+        arl_expect(arl_ipv6, "Icmp6OutType133", &Icmp6OutType133);
+        arl_expect(arl_ipv6, "Icmp6OutType135", &Icmp6OutType135);
+        arl_expect(arl_ipv6, "Icmp6OutType143", &Icmp6OutType143);
+        arl_expect(arl_ipv6, "Udp6InDatagrams", &Udp6InDatagrams);
+        arl_expect(arl_ipv6, "Udp6NoPorts", &Udp6NoPorts);
+        arl_expect(arl_ipv6, "Udp6InErrors", &Udp6InErrors);
+        arl_expect(arl_ipv6, "Udp6OutDatagrams", &Udp6OutDatagrams);
+        arl_expect(arl_ipv6, "Udp6RcvbufErrors", &Udp6RcvbufErrors);
+        arl_expect(arl_ipv6, "Udp6SndbufErrors", &Udp6SndbufErrors);
+        arl_expect(arl_ipv6, "Udp6InCsumErrors", &Udp6InCsumErrors);
+        arl_expect(arl_ipv6, "Udp6IgnoredMulti", &Udp6IgnoredMulti);
+        arl_expect(arl_ipv6, "UdpLite6InDatagrams", &UdpLite6InDatagrams);
+        arl_expect(arl_ipv6, "UdpLite6NoPorts", &UdpLite6NoPorts);
+        arl_expect(arl_ipv6, "UdpLite6InErrors", &UdpLite6InErrors);
+        arl_expect(arl_ipv6, "UdpLite6OutDatagrams", &UdpLite6OutDatagrams);
+        arl_expect(arl_ipv6, "UdpLite6RcvbufErrors", &UdpLite6RcvbufErrors);
+        arl_expect(arl_ipv6, "UdpLite6SndbufErrors", &UdpLite6SndbufErrors);
+        arl_expect(arl_ipv6, "UdpLite6InCsumErrors", &UdpLite6InCsumErrors);
+    }
+
     // parse /proc/net/netstat
 
     if(unlikely(!ff_netstat)) {
@@ -632,6 +856,36 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     break;
             }
         }
+    }
+
+    // parse /proc/net/snmp
+
+    if(unlikely(!ff_snmp6)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/snmp6");
+        ff_snmp6 = procfile_open(config_get("plugin:proc:/proc/net/snmp6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff_snmp6))
+            return 1;
+    }
+
+    ff_snmp6 = procfile_readall(ff_snmp6);
+    if(unlikely(!ff_snmp6))
+        return 0; // we return 0, so that we will retry to open it next time
+
+    size_t lines = procfile_lines(ff_snmp6), l;
+
+    arl_begin(arl_ipv6);
+
+    for(l = 0; l < lines ;l++) {
+        size_t words = procfile_linewords(ff_snmp6, l);
+        if(unlikely(words < 2)) {
+            if(unlikely(words)) error("Cannot read /proc/net/snmp6 line %zu. Expected 2 params, read %zu.", l, words);
+            continue;
+        }
+
+        if(unlikely(arl_check(arl_ipv6,
+                procfile_lineword(ff_snmp6, l, 0),
+                procfile_lineword(ff_snmp6, l, 1)))) break;
     }
 
     // netstat IpExt charts
