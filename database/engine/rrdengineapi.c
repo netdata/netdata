@@ -836,36 +836,6 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return (time_t)(page_index->oldest_time_ut / USEC_PER_SEC);
 }
 
-int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t, int tier)
-{
-    struct page_cache *pg_cache;
-    struct rrdengine_instance *ctx;
-    Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
-
-    ctx = get_rrdeng_ctx_from_host(localhost, tier);
-    if (unlikely(!ctx)) {
-        error("Failed to fetch multidb context");
-        return 1;
-    }
-    pg_cache = &ctx->pg_cache;
-
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, dim_uuid, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
-        page_index = *PValue;
-    }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-
-    if (likely(page_index)) {
-        *first_entry_t = page_index->oldest_time_ut / USEC_PER_SEC;
-        *last_entry_t = page_index->latest_time_ut / USEC_PER_SEC;
-        return 0;
-    }
-
-    return 1;
-}
-
 int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t)
 {
     struct page_cache *pg_cache;
