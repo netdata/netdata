@@ -7,7 +7,7 @@ on:
   push:
     branches: [master]
   schedule:
-    - cron: "27 2 * * * 1"
+    - cron: "27 2 * * 1"
 env:
   DISABLE_TELEMETRY: 1
 concurrency:
@@ -17,7 +17,7 @@ jobs:
   prepare:
     name: Prepare Jobs
     runs-on: ubuntu-latest
-    output:
+    outputs:
       cpp: ${{ steps.cpp.outputs.run }}
       python: ${{ steps.python.outputs.run }}
     steps:
