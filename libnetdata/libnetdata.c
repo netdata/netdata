@@ -37,6 +37,12 @@ const char *program_version = VERSION;
 #ifdef HAVE_DLSYM
 #include <dlfcn.h>
 
+// do not intercept system malloc calls, until this is set to true
+// on musl libc, allocators are called BEFORE the string literals
+// of our program are available, resulting to SIGSEGV when we try
+// to access __FILE__, __FUNCTION__ and __LINE__
+bool netdata_trace_allocations_enabled = false;
+
 typedef void (*libc_function_t)(void);
 
 static void *malloc_first_run(size_t size);
@@ -70,32 +76,44 @@ static void link_system_library_function(libc_function_t *func_pptr, const char 
 }
 
 static void *malloc_first_run(size_t size) {
-    link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
+    if(netdata_trace_allocations_enabled)
+        link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
+
     return libc_malloc(size);
 }
 
 static void *calloc_first_run(size_t n, size_t size) {
-    link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
+    if(netdata_trace_allocations_enabled)
+        link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
+
     return libc_calloc(n, size);
 }
 
 static void *realloc_first_run(void *ptr, size_t size) {
-    link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
+    if(netdata_trace_allocations_enabled)
+        link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
+
     return libc_realloc(ptr, size);
 }
 
 static void free_first_run(void *ptr) {
-    link_system_library_function((libc_function_t *) &libc_free, "free", true);
+    if(netdata_trace_allocations_enabled)
+        link_system_library_function((libc_function_t *) &libc_free, "free", true);
+
     libc_free(ptr);
 }
 
 static char *strdup_first_run(const char *s) {
-    link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
+    if(netdata_trace_allocations_enabled)
+        link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
+
     return libc_strdup(s);
 }
 
 static size_t malloc_usable_size_first_run(void *ptr) {
-    link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+    if(netdata_trace_allocations_enabled)
+        link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+
     if(libc_malloc_usable_size)
         return libc_malloc_usable_size(ptr);
     else
