@@ -34,7 +34,7 @@ const char *program_version = VERSION;
 #warning NETDATA_TRACE_ALLOCATIONS ENABLED
 #include "Judy.h"
 
-static bool libc_libs_initialized;
+static bool libc_libs_initialized = false;
 static void *(*libc_malloc)(size_t) = malloc;
 static void *(*libc_calloc)(size_t, size_t) = calloc;
 static void *(*libc_realloc)(void *, size_t) = realloc;
