@@ -93,7 +93,7 @@ void metadata_sync_shutdown_prepare(void);
 void metaqueue_dimension_update(RRDDIM *rd);
 void metaqueue_chart_update(RRDSET *st);
 void metaqueue_dimension_update_flags(RRDDIM *rd);
-void metaqueue_host_update_system_info(const char *machine_guid);
+void metaqueue_host_update_system_info(RRDHOST *host);
 void metaqueue_host_update_info(const char *machine_guid);
 void metaqueue_delete_dimension_uuid(uuid_t *uuid);
 void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid);

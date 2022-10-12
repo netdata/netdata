@@ -8,14 +8,14 @@ extern DICTIONARY *rrdhost_root_index;
 // Metadata functions
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 
-struct label_str {
+struct query_build {
     BUFFER *sql;
     int count;
     char uuid_str[UUID_STR_LEN];
 };
 
 static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    struct label_str *lb = data;
+    struct query_build *lb = data;
     if (unlikely(!lb->count))
         buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES ");
     else
@@ -26,7 +26,7 @@ static int host_label_store_to_sql_callback(const char *name, const char *value,
 }
 
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    struct label_str *lb = data;
+    struct query_build *lb = data;
     if (unlikely(!lb->count))
         buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");
     else
@@ -43,7 +43,7 @@ static void check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
 
     if(new_version != old_version) {
         buffer_flush(work_buffer);
-        struct label_str tmp = {.sql = work_buffer, .count = 0};
+        struct query_build tmp = {.sql = work_buffer, .count = 0};
         uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
         rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
         st->rrdlabels_last_saved_version = new_version;
@@ -245,131 +245,60 @@ bind_fail:
     return 1;
 }
 
-#define SQL_INS_HOST_SYSTEM_INFO "INSERT OR REPLACE INTO host_info " \
-    "(host_id, system_key, system_value, date_created) " \
-    "VALUES (@host, @key, @value, unixepoch());"
-
-static void sql_store_host_system_info_key_value(uuid_t *host_id, const char *name, const char *value)
+static void sql_store_host_system_info_key_value(const char *name, const char *value, void *data)
 {
-    sqlite3_stmt *res = NULL;
-    int rc;
+    struct query_build *lb = data;
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_INS_HOST_SYSTEM_INFO, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to store system info");
+    if (unlikely(!value))
         return;
-    }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter to store system information");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_text(res, 2, name, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind label parameter to store name information");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_text(res, 3, value, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind value parameter to store value information");
-        goto skip_store;
-    }
-
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store host system info, rc = %d", rc);
-
-skip_store:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing  host system information");
+    if (unlikely(!lb->count))
+        buffer_sprintf(
+            lb->sql, "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES ");
+    else
+        buffer_strcat(lb->sql, ", ");
+    buffer_sprintf(lb->sql, "(u2h('%s'), '%s','%s', unixepoch())", lb->uuid_str, name, value);
+    lb->count++;
 }
 
-
-static void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info)
+static BUFFER *sql_store_host_system_info(RRDHOST *host)
 {
+    struct rrdhost_system_info *system_info = host->system_info;
+
     if (unlikely(!system_info))
-        return;
+        return NULL;
 
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return;
-    }
+    BUFFER *work_buffer = buffer_create(1024);
 
-    if (system_info->container_os_name)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_NAME", system_info->container_os_name);
+    struct query_build key_data = {.sql = work_buffer, .count = 0};
+    uuid_unparse_lower(host->host_uuid, key_data.uuid_str);
 
-    if (system_info->container_os_id)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_ID", system_info->container_os_id);
+    sql_store_host_system_info_key_value("NETDATA_CONTAINER_OS_NAME", system_info->container_os_name, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_CONTAINER_OS_ID", system_info->container_os_id, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_OS_NAME", system_info->host_os_name, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_OS_ID", system_info->host_os_id, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_OS_VERSION", system_info->host_os_version, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_OS_VERSION_ID", system_info->host_os_version_id, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_OS_DETECTION", system_info->host_os_detection, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_KERNEL_NAME", system_info->kernel_name, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", system_info->host_cores, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_KERNEL_VERSION", system_info->kernel_version, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_ARCHITECTURE", system_info->architecture, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_VIRTUALIZATION", system_info->virtualization, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_VIRT_DETECTION", system_info->virt_detection, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_CONTAINER", system_info->container, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_SYSTEM_CONTAINER_DETECTION", system_info->container_detection, &key_data);
+    sql_store_host_system_info_key_value("NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node, &key_data);
 
-    if (system_info->container_os_id_like)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like);
-
-    if (system_info->container_os_version)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version);
-
-    if (system_info->container_os_version_id)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id);
-
-    if (system_info->host_os_detection)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection);
-
-    if (system_info->host_os_name)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_NAME", system_info->host_os_name);
-
-    if (system_info->host_os_id)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_ID", system_info->host_os_id);
-
-    if (system_info->host_os_id_like)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like);
-
-    if (system_info->host_os_version)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_VERSION", system_info->host_os_version);
-
-    if (system_info->host_os_version_id)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_VERSION_ID", system_info->host_os_version_id);
-
-    if (system_info->host_os_detection)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_OS_DETECTION", system_info->host_os_detection);
-
-    if (system_info->kernel_name)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_KERNEL_NAME", system_info->kernel_name);
-
-    if (system_info->host_cores)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", system_info->host_cores);
-
-    if (system_info->host_cpu_freq)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq);
-
-    if (system_info->host_ram_total)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total);
-
-    if (system_info->host_disk_space)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space);
-
-    if (system_info->kernel_version)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_KERNEL_VERSION", system_info->kernel_version);
-
-    if (system_info->architecture)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_ARCHITECTURE", system_info->architecture);
-
-    if (system_info->virtualization)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_VIRTUALIZATION", system_info->virtualization);
-
-    if (system_info->virt_detection)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_VIRT_DETECTION", system_info->virt_detection);
-
-    if (system_info->container)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CONTAINER", system_info->container);
-
-    if (system_info->container_detection)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_SYSTEM_CONTAINER_DETECTION", system_info->container_detection);
-
-    if (system_info->is_k8s_node)
-        sql_store_host_system_info_key_value(host_id, "NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node);
+    return work_buffer;
 }
 
 
@@ -1032,6 +961,7 @@ static void metadata_event_loop(void *arg)
     int shutdown = 0;
     int in_transaction = 0;
     int commands_in_transaction = 0;
+    // This can be used in the event loop for all opcodes (not workers)
     BUFFER *work_buffer = buffer_create(1024);
     wc->row_id = 0;
     completion_mark_complete(&wc->init_complete);
@@ -1119,8 +1049,6 @@ static void metadata_event_loop(void *arg)
                 case METADATA_ADD_DIMENSION:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     rd = (RRDDIM *) dictionary_acquired_item_value(dict_item);
-//                    info("METADATA: Storing DIM %s (chart %s) (host %s)",
-//                         string2str(rd->id), string2str(rd->rrdset->id), string2str(rd->rrdset->rrdhost->hostname));
 
                     rc = sql_store_dimension(
                         &rd->metric_uuid,
@@ -1144,7 +1072,6 @@ static void metadata_event_loop(void *arg)
                 case METADATA_ADD_DIMENSION_OPTION:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     rd = (RRDDIM *) dictionary_acquired_item_value(dict_item);
-//                    info("METADATA: Storing DIM OPTION %s", string2str(rd->id));
                     rc = sql_set_dimension_option(
                         &rd->metric_uuid, rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN) ? "hidden" : NULL);
                     if (unlikely(rc))
@@ -1152,24 +1079,19 @@ static void metadata_event_loop(void *arg)
                     dictionary_acquired_item_release(rd->rrdset->rrddim_root_index, dict_item);
                     break;
                 case METADATA_ADD_HOST_SYSTEM_INFO:
-                    dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
-                    host = (RRDHOST *) dictionary_acquired_item_value(dict_item);
-//                    info("METADATA: Storing HOST SYSTEM INFO %s", string2str(host->hostname));
-                    // TODO: Resolve race condition -- system info may be changed
-                    sql_store_host_system_info(&host->host_uuid, host->system_info);
-                    dictionary_acquired_item_release(rrdhost_root_index, dict_item);
+                    buffer = (BUFFER *) cmd.param[0];
+                    db_execute(buffer_tostring(buffer));
+                    buffer_free(buffer);
                     break;
                 case METADATA_ADD_HOST_INFO:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     host = (RRDHOST *) dictionary_acquired_item_value(dict_item);
-//                    info("METADATA: Storing HOST SYSTEM INFO %s", string2str(host->hostname));
                     rc = sql_store_host_info(host);
                     if (unlikely(rc))
                         error_report("Failed to store host info in the database for %s", string2str(host->hostname));
                     dictionary_acquired_item_release(rrdhost_root_index, dict_item);
                     break;
                 case METADATA_STORE_CLAIM_ID:
-//                    info("METADATA: Storing CLAIM ID FOR HOST");
                     store_claim_id((uuid_t *) cmd.param[0], (uuid_t *) cmd.param[1]);
                     freez((void *) cmd.param[0]);
                     freez((void *) cmd.param[1]);
@@ -1177,12 +1099,11 @@ static void metadata_event_loop(void *arg)
                 case METADATA_STORE_HOST_LABELS:
                     dict_item = (DICTIONARY_ITEM * ) cmd.param[0];
                     host = (RRDHOST *) dictionary_acquired_item_value(dict_item);
-//                    info("METADATA: Storing HOST LABELS %s", string2str(host->hostname));
-
                     rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
+
                     if (likely(rc == SQLITE_OK)) {
                         buffer_flush(work_buffer);
-                        struct label_str tmp = {.sql = work_buffer, .count = 0};
+                        struct query_build tmp = {.sql = work_buffer, .count = 0};
                         uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
                         rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
                         db_execute(buffer_tostring(work_buffer));
@@ -1256,7 +1177,6 @@ static void metadata_event_loop(void *arg)
             if (in_transaction && (commands_in_transaction >= METADATA_MAX_TRANSACTION_BATCH || opcode != next_opcode)) {
                 in_transaction = 0;
                 db_execute("COMMIT TRANSACTION;");
-                //info("METADATA: Ending transaction commands %d", commands_in_transaction);
                 commands_in_transaction = 0;
             }
 
@@ -1412,10 +1332,14 @@ void metaqueue_dimension_update_flags(RRDDIM *rd)
     queue_metadata_cmd(METADATA_ADD_DIMENSION_OPTION, acquired_rd, NULL);
 }
 
-void metaqueue_host_update_system_info(const char *machine_guid)
+void metaqueue_host_update_system_info(RRDHOST *host)
 {
-    const DICTIONARY_ITEM *acquired_host = dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
-    queue_metadata_cmd(METADATA_ADD_HOST_SYSTEM_INFO, acquired_host, NULL);
+    BUFFER *work_buffer = sql_store_host_system_info(host);
+
+    if (unlikely(!work_buffer))
+        return;
+
+    queue_metadata_cmd(METADATA_ADD_HOST_SYSTEM_INFO, work_buffer, NULL);
 }
 
 void metaqueue_host_update_info(const char *machine_guid)
