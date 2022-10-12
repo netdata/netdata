@@ -121,30 +121,54 @@ static size_t malloc_usable_size_first_run(void *ptr) {
 }
 
 void *malloc(size_t size) {
+    if(unlikely(!netdata_trace_allocations_enabled))
+        return libc_malloc(size);
+
     return mallocz(size);
 }
 
 void *calloc(size_t n, size_t size) {
+    if(unlikely(!netdata_trace_allocations_enabled))
+        return libc_calloc(n, size);
+
     return callocz(n, size);
 }
 
 void *realloc(void *ptr, size_t size) {
+    if(unlikely(!netdata_trace_allocations_enabled))
+        return libc_realloc(ptr, size);
+
     return reallocz(ptr, size);
 }
 
 void *reallocarray(void *ptr, size_t n, size_t size) {
+    if(unlikely(!netdata_trace_allocations_enabled))
+        return libc_realloc(ptr, n * size);
+
     return reallocz(ptr, n * size);
 }
 
 void free(void *ptr) {
-    freez(ptr);
+    if(unlikely(!netdata_trace_allocations_enabled))
+        libc_free(ptr);
+    else
+        freez(ptr);
 }
 
 char *strdup(const char *s) {
+    if(unlikely(!netdata_trace_allocations_enabled))
+        return libc_strdup(s);
+
     return strdupz(s);
 }
 
 size_t malloc_usable_size(void *ptr) {
+    if(unlikely(!netdata_trace_allocations_enabled)) {
+        if(libc_malloc_usable_size)
+            return libc_malloc_usable_size(ptr);
+        return 0;
+    }
+
     return mallocz_usable_size(ptr);
 }
 #else // !HAVE_DLSYM
