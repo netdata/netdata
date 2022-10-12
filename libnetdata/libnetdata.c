@@ -37,12 +37,6 @@ const char *program_version = VERSION;
 #ifdef HAVE_DLSYM
 #include <dlfcn.h>
 
-// do not intercept system malloc calls, until this is set to true
-// on musl libc, allocators are called BEFORE the string literals
-// of our program are available, resulting to SIGSEGV when we try
-// to access __FILE__, __FUNCTION__ and __LINE__
-bool netdata_trace_allocations_enabled = false;
-
 typedef void (*libc_function_t)(void);
 
 static void *malloc_first_run(size_t size);
@@ -76,43 +70,37 @@ static void link_system_library_function(libc_function_t *func_pptr, const char 
 }
 
 static void *malloc_first_run(size_t size) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
+    link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
 
     return libc_malloc(size);
 }
 
 static void *calloc_first_run(size_t n, size_t size) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
+    link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
 
     return libc_calloc(n, size);
 }
 
 static void *realloc_first_run(void *ptr, size_t size) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
+    link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
 
     return libc_realloc(ptr, size);
 }
 
 static void free_first_run(void *ptr) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_free, "free", true);
+    link_system_library_function((libc_function_t *) &libc_free, "free", true);
 
     libc_free(ptr);
 }
 
 static char *strdup_first_run(const char *s) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
+    link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
 
     return libc_strdup(s);
 }
 
 static size_t malloc_usable_size_first_run(void *ptr) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+    link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
 
     if(libc_malloc_usable_size)
         return libc_malloc_usable_size(ptr);
@@ -121,54 +109,30 @@ static size_t malloc_usable_size_first_run(void *ptr) {
 }
 
 void *malloc(size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_malloc(size);
-
     return mallocz(size);
 }
 
 void *calloc(size_t n, size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_calloc(n, size);
-
     return callocz(n, size);
 }
 
 void *realloc(void *ptr, size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_realloc(ptr, size);
-
     return reallocz(ptr, size);
 }
 
 void *reallocarray(void *ptr, size_t n, size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_realloc(ptr, n * size);
-
     return reallocz(ptr, n * size);
 }
 
 void free(void *ptr) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        libc_free(ptr);
-    else
-        freez(ptr);
+    freez(ptr);
 }
 
 char *strdup(const char *s) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_strdup(s);
-
     return strdupz(s);
 }
 
 size_t malloc_usable_size(void *ptr) {
-    if(unlikely(!netdata_trace_allocations_enabled)) {
-        if(libc_malloc_usable_size)
-            return libc_malloc_usable_size(ptr);
-        return 0;
-    }
-
     return mallocz_usable_size(ptr);
 }
 #else // !HAVE_DLSYM
@@ -234,7 +198,7 @@ static size_t malloc_header_size = sizeof(struct malloc_header);
 int malloc_trace_compare(void *A, void *B) {
     struct malloc_trace *a = A;
     struct malloc_trace *b = B;
-    return strcmp(a->function, b->function);
+    return (int)(a->function - b->function);
 }
 
 static avl_tree_lock malloc_trace_index = {
