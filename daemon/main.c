@@ -867,15 +867,7 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
-#ifdef HAVE_DLSYM
-extern bool netdata_trace_allocations_enabled;
-#endif
-
 int main(int argc, char **argv) {
-#ifdef HAVE_DLSYM
-    netdata_trace_allocations_enabled = true;
-#endif
-
     int i;
     int config_loaded = 0;
     int dont_fork = 0;

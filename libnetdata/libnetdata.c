@@ -37,12 +37,6 @@ const char *program_version = VERSION;
 #ifdef HAVE_DLSYM
 #include <dlfcn.h>
 
-// do not intercept system malloc calls, until this is set to true
-// on musl libc, allocators are called BEFORE the string literals
-// of our program are available, resulting to SIGSEGV when we try
-// to access __FILE__, __FUNCTION__ and __LINE__
-bool netdata_trace_allocations_enabled = false;
-
 typedef void (*libc_function_t)(void);
 
 static void *malloc_first_run(size_t size);
@@ -110,54 +104,30 @@ static size_t malloc_usable_size_first_run(void *ptr) {
 }
 
 void *malloc(size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_malloc(size);
-
     return mallocz(size);
 }
 
 void *calloc(size_t n, size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_calloc(n, size);
-
     return callocz(n, size);
 }
 
 void *realloc(void *ptr, size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_realloc(ptr, size);
-
     return reallocz(ptr, size);
 }
 
 void *reallocarray(void *ptr, size_t n, size_t size) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_realloc(ptr, n * size);
-
     return reallocz(ptr, n * size);
 }
 
 void free(void *ptr) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        libc_free(ptr);
-    else
-        freez(ptr);
+    freez(ptr);
 }
 
 char *strdup(const char *s) {
-    if(unlikely(!netdata_trace_allocations_enabled))
-        return libc_strdup(s);
-
     return strdupz(s);
 }
 
 size_t malloc_usable_size(void *ptr) {
-    if(unlikely(!netdata_trace_allocations_enabled)) {
-        if(libc_malloc_usable_size)
-            return libc_malloc_usable_size(ptr);
-        return 0;
-    }
-
     return mallocz_usable_size(ptr);
 }
 #else // !HAVE_DLSYM
@@ -223,7 +193,7 @@ static size_t malloc_header_size = sizeof(struct malloc_header);
 int malloc_trace_compare(void *A, void *B) {
     struct malloc_trace *a = A;
     struct malloc_trace *b = B;
-    return (int)(a->function - b->function);
+    return strcmp(a->function, b->function);
 }
 
 static avl_tree_lock malloc_trace_index = {
@@ -267,9 +237,6 @@ static struct malloc_trace *malloc_trace_find_or_create(const char *file, const 
 }
 
 void malloc_trace_mmap(size_t size) {
-    if(!netdata_trace_allocations_enabled)
-        return;
-
     struct malloc_trace *p = malloc_trace_find_or_create("unknown", "netdata_mmap", 1);
     size_t_atomic_count(add, p->mmap_calls, 1);
     size_t_atomic_count(add, p->allocations, 1);
@@ -277,9 +244,6 @@ void malloc_trace_mmap(size_t size) {
 }
 
 void malloc_trace_munmap(size_t size) {
-    if(!netdata_trace_allocations_enabled)
-        return;
-
     struct malloc_trace *p = malloc_trace_find_or_create("unknown", "netdata_mmap", 1);
     size_t_atomic_count(add, p->munmap_calls, 1);
     size_t_atomic_count(sub, p->allocations, 1);
@@ -287,9 +251,6 @@ void malloc_trace_munmap(size_t size) {
 }
 
 void *mallocz_int(size_t size, const char *file, const char *function, size_t line) {
-    if(!netdata_trace_allocations_enabled)
-        return libc_malloc(size);
-
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
 
     size_t_atomic_count(add, p->malloc_calls, 1);
@@ -311,9 +272,6 @@ void *mallocz_int(size_t size, const char *file, const char *function, size_t li
 }
 
 void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line) {
-    if(!netdata_trace_allocations_enabled)
-        return libc_calloc(nmemb, size);
-
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
     size = nmemb * size;
 
@@ -336,9 +294,6 @@ void *callocz_int(size_t nmemb, size_t size, const char *file, const char *funct
 }
 
 char *strdupz_int(const char *s, const char *file, const char *function, size_t line) {
-    if(!netdata_trace_allocations_enabled)
-        return libc_strdup(s);
-
     struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
     size_t size = strlen(s) + 1;
 
@@ -374,9 +329,6 @@ static struct malloc_header *malloc_get_header(void *ptr, const char *caller, co
 }
 
 void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line) {
-    if(!netdata_trace_allocations_enabled)
-        return libc_realloc(ptr, size);
-
     if(!ptr) return mallocz_int(size, file, function, line);
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
@@ -408,13 +360,6 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
 }
 
 size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line) {
-    if(!netdata_trace_allocations_enabled) {
-        if(libc_malloc_usable_size)
-            return libc_malloc_usable_size(ptr);
-        else
-            return 0;
-    }
-
     if(unlikely(!ptr)) return 0;
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
@@ -429,11 +374,6 @@ size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function
 }
 
 void freez_int(void *ptr, const char *file, const char *function, size_t line) {
-    if(!netdata_trace_allocations_enabled) {
-        libc_free(ptr);
-        return;
-    }
-
     if(unlikely(!ptr)) return;
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
