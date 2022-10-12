@@ -6,7 +6,7 @@
 #include "sqlite3.h"
 #include "sqlite_functions.h"
 
-#define METADATA_CMD_Q_MAX_SIZE (16384)            // Max queue size; callers will block until there is room
+#define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running Or last run did actual work
 #define METADATA_MAINTENANCE_INTERVAL (3600)        // Repeat maintenance after latest successful
@@ -67,13 +67,6 @@ typedef enum {
 #define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define metadata_flag_set(target_flags, flag)   __atomic_or_fetch(&((target_flags)->flags), (flag), __ATOMIC_SEQ_CST)
 #define metadata_flag_clear(target_flags, flag) __atomic_and_fetch(&((target_flags)->flags), ~(flag), __ATOMIC_SEQ_CST)
-
-struct metadata_queue {
-    volatile unsigned queue_size;
-    struct metadata_database_cmdqueue cmd_queue;
-    struct metadata_queue *prev;
-    struct metadata_queue *next;
-};
 
 struct metadata_wc {
     uv_thread_t thread;
