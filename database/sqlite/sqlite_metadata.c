@@ -882,7 +882,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
     bool run_again = false;
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) && !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
         internal_error(true, "METADATA: Scanning host %s", rrdhost_hostname(host));
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
