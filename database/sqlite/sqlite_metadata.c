@@ -1118,11 +1118,11 @@ static void metadata_event_loop(void *arg)
 
                     struct scan_metadata_payload *data = mallocz(sizeof(*data));
                     data->wc = wc;
+                    data->completion = cmd.completion;  // Completion by the worker
 
                     if (unlikely(cmd.completion)) {
-                        data->max_count = 0;                   // 0 will process all pending updates
-                        data->completion = cmd.completion;     // Completion by the worker
-                        cmd.completion = NULL;                 // Do not complete after launching worker
+                        data->max_count = 0;            // 0 will process all pending updates
+                        cmd.completion = NULL;          // Do not complete after launching worker (worker will do)
                     }
                     else
                         data->max_count = 1000;
