@@ -76,43 +76,32 @@ static void link_system_library_function(libc_function_t *func_pptr, const char 
 }
 
 static void *malloc_first_run(size_t size) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
-
+    link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
     return libc_malloc(size);
 }
 
 static void *calloc_first_run(size_t n, size_t size) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
-
+    link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
     return libc_calloc(n, size);
 }
 
 static void *realloc_first_run(void *ptr, size_t size) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
-
+    link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
     return libc_realloc(ptr, size);
 }
 
 static void free_first_run(void *ptr) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_free, "free", true);
-
+    link_system_library_function((libc_function_t *) &libc_free, "free", true);
     libc_free(ptr);
 }
 
 static char *strdup_first_run(const char *s) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
-
+    link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
     return libc_strdup(s);
 }
 
 static size_t malloc_usable_size_first_run(void *ptr) {
-    if(netdata_trace_allocations_enabled)
-        link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+    link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
 
     if(libc_malloc_usable_size)
         return libc_malloc_usable_size(ptr);
