@@ -537,7 +537,8 @@ int is_legacy = 1;
          , string2str(host->health_default_exec)
          , string2str(host->health_default_recipient)
     );
-    metaqueue_host_update_system_info(host->machine_guid);
+    if(!archived)
+        metaqueue_host_update_system_info(host);
 
     rrd_hosts_available++;
 
@@ -580,7 +581,7 @@ void rrdhost_update(RRDHOST *host
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
-    metaqueue_host_update_system_info(host->machine_guid);
+    metaqueue_host_update_system_info(host);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
