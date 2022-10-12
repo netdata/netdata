@@ -18,13 +18,13 @@
 
 rbuf_t rbuf_create(size_t size)
 {
-    rbuf_t buffer = calloc(1, sizeof(struct rbuf_t));
+    rbuf_t buffer = malloc(sizeof(struct rbuf_t) + size);
     if (!buffer)
         return NULL;
 
-    buffer->data = malloc(size);
-    if (!buffer->data)
-        goto cleanup;
+    memset(buffer, 0, sizeof(struct rbuf_t));
+
+    buffer->data = ((char*)buffer) + sizeof(struct rbuf_t);
 
     buffer->head = buffer->data;
     buffer->tail = buffer->data;
@@ -32,15 +32,10 @@ rbuf_t rbuf_create(size_t size)
     buffer->end = buffer->data + size;
 
     return buffer;
-
-cleanup:
-    free(buffer);
-    return NULL;
 }
 
 void rbuf_free(rbuf_t buffer)
 {
-    free(buffer->data);
     free(buffer);
 }
 
