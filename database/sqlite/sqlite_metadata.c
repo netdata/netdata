@@ -858,6 +858,7 @@ static void start_metadata_cleanup(uv_work_t *req)
 
 struct scan_metadata_payload {
     struct metadata_wc *wc;
+    struct completion *completion;
     uint32_t max_count;
 };
 
@@ -869,6 +870,10 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 
     metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
     internal_error(true, "METADATA: scanning hosts complete");
+    if (unlikely(data->completion)) {
+        completion_mark_complete(data->completion);
+        internal_error(true, "METADATA: Sending completion done");
+    }
     freez(data);
 }
 
@@ -877,7 +882,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
     int rc;
 
     bool more_to_do = false;
-    uint32_t scan_count = 0;
+    uint32_t scan_count = 1;
     BUFFER *work_buffer = buffer_create(1024);
 
     rrdset_foreach_reentrant(st, host) {
@@ -950,7 +955,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) && !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
-        internal_error(true, "METADATA: %d Scanning host %s", gettid(), rrdhost_hostname(host));
+        internal_error(true, "METADATA: Scanning host %s", rrdhost_hostname(host));
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
         if (unlikely(metadata_scan_host(host, data->max_count))) {
             run_again = true;
@@ -988,7 +993,7 @@ static void metadata_event_loop(void *arg)
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode, next_opcode;
     uv_work_t metadata_cleanup_worker;
-    uv_work_t metadata_scan_hosts_worker;
+    uv_work_t worker_request;
 
     uv_thread_set_name_np(wc->thread, "METASYNC");
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
@@ -1192,13 +1197,24 @@ static void metadata_event_loop(void *arg)
 
                     struct scan_metadata_payload *data = mallocz(sizeof(*data));
                     data->wc = wc;
-                    data->max_count = 1000;
 
-                    metadata_scan_hosts_worker.data = data;
+                    if (unlikely(cmd.completion)) {
+                        data->max_count = 0;                   // 0 will process all pending updates
+                        data->completion = cmd.completion;     // Completion by the worker
+                        cmd.completion = NULL;                 // Do not complete after launching worker
+                    }
+                    else
+                        data->max_count = 1000;
+
+                    worker_request.data = data;
                     metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
-                    internal_error(true, "Starting metadata host check in a worker thread");
                     if (unlikely(
-                            uv_queue_work(loop, &metadata_scan_hosts_worker, start_metadata_hosts, after_metadata_hosts))) {
+                            uv_queue_work(loop,&worker_request,
+                                          start_metadata_hosts,
+                                          after_metadata_hosts))) {
+                        // Failed to launch worker -- let the event loop handle completion
+                        cmd.completion = data->completion;
+                        freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
                     }
                     break;
@@ -1293,10 +1309,8 @@ void metadata_sync_shutdown(void)
 {
     completion_init(&metasync_worker.init_complete);
 
-    info("METADATA: Starting shutdown...");
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-
     info("METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
     metadata_enq_cmd(&metasync_worker, &cmd);
@@ -1317,6 +1331,13 @@ void metadata_sync_shutdown_prepare(void)
     completion_init(&compl);
 
     info("METADATA: Sending a scan host command");
+    uint32_t max_wait_iterations = 2000;
+    while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_SCANNING_HOSTS)) && max_wait_iterations--) {
+        if (max_wait_iterations == 1999)
+            info("METADATA: Current worker is running; waiting to finish");
+        usleep(1000);
+    }
+
     cmd.opcode = METADATA_SCAN_HOSTS;
     cmd.completion = &compl;
     metadata_enq_cmd(&metasync_worker, &cmd);
