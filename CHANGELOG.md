@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- fix post-processing of contexts [\#13807](https://github.com/netdata/netdata/pull/13807) ([ktsaou](https://github.com/ktsaou))
+- Merge netstat, snmp, and snmp6 modules [\#13806](https://github.com/netdata/netdata/pull/13806) ([vlvkobal](https://github.com/vlvkobal))
+- fix warning when -Wfree-nonheap-object is used [\#13805](https://github.com/netdata/netdata/pull/13805) ([underhood](https://github.com/underhood))
 - ARAL optimal alloc size [\#13804](https://github.com/netdata/netdata/pull/13804) ([ktsaou](https://github.com/ktsaou))
 - internal log error, when passing NULL dictionary [\#13803](https://github.com/netdata/netdata/pull/13803) ([ktsaou](https://github.com/ktsaou))
 - Return memory freed properly [\#13799](https://github.com/netdata/netdata/pull/13799) ([stelfrag](https://github.com/stelfrag))
@@ -18,6 +21,8 @@
 - full memory tracking and profiling of Netdata Agent [\#13789](https://github.com/netdata/netdata/pull/13789) ([ktsaou](https://github.com/ktsaou))
 - Stop pulling in netcat as a mandatory dependency. [\#13787](https://github.com/netdata/netdata/pull/13787) ([Ferroin](https://github.com/Ferroin))
 - Initialize st-\>rrdvars from rrdset insert callback [\#13786](https://github.com/netdata/netdata/pull/13786) ([MrZammler](https://github.com/MrZammler))
+- Add Ubuntu 22.10 to supported distros, CI, and package builds. [\#13785](https://github.com/netdata/netdata/pull/13785) ([Ferroin](https://github.com/Ferroin))
+- minor - add host labels for ephemerality and nodes with unstable connections [\#13784](https://github.com/netdata/netdata/pull/13784) ([underhood](https://github.com/underhood))
 - Parser cleanup  [\#13782](https://github.com/netdata/netdata/pull/13782) ([stelfrag](https://github.com/stelfrag))
 - allow netdata installer to install and run netdata as any user [\#13780](https://github.com/netdata/netdata/pull/13780) ([ktsaou](https://github.com/ktsaou))
 - Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -149,6 +154,7 @@
 - fix\(packaging\): add CAP\_NET\_ADMIN for go.d.plugin [\#13507](https://github.com/netdata/netdata/pull/13507) ([ilyam8](https://github.com/ilyam8))
 - netdata.service: Update PIDFile to avoid systemd legacy path warning [\#13504](https://github.com/netdata/netdata/pull/13504) ([candrews](https://github.com/candrews))
 - chore\(python.d\): remove python.d/\* announced in v1.36.0 deprecation notice [\#13503](https://github.com/netdata/netdata/pull/13503) ([ilyam8](https://github.com/ilyam8))
+- Add Fedora 37 to CI and package builds. [\#13489](https://github.com/netdata/netdata/pull/13489) ([Ferroin](https://github.com/Ferroin))
 - Overhaul handling of installation of Netdata as a system service. [\#13451](https://github.com/netdata/netdata/pull/13451) ([Ferroin](https://github.com/Ferroin))
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -342,10 +348,6 @@
 - fix\(python.d\): urllib3 import collection for py3.10+ [\#13136](https://github.com/netdata/netdata/pull/13136) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d/mongodb\): set `serverSelectionTimeoutMS` for pymongo4+ [\#13135](https://github.com/netdata/netdata/pull/13135) ([ilyam8](https://github.com/ilyam8))
 - Use new mqtt implementation as default [\#13132](https://github.com/netdata/netdata/pull/13132) ([underhood](https://github.com/underhood))
-- use ks2 as MC default [\#13131](https://github.com/netdata/netdata/pull/13131) ([andrewm4894](https://github.com/andrewm4894))
-- allow label names to have slashes [\#13125](https://github.com/netdata/netdata/pull/13125) ([ktsaou](https://github.com/ktsaou))
-- fixed coveriry 379136 379135 379134 379133 [\#13123](https://github.com/netdata/netdata/pull/13123) ([ktsaou](https://github.com/ktsaou))
-- buffer overflow detected by the compiler [\#13120](https://github.com/netdata/netdata/pull/13120) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
