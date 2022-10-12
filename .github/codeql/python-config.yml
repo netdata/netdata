@@ -1,0 +1,7 @@
+paths-ignore:
+- .github
+- build_external/
+- ml/dlib
+- ml/json
+- tests/api
+- web/gui

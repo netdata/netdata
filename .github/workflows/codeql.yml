@@ -107,6 +107,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
+          config-file: ./.github/codeql/python-config.yml
           languages: python
       - name: Run CodeQL
         uses: github/codeql-action/analyze@v2
