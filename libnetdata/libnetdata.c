@@ -34,7 +34,103 @@ const char *program_version = VERSION;
 #warning NETDATA_TRACE_ALLOCATIONS ENABLED
 #include "Judy.h"
 
-static bool libc_libs_initialized = false;
+#ifdef HAVE_DLSYM
+#include <dlfcn.h>
+
+typedef void (*libc_function_t)(void);
+
+static void *malloc_first_run(size_t size);
+static void *(*libc_malloc)(size_t) = malloc_first_run;
+
+static void *calloc_first_run(size_t n, size_t size);
+static void *(*libc_calloc)(size_t, size_t) = calloc_first_run;
+
+static void *realloc_first_run(void *ptr, size_t size);
+static void *(*libc_realloc)(void *, size_t) = realloc_first_run;
+
+static void free_first_run(void *ptr);
+static void (*libc_free)(void *) = free_first_run;
+
+static char *strdup_first_run(const char *s);
+static char *(*libc_strdup)(const char *) = strdup_first_run;
+
+static size_t malloc_usable_size_first_run(void *ptr);
+#ifdef HAVE_MALLOC_USABLE_SIZE
+static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size_first_run;
+#else
+static size_t (*libc_malloc_usable_size)(void *) = NULL;
+#endif
+
+static void link_system_library_function(libc_function_t *func_pptr, const char *name, bool required) {
+    *func_pptr = dlsym(RTLD_NEXT, name);
+    if(!*func_pptr && required) {
+        fprintf(stderr, "FATAL: Cannot find system's %s() function.\n", name);
+        abort();
+    }
+}
+
+static void *malloc_first_run(size_t size) {
+    link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
+    return libc_malloc(size);
+}
+
+static void *calloc_first_run(size_t n, size_t size) {
+    link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
+    return libc_calloc(n, size);
+}
+
+static void *realloc_first_run(void *ptr, size_t size) {
+    link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
+    return libc_realloc(ptr, size);
+}
+
+static void free_first_run(void *ptr) {
+    link_system_library_function((libc_function_t *) &libc_free, "free", true);
+    libc_free(ptr);
+}
+
+static char *strdup_first_run(const char *s) {
+    link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
+    return libc_strdup(s);
+}
+
+static size_t malloc_usable_size_first_run(void *ptr) {
+    link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+    if(libc_malloc_usable_size)
+        return libc_malloc_usable_size(ptr);
+    else
+        return 0;
+}
+
+void *malloc(size_t size) {
+    return mallocz(size);
+}
+
+void *calloc(size_t n, size_t size) {
+    return callocz(n, size);
+}
+
+void *realloc(void *ptr, size_t size) {
+    return reallocz(ptr, size);
+}
+
+void *reallocarray(void *ptr, size_t n, size_t size) {
+    return reallocz(ptr, n * size);
+}
+
+void free(void *ptr) {
+    freez(ptr);
+}
+
+char *strdup(const char *s) {
+    return strdupz(s);
+}
+
+size_t malloc_usable_size(void *ptr) {
+    return mallocz_usable_size(ptr);
+}
+#else // !HAVE_DLSYM
+
 static void *(*libc_malloc)(size_t) = malloc;
 static void *(*libc_calloc)(size_t, size_t) = calloc;
 static void *(*libc_realloc)(void *, size_t) = realloc;
@@ -47,71 +143,8 @@ static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size;
 static size_t (*libc_malloc_usable_size)(void *) = NULL;
 #endif
 
-#ifdef HAVE_DLSYM
-#include <dlfcn.h>
-
-static inline void initialize_malloc_trace(void) {
-    libc_malloc = dlsym(RTLD_NEXT, "malloc");
-    libc_calloc = dlsym(RTLD_NEXT, "calloc");
-    libc_realloc = dlsym(RTLD_NEXT, "realloc");
-    libc_free = dlsym(RTLD_NEXT, "free");
-    libc_strdup = dlsym(RTLD_NEXT, "strdup");
-
-
-    libc_malloc_usable_size = dlsym(RTLD_NEXT, "malloc_usable_size");
-
-    if(!libc_malloc || !libc_calloc || !libc_realloc || !libc_free || !libc_strdup)
-        abort();
-
-    libc_libs_initialized = true;
-}
-
-void *malloc(size_t size) {
-    if(unlikely(!libc_libs_initialized))
-        initialize_malloc_trace();
-
-    return mallocz(size);
-}
-
-void *calloc(size_t n, size_t size) {
-    if(unlikely(!libc_libs_initialized))
-        initialize_malloc_trace();
-
-    return callocz(n, size);
-}
-
-void *realloc(void *ptr, size_t size) {
-    if(unlikely(!libc_libs_initialized))
-        initialize_malloc_trace();
-
-    return reallocz(ptr, size);
-}
-
-void *reallocarray(void *ptr, size_t n, size_t size) {
-    if(unlikely(!libc_libs_initialized))
-        initialize_malloc_trace();
-
-    return reallocz(ptr, n * size);
-}
-
-void free(void *ptr) {
-    if(unlikely(!libc_libs_initialized))
-        initialize_malloc_trace();
-
-    freez(ptr);
-}
-
-char *strdup(const char *s) {
-    if(unlikely(!libc_libs_initialized))
-        initialize_malloc_trace();
-
-    return strdupz(s);
-}
-
-size_t malloc_usable_size(void *ptr) {
-    return mallocz_usable_size(ptr);
-}
 #endif // HAVE_DLSYM
+
 
 void posix_memfree(void *ptr) {
     libc_free(ptr);
@@ -183,12 +216,6 @@ static struct malloc_trace *malloc_trace_find_or_create(const char *file, const 
 
     struct malloc_trace *t = (struct malloc_trace *)avl_search_lock(&malloc_trace_index, (avl_t *)&tmp);
     if(!t) {
-
-#ifdef HAVE_DLSYM
-        if(unlikely(!libc_libs_initialized))
-            initialize_malloc_trace();
-#endif
-
         t = libc_calloc(1, sizeof(struct malloc_trace));
         if(!t) fatal("No memory");
         t->line = line;
