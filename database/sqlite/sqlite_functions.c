@@ -63,8 +63,6 @@ sqlite3 *db_meta = NULL;
 #define MAX_PREPARED_STATEMENTS (32)
 pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
 
-//static uv_mutex_t sqlite_transaction_lock;
-
 SQLITE_API int sqlite3_exec_monitored(
     sqlite3 *db,                               /* An open database */
     const char *sql,                           /* SQL to be evaluated */
@@ -446,7 +444,6 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (init_database_batch(db_meta, rebuild, 0, &database_cleanup[0]))
         return 1;
 
-//    fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
     info("SQLite database initialization completed");
 
     for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
@@ -840,19 +837,6 @@ void db_execute(const char *cmd)
         ++cnt;
     }
 }
-
-//void db_lock(void)
-//{
-//    uv_mutex_lock(&sqlite_transaction_lock);
-//    return;
-//}
-//
-//void db_unlock(void)
-//{
-//    uv_mutex_unlock(&sqlite_transaction_lock);
-//    return;
-//}
-
 
 #define SELECT_MIGRATED_FILE    "select 1 from metadata_migration where filename = @path;"
 
