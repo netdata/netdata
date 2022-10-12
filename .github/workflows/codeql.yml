@@ -2,7 +2,8 @@
 # Run CodeQL to analyze C/C++ and Python code.
 name: CodeQL
 on:
-  pull_request: null
+  pull_request:
+    types: [opened, reopened, labeled, synchronize]
   push:
     branches: [master]
   schedule:
@@ -25,10 +26,22 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Check if we should always run
+        id: always
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ contains(github.event.pull_request.labels.*.name, 'ci/codeql') }}" = "true" ]; then
+              echo '::set-output name=run::true'
+            else
+              echo '::set-output name=run::false'
+            fi
+          else
+            echo '::set-output name=run::true'
+          fi
       - name: Check for C/C++ changes
         id: cpp
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ steps.always.outputs.run }}" = "false" ]; then
             if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.[ch](xx|\+\+)?' ; then
               echo '::set-output name=run::true'
               echo '::notice::C/C++ code has changed, need to run CodeQL.'
@@ -41,7 +54,7 @@ jobs:
       - name: Check for python changes
         id: python
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ steps.always.outputs.run }}" = "false" ]; then
             if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'collectors/python.d.plugin/.*\.py' ; then
               echo '::set-output name=run::true'
               echo '::notice::Python code has changed, need to run CodeQL.'
