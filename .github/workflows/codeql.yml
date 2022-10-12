@@ -4,6 +4,7 @@ name: CodeQL
 on:
   pull_request:
     types: [opened, reopened, labeled, synchronize]
+    branches: [master]
   push:
     branches: [master]
   schedule:
