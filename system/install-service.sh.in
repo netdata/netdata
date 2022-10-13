@@ -388,7 +388,7 @@ check_lsb() {
 enable_lsb() {
   if ! update-rc.d netdata defaults; then
     warning "Failed to enable Netdata service."
-  elif ! update-rc.d netdata defaults-disable; then
+  elif ! update-rc.d netdata defaults-disabled; then
     warning "Failed to fully enable Netdata service."
   fi
 }
@@ -604,8 +604,7 @@ detect_linux_svc_type() {
     found_types=''
 
     for t in ${LINUX_INIT_TYPES}; do
-      "check_${t}"
-      case "$?" in
+      case "$("safe_check_${t}")" in
         1) continue ;;
         0)
           SVC_TYPE="${t}"
