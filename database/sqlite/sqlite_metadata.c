@@ -151,7 +151,7 @@ skip_execution:
 static int sql_store_host_info(RRDHOST *host)
 {
     static __thread sqlite3_stmt *res = NULL;
-    int rc;
+    int rc, param = 0;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
@@ -168,63 +168,63 @@ static int sql_store_host_info(RRDHOST *host)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 2, rrdhost_hostname(host), 0);
+    rc = bind_text_null(res, ++param, rrdhost_hostname(host), 0);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 3, rrdhost_registry_hostname(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 4, host->rrd_update_every);
+    rc = sqlite3_bind_int(res, ++param, host->rrd_update_every);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 5, rrdhost_os(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_os(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 6, rrdhost_timezone(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_timezone(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 7, rrdhost_tags(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_tags(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 8, host->system_info ? host->system_info->hops : 0);
+    rc = sqlite3_bind_int(res, ++param, host->system_info ? host->system_info->hops : 0);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 9, host->rrd_memory_mode);
+    rc = sqlite3_bind_int(res, ++param, host->rrd_memory_mode);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 10, rrdhost_abbrev_timezone(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_abbrev_timezone(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 11, host->utc_offset);
+    rc = sqlite3_bind_int(res, ++param, host->utc_offset);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 12, rrdhost_program_name(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_program_name(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, 13, rrdhost_program_version(host), 1);
+    rc = bind_text_null(res, ++param, rrdhost_program_version(host), 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int64(res, 14, host->rrd_history_entries);
+    rc = sqlite3_bind_int64(res, ++param, host->rrd_history_entries);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 15, (int ) host->health_enabled);
+    rc = sqlite3_bind_int(res, ++param, (int ) host->health_enabled);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -238,7 +238,7 @@ static int sql_store_host_info(RRDHOST *host)
 
     return !(store_rc == SQLITE_DONE);
 bind_fail:
-    error_report("Failed to bind parameter to store host %s, rc = %d", rrdhost_hostname(host), rc);
+    error_report("Failed to bind %d parameter to store host %s, rc = %d", param, rrdhost_hostname(host), rc);
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement to store host %s, rc = %d", rrdhost_hostname(host), rc);
@@ -488,7 +488,7 @@ static int sql_store_dimension(
     collected_number divisor, int algorithm)
 {
     static __thread sqlite3_stmt *res = NULL;
-    int rc;
+    int rc, param = 0;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
@@ -505,31 +505,31 @@ static int sql_store_dimension(
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, ++param, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_blob(res, 2, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, ++param, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 3, id, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, ++param, id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 4, name, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, ++param, name, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 5, (int) multiplier);
+    rc = sqlite3_bind_int(res, ++param, (int) multiplier);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 6, (int ) divisor);
+    rc = sqlite3_bind_int(res, ++param, (int ) divisor);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, 7, algorithm);
+    rc = sqlite3_bind_int(res, ++param, algorithm);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -543,7 +543,7 @@ static int sql_store_dimension(
     return 0;
 
 bind_fail:
-    error_report("Failed to bind parameter to store dimension, rc = %d", rc);
+    error_report("Failed to bind parameter %d to store dimension, rc = %d", param, rc);
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement in store dimension, rc = %d", rc);
@@ -786,6 +786,7 @@ static void start_metadata_cleanup(uv_work_t *req)
 }
 
 struct scan_metadata_payload {
+    uv_work_t request;
     struct metadata_wc *wc;
     struct completion *completion;
     uint32_t max_count;
@@ -922,7 +923,6 @@ static void metadata_event_loop(void *arg)
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode, next_opcode;
     uv_work_t metadata_cleanup_worker;
-    uv_work_t worker_request;
 
     uv_thread_set_name_np(wc->thread, "METASYNC");
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
@@ -967,13 +967,13 @@ static void metadata_event_loop(void *arg)
     completion_mark_complete(&wc->init_complete);
 
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
-        RRDDIM *rd;
-        RRDSET *st;
-        RRDHOST *host;
+        RRDDIM *rd = NULL;
+        RRDSET *st = NULL;
+        RRDHOST *host = NULL;
+        DICTIONARY_ITEM *dict_item = NULL;
+        BUFFER *buffer = NULL;
         uuid_t  *uuid;
         int rc;
-        DICTIONARY_ITEM *dict_item;
-        BUFFER *buffer;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -1117,6 +1117,7 @@ static void metadata_event_loop(void *arg)
                         break;
 
                     struct scan_metadata_payload *data = mallocz(sizeof(*data));
+                    data->request.data = data;
                     data->wc = wc;
                     data->completion = cmd.completion;  // Completion by the worker
 
@@ -1127,10 +1128,9 @@ static void metadata_event_loop(void *arg)
                     else
                         data->max_count = 1000;
 
-                    worker_request.data = data;
                     metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
                     if (unlikely(
-                            uv_queue_work(loop,&worker_request,
+                            uv_queue_work(loop,&data->request,
                                           start_metadata_hosts,
                                           after_metadata_hosts))) {
                         // Failed to launch worker -- let the event loop handle completion
@@ -1141,10 +1141,7 @@ static void metadata_event_loop(void *arg)
                     break;
                 case METADATA_STORE_BUFFER:
                     buffer = (BUFFER *) cmd.param[0];
-
-                    /// TODO: Error checking
                     db_execute(buffer_tostring(buffer));
-
                     buffer_free(buffer);
                     break;
                 case METADATA_MAINTENANCE:
@@ -1196,7 +1193,6 @@ static void metadata_event_loop(void *arg)
     uv_close((uv_handle_t *)&wc->async, NULL);
     uv_run(loop, UV_RUN_DEFAULT);
 
-    /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
     /*  uv_mutex_destroy(&wc->cmd_mutex); */
     //fatal_assert(0 == uv_loop_close(loop));

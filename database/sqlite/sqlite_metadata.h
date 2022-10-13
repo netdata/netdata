@@ -8,11 +8,11 @@
 
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
-#define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running Or last run did actual work
+#define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
 #define METADATA_MAINTENANCE_INTERVAL (3600)        // Repeat maintenance after latest successful
 
-#define METADATA_HOST_CHECK_FIRST_CHECK (30)        // Check host for pending metadata within 60 seconds
-#define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat host check every 60 seconds
+#define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
+#define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat check for pending metadata
 #define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
 
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
