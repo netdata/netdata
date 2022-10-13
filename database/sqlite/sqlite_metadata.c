@@ -594,7 +594,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
     uint32_t total_deleted= 0;
     uint64_t last_row_id = wc->row_id;
 
-    info("METADATA: Checking dimensions starting after row %lu", wc->row_id);
+    info("METADATA: Checking dimensions starting after row %"PRIu64, wc->row_id);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW && total_deleted < MAX_METADATA_CLEANUP) {
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
@@ -609,12 +609,12 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         total_checked++;
     }
     wc->row_id = last_row_id;
-    int64_t now = now_realtime_sec();
+    time_t now = now_realtime_sec();
     if (total_deleted > 0) {
         wc->check_metadata_after = now + METADATA_MAINTENANCE_RETRY;
     } else
         wc->row_id = 0;
-    info("METADATA: Checked %u, deleted %u -- will resume after row %lu in %ld seconds", total_checked, total_deleted, wc->row_id,
+    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %ld seconds", total_checked, total_deleted, wc->row_id,
          wc->check_metadata_after - now);
 
 skip_run:
@@ -948,7 +948,7 @@ static void metadata_event_loop(void *arg)
     wc->timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&wc->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
-    info("Starting metadata sync thread -- scratch area %d entries, %lu bytes", METADATA_CMD_Q_MAX_SIZE, sizeof(*wc));
+    info("Starting metadata sync thread with %d entries command queue", METADATA_CMD_Q_MAX_SIZE);
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
