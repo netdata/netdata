@@ -1182,3 +1182,10 @@ void add_aclk_host_labels(void) {
     rrdlabels_add(labels, "_aclk_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #endif
 }
+
+void aclk_queue_node_info(RRDHOST *host) {
+    struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+    if (likely(wc)) {
+        wc->node_info_send = 1;
+    }
+}

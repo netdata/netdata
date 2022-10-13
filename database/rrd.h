@@ -245,7 +245,7 @@ void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 void reload_host_labels(void);
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
 void rrdset_save_rrdlabels_to_sql(RRDSET *st);
-
+void rrdhost_set_is_parent_label(int count);
 int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h
@@ -934,6 +934,7 @@ struct rrdhost {
     time_t senders_connect_time;                    // the time the last sender was connected
     time_t senders_last_chart_command;              // the time of the last CHART streaming command
     time_t senders_disconnected_time;               // the time the last sender was disconnected
+    int senders_count;                              // number of senders currently streaming
 
     struct receiver_state *receiver;
     netdata_mutex_t receiver_lock;
