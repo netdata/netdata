@@ -269,6 +269,8 @@ if test "${enable_accept4}" != "no"; then
     AC_CHECK_FUNCS_ONCE(accept4)
 fi
 
+AC_CHECK_FUNCS_ONCE(malloc_usable_size)
+
 # -----------------------------------------------------------------------------
 # operating system detection
 
@@ -1528,6 +1530,30 @@ fi
 AC_SUBST([OPTIONAL_ATOMIC_LIBS])
 
 AC_LANG_POP([C++])
+
+# -----------------------------------------------------------------------------
+
+AC_MSG_CHECKING(whether we can use dlsym)
+OLD_LIBS="${LIBS}"
+LIBS="-ldl"
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+  #include <dlfcn.h>
+  static void *(*libc_malloc)(size_t);
+  int main() {
+    libc_malloc = dlsym(RTLD_NEXT, "malloc");
+  }
+]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
+LIBS="${OLD_LIBS}"
+AC_MSG_RESULT($CAN_USE_DLSYM)
+
+if test "x$CAN_USE_DLSYM" = xyes; then
+    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
+    OPTIONAL_DL_LIBS="-ldl"
+fi
+AC_SUBST([OPTIONAL_DL_LIBS])
+
+# -----------------------------------------------------------------------------
+
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 

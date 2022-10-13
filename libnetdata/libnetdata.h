@@ -15,9 +15,10 @@ extern "C" {
 #define NETDATA_INTERNAL_CHECKS 1
 #endif
 
-#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
-#define NETDATA_TRACE_ALLOCATIONS 1
-#endif
+// NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
+//#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
+//#define NETDATA_TRACE_ALLOCATIONS 1
+//#endif
 
 #define OS_LINUX   1
 #define OS_FREEBSD 2
@@ -312,12 +313,14 @@ int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data
 #define mallocz(size) mallocz_int(size, __FILE__, __FUNCTION__, __LINE__)
 #define reallocz(ptr, size) reallocz_int(ptr, size, __FILE__, __FUNCTION__, __LINE__)
 #define freez(ptr) freez_int(ptr, __FILE__, __FUNCTION__, __LINE__)
+#define mallocz_usable_size(ptr) mallocz_usable_size_int(ptr, __FILE__, __FUNCTION__, __LINE__)
 
 char *strdupz_int(const char *s, const char *file, const char *function, size_t line);
 void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line);
 void *mallocz_int(size_t size, const char *file, const char *function, size_t line);
 void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line);
 void freez_int(void *ptr, const char *file, const char *function, size_t line);
+size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
 char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
@@ -326,6 +329,8 @@ void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
 void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
 void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
+
+void posix_memfree(void *ptr);
 
 void json_escape_string(char *dst, const char *src, size_t size);
 void json_fix_string(char *s);

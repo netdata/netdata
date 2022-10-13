@@ -103,7 +103,7 @@ static int check_metadata_logfile_superblock(uv_file file)
         error("File has unknown version %"PRIu16". Compatibility is not guaranteed.", superblock->version);
     }
 error:
-    free(superblock);
+    posix_memfree(superblock);
     return ret;
 }
 

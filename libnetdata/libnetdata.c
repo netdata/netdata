@@ -34,6 +34,123 @@ const char *program_version = VERSION;
 #warning NETDATA_TRACE_ALLOCATIONS ENABLED
 #include "Judy.h"
 
+#ifdef HAVE_DLSYM
+#include <dlfcn.h>
+
+typedef void (*libc_function_t)(void);
+
+static void *malloc_first_run(size_t size);
+static void *(*libc_malloc)(size_t) = malloc_first_run;
+
+static void *calloc_first_run(size_t n, size_t size);
+static void *(*libc_calloc)(size_t, size_t) = calloc_first_run;
+
+static void *realloc_first_run(void *ptr, size_t size);
+static void *(*libc_realloc)(void *, size_t) = realloc_first_run;
+
+static void free_first_run(void *ptr);
+static void (*libc_free)(void *) = free_first_run;
+
+static char *strdup_first_run(const char *s);
+static char *(*libc_strdup)(const char *) = strdup_first_run;
+
+static size_t malloc_usable_size_first_run(void *ptr);
+#ifdef HAVE_MALLOC_USABLE_SIZE
+static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size_first_run;
+#else
+static size_t (*libc_malloc_usable_size)(void *) = NULL;
+#endif
+
+static void link_system_library_function(libc_function_t *func_pptr, const char *name, bool required) {
+    *func_pptr = dlsym(RTLD_NEXT, name);
+    if(!*func_pptr && required) {
+        fprintf(stderr, "FATAL: Cannot find system's %s() function.\n", name);
+        abort();
+    }
+}
+
+static void *malloc_first_run(size_t size) {
+    link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
+    return libc_malloc(size);
+}
+
+static void *calloc_first_run(size_t n, size_t size) {
+    link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
+    return libc_calloc(n, size);
+}
+
+static void *realloc_first_run(void *ptr, size_t size) {
+    link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
+    return libc_realloc(ptr, size);
+}
+
+static void free_first_run(void *ptr) {
+    link_system_library_function((libc_function_t *) &libc_free, "free", true);
+    libc_free(ptr);
+}
+
+static char *strdup_first_run(const char *s) {
+    link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
+    return libc_strdup(s);
+}
+
+static size_t malloc_usable_size_first_run(void *ptr) {
+    link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+
+    if(libc_malloc_usable_size)
+        return libc_malloc_usable_size(ptr);
+    else
+        return 0;
+}
+
+void *malloc(size_t size) {
+    return mallocz(size);
+}
+
+void *calloc(size_t n, size_t size) {
+    return callocz(n, size);
+}
+
+void *realloc(void *ptr, size_t size) {
+    return reallocz(ptr, size);
+}
+
+void *reallocarray(void *ptr, size_t n, size_t size) {
+    return reallocz(ptr, n * size);
+}
+
+void free(void *ptr) {
+    freez(ptr);
+}
+
+char *strdup(const char *s) {
+    return strdupz(s);
+}
+
+size_t malloc_usable_size(void *ptr) {
+    return mallocz_usable_size(ptr);
+}
+#else // !HAVE_DLSYM
+
+static void *(*libc_malloc)(size_t) = malloc;
+static void *(*libc_calloc)(size_t, size_t) = calloc;
+static void *(*libc_realloc)(void *, size_t) = realloc;
+static void (*libc_free)(void *) = free;
+static char *(*libc_strdup)(const char *) = strdup;
+
+#ifdef HAVE_MALLOC_USABLE_SIZE
+static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size;
+#else
+static size_t (*libc_malloc_usable_size)(void *) = NULL;
+#endif
+
+#endif // HAVE_DLSYM
+
+
+void posix_memfree(void *ptr) {
+    libc_free(ptr);
+}
+
 Word_t JudyMalloc(Word_t Words) {
     Word_t Addr;
 
@@ -57,7 +174,7 @@ void JudyFreeVirtual(void * PWord, Word_t Words) {
 
 #define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
 #define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
-#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - (size % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
+#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
 
 struct malloc_header_signature {
     uint32_t magic;
@@ -100,7 +217,7 @@ static struct malloc_trace *malloc_trace_find_or_create(const char *file, const 
 
     struct malloc_trace *t = (struct malloc_trace *)avl_search_lock(&malloc_trace_index, (avl_t *)&tmp);
     if(!t) {
-        t = calloc(1, sizeof(struct malloc_trace));
+        t = libc_calloc(1, sizeof(struct malloc_trace));
         if(!t) fatal("No memory");
         t->line = line;
         t->function = function;
@@ -140,7 +257,7 @@ void *mallocz_int(size_t size, const char *file, const char *function, size_t li
     size_t_atomic_count(add, p->allocations, 1);
     size_t_atomic_bytes(add, p->bytes, size);
 
-    struct malloc_header *t = (struct malloc_header *)malloc(malloc_header_size + size);
+    struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
@@ -162,7 +279,7 @@ void *callocz_int(size_t nmemb, size_t size, const char *file, const char *funct
     size_t_atomic_count(add, p->allocations, 1);
     size_t_atomic_bytes(add, p->bytes, size);
 
-    struct malloc_header *t = (struct malloc_header *)calloc(1, malloc_header_size + size);
+    struct malloc_header *t = (struct malloc_header *)libc_calloc(1, malloc_header_size + size);
     if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
@@ -184,7 +301,7 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
     size_t_atomic_count(add, p->allocations, 1);
     size_t_atomic_bytes(add, p->bytes, size);
 
-    struct malloc_header *t = (struct malloc_header *)malloc(malloc_header_size + size);
+    struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
@@ -216,7 +333,7 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
     if(!t)
-        return realloc(ptr, size);
+        return libc_realloc(ptr, size);
 
     if(t->signature.size == size) return ptr;
     size_t_atomic_count(add, t->signature.trace->free_calls, 1);
@@ -228,7 +345,7 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
     size_t_atomic_count(add, p->allocations, 1);
     size_t_atomic_bytes(add, p->bytes, size);
 
-    t = (struct malloc_header *)realloc(t, malloc_header_size + size);
+    t = (struct malloc_header *)libc_realloc(t, malloc_header_size + size);
     if (unlikely(!t)) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
@@ -242,12 +359,26 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
     return (void *)&t->data;
 }
 
+size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line) {
+    if(unlikely(!ptr)) return 0;
+
+    struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
+    if(!t) {
+        if(libc_malloc_usable_size)
+            return libc_malloc_usable_size(ptr);
+        else
+            return 0;
+    }
+
+    return t->signature.size;
+}
+
 void freez_int(void *ptr, const char *file, const char *function, size_t line) {
     if(unlikely(!ptr)) return;
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
     if(!t) {
-        free(ptr);
+        libc_free(ptr);
         return;
     }
 
@@ -260,7 +391,7 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
     memset(t, 0, malloc_header_size + t->signature.size);
 #endif
 
-    free(t);
+    libc_free(t);
 }
 #else
 
@@ -291,6 +422,10 @@ void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
     if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
+}
+
+void posix_memfree(void *ptr) {
+    free(ptr);
 }
 
 #endif

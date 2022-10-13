@@ -1317,6 +1317,12 @@ int main(int argc, char **argv) {
         i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
+
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        mallopt(M_PERTURB, 0x5A);
+        // mallopt(M_MXFAST, 0);
+#endif
 #endif
 
         // initialize the system clocks
