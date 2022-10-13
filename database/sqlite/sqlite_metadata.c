@@ -1036,7 +1036,7 @@ static void metadata_event_loop(void *arg)
                         st->entries);
 
                     if (unlikely(rc))
-                        error_report("Failed to store chart %s", string2str(rd->id));
+                        error_report("Failed to store chart %s", rrdset_id(st));
 
                     dictionary_acquired_item_release(st->rrdhost->rrdset_root_index, dict_item);
                     break;
@@ -1060,7 +1060,8 @@ static void metadata_event_loop(void *arg)
                         rd->algorithm);
 
                     if (unlikely(rc))
-                        error_report("Failed to store dimension %s", string2str(rd->id));
+                        error_report("Failed to store dimension %s", rrddim_id(rd));
+
                     dictionary_acquired_item_release(rd->rrdset->rrddim_root_index, dict_item);
                     break;
                 case METADATA_DEL_DIMENSION:
