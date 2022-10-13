@@ -594,7 +594,8 @@ detect_linux_svc_type() {
     found_types=''
 
     for t in ${LINUX_INIT_TYPES}; do
-      case "$("safe_check_${t}")" in
+      "check_${t}"
+      case "$?" in
         1) continue ;;
         0)
           SVC_TYPE="${t}"
