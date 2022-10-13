@@ -83,7 +83,7 @@ static inline void crc32set(void *crcp, uLong crc)
     *(uint32_t *)crcp = crc;
 }
 
-void print_page_cache_descr(struct rrdeng_page_descr *page_cache_descr);
+void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug);
 void print_page_descr(struct rrdeng_page_descr *descr);
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
 int open_file_for_io(char *path, int flags, uv_file *file, int direct);

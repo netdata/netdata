@@ -317,6 +317,10 @@ AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 AC_MSG_RESULT([Host OS: ${build_target}])
 
+# -----------------------------------------------------------------------------
+# backtrace
+
+AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backtrace availability])])
 
 # -----------------------------------------------------------------------------
 # pthreads

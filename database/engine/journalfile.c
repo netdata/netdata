@@ -311,20 +311,46 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             }
             continue;
         }
-        uint64_t start_time = jf_metric_data->descr[i].start_time;
-        uint64_t end_time = jf_metric_data->descr[i].end_time;
+        uint64_t start_time_ut = jf_metric_data->descr[i].start_time_ut;
+        uint64_t end_time_ut = jf_metric_data->descr[i].end_time_ut;
+        size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
+        time_t update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
 
-        if (unlikely(start_time > end_time)) {
-            error("Invalid page encountered, start time %"PRIu64" > end time %"PRIu64"", start_time , end_time);
+        if (unlikely(start_time_ut > end_time_ut)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut = end_time_ut;
             continue;
         }
 
-        if (unlikely(start_time == end_time)) {
-            size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
-            if (unlikely(entries > 1)) {
-                error("Invalid page encountered, start time %"PRIu64" = end time but %zu entries were found", start_time, entries);
-                continue;
-            }
+        if (unlikely(start_time_ut == end_time_ut && entries != 1)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if (unlikely(!entries)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if(entries > 1 && update_every_s == 0) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut = end_time_ut;
+
+            // let this be
+            // end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
         }
 
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
@@ -340,7 +366,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
             PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, temp_id, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(temp_id);
+            *PValue = page_index = create_page_index(temp_id, ctx);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
@@ -348,21 +374,32 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         descr = pg_cache_create_descr();
         descr->page_length = jf_metric_data->descr[i].page_length;
-        descr->start_time = start_time;
-        descr->end_time = end_time;
+        descr->start_time_ut = start_time_ut;
+        descr->end_time_ut = end_time_ut;
+        descr->update_every_s = (update_every_s > 0) ? (uint32_t)update_every_s : (page_index->latest_update_every_s);
         descr->id = &page_index->id;
         descr->extent = extent;
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
+
+        if(page_index->latest_time_ut == descr->end_time_ut)
+            page_index->latest_update_every_s = descr->update_every_s;
+
+        if(descr->update_every_s == 0)
+            fatal(
+                "DBENGINE: page descriptor update every is zero, end_time_ut = %llu, start_time_ut = %llu, entries = %zu",
+                (unsigned long long)end_time_ut, (unsigned long long)start_time_ut, entries);
     }
 
     extent->number_of_pages = valid_pages;
 
     if (likely(valid_pages))
         df_extent_insert(extent);
-    else
+    else {
         freez(extent);
+        ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter++;
+    }
 }
 
 /*

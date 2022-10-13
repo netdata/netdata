@@ -85,7 +85,6 @@ int find_uuid_type(uuid_t *uuid);
 
 void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
-RRDHOST *sql_create_host_by_uuid(char *guid);
 int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement);
 int execute_insert(sqlite3_stmt *res);
 void db_execute(const char *cmd);
@@ -94,7 +93,6 @@ void add_migrated_file(char *path, uint64_t file_size);
 void db_unlock(void);
 void db_lock(void);
 void delete_dimension_uuid(uuid_t *dimension_uuid);
-void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **param_list, RRDHOST *host, char *context, char *chart);
 void store_claim_id(uuid_t *host_id, uuid_t *claim_id);
 int update_node_id(uuid_t *host_id, uuid_t *node_id);
 int get_node_id(uuid_t *host_id, uuid_t *node_id);
@@ -104,7 +102,6 @@ struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
 int sql_set_dimension_option(uuid_t *dim_uuid, char *option);
 char *get_hostname_by_node_id(char *node_id);
-void free_temporary_host(RRDHOST *host);
 int init_database_batch(sqlite3 *database, int rebuild, int init_type, const char *batch[]);
 void migrate_localhost(uuid_t *host_uuid);
 void sql_store_host_system_info(uuid_t *host_id, const struct rrdhost_system_info *system_info);

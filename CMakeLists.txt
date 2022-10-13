@@ -9,31 +9,25 @@ project(netdata C CXX)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
+include(CheckFunctionExists)
+include(CheckLibraryExists)
+
 # default is "Debug"
 #set(CMAKE_BUILD_TYPE "Release")
 
 # set this to see the compilation commands
-# set(CMAKE_VERBOSE_MAKEFILE 1)
-
+#set(CMAKE_VERBOSE_MAKEFILE 1)
 
 # -----------------------------------------------------------------------------
 # Set compilation options according to build type
 
-IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
-    message(STATUS "building for: debugging")
+set(CMAKE_C_STANDARD 11)
 
-    ## unfortunately these produce errors
-    #include(CheckCXXCompilerFlag)
-    #CHECK_CXX_COMPILER_FLAG("-Wformat-signedness" CXX_FORMAT_SIGNEDNESS)
-    #CHECK_CXX_COMPILER_FLAG("-Werror=format-security" CXX_FORMAT_SECURITY)
-    #CHECK_CXX_COMPILER_FLAG("-fstack-protector-all" CXX_STACK_PROTECTOR)
-    set(CXX_FORMAT_SIGNEDNESS "-Wformat-signedness")
-    set(CXX_FORMAT_SECURITY "-Werror=format-security")
-    set(CXX_STACK_PROTECTOR "-fstack-protector-all")
-    set(CXX_FLAGS_DEBUG "-O0")
-    set(CMAKE_C_STANDARD 99)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR} ${CXX_FLAGS_DEBUG}")
+IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+    set(CXX_DEFAULT_CFLAGS "-O0 -g -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_DEV_MODE=1 -fstack-protector-all -fno-omit-frame-pointer")
+    message(STATUS "building for: debugging")
 ELSE()
+    set(CXX_DEFAULT_CFLAGS "-O2")
     message(STATUS "building for: release")
     cmake_policy(SET CMP0069 "NEW")
     include(CheckIPOSupported)
@@ -46,6 +40,7 @@ ELSE()
     ENDIF()
 ENDIF()
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -Wformat-signedness -Werror=format-security -Wunused-result ${CXX_DEFAULT_CFLAGS}")
 
 # -----------------------------------------------------------------------------
 # O/S Detection
@@ -71,6 +66,12 @@ set(GENERATED_CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(GENERATED_CONFIG_H ${GENERATED_CONFIG_H_DIR}/config.h)
 
 # -----------------------------------------------------------------------------
+# Math
+
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m)
+set(NETDATA_REQUIRED_DEFINES "-DSTORAGE_WITH_MATH=1 ${NETDATA_REQUIRED_DEFINES}")
+
+# -----------------------------------------------------------------------------
 # Detect libuuid
 
 pkg_check_modules(UUID REQUIRED uuid)
@@ -85,6 +86,7 @@ pkg_check_modules(ZLIB REQUIRED zlib)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
+# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DNETDATA_WITH_ZLIB=1")
 
 # -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O
@@ -101,6 +103,7 @@ pkg_check_modules(LIBLZ4 REQUIRED liblz4)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${LIBLZ4_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${LIBLZ4_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_DIRS})
+# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DENABLE_COMPRESSION=1")
 
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
@@ -114,6 +117,7 @@ pkg_check_modules(OPENSSL REQUIRED openssl)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${OPENSSL_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${OPENSSL_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
+# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DENABLE_HTTPS=1")
 
 # -----------------------------------------------------------------------------
 # JSON-C used to health
@@ -1023,7 +1027,11 @@ set(ML_FILES
     ml/ml-dummy.c
 )
 
+# -----------------------------------------------------------------------------
+# ML
+
 IF(ENABLE_ML)
+    message(STATUS "ML: enabled")
     list(APPEND ML_FILES
             ml/Config.h
             ml/Config.cc
@@ -1041,6 +1049,8 @@ IF(ENABLE_ML)
             ml/ml.cc
             ml/ml-private.h
     )
+ELSE()
+    message(STATUS "ML: disabled")
 ENDIF()
 
 set(NETDATA_FILES
@@ -1731,7 +1741,6 @@ if (HAVE_SYS_SYSMACROS_H)
 endif()
 
 if (CRYPTO_FOUND)
-    include(CheckLibraryExists)
     set(HAVE_CRYPTO True)
     FIND_LIBRARY(CRYPTO_LIBRARY_LOCATION NAMES crypto)
     check_library_exists(crypto X509_VERIFY_PARAM_set1_host ${CRYPTO_LIBRARY_LOCATION} HAVE_X509_VERIFY_PARAM_set1_host)
@@ -1762,5 +1771,24 @@ ELSE()
     SET(ALWAYS_UNUSED_MACRO "")
     SET(MAYBE_UNUSED_MACRO "")
 ENDIF()
+
+# -----------------------------------------------------------------------------
+
+check_library_exists(c clock_gettime "" HAVE_CLOCK_GETTIME)
+
+IF(NOT HAVE_CLOCK_GETTIME)
+    CHECK_LIBRARY_EXISTS(rt clock_gettime "" HAVE_CLOCK_GETTIME)
+ENDIF()
+
+IF(HAVE_CLOCK_GETTIME)
+    message("-- clock_gettime(): found")
+    set(NETDATA_REQUIRED_DEFINES "-DHAVE_CLOCK_GETTIME=1 ${NETDATA_REQUIRED_DEFINES}")
+ELSE()
+    message("-- clock_gettime(): not found")
+ENDIF()
+
+# -----------------------------------------------------------------------------
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${NETDATA_REQUIRED_DEFINES}")
+message("CFLAGS=\"${CMAKE_C_FLAGS}\"")
 
 configure_file(config.cmake.h.in config.h)

@@ -966,7 +966,7 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
 
     ops->tier = ops->plan.data[plan_id].tier;
     ops->tier_ptr = ops->rd->tiers[ops->tier];
-    ops->tier_ptr->query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before, ops->r->internal.tier_query_fetch);
+    ops->tier_ptr->query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before);
     ops->next_metric = ops->tier_ptr->query_ops.next_metric;
     ops->is_finished = ops->tier_ptr->query_ops.is_finished;
     ops->finalize = ops->tier_ptr->query_ops.finalize;
@@ -1156,6 +1156,10 @@ static inline void rrd2rrdr_do_dimension(
     , time_t after_wanted
     , time_t before_wanted
 ){
+//    bool debug_this = false;
+//    if(strcmp("user", string2str(rd->id)) == 0 && strcmp("system.cpu", string2str(rd->rrdset->id)) == 0)
+//        debug_this = true;
+
     time_t max_date = 0,
            min_date = 0;
 
@@ -1210,6 +1214,9 @@ static inline void rrd2rrdr_do_dimension(
                 new_point = QUERY_POINT_EMPTY;
                 new_point.start_time = last1_point.end_time;
                 new_point.end_time   = now_end_time;
+//
+//                if(debug_this) info("QUERY: is finished() returned true");
+//
                 break;
             }
 
@@ -1225,6 +1232,10 @@ static inline void rrd2rrdr_do_dimension(
                 new_point.anomaly    = sp.count ? (NETDATA_DOUBLE)sp.anomaly_count * 100.0 / (NETDATA_DOUBLE)sp.count : 0.0;
                 query_point_set_id(new_point, ops.db_total_points_read);
 
+//                if(debug_this)
+//                    info("QUERY: got point %zu, from time %ld to %ld   //   now from %ld to %ld   //   query from %ld to %ld",
+//                         new_point.id, new_point.start_time, new_point.end_time, now_start_time, now_end_time, after_wanted, before_wanted);
+//
                 // set the right value to the point we got
                 if(likely(!storage_point_is_unset(sp) && !storage_point_is_empty(sp))) {
 
@@ -1268,7 +1279,7 @@ static inline void rrd2rrdr_do_dimension(
 
             // check if the db is advancing the query
             if(unlikely(new_point.end_time <= last1_point.end_time)) {
-                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld time %ld, before the last point %zu end time %ld, now is %ld to %ld",
+                internal_error(true, "QUERY: next_metric(%s, %s) returned point %zu from %ld to %ld, before the last point %zu end time %ld, now is %ld to %ld",
                                rrdset_name(rd->rrdset), rrddim_name(rd), new_point.id, new_point.start_time, new_point.end_time,
                                last1_point.id, last1_point.end_time, now_start_time, now_end_time);
 
@@ -1466,7 +1477,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = rd->tiers[tr];
-        tmp->query_ops.init(tmp->db_metric_handle, &handle, after_wanted, before_wanted, TIER_QUERY_FETCH_AVERAGE);
+        tmp->query_ops.init(tmp->db_metric_handle, &handle, after_wanted, before_wanted);
 
         size_t points = 0;
 

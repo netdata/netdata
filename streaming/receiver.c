@@ -126,18 +126,15 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     return PARSER_RC_ERROR;
 }
 
-#define CLAIMED_ID_MIN_WORDS 3
 PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
     UNUSED(plugins_action);
 
-    int i;
     uuid_t uuid;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 
-    for (i = 0; words[i]; i++) ;
-    if (i != CLAIMED_ID_MIN_WORDS) {
-        error("Command CLAIMED_ID came malformed %d parameters are expected but %d received", CLAIMED_ID_MIN_WORDS - 1, i - 1);
+    if (!words[1] || !words[2]) {
+        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'", words[1]?words[1]:"[unset]", words[2]?words[2]:"[unset]");
         return PARSER_RC_ERROR;
     }
 

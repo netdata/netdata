@@ -1308,14 +1308,6 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         host = rrdhost_find_by_hostname(tok);
         if (!host)
             host = rrdhost_find_by_guid(tok);
-        if (!host) {
-            host = sql_create_host_by_uuid(tok);
-            if (likely(host)) {
-                int rc = web_client_process_url(host, w, url);
-                free_temporary_host(host);
-                return rc;
-            }
-        }
         if (host) return web_client_process_url(host, w, url);
     }
 
