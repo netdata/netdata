@@ -6,6 +6,51 @@
 #include "sqlite3.h"
 #include "sqlite_functions.h"
 
+// SQL statements
+
+#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
+    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
+    "on conflict(host_id) do update set claim_id = excluded.claim_id;"
+
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
+
+#define STORE_HOST_LABEL                                                                                               \
+    "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
+
+#define STORE_CHART_LABEL                                                                                              \
+    "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
+
+#define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
+
+#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
+
+#define SQL_STORE_HOST_INFO "INSERT OR REPLACE INTO host " \
+        "(host_id, hostname, registry_hostname, update_every, os, timezone," \
+        "tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, program_version," \
+        "entries, health_enabled) " \
+        "values (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, " \
+        "@abbrev_timezone, @utc_offset, @program_name, @program_version, " \
+        "@entries, @health_enabled);"
+
+#define SQL_STORE_CHART "insert or replace into chart (chart_id, host_id, type, id, " \
+    "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
+    "history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
+
+#define SQL_STORE_DIMENSION "INSERT OR REPLACE INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) " \
+        "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm);"
+
+#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
+
+#define STORE_HOST_INFO "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES "
+#define STORE_HOST_INFO_VALUES "(u2h('%s'), '%s','%s', unixepoch())"
+
+#define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
+    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0);"
+#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id;"
+#define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
+
+
+
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work

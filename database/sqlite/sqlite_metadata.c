@@ -6,7 +6,6 @@
 extern DICTIONARY *rrdhost_root_index;
 
 // Metadata functions
-#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 
 struct query_build {
     BUFFER *sql;
@@ -17,10 +16,10 @@ struct query_build {
 static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct query_build *lb = data;
     if (unlikely(!lb->count))
-        buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES ");
+        buffer_sprintf(lb->sql, STORE_HOST_LABEL);
     else
         buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, "(u2h('%s'), %d,'%s','%s', unixepoch())", lb->uuid_str, (int)ls & ~(RRDLABEL_FLAG_INTERNAL), name, value);
+    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, (int)ls & ~(RRDLABEL_FLAG_INTERNAL), name, value);
     lb->count++;
     return 1;
 }
@@ -28,10 +27,10 @@ static int host_label_store_to_sql_callback(const char *name, const char *value,
 static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct query_build *lb = data;
     if (unlikely(!lb->count))
-        buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");
+        buffer_sprintf(lb->sql, STORE_CHART_LABEL);
     else
         buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, "(u2h('%s'), %d,'%s','%s', unixepoch())", lb->uuid_str, ls, name, value);
+    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, ls, name, value);
     lb->count++;
     return 1;
 }
@@ -51,23 +50,18 @@ static void check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
     }
 }
 
-
 // Migrate all hosts with hops zero to this host_uuid
 void migrate_localhost(uuid_t *host_uuid)
 {
     int rc;
 
-    rc = exec_statement_with_uuid("UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0); ", host_uuid);
+    rc = exec_statement_with_uuid(MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID, host_uuid);
     if (!rc)
-        rc = exec_statement_with_uuid("DELETE FROM host WHERE hops = 0 AND host_id <> @host_id; ", host_uuid);
+        rc = exec_statement_with_uuid(DELETE_NON_EXISTING_LOCALHOST, host_uuid);
     if (!rc)
-        db_execute("DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);");
+        db_execute(DELETE_MISSING_NODE_INSTANCES);
 
 }
-
-#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
-    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
-    "on conflict(host_id) do update set claim_id = excluded.claim_id;"
 
 static void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
 {
@@ -110,7 +104,6 @@ failed:
         error_report("Failed to finalize the prepared statement when storing node instance information");
 }
 
-#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
 static void delete_dimension_uuid(uuid_t *dimension_uuid)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -140,14 +133,6 @@ skip_execution:
 
 //
 // Store host and host system info information in the database
-#define SQL_STORE_HOST_INFO "INSERT OR REPLACE INTO host " \
-        "(host_id, hostname, registry_hostname, update_every, os, timezone," \
-        "tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, program_version," \
-        "entries, health_enabled) " \
-        "values (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, " \
-        "@abbrev_timezone, @utc_offset, @program_name, @program_version, " \
-        "@entries, @health_enabled);"
-
 static int sql_store_host_info(RRDHOST *host)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -254,10 +239,10 @@ static void sql_store_host_system_info_key_value(const char *name, const char *v
 
     if (unlikely(!lb->count))
         buffer_sprintf(
-            lb->sql, "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES ");
+            lb->sql, STORE_HOST_INFO);
     else
         buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, "(u2h('%s'), '%s','%s', unixepoch())", lb->uuid_str, name, value);
+    buffer_sprintf(lb->sql, STORE_HOST_INFO_VALUES, lb->uuid_str, name, value);
     lb->count++;
 }
 
@@ -348,10 +333,6 @@ bind_fail:
 /*
  * Store a chart in the database
  */
-
-#define SQL_STORE_CHART "insert or replace into chart (chart_id, host_id, type, id, " \
-    "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
-    "history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
 
 static int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
@@ -480,9 +461,6 @@ bind_fail:
 /*
  * Store a dimension
  */
-
-#define SQL_STORE_DIMENSION "INSERT OR REPLACE INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) " \
-        "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm);"
 static int sql_store_dimension(
     uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
     collected_number divisor, int algorithm)
@@ -570,8 +548,6 @@ static bool dimension_can_be_deleted(uuid_t *dim_uuid)
     return false;
 #endif
 }
-
-#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
 
 static void check_dimension_metadata(struct metadata_wc *wc)
 {
