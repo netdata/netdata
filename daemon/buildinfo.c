@@ -197,6 +197,11 @@
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+#define FEAT_TRACE_ALLOC 1
+#else
+#define FEAT_TRACE_ALLOC 0
+#endif
 
 char *get_value_from_key(char *buffer, char *key) {
     char *s = NULL, *t = NULL;
@@ -298,6 +303,9 @@ void print_build_info(void) {
     printf("    GCP PubSub:              %s\n", FEAT_YES_NO(FEAT_PUBSUB));
     printf("    MongoDB:                 %s\n", FEAT_YES_NO(FEAT_MONGO));
     printf("    Prometheus Remote Write: %s\n", FEAT_YES_NO(FEAT_REMOTE_WRITE));
+
+    printf("Debug/Developer Features:\n");
+    printf("    Trace Allocations:       %s\n", FEAT_YES_NO(FEAT_TRACE_ALLOC));
 };
 
 #define FEAT_JSON_BOOL(x) ((x) ? "true" : "false")
@@ -354,6 +362,8 @@ void print_build_info_json(void) {
     printf("    \"mongodb\": %s,\n",          FEAT_JSON_BOOL(FEAT_MONGO));
     printf("    \"prom-remote-write\": %s\n", FEAT_JSON_BOOL(FEAT_REMOTE_WRITE));
     printf("  }\n");
+    printf("  \"debug-n-devel\": {\n");
+    printf("    \"trace-allocations\": %s\n  }\n",FEAT_JSON_BOOL(FEAT_TRACE_ALLOC));
     printf("}\n");
 };
 
@@ -453,5 +463,8 @@ void analytics_build_info(BUFFER *b) {
 #endif
 #ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
     add_to_bi(b, "Prometheus Remote Write");
+#endif
+#ifdef NETDATA_TRACE_ALLOCATIONS
+    add_to_bi(b, "DebugTraceAlloc");
 #endif
 }
