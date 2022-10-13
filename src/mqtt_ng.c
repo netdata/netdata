@@ -362,7 +362,7 @@ static void buffer_frag_free_data(struct buffer_fragment *frag)
     if ( frag->flags & BUFFER_FRAG_DATA_EXTERNAL && frag->data != NULL) {
         switch (ptr2memory_mode(frag->free_fnc)) {
             case MEMCPY:
-                free(frag->data);
+                mw_free(frag->data);
                 break;
             case EXTERNAL_FREE_AFTER_USE:
                 frag->free_fnc(frag->data);
@@ -498,7 +498,7 @@ static int transaction_buffer_grow(struct transaction_buffer *buf, mqtt_wss_log_
     if (buf->hdr_buffer.size > max)
         buf->hdr_buffer.size = max;
 
-    void *ret = realloc(buf->hdr_buffer.data, buf->hdr_buffer.size);
+    void *ret = mw_realloc(buf->hdr_buffer.data, buf->hdr_buffer.size);
     if (ret == NULL) {
         mws_warn(log_ctx, "Buffer growth failed (realloc)");
         return 1;
@@ -516,7 +516,7 @@ inline static int transaction_buffer_init(struct transaction_buffer *to_init, si
     pthread_mutex_init(&to_init->mutex, NULL);
 
     to_init->hdr_buffer.size = size;
-    to_init->hdr_buffer.data = malloc(size);
+    to_init->hdr_buffer.data = mw_malloc(size);
     if (to_init->hdr_buffer.data == NULL)
         return 1;
 
@@ -529,7 +529,7 @@ static void transaction_buffer_destroy(struct transaction_buffer *to_init)
 {
     buffer_purge(&to_init->hdr_buffer);
     pthread_mutex_destroy(&to_init->mutex);
-    free(to_init->hdr_buffer.data);
+    mw_free(to_init->hdr_buffer.data);
 }
 
 // Creates transaction
@@ -561,12 +561,12 @@ void transaction_buffer_transaction_rollback(struct transaction_buffer *buf, str
 
 struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 {
-    struct mqtt_ng_client *client = calloc(1, sizeof(struct mqtt_ng_client));
+    struct mqtt_ng_client *client = mw_calloc(1, sizeof(struct mqtt_ng_client));
     if (client == NULL)
         return NULL;
 
     if (transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE)) {
-        free(client);
+        mw_free(client);
         return NULL;
     }
 
@@ -592,7 +592,7 @@ static inline uint8_t get_control_packet_type(uint8_t first_hdr_byte)
 void mqtt_ng_destroy(struct mqtt_ng_client *client)
 {
     transaction_buffer_destroy(&client->main_buffer);
-    free(client);
+    mw_free(client);
 }
 
 int frag_set_external_data(mqtt_wss_log_ctx_t log, struct buffer_fragment *frag, void *data, size_t data_len, free_fnc_t data_free_fnc)
@@ -608,7 +608,7 @@ int frag_set_external_data(mqtt_wss_log_ctx_t log, struct buffer_fragment *frag,
 
     switch (ptr2memory_mode(data_free_fnc)) {
         case MEMCPY:
-            frag->data = malloc(data_len);
+            frag->data = mw_malloc(data_len);
             if (frag->data == NULL) {
                 mws_error(log, UNIT_LOG_PREFIX "OOM while malloc @_optimized_add");
                 return 1;
@@ -1342,7 +1342,7 @@ static int parse_suback_varhdr(struct mqtt_ng_client *client)
                 return rc;
             parser->mqtt_parsed_len += parser->properties_parser.bytes_consumed;
             suback->reason_code_count = parser->mqtt_fixed_hdr_remaining_length - parser->mqtt_parsed_len;
-            suback->reason_codes = calloc(suback->reason_code_count, sizeof(*suback->reason_codes));
+            suback->reason_codes = mw_calloc(suback->reason_code_count, sizeof(*suback->reason_codes));
             suback->reason_codes_pending = suback->reason_code_count;
             parser->varhdr_state = MQTT_PARSE_REASONCODES;
             /* FALLTHROUGH */
@@ -1375,7 +1375,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             publish->qos = ((parser->mqtt_control_packet_type >> 1) & 0x03);
             rbuf_pop(parser->received_data, (char*)&publish->topic_len, 2);
             publish->topic_len = be16toh(publish->topic_len);
-            publish->topic = calloc(1, publish->topic_len + 1 /* add 0x00 */);
+            publish->topic = mw_calloc(1, publish->topic_len + 1 /* add 0x00 */);
             if (publish->topic == NULL)
                 return MQTT_NG_CLIENT_OOM;
             parser->varhdr_state = MQTT_PARSE_VARHDR_PACKET_ID;
@@ -1409,7 +1409,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             /* FALLTHROUGH */
         case MQTT_PARSE_PAYLOAD:
             if (parser->mqtt_fixed_hdr_remaining_length < parser->mqtt_parsed_len) {
-                free(publish->topic);
+                mw_free(publish->topic);
                 publish->topic = NULL;
                 ERROR("Error parsing PUBLISH message");
                 return MQTT_NG_CLIENT_PROTOCOL_ERROR;
@@ -1421,9 +1421,9 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             }
             BUF_READ_CHECK_AT_LEAST(parser->received_data, publish->data_len);
 
-            publish->data = malloc(publish->data_len);
+            publish->data = mw_malloc(publish->data_len);
             if (publish->data == NULL) {
-                free(publish->topic);
+                mw_free(publish->topic);
                 publish->topic = NULL;
                 return MQTT_NG_CLIENT_OOM;
             }
@@ -1480,7 +1480,7 @@ static int parse_data(struct mqtt_ng_client *client)
                 case MQTT_CPT_SUBACK:
                     rc = parse_suback_varhdr(client);
                     if (rc != MQTT_NG_CLIENT_NEED_MORE_BYTES && rc != MQTT_NG_CLIENT_OK_CALL_AGAIN) {
-                        free(parser->mqtt_packet.suback.reason_codes);
+                        mw_free(parser->mqtt_packet.suback.reason_codes);
                     }
                     if (rc == MQTT_NG_CLIENT_PARSE_DONE) {
                         parser->state = MQTT_PARSE_MQTT_PACKET_DONE;
@@ -1695,8 +1695,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 #endif
                 pub = &client->parser.mqtt_packet.publish;
                 if (pub->qos > 1) {
-                    free(pub->topic);
-                    free(pub->data);
+                    mw_free(pub->topic);
+                    mw_free(pub->data);
                     return MQTT_NG_CLIENT_NOT_IMPL_YET;
                 }
                 if ( (rc = mqtt_ng_puback(client, pub->packet_id, 0)) ) {
@@ -1706,8 +1706,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 }
                 if (client->msg_callback)
                     client->msg_callback(pub->topic, pub->data, pub->data_len, pub->qos);
-                free(pub->topic);
-                free(pub->data);
+                mw_free(pub->topic);
+                mw_free(pub->data);
                 return MQTT_NG_CLIENT_WANT_WRITE;
             case MQTT_CPT_DISCONNECT:
                 INFO ("Got MQTT DISCONNECT control packet from server. Reason code: %d", (int)client->parser.mqtt_packet.disconnect.reason_code);

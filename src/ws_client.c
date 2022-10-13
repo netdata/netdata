@@ -53,7 +53,7 @@ ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log)
     if(!host)
         return NULL;
 
-    client = calloc(1, sizeof(ws_client));
+    client = mw_calloc(1, sizeof(ws_client));
     if (!client)
         return NULL;
 
@@ -87,7 +87,7 @@ cleanup_2:
 cleanup_1:
     rbuf_free(client->buf_read);
 cleanup:
-    free(client);
+    mw_free(client);
     return NULL;
 }
 
@@ -99,7 +99,7 @@ void ws_client_free_headers(ws_client *client)
     while (ptr) {
         tmp = ptr;
         ptr = ptr->next;
-        free(tmp);
+        mw_free(tmp);
     }
 
     client->hs.headers = NULL;
@@ -110,21 +110,21 @@ void ws_client_free_headers(ws_client *client)
 void ws_client_destroy(ws_client *client)
 {
     ws_client_free_headers(client);
-    free(client->hs.nonce_reply);
-    free(client->hs.http_reply_msg);
+    mw_free(client->hs.nonce_reply);
+    mw_free(client->hs.http_reply_msg);
     close(client->entropy_fd);
     rbuf_free(client->buf_read);
     rbuf_free(client->buf_write);
     rbuf_free(client->buf_to_mqtt);
-    free(client);
+    mw_free(client);
 }
 
 void ws_client_reset(ws_client *client)
 {
     ws_client_free_headers(client);
-    free(client->hs.nonce_reply);
+    mw_free(client->hs.nonce_reply);
     client->hs.nonce_reply = NULL;
-    free(client->hs.http_reply_msg);
+    mw_free(client->hs.http_reply_msg);
     client->hs.http_reply_msg = NULL;
     rbuf_flush(client->buf_read);
     rbuf_flush(client->buf_write);
@@ -238,8 +238,8 @@ int ws_client_start_handshake(ws_client *client)
 
     EVP_EncodeBlock((unsigned char *)nonce_b64, digest, md_len);
 
-    free(client->hs.nonce_reply);
-    client->hs.nonce_reply = strdup(nonce_b64);
+    mw_free(client->hs.nonce_reply);
+    client->hs.nonce_reply = mw_strdup(nonce_b64);
 
     OPENSSL_free(digest);
 
@@ -321,7 +321,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             }
             HTTP_HDR_LINE_CHECK_LIMIT(idx_crlf);
 
-            client->hs.http_reply_msg = malloc(idx_crlf+1);
+            client->hs.http_reply_msg = mw_malloc(idx_crlf+1);
             rbuf_pop(client->buf_read, client->hs.http_reply_msg, idx_crlf);
             client->hs.http_reply_msg[idx_crlf] = 0;
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
@@ -357,7 +357,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
-            struct http_header *hdr = calloc(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
+            struct http_header *hdr = mw_calloc(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
             hdr->key = ((char*)hdr) + sizeof(struct http_header);
             hdr->value = hdr->key + idx_sep + 1;
 
@@ -642,7 +642,7 @@ int ws_client_process_rx_ws(ws_client *client)
             break;
         case WS_PAYLOAD_CONNECTION_CLOSE_MSG:
             if (!client->rx.specific_data.op_close.reason)
-                client->rx.specific_data.op_close.reason = malloc(client->rx.payload_length + 1);
+                client->rx.specific_data.op_close.reason = mw_malloc(client->rx.payload_length + 1);
 
             while (client->rx.payload_processed < client->rx.payload_length) {
                 if (!rbuf_bytes_available(client->buf_read))
@@ -655,7 +655,7 @@ int ws_client_process_rx_ws(ws_client *client)
             INFO("WebSocket server closed the connection with EC=%d and reason \"%s\"",
                 client->rx.specific_data.op_close.ec,
                 client->rx.specific_data.op_close.reason);
-            free(client->rx.specific_data.op_close.reason);
+            mw_free(client->rx.specific_data.op_close.reason);
             client->rx.specific_data.op_close.reason = NULL;
             client->rx.parse_state = WS_PACKET_DONE;
             break;
@@ -672,7 +672,7 @@ int ws_client_process_rx_ws(ws_client *client)
                 return WS_CLIENT_INTERNAL_ERROR;
             }
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
-            client->rx.specific_data.ping_msg = malloc(client->rx.payload_length);
+            client->rx.specific_data.ping_msg = mw_malloc(client->rx.payload_length);
             rbuf_pop(client->buf_read, client->rx.specific_data.ping_msg, client->rx.payload_length);
             // TODO schedule this instead of sending right away
             // then attempt to send as soon as buffer space clears up

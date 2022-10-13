@@ -200,35 +200,35 @@ static void mqtt_rx_msg_callback(void **state, struct mqtt_response_publish *pub
 }
 
 void mqtt_c_client_destroy(struct mqtt_c_client *mqtt_c) {
-    free(mqtt_c->mqtt_recv_buf);
-    free(mqtt_c->mqtt_send_buf);
-    free(mqtt_c->mqtt_client);
-    free(mqtt_c);
+    mw_free(mqtt_c->mqtt_recv_buf);
+    mw_free(mqtt_c->mqtt_send_buf);
+    mw_free(mqtt_c->mqtt_client);
+    mw_free(mqtt_c);
 }
 
 #define MQTT_BUFFER_SIZE 1024*1024*3
 static int mqtt_c_init(mqtt_wss_client client, msg_callback_fnc_t msg_callback) {
     enum MQTTErrors ret;
-    client->mqtt.mqtt_c = calloc(1, sizeof(struct mqtt_c_client));
+    client->mqtt.mqtt_c = mw_calloc(1, sizeof(struct mqtt_c_client));
     if (!client->mqtt.mqtt_c)
         return 1;
 
     struct mqtt_c_client *mqtt_c = client->mqtt.mqtt_c;
 
-    mqtt_c->mqtt_client = calloc(1, sizeof(struct mqtt_client));
+    mqtt_c->mqtt_client = mw_calloc(1, sizeof(struct mqtt_client));
     if (!mqtt_c->mqtt_client) {
         mqtt_c_client_destroy(client->mqtt.mqtt_c);
         return 1;
     }
 
     mqtt_c->mqtt_send_buf_size = MQTT_BUFFER_SIZE;
-    mqtt_c->mqtt_send_buf = malloc(mqtt_c->mqtt_send_buf_size);
+    mqtt_c->mqtt_send_buf = mw_malloc(mqtt_c->mqtt_send_buf_size);
     if (!mqtt_c->mqtt_send_buf) {
         mqtt_c_client_destroy(client->mqtt.mqtt_c);
         return 1;
     }
     mqtt_c->mqtt_recv_buf_size = MQTT_BUFFER_SIZE;
-    mqtt_c->mqtt_recv_buf = malloc(mqtt_c->mqtt_recv_buf_size);
+    mqtt_c->mqtt_recv_buf = mw_malloc(mqtt_c->mqtt_recv_buf_size);
     if (!mqtt_c->mqtt_send_buf) {
         mqtt_c_client_destroy(client->mqtt.mqtt_c);
         return 1;
@@ -278,7 +278,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
     SSL_library_init();
     SSL_load_error_strings();
 
-    mqtt_wss_client client = calloc(1, sizeof(struct mqtt_wss_client_struct));
+    mqtt_wss_client client = mw_calloc(1, sizeof(struct mqtt_wss_client_struct));
     if (!client) {
         mws_error(log, "OOM alocating mqtt_wss_client");
         goto fail;
@@ -343,7 +343,7 @@ fail_3:
 fail_2:
     ws_client_destroy(client->ws_client);
 fail_1:
-    free(client);
+    mw_free(client);
 fail:
     mqtt_wss_log_ctx_destroy(log);
     return NULL;
@@ -374,11 +374,11 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     if (client->target_host == client->host)
         client->target_host = NULL;
     if (client->target_host)
-        free(client->target_host);
+        mw_free(client->target_host);
     if (client->host)
-        free(client->host);
-    free(client->proxy_passwd);
-    free(client->proxy_uname);
+        mw_free(client->host);
+    mw_free(client->proxy_passwd);
+    mw_free(client->proxy_uname);
 
     if (client->ssl)
         SSL_free(client->ssl);
@@ -393,7 +393,7 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     pthread_mutex_destroy(&client->stat_lock);
 
     mqtt_wss_log_ctx_destroy(client->log);
-    free(client);
+    mw_free(client);
 }
 
 static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
@@ -418,7 +418,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         mws_error(client->log, "verify error:num=%d:%s:depth=%d:%s", err,
                  X509_verify_cert_error_string(err), depth, err_str);
 
-        free(err_str);
+        mw_free(err_str);
     }
 
     if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT &&
@@ -479,14 +479,14 @@ static int http_parse_reply(mqtt_wss_client client, rbuf_t buf)
     }
 
     if (http_code != 200) {
-        ptr = malloc(idx + 1);
+        ptr = mw_malloc(idx + 1);
         if (!ptr)
             return 6;
         rbuf_pop(buf, ptr, idx);
         ptr[idx] = 0;
 
         mws_error(client->log, "http_proxy returned error code %d \"%s\"", http_code, ptr);
-        free(ptr);
+        mw_free(ptr);
         return 7;
     }/* else
         rbuf_bump_tail(buf, idx);*/
@@ -566,7 +566,7 @@ static int http_proxy_connect(mqtt_wss_client client)
 
     if (client->proxy_uname) {
         size_t creds_plain_len = strlen(client->proxy_uname) + strlen(client->proxy_passwd) + 2;
-        char *creds_plain = malloc(creds_plain_len);
+        char *creds_plain = mw_malloc(creds_plain_len);
         if (!creds_plain) {
             mws_error(client->log, "OOM creds_plain");
             rc = 6;
@@ -576,9 +576,9 @@ static int http_proxy_connect(mqtt_wss_client client)
         // OpenSSL encoder puts newline every 64 output bytes
         // we remove those but during encoding we need that space in the buffer
         creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
-        char *creds_base64 = malloc(creds_base64_len + 1);
+        char *creds_base64 = mw_malloc(creds_base64_len + 1);
         if (!creds_base64) {
-            free(creds_plain);
+            mw_free(creds_plain);
             mws_error(client->log, "OOM creds_base64");
             rc = 6;
             goto cleanup;
@@ -591,12 +591,12 @@ static int http_proxy_connect(mqtt_wss_client client)
 
         int b64_len;
         base64_encode_helper((unsigned char*)creds_base64, &b64_len, (unsigned char*)creds_plain, strlen(creds_plain));
-        free(creds_plain);
+        mw_free(creds_plain);
 
         r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
         snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"Proxy-Authorization: Basic %s" HTTP_ENDLINE, creds_base64);
         write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
-        free(creds_base64);
+        mw_free(creds_base64);
     }
     write(client->sockfd, HTTP_ENDLINE, strlen(HTTP_ENDLINE));
 
@@ -646,7 +646,7 @@ static int mqtt_wss_grow_mqtt_buf(uint8_t **buffer, size_t *buffer_size, size_t 
     if (new_size == *buffer_size)
         return 0;
 
-    uint8_t *new_ptr = realloc(*buffer, new_size);
+    uint8_t *new_ptr = mw_realloc(*buffer, new_size);
     if (!new_ptr)
         return -1;
 
@@ -679,22 +679,22 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     if (client->target_host == client->host)
         client->target_host = NULL;
     if (client->target_host)
-        free(client->target_host);
+        mw_free(client->target_host);
     if (client->host)
-        free(client->host);
+        mw_free(client->host);
 
     if (proxy && proxy->type != MQTT_WSS_DIRECT) {
-        client->host = strdup(proxy->host);
+        client->host = mw_strdup(proxy->host);
         client->port = proxy->port;
-        client->target_host = strdup(host);
+        client->target_host = mw_strdup(host);
         client->target_port = port;
         client->proxy_type = proxy->type;
         if (proxy->username)
-            client->proxy_uname = strdup(proxy->username);
+            client->proxy_uname = mw_strdup(proxy->username);
         if (proxy->password)
-            client->proxy_passwd = strdup(proxy->password);
+            client->proxy_passwd = mw_strdup(proxy->password);
     } else {
-        client->host = strdup(host);
+        client->host = mw_strdup(host);
         client->port = port;
         client->target_host = client->host;
         client->target_port = port;
