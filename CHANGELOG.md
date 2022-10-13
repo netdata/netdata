@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin v0.40.4 [\#13808](https://github.com/netdata/netdata/pull/13808) ([ilyam8](https://github.com/ilyam8))
 - fix post-processing of contexts [\#13807](https://github.com/netdata/netdata/pull/13807) ([ktsaou](https://github.com/ktsaou))
 - Merge netstat, snmp, and snmp6 modules [\#13806](https://github.com/netdata/netdata/pull/13806) ([vlvkobal](https://github.com/vlvkobal))
 - fix warning when -Wfree-nonheap-object is used [\#13805](https://github.com/netdata/netdata/pull/13805) ([underhood](https://github.com/underhood))
@@ -345,9 +346,6 @@
 - Add an option to use malloc for page cache instead of mmap [\#13142](https://github.com/netdata/netdata/pull/13142) ([stelfrag](https://github.com/stelfrag))
 - Add mem.available chart to FreeBSD [\#13140](https://github.com/netdata/netdata/pull/13140) ([MrZammler](https://github.com/MrZammler))
 - fix crashes due to misaligned allocations [\#13137](https://github.com/netdata/netdata/pull/13137) ([ktsaou](https://github.com/ktsaou))
-- fix\(python.d\): urllib3 import collection for py3.10+ [\#13136](https://github.com/netdata/netdata/pull/13136) ([ilyam8](https://github.com/ilyam8))
-- fix\(python.d/mongodb\): set `serverSelectionTimeoutMS` for pymongo4+ [\#13135](https://github.com/netdata/netdata/pull/13135) ([ilyam8](https://github.com/ilyam8))
-- Use new mqtt implementation as default [\#13132](https://github.com/netdata/netdata/pull/13132) ([underhood](https://github.com/underhood))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
