@@ -11,6 +11,9 @@
  */
 void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system)
 {
+    if (!global_statistics_enabled)
+        return;
+        
     if (*st_rusage && *rd_user && *rd_system)
         return;
 
@@ -31,6 +34,9 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
  */
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
 {
+    if (!global_statistics_enabled)
+        return;
+
     struct rusage thread;
     getrusage(RUSAGE_THREAD, &thread);
 
@@ -52,6 +58,9 @@ void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
  */
 void send_internal_metrics(struct instance *instance)
 {
+    if (!global_statistics_enabled)
+        return;
+
     struct stats *stats = &instance->stats;
 
     // ------------------------------------------------------------------------

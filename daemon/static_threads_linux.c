@@ -46,15 +46,45 @@ const struct netdata_static_thread static_threads_linux[] = {
         .start_routine = cgroups_main
     },
 
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    // terminator
+    {
+        .name = NULL,
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    }
 };
 
 const struct netdata_static_thread static_threads_freebsd[] = {
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    // terminator
+    {
+        .name = NULL,
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    }
 };
 
 const struct netdata_static_thread static_threads_macos[] = {
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    // terminator
+    {
+        .name = NULL,
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    }
 };
 
 struct netdata_static_thread *static_threads_get() {

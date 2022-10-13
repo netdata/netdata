@@ -22,9 +22,16 @@ static netdata_idx_t *mount_values = NULL;
 
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
-struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
-                                              NULL, NULL, 1, NULL,
-                                              NULL,  NULL};
+struct netdata_static_thread mount_thread = {
+                                 .name = "MOUNT KERNEL",
+                                 .config_section = NULL,
+                                 .config_name = NULL,
+                                 .env_name = NULL,
+                                 .enabled = 1,
+                                 .thread = NULL,
+                                 .init_routine = NULL,
+                                 .start_routine = NULL
+};
 
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},

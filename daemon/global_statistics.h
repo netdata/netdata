@@ -21,4 +21,6 @@ void finished_web_request_statistics(uint64_t dt,
 uint64_t web_client_connected(void);
 void web_client_disconnected(void);
 
+extern bool global_statistics_enabled;
+
 #endif /* NETDATA_GLOBAL_STATISTICS_H */

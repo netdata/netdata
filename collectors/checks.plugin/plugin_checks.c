@@ -12,6 +12,9 @@ static void checks_main_cleanup(void *ptr) {
 }
 
 void *checks_main(void *ptr) {
+    if (!global_statistics_enabled)
+        return NULL;
+
     netdata_thread_cleanup_push(checks_main_cleanup, ptr);
 
     usec_t usec = 0, susec = localhost->rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;

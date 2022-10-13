@@ -35,9 +35,16 @@ static avl_tree_lock mdflush_pub;
 // tmp store for mdflush values we get from a per-CPU eBPF map.
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 
-static struct netdata_static_thread mdflush_threads = {"MDFLUSH KERNEL",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, NULL };
+static struct netdata_static_thread mdflush_threads = {
+                                        .name = "MDFLUSH KERNEL",
+                                        .config_section = NULL,
+                                        .config_name = NULL,
+                                        .env_name = NULL,
+                                        .enabled = 1,
+                                        .thread = NULL,
+                                        .init_routine = NULL,
+                                        .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_mdflush_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**

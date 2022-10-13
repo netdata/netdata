@@ -17,6 +17,8 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
 #endif
 
+bool global_statistics_enabled = true;
+
 static struct global_statistics {
     volatile uint16_t connected_clients;
 

@@ -54,9 +54,16 @@ static softirq_val_t softirq_vals[] = {
 // tmp store for soft IRQ values we get from a per-CPU eBPF map.
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
-static struct netdata_static_thread softirq_threads = {"SOFTIRQ KERNEL",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, NULL };
+static struct netdata_static_thread softirq_threads = {
+    .name = "SOFTIRQ KERNEL",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 /**
