@@ -198,11 +198,10 @@ time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
     return mock_type(time_t);
 }
 
-void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
 {
     (void)db_metric_handle;
     (void)handle;
-    (void)tier_query_fetch_type;
 
     function_called();
     check_expected(start_time);
