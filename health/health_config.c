@@ -1163,7 +1163,7 @@ void sql_refresh_hashes(void)
 }
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
-    if(unlikely(!host->health_enabled)) {
+    if(unlikely(!host->health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
         debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;
     }

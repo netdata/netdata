@@ -952,7 +952,6 @@ struct rrdhost {
     volatile bool health_spawn;                    // true when health thread is running
     netdata_thread_t health_thread;                // the health thread
     unsigned int aclk_alert_reloaded;              // 1 on thread start and health reload, 0 after removed are sent
-    bool health_initialized;                       // health config/alarm log loaded
     time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
     STRING *health_default_exec;                   // the full path of the alarms notifications program
     STRING *health_default_recipient;              // the default recipient for all alarms

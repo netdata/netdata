@@ -146,7 +146,7 @@ static void health_silencers_init(void) {
  * @param host the structure of the host that the function will reload the configuration.
  */
 static void health_reload_host(RRDHOST *host) {
-    if(unlikely(!host->health_enabled))
+    if(unlikely(!host->health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
         return;
 
     log_health("[%s]: Reloading health.", rrdhost_hostname(host));
@@ -906,10 +906,6 @@ void *health_main(void *ptr) {
             marked_aclk_reload_loop = loop;
 #endif
 
-        if (unlikely(!host->health_enabled)) {
-            health_thread_stop(host);
-        }
-
         if (unlikely(apply_hibernation_delay)) {
             log_health(
                        "[%s]: Postponing health checks for %"PRId64" seconds.",
@@ -930,6 +926,10 @@ void *health_main(void *ptr) {
 
             log_health("[%s]: Resuming health checks after delay.", rrdhost_hostname(host));
             host->health_delay_up_to = 0;
+        }
+
+        if (unlikely(!host->health_enabled)) {
+            health_thread_stop(host);
         }
 
         // wait until cleanup of obsolete charts on children is complete
