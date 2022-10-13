@@ -581,6 +581,7 @@ void *diskspace_slow_worker(void *ptr)
 }
 
 static void diskspace_main_cleanup(void *ptr) {
+    rrd_collector_finished();
     worker_unregister();
 
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -611,6 +612,8 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_MOUNTINFO, "mountinfo");
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
+
+    rrd_collector_started();
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 

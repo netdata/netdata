@@ -4,13 +4,19 @@ install_debian_like() {
   # This is needed to ensure package installs don't prompt for any user input.
   export DEBIAN_FRONTEND=noninteractive
 
+  if apt-cache show netcat 2>&1 | grep -q "No packages found"; then
+    netcat="netcat-traditional"
+  else
+    netcat="netcat"
+  fi
+
   apt-get update
 
   # Install Netdata
   apt-get install -y /netdata/artifacts/netdata_"${VERSION}"*_*.deb || exit 1
 
   # Install testing tools
-  apt-get install -y --no-install-recommends curl netcat jq || exit 1
+  apt-get install -y --no-install-recommends curl "${netcat}" jq || exit 1
 }
 
 install_fedora_like() {

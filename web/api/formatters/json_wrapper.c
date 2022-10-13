@@ -175,6 +175,25 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         buffer_strcat(wb, "],\n");
     }
 
+    // functions
+    {
+        DICTIONARY *funcs = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+        for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
+            chart_functions_to_dict(rd->rrdset, funcs);
+        }
+
+        buffer_sprintf(wb, "   %sfunctions%s: [", kq, kq);
+        void *t; (void)t;
+        dfe_start_read(funcs, t) {
+            const char *comma = "";
+            if(t_dfe.counter) comma = ", ";
+            buffer_sprintf(wb, "%s%s%s%s", comma, sq, t_dfe.name, sq);
+        }
+        dfe_done(t);
+        dictionary_destroy(funcs);
+        buffer_strcat(wb, "],\n");
+    }
+
     // Composite charts
     if (context_mode && temp_rd) {
         buffer_sprintf(

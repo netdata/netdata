@@ -25,58 +25,65 @@ extern size_t page_type_size[];
 #define PAGE_POINT_SIZE_BYTES(x) page_type_size[(x)->type]
 
 struct rrdeng_region_info {
-    time_t start_time;
+    time_t start_time_s;
     int update_every;
     unsigned points;
 };
 
-extern void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr);
-extern void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
+void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr);
+void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
                                Word_t page_correlation_id);
-extern void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle);
-extern void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time, void **handle);
-extern void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle);
+void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle);
+void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time_ut, void **handle);
+void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle);
 
-extern void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret_uuid);
-extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid,
+void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
+void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid,
                                                     uuid_t *ret_uuid);
 
 
-extern STORAGE_METRIC_HANDLE *rrdeng_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
-extern void rrdeng_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg);
+STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id, STORAGE_METRICS_GROUP *smg);
+void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
 
-extern STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle);
-extern void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
-extern void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE n,
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every);
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut, NETDATA_DOUBLE n,
                                      NETDATA_DOUBLE min_value,
                                      NETDATA_DOUBLE max_value,
                                      uint16_t count,
                                      uint16_t anomaly_count,
                                      SN_FLAGS flags);
-extern int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
-extern unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
+unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time_s, time_t end_time_s,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 
-extern void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
-                                    time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
-extern STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle);
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
+                                    time_t start_time_s, time_t end_time_s);
+STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle);
 
-extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
-extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
-extern time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-extern time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 
-extern void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
+int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
+void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
+time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+
+void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */
-extern int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
                        unsigned disk_space_mb, int tier);
 
-extern int rrdeng_exit(struct rrdengine_instance *ctx);
-extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
-extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t, int tier);
-extern int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
+int rrdeng_exit(struct rrdengine_instance *ctx);
+void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
+int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
+
+extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
 
 typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
@@ -134,6 +141,6 @@ typedef struct rrdengine_size_statistics {
     double average_page_size_bytes;
 } RRDENG_SIZE_STATS;
 
-extern RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
+RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

@@ -4,13 +4,13 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-
-from time import sleep, time
+import os
 
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import safe_print
 from bases.loggers import PythonDLimitedLogger
 from third_party.monotonic import monotonic
+from time import sleep, time
 
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
@@ -18,6 +18,8 @@ RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
 
 PENALTY_EVERY = 5
 MAX_PENALTY = 10 * 60  # 10 minutes
+
+ND_INTERNAL_MONITORING_DISABLED = os.getenv("NETDATA_INTERNALS_MONITORING") == "NO"
 
 
 class RuntimeCounters:
@@ -209,9 +211,10 @@ class SimpleService(PythonDLimitedLogger, object):
                 job.elapsed = int((monotonic() - job.start_mono) * 1e3)
                 job.prev_update = job.start_real
                 job.retries, job.penalty = 0, 0
-                safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
-                                                       since_last=since,
-                                                       elapsed=job.elapsed))
+                if not ND_INTERNAL_MONITORING_DISABLED:
+                    safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
+                                                           since_last=since,
+                                                           elapsed=job.elapsed))
             self.debug('update => [{status}] (elapsed time: {elapsed}, failed retries in a row: {retries})'.format(
                 status='OK' if updated else 'FAILED',
                 elapsed=job.elapsed if updated else '-',

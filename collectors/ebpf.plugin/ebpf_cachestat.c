@@ -15,9 +15,14 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
-struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
-                                                  NULL, NULL, 1, NULL,
-                                                  NULL,  NULL};
+struct netdata_static_thread cachestat_threads = {.name = "CACHESTAT KERNEL",
+                                                  .config_section = NULL,
+                                                  .config_name = NULL,
+                                                  .env_name = NULL,
+                                                  .enabled = 1,
+                                                  .thread = NULL,
+                                                  .init_routine = NULL,
+                                                  .start_routine = NULL};
 
 ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
                                               .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,

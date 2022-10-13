@@ -10,8 +10,16 @@ static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_ID
 
 static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
 
-struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
-                                              NULL, NULL,  NULL};
+struct netdata_static_thread sync_threads = {
+    .name = "SYNC KERNEL",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
 
 static ebpf_local_maps_t sync_maps[] = {{.name = "tbl_sync", .internal_input = NETDATA_SYNC_END,
                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,

@@ -127,15 +127,15 @@ typedef struct rrdresult {
 #define rrdr_rows(r) ((r)->rows)
 
 #include "database/rrd.h"
-extern void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
-extern RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt);
+void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
+RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt);
+RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt);
 
-extern int rrdr_relative_window_to_absolute(long long *after, long long *before);
+int rrdr_relative_window_to_absolute(long long *after, long long *before);
 
 #ifdef __cplusplus
 }

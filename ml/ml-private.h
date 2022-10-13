@@ -3,7 +3,7 @@
 #ifndef ML_PRIVATE_H
 #define ML_PRIVATE_H
 
-#include "kmeans/KMeans.h"
+#include "KMeans.h"
 #include "ml/ml.h"
 
 #include <chrono>

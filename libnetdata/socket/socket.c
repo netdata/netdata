@@ -779,6 +779,10 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         char *path = host + 5;
         return connect_to_unix(path, timeout);
     }
+    else if(*host == '/') {
+        char *path = host;
+        return connect_to_unix(path, timeout);
+    }
 
     char *e = host;
     if(*e == '[') {
@@ -826,41 +830,92 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout);
 }
 
-int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
-    int sock = -1;
-
+void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data) {
     const char *s = destination;
     while(*s) {
         const char *e = s;
-
-        // skip path, moving both s(tart) and e(nd)
-        if(*e == '/')
-            while(!isspace(*e) && *e != ',') s = ++e;
 
         // skip separators, moving both s(tart) and e(nd)
         while(isspace(*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
+        while(*e && !isspace(*e) && *e != ',') e++;
 
         // is there anything?
         if(!*s || s == e) break;
 
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
-        if(reconnects_counter) *reconnects_counter += 1;
-        sock = connect_to_this(buf, default_port, timeout);
-        if(sock != -1) {
-            if(connected_to && connected_to_size) {
-                strncpy(connected_to, buf, connected_to_size);
-                connected_to[connected_to_size - 1] = '\0';
-            }
-            break;
-        }
+
+        if(callback(buf, data)) break;
+
         s = e;
     }
+}
 
-    return sock;
+struct connect_to_one_of_data {
+    int default_port;
+    struct timeval *timeout;
+    size_t *reconnects_counter;
+    char *connected_to;
+    size_t connected_to_size;
+    int sock;
+};
+
+static bool connect_to_one_of_callback(char *entry, void *data) {
+    struct connect_to_one_of_data *t = data;
+
+    if(t->reconnects_counter)
+        t->reconnects_counter++;
+
+    t->sock = connect_to_this(entry, t->default_port, t->timeout);
+    if(t->sock != -1) {
+        if(t->connected_to && t->connected_to_size) {
+            strncpyz(t->connected_to, entry, t->connected_to_size);
+            t->connected_to[t->connected_to_size - 1] = '\0';
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+    struct connect_to_one_of_data t = {
+        .default_port = default_port,
+        .timeout = timeout,
+        .reconnects_counter = reconnects_counter,
+        .connected_to = connected_to,
+        .connected_to_size = connected_to_size,
+        .sock = -1,
+    };
+
+    foreach_entry_in_connection_string(destination, connect_to_one_of_callback, &t);
+
+    return t.sock;
+}
+
+static bool connect_to_one_of_urls_callback(char *entry, void *data) {
+    char *s = strchr(entry, '/');
+    if(s) *s = '\0';
+
+    return connect_to_one_of_callback(entry, data);
+}
+
+int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+    struct connect_to_one_of_data t = {
+        .default_port = default_port,
+        .timeout = timeout,
+        .reconnects_counter = reconnects_counter,
+        .connected_to = connected_to,
+        .connected_to_size = connected_to_size,
+        .sock = -1,
+    };
+
+    foreach_entry_in_connection_string(destination, connect_to_one_of_urls_callback, &t);
+
+    return t.sock;
 }
 
 
@@ -1087,12 +1142,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
-            strncpyz(client_ip, "UNKNOWN", ipsize - 1);
-            strncpyz(client_port, "UNKNOWN", portsize - 1);
+            strncpyz(client_ip, "UNKNOWN", ipsize);
+            strncpyz(client_port, "UNKNOWN", portsize);
         }
         if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
-            strncpy(client_ip, "localhost", ipsize);
-            client_ip[ipsize - 1] = '\0';
+            strncpyz(client_ip, "localhost", ipsize);
         }
 
 #ifdef __FreeBSD__
@@ -1107,8 +1161,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             case AF_UNIX:
                 debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
                 // set the port - certain versions of libc return garbage on unix sockets
-                strncpy(client_port, "UNIX", portsize);
-                client_port[portsize - 1] = '\0';
+                strncpyz(client_port, "UNIX", portsize);
                 break;
 
             case AF_INET:

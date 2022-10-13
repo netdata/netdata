@@ -214,7 +214,7 @@ void graphite_http_prepare_header(struct instance *instance)
         "\r\n",
         instance->config.destination,
         simple_connector_data->auth_string ? simple_connector_data->auth_string : "",
-        buffer_strlen(simple_connector_data->last_buffer->buffer));
+        (unsigned long int) buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;
 }

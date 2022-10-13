@@ -46,8 +46,8 @@ struct rrdeng_extent_page_descr {
 
     uint8_t uuid[UUID_SZ];
     uint32_t page_length;
-    uint64_t start_time;
-    uint64_t end_time;
+    uint64_t start_time_ut;
+    uint64_t end_time_ut;
 } __attribute__ ((packed));
 
 /*

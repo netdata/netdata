@@ -2,14 +2,14 @@
 
 #ifdef ENABLE_HTTPS
 
-SSL_CTX *netdata_exporting_ctx=NULL;
-SSL_CTX *netdata_client_ctx=NULL;
-SSL_CTX *netdata_srv_ctx=NULL;
-const char *security_key=NULL;
-const char *security_cert=NULL;
+SSL_CTX *netdata_ssl_exporting_ctx =NULL;
+SSL_CTX *netdata_ssl_client_ctx =NULL;
+SSL_CTX *netdata_ssl_srv_ctx =NULL;
+const char *netdata_ssl_security_key =NULL;
+const char *netdata_ssl_security_cert =NULL;
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
-int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
+int netdata_ssl_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 /**
  * Info Callback
@@ -161,7 +161,7 @@ static SSL_CTX * security_initialize_openssl_server() {
         return NULL;
     }
 
-    SSL_CTX_use_certificate_file(ctx, security_cert, SSL_FILETYPE_PEM);
+    SSL_CTX_use_certificate_file(ctx, netdata_ssl_security_cert, SSL_FILETYPE_PEM);
 #else
     ctx = SSL_CTX_new(TLS_server_method());
     if (!ctx) {
@@ -169,11 +169,11 @@ static SSL_CTX * security_initialize_openssl_server() {
         return NULL;
     }
 
-    SSL_CTX_use_certificate_chain_file(ctx, security_cert);
+    SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
 #endif
     security_openssl_common_options(ctx, 0);
 
-    SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx, netdata_ssl_security_key,SSL_FILETYPE_PEM);
 
     if (!SSL_CTX_check_private_key(ctx)) {
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
@@ -207,24 +207,25 @@ void security_start_ssl(int selector) {
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
             struct stat statbuf;
-            if (stat(security_key, &statbuf) || stat(security_cert, &statbuf)) {
+            if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf)) {
                 info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 return;
             }
 
-            netdata_srv_ctx =  security_initialize_openssl_server();
-            SSL_CTX_set_mode(netdata_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+            netdata_ssl_srv_ctx =  security_initialize_openssl_server();
+            SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
             break;
         }
         case NETDATA_SSL_CONTEXT_STREAMING: {
-            netdata_client_ctx = security_initialize_openssl_client();
+            netdata_ssl_client_ctx = security_initialize_openssl_client();
             //This is necessary for the stream, because it is working sometimes with nonblock socket.
             //It returns the bitmask after to change, there is not any description of errors in the documentation
-            SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
+            SSL_CTX_set_mode(
+                netdata_ssl_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }
         case NETDATA_SSL_CONTEXT_EXPORTING: {
-            netdata_exporting_ctx = security_initialize_openssl_client();
+            netdata_ssl_exporting_ctx = security_initialize_openssl_client();
             break;
         }
     }
@@ -237,16 +238,16 @@ void security_start_ssl(int selector) {
  */
 void security_clean_openssl()
 {
-    if (netdata_srv_ctx) {
-        SSL_CTX_free(netdata_srv_ctx);
+    if (netdata_ssl_srv_ctx) {
+        SSL_CTX_free(netdata_ssl_srv_ctx);
     }
 
-    if (netdata_client_ctx) {
-        SSL_CTX_free(netdata_client_ctx);
+    if (netdata_ssl_client_ctx) {
+        SSL_CTX_free(netdata_ssl_client_ctx);
     }
 
-    if (netdata_exporting_ctx) {
-        SSL_CTX_free(netdata_exporting_ctx);
+    if (netdata_ssl_exporting_ctx) {
+        SSL_CTX_free(netdata_ssl_exporting_ctx);
     }
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
@@ -355,7 +356,7 @@ int security_test_certificate(SSL *ssl) {
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
+int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     struct stat statbuf;
     if (stat(file, &statbuf)) {
         info("Netdata does not have the parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");

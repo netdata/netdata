@@ -5,8 +5,8 @@
 #include "../libnetdata.h"
 
 typedef struct arrayalloc {
-    size_t element_size;
-    size_t elements;
+    size_t requested_element_size;
+    size_t initial_elements;
     const char *filename;
     char **cache_dir;
     bool use_mmap;
@@ -23,13 +23,26 @@ typedef struct arrayalloc {
         size_t allocation_multiplier;
         size_t max_alloc_size;
         netdata_mutex_t mutex;
-        struct arrayalloc_page *first_page;
-        struct arrayalloc_page *last_page;
+        struct arrayalloc_page *pages;
     } internal;
 } ARAL;
 
-extern ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir);
-extern void *arrayalloc_mallocz(ARAL *ar);
-extern void arrayalloc_freez(ARAL *ar, void *ptr);
+ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap);
+int aral_unittest(size_t elements);
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+
+#define arrayalloc_mallocz(ar) arrayalloc_mallocz_int(ar, __FILE__, __FUNCTION__, __LINE__)
+#define arrayalloc_freez(ar, ptr) arrayalloc_freez_int(ar, ptr, __FILE__, __FUNCTION__, __LINE__)
+
+void *arrayalloc_mallocz_int(ARAL *ar, const char *file, const char *function, size_t line);
+void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *function, size_t line);
+
+#else // NETDATA_TRACE_ALLOCATIONS
+
+void *arrayalloc_mallocz(ARAL *ar);
+void arrayalloc_freez(ARAL *ar, void *ptr);
+
+#endif // NETDATA_TRACE_ALLOCATIONS
 
 #endif // ARRAYALLOC_H

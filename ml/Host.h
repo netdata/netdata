@@ -3,12 +3,11 @@
 #ifndef ML_HOST_H
 #define ML_HOST_H
 
-#include "BitRateWindow.h"
 #include "Config.h"
-#include "Database.h"
 #include "Dimension.h"
 
 #include "ml-private.h"
+#include "json/single_include/nlohmann/json.hpp"
 
 namespace ml {
 
@@ -42,6 +41,10 @@ public:
         char S[UUID_STR_LEN];
         uuid_unparse_lower(RH->host_uuid, S);
         return S;
+    }
+
+    RRDSET *getAnomalyRateRS() const {
+        return AnomalyRateRS;
     }
 
     void addDimension(Dimension *D);
@@ -78,6 +81,8 @@ public:
         memcpy(RU, &ResourceUsage, sizeof(struct rusage));
     }
 
+    void getModelsAsJson(nlohmann::json &Json);
+
 private:
     std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
     void trainDimension(Dimension *D, const TimePoint &NowTP);
@@ -93,16 +98,6 @@ public:
     void startAnomalyDetectionThreads();
     void stopAnomalyDetectionThreads();
 
-    template<typename ...ArgTypes>
-    bool getAnomalyInfo(ArgTypes&&... Args) {
-        return DB.getAnomalyInfo(Args...);
-    }
-
-    template<typename ...ArgTypes>
-    bool getAnomaliesInRange(ArgTypes&&... Args) {
-        return DB.getAnomaliesInRange(Args...);
-    }
-
     void getDetectionInfoAsJson(nlohmann::json &Json) const;
 
 private:
@@ -113,14 +108,7 @@ private:
     std::thread TrainingThread;
     std::thread DetectionThread;
 
-    BitRateWindow BRW{
-        static_cast<size_t>(Cfg.ADMinWindowSize),
-        static_cast<size_t>(Cfg.ADMaxWindowSize),
-        static_cast<size_t>(Cfg.ADIdleWindowSize),
-        static_cast<size_t>(Cfg.ADMinWindowSize * Cfg.ADWindowRateThreshold)
-    };
-
-    CalculatedNumber WindowAnomalyRate{0.0};
+    CalculatedNumber HostAnomalyRate{0.0};
 
     size_t NumAnomalousDimensions{0};
     size_t NumNormalDimensions{0};
@@ -128,8 +116,6 @@ private:
     size_t NumActiveDimensions{0};
 
     unsigned AnomalyRateTimer{0};
-
-    Database DB{Cfg.AnomalyDBPath};
 };
 
 using Host = DetectableHost;

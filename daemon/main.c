@@ -55,13 +55,17 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
-        for(int tier = 0; tier < storage_tiers ; tier++)
-            rrdeng_prepare_exit(multidb_ctx[tier]);
+        if(dbengine_enabled) {
+            for (int tier = 0; tier < storage_tiers; tier++)
+                rrdeng_prepare_exit(multidb_ctx[tier]);
+        }
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
-        for(int tier = 0; tier < storage_tiers ; tier++)
-            rrdeng_exit(multidb_ctx[tier]);
+        if(dbengine_enabled) {
+            for (int tier = 0; tier < storage_tiers; tier++)
+                rrdeng_exit(multidb_ctx[tier]);
+        }
 #endif
     }
     sql_close_context_database();
@@ -255,7 +259,8 @@ void cancel_main_threads() {
 
     for (i = 0; static_threads[i].name != NULL ; i++)
         freez(static_threads[i].thread);
-    free(static_threads);
+
+    freez(static_threads);
 }
 
 struct option_def option_definitions[] = {
@@ -379,10 +384,10 @@ int help(int exitcode) {
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+    netdata_ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    netdata_ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
@@ -736,12 +741,6 @@ static void get_netdata_configured_variables() {
     }
 
     // --------------------------------------------------------------------
-    // rrdcontext
-
-    rrdcontext_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "rrdcontexts", rrdcontext_enabled);
-
-
-    // --------------------------------------------------------------------
     // get various system parameters
 
     get_system_HZ();
@@ -801,12 +800,13 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     info("Executing %s", script);
 
-    FILE *fp = mypopen(script, &command_pid);
-    if(fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if(fp_child_output) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -827,7 +827,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        mypclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
     return 0;
@@ -987,7 +987,6 @@ int main(int argc, char **argv) {
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
-                            rrdcontext_enabled = CONFIG_BOOLEAN_NO;
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
@@ -1006,6 +1005,8 @@ int main(int argc, char **argv) {
                             if(test_sqlite()) return 1;
                             if(string_unittest(10000)) return 1;
                             if (dictionary_unittest(10000))
+                                return 1;
+                            if(aral_unittest(10000))
                                 return 1;
                             if (rrdlabels_unittest())
                                 return 1;
@@ -1028,6 +1029,9 @@ int main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             return dictionary_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "araltest") == 0) {
+                            return aral_unittest(10000);
                         }
                         else if(strcmp(optarg, "stringtest") == 0) {
                             return string_unittest(10000);
@@ -1288,11 +1292,17 @@ int main(int argc, char **argv) {
     }
 #endif
 
+
     if(!config_loaded)
     {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
         load_cloud_conf(0);
+    }
+
+    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
+    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
     }
 
 
@@ -1307,6 +1317,12 @@ int main(int argc, char **argv) {
         i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
+
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        mallopt(M_PERTURB, 0x5A);
+        // mallopt(M_MXFAST, 0);
+#endif
 #endif
 
         // initialize the system clocks
@@ -1405,8 +1421,13 @@ int main(int argc, char **argv) {
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
-        }
 
+            if(st->env_name)
+                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+
+            if(st->global_variable)
+                *st->global_variable = (st->enabled) ? true : false;
+        }
 
         // --------------------------------------------------------------------
         // create the listening sockets

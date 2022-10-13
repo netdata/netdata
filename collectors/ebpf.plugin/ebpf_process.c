@@ -46,6 +46,7 @@ ebpf_process_stat_t **global_process_stats = NULL;
 ebpf_process_publish_apps_t **current_apps_data = NULL;
 
 int process_enabled = 0;
+bool publish_internal_metrics = true;
 
 struct config process_config = { .first_section = NULL,
     .last_section = NULL,
@@ -53,8 +54,16 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
-                                                    1, NULL, NULL,  NULL};
+static struct netdata_static_thread cgroup_thread = {
+                                        .name = "EBPF CGROUP",
+                                        .config_section = NULL,
+                                        .config_name = NULL,
+                                        .env_name = NULL,
+                                        .enabled = 1,
+                                        .thread = NULL,
+                                        .init_routine = NULL,
+                                        .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
@@ -493,6 +502,21 @@ static inline void ebpf_create_statistic_load_chart(ebpf_module_t *em)
 }
 
 /**
+ * Update Internal Metric variable
+ *
+ * By default eBPF.plugin sends internal metrics for netdata, but user can
+ * disable this.
+ *
+ * The function updates the variable used to send charts.
+ */
+static void update_internal_metric_variable()
+{
+    const char *s = getenv("NETDATA_INTERNALS_MONITORING");
+    if (s && *s && strcmp(s, "NO") == 0)
+        publish_internal_metrics = false;
+}
+
+/**
  * Create Statistics Charts
  *
  * Create charts that will show statistics related to eBPF plugin.
@@ -501,6 +525,10 @@ static inline void ebpf_create_statistic_load_chart(ebpf_module_t *em)
  */
 static void ebpf_create_statistic_charts(ebpf_module_t *em)
 {
+    update_internal_metric_variable();
+    if (!publish_internal_metrics)
+        return;
+
     ebpf_create_statistic_thread_chart(em);
 
     ebpf_create_statistic_load_chart(em);
@@ -1071,6 +1099,9 @@ void ebpf_process_update_cgroup_algorithm()
  */
 void ebpf_send_statistic_data()
 {
+    if (!publish_internal_metrics)
+        return;
+
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
     write_chart_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_TOTAL], (long long)plugin_statistics.threads);
     write_chart_dimension(threads_stat[NETDATA_EBPF_THREAD_STAT_RUNNING], (long long)plugin_statistics.running);

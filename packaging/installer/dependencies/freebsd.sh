@@ -18,7 +18,6 @@ package_tree="
   cmake
   curl
   gzip
-  netcat
   lzlib
   e2fsprogs-libuuid
   json-c

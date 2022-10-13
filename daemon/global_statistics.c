@@ -11,10 +11,13 @@
 #define WORKER_JOB_HEARTBEAT          4
 #define WORKER_JOB_STRINGS            5
 #define WORKER_JOB_DICTIONARIES       6
+#define WORKER_JOB_MALLOC_TRACE       7
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 7
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
 #endif
+
+bool global_statistics_enabled = true;
 
 static struct global_statistics {
     volatile uint16_t connected_clients;
@@ -1571,6 +1574,153 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     }
 }
 
+#ifdef NETDATA_TRACE_ALLOCATIONS
+
+struct memory_trace_data {
+    RRDSET *st_memory;
+    RRDSET *st_allocations;
+    RRDSET *st_avg_alloc;
+    RRDSET *st_ops;
+};
+
+static int do_memory_trace_item(void *item, void *data) {
+    struct memory_trace_data *tmp = data;
+    struct malloc_trace *p = item;
+
+    // ------------------------------------------------------------------------
+
+    if(!p->rd_bytes)
+        p->rd_bytes = rrddim_add(tmp->st_memory, p->function, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    collected_number bytes = (collected_number)__atomic_load_n(&p->bytes, __ATOMIC_RELAXED);
+    rrddim_set_by_pointer(tmp->st_memory, p->rd_bytes, bytes);
+
+    // ------------------------------------------------------------------------
+
+    if(!p->rd_allocations)
+        p->rd_allocations = rrddim_add(tmp->st_allocations, p->function, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    collected_number allocs = (collected_number)__atomic_load_n(&p->allocations, __ATOMIC_RELAXED);
+    rrddim_set_by_pointer(tmp->st_allocations, p->rd_allocations, allocs);
+
+    // ------------------------------------------------------------------------
+
+    if(!p->rd_avg_alloc)
+        p->rd_avg_alloc = rrddim_add(tmp->st_avg_alloc, p->function, NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+
+    collected_number avg_alloc = (allocs)?(bytes * 100 / allocs):0;
+    rrddim_set_by_pointer(tmp->st_avg_alloc, p->rd_avg_alloc, avg_alloc);
+
+    // ------------------------------------------------------------------------
+
+    if(!p->rd_ops)
+        p->rd_ops = rrddim_add(tmp->st_ops, p->function, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    collected_number ops = 0;
+    ops += (collected_number)__atomic_load_n(&p->malloc_calls, __ATOMIC_RELAXED);
+    ops += (collected_number)__atomic_load_n(&p->calloc_calls, __ATOMIC_RELAXED);
+    ops += (collected_number)__atomic_load_n(&p->realloc_calls, __ATOMIC_RELAXED);
+    ops += (collected_number)__atomic_load_n(&p->strdup_calls, __ATOMIC_RELAXED);
+    ops += (collected_number)__atomic_load_n(&p->free_calls, __ATOMIC_RELAXED);
+    rrddim_set_by_pointer(tmp->st_ops, p->rd_ops, ops);
+
+    // ------------------------------------------------------------------------
+
+    return 1;
+}
+static void malloc_trace_statistics(void) {
+    static struct memory_trace_data tmp = {
+        .st_memory = NULL,
+        .st_allocations = NULL,
+        .st_avg_alloc = NULL,
+        .st_ops = NULL,
+    };
+
+    if(!tmp.st_memory) {
+        tmp.st_memory = rrdset_create_localhost(
+            "netdata"
+            , "memory_size"
+            , NULL
+            , "memory"
+            , "netdata.memory.size"
+            , "Netdata Memory Used by Function"
+            , "bytes"
+            , "netdata"
+            , "stats"
+            , 900000
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+        );
+    }
+    else
+        rrdset_next(tmp.st_memory);
+
+    if(!tmp.st_ops) {
+        tmp.st_ops = rrdset_create_localhost(
+            "netdata"
+            , "memory_operations"
+            , NULL
+            , "memory"
+            , "netdata.memory.operations"
+            , "Netdata Memory Operations by Function"
+            , "ops/s"
+            , "netdata"
+            , "stats"
+            , 900001
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE
+        );
+    }
+    else
+        rrdset_next(tmp.st_ops);
+
+    if(!tmp.st_allocations) {
+        tmp.st_allocations = rrdset_create_localhost(
+            "netdata"
+            , "memory_allocations"
+            , NULL
+            , "memory"
+            , "netdata.memory.allocations"
+            , "Netdata Memory Allocations by Function"
+            , "allocations"
+            , "netdata"
+            , "stats"
+            , 900002
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+        );
+    }
+    else
+        rrdset_next(tmp.st_allocations);
+
+    if(!tmp.st_avg_alloc) {
+        tmp.st_avg_alloc = rrdset_create_localhost(
+            "netdata"
+            , "memory_avg_alloc"
+            , NULL
+            , "memory"
+            , "netdata.memory.avg_alloc"
+            , "Netdata Average Allocation Size by Function"
+            , "bytes"
+            , "netdata"
+            , "stats"
+            , 900003
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE
+        );
+    }
+    else
+        rrdset_next(tmp.st_avg_alloc);
+
+    malloc_trace_walkthrough(do_memory_trace_item, &tmp);
+
+    rrdset_done(tmp.st_memory);
+    rrdset_done(tmp.st_ops);
+    rrdset_done(tmp.st_allocations);
+    rrdset_done(tmp.st_avg_alloc);
+}
+#endif
+
 static void dictionary_statistics(void) {
     for(int i = 0; dictionary_categories[i].stats ;i++) {
         update_dictionary_category_charts(&dictionary_categories[i]);
@@ -2375,6 +2525,7 @@ void *global_statistics_main(void *ptr)
     worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
     worker_register_job_name(WORKER_JOB_STRINGS, "strings");
     worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
+    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
 
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
@@ -2404,8 +2555,10 @@ void *global_statistics_main(void *ptr)
         worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
 
-        worker_is_busy(WORKER_JOB_DBENGINE);
-        dbengine_statistics_charts();
+        if(dbengine_enabled) {
+            worker_is_busy(WORKER_JOB_DBENGINE);
+            dbengine_statistics_charts();
+        }
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);
         update_heartbeat_charts();
@@ -2415,6 +2568,11 @@ void *global_statistics_main(void *ptr)
 
         worker_is_busy(WORKER_JOB_DICTIONARIES);
         dictionary_statistics();
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        worker_is_busy(WORKER_JOB_MALLOC_TRACE);
+        malloc_trace_statistics();
+#endif
     }
 
     netdata_thread_cleanup_pop(1);

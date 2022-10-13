@@ -79,7 +79,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     static RRDSET **st_nodezonetype = NULL;
 
     // Local temp variables
-    size_t l, o, p;
+    long unsigned int l, o, p;
     struct pageline *pgl = NULL;
 
     // --------------------------------------------------------------------
@@ -149,7 +149,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         pageorders_cnt -= 9;
 
         if (pageorders_cnt > MAX_PAGETYPE_ORDER) {
-            error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d", pageorders_cnt, MAX_PAGETYPE_ORDER);
+            error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d",
+                  (long unsigned int) pageorders_cnt, MAX_PAGETYPE_ORDER);
             return 1;
         }
 
@@ -157,7 +158,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         if (!pagelines) {
             pagelines = callocz(pagelines_cnt, sizeof(struct pageline));
             if (!pagelines) {
-                error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B", pagelines_cnt, sizeof(struct pageline));
+                error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B",
+                      (long unsigned int) pagelines_cnt, (long unsigned int) sizeof(struct pageline));
                 return 1;
             }
         }
@@ -289,7 +291,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         size_t words = procfile_linewords(ff, l);
 
         if (words != 7+pageorders_cnt) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu", l+1, words, 7+pageorders_cnt);
+            error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu",
+                  l+1, (long unsigned int) words, (long unsigned int) 7+pageorders_cnt);
             break;
         }
 

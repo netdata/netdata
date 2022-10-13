@@ -196,7 +196,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     }
 
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )) {
+    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
         if( sock_delnonblock(w->ifd) < 0 ){
             error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
         }
@@ -218,7 +218,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         //The next two ifs are not together because I am reusing SSL structure
         if (!w->ssl.conn)
         {
-            w->ssl.conn = SSL_new(netdata_srv_ctx);
+            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
             if ( w->ssl.conn ) {
                 SSL_set_accept_state(w->ssl.conn);
             } else {

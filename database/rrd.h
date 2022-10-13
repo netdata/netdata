@@ -11,6 +11,7 @@ extern "C" {
 // to enable type checking at compile time
 typedef struct storage_instance STORAGE_INSTANCE;
 typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
+typedef struct storage_alignment STORAGE_METRICS_GROUP;
 
 // forward typedefs
 typedef struct rrdhost RRDHOST;
@@ -56,6 +57,7 @@ struct pg_cache_page_index;
 #include "sqlite/sqlite_health.h"
 #include "rrdcontext.h"
 
+extern bool dbengine_enabled;
 extern int storage_tiers;
 extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
@@ -136,8 +138,8 @@ typedef enum rrd_memory_mode {
 
 extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
-extern const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
-extern RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
+RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 
 
 // ----------------------------------------------------------------------------
@@ -157,17 +159,17 @@ typedef enum rrd_algorithm {
 #define RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
 #define RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
 
-extern RRD_ALGORITHM rrd_algorithm_id(const char *name);
-extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
+RRD_ALGORITHM rrd_algorithm_id(const char *name);
+const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 // ----------------------------------------------------------------------------
 // RRD FAMILY
 
-extern const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
-extern void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
-extern void rrdfamily_index_init(RRDHOST *host);
-extern void rrdfamily_index_destroy(RRDHOST *host);
-extern DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
+const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
+void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
+void rrdfamily_index_init(RRDHOST *host);
+void rrdfamily_index_destroy(RRDHOST *host);
+DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 
 
 // ----------------------------------------------------------------------------
@@ -182,20 +184,21 @@ typedef enum rrddim_options {
     // this is 8-bit
 } RRDDIM_OPTIONS;
 
-#define rrddim_option_check(rd, flag) ((rd)->flags & (flag))
-#define rrddim_option_set(rd, flag)   (rd)->flags |= (flag)
-#define rrddim_option_clear(rd, flag) (rd)->flags &= ~(flag)
+#define rrddim_option_check(rd, option) ((rd)->options & (option))
+#define rrddim_option_set(rd, option)   (rd)->options |= (option)
+#define rrddim_option_clear(rd, option) (rd)->options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
+    RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
+
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
     RRDDIM_FLAG_ACLK                            = (1 << 4),
 
-    RRDDIM_FLAG_PENDING_FOREACH_ALARMS          = (1 << 5), // set when foreach alarm has not been initialized yet
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 
     // this is 8 bit
@@ -220,36 +223,37 @@ typedef enum rrdlabel_source {
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT)
 
-extern DICTIONARY *rrdlabels_create(void);
-extern void rrdlabels_destroy(DICTIONARY *labels_dict);
-extern void rrdlabels_flush(DICTIONARY *labels_dict);
-extern void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
-extern void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
-extern void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
-extern void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key);
+size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length);
 
-extern void rrdlabels_unmark_all(DICTIONARY *labels);
-extern void rrdlabels_remove_all_unmarked(DICTIONARY *labels);
+DICTIONARY *rrdlabels_create(void);
+void rrdlabels_destroy(DICTIONARY *labels_dict);
+void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
+void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
+void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
+void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key);
 
-extern int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
-extern int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+void rrdlabels_unmark_all(DICTIONARY *labels);
+void rrdlabels_remove_all_unmarked(DICTIONARY *labels);
 
-extern void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
-extern bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
-extern bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
-extern int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
 
-extern void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
-extern void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
+void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
+bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
+bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
+int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+
+void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
+void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
 
 void reload_host_labels(void);
-extern void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
-extern void rrdset_save_rrdlabels_to_sql(RRDSET *st);
+void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
+void rrdset_save_rrdlabels_to_sql(RRDSET *st);
 
-extern int rrdlabels_unittest(void);
+int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h
-extern bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
+bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -330,20 +334,20 @@ struct rrddim {
 #define rrddim_name(rd) string2str((rd) ->name)
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
-extern const char *rrddim_cache_filename(RRDDIM *rd);
+const char *rrddim_cache_filename(RRDDIM *rd);
 
 // updated the header with the latest RRDDIM value, for memory mode MAP and SAVE
-extern void rrddim_memory_file_update(RRDDIM *rd);
+void rrddim_memory_file_update(RRDDIM *rd);
 
 // free the memory file structures for memory mode MAP and SAVE
-extern void rrddim_memory_file_free(RRDDIM *rd);
+void rrddim_memory_file_free(RRDDIM *rd);
 
-extern bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
+bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
 
 // return the v019 header size of RRDDIM files
-extern size_t rrddim_memory_file_header_size(void);
+size_t rrddim_memory_file_header_size(void);
 
-extern void rrddim_memory_file_save(RRDDIM *rd);
+void rrddim_memory_file_save(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -357,8 +361,8 @@ typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 // iterator state for RRD dimension data queries
 struct rrddim_query_handle {
     RRDDIM *rd;
-    time_t start_time;
-    time_t end_time;
+    time_t start_time_s;
+    time_t end_time_s;
     STORAGE_QUERY_HANDLE* handle;
 };
 
@@ -402,7 +406,7 @@ typedef struct storage_point {
 // function pointers that handle data collection
 struct rrddim_collect_ops {
     // an initialization function to run before starting collection
-    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle);
+    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every);
 
     // run this to store each metric into the database
     void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
@@ -414,12 +418,17 @@ struct rrddim_collect_ops {
     // a finalization function to run after collection is over
     // returns 1 if it's safe to delete the dimension
     int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
+
+    void (*change_collection_frequency)(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+
+    STORAGE_METRICS_GROUP *(*metrics_group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+    void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
 };
 
 // function pointers that handle database queries
 struct rrddim_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
     STORAGE_POINT (*next_metric)(struct rrddim_query_handle *handle);
@@ -453,7 +462,7 @@ struct rrddim_tier {
     struct rrddim_query_ops query_ops;
 };
 
-extern void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -496,13 +505,12 @@ typedef enum rrdset_flags {
                                                      // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
-    RRDSET_FLAG_ACLK                    = (1 << 16),
-    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
 
     RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 22),
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -553,14 +561,13 @@ struct rrdset {
     RRDSET_FLAGS flags;                             // flags
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
 
-    uuid_t hash_uuid;                               // hash_id for syncing with cloud
-                                                    // TODO - obsolete now - cleanup
-
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
                                                     // TODO - use the global - all charts have the same value
+
+    STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -587,6 +594,8 @@ struct rrdset {
     total_number last_collected_total;              // used internally to calculate percentages
 
     size_t rrdlabels_last_saved_version;
+
+    DICTIONARY *functions_view;                     // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
@@ -663,7 +672,7 @@ struct rrdset {
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
 #define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
 
-extern STRING *rrd_string_strdupz(const char *s);
+STRING *rrd_string_strdupz(const char *s);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -683,11 +692,13 @@ extern STRING *rrd_string_strdupz(const char *s);
 #define rrdset_number_of_dimensions(st) \
     dictionary_entries((st)->rrddim_root_index)
 
-extern void rrdset_memory_file_save(RRDSET *st);
-extern void rrdset_memory_file_free(RRDSET *st);
-extern void rrdset_memory_file_update(RRDSET *st);
-extern const char *rrdset_cache_filename(RRDSET *st);
-extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
+void rrdset_memory_file_save(RRDSET *st);
+void rrdset_memory_file_free(RRDSET *st);
+void rrdset_memory_file_update(RRDSET *st);
+const char *rrdset_cache_filename(RRDSET *st);
+bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
+
+#include "rrdfunctions.h"
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags
@@ -696,23 +707,30 @@ extern bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_FLAG_ORPHAN                         = (1 << 0), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS         = (1 << 1), // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST             = (1 << 2), // delete the entire host when orphan
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 3), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 4), // don't send it to external databases
-    RRDHOST_FLAG_ARCHIVED                       = (1 << 5), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_PENDING_FOREACH_ALARMS         = (1 << 7), // contains dims with uninitialized foreach alarms
-    RRDHOST_FLAG_STREAM_LABELS_UPDATE           = (1 << 8),
-    RRDHOST_FLAG_STREAM_LABELS_STOP             = (1 << 9),
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 10), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_INDEXED_MACHINE_GUID           = (1 << 11), // when set, we have indexed its machine guid
-    RRDHOST_FLAG_INDEXED_HOSTNAME               = (1 << 12), // when set, we have indexed its hostname
-    RRDHOST_FLAG_STREAM_COLLECTED_METRICS       = (1 << 13), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 14), // the host has initialized health structures
-    RRDHOST_FLAG_INITIALIZED_RRDPUSH            = (1 << 15), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 16), // the host has pending chart obsoletions
-    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 17), // the host has pending dimension obsoletions
+    // Orphan, Archived and Obsolete flags
+    RRDHOST_FLAG_ORPHAN                         = (1 << 10), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_ARCHIVED                       = (1 << 11), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 12), // the host has pending chart obsoletions
+    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 13), // the host has pending dimension obsoletions
+
+    // Streaming sender
+    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 14), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 15), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 16), // When set, the host is connected to a parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 17), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 18), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_RRDPUSH_SENDER_JOIN            = (1 << 19), // When set, we want to join the sender thread
+
+    // Health
+    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 20), // contains charts and dims with uninitialized variables
+    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 21), // the host has initialized health structures
+
+    // Exporting
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 22), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 23), // don't send it to external databases
+
+    // ACLK
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -725,6 +743,27 @@ typedef enum rrdhost_flags {
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
+
+typedef enum {
+    // Indexing
+    RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
+    RRDHOST_OPTION_INDEXED_HOSTNAME         = (1 << 1), // when set, we have indexed its hostname
+
+    // Streaming configuration
+    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 2), // set when the host is configured to send metrics to a parent
+
+    // Configuration options
+    RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS   = (1 << 3), // delete files of obsolete charts
+    RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
+} RRDHOST_OPTIONS;
+
+#define rrdhost_option_check(host, flag) ((host)->options & (flag))
+#define rrdhost_option_set(host, flag)   (host)->options |= flag
+#define rrdhost_option_clear(host, flag) (host)->options &= ~(flag)
+
+#define rrdhost_has_rrdpush_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
+
+#define rrdhost_can_send_definitions_to_parent(host) (rrdhost_has_rrdpush_sender_enabled(host) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
 
 // ----------------------------------------------------------------------------
 // Health data
@@ -865,7 +904,8 @@ struct rrdhost {
 
     int32_t utc_offset;                             // the offset in seconds from utc
 
-    RRDHOST_FLAGS flags;                            // flags about this RRDHOST
+    RRDHOST_OPTIONS options;                        // configuration option for this RRDHOST (no atomics on this)
+    RRDHOST_FLAGS flags;                            // runtime flags about this RRDHOST (atomics on this)
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
     int rrd_update_every;                           // the update frequency of the host
@@ -878,36 +918,22 @@ struct rrdhost {
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
-    // streaming of data to remote hosts - rrdpush
+    // streaming of data to remote hosts - rrdpush sender
 
-    unsigned int rrdpush_send_enabled;            // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
     struct rrdpush_destinations *destination;       // the current destination from the above list
+    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    volatile unsigned int rrdpush_sender_spawn;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     void *dbsync_worker;
 
-    bool rrdpush_sender_connected;                  // 1 when the sender is ready to push metrics
-    int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
-
-    volatile unsigned int rrdpush_sender_error_shown; // 1 when we have logged a communication error
-    volatile unsigned int rrdpush_sender_join;    // 1 when we have to join the sending thread
-
-    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
-
-    int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
-    //BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
-
-    //uint32_t stream_version;                             //Set the current version of the stream.
-
     // ------------------------------------------------------------------------
-    // streaming of data from remote hosts - rrdpush
+    // streaming of data from remote hosts - rrdpush receiver
 
     time_t senders_connect_time;                    // the time the last sender was connected
     time_t senders_last_chart_command;              // the time of the last CHART streaming command
@@ -921,25 +947,21 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // health monitoring options
 
-    unsigned int health_enabled;                  // 1 when this host has health enabled
-    time_t health_delay_up_to;                    // a timestamp to delay alarms processing up to
-    STRING *health_default_exec;                  // the full path of the alarms notifications program
-    STRING *health_default_recipient;             // the default recipient for all alarms
-    char *health_log_filename;                    // the alarms event log filename
-    size_t health_log_entries_written;            // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                          // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;    // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;    // the default value for the interval between repeating critical notifications
+    unsigned int health_enabled;                    // 1 when this host has health enabled
+    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                    // the full path of the alarms notifications program
+    STRING *health_default_recipient;               // the default recipient for all alarms
+    char *health_log_filename;                      // the alarms event log filename
+    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
 
 
     // all RRDCALCs are primarily allocated and linked here
-    // RRDCALCs may be linked to charts at any point
-    // (charts may or may not exist when these are loaded)
     DICTIONARY *rrdcalc_root_index;
 
     // templates of alarms
-    // these are used to create alarms when charts
-    // are created or renamed, that match them
     DICTIONARY *rrdcalctemplate_root_index;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
@@ -961,6 +983,10 @@ struct rrdhost {
     DICTIONARY *rrdlabels;
 
     // ------------------------------------------------------------------------
+    // Support for functions
+    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
+
+    // ------------------------------------------------------------------------
     // indexes
 
     DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
@@ -978,11 +1004,6 @@ struct rrdhost {
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
-
-#ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                         //Structure used to encrypt the connection
-    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
-#endif
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;
@@ -1008,7 +1029,7 @@ extern RRDHOST *localhost;
 #define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
 #define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
-extern long rrdhost_hosts_available(void);
+long rrdhost_hosts_available(void);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -1031,24 +1052,24 @@ extern netdata_rwlock_t rrd_rwlock;
 
 // ----------------------------------------------------------------------------
 
-extern bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
-extern void rrdset_index_init(RRDHOST *host);
-extern void rrdset_index_destroy(RRDHOST *host);
+bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
+void rrdset_index_init(RRDHOST *host);
+void rrdset_index_destroy(RRDHOST *host);
 
-extern void rrddim_index_init(RRDSET *st);
-extern void rrddim_index_destroy(RRDSET *st);
+void rrddim_index_init(RRDSET *st);
+void rrddim_index_destroy(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 
 extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
-extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
-extern RRDHOST *rrdhost_find_by_hostname(const char *hostname);
-extern RRDHOST *rrdhost_find_by_guid(const char *guid);
+RRDHOST *rrdhost_find_by_hostname(const char *hostname);
+RRDHOST *rrdhost_find_by_guid(const char *guid);
 
-extern RRDHOST *rrdhost_find_or_create(
+RRDHOST *rrdhost_find_or_create(
         const char *hostname
         , const char *registry_hostname
         , const char *guid
@@ -1071,7 +1092,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , bool is_archived
 );
 
-extern void rrdhost_update(RRDHOST *host
+void rrdhost_update(RRDHOST *host
     , const char *hostname
     , const char *registry_hostname
     , const char *guid
@@ -1093,15 +1114,15 @@ extern void rrdhost_update(RRDHOST *host
     , struct rrdhost_system_info *system_info
 );
 
-extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
+int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
-extern void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-extern void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-extern void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-extern void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-extern void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
-extern void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line);
+void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
+void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
+void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
+void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line);
 
 #define rrdhost_check_rdlock(host) __rrdhost_check_rdlock(host, __FILE__, __FUNCTION__, __LINE__)
 #define rrdhost_check_wrlock(host) __rrdhost_check_wrlock(host, __FILE__, __FUNCTION__, __LINE__)
@@ -1122,9 +1143,9 @@ extern void __rrd_check_wrlock(const char *file, const char *function, const uns
 // ----------------------------------------------------------------------------
 // RRDSET functions
 
-extern int rrdset_reset_name(RRDSET *st, const char *name);
+int rrdset_reset_name(RRDSET *st, const char *name);
 
-extern RRDSET *rrdset_create_custom(RRDHOST *host
+RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *type
                              , const char *id
                              , const char *name
@@ -1146,20 +1167,20 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
 
-extern void rrdhost_free_all(void);
-extern void rrdhost_save_all(void);
-extern void rrdhost_cleanup_all(void);
+void rrdhost_free_all(void);
+void rrdhost_save_all(void);
+void rrdhost_cleanup_all(void);
 
-extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
-extern void rrdhost_free(RRDHOST *host, bool force);
-extern void rrdhost_save_charts(RRDHOST *host);
-extern void rrdhost_delete_charts(RRDHOST *host);
+void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
+void rrdhost_free(RRDHOST *host, bool force);
+void rrdhost_save_charts(RRDHOST *host);
+void rrdhost_delete_charts(RRDHOST *host);
 
-extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
+int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
 
-extern void rrdset_update_heterogeneous_flag(RRDSET *st);
+void rrdset_update_heterogeneous_flag(RRDSET *st);
 
-extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
+RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
@@ -1170,7 +1191,7 @@ static inline RRDSET *rrdset_find_active_localhost(const char *id)
     return st;
 }
 
-extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
+RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
 #define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
@@ -1181,7 +1202,7 @@ static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, cons
     return st;
 }
 
-extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
+RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 #define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
@@ -1192,30 +1213,30 @@ static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
     return st;
 }
 
-extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
-extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
+void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
+void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
-extern void rrdset_done(RRDSET *st);
+void rrdset_done(RRDSET *st);
 
-extern void rrdset_is_obsolete(RRDSET *st);
-extern void rrdset_isnot_obsolete(RRDSET *st);
+void rrdset_is_obsolete(RRDSET *st);
+void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
 #define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
 
-extern time_t rrddim_first_entry_t(RRDDIM *rd);
-extern time_t rrddim_last_entry_t(RRDDIM *rd);
-extern time_t rrdset_last_entry_t(RRDSET *st);
-extern time_t rrdset_first_entry_t(RRDSET *st);
-extern time_t rrdhost_last_entry_t(RRDHOST *h);
+time_t rrddim_first_entry_t(RRDDIM *rd);
+time_t rrddim_last_entry_t(RRDDIM *rd);
+time_t rrdset_last_entry_t(RRDSET *st);
+time_t rrdset_first_entry_t(RRDSET *st);
+time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-extern RRDDIM *rrddim_add_custom(RRDSET *st
+RRDDIM *rrddim_add_custom(RRDSET *st
                                  , const char *id
                                  , const char *name
                                  , collected_number multiplier
@@ -1227,49 +1248,49 @@ extern RRDDIM *rrddim_add_custom(RRDSET *st
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
     rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
-extern int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
-extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
-extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
-extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
+int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
+int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
+int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
+int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
 
-extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
-extern RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
+RRDDIM *rrddim_find(RRDSET *st, const char *id);
+RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 
-extern int rrddim_hide(RRDSET *st, const char *id);
-extern int rrddim_unhide(RRDSET *st, const char *id);
+int rrddim_hide(RRDSET *st, const char *id);
+int rrddim_unhide(RRDSET *st, const char *id);
 
-extern void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd);
-extern void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
+void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd);
+void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
-extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
-extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
+collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
+collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 #ifdef ENABLE_ACLK
-extern time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
+time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 #endif
-extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
+long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
+char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions
 
-extern void rrdset_delete_files(RRDSET *st);
-extern void rrdset_save(RRDSET *st);
-extern void rrdset_free(RRDSET *st);
+void rrdset_delete_files(RRDSET *st);
+void rrdset_save(RRDSET *st);
+void rrdset_free(RRDSET *st);
 
 #ifdef NETDATA_RRD_INTERNALS
 
-extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
+char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
-extern void rrddim_free(RRDSET *st, RRDDIM *rd);
+void rrddim_free(RRDSET *st, RRDDIM *rd);
 
-extern void rrdset_reset(RRDSET *st);
-extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
+void rrdset_reset(RRDSET *st);
+void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
-extern RRDHOST *rrdhost_create(
+RRDHOST *rrdhost_create(
     const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
     const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
     int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
@@ -1278,12 +1299,12 @@ extern RRDHOST *rrdhost_create(
 
 #endif /* NETDATA_RRD_INTERNALS */
 
-extern void set_host_properties(
+void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
 
-extern int get_tier_grouping(int tier);
+int get_tier_grouping(int tier);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations
@@ -1294,7 +1315,6 @@ extern int get_tier_grouping(int tier);
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"
 #include "sqlite/sqlite_aclk.h"
-#include "sqlite/sqlite_aclk_chart.h"
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "sqlite/sqlite_health.h"

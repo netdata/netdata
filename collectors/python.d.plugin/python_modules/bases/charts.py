@@ -3,6 +3,8 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import os
+
 from bases.collection import safe_print
 
 CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type', 'hidden']
@@ -26,11 +28,15 @@ DIMENSION_SET = "SET '{id}' = {value}\n"
 
 CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
 
+# 1 is label source auto
+# https://github.com/netdata/netdata/blob/cc2586de697702f86a3c34e60e23652dd4ddcb42/database/rrd.h#L205
 RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time' 'ms' 'python.d' " \
                        "netdata.pythond_runtime line 145000 {update_every} '' 'python.d.plugin' '{module_name}'\n" \
-                       "CLABEL '_collect_job' '{actual_job_name}' '0'\n" \
+                       "CLABEL '_collect_job' '{actual_job_name}' '1'\n" \
                        "CLABEL_COMMIT\n" \
                        "DIMENSION run_time 'run time' absolute 1 1\n"
+
+ND_INTERNAL_MONITORING_DISABLED = os.getenv("NETDATA_INTERNALS_MONITORING") == "NO"
 
 
 def create_runtime_chart(func):
@@ -47,13 +53,14 @@ def create_runtime_chart(func):
 
     def wrapper(*args, **kwargs):
         self = args[0]
-        chart = RUNTIME_CHART_CREATE.format(
-            job_name=self.name,
-            actual_job_name=self.actual_job_name,
-            update_every=self._runtime_counters.update_every,
-            module_name=self.module_name,
-        )
-        safe_print(chart)
+        if not ND_INTERNAL_MONITORING_DISABLED:
+            chart = RUNTIME_CHART_CREATE.format(
+                job_name=self.name,
+                actual_job_name=self.actual_job_name,
+                update_every=self._runtime_counters.update_every,
+                module_name=self.module_name,
+            )
+            safe_print(chart)
         ok = func(*args, **kwargs)
         return ok
 

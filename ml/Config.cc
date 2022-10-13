@@ -31,6 +31,7 @@ void Config::readMLConfig(void) {
     unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
     unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 900);
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
+    unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1 * 24);
 
     unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 30);
 
@@ -42,25 +43,19 @@ void Config::readMLConfig(void) {
     unsigned MaxKMeansIters = config_get_number(ConfigSectionML, "maximum number of k-means iterations", 1000);
 
     double DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
-    double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 0.01);
 
-    double ADMinWindowSize = config_get_float(ConfigSectionML, "minimum window size", 30);
-    double ADMaxWindowSize = config_get_float(ConfigSectionML, "maximum window size", 600);
-    double ADIdleWindowSize = config_get_float(ConfigSectionML, "idle window size", 30);
-    double ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
-    double ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.05);
-
-    std::stringstream SS;
-    SS << netdata_configured_cache_dir << "/anomaly-detection.db";
-    Cfg.AnomalyDBPath = SS.str();
+    double HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 1.0);
+    std::string AnomalyDetectionGroupingMethod = config_get(ConfigSectionML, "anomaly detection grouping method", "average");
+    time_t AnomalyDetectionQueryDuration = config_get_number(ConfigSectionML, "anomaly detection grouping duration", 5 * 60);
 
     /*
      * Clamp
      */
 
-    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 24 * 3600u);
-    MinTrainSamples = clamp(MinTrainSamples, 1 * 900u, 6 * 3600u);
-    TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
+    MaxTrainSamples = clamp<unsigned>(MaxTrainSamples, 1 * 3600, 24 * 3600);
+    MinTrainSamples = clamp<unsigned>(MinTrainSamples, 1 * 900, 6 * 3600);
+    TrainEvery = clamp<unsigned>(TrainEvery, 1 * 3600, 6 * 3600);
+    NumModelsToUse = clamp<unsigned>(TrainEvery, 1, 7 * 24);
 
     DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 30u, 15 * 60u);
 
@@ -72,13 +67,9 @@ void Config::readMLConfig(void) {
     MaxKMeansIters = clamp(MaxKMeansIters, 500u, 1000u);
 
     DimensionAnomalyScoreThreshold = clamp(DimensionAnomalyScoreThreshold, 0.01, 5.00);
-    HostAnomalyRateThreshold = clamp(HostAnomalyRateThreshold, 0.01, 1.0);
 
-    ADMinWindowSize = clamp(ADMinWindowSize, 30.0, 300.0);
-    ADMaxWindowSize = clamp(ADMaxWindowSize, 60.0, 900.0);
-    ADIdleWindowSize = clamp(ADIdleWindowSize, 30.0, 900.0);
-    ADWindowRateThreshold = clamp(ADWindowRateThreshold, 0.01, 0.99);
-    ADDimensionRateThreshold = clamp(ADDimensionRateThreshold, 0.01, 0.99);
+    HostAnomalyRateThreshold = clamp(HostAnomalyRateThreshold, 0.1, 10.0);
+    AnomalyDetectionQueryDuration = clamp<time_t>(AnomalyDetectionQueryDuration, 60, 15 * 60);
 
     /*
      * Validate
@@ -91,13 +82,6 @@ void Config::readMLConfig(void) {
         MaxTrainSamples = 4 * 3600;
     }
 
-    if (ADMinWindowSize >= ADMaxWindowSize) {
-        error("invalid min/max anomaly window size found (%lf >= %lf)", ADMinWindowSize, ADMaxWindowSize);
-
-        ADMinWindowSize = 30.0;
-        ADMaxWindowSize = 600.0;
-    }
-
     /*
      * Assign to config instance
      */
@@ -107,6 +91,7 @@ void Config::readMLConfig(void) {
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
+    Cfg.NumModelsToUse = NumModelsToUse;
 
     Cfg.DBEngineAnomalyRateEvery = DBEngineAnomalyRateEvery;
 
@@ -118,13 +103,10 @@ void Config::readMLConfig(void) {
     Cfg.MaxKMeansIters = MaxKMeansIters;
 
     Cfg.DimensionAnomalyScoreThreshold = DimensionAnomalyScoreThreshold;
-    Cfg.HostAnomalyRateThreshold = HostAnomalyRateThreshold;
 
-    Cfg.ADMinWindowSize = ADMinWindowSize;
-    Cfg.ADMaxWindowSize = ADMaxWindowSize;
-    Cfg.ADIdleWindowSize = ADIdleWindowSize;
-    Cfg.ADWindowRateThreshold = ADWindowRateThreshold;
-    Cfg.ADDimensionRateThreshold = ADDimensionRateThreshold;
+    Cfg.HostAnomalyRateThreshold = HostAnomalyRateThreshold;
+    Cfg.AnomalyDetectionGroupingMethod = web_client_api_request_v1_data_group(AnomalyDetectionGroupingMethod.c_str(), RRDR_GROUPING_AVERAGE);
+    Cfg.AnomalyDetectionQueryDuration = AnomalyDetectionQueryDuration;
 
     Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);

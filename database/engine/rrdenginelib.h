@@ -83,10 +83,10 @@ static inline void crc32set(void *crcp, uLong crc)
     *(uint32_t *)crcp = crc;
 }
 
-extern void print_page_cache_descr(struct rrdeng_page_descr *page_cache_descr);
-extern void print_page_descr(struct rrdeng_page_descr *descr);
-extern int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
-extern int open_file_for_io(char *path, int flags, uv_file *file, int direct);
+void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug);
+void print_page_descr(struct rrdeng_page_descr *descr);
+int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
+int open_file_for_io(char *path, int flags, uv_file *file, int direct);
 static inline int open_file_direct_io(char *path, int flags, uv_file *file)
 {
     return open_file_for_io(path, flags, file, 1);
@@ -95,8 +95,8 @@ static inline int open_file_buffered_io(char *path, int flags, uv_file *file)
 {
     return open_file_for_io(path, flags, file, 0);
 }
-extern char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
-extern int compute_multidb_diskspace();
-extern int is_legacy_child(const char *machine_guid);
+char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
+int compute_multidb_diskspace();
+int is_legacy_child(const char *machine_guid);
 
 #endif /* NETDATA_RRDENGINELIB_H */

@@ -872,12 +872,12 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 #endif
 
 #ifdef ENABLE_ACLK
-static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
+static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
 
     while (ae) {
-        if (ae->alarm_id == alarm_id && ae->unique_id > mark &&
+        if (ae->alarm_id == alarm_id && ae->unique_id >mark &&
             (ae->new_status != RRDCALC_STATUS_WARNING && ae->new_status != RRDCALC_STATUS_CRITICAL))
             return 1;
         ae = ae->next;

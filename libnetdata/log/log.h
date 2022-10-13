@@ -74,10 +74,10 @@ extern int output_log_syslog;
 
 extern time_t error_log_throttle_period;
 extern unsigned long error_log_errors_per_period, error_log_errors_per_period_backup;
-extern int error_log_limit(int reset);
+int error_log_limit(int reset);
 
-extern void open_all_log_files();
-extern void reopen_all_log_files();
+void open_all_log_files();
+void reopen_all_log_files();
 
 static inline void debug_dummy(void) {}
 
@@ -87,9 +87,11 @@ void error_log_limit_unlimited(void);
 #ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) error_int("IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_fatal(condition, args...) do { if(unlikely(condition)) fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
+#define internal_fatal(args...) debug_dummy()
 #endif
 
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -98,15 +100,15 @@ void error_log_limit_unlimited(void);
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal_assert(expr) ((expr) ? (void)(0) : fatal_int(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
 
-extern void send_statistics(const char *action, const char *action_result, const char *action_data);
-extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
-extern void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
-extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
-extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
-extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+void send_statistics(const char *action, const char *action_result, const char *action_data);
+void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
+void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
+void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
+void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
+void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 #ifdef ENABLE_ACLK
-extern void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
+void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
 #endif
 
 # ifdef __cplusplus

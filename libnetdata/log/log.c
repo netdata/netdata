@@ -3,6 +3,10 @@
 #include <daemon/main.h>
 #include "../libnetdata.h"
 
+#ifdef HAVE_BACKTRACE
+#include <execinfo.h>
+#endif
+
 int web_server_is_multithreaded = 1;
 
 const char *program_name = "";
@@ -857,6 +861,18 @@ static void crash_netdata(void) {
 }
 #endif
 
+#ifdef HAVE_BACKTRACE
+#define BT_BUF_SIZE 100
+static void print_call_stack(void) {
+    int nptrs;
+    void *buffer[BT_BUF_SIZE];
+
+    nptrs = backtrace(buffer, BT_BUF_SIZE);
+    if(nptrs)
+        backtrace_symbols_fd(buffer, nptrs, fileno(stderr));
+}
+#endif
+
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
@@ -903,6 +919,10 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
     snprintfz(action_result, 60, "%s:%s", program_name, strncmp(thread_tag, "STREAM_RECEIVER", strlen("STREAM_RECEIVER")) ? thread_tag : "[x]");
     send_statistics("FATAL", action_result, action_data);
+
+#ifdef HAVE_BACKTRACE
+    print_call_stack();
+#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     crash_netdata();

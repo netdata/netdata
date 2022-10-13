@@ -166,40 +166,176 @@ ebpf_module_t ebpf_modules[] = {
 };
 
 struct netdata_static_thread ebpf_threads[] = {
-    {"EBPF PROCESS", NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF SOCKET" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF CACHESTAT" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF SYNC" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF DCSTAT" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF SWAP" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF VFS" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF FILESYSTEM" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF DISK" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF MOUNT" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF FD" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF HARDIRQ" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF SOFTIRQ" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF OOMKILL" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF SHM" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {"EBPF MDFLUSH" , NULL, NULL, 1,
-        NULL, NULL, NULL},
-    {NULL          , NULL, NULL, 0,
-                     NULL, NULL, NULL}
+    {
+        .name = "EBPF PROCESS",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF SOCKET",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF CACHESTAT",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF SYNC",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF DCSTAT",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF SWAP",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF VFS",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF FILESYSTEM",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF DISK",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF MOUNT",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF FD",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF HARDIRQ",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF SOFTIRQ",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF OOMKILL",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF SHM",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF MDFLUSH",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = NULL,
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
 };
 
 ebpf_filesystem_partitions_t localfs[] =

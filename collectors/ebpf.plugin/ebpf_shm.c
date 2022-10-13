@@ -34,8 +34,16 @@ static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input =
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                         {.name = NULL, .internal_input = 0, .user_input = 0}};
 
-struct netdata_static_thread shm_threads = {"SHM KERNEL", NULL, NULL, 1,
-                                             NULL, NULL,  NULL};
+struct netdata_static_thread shm_threads = {
+                                            .name = "SHM KERNEL",
+                                            .config_section = NULL,
+                                            .config_name = NULL,
+                                            .env_name = NULL,
+                                            .enabled = 1,
+                                            .thread = NULL,
+                                            .init_routine = NULL,
+                                            .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_shm_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},

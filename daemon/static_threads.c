@@ -13,6 +13,8 @@ extern void *service_main(void *ptr);
 extern void *statsd_main(void *ptr);
 extern void *timex_main(void *ptr);
 
+extern bool global_statistics_enabled;
+
 const struct netdata_static_thread static_threads_common[] = {
     {
         .name = "PLUGIN[timex]",
@@ -52,8 +54,10 @@ const struct netdata_static_thread static_threads_common[] = {
     },
     {
         .name = "GLOBAL_STATS",
-        .config_section = NULL,
-        .config_name = NULL,
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "netdata monitoring",
+        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .global_variable = &global_statistics_enabled,
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
@@ -145,7 +149,17 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = rrdcontext_main
     },
 
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    // terminator
+    {
+        .name = NULL,
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    }
 };
 
 struct netdata_static_thread *

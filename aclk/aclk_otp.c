@@ -13,7 +13,7 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
     int rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings
     // then only calls https_request
-    struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .type = MQTT_WSS_DIRECT };
+    struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
     aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
 
     if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
@@ -380,7 +380,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
     base64_decode_helper(*challenge, challenge_bytes, (const unsigned char*)challenge_base64, strlen(challenge_base64));
     if (*challenge_bytes != CHALLENGE_LEN) {
         error("Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
-        freez(challenge);
+        freez(*challenge);
         *challenge = NULL;
         goto cleanup_json;
     }
@@ -490,7 +490,7 @@ int aclk_get_mqtt_otp(EVP_PKEY *p_key, char **mqtt_id, char **mqtt_usr, char **m
 int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
 #endif
 {
-    unsigned char *challenge;
+    unsigned char *challenge = NULL;
     int challenge_bytes;
 
     char *agent_id = get_agent_claimid();
@@ -844,10 +844,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         return 1;
     }
 
-    if (rrdcontext_enabled)
-        buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto,ctx&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
-    else
-        buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto,ctx&claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
 
     freez(agent_id);
 

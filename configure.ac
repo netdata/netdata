@@ -269,6 +269,8 @@ if test "${enable_accept4}" != "no"; then
     AC_CHECK_FUNCS_ONCE(accept4)
 fi
 
+AC_CHECK_FUNCS_ONCE(malloc_usable_size)
+
 # -----------------------------------------------------------------------------
 # operating system detection
 
@@ -315,6 +317,10 @@ AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 AC_MSG_RESULT([Host OS: ${build_target}])
 
+# -----------------------------------------------------------------------------
+# backtrace
+
+AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backtrace availability])])
 
 # -----------------------------------------------------------------------------
 # pthreads
@@ -498,7 +504,6 @@ if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${SSL_
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
     OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
-    OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
@@ -1110,7 +1115,7 @@ fi
 
 # Check if submodules have not been fetched. Fail if ML was explicitly requested.
 AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
-if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+if test -f "ml/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
     AC_MSG_RESULT([yes])
     have_ml_submodules="yes"
 else
@@ -1150,7 +1155,7 @@ fi
 AM_CONDITIONAL([ENABLE_ML], [test "${build_ml}" = "yes"])
 if test "${build_ml}" = "yes"; then
     AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
-    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
+    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/dlib"
     OPTIONAL_ML_LIBS=""
 fi
 
@@ -1530,6 +1535,30 @@ AC_SUBST([OPTIONAL_ATOMIC_LIBS])
 
 AC_LANG_POP([C++])
 
+# -----------------------------------------------------------------------------
+
+AC_MSG_CHECKING(whether we can use dlsym)
+OLD_LIBS="${LIBS}"
+LIBS="-ldl"
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+  #include <dlfcn.h>
+  static void *(*libc_malloc)(size_t);
+  int main() {
+    libc_malloc = dlsym(RTLD_NEXT, "malloc");
+  }
+]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
+LIBS="${OLD_LIBS}"
+AC_MSG_RESULT($CAN_USE_DLSYM)
+
+if test "x$CAN_USE_DLSYM" = xyes; then
+    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
+    OPTIONAL_DL_LIBS="-ldl"
+fi
+AC_SUBST([OPTIONAL_DL_LIBS])
+
+# -----------------------------------------------------------------------------
+
+
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
 varlibdir="${localstatedir}/lib/netdata"
@@ -1541,6 +1570,8 @@ configdir="${sysconfdir}/netdata"
 libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
+netdata_user="${with_user}"
+libsysdir="${libdir}/netdata/system"
 
 AC_SUBST([varlibdir])
 AC_SUBST([registrydir])
@@ -1552,12 +1583,14 @@ AC_SUBST([libconfigdir])
 AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+AC_SUBST([netdata_user])
+AC_SUBST([libsysdir])
 
 CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} \
     ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
-    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
+    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
     ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
@@ -1696,8 +1729,6 @@ AC_CONFIG_FILES([
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
-    ml/Makefile
-    ml/kmeans/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile

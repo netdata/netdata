@@ -153,14 +153,15 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     char buf[MAXSIZE_PROC_CMDLINE];
     char *begin, *end;
 
-    FILE *f = mypopen(exec, &command_pid);
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(exec, &command_pid, &fp_child_input);
 
-    if (!f)
+    if (!fp_child_output)
         return retval;
 
     fd_set rfds;
     struct timeval timeout;
-    int fd = fileno(f);
+    int fd = fileno(fp_child_output);
     int ret = -1;
 
     FD_ZERO(&rfds);
@@ -177,7 +178,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     } else if (ret == 0) {
         info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
     } else {
-        while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
@@ -196,7 +197,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         }
     }
 
-    if (mypclose(f, command_pid))
+    if (netdata_pclose(fp_child_input, fp_child_output, command_pid))
         return SYSTEMD_CGROUP_ERR;
 
     return retval;
@@ -210,18 +211,19 @@ static enum cgroups_type cgroups_try_detect_version()
     int cgroups2_available = 0;
 
     // 1. check if cgroups2 available on system at all
-    FILE *f = mypopen("grep cgroup /proc/filesystems", &command_pid);
-    if (!f) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen("grep cgroup /proc/filesystems", &command_pid, &fp_child_input);
+    if (!fp_child_output) {
         error("popen failed");
         return CGROUPS_AUTODETECT_FAIL;
     }
-    while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
         if (strstr(buf, "cgroup2")) {
             cgroups2_available = 1;
             break;
         }
     }
-    if(mypclose(f, command_pid))
+    if(netdata_pclose(fp_child_input, fp_child_output, command_pid))
         return CGROUPS_AUTODETECT_FAIL;
 
     if(!cgroups2_available)
@@ -254,19 +256,19 @@ static enum cgroups_type cgroups_try_detect_version()
 
     // 4. if we are unified as on Fedora (default cgroups2 only mode)
     //    check kernel command line flag that can override that setting
-    f = fopen("/proc/cmdline", "r");
-    if (!f) {
+    FILE *fp = fopen("/proc/cmdline", "r");
+    if (!fp) {
         error("Error reading kernel boot commandline parameters");
         return CGROUPS_AUTODETECT_FAIL;
     }
 
-    if (!fgets(buf, MAXSIZE_PROC_CMDLINE, f)) {
+    if (!fgets(buf, MAXSIZE_PROC_CMDLINE, fp)) {
         error("couldn't read all cmdline params into buffer");
-        fclose(f);
+        fclose(fp);
         return CGROUPS_AUTODETECT_FAIL;
     }
 
-    fclose(f);
+    fclose(fp);
 
     if (strstr(buf, "systemd.unified_cgroup_hierarchy=0")) {
         info("cgroups v2 (unified cgroups) is available but are disabled on this system.");
@@ -1665,16 +1667,16 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
-    FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
-    if(!fp) {
+    FILE *fp_child_input, *fp_child_output;
+    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
+    if(!fp_child_output) {
         error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
     char *s;
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp_child_output))) {
         trim(s);
 
         if(*s && *s != '\n') {
@@ -1709,7 +1711,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         }
     }
 
-    mypclose(fp, cgroup_pid);
+    netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
     // debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
 }
 
@@ -1871,9 +1873,9 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
     pid_t cgroup_pid;
 
-    FILE *fp;
-    (void)mypopen_raw_default_flags_and_environment(&cgroup_pid, &fp, cgroups_rename_script, cg->id, cg->intermediate_id);
-    if (!fp) {
+    FILE *fp_child_input, *fp_child_output;
+    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_rename_script, cg->id, cg->intermediate_id);
+    if (!fp_child_output) {
         error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
         cg->processed = 1;
@@ -1881,8 +1883,8 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
 
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
-    char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
-    int exit_code = mypclose(fp, cgroup_pid);
+    char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp_child_output);
+    int exit_code = netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
 
     switch (exit_code) {
         case 0:

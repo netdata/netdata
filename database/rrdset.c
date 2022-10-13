@@ -3,6 +3,9 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 #include <sched.h>
+#include "storage_engine.h"
+
+// ----------------------------------------------------------------------------
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", rrdset_id(st));
@@ -107,7 +110,7 @@ struct rrdset_constructor {
     enum {
         RRDSET_REACT_NONE                   = 0,
         RRDSET_REACT_NEW                    = (1 << 0),
-        RRDSET_REACT_CHART_ARCHIVED_TO_LIVE = (1 << 1),
+        RRDSET_REACT_UPDATED                = (1 << 1),
         RRDSET_REACT_PLUGIN_UPDATED         = (1 << 2),
         RRDSET_REACT_MODULE_UPDATED         = (1 << 3),
         RRDSET_REACT_CHART_ACTIVATED        = (1 << 4),
@@ -118,7 +121,7 @@ struct rrdset_constructor {
 static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
     static STRING *anomaly_rates_chart = NULL;
 
-    if(!unlikely(!anomaly_rates_chart))
+    if(unlikely(!anomaly_rates_chart))
         anomaly_rates_chart = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
 
     struct rrdset_constructor *ctr = constructor_data;
@@ -174,14 +177,23 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         uuid_generate(st->chart_uuid);
     update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
 
+    // initialize the db tiers
+    {
+        RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
+        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+            if(!eng) continue;
+
+            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->storage_instance[tier], &st->chart_uuid);
+        }
+    }
+
     rrddim_index_init(st);
 
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
 
-    if(host->health_enabled) {
-        st->green = NAN;
-        st->red = NAN;
+    if (host->health_enabled) {
         st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
         st->rrdvars = rrdvariables_create();
         rrddimvar_index_init(st);
@@ -189,6 +201,9 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
+
+    st->green = NAN;
+    st->red = NAN;
 
     ctr->react_action = RRDSET_REACT_NEW;
 }
@@ -200,8 +215,22 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
+    // cleanup storage engines
+    {
+        RRD_MEMORY_MODE wanted_mode = st->rrd_memory_mode;
+        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+            if(!eng) continue;
+
+            eng->api.collect_ops.metrics_group_release(host->storage_instance[tier], st->storage_metrics_groups[tier]);
+        }
+    }
+
     // remove it from the name index
     rrdset_index_del_name(host, st);
+
+    // release the collector info
+    dictionary_destroy(st->functions_view);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 
@@ -275,15 +304,27 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     }
 
     if (rrdset_reset_name(st, (ctr->name && *ctr->name) ? ctr->name : ctr->id) == 2)
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
     if (unlikely(st->priority != ctr->priority)) {
         st->priority = ctr->priority;
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        ctr->react_action |= RRDSET_REACT_UPDATED;
     }
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != ctr->update_every)) {
+
+    if (unlikely(st->update_every != ctr->update_every)) {
         st->update_every = ctr->update_every;
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+
+        // switch update every to the storage engine
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            for (int tier = 0; tier < storage_tiers; tier++) {
+                if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
+                    rd->tiers[tier]->collect_ops.change_collection_frequency(rd->tiers[tier]->db_collection_handle, st->update_every);
+            }
+        }
+        rrddim_foreach_done(rd);
+
+        ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
     if(ctr->plugin && *ctr->plugin) {
@@ -306,7 +347,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         STRING *old_title = st->title;
         st->title = rrd_string_strdupz(ctr->title);
         if(old_title != st->title)
-            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+            ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_title);
     }
 
@@ -314,7 +355,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         STRING *old_units = st->units;
         st->units = rrd_string_strdupz(ctr->units);
         if(old_units != st->units)
-            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+            ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_units);
     }
 
@@ -322,17 +363,14 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         STRING *old_context = st->context;
         st->context = rrd_string_strdupz(ctr->context);
         if(old_context != st->context)
-            ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+            ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_context);
     }
 
     if(st->chart_type != ctr->chart_type) {
         st->chart_type = ctr->chart_type;
-        ctr->react_action |= RRDSET_REACT_CHART_ARCHIVED_TO_LIVE;
+        ctr->react_action |= RRDSET_REACT_UPDATED;
     }
-
-    if(ctr->react_action)
-        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 
     rrdset_update_permanent_labels(st);
 
@@ -349,18 +387,12 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
-    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
-        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
-
-        rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching_templates_to_rrdset(st);
+    if((host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) && !rrdset_is_ar_chart(st)) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
-    if(ctr->react_action & (RRDSET_REACT_CHART_ARCHIVED_TO_LIVE | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
+    if(ctr->react_action & (RRDSET_REACT_UPDATED | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
         if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
             error_report("Failed to update chart metadata in the database");
@@ -1001,9 +1033,37 @@ static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, tim
     return now + loop - ((now + loop) % loop);
 }
 
-void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut) {
+void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
     if (unlikely(!t->next_point_time))
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+
+    if(unlikely(sp.start_time > t->next_point_time)) {
+        if (likely(!storage_point_is_unset(t->virtual_point))) {
+
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                t->next_point_time * USEC_PER_SEC,
+                t->virtual_point.sum,
+                t->virtual_point.min,
+                t->virtual_point.max,
+                t->virtual_point.count,
+                t->virtual_point.anomaly_count,
+                t->virtual_point.flags);
+        }
+        else {
+            t->collect_ops.store_metric(
+                t->db_collection_handle,
+                t->next_point_time * USEC_PER_SEC,
+                NAN,
+                NAN,
+                NAN,
+                0,
+                0, SN_FLAG_NONE);
+        }
+
+        t->virtual_point.count = 0; // make the point unset
+        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+    }
 
     // merge the dates into our virtual point
     if (unlikely(sp.start_time < t->virtual_point.start_time))
@@ -1030,34 +1090,6 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
             t->virtual_point = sp;
         }
     }
-
-    if(unlikely(sp.end_time >= t->next_point_time)) {
-        if (likely(!storage_point_is_unset(t->virtual_point))) {
-
-            t->collect_ops.store_metric(
-                t->db_collection_handle,
-                now_ut,
-                t->virtual_point.sum,
-                t->virtual_point.min,
-                t->virtual_point.max,
-                t->virtual_point.count,
-                t->virtual_point.anomaly_count,
-                t->virtual_point.flags);
-        }
-        else {
-            t->collect_ops.store_metric(
-                t->db_collection_handle,
-                now_ut,
-                NAN,
-                NAN,
-                NAN,
-                0,
-                0, SN_FLAG_NONE);
-        }
-
-        t->virtual_point.count = 0;
-        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
-    }
 }
 
 static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
@@ -1065,29 +1097,29 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     // store the metric on tier 0
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
+    time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
+
+    STORAGE_POINT sp = {
+        .start_time = now - rd->update_every,
+        .end_time = now,
+        .min = n,
+        .max = n,
+        .sum = n,
+        .count = 1,
+        .anomaly_count = (flags & SN_FLAG_NOT_ANOMALOUS) ? 0 : 1,
+        .flags = flags
+    };
+
     for(int tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
         struct rrddim_tier *t = rd->tiers[tier];
-
-        time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
         if(!t->last_collected_ut) {
             // we have not collected this tier before
             // let's fill any gap that may exist
             rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
         }
-
-        STORAGE_POINT sp = {
-            .start_time = now - rd->update_every,
-            .end_time = now,
-            .min = n,
-            .max = n,
-            .sum = n,
-            .count = 1,
-            .anomaly_count = (flags & SN_FLAG_NOT_ANOMALOUS) ? 0 : 1,
-            .flags = flags
-        };
 
         t->last_collected_ut = point_end_time_ut;
         store_metric_at_tier(rd, t, sp, point_end_time_ut);
@@ -1096,6 +1128,7 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rrdcontext_collected_rrddim(rd);
 }
 
+// caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through
 struct rda_item {
     const DICTIONARY_ITEM *item;
     RRDDIM *rd;
@@ -1355,20 +1388,6 @@ void rrdset_done(RRDSET *st) {
 
     netdata_thread_disable_cancelability();
 
-#ifdef ENABLE_ACLK
-    time_t mark = now_realtime_sec();
-    bool rrdset_flag_aclk = rrdset_flag_check(st, RRDSET_FLAG_ACLK);
-    bool rrdset_is_ar = rrdset_is_ar_chart(st);
-
-    if (likely(!rrdset_is_ar)) {
-        if (unlikely(!rrdset_flag_aclk)) {
-            if (likely(rrdset_number_of_dimensions(st) && st->counter_done && !queue_chart_to_aclk(st))) {
-                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-            }
-        }
-    }
-#endif
-
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
@@ -1509,7 +1528,7 @@ void rrdset_done(RRDSET *st) {
 after_first_database_work:
     st->counter_done++;
 
-    if(unlikely(st->rrdhost->rrdpush_send_enabled))
+    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         rrdset_done_push(st);
 
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
@@ -1788,7 +1807,7 @@ after_first_database_work:
     rrdset_done_interpolate(
             st
             , rda_base
-            ,rda_slots
+            , rda_slots
             , update_every_ut
             , last_stored_ut
             , next_store_ut
@@ -1805,12 +1824,6 @@ after_second_database_work:
         rd = rda->rd;
         if(unlikely(!rd)) continue;
 
-#ifdef ENABLE_ACLK
-        if (likely(!rrdset_is_ar)) {
-            if (!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) && likely(rrdset_flag_aclk))
-                queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, mark));
-        }
-#endif
         if(unlikely(!rd->updated))
             continue;
 
@@ -2000,7 +2013,7 @@ void rrdset_memory_file_free(RRDSET *st) {
     rrdset_memory_file_update(st);
 
     struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
-    munmap(st_on_file, st_on_file->memsize);
+    netdata_munmap(st_on_file, st_on_file->memsize);
 
     // remove the pointers from the RRDDIM
     st->st_on_file = NULL;

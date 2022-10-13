@@ -125,7 +125,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, after, before, TIER_QUERY_FETCH_SUM); !rd->tiers[0]->query_ops.is_finished(&handle);) {
+    for (rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, after, before); !rd->tiers[0]->query_ops.is_finished(&handle);) {
         STORAGE_POINT sp = rd->tiers[0]->query_ops.next_metric(&handle);
 
         if (unlikely(storage_point_is_empty(sp))) {

@@ -27,6 +27,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
 #define HTTP_RESP_BACKEND_FETCH_FAILED 503
 #define HTTP_RESP_GATEWAY_TIMEOUT 504
+#define HTTP_RESP_BACKEND_RESPONSE_INVALID 591
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
@@ -189,21 +190,21 @@ struct web_client {
 #endif
 };
 
-extern int web_client_permission_denied(struct web_client *w);
+int web_client_permission_denied(struct web_client *w);
 
-extern ssize_t web_client_send(struct web_client *w);
-extern ssize_t web_client_receive(struct web_client *w);
-extern ssize_t web_client_read_file(struct web_client *w);
+ssize_t web_client_send(struct web_client *w);
+ssize_t web_client_receive(struct web_client *w);
+ssize_t web_client_read_file(struct web_client *w);
 
-extern void web_client_process_request(struct web_client *w);
-extern void web_client_request_done(struct web_client *w);
+void web_client_process_request(struct web_client *w);
+void web_client_request_done(struct web_client *w);
 
-extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
+void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
-extern int mysendfile(struct web_client *w, char *filename);
+int mysendfile(struct web_client *w, char *filename);
 
-extern void web_client_build_http_header(struct web_client *w);
-extern char *strip_control_characters(char *url);
+void web_client_build_http_header(struct web_client *w);
+char *strip_control_characters(char *url);
 
 #include "daemon/common.h"
 

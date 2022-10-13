@@ -1421,7 +1421,10 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     app->default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
             }
             else if (!strcmp(name, "memory mode")) {
-                app->rrd_memory_mode = rrd_memory_mode_id(value);
+                // this is not supported anymore
+                // with the implementation of storage engines, all charts have the same storage engine always
+                // app->rrd_memory_mode = rrd_memory_mode_id(value);
+                ;
             }
             else if (!strcmp(name, "history")) {
                 app->rrd_history_entries = atol(value);
@@ -2532,173 +2535,209 @@ void *statsd_main(void *ptr) {
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
 
-    RRDSET *st_metrics = rrdset_create_localhost(
-            "netdata"
-            , "statsd_metrics"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Metrics in the netdata statsd database"
-            , "metrics"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132010
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-    RRDDIM *rd_metrics_gauge     = rrddim_add(st_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_metrics_counter   = rrddim_add(st_metrics, "counters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_metrics_timer     = rrddim_add(st_metrics, "timers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_metrics_meter     = rrddim_add(st_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_metrics_histogram = rrddim_add(st_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_metrics_set       = rrddim_add(st_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_metrics_dictionary= rrddim_add(st_metrics, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDSET *st_metrics = NULL;
+    RRDDIM *rd_metrics_gauge = NULL;
+    RRDDIM *rd_metrics_counter = NULL;
+    RRDDIM *rd_metrics_timer = NULL;
+    RRDDIM *rd_metrics_meter = NULL;
+    RRDDIM *rd_metrics_histogram = NULL;
+    RRDDIM *rd_metrics_set = NULL;
+    RRDDIM *rd_metrics_dictionary = NULL;
+    RRDSET *st_useful_metrics = NULL;
+    RRDDIM *rd_useful_metrics_gauge = NULL;
+    RRDDIM *rd_useful_metrics_counter = NULL;
+    RRDDIM *rd_useful_metrics_timer = NULL;
+    RRDDIM *rd_useful_metrics_meter = NULL;
+    RRDDIM *rd_useful_metrics_histogram = NULL;
+    RRDDIM *rd_useful_metrics_set = NULL;
+    RRDDIM *rd_useful_metrics_dictionary = NULL;
+    RRDSET *st_events = NULL;
+    RRDDIM *rd_events_gauge = NULL;
+    RRDDIM *rd_events_counter = NULL;
+    RRDDIM *rd_events_timer = NULL;
+    RRDDIM *rd_events_meter = NULL;
+    RRDDIM *rd_events_histogram = NULL;
+    RRDDIM *rd_events_set = NULL;
+    RRDDIM *rd_events_dictionary = NULL;
+    RRDDIM *rd_events_unknown = NULL;
+    RRDDIM *rd_events_errors = NULL;
+    RRDSET *st_reads = NULL;
+    RRDDIM *rd_reads_tcp = NULL;
+    RRDDIM *rd_reads_udp = NULL;
+    RRDSET *st_bytes = NULL;
+    RRDDIM *rd_bytes_tcp = NULL;
+    RRDDIM *rd_bytes_udp = NULL;
+    RRDSET *st_packets = NULL;
+    RRDDIM *rd_packets_tcp = NULL;
+    RRDDIM *rd_packets_udp = NULL;
+    RRDSET *st_tcp_connects = NULL;
+    RRDDIM *rd_tcp_connects = NULL;
+    RRDDIM *rd_tcp_disconnects = NULL;
+    RRDSET *st_tcp_connected = NULL;
+    RRDDIM *rd_tcp_connected = NULL;
+    RRDSET *st_pcharts = NULL;
+    RRDDIM *rd_pcharts = NULL;
 
-    RRDSET *st_useful_metrics = rrdset_create_localhost(
-            "netdata"
-            , "statsd_useful_metrics"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Useful metrics in the netdata statsd database"
-            , "metrics"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132010
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-    RRDDIM *rd_useful_metrics_gauge     = rrddim_add(st_useful_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_useful_metrics_counter   = rrddim_add(st_useful_metrics, "counters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_useful_metrics_timer     = rrddim_add(st_useful_metrics, "timers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_useful_metrics_meter     = rrddim_add(st_useful_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_useful_metrics_histogram = rrddim_add(st_useful_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_useful_metrics_set       = rrddim_add(st_useful_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    RRDDIM *rd_useful_metrics_dictionary= rrddim_add(st_useful_metrics, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(global_statistics_enabled) {
+        st_metrics = rrdset_create_localhost(
+            "netdata",
+            "statsd_metrics",
+            NULL,
+            "statsd",
+            NULL,
+            "Metrics in the netdata statsd database",
+            "metrics",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132010,
+            statsd.update_every,
+            RRDSET_TYPE_STACKED);
+        rd_metrics_gauge = rrddim_add(st_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_metrics_counter = rrddim_add(st_metrics, "counters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_metrics_timer = rrddim_add(st_metrics, "timers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_metrics_meter = rrddim_add(st_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_metrics_histogram = rrddim_add(st_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_metrics_set = rrddim_add(st_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_metrics_dictionary = rrddim_add(st_metrics, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *st_events = rrdset_create_localhost(
-            "netdata"
-            , "statsd_events"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Events processed by the netdata statsd server"
-            , "events/s"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132011
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-    RRDDIM *rd_events_gauge     = rrddim_add(st_events, "gauges", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_counter   = rrddim_add(st_events, "counters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_timer     = rrddim_add(st_events, "timers", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_meter     = rrddim_add(st_events, "meters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_histogram = rrddim_add(st_events, "histograms", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_set       = rrddim_add(st_events, "sets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_dictionary= rrddim_add(st_events, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_unknown   = rrddim_add(st_events, "unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_events_errors    = rrddim_add(st_events, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        st_useful_metrics = rrdset_create_localhost(
+            "netdata",
+            "statsd_useful_metrics",
+            NULL,
+            "statsd",
+            NULL,
+            "Useful metrics in the netdata statsd database",
+            "metrics",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132010,
+            statsd.update_every,
+            RRDSET_TYPE_STACKED);
+        rd_useful_metrics_gauge = rrddim_add(st_useful_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_useful_metrics_counter = rrddim_add(st_useful_metrics, "counters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_useful_metrics_timer = rrddim_add(st_useful_metrics, "timers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_useful_metrics_meter = rrddim_add(st_useful_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_useful_metrics_histogram = rrddim_add(st_useful_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_useful_metrics_set = rrddim_add(st_useful_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_useful_metrics_dictionary = rrddim_add(st_useful_metrics, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *st_reads = rrdset_create_localhost(
-            "netdata"
-            , "statsd_reads"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Read operations made by the netdata statsd server"
-            , "reads/s"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132012
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-    RRDDIM *rd_reads_tcp = rrddim_add(st_reads, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_reads_udp = rrddim_add(st_reads, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        st_events = rrdset_create_localhost(
+            "netdata",
+            "statsd_events",
+            NULL,
+            "statsd",
+            NULL,
+            "Events processed by the netdata statsd server",
+            "events/s",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132011,
+            statsd.update_every,
+            RRDSET_TYPE_STACKED);
+        rd_events_gauge = rrddim_add(st_events, "gauges", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_counter = rrddim_add(st_events, "counters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_timer = rrddim_add(st_events, "timers", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_meter = rrddim_add(st_events, "meters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_histogram = rrddim_add(st_events, "histograms", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_set = rrddim_add(st_events, "sets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_dictionary = rrddim_add(st_events, "dictionaries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_unknown = rrddim_add(st_events, "unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_events_errors = rrddim_add(st_events, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-    RRDSET *st_bytes = rrdset_create_localhost(
-            "netdata"
-            , "statsd_bytes"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Bytes read by the netdata statsd server"
-            , "kilobits/s"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132013
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-    RRDDIM *rd_bytes_tcp = rrddim_add(st_bytes, "tcp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_bytes_udp = rrddim_add(st_bytes, "udp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        st_reads = rrdset_create_localhost(
+            "netdata",
+            "statsd_reads",
+            NULL,
+            "statsd",
+            NULL,
+            "Read operations made by the netdata statsd server",
+            "reads/s",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132012,
+            statsd.update_every,
+            RRDSET_TYPE_STACKED);
+        rd_reads_tcp = rrddim_add(st_reads, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_reads_udp = rrddim_add(st_reads, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-    RRDSET *st_packets = rrdset_create_localhost(
-            "netdata"
-            , "statsd_packets"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Network packets processed by the netdata statsd server"
-            , "packets/s"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132014
-            , statsd.update_every
-            , RRDSET_TYPE_STACKED
-    );
-    RRDDIM *rd_packets_tcp = rrddim_add(st_packets, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_packets_udp = rrddim_add(st_packets, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        st_bytes = rrdset_create_localhost(
+            "netdata",
+            "statsd_bytes",
+            NULL,
+            "statsd",
+            NULL,
+            "Bytes read by the netdata statsd server",
+            "kilobits/s",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132013,
+            statsd.update_every,
+            RRDSET_TYPE_STACKED);
+        rd_bytes_tcp = rrddim_add(st_bytes, "tcp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        rd_bytes_udp = rrddim_add(st_bytes, "udp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
 
-    RRDSET *st_tcp_connects = rrdset_create_localhost(
-            "netdata"
-            , "tcp_connects"
-            , NULL
-            , "statsd"
-            , NULL
-            , "statsd server TCP connects and disconnects"
-            , "events"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132015
-            , statsd.update_every
-            , RRDSET_TYPE_LINE
-    );
-    RRDDIM *rd_tcp_connects = rrddim_add(st_tcp_connects, "connects", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_tcp_disconnects = rrddim_add(st_tcp_connects, "disconnects", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        st_packets = rrdset_create_localhost(
+            "netdata",
+            "statsd_packets",
+            NULL,
+            "statsd",
+            NULL,
+            "Network packets processed by the netdata statsd server",
+            "packets/s",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132014,
+            statsd.update_every,
+            RRDSET_TYPE_STACKED);
+        rd_packets_tcp = rrddim_add(st_packets, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_packets_udp = rrddim_add(st_packets, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-    RRDSET *st_tcp_connected = rrdset_create_localhost(
-            "netdata"
-            , "tcp_connected"
-            , NULL
-            , "statsd"
-            , NULL
-            , "statsd server TCP connected sockets"
-            , "sockets"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132016
-            , statsd.update_every
-            , RRDSET_TYPE_LINE
-    );
-    RRDDIM *rd_tcp_connected = rrddim_add(st_tcp_connected, "connected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        st_tcp_connects = rrdset_create_localhost(
+            "netdata",
+            "tcp_connects",
+            NULL,
+            "statsd",
+            NULL,
+            "statsd server TCP connects and disconnects",
+            "events",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132015,
+            statsd.update_every,
+            RRDSET_TYPE_LINE);
+        rd_tcp_connects = rrddim_add(st_tcp_connects, "connects", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_tcp_disconnects = rrddim_add(st_tcp_connects, "disconnects", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-    RRDSET *st_pcharts = rrdset_create_localhost(
-            "netdata"
-            , "private_charts"
-            , NULL
-            , "statsd"
-            , NULL
-            , "Private metric charts created by the netdata statsd server"
-            , "charts"
-            , PLUGIN_STATSD_NAME
-            , "stats"
-            , 132020
-            , statsd.update_every
-            , RRDSET_TYPE_AREA
-    );
-    RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        st_tcp_connected = rrdset_create_localhost(
+            "netdata",
+            "tcp_connected",
+            NULL,
+            "statsd",
+            NULL,
+            "statsd server TCP connected sockets",
+            "sockets",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132016,
+            statsd.update_every,
+            RRDSET_TYPE_LINE);
+        rd_tcp_connected = rrddim_add(st_tcp_connected, "connected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        st_pcharts = rrdset_create_localhost(
+            "netdata",
+            "private_charts",
+            NULL,
+            "statsd",
+            NULL,
+            "Private metric charts created by the netdata statsd server",
+            "charts",
+            PLUGIN_STATSD_NAME,
+            "stats",
+            132020,
+            statsd.update_every,
+            RRDSET_TYPE_AREA);
+        rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd thread to turn metrics into charts
@@ -2737,68 +2776,70 @@ void *statsd_main(void *ptr) {
         if(unlikely(netdata_exit))
             break;
 
-        if(likely(hb_dt)) {
-            rrdset_next(st_metrics);
-            rrdset_next(st_useful_metrics);
-            rrdset_next(st_events);
-            rrdset_next(st_reads);
-            rrdset_next(st_bytes);
-            rrdset_next(st_packets);
-            rrdset_next(st_tcp_connects);
-            rrdset_next(st_tcp_connected);
-            rrdset_next(st_pcharts);
+        if(global_statistics_enabled) {
+            if(likely(hb_dt)) {
+                rrdset_next(st_metrics);
+                rrdset_next(st_useful_metrics);
+                rrdset_next(st_events);
+                rrdset_next(st_reads);
+                rrdset_next(st_bytes);
+                rrdset_next(st_packets);
+                rrdset_next(st_tcp_connects);
+                rrdset_next(st_tcp_connected);
+                rrdset_next(st_pcharts);
+            }
+
+            rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)statsd.meters.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_dictionary,   (collected_number)statsd.dictionaries.metrics);
+            rrdset_done(st_metrics);
+
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_counter,      (collected_number)statsd.counters.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_timer,        (collected_number)statsd.timers.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_dictionary,   (collected_number)statsd.dictionaries.useful);
+            rrdset_done(st_useful_metrics);
+
+            rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
+            rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
+            rrddim_set_by_pointer(st_events,  rd_events_timer,         (collected_number)statsd.timers.events);
+            rrddim_set_by_pointer(st_events,  rd_events_meter,         (collected_number)statsd.meters.events);
+            rrddim_set_by_pointer(st_events,  rd_events_histogram,     (collected_number)statsd.histograms.events);
+            rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)statsd.sets.events);
+            rrddim_set_by_pointer(st_events,  rd_events_dictionary,    (collected_number)statsd.dictionaries.events);
+            rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd.unknown_types);
+            rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd.socket_errors);
+            rrdset_done(st_events);
+
+            rrddim_set_by_pointer(st_reads,   rd_reads_tcp,            (collected_number)statsd.tcp_socket_reads);
+            rrddim_set_by_pointer(st_reads,   rd_reads_udp,            (collected_number)statsd.udp_socket_reads);
+            rrdset_done(st_reads);
+
+            rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,            (collected_number)statsd.tcp_bytes_read);
+            rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,            (collected_number)statsd.udp_bytes_read);
+            rrdset_done(st_bytes);
+
+            rrddim_set_by_pointer(st_packets, rd_packets_tcp,          (collected_number)statsd.tcp_packets_received);
+            rrddim_set_by_pointer(st_packets, rd_packets_udp,          (collected_number)statsd.udp_packets_received);
+            rrdset_done(st_packets);
+
+            rrddim_set_by_pointer(st_tcp_connects, rd_tcp_connects,    (collected_number)statsd.tcp_socket_connects);
+            rrddim_set_by_pointer(st_tcp_connects, rd_tcp_disconnects, (collected_number)statsd.tcp_socket_disconnects);
+            rrdset_done(st_tcp_connects);
+
+            rrddim_set_by_pointer(st_tcp_connected, rd_tcp_connected,  (collected_number)statsd.tcp_socket_connected);
+            rrdset_done(st_tcp_connected);
+
+            rrddim_set_by_pointer(st_pcharts, rd_pcharts,              (collected_number)statsd.private_charts);
+            rrdset_done(st_pcharts);
         }
-
-        rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)statsd.meters.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_dictionary,   (collected_number)statsd.dictionaries.metrics);
-        rrdset_done(st_metrics);
-
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful);
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_counter,      (collected_number)statsd.counters.useful);
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_timer,        (collected_number)statsd.timers.useful);
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful);
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful);
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful);
-        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_dictionary,   (collected_number)statsd.dictionaries.useful);
-        rrdset_done(st_useful_metrics);
-
-        rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
-        rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
-        rrddim_set_by_pointer(st_events,  rd_events_timer,         (collected_number)statsd.timers.events);
-        rrddim_set_by_pointer(st_events,  rd_events_meter,         (collected_number)statsd.meters.events);
-        rrddim_set_by_pointer(st_events,  rd_events_histogram,     (collected_number)statsd.histograms.events);
-        rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)statsd.sets.events);
-        rrddim_set_by_pointer(st_events,  rd_events_dictionary,    (collected_number)statsd.dictionaries.events);
-        rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd.unknown_types);
-        rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd.socket_errors);
-        rrdset_done(st_events);
-
-        rrddim_set_by_pointer(st_reads,   rd_reads_tcp,            (collected_number)statsd.tcp_socket_reads);
-        rrddim_set_by_pointer(st_reads,   rd_reads_udp,            (collected_number)statsd.udp_socket_reads);
-        rrdset_done(st_reads);
-
-        rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,            (collected_number)statsd.tcp_bytes_read);
-        rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,            (collected_number)statsd.udp_bytes_read);
-        rrdset_done(st_bytes);
-
-        rrddim_set_by_pointer(st_packets, rd_packets_tcp,          (collected_number)statsd.tcp_packets_received);
-        rrddim_set_by_pointer(st_packets, rd_packets_udp,          (collected_number)statsd.udp_packets_received);
-        rrdset_done(st_packets);
-
-        rrddim_set_by_pointer(st_tcp_connects, rd_tcp_connects,    (collected_number)statsd.tcp_socket_connects);
-        rrddim_set_by_pointer(st_tcp_connects, rd_tcp_disconnects, (collected_number)statsd.tcp_socket_disconnects);
-        rrdset_done(st_tcp_connects);
-
-        rrddim_set_by_pointer(st_tcp_connected, rd_tcp_connected,  (collected_number)statsd.tcp_socket_connected);
-        rrdset_done(st_tcp_connected);
-
-        rrddim_set_by_pointer(st_pcharts, rd_pcharts,              (collected_number)statsd.private_charts);
-        rrdset_done(st_pcharts);
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement

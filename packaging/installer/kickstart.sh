@@ -515,7 +515,7 @@ create_tmp_directory() {
 }
 
 set_tmpdir() {
-  if [ -z "${tmpdir}" ]; then
+  if [ -z "${tmpdir}" ] || [ ! -d "${tmpdir}" ]; then
     tmpdir="$(create_tmp_directory)"
     progress "Using ${tmpdir} as a temporary directory."
     cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
@@ -607,7 +607,7 @@ get_system_info() {
             opensuse-leap)
                 DISTRO_COMPAT_NAME="opensuse"
                 ;;
-            almalinux|rocky|rhel)
+            cloudlinux|almalinux|rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
                 ;;
             *)

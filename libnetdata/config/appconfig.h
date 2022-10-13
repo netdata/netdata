@@ -163,41 +163,43 @@ struct config {
 #define CONFIG_BOOLEAN_AUTO 2       // enabled if it has useful info when enabled
 #endif
 
-extern int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
-extern void config_section_wrlock(struct section *co);
-extern void config_section_unlock(struct section *co);
+int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
+void config_section_wrlock(struct section *co);
+void config_section_unlock(struct section *co);
 
-extern char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value);
-extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
-extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-extern NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-extern int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
-extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
-extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
-extern int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value);
+char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value);
+char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
+long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
+NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
+int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
+int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
+int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
+int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value);
 
-extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
-extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
-extern long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
-extern NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-extern int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
+const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
+const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
+long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
+NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
+int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 
-extern int appconfig_exists(struct config *root, const char *section, const char *name);
-extern int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
+int appconfig_exists(struct config *root, const char *section, const char *name);
+int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
 
-extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed);
+void appconfig_generate(struct config *root, BUFFER *wb, int only_changed);
 
-extern int appconfig_section_compare(void *a, void *b);
+int appconfig_section_compare(void *a, void *b);
 
-extern void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
-extern void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
+void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
+void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
 
-extern int config_parse_duration(const char* string, int* result);
+int config_parse_duration(const char* string, int* result);
 
-extern struct section *appconfig_get_section(struct config *root, const char *name);
+struct section *appconfig_get_section(struct config *root, const char *name);
 
-extern void appconfig_wrlock(struct config *root);
-extern void appconfig_unlock(struct config *root);
+void appconfig_wrlock(struct config *root);
+void appconfig_unlock(struct config *root);
+
+int appconfig_test_boolean_value(char *s);
 
 struct connector_instance {
     char instance_name[CONFIG_MAX_NAME + 1];
@@ -212,6 +214,6 @@ typedef struct _connector_instance {
     struct _connector_instance *next; // Next instance
 } _CONNECTOR_INSTANCE;
 
-extern _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
+_CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
 
 #endif /* NETDATA_CONFIG_H */

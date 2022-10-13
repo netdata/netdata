@@ -87,9 +87,16 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
                                             {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
-struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
-                                               NULL, NULL, 1, NULL,
-                                               NULL, NULL };
+struct netdata_static_thread socket_threads = {
+    .name = "EBPF SOCKET READ",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION

@@ -35,7 +35,6 @@ declare -a package_tree=(
   libatomic
   libtool
   cmake
-  nmap-ncat
   zlib-devel
   libuuid-devel
   libmnl-devel

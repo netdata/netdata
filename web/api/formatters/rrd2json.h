@@ -11,6 +11,7 @@ typedef struct query_params {
     char *chart_label_key;
     int max_anomaly_rates;
     int timeout;
+    int show_dimensions;
 } QUERY_PARAMS;
 
 
@@ -61,12 +62,29 @@ typedef enum {
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
 #define DATASOURCE_FORMAT_CSV_MARKDOWN "markdown"
 
-extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
-extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
+void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
+void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 
-extern int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp);
+int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp);
 
-extern int rrdset2value_api_v1(
+int rrdset2anything_api_v1(
+          ONEWAYALLOC *owa
+        , RRDSET *st
+        , QUERY_PARAMS *query_params
+        , BUFFER *dimensions
+        , uint32_t format
+        , long points
+        , long long after
+        , long long before
+        , int group_method
+        , const char *group_options
+        , long group_time
+        , uint32_t options
+        , time_t *latest_timestamp
+        , int tier
+);
+
+int rrdset2value_api_v1(
           RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
@@ -89,8 +107,8 @@ extern int rrdset2value_api_v1(
         , int tier
 );
 
-extern void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);
-extern void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_param_list, time_t after_requested);
-extern void free_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list);
+void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);
+void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_param_list, time_t after_requested);
+void free_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list);
 
 #endif /* NETDATA_RRD2JSON_H */

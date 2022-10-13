@@ -11,14 +11,14 @@ usec_t clock_monotonic_resolution = 1000;
 usec_t clock_realtime_resolution = 1000;
 
 #ifndef HAVE_CLOCK_GETTIME
-inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
+inline int clock_gettime(clockid_t clk_id __maybe_unused, struct timespec *ts) {
     struct timeval tv;
     if(unlikely(gettimeofday(&tv, NULL) == -1)) {
         error("gettimeofday() failed.");
         return -1;
     }
     ts->tv_sec = tv.tv_sec;
-    ts->tv_nsec = (tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC;
+    ts->tv_nsec = (long)((tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC);
     return 0;
 }
 #endif

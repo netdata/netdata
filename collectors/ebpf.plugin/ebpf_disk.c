@@ -33,9 +33,16 @@ static netdata_syscall_stat_t disk_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
 static netdata_idx_t *disk_hash_values = NULL;
-static struct netdata_static_thread disk_threads = {"DISK KERNEL",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, NULL };
+static struct netdata_static_thread disk_threads = {
+                                        .name = "DISK KERNEL",
+                                        .config_section = NULL,
+                                        .config_name = NULL,
+                                        .env_name = NULL,
+                                        .enabled = 1,
+                                        .thread = NULL,
+                                        .init_routine = NULL,
+                                        .start_routine = NULL
+};
 static enum ebpf_threads_status ebpf_disk_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 ebpf_publish_disk_t *plot_disks = NULL;

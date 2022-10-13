@@ -233,6 +233,36 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         rrddim_set_by_pointer(st_ahits, rd_ahits,   arcstats.hits);
         rrddim_set_by_pointer(st_ahits, rd_amisses, arcstats.misses);
         rrdset_done(st_ahits);
+
+        static RRDSET *st_ahits_rate = NULL;
+        static RRDDIM *rd_ahits_rate = NULL;
+        static RRDDIM *rd_amisses_rate = NULL;
+
+        if (unlikely(!st_ahits_rate)) {
+            st_ahits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "hits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS ARC Hits Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_HITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_ahits_rate   = rrddim_add(st_ahits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_amisses_rate = rrddim_add(st_ahits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_ahits_rate);
+
+        rrddim_set_by_pointer(st_ahits_rate, rd_ahits_rate,   arcstats.hits);
+        rrddim_set_by_pointer(st_ahits_rate, rd_amisses_rate, arcstats.misses);
+        rrdset_done(st_ahits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -269,6 +299,36 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         rrddim_set_by_pointer(st_dhits, rd_dhits,   dhit);
         rrddim_set_by_pointer(st_dhits, rd_dmisses, dmiss);
         rrdset_done(st_dhits);
+
+        static RRDSET *st_dhits_rate = NULL;
+        static RRDDIM *rd_dhits_rate = NULL;
+        static RRDDIM *rd_dmisses_rate = NULL;
+
+        if (unlikely(!st_dhits_rate)) {
+            st_dhits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "dhits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS Demand Hits Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_DHITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_dhits_rate   = rrddim_add(st_dhits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_dmisses_rate = rrddim_add(st_dhits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_dhits_rate);
+
+        rrddim_set_by_pointer(st_dhits_rate, rd_dhits_rate,   dhit);
+        rrddim_set_by_pointer(st_dhits_rate, rd_dmisses_rate, dmiss);
+        rrdset_done(st_dhits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -305,6 +365,36 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         rrddim_set_by_pointer(st_phits, rd_phits,   phit);
         rrddim_set_by_pointer(st_phits, rd_pmisses, pmiss);
         rrdset_done(st_phits);
+
+        static RRDSET *st_phits_rate = NULL;
+        static RRDDIM *rd_phits_rate = NULL;
+        static RRDDIM *rd_pmisses_rate = NULL;
+
+        if (unlikely(!st_phits_rate)) {
+            st_phits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "phits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS Prefetch Hits Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_PHITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_phits_rate   = rrddim_add(st_phits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pmisses_rate = rrddim_add(st_phits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_phits_rate);
+
+        rrddim_set_by_pointer(st_phits_rate, rd_phits_rate,   phit);
+        rrddim_set_by_pointer(st_phits_rate, rd_pmisses_rate, pmiss);
+        rrdset_done(st_phits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -341,6 +431,36 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         rrddim_set_by_pointer(st_mhits, rd_mhits,   mhit);
         rrddim_set_by_pointer(st_mhits, rd_mmisses, mmiss);
         rrdset_done(st_mhits);
+
+        static RRDSET *st_mhits_rate = NULL;
+        static RRDDIM *rd_mhits_rate = NULL;
+        static RRDDIM *rd_mmisses_rate = NULL;
+
+        if (unlikely(!st_mhits_rate)) {
+            st_mhits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "mhits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS Metadata Hits Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_MHITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_mhits_rate   = rrddim_add(st_mhits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mmisses_rate = rrddim_add(st_mhits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_mhits_rate);
+
+        rrddim_set_by_pointer(st_mhits_rate, rd_mhits_rate,   mhit);
+        rrddim_set_by_pointer(st_mhits_rate, rd_mmisses_rate, mmiss);
+        rrdset_done(st_mhits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -377,6 +497,36 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         rrddim_set_by_pointer(st_l2hits, rd_l2hits,   l2hit);
         rrddim_set_by_pointer(st_l2hits, rd_l2misses, l2miss);
         rrdset_done(st_l2hits);
+
+        static RRDSET *st_l2hits_rate = NULL;
+        static RRDDIM *rd_l2hits_rate = NULL;
+        static RRDDIM *rd_l2misses_rate = NULL;
+
+        if (unlikely(!st_l2hits_rate)) {
+            st_l2hits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "l2hits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS L2 Hits Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_L2HITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_l2hits_rate   = rrddim_add(st_l2hits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_l2misses_rate = rrddim_add(st_l2hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_l2hits_rate);
+
+        rrddim_set_by_pointer(st_l2hits_rate, rd_l2hits_rate, l2hit);
+        rrddim_set_by_pointer(st_l2hits_rate, rd_l2misses_rate, l2miss);
+        rrdset_done(st_l2hits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -620,6 +770,36 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         rrddim_set_by_pointer(st_actual_hits, rd_actual_hits,   real_hits);
         rrddim_set_by_pointer(st_actual_hits, rd_actual_misses, real_misses);
         rrdset_done(st_actual_hits);
+
+        static RRDSET *st_actual_hits_rate = NULL;
+        static RRDDIM *rd_actual_hits_rate = NULL;
+        static RRDDIM *rd_actual_misses_rate = NULL;
+
+        if (unlikely(!st_actual_hits_rate)) {
+            st_actual_hits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "actual_hits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS Actual Cache Hits Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_ACTUAL_HITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_actual_hits_rate   = rrddim_add(st_actual_hits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_actual_misses_rate = rrddim_add(st_actual_hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_actual_hits_rate);
+
+        rrddim_set_by_pointer(st_actual_hits_rate, rd_actual_hits_rate,   real_hits);
+        rrddim_set_by_pointer(st_actual_hits_rate, rd_actual_misses_rate, real_misses);
+        rrdset_done(st_actual_hits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -656,6 +836,36 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         rrddim_set_by_pointer(st_demand_data_hits, rd_demand_data_hits,   arcstats.demand_data_hits);
         rrddim_set_by_pointer(st_demand_data_hits, rd_demand_data_misses, arcstats.demand_data_misses);
         rrdset_done(st_demand_data_hits);
+
+        static RRDSET *st_demand_data_hits_rate = NULL;
+        static RRDDIM *rd_demand_data_hits_rate = NULL;
+        static RRDDIM *rd_demand_data_misses_rate = NULL;
+
+        if (unlikely(!st_demand_data_hits_rate)) {
+            st_demand_data_hits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "demand_data_hits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS Data Demand Efficiency Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_DEMAND_DATA_HITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_demand_data_hits_rate   = rrddim_add(st_demand_data_hits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_demand_data_misses_rate = rrddim_add(st_demand_data_hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_demand_data_hits_rate);
+
+        rrddim_set_by_pointer(st_demand_data_hits_rate, rd_demand_data_hits_rate,   arcstats.demand_data_hits);
+        rrddim_set_by_pointer(st_demand_data_hits_rate, rd_demand_data_misses_rate, arcstats.demand_data_misses);
+        rrdset_done(st_demand_data_hits_rate);
     }
 
     // --------------------------------------------------------------------
@@ -693,6 +903,36 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         rrddim_set_by_pointer(st_prefetch_data_hits, rd_prefetch_data_hits,   arcstats.prefetch_data_hits);
         rrddim_set_by_pointer(st_prefetch_data_hits, rd_prefetch_data_misses, arcstats.prefetch_data_misses);
         rrdset_done(st_prefetch_data_hits);
+
+        static RRDSET *st_prefetch_data_hits_rate = NULL;
+        static RRDDIM *rd_prefetch_data_hits_rate = NULL;
+        static RRDDIM *rd_prefetch_data_misses_rate = NULL;
+
+        if (unlikely(!st_prefetch_data_hits_rate)) {
+            st_prefetch_data_hits_rate = rrdset_create_localhost(
+                    "zfs"
+                    , "prefetch_data_hits_rate"
+                    , NULL
+                    , ZFS_FAMILY_EFFICIENCY
+                    , NULL
+                    , "ZFS Data Prefetch Efficiency Rate"
+                    , "events/s"
+                    , plugin
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_PREFETCH_DATA_HITS + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_prefetch_data_hits_rate   = rrddim_add(st_prefetch_data_hits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_prefetch_data_misses_rate = rrddim_add(st_prefetch_data_hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_prefetch_data_hits_rate);
+
+        rrddim_set_by_pointer(st_prefetch_data_hits_rate, rd_prefetch_data_hits_rate,   arcstats.prefetch_data_hits);
+        rrddim_set_by_pointer(st_prefetch_data_hits_rate, rd_prefetch_data_misses_rate, arcstats.prefetch_data_misses);
+        rrdset_done(st_prefetch_data_hits_rate);
     }
 
     // --------------------------------------------------------------------

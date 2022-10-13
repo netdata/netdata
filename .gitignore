@@ -128,6 +128,7 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 system/netdata.crontab
+system/install-service.sh
 
 daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh

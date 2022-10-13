@@ -174,7 +174,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
     uv_fs_req_cleanup(&req);
-    free(superblock);
+    posix_memfree(superblock);
     if (ret < 0) {
         destroy_data_file(datafile);
         return ret;
@@ -218,7 +218,7 @@ static int check_data_file_superblock(uv_file file)
         ret = 0;
     }
     error:
-    free(superblock);
+    posix_memfree(superblock);
     return ret;
 }
 

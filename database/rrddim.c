@@ -2,9 +2,6 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
-#ifdef ENABLE_DBENGINE
-#include "database/engine/rrdengineapi.h"
-#endif
 #include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
@@ -27,18 +24,10 @@ struct rrddim_constructor {
 
 };
 
-static void rrddim_update_rrddimvars_unsafe(RRDDIM *rd) {
-    RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
-
-    if(host->health_enabled && !rrdset_is_ar_chart(st)) {
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_FOREACH_ALARMS);
-        rrdset_flag_set(st, RRDSET_FLAG_PENDING_FOREACH_ALARMS);
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_FOREACH_ALARMS);
-    }
+// isolated call to appear
+// separate in statistics
+static void *rrddim_alloc_db(size_t entries) {
+    return callocz(entries, sizeof(storage_number));
 }
 
 static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *constructor_data) {
@@ -87,7 +76,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->entries;
         if(entries < 5) entries = 5;
 
-        rd->db = callocz(entries, sizeof(storage_number));
+        rd->db = rrddim_alloc_db(entries);
         rd->memsize = entries * sizeof(storage_number);
     }
 
@@ -112,7 +101,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             rd->tiers[tier]->mode = eng->id;
             rd->tiers[tier]->collect_ops = eng->api.collect_ops;
             rd->tiers[tier]->query_ops = eng->api.query_ops;
-            rd->tiers[tier]->db_metric_handle = eng->api.init(rd, host->storage_instance[tier]);
+            rd->tiers[tier]->db_metric_handle = eng->api.metric_get_or_create(rd, host->storage_instance[tier], rd->rrdset->storage_metrics_groups[tier]);
             storage_point_unset(rd->tiers[tier]->virtual_point);
             initialized++;
 
@@ -131,7 +120,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (int tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier]) {
-                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
+                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every * storage_tiers_grouping_iterations[tier]);
                 initialized++;
             }
         }
@@ -160,7 +149,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    rrddim_update_rrddimvars_unsafe(rd);
+    if(!rrdset_is_ar_chart(st)) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -224,7 +217,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
         if(eng)
-            eng->api.free(rd->tiers[tier]->db_metric_handle);
+            eng->api.metric_release(rd->tiers[tier]->db_metric_handle);
 
         freez(rd->tiers[tier]);
         rd->tiers[tier] = NULL;
@@ -232,7 +225,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if(rd->db) {
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
-            munmap(rd->db, rd->memsize);
+            netdata_munmap(rd->db, rd->memsize);
         else
             freez(rd->db);
     }
@@ -260,11 +253,16 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         for(int tier = 0; tier < storage_tiers ;tier++) {
             if (rd->tiers[tier])
                 rd->tiers[tier]->db_collection_handle =
-                    rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle);
+                    rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every * storage_tiers_grouping_iterations[tier]);
         }
 
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-        rrddim_update_rrddimvars_unsafe(rd);
+
+        if(!rrdset_is_ar_chart(st)) {
+            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+            rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+            rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+        }
     }
 
     if(unlikely(rc))
@@ -281,9 +279,6 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
         (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
-#ifdef ENABLE_ACLK
-        queue_dimension_to_aclk(rd, calc_dimension_liveness(rd, now_realtime_sec()));
-#endif
 
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -363,8 +358,8 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
     rd->exposed = 0;
-    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_algorithm(rd);
     return 1;
 }
@@ -376,8 +371,8 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rd->exposed = 0;
-    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_multiplier(rd);
     return 1;
 }
@@ -389,8 +384,8 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
     rd->exposed = 0;
-    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_divisor(rd);
     return 1;
 }
@@ -431,6 +426,8 @@ time_t rrddim_first_entry_t(RRDDIM *rd) {
 //   last collected time : Dimension is not live
 
 #ifdef ENABLE_ACLK
+#define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
+#define RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER (30)
 time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
 {
     time_t last_updated = rd->last_collected_time.tv_sec;
@@ -647,7 +644,7 @@ void rrddim_memory_file_free(RRDDIM *rd) {
 
     struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
     freez(rd_on_file->cache_filename);
-    munmap(rd_on_file, rd_on_file->memsize);
+    netdata_munmap(rd_on_file, rd_on_file->memsize);
 
     // remove the pointers from the RRDDIM
     rd->rd_on_file = NULL;
@@ -700,7 +697,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
         reset = 1;
     }
     else if(rd_on_file->memsize != size) {
-        error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, rd_on_file->memsize);
+        error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, (unsigned long int) rd_on_file->memsize);
         memset(rd_on_file, 0, size);
         reset = 1;
     }

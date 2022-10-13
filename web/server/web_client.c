@@ -1018,7 +1018,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // TODO -- ideally we we should avoid copying buffers around
                 snprintfz(w->last_url, NETDATA_WEB_REQUEST_URL_SIZE, "%s%s", w->decoded_url,  w->decoded_query_string);
 #ifdef ENABLE_HTTPS
-                if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+                if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
@@ -1054,7 +1054,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
             bytes = SSL_write(w->ssl.conn,buf, len) ;
         } else {
@@ -1211,7 +1211,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
            if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
                 while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
@@ -1308,14 +1308,6 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         host = rrdhost_find_by_hostname(tok);
         if (!host)
             host = rrdhost_find_by_guid(tok);
-        if (!host) {
-            host = sql_create_host_by_uuid(tok);
-            if (likely(host)) {
-                int rc = web_client_process_url(host, w, url);
-                free_temporary_host(host);
-                return rc;
-            }
-        }
         if (host) return web_client_process_url(host, w, url);
     }
 
@@ -1915,7 +1907,7 @@ ssize_t web_client_receive(struct web_client *w)
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
             bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {

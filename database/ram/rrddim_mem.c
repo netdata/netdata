@@ -2,21 +2,70 @@
 
 #include "rrddim_mem.h"
 
-// ----------------------------------------------------------------------------
-// RRDDIM legacy data collection functions
+static Pvoid_t rrddim_JudyHS_array = NULL;
+static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-STORAGE_METRIC_HANDLE *rrddim_metric_init(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused) {
-    return (STORAGE_METRIC_HANDLE *)rd;
+
+// ----------------------------------------------------------------------------
+// metrics groups
+
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+    return NULL;
 }
 
-void rrddim_metric_free(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {
+void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+    // if(!smg) return; // smg may be NULL
     ;
 }
 
-STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle) {
+// ----------------------------------------------------------------------------
+// RRDDIM legacy data collection functions
+
+STORAGE_METRIC_HANDLE *
+rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+    STORAGE_METRIC_HANDLE *t = rrddim_metric_get(db_instance, &rd->metric_uuid, smg);
+    if(!t) {
+        netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+        Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
+        fatal_assert(NULL == *PValue);
+        *PValue = rd;
+        t = (STORAGE_METRIC_HANDLE *)rd;
+        netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+    }
+
+    if((RRDDIM *)t != rd)
+        fatal("RRDDIM_MEM: incorrect pointer returned from index.");
+
+    return (STORAGE_METRIC_HANDLE *)rd;
+}
+
+STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+    RRDDIM *rd = NULL;
+    netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
+    Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
+    if (likely(NULL != PValue))
+        rd = *PValue;
+    netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+
+    return (STORAGE_METRIC_HANDLE *)rd;
+}
+
+void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {
+    RRDDIM *rd = (RRDDIM *)db_metric_handle;
+
+    netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+    JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
+    netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+}
+
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every __maybe_unused) {
+    rrddim_store_metric_flush(collection_handle);
+}
+
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every __maybe_unused) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     rd->db[rd->rrdset->current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
-    struct mem_collect_handle *ch = calloc(1, sizeof(struct mem_collect_handle));
+    struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
     ch->rd = rd;
     return (STORAGE_COLLECT_HANDLE *)ch;
 }
@@ -41,12 +90,15 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec
 
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+
     RRDDIM *rd = ch->rd;
-    memset(rd->db, 0, rd->rrdset->entries * sizeof(storage_number));
+    for(int i = 0; i < rd->rrdset->entries ;i++)
+        rd->db[i] = SN_EMPTY_SLOT;
+
 }
 
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
-    free(collection_handle);
+    freez(collection_handle);
     return 0;
 }
 
@@ -134,15 +186,13 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type) {
-    UNUSED(tier_query_fetch_type);
-
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;
-    handle->start_time = start_time;
-    handle->end_time = end_time;
-    struct mem_query_handle* h = calloc(1, sizeof(struct mem_query_handle));
+    handle->start_time_s = start_time;
+    handle->end_time_s = end_time;
+    struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->slot           = rrddim_time2slot(rd, start_time);
     h->last_slot      = rrddim_time2slot(rd, end_time);
     h->dt = rd->rrdset->update_every;
@@ -200,7 +250,7 @@ STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
 
 int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
-    return (h->next_timestamp > handle->end_time);
+    return (h->next_timestamp > handle->end_time_s);
 }
 
 void rrddim_query_finalize(struct rrddim_query_handle *handle) {
