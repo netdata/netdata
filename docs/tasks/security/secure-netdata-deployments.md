@@ -1,7 +1,8 @@
 <!--
-title: "Accessing Netdata components"
-sidebar_label: "Accessing Netdata components"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/accessing-netdata-components.md"
+title: "Secure Netdata deployments"
+sidebar_label: "Secure Netdata deployments"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/secure-netdata-deployments.md"
+sidebar_position : 1 
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "security"

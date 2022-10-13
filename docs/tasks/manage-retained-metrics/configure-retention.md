@@ -3,6 +3,7 @@ title: "Configure retention"
 sidebar_label: "Configure retention"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-retention.md"
 learn_status: "Published"
+sidebar_position: 4
 learn_topic_type: "Tasks"
 learn_rel_path: "manage-retained-metrics"
 learn_docs_purpose: "Instructions on how to use the calculator to find the values that meet the user’s needs along with instructions on configuring Agent Retention"

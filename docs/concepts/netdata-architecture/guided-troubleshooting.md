@@ -2,6 +2,7 @@
 title: "Guided troubleshooting"
 sidebar_label: "Guided troubleshooting"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md"
+sidebar_position: 16
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-architecture"

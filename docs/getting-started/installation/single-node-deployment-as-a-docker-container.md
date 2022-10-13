@@ -1,11 +1,12 @@
 <!--
-title: Deploy netdata in a host with Docker runtime
-sidebar_label: Deploy netdata in a host with Docker runtime
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-host-with-docker-runtime.md"
+title: Deploy netdata in a host as a Docker container
+sidebar_label: Deploy netdata as a Docker container
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/deploy-netdata-as-a-docker-container.md"
+sidebar_position: 7
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "installation"
-learn_docs_purpose: "Instruction to deploy Netdata in a Docker container"
+learn_topic_type: "Getting started"
+learn_rel_path: "Installation"
+learn_docs_purpose: "Instruction to deploy Netdata as a Docker container"
 -->
 
 Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps

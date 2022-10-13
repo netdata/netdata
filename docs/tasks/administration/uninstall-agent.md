@@ -4,7 +4,8 @@ sidebar_label: "Uninstall agent"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/uninstall-agent.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "general-configuration"
+sidebar_position: 7
+learn_rel_path: "administration"
 learn_docs_purpose: "Instructions on how to uninstall demonstration"
 -->
 

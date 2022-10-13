@@ -3,6 +3,7 @@ title: "Configure health settings"
 sidebar_label: "Configure health settings"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-health-settings.md"
 learn_status: "Published"
+sidebar_position: 7
 learn_topic_type: "Tasks"
 learn_rel_path: "alerting"
 learn_docs_purpose: "Instructions on how to write a health entity, notification systems/methods"

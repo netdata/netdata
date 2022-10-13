@@ -3,6 +3,7 @@ title: "Enable a collector & configure a module"
 sidebar_label: "Enable a collector & configure a module"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/enable-a-collector-&-configure-a-module.md"
 learn_status: "Published"
+sidebar_position: 4
 learn_topic_type: "Tasks"
 learn_rel_path: "general-configuration"
 learn_docs_purpose: "Instructions on how to enable a collector or its orchestrator, and how to configure a module"

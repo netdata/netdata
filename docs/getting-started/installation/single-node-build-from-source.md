@@ -1,11 +1,12 @@
 <!--
-title: "Unclaim an Agent from a Space in the Hub"
-sidebar_label: "Unclaim an Agent from a Space in the Hub"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/unclaim-an-agent-from-a-space-in-the-hub.md"
+title: "Build from source"
+sidebar_label: "Build from source"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/single-node-build-from-source.md"
+sidebar_position: 10
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "general-configuration"
-learn_docs_purpose: "Instructions on how to unclaim a node from a Space in the Hub"
+learn_topic_type: "Getting Started"
+learn_rel_path: "Installation"
+learn_docs_purpose: "Build Netdata from source"
 -->
 
 **********************************************************************

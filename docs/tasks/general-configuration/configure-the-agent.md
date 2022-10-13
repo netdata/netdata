@@ -3,6 +3,7 @@ title: "Configure the Agent"
 sidebar_label: "Configure the Agent"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md"
 learn_status: "Published"
+sidebar_position: 1
 learn_topic_type: "Tasks"
 learn_rel_path: "general-configuration"
 learn_docs_purpose: "demonstrate an edit-config, reference to the ref-doc of netdata.conf, plus add an admonition in case user want to change metric retention to follow the corresponding doc"

@@ -3,6 +3,7 @@ title: "Silence Alerts"
 sidebar_label: "Silence Alerts"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/silence-alerts.md"
 learn_status: "Published"
+sidebar_position: 10
 learn_topic_type: "Tasks"
 learn_rel_path: "alerting"
 learn_docs_purpose: "Instructions on how to silence an alert"

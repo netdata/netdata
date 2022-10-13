@@ -1,10 +1,11 @@
 <!--
 title: "Deploy Netdata in a Kubernetes Cluster"
 sidebar_label: "Deploy Netdata in a Kubernetes Cluster"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-kubernetes-cluster.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/deploy-netdata-in-a-kubernetes-cluster.md"
+sidebar_position: 13
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "installation"
+learn_topic_type: "Getting started"
+learn_rel_path: "Installation"
 learn_docs_purpose: "Instructions on deploying Netdata in a Kubernetes cluster"
 -->
 

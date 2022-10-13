@@ -1,11 +1,12 @@
 <!--
-title: "Claim an Agent to the Hub"
-sidebar_label: "Claim an Agent to the Hub"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/claim-an-agent-to-the-hub.md"
+title: "Claim an Agent to the Cloud"
+sidebar_label: "Claim an Agent to the Cloud"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/claim-an-agent-to-the-cloud.md"
 learn_status: "Published"
+sidebar_position: 10
 learn_topic_type: "Tasks"
-learn_rel_path: "general-configuration"
-learn_docs_purpose: "Instructions on how to claim a node on a Space in the Hub."
+learn_rel_path: "administration"
+learn_docs_purpose: "Instructions on how to claim a node on a Space in the Cloud."
 -->
 
 You can securely connect a Netdata Agent, running on a distributed node, to Netdata Cloud.  

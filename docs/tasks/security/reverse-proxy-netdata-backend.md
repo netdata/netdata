@@ -2,6 +2,7 @@
 title: "Reverse proxy Netdata backend"
 sidebar_label: "Reverse proxy Netdata backend"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/reverse-proxy-netdata-backend.md"
+sidebar_position : 4
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "security"

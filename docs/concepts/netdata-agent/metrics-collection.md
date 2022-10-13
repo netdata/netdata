@@ -2,6 +2,7 @@
 title: "Metrics collection"
 sidebar_label: "Metrics collection"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md"
+sidebar_position: 4
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-agent"

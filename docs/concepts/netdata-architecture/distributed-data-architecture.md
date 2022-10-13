@@ -2,6 +2,7 @@
 title: "Distributed data architecture"
 sidebar_label: "Distributed data architecture"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/distributed-data-architecture.md"
+sidebar_position: 4
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-architecture"

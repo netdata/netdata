@@ -2,6 +2,7 @@
 title: "Metrics storage"
 sidebar_label: "Metrics storage"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md"
+sidebar_position: 7
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-agent"

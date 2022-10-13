@@ -1,42 +1,21 @@
 <!--
-title: "Netdata in a pane"
-sidebar_label: "Netdata in a pane"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/netdata-in-a-pane.md"
+title: "Introduction"
+sidebar_label: "Introduction"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/intro.md"
 learn_status: "Published"
 learn_topic_type: "Getting started"
 learn_rel_path: ""
 learn_docs_purpose: "Present netdata in a nutshell"
 -->
 
-<h2 align="center">Netdata is an ecosystem that provides monitoring, visualization, and troubleshooting solution for systems, containers, services, and applications.</h2>
-<br />
-<p align="center">
-  <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
-  <br />
-  <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
-  <a href="https://storage.googleapis.com/netdata-nightlies/latest-version.txt"><img src="https://img.shields.io/badge/dynamic/xml?url=https://storage.googleapis.com/netdata-nightlies/latest-version.txt&label=nightly%20release&query=/text()" alt="Nightly release"></a>
-  <br />
-  <a href="https://travis-ci.com/netdata/netdata"><img src="https://travis-ci.com/netdata/netdata.svg?branch=master" alt="Build status"></a>
-  <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
-  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
-  <br />
-  <a href="https://codeclimate.com/github/netdata/netdata"><img src="https://codeclimate.com/github/netdata/netdata/badges/gpa.svg" alt="Code Climate"></a>
-  <a href="https://lgtm.com/projects/g/netdata/netdata/context:cpp"><img src="https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm" alt="LGTM C"></a>
-  <a href="https://lgtm.com/projects/g/netdata/netdata/context:python"><img src="https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm" alt="LGTM PYTHON"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&v44" alt="User base"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&options=unaligned&v44" alt="Servers monitored"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&options=unaligned&v44" alt="Sessions served"></a>
-  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000000&precision=1&units=M&label=docker+hub+pulls&options=unaligned&v44" alt="Docker Hub pulls"></a>
-  <br />
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&options=unaligned&v44" alt="New users today"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v44" alt="New machines today"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v44" alt="Sessions today"></a>
-  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
-</p>
 
+:::info
 
-## <image> a random Netdata deployment
+I want this doc to be also the README.md in netdata/netdata.
 
+:::
+
+## What is Netdata ?
 
 ## Why use Netdata?
 
@@ -105,6 +84,10 @@ Netdata works with tons of applications, notifications platforms, and other time
 -   **30+ external time-series databases**: Export resampled metrics as they're collected to other [local- and
     Cloud-based databases](https://learn.netdata.cloud/docs/export/external-databases) for best-in-class
     interoperability.
+
+
+## How it works 
+
 
 ## Community
 
