@@ -404,13 +404,8 @@ install_lsb_service() {
 }
 
 lsb_cmds() {
-  if command -v service >/dev/null 2>&1; then
-    NETDATA_START_CMD='service netdata start'
-    NETDATA_STOP_CMD='service netdata stop'
-  else
-    NETDATA_START_CMD='/etc/init.d/netdata start'
-    NETDATA_STOP_CMD='/etc/init.d/netdata stop'
-  fi
+  NETDATA_START_CMD='/etc/init.d/netdata start'
+  NETDATA_STOP_CMD='/etc/init.d/netdata stop'
 }
 
 # =====================================================================
@@ -465,13 +460,8 @@ install_initd_service() {
 }
 
 initd_cmds() {
-  if command -v service >/dev/null 2>&1; then
-    NETDATA_START_CMD='service netdata start'
-    NETDATA_STOP_CMD='service netdata stop'
-  else
-    NETDATA_START_CMD='/etc/init.d/netdata start'
-    NETDATA_STOP_CMD='/etc/init.d/netdata stop'
-  fi
+  NETDATA_START_CMD='/etc/init.d/netdata start'
+  NETDATA_STOP_CMD='/etc/init.d/netdata stop'
 }
 
 # =====================================================================
