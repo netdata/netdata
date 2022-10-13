@@ -135,7 +135,7 @@ typedef struct query_target_request {
     int points;
     int timeout;                        // the timeout of the query
     int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it
-    DATASOURCE_FORMAT format;
+    uint32_t format;                    // DATASOURCE_FORMAT
     RRDR_OPTIONS options;
     RRDR_GROUPING group_method;
     const char *group_options;
@@ -196,10 +196,10 @@ typedef struct query_target {
 
 } QUERY_TARGET;
 
-extern void query_target_free(void);
-extern void query_target_release(QUERY_TARGET *qt);
+void query_target_free(void);
+void query_target_release(QUERY_TARGET *qt);
 
-extern QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
+QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr);
 
 #endif // NETDATA_RRDCONTEXT_H
 

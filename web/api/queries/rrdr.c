@@ -61,6 +61,7 @@ static void rrdr_dump(RRDR *r)
 inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     if(unlikely(!r)) return;
 
+    query_target_release(r->qt);
     onewayalloc_freez(owa, r->t);
     onewayalloc_freez(owa, r->v);
     onewayalloc_freez(owa, r->o);
@@ -70,7 +71,13 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
 }
 
 RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
-    if(unlikely(!qt || !qt->query.used || !qt->points)) return NULL;
+    if(unlikely(!qt))
+        return NULL;
+
+    if(unlikely(!qt->query.used || !qt->points)) {
+        query_target_release(qt);
+        return NULL;
+    }
 
     size_t dimensions = qt->query.used;
     size_t points = qt->points;

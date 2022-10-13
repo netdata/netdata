@@ -202,10 +202,18 @@ int rrdset2value_api_v1(
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     ONEWAYALLOC *owa = onewayalloc_create(0);
-
-    RRDR *r = rrd2rrdr(owa, st, points, after, before,
-                       group_method, group_time, options, dimensions, NULL,
-                       group_options, timeout, tier);
+    RRDR *r = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
+            .st = st,
+            .dimensions = dimensions,
+            .points = (int)points,
+            .after = after,
+            .before = before,
+            .group_method = group_method,
+            .group_options = group_options,
+            .options = options,
+            .timeout = timeout,
+            .tier = tier,
+    }));
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -248,26 +256,14 @@ int rrdset2value_api_v1(
     ret = HTTP_RESP_OK;
 
 cleanup:
-    if(r) rrdr_free(owa, r);
+    rrdr_free(owa, r);
     onewayalloc_destroy(owa);
     return ret;
 }
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp) {
 
-    RRDR *r = rrd2rrdr(
-        owa,
-        qt->request.st,
-        qt->request.points,
-        qt->request.after,
-        qt->request.before,
-        qt->request.group_method,
-        qt->request.resampling_time,
-        qt->request.options,
-        qt->request.dimensions,
-        NULL,
-        qt->request.group_options,
-        qt->request.timeout, qt->request.tier);
+    RRDR *r = rrd2rrdr(owa, qt);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -278,7 +274,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
-    if (rrdset_is_ar_chart(st))
+    if (qt->request.st && rrdset_is_ar_chart(qt->request.st))
         ml_process_rrdr(r, qt->request.max_anomaly_rates);
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
@@ -288,6 +284,14 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     if(latest_timestamp && rrdr_rows(r) > 0)
         *latest_timestamp = r->before;
+
+    DATASOURCE_FORMAT format = qt->request.format;
+    RRDR_OPTIONS options = qt->request.options;
+    RRDR_GROUPING group_method = qt->request.group_method;
+
+    // FIXME - added these for temporary compilation - they should be fixed
+    QUERY_PARAMS *query_params = NULL;
+    RRDDIM *temp_rd = NULL;
 
     switch(format) {
     case DATASOURCE_SSV:

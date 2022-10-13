@@ -528,10 +528,19 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_queries++;
     usec_t started_usec = now_realtime_usec();
     ONEWAYALLOC *owa = onewayalloc_create(0);
-    high_rrdr = rrd2rrdr(owa, st, points,
-                         after, before, group,
-                         group_time, options, NULL, context_param_list, group_options,
-                         timeout, tier);
+    high_rrdr = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
+            .st = st,
+            .after = after,
+            .before = before,
+            .points = (int)points,
+            .options = options,
+            .group_method = group,
+            .group_options = group_options,
+            .resampling_time = group_time,
+            .timeout = timeout,
+            .tier = tier,
+    }));
+
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", rrdset_name(st));
         goto cleanup;
@@ -558,10 +567,18 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
     // get the baseline, requesting the same number of points as the highlight
     stats->db_queries++;
-    base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
-                    baseline_after, baseline_before, group,
-                    group_time, options, NULL, context_param_list, group_options,
-                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), tier);
+    base_rrdr = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
+            .st = st,
+            .after = baseline_after,
+            .before = baseline_before,
+            .points = (int)(high_points << shifts),
+            .options = options,
+            .group_method = group,
+            .group_options = group_options,
+            .resampling_time = group_time,
+            .timeout = (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
+            .tier = tier,
+    }));
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", rrdset_name(st));
         goto cleanup;

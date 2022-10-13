@@ -670,7 +670,6 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
 
     SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
-    RRDDIM *d;
     long dims_selected = 0, dims_not_hidden_not_zero = 0;
     for(size_t c = 0, max = qt->query.used; c < max ;c++) {
         if(       (match_ids   && simple_pattern_matches(pattern, string2str(qt->query.array[c].dimension.id)))

@@ -709,27 +709,25 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
     int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
-    QUERY_TARGET_REQUEST qtr = {
-        .after = after,
-        .before = before,
-        .host = host,
-        .st = st,
-        .hosts = NULL,
-        .contexts = context,
-        .charts = chart,
-        .dimensions = buffer_tostring(dimensions),
-        .timeout = timeout,
-        .max_anomaly_rates = max_anomaly_rates,
-        .points = points,
-        .format = format,
-        .options = options,
-        .group_method = group,
-        .group_options = group_options,
-        .resampling_time = group_time,
-        .tier = tier,
-    };
-
-    QUERY_TARGET *qt = query_target_create(&qtr);
+    QUERY_TARGET *qt = query_target_create((QUERY_TARGET_REQUEST) {
+            .after = after,
+            .before = before,
+            .host = host,
+            .st = st,
+            .hosts = NULL,
+            .contexts = context,
+            .charts = chart,
+            .dimensions = buffer_tostring(dimensions),
+            .timeout = timeout,
+            .max_anomaly_rates = max_anomaly_rates,
+            .points = points,
+            .format = format,
+            .options = options,
+            .group_method = group,
+            .group_options = group_options,
+            .resampling_time = group_time,
+            .tier = tier,
+    });
 
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
@@ -745,7 +743,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         if (timeout <= 0) {
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Query timeout exceeded");
-            return HTTP_RESP_BACKEND_FETCH_FAILED;
+            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
+            goto cleanup;
         }
     }
 

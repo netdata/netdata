@@ -65,24 +65,7 @@ typedef enum {
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 
-int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp);
-
-int rrdset2anything_api_v1(
-          ONEWAYALLOC *owa
-        , RRDSET *st
-        , QUERY_PARAMS *query_params
-        , BUFFER *dimensions
-        , uint32_t format
-        , long points
-        , long long after
-        , long long before
-        , int group_method
-        , const char *group_options
-        , long group_time
-        , uint32_t options
-        , time_t *latest_timestamp
-        , int tier
-);
+int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
 int rrdset2value_api_v1(
           RRDSET *st

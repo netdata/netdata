@@ -69,12 +69,12 @@ typedef enum rrdr_result_flags {
                                                    // (should not to be cached by browsers and proxies)
     RRDR_RESULT_OPTION_VARIABLE_STEP = 0x00000004, // the query uses variable-step time-frames
     RRDR_RESULT_OPTION_CANCEL        = 0x00000008, // the query needs to be cancelled
-} RRDR_RESULT_FLAGS;
+} RRDR_RESULT_OPTIONS;
 
 typedef struct rrdresult {
     struct query_target *qt;
 
-    RRDR_RESULT_FLAGS result_options; // RRDR_RESULT_OPTION_*
+    RRDR_RESULT_OPTIONS result_options; // RRDR_RESULT_OPTION_*
 
     int d;                    // the number of dimensions
     long n;                   // the number of values in the arrays
@@ -128,12 +128,12 @@ typedef struct rrdresult {
 
 #include "database/rrd.h"
 void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
-RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt);
+RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt);
+RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 
 int rrdr_relative_window_to_absolute(long long *after, long long *before);
 

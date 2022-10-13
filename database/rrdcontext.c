@@ -115,7 +115,7 @@ typedef enum {
 // check if ANY of the given flags (bits) is set
 #define rrd_flag_check(obj, flag) (rrd_flags_get(obj) & (flag))
 
-// check if ALL of the given flags (bits) are set
+// check if ALL the given flags (bits) are set
 #define rrd_flag_check_all(obj, flag) (rrd_flag_check(obj, flag) == (flag))
 
 // set one or more flags (bits)
@@ -484,9 +484,9 @@ static void rrdmetric_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 // called when the same rrdmetric is inserted again to the rrdmetrics dictionary of a rrdinstance
 // while this is called, the dictionary is write locked, but there may be other users of the object
-static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdinstance __maybe_unused) {
-    RRDMETRIC *rm     = oldv;
-    RRDMETRIC *rm_new = newv;
+static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdinstance __maybe_unused) {
+    RRDMETRIC *rm     = old_value;
+    RRDMETRIC *rm_new = new_value;
 
     internal_error(rm->id != rm_new->id,
                    "RRDMETRIC: '%s' cannot change id to '%s'",
@@ -746,9 +746,9 @@ static void rrdinstance_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
     rrdinstance_free(ri);
 }
 
-static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdcontext __maybe_unused) {
-    RRDINSTANCE *ri     = (RRDINSTANCE *)oldv;
-    RRDINSTANCE *ri_new = (RRDINSTANCE *)newv;
+static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdcontext __maybe_unused) {
+    RRDINSTANCE *ri     = (RRDINSTANCE *)old_value;
+    RRDINSTANCE *ri_new = (RRDINSTANCE *)new_value;
 
     internal_error(ri->id != ri_new->id,
                    "RRDINSTANCE: '%s' cannot change id to '%s'",
@@ -951,7 +951,7 @@ static inline void rrdinstance_from_rrdset(RRDSET *st) {
     }
 
     if(rca_old && ria_old) {
-        // Ooops! The chart changed context!
+        // Oops! The chart changed context!
 
         // RRDCONTEXT *rc_old = rrdcontext_acquired_value(rca_old);
         RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
@@ -1162,8 +1162,8 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
         rc->version      = rc->hub.version;
         rc->priority     = rc->hub.priority;
-        rc->first_time_t = rc->hub.first_time_t;
-        rc->last_time_t  = rc->hub.last_time_t;
+        rc->first_time_t = (time_t)rc->hub.first_time_t;
+        rc->last_time_t  = (time_t)rc->hub.last_time_t;
 
         if(rc->hub.deleted || !rc->hub.first_time_t)
             rrd_flag_set_deleted(rc, RRD_FLAG_NONE);
@@ -1197,11 +1197,11 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
     rrdcontext_freez(rc);
 }
 
-static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *oldv, void *newv, void *rrdhost __maybe_unused) {
-    RRDCONTEXT *rc = (RRDCONTEXT *)oldv;
-    RRDCONTEXT *rc_new = (RRDCONTEXT *)newv;
+static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdhost __maybe_unused) {
+    RRDCONTEXT *rc = (RRDCONTEXT *)old_value;
+    RRDCONTEXT *rc_new = (RRDCONTEXT *)new_value;
 
-    //current rc is not archived, new_rc is archived, dont merge
+    //current rc is not archived, new_rc is archived, don't merge
     if (!rrd_flag_is_archived(rc) && rrd_flag_is_archived(rc_new)) {
         rrdcontext_freez(rc_new);
         return false;
@@ -2079,6 +2079,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 
 static __thread QUERY_TARGET thread_query_target = {};
 void query_target_release(QUERY_TARGET *qt) {
+    if(unlikely(!qt)) return;
 
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
@@ -2342,8 +2343,10 @@ static void query_target_add_context_instances(QUERY_TARGET_LOCALS *qtl, RRDCONT
 
 }
 
-QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
-    if(thread_query_target.used) fatal("QUERY TARGET: this query target is already used.");
+QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
+    if(thread_query_target.used)
+        fatal("QUERY TARGET: this query target is already used.");
+
     thread_query_target.used = true;
     thread_query_target.start_us = now_realtime_usec();
 
@@ -2351,7 +2354,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         thread_query_target.rrdlabels = rrdlabels_create();
 
     // copy the request into query_thread_target
-    thread_query_target.request = *qtr;
+    thread_query_target.request = qtr;
 
     // prepare our local variables
     QUERY_TARGET_LOCALS qtl = {
@@ -3471,7 +3474,7 @@ void *rrdcontext_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
     worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
     worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
-    worker_register_job_name(WORKER_JOB_DEQUEUE, "deduped contexts");
+    worker_register_job_name(WORKER_JOB_DEQUEUE, "deduplicated contexts");
     worker_register_job_name(WORKER_JOB_RETENTION, "metrics retention");
     worker_register_job_name(WORKER_JOB_QUEUED, "queued contexts");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanups");

@@ -1920,22 +1920,27 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
     long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start, time_end,
-                           RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
-                           NULL, NULL, NULL, 0, 0);
+        RRDR *r = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
+                .st = st[i],
+                .after = time_start,
+                .before = time_end,
+                .points = (int)points,
+                .group_method = RRDR_GROUPING_AVERAGE,
+                .options = RRDR_OPTION_NATURAL_POINTS,
+        }));
 
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
         } else {
-            assert(r->st == st[i]);
+            assert(r->qt->request.st == st[i]);
             for (c = 0; c != rrdr_rows(r) ; ++c) {
                 RRDDIM *d;
                 time_now = time_start + (c + 1) * update_every;
                 time_retrieved = r->t[c];
 
                 // for each dimension
-                rrddim_foreach_read(d, r->st) {
+                rrddim_foreach_read(d, r->qt->request.st) {
                     if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
 
                     j = (int)d_dfe.counter;
@@ -2059,16 +2064,22 @@ int test_dbengine(void)
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, st[i], points, time_start[0] + update_every,
-                           time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
-                           RRDR_OPTION_NATURAL_POINTS, NULL, NULL, NULL, 0, 0);
+        RRDR *r = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
+                .st = st[i],
+                .after = time_start[0] + update_every,
+                .before = time_end[REGIONS - 1],
+                .points = (int)points,
+                .group_method = RRDR_GROUPING_AVERAGE,
+                .options = RRDR_OPTION_NATURAL_POINTS,
+        }));
+
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));
             ++errors;
         } else {
             long c;
 
-            assert(r->st == st[i]);
+            assert(r->qt->request.st == st[i]);
             // test current region values only, since they must be left unchanged
             for (c = point_offset ; c < point_offset + rrdr_rows(r) / REGIONS / 2 ; ++c) {
                 RRDDIM *d;
@@ -2076,7 +2087,7 @@ int test_dbengine(void)
                 time_t time_retrieved = r->t[c];
 
                 // for each dimension
-                rrddim_foreach_read(d, r->st) {
+                rrddim_foreach_read(d, r->qt->request.st) {
                     if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
 
                     j = (int)d_dfe.counter;
