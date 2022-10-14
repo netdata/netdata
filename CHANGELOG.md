@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- minor - add trace alloc to buildinfo [\#13817](https://github.com/netdata/netdata/pull/13817) ([underhood](https://github.com/underhood))
+- Fix exporting unit tests [\#13816](https://github.com/netdata/netdata/pull/13816) ([vlvkobal](https://github.com/vlvkobal))
+- overload libc memory allocators with custom ones to trace all allocations [\#13810](https://github.com/netdata/netdata/pull/13810) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.40.4 [\#13808](https://github.com/netdata/netdata/pull/13808) ([ilyam8](https://github.com/ilyam8))
 - fix post-processing of contexts [\#13807](https://github.com/netdata/netdata/pull/13807) ([ktsaou](https://github.com/ktsaou))
 - Merge netstat, snmp, and snmp6 modules [\#13806](https://github.com/netdata/netdata/pull/13806) ([vlvkobal](https://github.com/vlvkobal))
@@ -20,6 +23,7 @@
 - Array Allocator Memory Leak Fix [\#13792](https://github.com/netdata/netdata/pull/13792) ([ktsaou](https://github.com/ktsaou))
 - Remove extern from function declared in headers. [\#13790](https://github.com/netdata/netdata/pull/13790) ([vkalintiris](https://github.com/vkalintiris))
 - full memory tracking and profiling of Netdata Agent [\#13789](https://github.com/netdata/netdata/pull/13789) ([ktsaou](https://github.com/ktsaou))
+- allow disabling netdata monitoring section of the dashboard [\#13788](https://github.com/netdata/netdata/pull/13788) ([ktsaou](https://github.com/ktsaou))
 - Stop pulling in netcat as a mandatory dependency. [\#13787](https://github.com/netdata/netdata/pull/13787) ([Ferroin](https://github.com/Ferroin))
 - Initialize st-\>rrdvars from rrdset insert callback [\#13786](https://github.com/netdata/netdata/pull/13786) ([MrZammler](https://github.com/MrZammler))
 - Add Ubuntu 22.10 to supported distros, CI, and package builds. [\#13785](https://github.com/netdata/netdata/pull/13785) ([Ferroin](https://github.com/Ferroin))
@@ -29,11 +33,14 @@
 - Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump websockets submodule [\#13776](https://github.com/netdata/netdata/pull/13776) ([underhood](https://github.com/underhood))
 - Rename variable for old CentOS version [\#13775](https://github.com/netdata/netdata/pull/13775) ([thiagoftsm](https://github.com/thiagoftsm))
+- dbengine free from RRDSET and RRDDIM [\#13772](https://github.com/netdata/netdata/pull/13772) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.40.3 [\#13771](https://github.com/netdata/netdata/pull/13771) ([ilyam8](https://github.com/ilyam8))
+- Update fping plugin documentation with better details about the required version. [\#13765](https://github.com/netdata/netdata/pull/13765) ([Ferroin](https://github.com/Ferroin))
 - fix bad merge [\#13764](https://github.com/netdata/netdata/pull/13764) ([ktsaou](https://github.com/ktsaou))
 - add 1m delay for tcp reset alarms [\#13761](https://github.com/netdata/netdata/pull/13761) ([ilyam8](https://github.com/ilyam8))
 - Use /bin/sh instead of ls to detect glibc [\#13758](https://github.com/netdata/netdata/pull/13758) ([MrZammler](https://github.com/MrZammler))
 - Add ZFS rate charts [\#13757](https://github.com/netdata/netdata/pull/13757) ([vlvkobal](https://github.com/vlvkobal))
+- Count currently streaming senders on the localhost [\#13755](https://github.com/netdata/netdata/pull/13755) ([MrZammler](https://github.com/MrZammler))
 - Fix streaming crash when child reconnects and is archived on the parent [\#13754](https://github.com/netdata/netdata/pull/13754) ([stelfrag](https://github.com/stelfrag))
 - Add CloudLinux OS detection to the updater script [\#13752](https://github.com/netdata/netdata/pull/13752) ([Pulseeey](https://github.com/Pulseeey))
 - Add CloudLinux OS detection to kickstart [\#13750](https://github.com/netdata/netdata/pull/13750) ([Pulseeey](https://github.com/Pulseeey))
@@ -160,6 +167,7 @@
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
 - Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
+- Fix existing install detection for FreeBSD and macOS. [\#13243](https://github.com/netdata/netdata/pull/13243) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -341,11 +349,6 @@
 - add CAP\_SYS\_RAWIO to Netdata's systemd unit CapabilityBoundingSet [\#13154](https://github.com/netdata/netdata/pull/13154) ([ilyam8](https://github.com/ilyam8))
 - Update docs on what to do if collector not there [\#13152](https://github.com/netdata/netdata/pull/13152) ([cakrit](https://github.com/cakrit))
 - revert to default of `host anomaly rate threshold=0.01` [\#13150](https://github.com/netdata/netdata/pull/13150) ([andrewm4894](https://github.com/andrewm4894))
-- fix conditions for nightly build triggers [\#13145](https://github.com/netdata/netdata/pull/13145) ([maneamarius](https://github.com/maneamarius))
-- Add cargo/rustc/bazel/buck to apps\_groups.conf [\#13143](https://github.com/netdata/netdata/pull/13143) ([vkalintiris](https://github.com/vkalintiris))
-- Add an option to use malloc for page cache instead of mmap [\#13142](https://github.com/netdata/netdata/pull/13142) ([stelfrag](https://github.com/stelfrag))
-- Add mem.available chart to FreeBSD [\#13140](https://github.com/netdata/netdata/pull/13140) ([MrZammler](https://github.com/MrZammler))
-- fix crashes due to misaligned allocations [\#13137](https://github.com/netdata/netdata/pull/13137) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
