@@ -4271,20 +4271,26 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     pluginsd_function_result_end_to_stdout();
 }
 
-#define add_table_field(wb, key, name, visible, type, units, max, sort)            do { \
-        if(fields_added) buffer_strcat(wb, ",");                                        \
-        buffer_sprintf(wb, "\n      \"%s\": {", key);                                   \
-        buffer_sprintf(wb, "\n         \"index\":%d,", fields_added);                   \
-        buffer_sprintf(wb, "\n         \"name\":\"%s\",", name);                        \
-        buffer_sprintf(wb, "\n         \"visible\":%s,", (visible)?"true":"false");     \
-        buffer_sprintf(wb, "\n         \"type\":\"%s\",", type);                        \
-        if(units)                                                                       \
-           buffer_sprintf(wb, "\n         \"units\":\"%s\",", (char*)(units));          \
-        if(!isnan(max))                                                                 \
-           buffer_sprintf(wb, "\n         \"max\":\"%f\",", (NETDATA_DOUBLE)(max));     \
-        buffer_sprintf(wb, "\n         \"sort\":\"%s\"", sort);                         \
-        buffer_sprintf(wb, "\n      }");                                                \
-        fields_added++;                                                                 \
+#define add_table_field(wb, key, name, visible, type, units, max, sort, sortable, sticky, unique_key, pointer_to, summary) do { \
+        if(fields_added) buffer_strcat(wb, ",");                                                                \
+        buffer_sprintf(wb, "\n      \"%s\": {", key);                                                           \
+        buffer_sprintf(wb, "\n         \"index\":%d,", fields_added);                                           \
+        buffer_sprintf(wb, "\n         \"unique_key\":%s,", (unique_key)?"true":"false");                       \
+        buffer_sprintf(wb, "\n         \"name\":\"%s\",", name);                                                \
+        buffer_sprintf(wb, "\n         \"visible\":%s,", (visible)?"true":"false");                             \
+        buffer_sprintf(wb, "\n         \"type\":\"%s\",", type);                                                \
+        if(units)                                                                                               \
+           buffer_sprintf(wb, "\n         \"units\":\"%s\",", (char*)(units));                                  \
+        if(!isnan(max))                                                                                         \
+           buffer_sprintf(wb, "\n         \"max\":\"%f\",", (NETDATA_DOUBLE)(max));                             \
+        if(pointer_to)                                                                                          \
+            buffer_sprintf(wb, "\n         \"pointer_to\":\"%s\",", (char *)(pointer_to));                      \
+        buffer_sprintf(wb, "\n         \"sort\":\"%s\",", sort);                                                \
+        buffer_sprintf(wb, "\n         \"sortable\":%s,", (sortable)?"true":"false");                           \
+        buffer_sprintf(wb, "\n         \"sticky\":%s,", (sticky)?"true":"false");                               \
+        buffer_sprintf(wb, "\n         \"summary\":\"%s\"", summary);                                           \
+        buffer_sprintf(wb, "\n      }");                                                                        \
+        fields_added++;                                                                                         \
     } while(0)
 
 static BUFFER *func_processes_fields = NULL;
@@ -4375,75 +4381,75 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
 
-        add_table_field(func_processes_fields, "Pid", "Process ID", true, "integer", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending");
+        add_table_field(func_processes_fields, "Pid", "Process ID", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "count_unique");
+        add_table_field(func_processes_fields, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
 
 #ifdef NETDATA_DEV_MODE
-        add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:cmd", NULL, NAN, "ascending");
+        add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:cmd", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
 #endif
-        add_table_field(func_processes_fields, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "User", "User Owner", true, "string", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "Uid", "User ID", false, "integer", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "Group", "Group Owner", false, "string", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending");
-        add_table_field(func_processes_fields, "Processes", "Processes", true, "bar-with-integer", "processes", NAN, "descending");
-        add_table_field(func_processes_fields, "Threads", "Threads", true, "bar-with-integer", "threads", NAN, "descending");
-        add_table_field(func_processes_fields, "Uptime", "Uptime in seconds", true, "duration", "seconds", NAN, "descending");
+        add_table_field(func_processes_fields, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, true, false, "Pid", "count_unique");
+        add_table_field(func_processes_fields, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(func_processes_fields, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(func_processes_fields, "Uid", "User ID", false, "integer", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(func_processes_fields, "Group", "Group Owner", false, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(func_processes_fields, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(func_processes_fields, "Processes", "Processes", true, "bar-with-integer", "processes", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Threads", "Threads", true, "bar-with-integer", "threads", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Uptime", "Uptime in seconds", true, "duration", "seconds", NAN, "descending", true, false, false, NULL, "max");
 
         // minor page faults
-        add_table_field(func_processes_fields, "MinFlt", "Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending");
-        add_table_field(func_processes_fields, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending");
-        add_table_field(func_processes_fields, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending");
+        add_table_field(func_processes_fields, "MinFlt", "Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // major page faults
-        add_table_field(func_processes_fields, "MajFlt", "Major Page Faults/s", false, "bar", "page faults/s", NAN, "descending");
-        add_table_field(func_processes_fields, "CMajFlt", "Children Major Page Faults/s", false, "bar", "page faults/s", NAN, "descending");
-        add_table_field(func_processes_fields, "TMajFlt", "Total Major Page Faults/s", true, "bar", "page faults/s", NAN, "descending");
+        add_table_field(func_processes_fields, "MajFlt", "Major Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CMajFlt", "Children Major Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "TMajFlt", "Total Major Page Faults/s", true, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // CPU utilization
-        add_table_field(func_processes_fields, "UserCPU", "User CPU time", false, "bar-only", "%", NAN, "descending");
-        add_table_field(func_processes_fields, "SysCPU", "System CPU Time", false, "bar-only", "%", NAN, "descending");
-        add_table_field(func_processes_fields, "GuestCPU", "Guest CPU Time", false, "bar-only", "%", NAN, "descending");
-        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time", false, "bar-only", "%", NAN, "descending");
-        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time", false, "bar-only", "%", NAN, "descending");
-        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time", false, "bar-only", "%", NAN, "descending");
-        add_table_field(func_processes_fields, "CPU", "Total CPU Time", true, "bar-only", "%", NAN, "descending");
+        add_table_field(func_processes_fields, "UserCPU", "User CPU time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "SysCPU", "System CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "GuestCPU", "Guest CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CPU", "Total CPU Time", true, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
 
         // memory
-        add_table_field(func_processes_fields, "VMSize", "Virtual Memory Size", false, "bar", "MiB", NAN, "descending");
-        add_table_field(func_processes_fields, "RSS", "Resident Set Size", MemTotal?false:true, "bar", "MiB", NAN, "descending");
-        add_table_field(func_processes_fields, "Shared", "Shared Pages", false, "bar", "MiB", NAN, "descending");
-        add_table_field(func_processes_fields, "Swap", "Swap Memory", false, "bar", "MiB", NAN, "descending");
+        add_table_field(func_processes_fields, "VMSize", "Virtual Memory Size", false, "bar", "MiB", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "RSS", "Resident Set Size", MemTotal?false:true, "bar", "MiB", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Shared", "Shared Pages", false, "bar", "MiB", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Swap", "Swap Memory", false, "bar", "MiB", NAN, "descending", true, false, false, NULL, "sum");
 
         if(MemTotal)
-            add_table_field(func_processes_fields, "MemPcnt", "Memory Percentage", true, "bar", "%", 100.0, "descending");
+            add_table_field(func_processes_fields, "MemPcnt", "Memory Percentage", true, "bar", "%", 100.0, "descending", true, false, false, NULL, "sum");
 
         // Logical I/O
 #ifndef __FreeBSD__
-        add_table_field(func_processes_fields, "LReads", "Logical I/O Reads", false, "bar", "KiB/s", NAN, "descending");
-        add_table_field(func_processes_fields, "LWrites", "Logical I/O Writes", false, "bar", "KiB/s", NAN, "descending");
+        add_table_field(func_processes_fields, "LReads", "Logical I/O Reads", false, "bar", "KiB/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "LWrites", "Logical I/O Writes", false, "bar", "KiB/s", NAN, "descending", true, false, false, NULL, "sum");
 #endif
 
         // Physical I/O
-        add_table_field(func_processes_fields, "PReads", "Physical I/O Reads", true, "bar", "KiB/s", NAN, "descending");
-        add_table_field(func_processes_fields, "PWrites", "Physical I/O Writes", true, "bar", "KiB/s", NAN, "descending");
+        add_table_field(func_processes_fields, "PReads", "Physical I/O Reads", true, "bar", "KiB/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "PWrites", "Physical I/O Writes", true, "bar", "KiB/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // I/O calls
-        add_table_field(func_processes_fields, "RCalls", "I/O Read Calls", false, "bar", "calls/s", NAN, "descending");
-        add_table_field(func_processes_fields, "WCalls", "I/O Write Calls", false, "bar", "calls/s", NAN, "descending");
+        add_table_field(func_processes_fields, "RCalls", "I/O Read Calls", false, "bar", "calls/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "WCalls", "I/O Write Calls", false, "bar", "calls/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // open file descriptors
-        add_table_field(func_processes_fields, "Files", "Open Files", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "Pipes", "Open Pipes", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "Sockets", "Open Sockets", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "EventFDs", "Open Event Descriptors", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "TimerFDs", "Open Timer Descriptors", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "SigFDs", "Open Signal Descriptors", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "OtherFDs", "Other Open Descriptors", false, "bar", "generic", NAN, "descending");
-        add_table_field(func_processes_fields, "FDs", "All Open File Descriptors", true, "bar", "generic", NAN, "descending");
+        add_table_field(func_processes_fields, "Files", "Open Files", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Pipes", "Open Pipes", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Sockets", "Open Sockets", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "EventFDs", "Open Event Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "TimerFDs", "Open Timer Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "SigFDs", "Open Signal Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "OtherFDs", "Other Open Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "FDs", "All Open File Descriptors", true, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
 
         buffer_strcat(
             func_processes_fields,
@@ -4531,12 +4537,16 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                 "\n   },"
                 "\n   \"group_by\": {"
                 "\n     \"Process Tree by PID\": {"
-                "\n         \"columns\": [ \"PPid\", \"Pid\" ],"
-                "\n         \"order\": [ \"ascending\", \"ascending\" ]"
+                "\n         \"columns\": [ \"PPid\" ]"
                 "\n     },"
                 "\n     \"Process Tree by Category\": {"
-                "\n         \"columns\": [ \"Category\", \"PPid\", \"Pid\" ],"
-                "\n         \"order\": [ \"any\", \"ascending\", \"ascending\" ]"
+                "\n         \"columns\": [ \"Category\", \"PPid\" ]"
+                "\n     },"
+                "\n     \"Process Tree by User\": {"
+                "\n         \"columns\": [ \"User\", \"PPid\" ]"
+                "\n     },"
+                "\n     \"Process Tree by Group\": {"
+                "\n         \"columns\": [ \"Group\", \"PPid\" ]"
                 "\n     }"
                 "\n   },"
                 "\n   \"data\":["
