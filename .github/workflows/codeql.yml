@@ -1,0 +1,117 @@
+---
+# Run CodeQL to analyze C/C++ and Python code.
+name: CodeQL
+on:
+  pull_request:
+    types: [opened, reopened, labeled, synchronize]
+    branches: [master]
+  push:
+    branches: [master]
+  schedule:
+    - cron: "27 2 * * 1"
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prepare:
+    name: Prepare Jobs
+    runs-on: ubuntu-latest
+    outputs:
+      cpp: ${{ steps.cpp.outputs.run }}
+      python: ${{ steps.python.outputs.run }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Check if we should always run
+        id: always
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ contains(github.event.pull_request.labels.*.name, 'ci/codeql') }}" = "true" ]; then
+              echo '::set-output name=run::true'
+              echo '::notice::Found ci/codeql label, unconditionally running all CodeQL checks.'
+            else
+              echo '::set-output name=run::false'
+            fi
+          else
+            echo '::set-output name=run::true'
+          fi
+      - name: Check for C/C++ changes
+        id: cpp
+        run: |
+          if [ "${{ steps.always.outputs.run }}" = "false" ]; then
+            if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.[ch](xx|\+\+)?' ; then
+              echo '::set-output name=run::true'
+              echo '::notice::C/C++ code has changed, need to run CodeQL.'
+            else
+              echo '::set-output name=run::false'
+            fi
+          else
+            echo '::set-output name=run::true'
+          fi
+      - name: Check for python changes
+        id: python
+        run: |
+          if [ "${{ steps.always.outputs.run }}" = "false" ]; then
+            if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'collectors/python.d.plugin/.*\.py' ; then
+              echo '::set-output name=run::true'
+              echo '::notice::Python code has changed, need to run CodeQL.'
+            else
+              echo '::set-output name=run::false'
+            fi
+          else
+            echo '::set-output name=run::true'
+          fi
+
+  analyze-cpp:
+    name: Analyze C/C++
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.cpp == 'true'
+    permissions:
+      security-events: write
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: cpp
+      - name: Prepare environment
+        run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
+      - name: Build netdata
+        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install /tmp/install --one-time-build
+      - name: Run CodeQL
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:cpp"
+
+  analyze-python:
+    name: Analyze Python
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.python == 'true'
+    permissions:
+      security-events: write
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          config-file: ./.github/codeql/python-config.yml
+          languages: python
+      - name: Run CodeQL
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:python"
