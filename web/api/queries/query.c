@@ -762,26 +762,39 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
 
     RRDHOST *host = qt->hosts.array[0];
     for(int tier = 0; tier < storage_tiers ; tier++) {
-        if(unlikely(!rd->tiers[tier])) {
-            internal_error(true, "QUERY: tier %d of chart '%s' dimension '%s' not initialized",
-                           tier, rrdset_name(rd->rrdset), rrddim_name(rd));
-    //        buffer_free(wb);
-            return 0;
+
+        time_t common_after;
+        time_t common_before;
+        time_t common_update_every;
+
+        // find the db time-range for this tier for all metrics
+        for(size_t i = 0, used = qt->query.used; i < used ; i++) {
+            QUERY_METRIC *qm = &qt->query.array[i];
+
+            time_t first_t = qm->tiers[tier].first_time_t;
+            time_t last_t  = qm->tiers[tier].last_time_t;
+            time_t update_every = qm->tiers[tier].update_every;
+
+            if(!i) {
+                common_after = first_t;
+                common_before = last_t;
+                common_update_every = update_every;
+            }
+            else {
+                common_after = MIN(first_t, common_after);
+                common_before = MAX(last_t, common_before);
+                common_update_every = MIN(update_every, common_update_every);
+            }
         }
 
-        time_t first_t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);
-        time_t last_t  = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
-
-        time_t common_after = MAX(first_t, after_wanted);
-        time_t common_before = MIN(last_t, before_wanted);
+        common_after = MAX(common_after, after_wanted);
+        common_before = MIN(common_before, before_wanted);
 
         long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
         if(time_coverage < 0) time_coverage = 0;
 
-        int update_every = (int)rd->tiers[tier]->tier_grouping * (int)rd->update_every;
-        if(unlikely(update_every == 0)) {
-            internal_error(true, "QUERY: update_every of tier %d for chart '%s' dimension '%s' is zero. tg = %d, ue = %d",
-                           tier, rrdset_name(rd->rrdset), rrddim_name(rd), rd->tiers[tier]->tier_grouping, rd->update_every);
+        if(unlikely(common_update_every == 0)) {
+            internal_error(true, "QUERY: update_every of tier %d of query '%s' is zero.", tier, qt->id);
     //        buffer_free(wb);
             return 0;
         }

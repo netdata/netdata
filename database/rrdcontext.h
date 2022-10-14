@@ -100,10 +100,17 @@ typedef struct query_metric {
     int update_every;
 
     struct {
-        uint32_t host_index;
-        uint32_t context_index;
-        uint32_t instance_index;
-        uint32_t metric_index;
+        STORAGE_METRIC_HANDLE *metric_handle;
+        time_t first_time_t;
+        time_t last_time_t;
+        time_t update_every;
+    } tiers[RRD_STORAGE_TIERS];
+
+    struct {
+        RRDHOST *host;
+        RRDCONTEXT_ACQUIRED *rca;
+        RRDINSTANCE_ACQUIRED *ria;
+        RRDMETRIC_ACQUIRED *rma;
     } link;
 
     struct {
@@ -123,10 +130,10 @@ typedef struct query_metric {
 
 typedef struct query_target_request {
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
-    RRDSET *st;                         // the chart to be queries (can be NULL, charts will be used)
+    RRDSET *st;                         // the chart to be queries (NULL, for context queries)
     const char *hosts;                  // hosts simple pattern
-    const char *contexts;               // contexts simple pattern
-    const char *charts;                 // charts simple pattern
+    const char *contexts;               // contexts simple pattern (context queries)
+    const char *charts;                 // charts simple pattern (for context queries)
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
     const char *charts_labels_filter;   // select only the charts having this combo of label key:value
@@ -145,8 +152,9 @@ typedef struct query_target_request {
 
 typedef struct query_target {
     bool used;
-    bool composite_query;
-    usec_t start_us;
+    bool multihost_query;
+    bool context_query;
+    usec_t start_ut;
 
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
     int update_every;                        // the min update every of the metrics in the query
