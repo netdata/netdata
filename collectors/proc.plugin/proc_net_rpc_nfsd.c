@@ -225,8 +225,8 @@ struct nfsd_procs nfsd4_ops_values[] = {
 int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
-    static int do_rc = -1, do_fh = -1, do_io = -1, do_th = -1, do_ra = -1, do_net = -1, do_rpc = -1, do_proc2 = -1, do_proc3 = -1, do_proc4 = -1, do_proc4ops = -1;
-    static int ra_warning = 0, proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;
+    static int do_rc = -1, do_fh = -1, do_io = -1, do_th = -1, do_net = -1, do_rpc = -1, do_proc2 = -1, do_proc3 = -1, do_proc4 = -1, do_proc4ops = -1;
+    static int proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
@@ -243,7 +243,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         do_fh = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "file handles", 1);
         do_io = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "I/O", 1);
         do_th = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "threads", 1);
-        do_ra = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read ahead", 1);
         do_net = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "network", 1);
         do_rpc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "rpc", 1);
         do_proc2 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v2 procedures", 1);
@@ -258,7 +257,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(do_fh) do_fh = 1;
     if(do_io) do_io = 1;
     if(do_th) do_th = 1;
-    if(do_ra) do_ra = 1;
     if(do_net) do_net = 1;
     if(do_rpc) do_rpc = 1;
     if(do_proc2) do_proc2 = 1;
@@ -273,7 +271,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     unsigned long long fh_stale = 0;
     unsigned long long io_read = 0, io_write = 0;
     unsigned long long th_threads = 0;
-    unsigned long long ra_size = 0, ra_hist10 = 0, ra_hist20 = 0, ra_hist30 = 0, ra_hist40 = 0, ra_hist50 = 0, ra_hist60 = 0, ra_hist70 = 0, ra_hist80 = 0, ra_hist90 = 0, ra_hist100 = 0, ra_none = 0;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
 
@@ -335,38 +332,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=8bbfa9f3889b643fc7de82c0c761ef17097f8faf
             
             do_th = 2;
-        }
-        else if(do_ra == 1 && strcmp(type, "ra") == 0) {
-            if(unlikely(words < 13)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
-                continue;
-            }
-
-            // readahead cache has been disabled since 2019 (kernel 5.4)
-            // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/fs/nfsd/vfs.c?id=501cb1849f865960501d19d54e6a5af306f9b6fd
-
-            ra_size = str2ull(procfile_lineword(ff, l, 1));
-            ra_hist10 = str2ull(procfile_lineword(ff, l, 2));
-            ra_hist20 = str2ull(procfile_lineword(ff, l, 3));
-            ra_hist30 = str2ull(procfile_lineword(ff, l, 4));
-            ra_hist40 = str2ull(procfile_lineword(ff, l, 5));
-            ra_hist50 = str2ull(procfile_lineword(ff, l, 6));
-            ra_hist60 = str2ull(procfile_lineword(ff, l, 7));
-            ra_hist70 = str2ull(procfile_lineword(ff, l, 8));
-            ra_hist80 = str2ull(procfile_lineword(ff, l, 9));
-            ra_hist90 = str2ull(procfile_lineword(ff, l, 10));
-            ra_hist100 = str2ull(procfile_lineword(ff, l, 11));
-            ra_none = str2ull(procfile_lineword(ff, l, 12));
-
-            unsigned long long sum = ra_hist10 + ra_hist20 + ra_hist30 + ra_hist40 + ra_hist50 + ra_hist60 + ra_hist70 + ra_hist80 + ra_hist90 + ra_hist100 + ra_none;
-            if(sum == 0ULL) {
-                if(!ra_warning) {
-                    info("Disabling /proc/net/rpc/nfsd read ahead histogram. It seems unused on this machine. It will be enabled automatically when found with data in it.");
-                    ra_warning = 1;
-                }
-                do_ra = -1;
-            }
-            else do_ra = 2;
         }
         else if(do_net == 1 && strcmp(type, "net") == 0) {
             if(unlikely(words < 5)) {
@@ -613,69 +578,6 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_threads, th_threads);
         rrdset_done(st);
 
-    }
-
-    // --------------------------------------------------------------------
-
-    if(do_ra == 2) {
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_ra_hist10  = NULL,
-                      *rd_ra_hist20  = NULL,
-                      *rd_ra_hist30  = NULL,
-                      *rd_ra_hist40  = NULL,
-                      *rd_ra_hist50  = NULL,
-                      *rd_ra_hist60  = NULL,
-                      *rd_ra_hist70  = NULL,
-                      *rd_ra_hist80  = NULL,
-                      *rd_ra_hist90  = NULL,
-                      *rd_ra_hist100 = NULL,
-                      *rd_ra_none    = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    "nfsd"
-                    , "readahead"
-                    , NULL
-                    , "readahead"
-                    , NULL
-                    , "NFS Server Read Ahead Depth"
-                    , "percentage"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NFSD_NAME
-                    , NETDATA_CHART_PRIO_NFSD_READAHEAD
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-
-            rd_ra_hist10  = rrddim_add(st, "10%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist20  = rrddim_add(st, "20%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist30  = rrddim_add(st, "30%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist40  = rrddim_add(st, "40%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist50  = rrddim_add(st, "50%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist60  = rrddim_add(st, "60%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist70  = rrddim_add(st, "70%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist80  = rrddim_add(st, "80%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist90  = rrddim_add(st, "90%",    NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_hist100 = rrddim_add(st, "100%",   NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-            rd_ra_none    = rrddim_add(st, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-        }
-        else rrdset_next(st);
-
-        // ignore ra_size
-        (void)ra_size;
-
-        rrddim_set_by_pointer(st, rd_ra_hist10, ra_hist10);
-        rrddim_set_by_pointer(st, rd_ra_hist20, ra_hist20);
-        rrddim_set_by_pointer(st, rd_ra_hist30, ra_hist30);
-        rrddim_set_by_pointer(st, rd_ra_hist40, ra_hist40);
-        rrddim_set_by_pointer(st, rd_ra_hist50, ra_hist50);
-        rrddim_set_by_pointer(st, rd_ra_hist60, ra_hist60);
-        rrddim_set_by_pointer(st, rd_ra_hist70, ra_hist70);
-        rrddim_set_by_pointer(st, rd_ra_hist80, ra_hist80);
-        rrddim_set_by_pointer(st, rd_ra_hist90, ra_hist90);
-        rrddim_set_by_pointer(st, rd_ra_hist100,ra_hist100);
-        rrddim_set_by_pointer(st, rd_ra_none,   ra_none);
-        rrdset_done(st);
     }
 
     // --------------------------------------------------------------------
