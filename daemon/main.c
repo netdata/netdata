@@ -1042,7 +1042,7 @@ int main(int argc, char **argv) {
                             return rrdlabels_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
-                            return metadata_unittest(10000);
+                            return metadata_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);

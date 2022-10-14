@@ -1201,10 +1201,6 @@ void timer_cb(uv_timer_t* handle)
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-//    if (unlikely(!ctx->metalog_ctx->initialized)) {
-//        worker_is_idle();
-//        return; /* Wait for the metadata log to initialize */
-//    }
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {

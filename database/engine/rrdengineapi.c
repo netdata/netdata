@@ -1088,7 +1088,6 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->drop_metrics_under_page_cache_pressure = rrdeng_drop_metrics_under_page_cache_pressure;
     ctx->metric_API_max_producers = 0;
     ctx->quiesce = NO_QUIESCE;
-    //ctx->metalog_ctx = NULL; /* only set this after the metadata log has finished initializing */
     ctx->host = host;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));

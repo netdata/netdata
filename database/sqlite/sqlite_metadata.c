@@ -1,9 +1,141 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sqlite_functions.h"
 #include "sqlite_metadata.h"
 
 extern DICTIONARY *rrdhost_root_index;
+
+// SQL statements
+
+#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
+    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
+    "on conflict(host_id) do update set claim_id = excluded.claim_id;"
+
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
+
+#define STORE_HOST_LABEL                                                                                               \
+    "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
+
+#define STORE_CHART_LABEL                                                                                              \
+    "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
+
+#define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
+
+#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
+
+#define SQL_STORE_HOST_INFO "INSERT OR REPLACE INTO host " \
+        "(host_id, hostname, registry_hostname, update_every, os, timezone," \
+        "tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, program_version," \
+        "entries, health_enabled) " \
+        "values (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, " \
+        "@abbrev_timezone, @utc_offset, @program_name, @program_version, " \
+        "@entries, @health_enabled);"
+
+#define SQL_STORE_CHART "insert or replace into chart (chart_id, host_id, type, id, " \
+    "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
+    "history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
+
+#define SQL_STORE_DIMENSION "INSERT OR REPLACE INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) " \
+        "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm);"
+
+#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
+
+#define STORE_HOST_INFO "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES "
+#define STORE_HOST_INFO_VALUES "(u2h('%s'), '%s','%s', unixepoch())"
+
+#define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
+    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0);"
+#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id;"
+#define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
+
+#define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
+#define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
+#define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
+#define METADATA_MAINTENANCE_INTERVAL (3600)        // Repeat maintenance after latest successful
+
+#define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
+#define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat check for pending metadata
+#define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
+
+#define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
+#define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
+#define METADATA_MAX_TRANSACTION_BATCH (128)        // Maximum commands to add in a transaction
+
+enum metadata_opcode {
+    METADATA_DATABASE_NOOP = 0,
+    METADATA_DATABASE_TIMER,
+    METADATA_ADD_CHART,
+    METADATA_ADD_CHART_LABEL,
+    METADATA_ADD_DIMENSION,
+    METADATA_DEL_DIMENSION,
+    METADATA_ADD_DIMENSION_OPTION,
+    METADATA_ADD_HOST_SYSTEM_INFO,
+    METADATA_ADD_HOST_INFO,
+    METADATA_STORE_CLAIM_ID,
+    METADATA_STORE_HOST_LABELS,
+    METADATA_STORE_BUFFER,
+
+    METADATA_SKIP_TRANSACTION,                      // Dummy -- OPCODES less than this one can be in a tranasction
+
+    METADATA_SCAN_HOSTS,
+    METADATA_MAINTENANCE,
+    METADATA_SYNC_SHUTDOWN,
+    METADATA_UNITTEST,
+    // leave this last
+    // we need it to check for worker utilization
+    METADATA_MAX_ENUMERATIONS_DEFINED
+};
+
+#define MAX_PARAM_LIST  (2)
+struct metadata_cmd {
+    enum metadata_opcode opcode;
+    struct completion *completion;
+    const void *param[MAX_PARAM_LIST];
+};
+
+struct metadata_database_cmdqueue {
+    unsigned head, tail;
+    struct metadata_cmd cmd_array[METADATA_CMD_Q_MAX_SIZE];
+};
+
+typedef enum {
+    METADATA_FLAG_CLEANUP           = (1 << 0), // Cleanup is running
+    METADATA_FLAG_SCANNING_HOSTS    = (1 << 1), // Scanning of hosts in worker thread
+    METADATA_FLAG_SHUTDOWN          = (1 << 2), // Shutting down
+} METADATA_FLAG;
+
+#define METADATA_WORKER_BUSY    (METADATA_FLAG_CLEANUP | METADATA_FLAG_SCANNING_HOSTS)
+
+struct metadata_wc {
+    uv_thread_t thread;
+    time_t check_metadata_after;
+    time_t check_hosts_after;
+    volatile unsigned queue_size;
+    uv_loop_t *loop;
+    uv_async_t async;
+    METADATA_FLAG flags;
+    uint64_t row_id;
+    uv_timer_t timer_req;
+    struct completion init_complete;
+    /* FIFO command queue */
+    uv_mutex_t cmd_mutex;
+    uv_cond_t cmd_cond;
+    struct metadata_database_cmdqueue cmd_queue;
+};
+
+#define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define metadata_flag_set(target_flags, flag)   __atomic_or_fetch(&((target_flags)->flags), (flag), __ATOMIC_SEQ_CST)
+#define metadata_flag_clear(target_flags, flag) __atomic_and_fetch(&((target_flags)->flags), ~(flag), __ATOMIC_SEQ_CST)
+
+//
+// For unittest
+//
+struct thread_unittest {
+    int join;
+    unsigned added;
+    unsigned processed;
+    unsigned *done;
+};
+
 
 // Metadata functions
 
@@ -605,7 +737,7 @@ skip_run:
 //
 static uv_mutex_t metadata_async_lock;
 
-static void metadata_database_init_cmd_queue(struct metadata_wc *wc)
+static void metadata_init_cmd_queue(struct metadata_wc *wc)
 {
     wc->cmd_queue.head = wc->cmd_queue.tail = 0;
     wc->queue_size = 0;
@@ -613,7 +745,7 @@ static void metadata_database_init_cmd_queue(struct metadata_wc *wc)
     fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
 }
 
-int metadata_database_enq_cmd_noblock(struct metadata_wc *wc, struct metadata_cmd *cmd)
+int metadata_enq_cmd_noblock(struct metadata_wc *wc, struct metadata_cmd *cmd)
 {
     unsigned queue_size;
 
@@ -737,13 +869,13 @@ static void timer_cb(uv_timer_t* handle)
 
    if (wc->check_metadata_after && wc->check_metadata_after < now) {
        cmd.opcode = METADATA_MAINTENANCE;
-       if (!metadata_database_enq_cmd_noblock(wc, &cmd))
+       if (!metadata_enq_cmd_noblock(wc, &cmd))
            wc->check_metadata_after = now + METADATA_MAINTENANCE_INTERVAL;
    }
 
    if (wc->check_hosts_after && wc->check_hosts_after < now) {
        cmd.opcode = METADATA_SCAN_HOSTS;
-       if (!metadata_database_enq_cmd_noblock(wc, &cmd))
+       if (!metadata_enq_cmd_noblock(wc, &cmd))
            wc->check_hosts_after = now + METADATA_HOST_CHECK_INTERVAL;
    }
 }
@@ -1132,17 +1264,9 @@ static void metadata_event_loop(void *arg)
                         metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
                     }
                     break;
-                case METADATA_UNITTEST:
-                    ;
-                    struct thread_unittest {
-                        int join;
-                        unsigned added;
-                        unsigned processed;
-                        unsigned *done;
-                    };
-
+                case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
-                    usleep(1000); // processing takes 1ms
+                    sleep_usec(1000); // processing takes 1ms
                     __atomic_fetch_add(&tu->processed, 1, __ATOMIC_SEQ_CST);
                     break;
                 default:
@@ -1228,7 +1352,7 @@ void metadata_sync_shutdown_prepare(void)
     while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_SCANNING_HOSTS)) && max_wait_iterations--) {
         if (max_wait_iterations == 1999)
             info("METADATA: Current worker is running; waiting to finish");
-        usleep(1000);
+        sleep_usec(1000);
     }
 
     cmd.opcode = METADATA_SCAN_HOSTS;
@@ -1251,7 +1375,7 @@ void metadata_sync_init(void)
     fatal_assert(0 == uv_mutex_init(&metadata_async_lock));
 
     memset(wc, 0, sizeof(*wc));
-    metadata_database_init_cmd_queue(wc);
+    metadata_init_cmd_queue(wc);
     completion_init(&wc->init_complete);
 
     fatal_assert(0 == uv_thread_create(&(wc->thread), metadata_event_loop, wc));
@@ -1366,13 +1490,6 @@ void metaqueue_chart_labels(RRDSET *st)
 // unitests
 //
 
-struct thread_unittest {
-    int join;
-    unsigned added;
-    unsigned processed;
-    unsigned *done;
-};
-
 static void *unittest_queue_metadata(void *arg) {
     struct thread_unittest *tu = arg;
 
@@ -1385,14 +1502,13 @@ static void *unittest_queue_metadata(void *arg) {
 
     do {
         __atomic_fetch_add(&tu->added, 1, __ATOMIC_SEQ_CST);
-        if (metadata_database_enq_cmd_noblock(&metasync_worker, &cmd))
-            break;
-        usleep(10000);
+        metadata_enq_cmd(&metasync_worker, &cmd);
+        sleep_usec(10000);
     } while (!__atomic_load_n(&tu->join, __ATOMIC_RELAXED));
     return arg;
 }
 
-static void *metadata_unittest_threads(int items __maybe_unused)
+static void *metadata_unittest_threads(void)
 {
 
     unsigned done;
@@ -1433,10 +1549,7 @@ static void *metadata_unittest_threads(int items __maybe_unused)
         void *retval;
         netdata_thread_join(threads[i], &retval);
     }
-    fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
-
-    uv_async_send(&metasync_worker.async);
-
+//    uv_async_send(&metasync_worker.async);
     sleep_usec(5 * USEC_PER_SEC);
 
     fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
@@ -1444,12 +1557,12 @@ static void *metadata_unittest_threads(int items __maybe_unused)
     return 0;
 }
 
-int metadata_unittest(int items)
+int metadata_unittest(void)
 {
     metadata_sync_init();
 
-    // Queue items
-    metadata_unittest_threads(items);
+    // Queue items for a specific period of time
+    metadata_unittest_threads();
 
     fprintf(stderr, "Items still in queue %u\n", metasync_worker.queue_size);
     metadata_sync_shutdown();
