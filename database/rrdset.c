@@ -860,31 +860,18 @@ RRDSET *rrdset_create_custom(
 // ----------------------------------------------------------------------------
 // RRDSET - data collection iteration control
 
-inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds) {
-    if(unlikely(!st->last_collected_time.tv_sec || !microseconds || (rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK)))) {
-        // call the full next_usec() function
-        rrdset_next_usec(st, microseconds);
-        return;
-    }
-
-    st->usec_since_last_update = microseconds;
-}
-
-inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
-    struct timeval now;
-    now_realtime_timeval(&now);
-
+void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_last_update) {
     #ifdef NETDATA_INTERNAL_CHECKS
     char *discard_reason = NULL;
-    usec_t discarded = microseconds;
+    usec_t discarded = duration_since_last_update;
     #endif
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK))) {
         // the chart needs to be re-synced to current time
         rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
 
-        // discard the microseconds supplied
-        microseconds = 0;
+        // discard the duration supplied
+        duration_since_last_update = 0;
 
         #ifdef NETDATA_INTERNAL_CHECKS
         if(!discard_reason) discard_reason = "SYNC CLOCK FLAG";
@@ -893,14 +880,14 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // the first entry
-        microseconds = st->update_every * USEC_PER_SEC;
+        duration_since_last_update = st->update_every * USEC_PER_SEC;
         #ifdef NETDATA_INTERNAL_CHECKS
         if(!discard_reason) discard_reason = "FIRST DATA COLLECTION";
         #endif
     }
-    else if(unlikely(!microseconds)) {
+    else if(unlikely(!duration_since_last_update)) {
         // no dt given by the plugin
-        microseconds = dt_usec(&now, &st->last_collected_time);
+        duration_since_last_update = dt_usec(&now, &st->last_collected_time);
         #ifdef NETDATA_INTERNAL_CHECKS
         if(!discard_reason) discard_reason = "NO USEC GIVEN BY COLLECTOR";
         #endif
@@ -924,7 +911,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             st->last_updated.tv_usec = now.tv_usec;
             last_updated_time_align(st);
 
-            microseconds    = st->update_every * USEC_PER_SEC;
+            duration_since_last_update = st->update_every * USEC_PER_SEC;
             #ifdef NETDATA_INTERNAL_CHECKS
             if(!discard_reason) discard_reason = "COLLECTION TIME IN FUTURE";
             #endif
@@ -936,21 +923,21 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
                 " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", rrdset_id(st), rrdhost_hostname(st->rrdhost), (NETDATA_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
             #endif
 
-            microseconds = (usec_t)since_last_usec;
+            duration_since_last_update = (usec_t)since_last_usec;
             #ifdef NETDATA_INTERNAL_CHECKS
             if(!discard_reason) discard_reason = "COLLECTION TIME TOO FAR IN THE PAST";
             #endif
         }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if(since_last_usec > 0 && (susec_t)microseconds < since_last_usec) {
+        if(since_last_usec > 0 && (susec_t) duration_since_last_update < since_last_usec) {
             static __thread susec_t min_delta = USEC_PER_SEC * 3600, permanent_min_delta = 0;
             static __thread time_t last_t = 0;
 
             // the first time initialize it so that it will make the check later
             if(last_t == 0) last_t = now.tv_sec + 60;
 
-            susec_t delta = since_last_usec - (susec_t)microseconds;
+            susec_t delta = since_last_usec - (susec_t) duration_since_last_update;
             if(delta < min_delta) min_delta = delta;
 
             if(now.tv_sec >= last_t + 60) {
@@ -968,23 +955,39 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", rrdset_name(st), microseconds);
-    rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
+    debug(D_RRD_CALLS, "rrdset_timed_next() for chart %s with duration since last update %llu usec", rrdset_name(st), duration_since_last_update);
+    rrdset_debug(st, "NEXT: %llu microseconds", duration_since_last_update);
 
-    if(discarded && discarded != microseconds)
-        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", rrdhost_hostname(st->rrdhost), rrdset_id(st), discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
+    if(discarded && discarded != duration_since_last_update)
+        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", rrdhost_hostname(st->rrdhost), rrdset_id(st), discarded, duration_since_last_update, discard_reason?discard_reason:"UNDEFINED");
 
     #endif
 
-    st->usec_since_last_update = microseconds;
+    st->usec_since_last_update = duration_since_last_update;
 }
 
+inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t duration_since_last_update) {
+    if(unlikely(!st->last_collected_time.tv_sec || !duration_since_last_update || (rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK)))) {
+        // call the full next_usec() function
+        rrdset_next_usec(st, duration_since_last_update);
+        return;
+    }
+
+    st->usec_since_last_update = duration_since_last_update;
+}
+
+inline void rrdset_next_usec(RRDSET *st, usec_t duration_since_last_update) {
+    struct timeval now;
+
+    now_realtime_timeval(&now);
+    rrdset_timed_next(st, now, duration_since_last_update);
+}
 
 // ----------------------------------------------------------------------------
 // RRDSET - process the collected values for all dimensions of a chart
 
-static inline usec_t rrdset_init_last_collected_time(RRDSET *st) {
-    now_realtime_timeval(&st->last_collected_time);
+static inline usec_t rrdset_init_last_collected_time(RRDSET *st, struct timeval now) {
+    st->last_collected_time = now;
     last_collected_time_align(st);
 
     usec_t last_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
@@ -1092,8 +1095,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
     }
 }
 
-static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
-
+void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
     // store the metric on tier 0
     rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
@@ -1282,7 +1284,7 @@ static inline size_t rrdset_done_interpolate(
 
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
-                store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
+                rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 continue;
             }
 
@@ -1294,7 +1296,7 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
 
-                store_metric(rd, next_store_ut, new_value, dim_storage_flags);
+                rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1304,7 +1306,7 @@ static inline size_t rrdset_done_interpolate(
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
                 #endif
 
-                store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
+                rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rd->last_stored_value = NAN;
             }
 
@@ -1369,6 +1371,13 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
 }
 
 void rrdset_done(RRDSET *st) {
+    struct timeval now;
+
+    now_realtime_timeval(&now);
+    rrdset_timed_done(st, now);
+}
+
+void rrdset_timed_done(RRDSET *st, struct timeval now) {
     if(unlikely(netdata_exit)) return;
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", rrdset_name(st));
@@ -1412,7 +1421,7 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // it is the first entry
         // set the last_collected_time to now
-        last_collect_ut = rrdset_init_last_collected_time(st) - update_every_ut;
+        last_collect_ut = rrdset_init_last_collected_time(st, now) - update_every_ut;
 
         // the first entry should not be stored
         store_this_entry = 0;
