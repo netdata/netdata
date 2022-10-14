@@ -29,8 +29,9 @@ DUMP_CMDS=0
 ENABLE="auto"
 EXPORT_CMDS=0
 INSTALL=1
-LINUX_INIT_TYPES="wsl systemd openrc lsb initd runit"
+LINUX_INIT_TYPES="systemd openrc lsb initd runit"
 PLATFORM="$(uname -s)"
+SHOW_SVC_TYPE=0
 SVC_SOURCE="@libsysdir_POST@"
 SVC_TYPE="detect"
 WSL_ERROR_MSG="We appear to be running in WSL and were unable to find a usable service manager. We currently support systemd, LSB init scripts, and traditional init.d style init scripts when running under WSL."
@@ -158,6 +159,7 @@ USAGE: install-service.sh [options]
 
   --source      Specify where to find the service files to install (default ${SVC_SOURCE}).
   --type        Specify the type of service file to install. Specify a type of 'help' to get a list of valid types for your platform.
+  --show-type   Display information about what service managers are detected.
   --cmds        Additionally print a list of commands for starting and stopping the agent with the detected service type.
   --export-cmds Export the variables that would be printed by the --cmds option.
   --cmds-only   Don't install, just handle the --cmds or --export-cmds option.
@@ -581,7 +583,7 @@ detect_linux_svc_type() {
   if [ "${SVC_TYPE}" = "detect" ]; then
     found_types=''
 
-    for t in ${LINUX_INIT_TYPES}; do
+    for t in wsl ${LINUX_INIT_TYPES}; do
       case "$("check_${t}")" in
         YES)
           SVC_TYPE="${t}"
@@ -643,6 +645,38 @@ linux_cmds() {
 }
 
 # =====================================================================
+# Service type display function
+
+show_service_type() {
+  info "Detected platform: ${PLATFORM}"
+
+  case "${PLATFORM}" in
+    FreeBSD)
+      info "Detected service managers:"
+      info "  - freebsd: YES"
+      info "Would use freebsd service management."
+      ;;
+    Darwin)
+      info "Detected service managers:"
+      info "  - launchd: YES"
+      info "Would use launchd service management."
+      ;;
+    Linux)
+      [ "$(check_wsl)" = "YES" ] && info "Detected WSL environment."
+      info "Detected service managers:"
+      for t in ${LINUX_INIT_TYPES}; do
+        info "  - ${t}: $("check_${t}")"
+      done
+      info "Would use $(detect_linux_svc_type) service management."
+      ;;
+    *)
+      info "${PLATFORM} is not supported by this script. No service file would be installed."
+  esac
+
+  exit 0
+}
+
+# =====================================================================
 # Argument handling
 
 parse_args() {
@@ -661,6 +695,7 @@ parse_args() {
           shift 1
         fi
         ;;
+      "--show-type") SHOW_SVC_TYPE=1 ; INSTALL=0 ;;
       "--save-cmds")
         if [ -z "${2}" ]; then
           info "No path specified to save command variables."
@@ -712,28 +747,33 @@ main() {
 
   parse_args "${@}"
 
-  case "${PLATFORM}" in
-    FreeBSD)
-      [ "${INSTALL}" -eq 1 ] && install_freebsd_service
-      freebsd_cmds
-      ;;
-    Darwin)
-      [ "${INSTALL}" -eq 1 ] && install_darwin_service
-      darwin_cmds
-      ;;
-    Linux)
-      [ "${INSTALL}" -eq 1 ] && install_linux_service
-      linux_cmds
-      ;;
-    *)
-      error "${PLATFORM} is not supported by this script."
-      exit 5
-      ;;
-  esac
+  if [ "${SHOW_SVC_TYPE}" -eq 1 ]; then
+    show_service_type
+  else
+    case "${PLATFORM}" in
+      FreeBSD)
+        [ "${INSTALL}" -eq 1 ] && install_freebsd_service
+        freebsd_cmds
+        ;;
+      Darwin)
+        [ "${INSTALL}" -eq 1 ] && install_darwin_service
+        darwin_cmds
+        ;;
+      Linux)
+        [ "${INSTALL}" -eq 1 ] && install_linux_service
+        linux_cmds
+        ;;
+      *)
+        error "${PLATFORM} is not supported by this script."
+        exit 5
+        ;;
+    esac
 
-  [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
-  [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
-  [ -n "${SAVE_CMDS_PATH}" ] && save_cmds
+    [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
+    [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
+    [ -n "${SAVE_CMDS_PATH}" ] && save_cmds
+  fi
+
   exit 0
 }
 
