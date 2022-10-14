@@ -177,31 +177,27 @@ HEREDOC
 # =====================================================================
 # systemd support functions
 
-issystemd() {
+_check_systemd() {
   pids=''
   p=''
   myns=''
   ns=''
-  systemctl=''
 
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
-    return 1
+    echo "NO" && return 0
   fi
 
   # if there is no systemctl command, it is not systemd
-  systemctl=$(command -v systemctl 2> /dev/null)
-  if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
-    return 1
-  fi
+  [ -z "$(command -v systemctl 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if pid 1 is systemd, it is systemd
-  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && echo "YES" && return 0
 
   # it ‘is’ systemd at this point, but systemd might not be running
   # if not, return 2 to indicate ‘systemd, but not running’
   pids=$(safe_pidof systemd 2> /dev/null)
-  [ -z "${pids}" ] && return 2
+  [ -z "${pids}" ] && echo "OFFLINE" && return 0
 
   # check if the running systemd processes are not in our namespace
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
@@ -209,20 +205,19 @@ issystemd() {
     ns="$(readlink "/proc/${p}/ns/pid" 2> /dev/null)"
 
     # if pid of systemd is in our namespace, it is systemd
-    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
+    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && echo "YES" && return 0
   done
 
   # else, it is not systemd
-  return 1
+  echo "NO"
 }
 
 check_systemd() {
   if [ -z "${IS_SYSTEMD}" ]; then
-    issystemd
-    IS_SYSTEMD="$?"
+    IS_SYSTEMD="$(_check_systemd)"
   fi
 
-  return "${IS_SYSTEMD}"
+  echo "${IS_SYSTEMD}"
 }
 
 get_systemd_service_dir() {
@@ -284,39 +279,38 @@ systemd_cmds() {
 # =====================================================================
 # OpenRC support functions
 
-isopenrc() {
+_check_openrc() {
   # if /lib/rc/sh/functions.sh does not exist, it's not OpenRC
-  [ ! -f /lib/rc/sh/functions.sh ] && return 1
+  [ ! -f /lib/rc/sh/functions.sh ] && echo "NO" && return 0
 
   # if there is no /etc/init.d, it's not OpenRC
-  [ ! -d /etc/init.d ] && return 1
+  [ ! -d /etc/init.d ] && echo "NO" && return 0
 
   # if there is no rc-update command, it's not OpenRC
-  command -v rc-update > /dev/null 2>&1 || return 1
+  [ -z "$(command -v rc-update 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # If /run/openrc/softlevel exists, it's OpenRC
-  [ -f /run/openrc/softlevel ] && return 0
+  [ -f /run/openrc/softlevel ] && echo "YES" && return 0
 
   # if PID 1 is openrc-init, it's OpenRC
-  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && return 0
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && echo "YES" && return 0
 
   # if there is an openrc command, it's OpenRC, but not booted as such
-  command -v openrc > /dev/null 2>&1 && return 2
+  [ -n "$(command -v openrc 2>/dev/null || true)" ] && echo "OFFLINE" && return 0
 
   # if /etc/init.d/local exists and has `openrc-run` in it's shebang line, it’s OpenRC, but not booted as such
-  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && return 2
+  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && echo "OFFLINE" && return 0
 
   # Otherwise, it’s not OpenRC
-  return 1
+  echo "NO" && return 0
 }
 
 check_openrc() {
   if [ -z "${IS_OPENRC}" ]; then
-    isopenrc
-    IS_OPENRC="$?"
+    IS_OPENRC="$(_check_openrc)"
   fi
 
-  return "${IS_OPENRC}"
+  echo "${IS_OPENRC}"
 }
 
 enable_openrc() {
@@ -354,35 +348,32 @@ openrc_cmds() {
 # =====================================================================
 # LSB init script support functions
 
-islsb_ignore_systemd() {
+_check_lsb_ignore_systemd() {
   # if there is no /etc/init.d directory, it’s not an LSB system
-  [ ! -d /etc/init.d ] && return 1
+  [ ! -d /etc/init.d ] && echo "NO" && return 0
 
   # If it's an OpenRC system, then it's not an LSB system
-  check_openrc ; [ $? = 1 ] || return 1
+  [ "$(check_openrc)" != "NO" ] && echo "NO" && return 0
 
   # If /lib/lsb/init-functions exists, it’s an LSB system
-  [ -f /lib/lsb/init-functions ] && return 0
+  [ -f /lib/lsb/init-functions ] && echo "YES" && return 0
 
-  return 1
+  echo "NO" && return 0
 }
 
-islsb() {
+_check_lsb() {
   # if there is _any_ systemd, it’s not an LSB system
-  check_systemd ; [ $? = 1 ] || return 1
+  [ "$(check_systemd)" != "NO" ] && echo "NO" && return 0
 
-  islsb_ignore_systemd && return 0
-
-  return 1
+  _check_lsb_ignore_systemd
 }
 
 check_lsb() {
   if [ -z "${IS_LSB}" ]; then
-    islsb
-    IS_LSB="$?"
+    IS_LSB="$(_check_lsb)"
   fi
 
-  return "${IS_LSB}"
+  echo "${IS_LSB}"
 }
 
 enable_lsb() {
@@ -411,36 +402,35 @@ lsb_cmds() {
 # =====================================================================
 # init.d init script support functions
 
-isinitd_ignore_systemd() {
+_check_initd_ignore_systemd() {
   # if there is no /etc/init.d directory, it’s not an init.d system
-  [ ! -d /etc/init.d ] && return 1
+  [ ! -d /etc/init.d ] && echo "NO" && return 1
 
   # if there is no chkconfig command, it's not a (usable) init.d system
-  command -v chkconfig >/dev/null 2>&1 || return 1
+  [ -z "$(command -v chkconfig 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if there is _any_ openrc, it’s not init.d
-  check_openrc ; [ $? = 1 ] || return 1
+  [ "$(check_openrc)" != "NO" ] && echo "NO" && return 0
 
   # if it's not an LSB setup, it’s init.d
-  check_lsb || return 0
+  [ "$(check_lsb)" != "NO" ] && echo "NO" && return 0
+
+  echo "YES" && return 0
 }
 
-isinitd() {
+_check_initd() {
   # if there is _any_ systemd, it’s not init.d
-  check_systemd ; [ $? = 1 ] || return 1
+  [ "$(check_systemd)" != "NO" ] && echo "NO" && return 0
 
-  isinitd_ignore_systemd && return 0
-
-  return 1
+  _check_initd_ignore_systemd
 }
 
 check_initd() {
   if [ -z "${IS_INITD}" ]; then
-    isinitd
-    IS_INITD="$?"
+    IS_INITD="$(_check_initd)"
   fi
 
-  return "${IS_INITD}"
+  echo "${IS_INITD}"
 }
 
 enable_initd() {
@@ -469,29 +459,28 @@ initd_cmds() {
 #
 # Currently not supported, this exists to provide useful error messages.
 
-isrunit() {
+_check_runit() {
   # if there is no runsvdir command, then it's not runit
-  command -v runsvdir >/dev/null 2>&1 || return 1
+  [ -z "$(command -v runsvdir 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if there is no runit command, then it's not runit
-  command -v runit >/dev/null 2>&1 || return 1
+  [ -z "$(command -v runit 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if /run/runit exists, then it's runit
-  [ -d /run/runit ] && return 0
+  [ -d /run/runit ] && echo "YES" && return 0
 
   # if /etc/runit/1 exists and is executable, then it's runit
-  [ -x /etc/runit/1 ] && return 0
+  [ -x /etc/runit/1 ] && echo "YES" && return 0
 
-  return 1
+  echo "NO" && return 0
 }
 
 check_runit() {
   if [ -z "${IS_RUNIT}" ]; then
-    isrunit
-    IS_RUNIT="$?"
+    IS_RUNIT="$(_check_runit)"
   fi
 
-  return "${IS_RUNIT}"
+  echo "${IS_RUNIT}"
 }
 
 install_runit_service() {
@@ -509,25 +498,24 @@ runit_cmds() {
 #
 # Cannot be supported, this exists to provide useful error messages.
 
-iswsl() {
+_check_wsl() {
   # If uname -r contains the string WSL, then it's WSL.
-  uname -r | grep -q 'WSL' && return 0
+  uname -r | grep -q 'WSL' && echo "YES" && return 0
 
   # If uname -r contains the string Microsoft, then it's WSL.
   # This probably throws a false positive on CBL-Mariner, but it's part of what MS officially recommends for
   # detecting if you're running under WSL.
-  uname -r | grep -q "Microsoft" && return 0
+  uname -r | grep -q "Microsoft" && echo "YES" && return 0
 
-  return 1
+  echo "NO" && return 0
 }
 
 check_wsl() {
   if [ -z "${IS_WSL}" ]; then
-    iswsl
-    IS_WSL="$?"
+    IS_WSL="$(_check_wsl)"
   fi
 
-  return "${IS_WSL}"
+  echo "${IS_WSL}"
 }
 
 install_wsl_service() {
@@ -594,14 +582,13 @@ detect_linux_svc_type() {
     found_types=''
 
     for t in ${LINUX_INIT_TYPES}; do
-      "check_${t}"
-      case "$?" in
-        1) continue ;;
-        0)
+      case "$("check_${t}")" in
+        YES)
           SVC_TYPE="${t}"
           break
           ;;
-        2)
+        NO) continue ;;
+        OFFLINE)
           if [ -z "${found_types}" ]; then
             found_types="${t}"
           else
@@ -619,13 +606,13 @@ detect_linux_svc_type() {
         warning "Failed to detect a running service manager, using detected (but not running) ${SVC_TYPE}."
       fi
     elif [ "${SVC_TYPE}" = "wsl" ]; then
-      if check_systemd; then
+      if [ "$(check_systemd)" = "YES" ]; then
         # Support for systemd in WSL.
         SVC_TYPE="systemd"
-      elif islsb_ignore_systemd; then
+      elif [ "$(_check_lsb_ignore_systemd)" = "YES" ]; then
         # Support for LSB init.d in WSL.
         SVC_TYPE="lsb"
-      elif isinitd_ignore_systemd; then
+      elif [ "$(_check_initd_ignore_systemd)" = "YES" ]; then
         # Support for ‘generic’ init.d in WSL.
         SVC_TYPE="initd"
       fi
