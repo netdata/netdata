@@ -124,8 +124,6 @@ void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
         page_index->alignment = NULL;
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-
-    freez(db_metric_handle);
 }
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
@@ -170,6 +168,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_
     page_index->prev = pg_cache->metrics_index.last_page_index;
     pg_cache->metrics_index.last_page_index = page_index;
     page_index->alignment = pa;
+    page_index->refcount = 1;
     if(pa)
         pa->refcount++;
     uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);

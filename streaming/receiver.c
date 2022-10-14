@@ -744,6 +744,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rpt->host->senders_connect_time = now_realtime_sec();
     rpt->host->senders_last_chart_command = 0;
     rpt->host->trigger_chart_obsoletion_check = 1;
+
     rrdhost_unlock(rpt->host);
 
     // call the plugins.d processor to receive the metrics
@@ -759,6 +760,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
+    rrdhost_set_is_parent_label(++localhost->senders_count);
+
     rrdcontext_host_child_connected(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, fp_in, fp_out);
@@ -772,10 +775,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
-    // new child connected
+    // a child disconnected
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 0);
 #endif
+
+    rrdhost_set_is_parent_label(--localhost->senders_count);
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {
