@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- extended processes function info from apps.plugin [\#13822](https://github.com/netdata/netdata/pull/13822) ([ktsaou](https://github.com/ktsaou))
+- Fix crash on child reconnect and lost metrics [\#13821](https://github.com/netdata/netdata/pull/13821) ([stelfrag](https://github.com/stelfrag))
+- Remove NFS readahead histogram [\#13819](https://github.com/netdata/netdata/pull/13819) ([vlvkobal](https://github.com/vlvkobal))
 - minor - add trace alloc to buildinfo [\#13817](https://github.com/netdata/netdata/pull/13817) ([underhood](https://github.com/underhood))
 - Fix exporting unit tests [\#13816](https://github.com/netdata/netdata/pull/13816) ([vlvkobal](https://github.com/vlvkobal))
 - overload libc memory allocators with custom ones to trace all allocations [\#13810](https://github.com/netdata/netdata/pull/13810) ([ktsaou](https://github.com/ktsaou))
@@ -21,6 +24,7 @@
 - Also enable rrdvars from health [\#13795](https://github.com/netdata/netdata/pull/13795) ([MrZammler](https://github.com/MrZammler))
 - feat\(python.d\): respect NETDATA\_INTERNALS\_MONITORING [\#13793](https://github.com/netdata/netdata/pull/13793) ([ilyam8](https://github.com/ilyam8))
 - Array Allocator Memory Leak Fix [\#13792](https://github.com/netdata/netdata/pull/13792) ([ktsaou](https://github.com/ktsaou))
+- Add variants of functions allowing callers to specify the time to use. [\#13791](https://github.com/netdata/netdata/pull/13791) ([vkalintiris](https://github.com/vkalintiris))
 - Remove extern from function declared in headers. [\#13790](https://github.com/netdata/netdata/pull/13790) ([vkalintiris](https://github.com/vkalintiris))
 - full memory tracking and profiling of Netdata Agent [\#13789](https://github.com/netdata/netdata/pull/13789) ([ktsaou](https://github.com/ktsaou))
 - allow disabling netdata monitoring section of the dashboard [\#13788](https://github.com/netdata/netdata/pull/13788) ([ktsaou](https://github.com/ktsaou))
@@ -347,8 +351,6 @@
 - Fix labels unit test [\#13156](https://github.com/netdata/netdata/pull/13156) ([stelfrag](https://github.com/stelfrag))
 - Query Engine multi-granularity support \(and MC improvements\) [\#13155](https://github.com/netdata/netdata/pull/13155) ([ktsaou](https://github.com/ktsaou))
 - add CAP\_SYS\_RAWIO to Netdata's systemd unit CapabilityBoundingSet [\#13154](https://github.com/netdata/netdata/pull/13154) ([ilyam8](https://github.com/ilyam8))
-- Update docs on what to do if collector not there [\#13152](https://github.com/netdata/netdata/pull/13152) ([cakrit](https://github.com/cakrit))
-- revert to default of `host anomaly rate threshold=0.01` [\#13150](https://github.com/netdata/netdata/pull/13150) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
