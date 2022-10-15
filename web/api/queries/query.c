@@ -746,7 +746,7 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
             return 0;
         }
 
-        long points_available = (before_wanted - after_wanted) / qt->min_update_every;
+        long points_available = (before_wanted - after_wanted) / qt->db.minimum_latest_update_every;
         long points_delta = points_available - points_wanted;
         long points_coverage = (points_delta < 0) ? points_available * 1000 / points_wanted: 1000;
 
@@ -777,7 +777,7 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
 }
 
 static int rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
-    int ret = qt->min_update_every;
+    int ret = qt->db.minimum_latest_update_every;
 
     int best_tier;
     if(options & RRDR_OPTION_SELECTED_TIER && tier >= 0 && tier < storage_tiers)
@@ -1604,7 +1604,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     const char *group_options = qt->request.group_options;
     int timeout = qt->request.timeout;
     int tier = qt->request.tier;
-    int update_every = qt->min_update_every;
+    int update_every = qt->db.minimum_latest_update_every;
 
     // RULES
     // points_requested = 0
@@ -1665,8 +1665,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(after_wanted == 0 || before_wanted == 0) {
         relative_period_requested = true;
 
-        time_t first_entry_t = qt->first_time_t;
-        time_t last_entry_t = qt->last_time_t;
+        time_t first_entry_t = qt->db.first_time_t;
+        time_t last_entry_t = qt->db.last_time_t;
 
         if(first_entry_t == 0 || last_entry_t == 0) {
             internal_error(true, "QUERY: no data detected on query '%s'", qt->id);
@@ -1711,8 +1711,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     if(natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
         update_every = rrdset_find_natural_update_every_for_timeframe(qt, after_wanted, before_wanted, points_wanted, options, tier);
-        if(update_every <= 0) update_every = qt->min_update_every;
-        query_debug_log(":natural update every %d", min_update_every);
+        if(update_every <= 0) update_every = qt->db.minimum_latest_update_every;
+        query_debug_log(":natural update every %d", update_every);
     }
 
     // this is the update_every of the query

@@ -2154,9 +2154,9 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->hosts.used = 0;
     qt->used = false;
 
-    qt->min_update_every = 0;
-    qt->first_time_t = 0;
-    qt->last_time_t = 0;
+    qt->db.minimum_latest_update_every = 0;
+    qt->db.first_time_t = 0;
+    qt->db.last_time_t = 0;
 
     rrdlabels_flush(qt->rrdlabels);
 
@@ -2280,13 +2280,13 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             qm->first_time_t = rm->first_time_t;
             qm->last_time_t = rm->last_time_t;
-            qm->update_every = ri->update_every;
+            qm->latest_update_every = ri->update_every;
 
-            if (!qt->first_time_t || rm->first_time_t < qt->first_time_t)
-                qt->first_time_t = rm->first_time_t;
+            if (!qt->db.first_time_t || rm->first_time_t < qt->db.first_time_t)
+                qt->db.first_time_t = rm->first_time_t;
 
-            if (!qt->last_time_t || rm->last_time_t > qt->last_time_t)
-                qt->last_time_t = rm->last_time_t;
+            if (!qt->db.last_time_t || rm->last_time_t > qt->db.last_time_t)
+                qt->db.last_time_t = rm->last_time_t;
 
             for (int tier = 0; tier < storage_tiers; tier++) {
                 STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
@@ -2314,8 +2314,8 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     if(ri->rrdset)
         ri->rrdset->last_accessed_time = (time_t)(qtl->qt->start_ut / USEC_PER_SEC);
 
-    if(qt->min_update_every == 0 || ri->update_every < qt->min_update_every)
-        qt->min_update_every = ri->update_every;
+    if(qt->db.minimum_latest_update_every == 0 || ri->update_every < qt->db.minimum_latest_update_every)
+        qt->db.minimum_latest_update_every = ri->update_every;
 
     bool instance_matches_label_filters = true;
     if ((qtl->chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->chart_label_key_sp, ':')) ||
@@ -2468,7 +2468,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     qt->window.after = qtl.after;
     qt->window.before = qtl.before;
 
-    qt->min_update_every = 0; // it will be updated by query_target_add_query()
+    qt->db.minimum_latest_update_every = 0; // it will be updated by query_target_add_query()
 
     // prepare all the patterns
     qtl.hosts_sp = is_valid_sp(qtl.hosts) ? simple_pattern_create(qtl.hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;

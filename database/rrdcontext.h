@@ -97,7 +97,7 @@ typedef struct query_metric {
     time_t first_time_t;
     time_t last_time_t;
 
-    int update_every;
+    int latest_update_every;
 
     struct {
         STORAGE_METRIC_HANDLE *metric_handle;
@@ -126,7 +126,7 @@ typedef struct query_metric {
 
 } QUERY_METRIC;
 
-#define MAX_QUERY_TARGET_ID_LENGTH 200
+#define MAX_QUERY_TARGET_ID_LENGTH 255
 
 typedef struct query_target_request {
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
@@ -151,53 +151,56 @@ typedef struct query_target_request {
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {
-    bool used;
-    bool multihost_query;
-    bool context_query;
-    usec_t start_ut;
-
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
-    int min_update_every;                    // the min update every of the metrics in the query
-    time_t first_time_t;                     // the combined first_time_t of all metrics in the query
-    time_t last_time_t;                      // the combined last_time_T of all metrics in the query
-    long points;                             // the number of points the query will return (maybe different from the request)
-
     QUERY_TARGET_REQUEST request;
 
+    bool used;                              // when true, this query is currently being used
+    bool multihost_query;                   // when true, this query addresses multiple hosts
+    bool context_query;                     // when true, this query addresses multiple charts
+    usec_t start_ut;                        // the time this query was prepared
+
+    long points;                            // the number of points the query will return (maybe different from the request)
+
     struct {
-        bool absolute;  // true when the request made with absolute timestamps, false if it was relative
-        size_t after;   // the absolute timestamp this query is about
-        size_t before;  // the absolute timestamp this query is about
+        bool absolute;                      // true when the request made with absolute timestamps, false if it was relative
+        size_t after;                       // the absolute timestamp this query is about
+        size_t before;                      // the absolute timestamp this query is about
     } window;
 
     struct {
-        QUERY_METRIC *array;
-        uint32_t used;
-        uint32_t size;
+        time_t first_time_t;                // the combined first_time_t of all metrics in the query, across all tiers
+        time_t last_time_t;                 // the combined last_time_T of all metrics in the query, across all tiers
+        int minimum_latest_update_every;    // the min update every of the metrics in the query
+    } db;
+
+    struct {
+        QUERY_METRIC *array;                // the metrics to be queried (all of them should be queried, no exceptions)
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
     } query;
 
     struct {
         RRDMETRIC_ACQUIRED **array;
-        uint32_t used;
-        uint32_t size;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
     } metrics;
 
     struct {
         RRDINSTANCE_ACQUIRED **array;
-        uint32_t used;
-        uint32_t size;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
     } instances;
 
     struct {
         RRDCONTEXT_ACQUIRED **array;
-        uint32_t used;
-        uint32_t size;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
     } contexts;
 
     struct {
         RRDHOST **array;
-        uint32_t used;
-        uint32_t size;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
     } hosts;
 
     DICTIONARY *rrdlabels;
