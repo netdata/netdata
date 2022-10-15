@@ -658,58 +658,6 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_GROUPING group_method) {
 }
 
 // ----------------------------------------------------------------------------
-
-static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims, QUERY_TARGET *qt)
-{
-    if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
-
-    bool match_ids = options & RRDR_OPTION_MATCH_IDS;
-    bool match_names = options & RRDR_OPTION_MATCH_NAMES;
-    if(likely(!match_ids && !match_names))
-        match_ids = match_names = true;
-
-    SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
-
-    long dims_selected = 0, dims_not_hidden_not_zero = 0;
-    for(size_t c = 0, max = qt->query.used; c < max ;c++) {
-        if(       (match_ids   && simple_pattern_matches(pattern, string2str(qt->query.array[c].dimension.id)))
-               || (match_names && simple_pattern_matches(pattern, string2str(qt->query.array[c].dimension.name)))
-                ) {
-            r->od[c] |= RRDR_DIMENSION_SELECTED;
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
-            dims_selected++;
-
-            // since the user needs this dimension
-            // make it appear as NONZERO, to return it
-            // even if the dimension has only zeros
-            // unless option non_zero is set
-            if(unlikely(!(options & RRDR_OPTION_NONZERO)))
-                r->od[c] |= RRDR_DIMENSION_NONZERO;
-
-            // count the visible dimensions
-            if(likely(r->od[c] & RRDR_DIMENSION_NONZERO))
-                dims_not_hidden_not_zero++;
-        }
-        else {
-            r->od[c] |= RRDR_DIMENSION_HIDDEN;
-            if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED)) r->od[c] &= ~RRDR_DIMENSION_SELECTED;
-        }
-    }
-    simple_pattern_free(pattern);
-
-    // check if all dimensions are hidden
-    if(unlikely(!dims_not_hidden_not_zero && dims_selected)) {
-        // there are a few selected dimensions,
-        // but they are all zero
-        // enable the selected ones
-        // to avoid returning an empty chart
-        for(size_t c = 0, max = qt->query.used; c < max ;c++)
-            if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED))
-                r->od[c] |= RRDR_DIMENSION_NONZERO;
-    }
-}
-
-// ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
 
 static inline RRDR_VALUE_FLAGS *UNUSED_FUNCTION(rrdr_line_options)(RRDR *r, long rrdr_line) {
@@ -760,7 +708,6 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
 
     long weight[storage_tiers];
 
-    RRDHOST *host = qt->hosts.array[0];
     for(int tier = 0; tier < storage_tiers ; tier++) {
 
         time_t common_after;
@@ -799,7 +746,7 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
             return 0;
         }
 
-        long points_available = (before_wanted - after_wanted) / update_every;
+        long points_available = (before_wanted - after_wanted) / qt->min_update_every;
         long points_delta = points_available - points_wanted;
         long points_coverage = (points_delta < 0) ? points_available * 1000 / points_wanted: 1000;
 
@@ -830,7 +777,7 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
 }
 
 static int rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
-    int ret = qt->update_every;
+    int ret = qt->min_update_every;
 
     int best_tier;
     if(options & RRDR_OPTION_SELECTED_TIER && tier >= 0 && tier < storage_tiers)
@@ -838,24 +785,20 @@ static int rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time
     else
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
 
-    if(!first_rd->tiers[best_tier]) {
-        internal_error(
-            true,
-            "QUERY: tier %d on chart '%s', is not initialized", best_tier, rrdset_name(st));
-    }
-    else {
-        ret = (int)first_rd->tiers[best_tier]->tier_grouping * (int)st->update_every;
-        if(unlikely(!ret)) {
-            internal_error(
-                true,
-                "QUERY: update_every calculated to be zero on chart '%s', tier_grouping %d, update_every %d",
-                rrdset_name(st), first_rd->tiers[best_tier]->tier_grouping, st->update_every);
+    // find the db minimum update every for this tier for all metrics
+    time_t common_update_every;
+    for(size_t i = 0, used = qt->query.used; i < used ; i++) {
+        QUERY_METRIC *qm = &qt->query.array[i];
 
-            ret = st->update_every;
-        }
+        time_t update_every = qm->tiers[best_tier].update_every;
+
+        if(!i)
+            common_update_every = update_every;
+        else
+            common_update_every = MIN(update_every, common_update_every);
     }
 
-    return ret;
+    return common_update_every;
 }
 
 // ----------------------------------------------------------------------------
@@ -1006,7 +949,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     }
     else {
 
-        selected_tier = rrddim_find_best_tier_for_timeframe(rd, after_wanted, before_wanted, points_wanted);
+        selected_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
 
         if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)
             ops->r->internal.query_options &= ~RRDR_OPTION_SELECTED_TIER;
@@ -1423,8 +1366,8 @@ static inline void rrd2rrdr_do_dimension(
     rrdr_done(r, rrdr_line);
 
     internal_error((long)points_added != points_wanted,
-                   "QUERY: query on %s/%s requested %zu points, but RRDR added %zu (%zu db points read).",
-                   rrdset_name(r->st), rrddim_name(rd), (size_t)points_wanted, (size_t)points_added, ops.db_total_points_read);
+                   "QUERY: query '%s' requested %zu points, but RRDR added %zu (%zu db points read).",
+                   qt->id, (size_t)points_wanted, (size_t)points_added, ops.db_total_points_read);
 }
 
 // ----------------------------------------------------------------------------
@@ -1658,11 +1601,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     RRDR_GROUPING group_method = qt->request.group_method;
     long resampling_time_requested = qt->request.resampling_time;
     RRDR_OPTIONS options = qt->request.options;
-    const char *dimensions = qt->request.dimensions;
     const char *group_options = qt->request.group_options;
     int timeout = qt->request.timeout;
     int tier = qt->request.tier;
-    int update_every = qt->update_every;
+    int update_every = qt->min_update_every;
 
     // RULES
     // points_requested = 0
@@ -1769,8 +1711,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     if(natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
         update_every = rrdset_find_natural_update_every_for_timeframe(qt, after_wanted, before_wanted, points_wanted, options, tier);
-        if(update_every <= 0) update_every = qt->update_every;
-        query_debug_log(":natural update every %d", update_every);
+        if(update_every <= 0) update_every = qt->min_update_every;
+        query_debug_log(":natural update every %d", min_update_every);
     }
 
     // this is the update_every of the query
@@ -1956,13 +1898,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // allocate any memory required by the grouping method
     r->internal.grouping_create(r, group_options);
 
-
-    // -------------------------------------------------------------------------
-    // disable the not-wanted dimensions
-
-    if(dimensions && *dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, dimensions, context_param_list);
-
     query_debug_log_fin();
 
     // -------------------------------------------------------------------------
@@ -1980,11 +1915,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // set the query target dimension options to rrdr
         r->od[c] = qt->query.array[c].dimension.options;
 
-        // if we need a percentage, we need to calculate all dimensions
-        if(unlikely(!(options & RRDR_OPTION_PERCENTAGE) && (r->od[c] & RRDR_DIMENSION_HIDDEN))) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED)) r->od[c] &= ~RRDR_DIMENSION_SELECTED;
-            continue;
-        }
         r->od[c] |= RRDR_DIMENSION_SELECTED;
 
         // reset the grouping for the new dimension

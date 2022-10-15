@@ -2093,17 +2093,18 @@ typedef struct query_target_locals {
     SIMPLE_PATTERN *hosts_sp;
     SIMPLE_PATTERN *contexts_sp;
     SIMPLE_PATTERN *charts_sp;
+    SIMPLE_PATTERN *dimensions_sp;
     SIMPLE_PATTERN *chart_label_key_sp;
     SIMPLE_PATTERN *charts_labels_filter_sp;
 
     long long after;
     long long before;
-    RRDR_OPTIONS options;
+    bool match_ids;
+    bool match_names;
 
     RRDHOST *host;
     RRDCONTEXT_ACQUIRED *rca;
     RRDINSTANCE_ACQUIRED *ria;
-
 } QUERY_TARGET_LOCALS;
 
 static __thread QUERY_TARGET thread_query_target = {};
@@ -2153,7 +2154,7 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->hosts.used = 0;
     qt->used = false;
 
-    qt->update_every = 0;
+    qt->min_update_every = 0;
     qt->first_time_t = 0;
     qt->last_time_t = 0;
 
@@ -2206,45 +2207,94 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     bool timeframe_matches = (rm->first_time_t <= qtl->before && rm->last_time_t >= qtl->after) ? true : false;
 
     if(timeframe_matches) {
-        if(qt->query.used == qt->query.size) {
-            qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
-            qt->query.array = reallocz(qt->query.array, qt->query.size * sizeof(QUERY_METRIC));
+        RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
+
+        if(unlikely(qt->request.options & RRDR_OPTION_PERCENTAGE)) {
+            // this is a percentage query
+            // we need all the dimensions to calculate it
+            options |= RRDR_DIMENSION_SELECTED;
+            options &= ~RRDR_DIMENSION_HIDDEN;
         }
-        QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
+        else {
+            // this is not a percentage query
+            // let the caller decide which dimensions are needed
 
-        qm->metric_uuid = &rm->uuid;
+            if (rrd_flag_check(rm, RRD_FLAG_HIDDEN)
+                || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
+                options |= RRDR_DIMENSION_HIDDEN;
+                options &= ~RRDR_DIMENSION_SELECTED;
+            }
 
-        qm->chart.id = string_dup(ri->id);
-        qm->chart.name = string_dup(ri->name);
+            if (qtl->dimensions_sp) {
+                // we have a dimensions pattern
+                // lets see if this dimension is selected
 
-        qm->dimension.id = string_dup(rm->id);
-        qm->dimension.name = string_dup(rm->name);
-        qm->dimension.options = ((rrd_flag_check(rm, RRD_FLAG_HIDDEN) ||
-                                  (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) ?
-                                 RRDR_DIMENSION_HIDDEN :
-                                 RRDR_DIMENSION_DEFAULT);
+                if ((qtl->match_ids && simple_pattern_matches(qtl->dimensions_sp, string2str(rm->id)))
+                    || (qtl->match_names && simple_pattern_matches(qtl->dimensions_sp, string2str(rm->name)))
+                        ) {
+                    // it matches the pattern
+                    options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
+                    options &= ~RRDR_DIMENSION_HIDDEN;
+                }
+                else {
+                    // it does not match the pattern
+                    options |= RRDR_DIMENSION_HIDDEN;
+                    options &= ~RRDR_DIMENSION_SELECTED;
+                }
+            }
+            else {
+                // we don't have a dimensions pattern
+                // so this is a selected dimension
+                // if it is not hidden
+                if(!(options & RRDR_DIMENSION_HIDDEN))
+                    options |= RRDR_DIMENSION_SELECTED;
+            }
+        }
 
-        qm->link.host = qtl->host;
-        qm->link.rca = qtl->rca;
-        qm->link.ria = qtl->ria;
-        qm->link.rma = rma;
+        if((options & RRDR_DIMENSION_HIDDEN) && (options & RRDR_DIMENSION_SELECTED))
+            options &= ~RRDR_DIMENSION_HIDDEN;
 
-        qm->first_time_t = rm->first_time_t;
-        qm->last_time_t = rm->last_time_t;
-        qm->update_every = ri->update_every;
+        if(!(options & RRDR_DIMENSION_HIDDEN)) {
+            // we have a non-hidden dimension
+            // let's add it to the query metrics
 
-        if(!qt->first_time_t || rm->first_time_t < qt->first_time_t)
-            qt->first_time_t = rm->first_time_t;
+            if (qt->query.used == qt->query.size) {
+                qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
+                qt->query.array = reallocz(qt->query.array, qt->query.size * sizeof(QUERY_METRIC));
+            }
+            QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
 
-        if(!qt->last_time_t || rm->last_time_t > qt->last_time_t)
-            qt->last_time_t = rm->last_time_t;
+            qm->metric_uuid = &rm->uuid;
 
-        for(int tier = 0; tier < storage_tiers ;tier++) {
-            STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
-            qm->tiers[tier].metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
-            qm->tiers[tier].first_time_t = eng->api.query_ops.oldest_time(qm->tiers[tier].metric_handle);
-            qm->tiers[tier].last_time_t = eng->api.query_ops.latest_time(qm->tiers[tier].metric_handle);
-            qm->tiers[tier].update_every = storage_tiers_grouping_iterations[tier] * ri->update_every;
+            qm->chart.id = string_dup(ri->id);
+            qm->chart.name = string_dup(ri->name);
+
+            qm->dimension.id = string_dup(rm->id);
+            qm->dimension.name = string_dup(rm->name);
+            qm->dimension.options = options;
+
+            qm->link.host = qtl->host;
+            qm->link.rca = qtl->rca;
+            qm->link.ria = qtl->ria;
+            qm->link.rma = rma;
+
+            qm->first_time_t = rm->first_time_t;
+            qm->last_time_t = rm->last_time_t;
+            qm->update_every = ri->update_every;
+
+            if (!qt->first_time_t || rm->first_time_t < qt->first_time_t)
+                qt->first_time_t = rm->first_time_t;
+
+            if (!qt->last_time_t || rm->last_time_t > qt->last_time_t)
+                qt->last_time_t = rm->last_time_t;
+
+            for (int tier = 0; tier < storage_tiers; tier++) {
+                STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
+                qm->tiers[tier].metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
+                qm->tiers[tier].first_time_t = eng->api.query_ops.oldest_time(qm->tiers[tier].metric_handle);
+                qm->tiers[tier].last_time_t = eng->api.query_ops.latest_time(qm->tiers[tier].metric_handle);
+                qm->tiers[tier].update_every = storage_tiers_grouping_iterations[tier] * ri->update_every;
+            }
         }
     }
 }
@@ -2264,8 +2314,8 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     if(ri->rrdset)
         ri->rrdset->last_accessed_time = (time_t)(qtl->qt->start_ut / USEC_PER_SEC);
 
-    if(qt->update_every == 0 || ri->update_every < qt->update_every)
-        qt->update_every = ri->update_every;
+    if(qt->min_update_every == 0 || ri->update_every < qt->min_update_every)
+        qt->min_update_every = ri->update_every;
 
     bool instance_matches_label_filters = true;
     if ((qtl->chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->chart_label_key_sp, ':')) ||
@@ -2377,7 +2427,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
         snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/context:%s/instance:%s/dimension:%s"
                   , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
                   , (qt->request.contexts) ? qt->request.contexts : "*"
-                  , (qt->request.charts) ? qt->request->charts : "*"
+                  , (qt->request.charts) ? qt->request.charts : "*"
                   , (qt->request.dimensions) ? qt->request.dimensions : "*"
                   );
 }
@@ -2412,21 +2462,26 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
         .charts_labels_filter = qt->request.charts_labels_filter,
         .after = qt->request.after,
         .before = qt->request.before,
-        .options = qt->request.options,
     };
 
     qt->window.absolute = rrdr_relative_window_to_absolute(&qtl.after, &qtl.before);
     qt->window.after = qtl.after;
     qt->window.before = qtl.before;
 
-    qt->update_every = 0; // it will be updated by query_target_add_query()
+    qt->min_update_every = 0; // it will be updated by query_target_add_query()
 
     // prepare all the patterns
     qtl.hosts_sp = is_valid_sp(qtl.hosts) ? simple_pattern_create(qtl.hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
     qtl.contexts_sp = is_valid_sp(qtl.contexts) ? simple_pattern_create(qtl.contexts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
     qtl.charts_sp = is_valid_sp(qtl.charts) ? simple_pattern_create(qtl.charts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qtl.dimensions_sp = is_valid_sp(qtl.dimensions) ? simple_pattern_create(qtl.dimensions, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
     qtl.chart_label_key_sp = is_valid_sp(qtl.chart_label_key) ? simple_pattern_create(qtl.chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
     qtl.charts_labels_filter_sp = is_valid_sp(qtl.charts_labels_filter) ? simple_pattern_create(qtl.charts_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+
+    qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
+    qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
+    if(likely(!qtl.match_ids && !qtl.match_names))
+        qtl.match_ids = qtl.match_names = true;
 
     // verify that the chart belongs to the host we are interested
     if(qtl.st) {
@@ -2460,6 +2515,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     simple_pattern_free(qtl.charts_labels_filter_sp);
     simple_pattern_free(qtl.chart_label_key_sp);
     simple_pattern_free(qtl.charts_sp);
+    simple_pattern_free(qtl.dimensions_sp);
     simple_pattern_free(qtl.contexts_sp);
     simple_pattern_free(qtl.hosts_sp);
 

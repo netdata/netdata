@@ -157,7 +157,7 @@ typedef struct query_target {
     usec_t start_ut;
 
     char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
-    int update_every;                        // the min update every of the metrics in the query
+    int min_update_every;                    // the min update every of the metrics in the query
     time_t first_time_t;                     // the combined first_time_t of all metrics in the query
     time_t last_time_t;                      // the combined last_time_T of all metrics in the query
     long points;                             // the number of points the query will return (maybe different from the request)
