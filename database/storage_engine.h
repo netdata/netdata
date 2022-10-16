@@ -20,8 +20,8 @@ typedef struct storage_engine_api {
     void (*group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
 
     // operations
-    struct rrddim_collect_ops collect_ops;
-    struct rrddim_query_ops query_ops;
+    struct storage_engine_collect_ops collect_ops;
+    struct storage_engine_query_ops query_ops;
 } STORAGE_ENGINE_API;
 
 struct storage_engine {

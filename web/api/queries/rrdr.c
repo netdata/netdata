@@ -74,18 +74,21 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(unlikely(!qt))
         return NULL;
 
-    if(unlikely(!qt->query.used || !qt->points)) {
+    if(unlikely(!qt->query.used || !qt->window.points)) {
         query_target_release(qt);
         return NULL;
     }
 
     size_t dimensions = qt->query.used;
-    size_t points = qt->points;
+    size_t points = qt->window.points;
 
     // create the rrdr
     RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
     r->internal.owa = owa;
 
+    r->before = qt->window.before;
+    r->after = qt->window.after;
+    r->internal.points_wanted = qt->window.points;
     r->d = (int)dimensions;
     r->n = (int)points;
 

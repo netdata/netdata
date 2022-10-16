@@ -1850,7 +1850,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
     int i, j, k, c, errors, update_every;
     collected_number last;
     NETDATA_DOUBLE value, expected;
-    struct rrddim_query_handle handle;
+    struct storage_engine_query_handle handle;
     size_t value_errors = 0, time_errors = 0;
 
     update_every = REGION_UPDATE_EVERY[current_region];
@@ -2302,7 +2302,7 @@ static void query_dbengine_chart(void *arg)
     time_t time_now, time_retrieved, end_time;
     collected_number generatedv;
     NETDATA_DOUBLE value, expected;
-    struct rrddim_query_handle handle;
+    struct storage_engine_query_handle handle;
     size_t value_errors = 0, time_errors = 0;
 
     do {

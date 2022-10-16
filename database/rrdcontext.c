@@ -2120,7 +2120,7 @@ void query_target_release(QUERY_TARGET *qt) {
 
         for(int tier = 0; tier < storage_tiers ;tier++) {
             STORAGE_ENGINE *eng = storage_engine_get(qt->query.array[i].link.host->rrd_memory_mode);
-            eng->api.metric_release(qt->query.array[i].tiers[tier].metric_handle);
+            eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
         }
     }
 
@@ -2290,10 +2290,11 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             for (int tier = 0; tier < storage_tiers; tier++) {
                 STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
-                qm->tiers[tier].metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
-                qm->tiers[tier].first_time_t = eng->api.query_ops.oldest_time(qm->tiers[tier].metric_handle);
-                qm->tiers[tier].last_time_t = eng->api.query_ops.latest_time(qm->tiers[tier].metric_handle);
-                qm->tiers[tier].update_every = storage_tiers_grouping_iterations[tier] * ri->update_every;
+                struct storage_engine_query_ops *ops = qm->tiers[tier].db_ops = &eng->api.query_ops;
+                qm->tiers[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
+                qm->tiers[tier].db_first_time_t = ops->oldest_time(qm->tiers[tier].db_metric_handle);
+                qm->tiers[tier].db_last_time_t = ops->latest_time(qm->tiers[tier].db_metric_handle);
+                qm->tiers[tier].db_update_every = storage_tiers_grouping_iterations[tier] * ri->update_every;
             }
         }
     }
@@ -2448,6 +2449,10 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     qt->request = qtr;
 
     query_target_generate_name(qt);
+    if(!query_target_calculate_window(qt)) {
+        query_target_release(qt);
+        return false;
+    }
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
@@ -2463,10 +2468,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
         .after = qt->request.after,
         .before = qt->request.before,
     };
-
-    qt->window.absolute = rrdr_relative_window_to_absolute(&qtl.after, &qtl.before);
-    qt->window.after = qtl.after;
-    qt->window.before = qtl.before;
 
     qt->db.minimum_latest_update_every = 0; // it will be updated by query_target_add_query()
 

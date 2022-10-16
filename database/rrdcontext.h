@@ -99,11 +99,12 @@ typedef struct query_metric {
 
     int latest_update_every;
 
-    struct {
-        STORAGE_METRIC_HANDLE *metric_handle;
-        time_t first_time_t;
-        time_t last_time_t;
-        time_t update_every;
+    struct query_metric_tier {
+        STORAGE_METRIC_HANDLE *db_metric_handle;
+        struct storage_engine_query_ops *db_ops;
+        time_t db_first_time_t;
+        time_t db_last_time_t;
+        time_t db_update_every;
     } tiers[RRD_STORAGE_TIERS];
 
     struct {
@@ -159,18 +160,26 @@ typedef struct query_target {
     bool context_query;                     // when true, this query addresses multiple charts
     usec_t start_ut;                        // the time this query was prepared
 
-    long points;                            // the number of points the query will return (maybe different from the request)
-
     struct {
-        bool absolute;                      // true when the request made with absolute timestamps, false if it was relative
-        size_t after;                       // the absolute timestamp this query is about
-        size_t before;                      // the absolute timestamp this query is about
+        bool relative;                      // true when the request made with relative timestamps, true if it was absolute
+        bool aligned;
+        time_t after;                       // the absolute timestamp this query is about
+        time_t before;                      // the absolute timestamp this query is about
+        time_t query_granularity;
+        long points;                        // the number of points the query will return (maybe different from the request)
+        long group;
+        RRDR_GROUPING group_method;
+        const char *group_options;
+        long resampling_group;
+        NETDATA_DOUBLE resampling_divisor;
+        RRDR_OPTIONS options;
+        int tier;
     } window;
 
     struct {
         time_t first_time_t;                // the combined first_time_t of all metrics in the query, across all tiers
         time_t last_time_t;                 // the combined last_time_T of all metrics in the query, across all tiers
-        int minimum_latest_update_every;    // the min update every of the metrics in the query
+        time_t minimum_latest_update_every; // the min update every of the metrics in the query
     } db;
 
     struct {

@@ -62,13 +62,13 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time_s, time_t end_time_s,
                                     struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle,
                                     time_t start_time_s, time_t end_time_s);
-STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle);
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
 
 
-int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
-void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle);
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle);
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 

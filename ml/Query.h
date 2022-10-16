@@ -42,8 +42,8 @@ private:
     RRDDIM *RD;
     bool Initialized;
 
-    struct rrddim_query_ops *Ops;
-    struct rrddim_query_handle Handle;
+    struct storage_engine_query_ops *Ops;
+    struct storage_engine_query_handle Handle;
 };
 
 } // namespace ml

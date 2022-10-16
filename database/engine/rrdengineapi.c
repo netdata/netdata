@@ -572,7 +572,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
 {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
     struct rrdengine_instance *ctx = page_index->ctx;
@@ -603,7 +603,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
         handle->wanted_start_time_s = INVALID_TIME;
 }
 
-static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
+static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdengine_instance *ctx = handle->ctx;
@@ -682,7 +682,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, bool
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle) {
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
@@ -799,7 +799,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle)
     return sp;
 }
 
-int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     return (INVALID_TIME == handle->wanted_start_time_s);
@@ -808,7 +808,7 @@ int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     struct rrdengine_instance *ctx = handle->ctx;

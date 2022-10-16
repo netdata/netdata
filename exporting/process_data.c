@@ -80,7 +80,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t first_t = rd->tiers[0]->query_ops.oldest_time(rd->tiers[0]->db_metric_handle);
     time_t last_t = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
     time_t update_every = st->update_every;
-    struct rrddim_query_handle handle;
+    struct storage_engine_query_handle handle;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics

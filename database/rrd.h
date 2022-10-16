@@ -360,7 +360,7 @@ typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 
 // ----------------------------------------------------------------------------
 // iterator state for RRD dimension data queries
-struct rrddim_query_handle {
+struct storage_engine_query_handle {
     RRDDIM *rd;
     time_t start_time_s;
     time_t end_time_s;
@@ -405,7 +405,7 @@ typedef struct storage_point {
 
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
-struct rrddim_collect_ops {
+struct storage_engine_collect_ops {
     // an initialization function to run before starting collection
     STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every);
 
@@ -427,18 +427,18 @@ struct rrddim_collect_ops {
 };
 
 // function pointers that handle database queries
-struct rrddim_query_ops {
+struct storage_engine_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time);
 
     // run this to load each metric number from the database
-    STORAGE_POINT (*next_metric)(struct rrddim_query_handle *handle);
+    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
 
     // run this to test if the series of next_metric() database queries is finished
-    int (*is_finished)(struct rrddim_query_handle *handle);
+    int (*is_finished)(struct storage_engine_query_handle *handle);
 
     // run this after finishing a series of load_metric() database queries
-    void (*finalize)(struct rrddim_query_handle *handle);
+    void (*finalize)(struct storage_engine_query_handle *handle);
 
     // get the timestamp of the last entry of this metric
     time_t (*latest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
@@ -459,8 +459,8 @@ struct rrddim_tier {
     STORAGE_POINT virtual_point;
     time_t next_point_time;
     usec_t last_collected_ut;
-    struct rrddim_collect_ops collect_ops;
-    struct rrddim_query_ops query_ops;
+    struct storage_engine_collect_ops collect_ops;
+    struct storage_engine_query_ops query_ops;
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);

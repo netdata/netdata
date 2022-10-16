@@ -98,7 +98,7 @@ typedef struct rrdresult {
 
     // internal rrd2rrdr() members below this point
     struct {
-        int query_tier;                         // the selected tier
+        int query_tier;                   // the selected tier
         RRDR_OPTIONS query_options;       // RRDR_OPTION_* (as run by the query)
 
         long points_wanted;
@@ -134,6 +134,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
 #include "web/api/queries/query.h"
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
+bool query_target_calculate_window(QUERY_TARGET *qt);
 
 int rrdr_relative_window_to_absolute(long long *after, long long *before);
 
