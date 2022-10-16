@@ -56,14 +56,14 @@ void netdata_cleanup_and_exit(int ret) {
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            for (int tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            for (int tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }
 #endif

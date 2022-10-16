@@ -727,6 +727,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .group_options = group_options,
             .resampling_time = group_time,
             .tier = tier,
+            .chart_label_key = chart_label_key,
+            .charts_labels_filter = chart_labels_filter,
     });
 
     if(!qt || !qt->query.used) {

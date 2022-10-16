@@ -58,8 +58,8 @@ struct pg_cache_page_index;
 #include "rrdcontext.h"
 
 extern bool dbengine_enabled;
-extern int storage_tiers;
-extern int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
+extern size_t storage_tiers;
+extern size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
 typedef enum {
     RRD_BACKFILL_NONE,
@@ -463,7 +463,7 @@ struct rrddim_tier {
     struct storage_engine_query_ops query_ops;
 };
 
-void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now);
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -1306,7 +1306,7 @@ void set_host_properties(
     const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
 
-int get_tier_grouping(int tier);
+size_t get_tier_grouping(size_t tier);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

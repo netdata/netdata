@@ -77,7 +77,7 @@ int rrdset2value_api_v1(
         , long long before
         , int group_method
         , const char *group_options
-        , long group_time
+        , size_t resampling_time
         , uint32_t options
         , time_t *db_after
         , time_t *db_before

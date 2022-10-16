@@ -693,7 +693,7 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // ----------------------------------------------------------------------------
 // tier management
 
-static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted) {
+static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     if(unlikely(storage_tiers < 2))
         return 0;
 
@@ -708,7 +708,7 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
 
     long weight[storage_tiers];
 
-    for(int tier = 0; tier < storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
 
         time_t common_first_t = 0;
         time_t common_last_t = 0;
@@ -748,8 +748,8 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
 //        if(time_coverage < 0) time_coverage = 0;
 
         long points_available = (before_wanted - after_wanted) / qt->db.minimum_latest_update_every;
-        long points_delta = points_available - points_wanted;
-        long points_coverage = (points_delta < 0) ? points_available * 1000 / points_wanted: 1000;
+        long points_delta = (long)(points_available - points_wanted);
+        long points_coverage = (points_delta < 0) ? (long)(points_available * 1000 / points_wanted): 1000;
 
         if(points_available <= 0)
             weight[tier] = -LONG_MAX;
@@ -761,8 +761,8 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
     //                   points_available, time_coverage, points_coverage, weight[tier]);
     }
 
-    int best_tier = 0;
-    for(int tier = 1; tier < storage_tiers ; tier++) {
+    size_t best_tier = 0;
+    for(size_t tier = 1; tier < storage_tiers ; tier++) {
         if(weight[tier] >= weight[best_tier])
             best_tier = tier;
     }
@@ -777,9 +777,9 @@ static int rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wa
     return best_tier;
 }
 
-static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, int tier) {
-    int best_tier;
-    if((options & RRDR_OPTION_SELECTED_TIER) && tier >= 0 && tier < storage_tiers)
+static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, size_t tier) {
+    size_t best_tier;
+    if((options & RRDR_OPTION_SELECTED_TIER) && tier < storage_tiers)
         best_tier = tier;
     else
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
@@ -934,14 +934,14 @@ static int compare_query_plan_entries_on_start_time(const void *a, const void *b
     return (p1->after < p2->after)?-1:1;
 }
 
-static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, long points_wanted) {
+static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     //BUFFER *wb = buffer_create(1000);
     //buffer_sprintf(wb, "QUERY PLAN for chart '%s' dimension '%s', from %ld to %ld:", rd->rrdset->name, rd->name, after_wanted, before_wanted);
 
     // put our selected tier as the first plan
     size_t selected_tier;
 
-    if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER && ops->r->internal.query_tier >= 0 && ops->r->internal.query_tier < storage_tiers) {
+    if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER && ops->r->internal.query_tier < storage_tiers) {
         selected_tier = ops->r->internal.query_tier;
     }
     else {
@@ -966,7 +966,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can start the query
         if (selected_tier_first_time_t > after_wanted) {
             // we need some help from other tiers
-            for (int tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
+            for (size_t tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
                 // find the first time of this tier
                 time_t first_time_t = ops->qm->tiers[tr].db_first_time_t;
 
@@ -1076,7 +1076,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
     QUERY_TARGET *qt = r->qt;
     QUERY_METRIC *qm = &qt->query.array[dim_id_in_rrdr];
-    long points_wanted = qt->window.points;
+    size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
     time_t before_wanted = qt->window.before;
 
@@ -1096,7 +1096,7 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
         .grouping_flush = r->internal.grouping_flush,
         .tier_query_fetch = r->internal.tier_query_fetch,
         .view_update_every = r->update_every,
-        .query_granularity = r->update_every / r->group,
+        .query_granularity = (time_t)(r->update_every / r->group),
         .group_value_flags = RRDR_VALUE_NOTHING
     };
 
@@ -1115,7 +1115,7 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
     time_t now_end_time   = after_wanted + ops.view_update_every - ops.query_granularity;
 
     // The main loop, based on the query granularity we need
-    for( ; (long)points_added < points_wanted ; now_start_time = now_end_time, now_end_time += ops.view_update_every) {
+    for( ; points_added < points_wanted ; now_start_time = now_end_time, now_end_time += ops.view_update_every) {
 
         if(query_plan_should_switch_plan(ops, now_end_time))
             query_planer_next_plan(&ops, now_end_time, new_point.end_time);
@@ -1260,7 +1260,7 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
         // we select the one to use based on their timestamps
 
         size_t iterations = 0;
-        for ( ; now_end_time <= new_point.end_time && (long)points_added < points_wanted ;
+        for ( ; now_end_time <= new_point.end_time && points_added < points_wanted ;
                 now_end_time += ops.view_update_every, iterations++) {
 
             // now_start_time is wrong in this loop
@@ -1364,7 +1364,7 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
 
     r->internal.result_points_generated += points_added;
     r->internal.db_points_read += ops.db_total_points_read;
-    for(int tr = 0; tr < storage_tiers ; tr++)
+    for(size_t tr = 0; tr < storage_tiers ; tr++)
         r->internal.tier_points_read[tr] += ops.db_points_read_per_tier[tr];
 
     r->min = min;
@@ -1373,7 +1373,7 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
     r->after = min_date - ops.view_update_every + ops.query_granularity;
     rrdr_done(r, rrdr_line);
 
-    internal_error((long)points_added != points_wanted,
+    internal_error(points_added != points_wanted,
                    "QUERY: '%s', dimension '%s', requested %zu points, but RRDR added %zu (%zu db points read).",
                    qt->id, string2str(qm->dimension.id),
                    (size_t)points_wanted, (size_t)points_added, ops.db_total_points_read);
@@ -1384,8 +1384,8 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
 
 extern void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
-void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
-    if(unlikely(tier < 0 || tier >= storage_tiers)) return;
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) {
+    if(unlikely(tier >= storage_tiers)) return;
     if(storage_tiers_backfill[tier] == RRD_BACKFILL_NONE) return;
 
     struct rrddim_tier *t = rd->tiers[tier];
@@ -1406,7 +1406,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, int tier, time_t now) {
     size_t all_points_read = 0;
 
     // for each lower tier
-    for(int tr = tier - 1; tr >= 0 ;tr--){
+    for(int tr = (int)tier - 1; tr >= 0 ;tr--){
         time_t smaller_tier_first_time = rd->tiers[tr]->query_ops.oldest_time(rd->tiers[tr]->db_metric_handle);
         time_t smaller_tier_last_time = rd->tiers[tr]->query_ops.latest_time(rd->tiers[tr]->db_metric_handle);
         if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
@@ -1448,15 +1448,15 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
         , RRDR_OPTIONS options __maybe_unused
         , RRDR_GROUPING group_method
         , bool aligned
-        , long group
-        , long resampling_time
-        , long resampling_group
+        , size_t group
+        , time_t resampling_time
+        , size_t resampling_group
         , time_t after_wanted
         , time_t after_requested
         , time_t before_wanted
         , time_t before_requested
-        , long points_requested
-        , long points_wanted
+        , size_t points_requested
+        , size_t points_wanted
         //, size_t after_slot
         //, size_t before_slot
         , const char *msg
@@ -1603,13 +1603,13 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before) {
 bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (unlikely(!qt)) return false;
 
-    long points_requested = qt->request.points;
+    long points_requested = (long)qt->request.points;
     long long after_requested = qt->request.after;
     long long before_requested = qt->request.before;
     RRDR_GROUPING group_method = qt->request.group_method;
-    long resampling_time_requested = qt->request.resampling_time;
+    time_t resampling_time_requested = qt->request.resampling_time;
     RRDR_OPTIONS options = qt->request.options;
-    int tier = qt->request.tier;
+    size_t tier = qt->request.tier;
     time_t update_every = qt->db.minimum_latest_update_every;
 
     // RULES
@@ -1696,13 +1696,6 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         if (points_wanted == 0) {
             points_wanted = (last_entry_t - first_entry_t) / update_every;
             query_debug_log(":zero points_wanted %ld", points_wanted);
-        }
-
-        // if they are still zero, assume 600
-
-        if (after_wanted == 0) {
-            after_wanted = -600;
-            query_debug_log(":zero600 after_wanted %lld", after_wanted);
         }
     }
 
@@ -1885,17 +1878,17 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     time_t resampling_time_requested = qt->request.resampling_time;
     time_t after_requested = qt->request.after;
     time_t before_requested = qt->request.before;
-    long points_requested = qt->request.points;
+    size_t points_requested = qt->request.points;
 
     RRDR_OPTIONS options = qt->window.options;
-    long points_wanted = qt->window.points;
+    size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
     time_t before_wanted = qt->window.before;
     bool relative_period_requested = qt->window.relative;
     bool aligned = qt->window.aligned;
     RRDR_GROUPING group_method = qt->window.group_method;
-    long group = qt->window.group;
-    long resampling_group = qt->window.resampling_group;
+    size_t group = qt->window.group;
+    size_t resampling_group = qt->window.resampling_group;
     time_t query_granularity = qt->window.query_granularity;
 
     RRDR *r = rrdr_create(owa, qt);
@@ -1942,7 +1935,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // do the work for each dimension
 
     time_t max_after = 0, min_before = 0;
-    long max_rows = 0;
+    size_t max_rows = 0;
 
     long dimensions_used = 0, dimensions_nonzero = 0;
     struct timeval query_start_time;

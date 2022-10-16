@@ -21,7 +21,7 @@ static inline void free_single_rrdrim(ONEWAYALLOC *owa, RRDDIM *temp_rd, int arc
         }
     }
 
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(!temp_rd->tiers[tier]) continue;
 
         if(archive_mode) {
@@ -113,7 +113,7 @@ void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_lis
         RRDDIM *rd = onewayalloc_memdupz(owa, rd1, sizeof(RRDDIM));
         rd->id = string_dup(rd1->id);
         rd->name = string_dup(rd1->name);
-        for(int tier = 0; tier < storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if(rd1->tiers[tier])
                 rd->tiers[tier] = onewayalloc_memdupz(owa, rd1->tiers[tier], sizeof(*rd->tiers[tier]));
             else
@@ -187,7 +187,7 @@ int rrdset2value_api_v1(
         , long long before
         , int group_method
         , const char *group_options
-        , long group_time
+        , size_t resampling_time
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
@@ -208,6 +208,7 @@ int rrdset2value_api_v1(
             .points = (int)points,
             .after = after,
             .before = before,
+            .resampling_time = resampling_time,
             .group_method = group_method,
             .group_options = group_options,
             .options = options,
@@ -225,7 +226,7 @@ int rrdset2value_api_v1(
         *db_points_read += r->internal.db_points_read;
 
     if(db_points_per_tier) {
-        for(int t = 0; t < storage_tiers ;t++)
+        for(size_t t = 0; t < storage_tiers ;t++)
             db_points_per_tier[t] += r->internal.tier_points_read[t];
     }
 

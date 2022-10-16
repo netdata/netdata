@@ -140,15 +140,15 @@ typedef struct query_target_request {
     const char *charts_labels_filter;   // select only the charts having this combo of label key:value
     long long after;                    // the requested timeframe
     long long before;                   // the requested timeframe
-    int points;
-    int timeout;                        // the timeout of the query
+    size_t points;                      // the requested number of points
+    time_t timeout;                     // the timeout of the query in seconds
     int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it
     uint32_t format;                    // DATASOURCE_FORMAT
     RRDR_OPTIONS options;
     RRDR_GROUPING group_method;
     const char *group_options;
-    long resampling_time;
-    int tier;
+    time_t resampling_time;
+    size_t tier;
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {
@@ -166,14 +166,14 @@ typedef struct query_target {
         time_t after;                       // the absolute timestamp this query is about
         time_t before;                      // the absolute timestamp this query is about
         time_t query_granularity;
-        long points;                        // the number of points the query will return (maybe different from the request)
-        long group;
+        size_t points;                        // the number of points the query will return (maybe different from the request)
+        size_t group;
         RRDR_GROUPING group_method;
         const char *group_options;
-        long resampling_group;
+        size_t resampling_group;
         NETDATA_DOUBLE resampling_divisor;
         RRDR_OPTIONS options;
-        int tier;
+        size_t tier;
     } window;
 
     struct {

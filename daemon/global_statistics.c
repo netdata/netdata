@@ -698,7 +698,7 @@ static void dbengine_statistics_charts(void) {
             if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
 
                 /* get localhost's DB engine's statistics for each tier */
-                for(int tier = 0; tier < storage_tiers ;tier++) {
+                for(size_t tier = 0; tier < storage_tiers ;tier++) {
                     if(!host->storage_instance[tier]) continue;
 
                     if(is_storage_engine_shared(host->storage_instance[tier])) {

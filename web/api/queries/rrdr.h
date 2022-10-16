@@ -76,9 +76,9 @@ typedef struct rrdresult {
 
     RRDR_RESULT_OPTIONS result_options; // RRDR_RESULT_OPTION_*
 
-    int d;                    // the number of dimensions
-    long n;                   // the number of values in the arrays
-    long rows;                // the number of rows used
+    size_t d;                 // the number of dimensions
+    size_t n;                 // the number of values in the arrays
+    size_t rows;              // the number of rows used
 
     RRDR_DIMENSION_FLAGS *od; // the options for the dimensions
 
@@ -87,8 +87,8 @@ typedef struct rrdresult {
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     NETDATA_DOUBLE *ar;       // array n x d of anomaly rates (0 - 100)
 
-    long group;               // how many collected values were grouped for each row
-    int update_every;         // what is the suggested update frequency in seconds
+    size_t group;             // how many collected values were grouped for each row
+    time_t update_every;      // what is the suggested update frequency in seconds
 
     NETDATA_DOUBLE min;
     NETDATA_DOUBLE max;
@@ -98,11 +98,11 @@ typedef struct rrdresult {
 
     // internal rrd2rrdr() members below this point
     struct {
-        int query_tier;                   // the selected tier
+        size_t query_tier;                   // the selected tier
         RRDR_OPTIONS query_options;       // RRDR_OPTION_* (as run by the query)
 
-        long points_wanted;
-        long resampling_group;
+        size_t points_wanted;
+        size_t resampling_group;
         NETDATA_DOUBLE resampling_divisor;
 
         void (*grouping_create)(struct rrdresult *r, const char *options);
@@ -134,7 +134,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
 #include "web/api/queries/query.h"
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
-bool query_target_calculate_window(QUERY_TARGET *qt);
+bool query_target_calculate_window(struct query_target *qt);
 
 int rrdr_relative_window_to_absolute(long long *after, long long *before);
 

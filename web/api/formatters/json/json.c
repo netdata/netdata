@@ -5,15 +5,7 @@
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
-void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct context_param *context_param_list)
-{
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-
-    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
-
-    if (should_lock)
-        rrdset_check_rdlock(r->st);
-
+void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     //info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                        // key quote
@@ -113,20 +105,20 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     // print the JSON header
 
     long c, i;
-    RRDDIM *rd;
+    QUERY_METRIC *qm;
+    QUERY_TARGET *qt = r->qt;
 
     // print the header lines
-    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0, qm = &qt->query.array[c]; c < r->qt->query.used && c < (long)r->d ; qm = &qt->query.array[c++]) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, rrddim_name(rd));
-//        buffer_strcat(wb, ".");
-//        buffer_strcat(wb, rd->rrdset->name);
+        buffer_strcat(wb, string2str(qm->dimension.name));
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
+
     if(!i) {
         buffer_fast_strcat(wb, pre_label, pre_label_len);
         buffer_fast_strcat(wb, "no data", 7);
@@ -187,7 +179,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely(row_annotations)) {
                 // google supports one annotation per row
                 int annotation_found = 0;
-                for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd ;c++, rd = rd->next) {
+                for(c = 0, qm = &qt->query.array[c]; c < qt->query.used && c < (long)r->d ; qm = &qt->query.array[c++]) {
                     if(unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
 
                     if(unlikely(co[c] & RRDR_VALUE_RESET)) {

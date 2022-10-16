@@ -47,7 +47,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 
         size_t tiers_available = 0, tiers_said_yes = 0;
-        for(int tier = 0; tier < storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if(rd->tiers[tier]) {
                 tiers_available++;
 

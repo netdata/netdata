@@ -176,7 +176,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                        stats->db_points
                    );
 
-    for(int tier = 0; tier < storage_tiers ;tier++)
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
         buffer_sprintf(wb, "%s%zu", tier?", ":"", stats->db_points_per_tier[tier]);
 
     buffer_sprintf(wb, " ]\n"
@@ -517,7 +517,6 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     options |= RRDR_OPTION_NATURAL_POINTS;
 
     long group_time = 0;
-    struct context_param  *context_param_list = NULL;
 
     int examined_dimensions = 0;
 
@@ -546,7 +545,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         goto cleanup;
     }
 
-    for(int i = 0; i < storage_tiers ;i++)
+    for(size_t i = 0; i < storage_tiers ;i++)
         stats->db_points_per_tier[i] += high_rrdr->internal.tier_points_read[i];
 
     stats->db_points     += high_rrdr->internal.db_points_read;
@@ -584,7 +583,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         goto cleanup;
     }
 
-    for(int i = 0; i < storage_tiers ;i++)
+    for(size_t i = 0; i < storage_tiers ;i++)
         stats->db_points_per_tier[i] += base_rrdr->internal.tier_points_read[i];
 
     stats->db_points     += base_rrdr->internal.db_points_read;
@@ -613,10 +612,10 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
     // for each dimension
     RRDDIM *d;
-    int i;
-    rrddim_foreach_read(d, base_rrdr->st) {
-        if(unlikely((int)d_dfe.counter >= base_rrdr->d)) break;
-        i = (int)d_dfe.counter; // d_counter is provided by the dictionary
+    size_t i;
+    rrddim_foreach_read(d, st) {
+        if(unlikely(d_dfe.counter >= base_rrdr->d)) break;
+        i = d_dfe.counter; // d_counter is provided by the dictionary
 
         // skip the not evaluated ones
         if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))
@@ -658,7 +657,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
             // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
             // so we flip the result of kstwo()
-            register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
+            register_result(results, st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
         }
     }
     rrddim_foreach_done(d);
@@ -681,7 +680,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
-    long group_time = 0;
+    size_t resampling_time = 0;
 
     int examined_dimensions = 0;
     int ret, value_is_null;
@@ -706,7 +705,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &baseline_average, rrddim_id(d), 1,
                                   baseline_after, baseline_before,
-                                  group, group_options, group_time, options,
+                                  group, group_options, resampling_time, options,
                                   NULL, NULL,
                                   &stats->db_points, stats->db_points_per_tier,
                                   &stats->result_points,
@@ -723,7 +722,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &highlight_average, rrddim_id(d), 1,
                                   after, before,
-                                  group, group_options, group_time, options,
+                                  group, group_options, resampling_time, options,
                                   NULL, NULL,
                                   &stats->db_points, stats->db_points_per_tier,
                                   &stats->result_points,
@@ -748,8 +747,8 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 
         ret = rrdset2value_api_v1(st, NULL, &highlight_countif, rrddim_id(d), 1,
                                   after, before,
-                                  RRDR_GROUPING_COUNTIF,highlighted_countif_options,
-                                  group_time, options,
+                                  RRDR_GROUPING_COUNTIF, highlighted_countif_options,
+                                  resampling_time, options,
                                   NULL, NULL,
                                   &stats->db_points, stats->db_points_per_tier,
                                   &stats->result_points,
@@ -793,7 +792,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
                                        WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT | RRDR_OPTION_NATURAL_POINTS;
-    long group_time = 0;
+    size_t resampling_time = 0;
 
     int examined_dimensions = 0;
     int ret, value_is_null;
@@ -818,7 +817,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
         value_is_null = 1;
         ret = rrdset2value_api_v1(st, NULL, &average, rrddim_id(d), 1,
                                   after, before,
-                                  group, group_options, group_time, options,
+                                  group, group_options, resampling_time, options,
                                   NULL, NULL,
                                   &stats->db_points, stats->db_points_per_tier,
                                   &stats->result_points,

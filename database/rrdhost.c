@@ -4,21 +4,21 @@
 #include "rrd.h"
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-int storage_tiers = 1;
-int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
+size_t storage_tiers = 1;
+size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
-int get_tier_grouping(int tier) {
+size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
     if(unlikely(tier < 0)) tier = 0;
 
-    int grouping = 1;
+    size_t grouping = 1;
     // first tier is always 1 iteration of whatever update every the chart has
-    for(int i = 1; i <= tier ;i++)
+    for(size_t i = 1; i <= tier ;i++)
         grouping *= storage_tiers_grouping_iterations[i];
 
     return grouping;
