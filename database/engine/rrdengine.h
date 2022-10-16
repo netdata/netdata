@@ -17,7 +17,6 @@
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
-#include "metadata_log/metadatalog.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
 #include "rrdenglocking.h"
@@ -236,7 +235,6 @@ typedef enum {
 } INVALID_PAGE_ID;
 
 struct rrdengine_instance {
-    struct metalog_instance *metalog_ctx;
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;

@@ -456,7 +456,9 @@ RRD_PLUGIN_FILES = \
     database/sqlite/sqlite_db_migration.c \
     database/sqlite/sqlite_db_migration.h \
     database/sqlite/sqlite_aclk.c \
-    database/sqlite/sqlite_aclk.h \
+	database/sqlite/sqlite_aclk.h \
+    database/sqlite/sqlite_metadata.c \
+    database/sqlite/sqlite_metadata.h \
     database/sqlite/sqlite_health.c \
     database/sqlite/sqlite_health.h \
     database/sqlite/sqlite_aclk_node.c \
@@ -547,16 +549,6 @@ if ENABLE_DBENGINE
         database/engine/pagecache.h \
         database/engine/rrdenglocking.c \
         database/engine/rrdenglocking.h \
-        database/engine/metadata_log/metadatalog.h \
-        database/engine/metadata_log/metadatalogapi.c \
-        database/engine/metadata_log/metadatalogapi.h \
-        database/engine/metadata_log/logfile.h \
-        database/engine/metadata_log/logfile.c \
-        database/engine/metadata_log/metadatalogprotocol.h \
-        database/engine/metadata_log/metalogpluginsd.c \
-        database/engine/metadata_log/metalogpluginsd.h \
-        database/engine/metadata_log/compaction.c \
-        database/engine/metadata_log/compaction.h \
         $(NULL)
 endif
 

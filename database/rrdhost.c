@@ -46,7 +46,7 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management
 
-static DICTIONARY *rrdhost_root_index = NULL;
+DICTIONARY *rrdhost_root_index = NULL;
 static DICTIONARY *rrdhost_root_index_hostname = NULL;
 
 static inline void rrdhost_init() {
@@ -299,6 +299,8 @@ static void rrdhost_initialize_health(RRDHOST *host,
             add_migrated_file(host->health_log_filename, 0);
         }
     } else {
+        // TODO: This needs to go to the metadata thread
+        // Health should wait before accessing the table (needs to be created by the metadata thread
         sql_create_health_log_table(host);
         sql_health_alarm_log_load(host);
     }
@@ -414,14 +416,8 @@ int is_legacy = 1;
     }
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-        int rc;
-
-        if(!archived) {
-            rc = sql_store_host_info(host);
-            if (unlikely(rc))
-                error_report("Failed to store machine GUID to the database");
-        }
-
+        if(!archived)
+            metaqueue_host_update_info(host->machine_guid);
         sql_load_node_id(host);
     }
     else
@@ -541,7 +537,8 @@ int is_legacy = 1;
          , string2str(host->health_default_exec)
          , string2str(host->health_default_recipient)
     );
-    sql_store_host_system_info(&host->host_uuid, system_info);
+    if(!archived)
+        metaqueue_host_update_system_info(host);
 
     rrd_hosts_available++;
 
@@ -584,7 +581,7 @@ void rrdhost_update(RRDHOST *host
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
-    sql_store_host_system_info(&host->host_uuid, system_info);
+    metaqueue_host_update_system_info(host);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
@@ -922,6 +919,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     health_init();
 
 unittest:
+    metadata_sync_init();
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     rrd_wrlock();
     localhost = rrdhost_create(
@@ -1385,7 +1383,7 @@ void reload_host_labels(void) {
     rrdhost_load_auto_labels();
 
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
-    sql_store_host_labels(localhost);
+    metaqueue_store_host_labels(localhost->machine_guid);
 
     health_label_log_save(localhost);
 

@@ -80,7 +80,6 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
         } else
             rrdset_next(st);
     }
-
     return PARSER_RC_OK;
 disable:
     ((PARSER_USER_OBJECT *)user)->enabled = 0;
@@ -306,14 +305,14 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
     if (likely(unhide_dimension)) {
         rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
             rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
+            metaqueue_dimension_update_flags(rd);
         }
     } else {
         rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
         if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
             rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
+            metaqueue_dimension_update_flags(rd);
         }
     }
 
@@ -639,7 +638,6 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
             error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, rrdhost_hostname(host), rrdset_id(st));
     }
 
-
     return PARSER_RC_OK;
 }
 
@@ -713,7 +711,7 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, (DICTIONARY *) (((PARSER_USER_OBJECT *)user)->new_host_labels));
-    sql_store_host_labels(host);
+    metaqueue_store_host_labels(host->machine_guid);
 
     rrdlabels_destroy(((PARSER_USER_OBJECT *)user)->new_host_labels);
     ((PARSER_USER_OBJECT *)user)->new_host_labels = NULL;
@@ -743,6 +741,11 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
     UNUSED(words);
 
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
+
+    if (unlikely(!st))
+        return PARSER_RC_OK;
+
     debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily) {
@@ -751,6 +754,9 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
     }
 
     rrdlabels_remove_all_unmarked(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
+
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
 
     ((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily = NULL;
     return PARSER_RC_OK;

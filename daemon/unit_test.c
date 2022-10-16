@@ -1564,8 +1564,10 @@ int test_sqlite(void) {
 
     buffer_free(sql);
     fprintf(stderr,"SQLite is OK\n");
+    rc = sqlite3_close_v2(db_meta);
     return 0;
 error:
+    rc = sqlite3_close_v2(db_meta);
     fprintf(stderr,"SQLite statement failed: %s\n", buffer_tostring(sql));
     buffer_free(sql);
     fprintf(stderr,"SQLite tests failed\n");

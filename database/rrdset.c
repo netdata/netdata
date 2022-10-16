@@ -173,10 +173,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), string2str(st->parts.name), &st->chart_uuid))
-        uuid_generate(st->chart_uuid);
-    update_chart_metadata(&st->chart_uuid, st, string2str(st->parts.id), string2str(st->parts.name));
-
     // initialize the db tiers
     {
         RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
@@ -392,10 +388,14 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
-    if(ctr->react_action & (RRDSET_REACT_UPDATED | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
-        debug(D_METADATALOG, "CHART [%s] metadata updated", rrdset_id(st));
-        if(unlikely(update_chart_metadata(&st->chart_uuid, st, ctr->id, ctr->name)))
-            error_report("Failed to update chart metadata in the database");
+    if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
+        if (ctr->react_action & RRDSET_REACT_NEW) {
+            if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), &st->chart_uuid)) {
+                uuid_generate(st->chart_uuid);
+            }
+        }
+        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrdcontext_updated_rrdset(st);

@@ -4,7 +4,6 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
-    metadata_log \
     $(NULL)
 
 dist_noinst_DATA = \

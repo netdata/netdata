@@ -66,19 +66,6 @@ static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
     out[23] = '_';
 }
 
-static inline char *get_str_from_uuid(uuid_t *uuid)
-{
-    char uuid_str[GUID_LEN + 1];
-    if (unlikely(!uuid)) {
-        uuid_t zero_uuid;
-        uuid_clear(zero_uuid);
-        uuid_unparse_lower(zero_uuid, uuid_str);
-    }
-    else
-        uuid_unparse_lower(*uuid, uuid_str);
-    return strdupz(uuid_str);
-}
-
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
         "alert_unique_id, date_created, date_submitted, date_cloud_ack, " \
         "unique(alert_unique_id));"
@@ -104,20 +91,11 @@ enum aclk_database_opcode {
     ACLK_MAX_ENUMERATIONS_DEFINED
 };
 
-struct aclk_chart_payload_t {
-    long sequence_id;
-    long last_sequence_id;
-    char *payload;
-    struct aclk_chart_payload_t *next;
-};
-
-
 struct aclk_database_cmd {
     enum aclk_database_opcode opcode;
     void *data;
     void *data_param;
     int count;
-    uint64_t param1;
     struct aclk_completion *completion;
 };
 
@@ -187,7 +165,6 @@ extern sqlite3 *db_meta;
 int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
-int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd);
 void sql_aclk_sync_init(void);
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
 void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

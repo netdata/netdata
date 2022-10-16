@@ -5,28 +5,12 @@
 
 #include "sqlite_aclk_node.h"
 
-#ifdef ENABLE_ACLK
-#include "../../aclk/aclk.h"
-#endif
-
 void sanity_check(void) {
     // make sure the compiler will stop on misconfigurations
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
 
 const char *aclk_sync_config[] = {
-    "CREATE TABLE IF NOT EXISTS dimension_delete (dimension_id blob, dimension_name text, chart_type_id text, "
-    "dim_id blob, chart_id blob, host_id blob, date_created);",
-
-    "CREATE INDEX IF NOT EXISTS ind_h1 ON dimension_delete (host_id);",
-
-    "CREATE TRIGGER IF NOT EXISTS tr_dim_del AFTER DELETE ON dimension BEGIN INSERT INTO dimension_delete "
-    "(dimension_id, dimension_name, chart_type_id, dim_id, chart_id, host_id, date_created)"
-    " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, unixepoch() FROM"
-    " chart c WHERE c.chart_id = old.chart_id; END;",
-
-    "DELETE FROM dimension_delete WHERE host_id NOT IN"
-    " (SELECT host_id FROM host) OR unixepoch() - date_created > 604800;",
 
     NULL,
 };
@@ -172,25 +156,6 @@ struct aclk_database_cmd aclk_database_deq_cmd(struct aclk_database_worker_confi
     uv_mutex_unlock(&wc->cmd_mutex);
 
     return ret;
-}
-
-int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd)
-{
-    if (unlikely(!node_id || !cmd))
-        return 0;
-
-    uv_mutex_lock(&aclk_async_lock);
-    struct aclk_database_worker_config *wc = aclk_thread_head;
-
-    while (wc) {
-        if (!strcmp(wc->node_id, node_id))
-            break;
-        wc = wc->next;
-    }
-    uv_mutex_unlock(&aclk_async_lock);
-    if (wc)
-        aclk_database_enq_cmd(wc, cmd);
-    return (wc == NULL);
 }
 
 struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id)
@@ -466,9 +431,7 @@ void aclk_database_worker(void *arg)
     timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
-//    wc->retry_count = 0;
     wc->node_info_send = 1;
-//    aclk_add_worker_thread(wc);
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, (unsigned long int) sizeof(*wc));
 
     memset(&cmd, 0, sizeof(cmd));
@@ -688,9 +651,7 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     strcpy(wc->host_guid, host_guid);
-//    wc->chart_updates = 0;
     wc->alert_updates = 0;
-//    wc->retry_count = 0;
     aclk_database_init_cmd_queue(wc);
     aclk_add_worker_thread(wc);
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
@@ -836,8 +797,5 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
         sqlite3_free(err_msg);
     }
-    db_execute("DELETE FROM dimension_delete WHERE host_id NOT IN (SELECT host_id FROM host) "
-               " OR unixepoch() - date_created > 604800;");
-
     return;
 }
