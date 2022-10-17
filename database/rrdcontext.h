@@ -8,18 +8,10 @@
 
 typedef struct rrdmetric_acquired RRDMETRIC_ACQUIRED;
 
-const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
-const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
-
 // ----------------------------------------------------------------------------
 // RRDINSTANCE
 
 typedef struct rrdinstance_acquired RRDINSTANCE_ACQUIRED;
-
-const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
-const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
-struct dictionary *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
-struct dictionary *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
@@ -30,6 +22,15 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 // ----------------------------------------------------------------------------
 
 #include "rrd.h"
+
+const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
+const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
+NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
+
+const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
+const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
+DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
+DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost
@@ -163,8 +164,6 @@ typedef struct query_target {
     QUERY_TARGET_REQUEST request;
 
     bool used;                              // when true, this query is currently being used
-    bool multihost_query;                   // when true, this query addresses multiple hosts
-    bool context_query;                     // when true, this query addresses multiple charts
     usec_t start_ut;                        // the time this query was prepared
 
     struct {
@@ -193,6 +192,7 @@ typedef struct query_target {
         QUERY_METRIC *array;                // the metrics to be queried (all of them should be queried, no exceptions)
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
     } query;
 
     struct {
@@ -205,19 +205,25 @@ typedef struct query_target {
         RRDINSTANCE_ACQUIRED **array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *chart_label_key_pattern;
+        SIMPLE_PATTERN *charts_labels_filter_pattern;
     } instances;
 
     struct {
         RRDCONTEXT_ACQUIRED **array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
     } contexts;
 
     struct {
         RRDHOST **array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
     } hosts;
+
 } QUERY_TARGET;
 
 void query_target_free(void);

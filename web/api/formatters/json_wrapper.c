@@ -33,22 +33,13 @@ static int fill_formatted_callback(const char *name, const char *value, RRDLABEL
 }
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
-    RRDR_GROUPING group_method, QUERY_PARAMS *rrdset_query_data)
+    RRDR_GROUPING group_method)
 {
     QUERY_TARGET *qt = r->qt;
 
-    struct context_param *context_param_list = rrdset_query_data->context_param_list;
-    char *chart_label_key = rrdset_query_data->chart_label_key;
-
-    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
-    uint8_t context_mode = (!context_param_list || (context_param_list->flags & CONTEXT_FLAGS_CONTEXT));
-
-    if (should_lock)
-        rrdset_check_rdlock(r->st);
-
     long rows = rrdr_rows(r);
     long c, i;
-    const long used = qt->query.used;
+    const long query_used = qt->query.used;
 
     //info("JSONWRAPPER(): %s: BEGIN", r->st->id);
     char kq[2] = "",                    // key quote
@@ -91,7 +82,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     buffer_sprintf(wb, "%s,\n   %sdimension_names%s: [", sq, kq, kq);
 
-    for(c = 0, i = 0; c < used ;c++) {
+    for(c = 0, i = 0; c < query_used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -115,7 +106,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sdimension_ids%s: ["
                    , kq, kq);
 
-    for(c = 0, i = 0; c < used ;c++) {
+    for(c = 0, i = 0; c < query_used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -193,7 +184,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     {
         DICTIONARY *funcs = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
         RRDINSTANCE_ACQUIRED *ria = NULL;
-        for (c = 0; c < used ; c++) {
+        for (c = 0; c < query_used ; c++) {
             QUERY_METRIC *qm = &qt->query.array[c];
             if(qm->link.ria == ria)
                 continue;
@@ -215,22 +206,25 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     }
 
     // Composite charts
-    if (qt->instances.used > 1) {
+    if (!qt->request.st) {
         buffer_sprintf(
             wb,
             "   %schart_ids%s: [",
             kq, kq);
 
-        for (c = 0, i = 0, rd = temp_rd ; rd && c < r->d; c++, rd = rd->next) {
+        for (c = 0, i = 0; c < query_used; c++) {
+            QUERY_METRIC *qm = &qt->query.array[c];
+
             if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
                 continue;
+
             if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
                 continue;
 
             if (i)
                 buffer_strcat(wb, ", ");
             buffer_strcat(wb, sq);
-            buffer_strcat(wb, rrdset_id(rd->rrdset));
+            buffer_strcat(wb, string2str(qm->dimension.id));
             buffer_strcat(wb, sq);
             i++;
         }
@@ -241,29 +235,29 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             buffer_strcat(wb, sq);
         }
         buffer_strcat(wb, "],\n");
-        if (chart_label_key) {
+        if (qt->instances.chart_label_key_pattern) {
             buffer_sprintf(wb, "   %schart_labels%s: { ", kq, kq);
 
-            SIMPLE_PATTERN *pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
-            SIMPLE_PATTERN *original_pattern = pattern;
+            SIMPLE_PATTERN *pattern = qt->instances.chart_label_key_pattern;
             char *label_key = NULL;
             int keys = 0;
             while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
-
                 if (keys)
                     buffer_strcat(wb, ", ");
                 buffer_sprintf(wb, "%s%s%s : [", kq, label_key, kq);
                 keys++;
 
-                for (c = 0, i = 0, rd = temp_rd; rd && c < r->d; c++, rd = rd->next) {
+                for (c = 0, i = 0; c < query_used; c++) {
+                    QUERY_METRIC *qm = &qt->query.array[c];
+
                     if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
                         continue;
                     if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
                         continue;
+
                     if (i)
                         buffer_strcat(wb, ", ");
-
-                    rrdlabels_get_value_to_buffer_or_null(rd->rrdset->rrdlabels, wb, label_key, sq, "null");
+                    rrdlabels_get_value_to_buffer_or_null(rrdinstance_acquired_labels(qm->link.ria), wb, label_key, sq, "null");
                     i++;
                 }
                 if (!i) {
@@ -275,33 +269,26 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                 buffer_strcat(wb, "]");
             }
             buffer_strcat(wb, "},\n");
-            simple_pattern_free(original_pattern);
         }
     }
 
     buffer_sprintf(wb, "   %slatest_values%s: ["
                    , kq, kq);
 
-    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0; c < query_used ;c++) {
+        QUERY_METRIC *qm = &qt->query.array[c];
+
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
         i++;
 
-        NETDATA_DOUBLE value = rd->last_stored_value;
+        NETDATA_DOUBLE value = rrdmetric_acquired_last_stored_value(qm->link.rma);
         if (NAN == value)
             buffer_strcat(wb, "null");
         else
             buffer_rrd_value(wb, value);
-        /*
-        storage_number n = rd->values[rrdset_last_slot(r->st)];
-
-        if(!does_storage_number_exist(n))
-            buffer_strcat(wb, "null");
-        else
-            buffer_rrd_value(wb, unpack_storage_number(n));
-        */
     }
     if(!i) {
         rows = 0;
@@ -318,7 +305,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
-            for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+            for(c = 0; c < query_used ;c++) {
                 NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
                 NETDATA_DOUBLE n = cn[c];
 
@@ -331,7 +318,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if(total == 0) total = 1;
         }
 
-        for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+        for(c = 0, i = 0; c < query_used ;c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -381,15 +368,10 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq
                    );
 
-    for(int tier = 0; tier < storage_tiers ; tier++)
+    for(size_t tier = 0; tier < storage_tiers ; tier++)
         buffer_sprintf(wb, "%s%zu", tier>0?", ":"", r->internal.tier_points_read[tier]);
 
     buffer_strcat(wb, " ]");
-
-    if((options & RRDR_OPTION_CUSTOM_VARS) && (options & RRDR_OPTION_JSON_WRAP)) {
-        buffer_sprintf(wb, ",\n   %schart_variables%s: ", kq, kq);
-        health_api_v1_chart_custom_variables2json(r->st, wb);
-    }
 
     buffer_sprintf(wb, ",\n   %sresult%s: ", kq, kq);
 

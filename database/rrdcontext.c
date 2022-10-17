@@ -347,6 +347,15 @@ const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma) {
     return string2str(rm->name);
 }
 
+NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+
+    if(rm->rrddim)
+        return rm->rrddim->last_stored_value;
+
+    return NAN;
+}
+
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDINSTANCE
 
@@ -2121,13 +2130,6 @@ typedef struct query_target_locals {
     const char *chart_label_key;
     const char *charts_labels_filter;
 
-    SIMPLE_PATTERN *hosts_sp;
-    SIMPLE_PATTERN *contexts_sp;
-    SIMPLE_PATTERN *charts_sp;
-    SIMPLE_PATTERN *dimensions_sp;
-    SIMPLE_PATTERN *chart_label_key_sp;
-    SIMPLE_PATTERN *charts_labels_filter_sp;
-
     long long after;
     long long before;
     bool match_ids;
@@ -2141,6 +2143,20 @@ typedef struct query_target_locals {
 static __thread QUERY_TARGET thread_query_target = {};
 void query_target_release(QUERY_TARGET *qt) {
     if(unlikely(!qt)) return;
+
+    simple_pattern_free(qt->hosts.pattern);
+    simple_pattern_free(qt->contexts.pattern);
+    simple_pattern_free(qt->instances.pattern);
+    simple_pattern_free(qt->instances.chart_label_key_pattern);
+    simple_pattern_free(qt->instances.charts_labels_filter_pattern);
+    simple_pattern_free(qt->query.pattern);
+
+    qt->hosts.pattern = NULL;
+    qt->contexts.pattern = NULL;
+    qt->instances.pattern = NULL;
+    qt->instances.chart_label_key_pattern = NULL;
+    qt->instances.charts_labels_filter_pattern = NULL;
+    qt->query.pattern = NULL;
 
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
@@ -2251,12 +2267,12 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 options &= ~RRDR_DIMENSION_SELECTED;
             }
 
-            if (qtl->dimensions_sp) {
+            if (qt->query.pattern) {
                 // we have a dimensions pattern
                 // lets see if this dimension is selected
 
-                if ((qtl->match_ids && simple_pattern_matches(qtl->dimensions_sp, string2str(rm->id)))
-                    || (qtl->match_names && simple_pattern_matches(qtl->dimensions_sp, string2str(rm->name)))
+                if ((qtl->match_ids   && simple_pattern_matches(qt->query.pattern, string2str(rm->id)))
+                 || (qtl->match_names && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
                         ) {
                     // it matches the pattern
                     options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
@@ -2345,8 +2361,8 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
         qt->db.minimum_latest_update_every = ri->update_every;
 
     bool instance_matches_label_filters = true;
-    if ((qtl->chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->chart_label_key_sp, ':')) ||
-        (qtl->charts_labels_filter_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->charts_labels_filter_sp, ':')))
+    if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, ':')) ||
+        (qt->instances.charts_labels_filter_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.charts_labels_filter_pattern, ':')))
         instance_matches_label_filters = false;
 
     size_t added = 0;
@@ -2379,13 +2395,14 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
         RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
         RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri){
-            if (qtl->charts_sp && !simple_pattern_matches(qtl->charts_sp, string2str(ri->id)) &&
-                !simple_pattern_matches(qtl->charts_sp, string2str(ri->name)))
-                continue;
-
-            query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *) &ri_dfe.item);
-            added++;
+        dfe_start_read(rc->rrdinstances, ri) {
+            if(!qt->instances.pattern
+                || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
+                || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
+                ) {
+                query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *) &ri_dfe.item);
+                added++;
+            }
         }
         dfe_done(ri);
     }
@@ -2434,7 +2451,7 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
             // Probably it is a pattern, we need to search for it...
             RRDCONTEXT *rc;
             dfe_start_read((DICTIONARY *)qtl->host->rrdctx, rc) {
-                if(qtl->contexts_sp && !simple_pattern_matches(qtl->contexts_sp, string2str(rc->id)))
+                if(qt->contexts.pattern && !simple_pattern_matches(qt->contexts.pattern, string2str(rc->id)))
                     continue;
 
                 query_target_add_context(qtl, (RRDCONTEXT_ACQUIRED *)rc_dfe.item);
@@ -2500,12 +2517,12 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     qt->db.minimum_latest_update_every = 0; // it will be updated by query_target_add_query()
 
     // prepare all the patterns
-    qtl.hosts_sp = is_valid_sp(qtl.hosts) ? simple_pattern_create(qtl.hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qtl.contexts_sp = is_valid_sp(qtl.contexts) ? simple_pattern_create(qtl.contexts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qtl.charts_sp = is_valid_sp(qtl.charts) ? simple_pattern_create(qtl.charts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qtl.dimensions_sp = is_valid_sp(qtl.dimensions) ? simple_pattern_create(qtl.dimensions, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qtl.chart_label_key_sp = is_valid_sp(qtl.chart_label_key) ? simple_pattern_create(qtl.chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
-    qtl.charts_labels_filter_sp = is_valid_sp(qtl.charts_labels_filter) ? simple_pattern_create(qtl.charts_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->hosts.pattern = is_valid_sp(qtl.hosts) ? simple_pattern_create(qtl.hosts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->contexts.pattern = is_valid_sp(qtl.contexts) ? simple_pattern_create(qtl.contexts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->instances.pattern = is_valid_sp(qtl.charts) ? simple_pattern_create(qtl.charts, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->query.pattern = is_valid_sp(qtl.dimensions) ? simple_pattern_create(qtl.dimensions, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->instances.chart_label_key_pattern = is_valid_sp(qtl.chart_label_key) ? simple_pattern_create(qtl.chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
+    qt->instances.charts_labels_filter_pattern = is_valid_sp(qtl.charts_labels_filter) ? simple_pattern_create(qtl.charts_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
@@ -2535,18 +2552,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
         // multi host query
         rrd_rdlock();
         rrdhost_foreach_read(qtl.host) {
-            if(!qtl.hosts_sp || simple_pattern_matches(qtl.hosts_sp, rrdhost_hostname(qtl.host)))
+            if(!qt->hosts.pattern || simple_pattern_matches(qt->hosts.pattern, rrdhost_hostname(qtl.host)))
                 query_target_add_host(&qtl, qtl.host);
         }
         rrd_unlock();
     }
-
-    simple_pattern_free(qtl.charts_labels_filter_sp);
-    simple_pattern_free(qtl.chart_label_key_sp);
-    simple_pattern_free(qtl.charts_sp);
-    simple_pattern_free(qtl.dimensions_sp);
-    simple_pattern_free(qtl.contexts_sp);
-    simple_pattern_free(qtl.hosts_sp);
 
     // make sure everything is good
     if(!qt->query.used || !qt->metrics.used || !qt->instances.used || !qt->contexts.used || !qt->hosts.used) {
@@ -2554,12 +2564,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
         query_target_release(qt);
         return NULL;
     }
-
-    if(qt->hosts.used > 1)
-        qt->multihost_query = true;
-
-    if(qt->instances.used > 1)
-        qt->context_query = true;
 
     return qt;
 }

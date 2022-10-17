@@ -800,7 +800,7 @@ void dbengine_init(char *hostname) {
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%d", netdata_configured_cache_dir, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -825,7 +825,7 @@ void dbengine_init(char *hostname) {
             if(grouping_iterations < 2) {
                 grouping_iterations = 2;
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
+                error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
             }
 
             snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);

@@ -250,7 +250,7 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
 
-        for(int tier = 0; tier < storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if (rd->tiers[tier])
                 rd->tiers[tier]->db_collection_handle =
                     rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every * storage_tiers_grouping_iterations[tier]);

@@ -34,7 +34,6 @@ typedef enum rrdr_options {
     RRDR_OPTION_DISPLAY_ABS     = 0x00002000, // for badges, display the absolute value, but calculate colors with sign
     RRDR_OPTION_MATCH_IDS       = 0x00004000, // when filtering dimensions, match only IDs
     RRDR_OPTION_MATCH_NAMES     = 0x00008000, // when filtering dimensions, match only names
-    RRDR_OPTION_CUSTOM_VARS     = 0x00010000, // when wrapping response in a JSON, return custom variables in response
     RRDR_OPTION_NATURAL_POINTS  = 0x00020000, // return the natural points of the database
     RRDR_OPTION_VIRTUAL_POINTS  = 0x00040000, // return virtual points
     RRDR_OPTION_ANOMALY_BIT     = 0x00080000, // Return the anomaly bit stored in each collected_number

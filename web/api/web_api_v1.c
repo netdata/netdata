@@ -34,7 +34,6 @@ static struct {
         , {"match-ids"         , 0    , RRDR_OPTION_MATCH_IDS}
         , {"match_names"       , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"match-names"       , 0    , RRDR_OPTION_MATCH_NAMES}
-        , {"showcustomvars"    , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {"anomaly-bit"       , 0    , RRDR_OPTION_ANOMALY_BIT}
         , {"selected-tier"     , 0    , RRDR_OPTION_SELECTED_TIER}
         , {"raw"               , 0    , RRDR_OPTION_RETURN_RAW}
@@ -590,7 +589,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
-    int tier = 0;
+    size_t tier = 0;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
     RRDR_OPTIONS options = 0;
@@ -674,9 +673,11 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             max_anomaly_rates_str = value;
         }
         else if(!strcmp(name, "tier")) {
-            tier = str2i(value);
-            if(tier >= 0 && tier < storage_tiers)
+            tier = str2ul(value);
+            if(tier < storage_tiers)
                 options |= RRDR_OPTION_SELECTED_TIER;
+            else
+                tier = 0;
         }
     }
 
@@ -1358,7 +1359,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     int options_count = 0;
     RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
-    int tier = 0;
+    size_t tier = 0;
     const char *group_options = NULL, *contexts_str = NULL;
 
     while (url) {
@@ -1406,9 +1407,11 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
             contexts_str = value;
 
         else if(!strcmp(name, "tier")) {
-            tier = str2i(value);
-            if(tier >= 0 && tier < storage_tiers)
+            tier = str2ul(value);
+            if(tier < storage_tiers)
                 options |= RRDR_OPTION_SELECTED_TIER;
+            else
+                tier = 0;
         }
     }
 
@@ -1484,7 +1487,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host, struct web_client *w
     return HTTP_RESP_NOT_FOUND;
 }
 #else
-static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, int tier) {
+static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
     RRDENG_SIZE_STATS stats = rrdeng_size_statistics(multidb_ctx[tier]);
 
     buffer_sprintf(wb,
@@ -1575,8 +1578,8 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        buffer_sprintf(wb, "%s\n\t\"tier%d\": {", tier?",":"", tier);
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        buffer_sprintf(wb, "%s\n\t\"tier%zu\": {", tier?",":"", tier);
         web_client_api_v1_dbengine_stats_for_tier(wb, tier);
         buffer_strcat(wb, "\n\t}");
     }

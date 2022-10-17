@@ -290,14 +290,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     RRDR_OPTIONS options = qt->request.options;
     RRDR_GROUPING group_method = qt->request.group_method;
 
-    // FIXME - added these for temporary compilation - they should be fixed
-    QUERY_PARAMS *query_params = NULL;
-
     switch(format) {
     case DATASOURCE_SSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
             rrdr2ssv(r, wb, options, "", " ", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -310,7 +307,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_SSV_COMMA:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
             rrdr2ssv(r, wb, options, "", ",", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -323,7 +320,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_JS_ARRAY:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
             rrdr2ssv(r, wb, options, "[", ",", "]");
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
@@ -336,7 +333,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_CSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
             rrdr2csv(r, wb, format, options, "", ",", "\\n", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -349,7 +346,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_CSV_MARKDOWN:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
             rrdr2csv(r, wb, format, options, "", "|", "\\n", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -362,7 +359,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_CSV_JSON_ARRAY:
         wb->contenttype = CT_APPLICATION_JSON;
         if(options & RRDR_OPTION_JSON_WRAP) {
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
             buffer_strcat(wb, "[\n");
             rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");
@@ -379,7 +376,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_TSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
             rrdr2csv(r, wb, format, options, "", "\t", "\\n", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
@@ -392,7 +389,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_HTML:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method);
             buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
             rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "");
             buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
@@ -410,7 +407,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
 
         rrdr2json(r, wb, options, 1);
 
@@ -422,7 +419,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         wb->contenttype = CT_APPLICATION_JSON;
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
 
         rrdr2json(r, wb, options, 1);
 
@@ -433,7 +430,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     case DATASOURCE_JSONP:
         wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
 
         rrdr2json(r, wb, options, 0);
 
@@ -446,7 +443,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         wb->contenttype = CT_APPLICATION_JSON;
 
         if(options & RRDR_OPTION_JSON_WRAP)
-            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
+            rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method);
 
         rrdr2json(r, wb, options, 0);
 
