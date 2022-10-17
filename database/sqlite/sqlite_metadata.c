@@ -664,7 +664,7 @@ static bool dimension_can_be_deleted(uuid_t *dim_uuid)
 {
 #ifdef ENABLE_DBENGINE
     bool no_retention = true;
-    for (int tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < storage_tiers; tier++) {
         if (!multidb_ctx[tier])
             continue;
         time_t first_time_t = 0, last_time_t = 0;
