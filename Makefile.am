@@ -678,26 +678,12 @@ ACLK_FILES = \
     aclk/aclk_rx_msgs.h \
     aclk/https_client.c \
     aclk/https_client.h \
-    mqtt_websockets/src/mqtt_wss_client.c \
-    mqtt_websockets/src/include/mqtt_wss_client.h \
-    mqtt_websockets/src/mqtt_wss_log.c \
-    mqtt_websockets/src/include/mqtt_wss_log.h \
-    mqtt_websockets/src/ws_client.c \
-    mqtt_websockets/src/include/ws_client.h \
-    mqtt_websockets/src/mqtt_ng.c \
-    mqtt_websockets/src/include/mqtt_ng.h \
-    mqtt_websockets/src/common_public.c \
-    mqtt_websockets/src/include/common_public.h \
-    mqtt_websockets/src/include/common_internal.h \
-    mqtt_websockets/c-rbuf/src/ringbuffer.c \
-    mqtt_websockets/c-rbuf/include/ringbuffer.h \
-    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
-    mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h \
     aclk/aclk_alarm_api.c \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
     aclk/aclk_contexts_api.h \
+    aclk/helpers/mqtt_wss_pal.h \
+    aclk/helpers/ringbuffer_pal.h \
     aclk/schema-wrappers/connection.cc \
     aclk/schema-wrappers/connection.h \
     aclk/schema-wrappers/node_connection.cc \
@@ -722,6 +708,28 @@ ACLK_FILES = \
     aclk/schema-wrappers/context.cc \
     aclk/schema-wrappers/context.h \
     $(NULL)
+
+noinst_LIBRARIES += libmqttwebsockets.a
+
+libmqttwebsockets_a_SOURCES = \
+    mqtt_websockets/src/mqtt_wss_client.c \
+    mqtt_websockets/src/include/mqtt_wss_client.h \
+    mqtt_websockets/src/mqtt_wss_log.c \
+    mqtt_websockets/src/include/mqtt_wss_log.h \
+    mqtt_websockets/src/ws_client.c \
+    mqtt_websockets/src/include/ws_client.h \
+    mqtt_websockets/src/mqtt_ng.c \
+    mqtt_websockets/src/include/mqtt_ng.h \
+    mqtt_websockets/src/common_public.c \
+    mqtt_websockets/src/include/common_public.h \
+    mqtt_websockets/src/include/common_internal.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer.c \
+    mqtt_websockets/c-rbuf/include/ringbuffer.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
+    mqtt_websockets/MQTT-C/src/mqtt.c \
+    mqtt_websockets/MQTT-C/include/mqtt.h
+
+libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -I$(srcdir)/aclk/helpers
 
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
@@ -958,6 +966,10 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
     $(NULL)
+
+if ENABLE_ACLK
+    NETDATA_COMMON_LIBS += libmqttwebsockets.a
+endif
 
 if LINK_STATIC_JSONC
     NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a

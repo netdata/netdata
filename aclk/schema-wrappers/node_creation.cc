@@ -18,7 +18,7 @@ char *generate_node_instance_creation(size_t *len, const node_instance_creation_
     msg.set_hops(data->hops);
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
-    char *bin = (char*)malloc(*len);
+    char *bin = (char*)mallocz(*len);
     if (bin)
         msg.SerializeToArray(bin, *len);
 
@@ -33,7 +33,7 @@ node_instance_creation_result_t parse_create_node_instance_result(const char *da
     if (!msg.ParseFromArray(data, len))
         return res;
 
-    res.node_id = strdup(msg.node_id().c_str());
-    res.machine_guid = strdup(msg.machine_guid().c_str());
+    res.node_id = strdupz(msg.node_id().c_str());
+    res.machine_guid = strdupz(msg.machine_guid().c_str());
     return res;
 }
