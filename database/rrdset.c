@@ -652,7 +652,6 @@ void rrdset_reset(RRDSET *st) {
     st->current_entry = 0;
     st->counter = 0;
     st->counter_done = 0;
-    st->rrddim_page_alignment = 0;
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {

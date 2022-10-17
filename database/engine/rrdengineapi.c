@@ -115,15 +115,12 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, c
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
     struct rrdengine_instance *ctx = page_index->ctx;
-    struct page_cache *pg_cache = &ctx->pg_cache;
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    page_index->refcount--;
-    if(page_index->alignment && page_index->refcount == 0) {
-        page_index->alignment->refcount--;
+    unsigned short refcount = __atomic_sub_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
+    if(refcount == 0 && page_index->alignment) {
+        __atomic_sub_fetch(&page_index->alignment->refcount, 1, __ATOMIC_SEQ_CST);
         page_index->alignment = NULL;
     }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 }
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
@@ -134,9 +131,12 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
+    if (likely(NULL != PValue))
         page_index = *PValue;
-        page_index->refcount++;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if (likely(page_index)) {
+        __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
 
         if(pa) {
             if(page_index->alignment && page_index->alignment != pa)
@@ -144,11 +144,10 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 
             if(!page_index->alignment) {
                 page_index->alignment = pa;
-                pa->refcount++;
+                __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
             }
         }
     }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
     return (STORAGE_METRIC_HANDLE *)page_index;
 }

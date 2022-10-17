@@ -693,6 +693,82 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // ----------------------------------------------------------------------------
 // tier management
 
+static bool query_metric_is_valid_tier(QUERY_METRIC *qm, size_t tier) {
+    if(!qm->tiers[tier].db_metric_handle || !qm->tiers[tier].db_first_time_t || !qm->tiers[tier].db_last_time_t || !qm->tiers[tier].db_update_every)
+        return false;
+
+    return true;
+}
+
+static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+
+        // find the db time-range for this tier for all metrics
+        STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
+        time_t first_t = qm->tiers[tier].db_first_time_t;
+        time_t last_t  = qm->tiers[tier].db_last_time_t;
+        time_t update_every = qm->tiers[tier].db_update_every;
+
+        if(!db_metric_handle || !first_t || !last_t || !update_every)
+            continue;
+
+        return tier;
+    }
+
+    return 0;
+}
+
+static long query_plan_points_coverage_weight(time_t db_first_t, time_t db_last_t, time_t db_update_every, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
+    if(db_first_t == 0 || db_last_t == 0 || db_update_every == 0)
+        return -LONG_MAX;
+
+    time_t common_first_t = MAX(db_first_t, after_wanted);
+    time_t common_last_t = MIN(db_last_t, before_wanted);
+
+    long points_available = (common_last_t - common_first_t) / db_update_every;
+    long points_delta = (long)(points_available - points_wanted);
+    long points_coverage = (points_delta < 0) ? (long)(points_available * 1000 / points_wanted): 1000;
+
+    if(points_available <= 0)
+        return -LONG_MAX;
+
+    return points_coverage;
+}
+
+static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
+    if(unlikely(storage_tiers < 2))
+        return 0;
+
+    if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
+        return query_metric_first_working_tier(qm);
+
+    long weight[storage_tiers];
+
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+
+        // find the db time-range for this tier for all metrics
+        STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
+        time_t first_t = qm->tiers[tier].db_first_time_t;
+        time_t last_t  = qm->tiers[tier].db_last_time_t;
+        time_t update_every = qm->tiers[tier].db_update_every;
+
+        if(!db_metric_handle || !first_t || !last_t || !update_every) {
+            weight[tier] = -LONG_MAX;
+            continue;
+        }
+
+        weight[tier] = query_plan_points_coverage_weight(first_t, last_t, update_every, after_wanted, before_wanted, points_wanted);
+    }
+
+    size_t best_tier = 0;
+    for(size_t tier = 1; tier < storage_tiers ; tier++) {
+        if(weight[tier] >= weight[best_tier])
+            best_tier = tier;
+    }
+
+    return best_tier;
+}
+
 static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     if(unlikely(storage_tiers < 2))
         return 0;
@@ -701,10 +777,6 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         internal_error(true, "QUERY: '%s' has invalid params to tier calculation", qt->id);
         return 0;
     }
-
-    //BUFFER *wb = buffer_create(1000);
-    //buffer_sprintf(wb, "Best tier for chart '%s', dim '%s', from %ld to %ld (dur %ld, every %d), points %ld",
-    //               rd->rrdset->name, rd->name, after_wanted, before_wanted, before_wanted - after_wanted, rd->update_every, points_wanted);
 
     long weight[storage_tiers];
 
@@ -741,24 +813,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
                 common_update_every = MIN(update_every, common_update_every);
         }
 
-        common_first_t = MAX(common_first_t, after_wanted);
-        common_last_t = MIN(common_last_t, before_wanted);
-
-//        long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
-//        if(time_coverage < 0) time_coverage = 0;
-
-        long points_available = (before_wanted - after_wanted) / common_update_every;
-        long points_delta = (long)(points_available - points_wanted);
-        long points_coverage = (points_delta < 0) ? (long)(points_available * 1000 / points_wanted): 1000;
-
-        if(points_available <= 0)
-            weight[tier] = -LONG_MAX;
-        else
-            weight[tier] = points_coverage;
-
-    //    buffer_sprintf(wb, ": tier %d, first %ld, last %ld (dur %ld, tg %d, every %d), points %ld, tcoverage %ld, pcoverage %ld, weight %ld",
-    //                   tier, first_t, last_t, last_t - first_t, rd->tiers[tier]->tier_grouping, update_every,
-    //                   points_available, time_coverage, points_coverage, weight[tier]);
+        weight[tier] = query_plan_points_coverage_weight(common_first_t, common_last_t, common_update_every, after_wanted, before_wanted, points_wanted);
     }
 
     size_t best_tier = 0;
@@ -769,10 +824,6 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 
     if(weight[best_tier] == -LONG_MAX)
         best_tier = 0;
-
-    //buffer_sprintf(wb, ": final best tier %d", best_tier);
-    //internal_error(true, "%s", buffer_tostring(wb));
-    //buffer_free(wb);
 
     return best_tier;
 }
@@ -882,9 +933,14 @@ typedef struct query_engine_ops {
 
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops).current_plan_expire_time)
 
-static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after) {
+static bool query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after) {
     if(unlikely(plan_id >= ops->plan.entries))
         plan_id = ops->plan.entries - 1;
+
+    if(!query_metric_is_valid_tier(ops->qm, ops->plan.data[plan_id].tier)) {
+        ops->current_plan_expire_time = ops->plan.data[plan_id].before;
+        return false;
+    }
 
     time_t after = ops->plan.data[plan_id].after;
     time_t before = ops->plan.data[plan_id].before;
@@ -900,6 +956,8 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     ops->finalize = ops->tier_ptr->db_ops->finalize;
     ops->current_plan = plan_id;
     ops->current_plan_expire_time = ops->plan.data[plan_id].before;
+
+    return true;
 }
 
 static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
@@ -912,6 +970,8 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
 
         if (ops->current_plan >= ops->plan.entries) {
             ops->current_plan = ops->plan.entries - 1;
+            // let the query run with current plan
+            // we will not switch it
             return;
         }
 
@@ -923,9 +983,9 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
         ops->finalize = NULL;
     }
 
-    query_planer_activate_plan(ops, ops->current_plan, MIN(now, last_point_end_time));
-
     // internal_error(true, "QUERY: switched plan to %zu (all is %zu), previous expiration was %ld, this starts at %ld, now is %ld, last_point_end_time %ld", ops->current_plan, ops->plan.entries, ops->plan.data[ops->current_plan-1].before, ops->plan.data[ops->current_plan].after, now, last_point_end_time);
+
+    query_planer_activate_plan(ops, ops->current_plan, MIN(now, last_point_end_time));
 }
 
 static int compare_query_plan_entries_on_start_time(const void *a, const void *b) {
@@ -934,18 +994,20 @@ static int compare_query_plan_entries_on_start_time(const void *a, const void *b
     return (p1->after < p2->after)?-1:1;
 }
 
-static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
+static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     //BUFFER *wb = buffer_create(1000);
     //buffer_sprintf(wb, "QUERY PLAN for chart '%s' dimension '%s', from %ld to %ld:", rd->rrdset->name, rd->name, after_wanted, before_wanted);
 
     // put our selected tier as the first plan
     size_t selected_tier;
 
-    if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER && ops->r->internal.query_tier < storage_tiers) {
+    if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER
+       && ops->r->internal.query_tier < storage_tiers
+       && query_metric_is_valid_tier(ops->qm, ops->r->internal.query_tier)) {
         selected_tier = ops->r->internal.query_tier;
     }
     else {
-        selected_tier = rrddim_find_best_tier_for_timeframe(ops->r->internal.qt, after_wanted, before_wanted, points_wanted);
+        selected_tier = query_metric_best_tier_for_timeframe(ops->qm, after_wanted, before_wanted, points_wanted);
 
         if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)
             ops->r->internal.query_options &= ~RRDR_OPTION_SELECTED_TIER;
@@ -967,6 +1029,9 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if (selected_tier_first_time_t > after_wanted) {
             // we need some help from other tiers
             for (size_t tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
+                if(!query_metric_is_valid_tier(ops->qm, tr))
+                    continue;
+
                 // find the first time of this tier
                 time_t first_time_t = ops->qm->tiers[tr].db_first_time_t;
 
@@ -994,6 +1059,9 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         if (selected_tier_last_time_t < before_wanted) {
             // we need some help from other tiers
             for (int tr = (int)selected_tier - 1; tr >= 0; tr--) {
+                if(!query_metric_is_valid_tier(ops->qm, tr))
+                    continue;
+
                 // find the last time of this tier
                 time_t last_time_t = ops->qm->tiers[tr].db_last_time_t;
 
@@ -1033,7 +1101,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
     //internal_error(true, "%s", buffer_tostring(wb));
 
-    query_planer_activate_plan(ops, 0, 0);
+    return query_planer_activate_plan(ops, 0, 0);
 }
 
 
@@ -1103,7 +1171,8 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr) {
     long rrdr_line = -1;
     bool use_anomaly_bit_as_value = (r->internal.query_options & RRDR_OPTION_ANOMALY_BIT) ? true : false;
 
-    query_plan(&ops, after_wanted, before_wanted, points_wanted);
+    if(!query_plan(&ops, after_wanted, before_wanted, points_wanted))
+        return;
 
     NETDATA_DOUBLE min = r->min, max = r->max;
 

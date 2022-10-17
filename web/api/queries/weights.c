@@ -680,7 +680,7 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
                                              WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
-    size_t resampling_time = 0;
+    time_t resampling_time = 0;
 
     int examined_dimensions = 0;
     int ret, value_is_null;
@@ -792,7 +792,7 @@ static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
                                        WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT | RRDR_OPTION_NATURAL_POINTS;
-    size_t resampling_time = 0;
+    time_t resampling_time = 0;
 
     int examined_dimensions = 0;
     int ret, value_is_null;

@@ -2135,29 +2135,43 @@ void query_target_release(QUERY_TARGET *qt) {
     if(unlikely(!qt)) return;
 
     simple_pattern_free(qt->hosts.pattern);
-    simple_pattern_free(qt->contexts.pattern);
-    simple_pattern_free(qt->instances.pattern);
-    simple_pattern_free(qt->instances.chart_label_key_pattern);
-    simple_pattern_free(qt->instances.charts_labels_filter_pattern);
-    simple_pattern_free(qt->query.pattern);
-
     qt->hosts.pattern = NULL;
+
+    simple_pattern_free(qt->contexts.pattern);
     qt->contexts.pattern = NULL;
+
+    simple_pattern_free(qt->instances.pattern);
     qt->instances.pattern = NULL;
+
+    simple_pattern_free(qt->instances.chart_label_key_pattern);
     qt->instances.chart_label_key_pattern = NULL;
+
+    simple_pattern_free(qt->instances.charts_labels_filter_pattern);
     qt->instances.charts_labels_filter_pattern = NULL;
+
+    simple_pattern_free(qt->query.pattern);
     qt->query.pattern = NULL;
 
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
         string_freez(qt->query.array[i].dimension.id);
+        qt->query.array[i].dimension.id = NULL;
+
         string_freez(qt->query.array[i].dimension.name);
+        qt->query.array[i].dimension.name = NULL;
+
         string_freez(qt->query.array[i].chart.id);
+        qt->query.array[i].chart.id = NULL;
+
         string_freez(qt->query.array[i].chart.name);
+        qt->query.array[i].chart.name = NULL;
 
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
-            STORAGE_ENGINE *eng = storage_engine_get(qt->query.array[i].link.host->rrd_memory_mode);
-            eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
+            if(qt->query.array[i].tiers[tier].db_metric_handle) {
+                STORAGE_ENGINE *eng = storage_engine_get(qt->query.array[i].link.host->rrd_memory_mode);
+                eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
+                qt->query.array[i].tiers[tier].db_metric_handle = NULL;
+            }
         }
     }
 
@@ -2189,34 +2203,37 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->instances.used = 0;
     qt->contexts.used = 0;
     qt->hosts.used = 0;
-    qt->used = false;
 
     qt->db.minimum_latest_update_every = 0;
     qt->db.first_time_t = 0;
     qt->db.last_time_t = 0;
 
     qt->id[0] = '\0';
+
+    qt->used = false;
 }
 void query_target_free(void) {
     if(thread_query_target.used)
         query_target_release(&thread_query_target);
 
     freez(thread_query_target.query.array);
-    freez(thread_query_target.metrics.array);
-    freez(thread_query_target.instances.array);
-    freez(thread_query_target.contexts.array);
-    freez(thread_query_target.hosts.array);
-
     thread_query_target.query.array = NULL;
-    thread_query_target.metrics.array = NULL;
-    thread_query_target.instances.array = NULL;
-    thread_query_target.contexts.array = NULL;
-    thread_query_target.hosts.array = NULL;
-
     thread_query_target.query.size = 0;
+
+    freez(thread_query_target.metrics.array);
+    thread_query_target.metrics.array = NULL;
     thread_query_target.metrics.size = 0;
+
+    freez(thread_query_target.instances.array);
+    thread_query_target.instances.array = NULL;
     thread_query_target.instances.size = 0;
+
+    freez(thread_query_target.contexts.array);
+    thread_query_target.contexts.array = NULL;
     thread_query_target.contexts.size = 0;
+
+    freez(thread_query_target.hosts.array);
+    thread_query_target.hosts.array = NULL;
     thread_query_target.hosts.size = 0;
 }
 
@@ -2286,12 +2303,6 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
 
             qm->metric_uuid = &rm->uuid;
-
-            qm->chart.id = string_dup(ri->id);
-            qm->chart.name = string_dup(ri->name);
-
-            qm->dimension.id = string_dup(rm->id);
-            qm->dimension.name = string_dup(rm->name);
             qm->dimension.options = options;
 
             qm->link.host = qtl->host;
@@ -2309,13 +2320,32 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             if (!qt->db.last_time_t || rm->last_time_t > qt->db.last_time_t)
                 qt->db.last_time_t = rm->last_time_t;
 
+            size_t tiers_added = 0;
             for (size_t tier = 0; tier < storage_tiers; tier++) {
                 STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
                 struct storage_engine_query_ops *ops = qm->tiers[tier].db_ops = &eng->api.query_ops;
                 qm->tiers[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
-                qm->tiers[tier].db_first_time_t = ops->oldest_time(qm->tiers[tier].db_metric_handle);
-                qm->tiers[tier].db_last_time_t = ops->latest_time(qm->tiers[tier].db_metric_handle);
-                qm->tiers[tier].db_update_every = (time_t)(get_tier_grouping(tier) * ri->update_every);
+                if(qm->tiers[tier].db_metric_handle) {
+                    qm->tiers[tier].db_first_time_t = ops->oldest_time(qm->tiers[tier].db_metric_handle);
+                    qm->tiers[tier].db_last_time_t = ops->latest_time(qm->tiers[tier].db_metric_handle);
+                    qm->tiers[tier].db_update_every = (time_t) (get_tier_grouping(tier) * ri->update_every);
+                    tiers_added++;
+                }
+                else {
+                    qm->tiers[tier].db_first_time_t = 0;
+                    qm->tiers[tier].db_last_time_t = 0;
+                    qm->tiers[tier].db_update_every = 0;
+                }
+            }
+
+            if(!tiers_added) {
+                qt->query.used--;
+            }
+            else {
+                qm->chart.id = string_dup(ri->id);
+                qm->chart.name = string_dup(ri->name);
+                qm->dimension.id = string_dup(rm->id);
+                qm->dimension.name = string_dup(rm->name);
             }
         }
     }

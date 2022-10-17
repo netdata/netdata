@@ -604,19 +604,6 @@ struct rrdset {
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
     // ------------------------------------------------------------------------
-    // context queries temp variables
-    // TODO - eliminate these
-
-    time_t last_entry_t;                            // the last_entry_t computed for transient RRDSET
-
-    // ------------------------------------------------------------------------
-    // dbengine specifics
-    // TODO - they should be managed by storage engine
-    //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
-
-    size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
-
-    // ------------------------------------------------------------------------
     // db mode SAVE, MAP specifics
     // TODO - they should be managed by storage engine
     //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
