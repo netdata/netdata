@@ -476,10 +476,14 @@ install_non_systemd_init() {
 }
 
 run_install_service_script() {
+  if [ -z "${tmpdir}" ]; then
+    tmpdir="${TMPDIR:-/tmp}"
+  fi
+
   # shellcheck disable=SC2154
   save_path="${tmpdir}/netdata-service-cmds"
   # shellcheck disable=SC2068
-  run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
+  "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
 
   case $? in
     0)
@@ -532,7 +536,7 @@ run_install_service_script() {
 install_netdata_service() {
   if [ "${UID}" -eq 0 ]; then
     if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-      run_install_service_script
+      run_install_service_script && return 0
     else
       # This is used by netdata-installer.sh
       # shellcheck disable=SC2034
