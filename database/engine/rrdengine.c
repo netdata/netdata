@@ -471,7 +471,7 @@ static void do_mmap_read_extent(uv_work_t *req)
     unsigned real_io_size = xt_io_descr->bytes;
 
     void *data = mmap(NULL, length, PROT_READ, MAP_SHARED, xt_io_descr->file, map_start);
-    if (likely(data)) {
+    if (likely(data != MAP_FAILED)) {
         xt_io_descr->map_base = data;
         xt_io_descr->map_length = length;
         xt_io_descr->buf = data + (xt_io_descr->pos - map_start);
