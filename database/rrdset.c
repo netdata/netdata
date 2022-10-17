@@ -315,7 +315,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         rrddim_foreach_read(rd, st) {
             for (int tier = 0; tier < storage_tiers; tier++) {
                 if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
-                    rd->tiers[tier]->collect_ops.change_collection_frequency(rd->tiers[tier]->db_collection_handle, st->update_every);
+                    rd->tiers[tier]->collect_ops.change_collection_frequency(rd->tiers[tier]->db_collection_handle, get_tier_grouping(tier) * st->update_every);
             }
         }
         rrddim_foreach_done(rd);
