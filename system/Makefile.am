@@ -54,7 +54,6 @@ dist_libsys_DATA = \
     $(NULL)
 
 dist_noinst_DATA = \
-    edit-config \
     install-service.sh.in \
     netdata-openrc.in \
     netdata.logrotate.in \
