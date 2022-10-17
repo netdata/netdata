@@ -117,6 +117,7 @@ web/gui/version.txt
 
 system/install-service.sh
 system/netdata.logrotate
+system/netdata-runit
 system/cron/netdata-updater-daily
 system/freebsd/rc.d/netdata
 system/initd/init.d/netdata
