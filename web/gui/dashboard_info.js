@@ -4149,6 +4149,55 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // CASSANDRA
+
+    'cassandra.throughput': {
+        info: '<p>I/O requests per seconds.</p><p><b>Read</b> - read request from client. <b>Write</b> - write request from client.</p>'
+    },
+    'cassandra.latency': {
+        info: '<p>I/O responses per second.</p><p><b>Read</b> - read requesponse from server. <b>Write</b> - write response from server.</p>'
+    },
+    'cassandra.cache': {
+        info: 'Percentage of read requests for which key location was found in cache.'
+    },
+    'cassandra.node': {
+        info: 'Disk space used on a node.'
+    },
+    'cassandra.disk_column': {
+        info: 'Total disk space used by server.'
+    },
+    'cassandra.compaction_completed': {
+        info: 'Total count of completed compaction tasks.'
+    },
+    'cassandra.compaction_queued': {
+        info: 'Total count of pending compaction tasks in queue.'
+    },
+    'cassandra.gc_parnew_count': {
+        info: 'Number of young-generation collection.'
+    },
+    'cassandra.gc_parnew_time': {
+        info: 'Elpased time of young-generation collection.'
+    },
+    'cassandra.gc_sweep_count': {
+        info: 'Number of old-generation collection.'
+    },
+    'cassandra.gc_sweep_time': {
+        info: 'Elapsed time of old-generation collection in milliseconds.'
+    },
+    'cassandra.error_timeout': {
+        info: 'Requests not unacknowledged within timeout window.'
+    },
+    'cassandra.error_unavailable': {
+        info: 'Requests for which required number of nodes was unavailable.'
+    },
+    'cassandra.task_queued': {
+        info: 'Tasks in queue awaiting a thread for processing.'
+    },
+    'cassandra.task_blocked': {
+        info: 'Tasks that have not yet ben queued for processing.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
