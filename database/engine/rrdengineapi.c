@@ -1039,7 +1039,7 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
  * Returns 0 on success, negative on error
  */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                unsigned disk_space_mb, int tier) {
+                unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance *ctx;
     int error;
     uint32_t max_open_files;

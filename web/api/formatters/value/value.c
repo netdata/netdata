@@ -3,9 +3,10 @@
 #include "value.h"
 
 
-inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate, RRDDIM *temp_rd) {
+inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate) {
+    QUERY_TARGET *qt = r->qt;
     long c;
-    RRDDIM *d;
+    const long used = qt->query.used;
 
     NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
@@ -20,7 +21,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
-        for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
+        for (c = 0; c < used; c++) {
             NETDATA_DOUBLE n = cn[c];
 
             if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -34,7 +35,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     }
 
     // for each dimension
-    for (c = 0, d = temp_rd ? temp_rd : r->st->dimensions; d && c < r->d; c++, d = d->next) {
+    for (c = 0; c < used; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -80,7 +81,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 
     if(anomaly_rate) {
         if(!r->d) *anomaly_rate = 0;
-        else *anomaly_rate = total_anomaly_rate / r->d;
+        else *anomaly_rate = total_anomaly_rate / (NETDATA_DOUBLE)r->d;
     }
 
     if(unlikely(all_null)) {

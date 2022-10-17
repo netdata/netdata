@@ -671,7 +671,7 @@ static inline NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rr
 static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
     rrdr_line++;
 
-    internal_error(rrdr_line >= r->n,
+    internal_error(rrdr_line >= (long)r->n,
                    "QUERY: requested to step above RRDR size for query '%s'",
                    r->qt->id);
 

@@ -452,7 +452,7 @@ struct storage_engine_query_ops {
 // Storage tier data for every dimension
 
 struct rrddim_tier {
-    int tier_grouping;
+    size_t tier_grouping;
     RRD_MEMORY_MODE mode;                           // the memory mode of this tier
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle

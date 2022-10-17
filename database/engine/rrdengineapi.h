@@ -76,7 +76,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
 
 /* must call once before using anything */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                       unsigned disk_space_mb, int tier);
+                       unsigned disk_space_mb, size_t tier);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_prepare_exit(struct rrdengine_instance *ctx);

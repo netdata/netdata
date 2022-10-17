@@ -180,7 +180,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // initialize the db tiers
     {
         RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
-        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+        for(size_t tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
             STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
             if(!eng) continue;
 
@@ -218,7 +218,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // cleanup storage engines
     {
         RRD_MEMORY_MODE wanted_mode = st->rrd_memory_mode;
-        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+        for(size_t tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
             STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
             if(!eng) continue;
 
@@ -317,7 +317,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         // switch update every to the storage engine
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            for (int tier = 0; tier < storage_tiers; tier++) {
+            for (size_t tier = 0; tier < storage_tiers; tier++) {
                 if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
                     rd->tiers[tier]->collect_ops.change_collection_frequency(rd->tiers[tier]->db_collection_handle, st->update_every);
             }
@@ -661,7 +661,7 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(int tier = 0; tier < storage_tiers ;tier++) {
+            for(size_t tier = 0; tier < storage_tiers ;tier++) {
                 if(rd->tiers[tier])
                     rd->tiers[tier]->collect_ops.flush(rd->tiers[tier]->db_collection_handle);
             }
@@ -1110,7 +1110,7 @@ static void store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         .flags = flags
     };
 
-    for(int tier = 1; tier < storage_tiers ;tier++) {
+    for(size_t tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
         struct rrddim_tier *t = rd->tiers[tier];

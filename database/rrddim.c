@@ -92,7 +92,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     {
         size_t initialized = 0;
         RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
-        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
+        for(size_t tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
             STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
             if(!eng) continue;
 
@@ -118,7 +118,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // initialize data collection for all tiers
     {
         size_t initialized = 0;
-        for (int tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier]) {
                 rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops.init(rd->tiers[tier]->db_metric_handle, st->update_every * storage_tiers_grouping_iterations[tier]);
                 initialized++;
@@ -184,7 +184,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
 
         size_t tiers_available = 0, tiers_said_yes = 0;
-        for(int tier = 0; tier < storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if(rd->tiers[tier]) {
                 tiers_available++;
 
@@ -212,7 +212,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // this will free MEMORY_MODE_SAVE and MEMORY_MODE_MAP structures
     rrddim_memory_file_free(rd);
 
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(!rd->tiers[tier]) continue;
 
         STORAGE_ENGINE* eng = storage_engine_get(rd->tiers[tier]->mode);
@@ -396,7 +396,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 time_t rrddim_last_entry_t(RRDDIM *rd) {
     time_t latest = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
 
-    for(int tier = 1; tier < storage_tiers ;tier++) {
+    for(size_t tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
         time_t t = rd->tiers[tier]->query_ops.latest_time(rd->tiers[tier]->db_metric_handle);
@@ -410,7 +410,7 @@ time_t rrddim_last_entry_t(RRDDIM *rd) {
 time_t rrddim_first_entry_t(RRDDIM *rd) {
     time_t oldest = 0;
 
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
         time_t t = rd->tiers[tier]->query_ops.oldest_time(rd->tiers[tier]->db_metric_handle);

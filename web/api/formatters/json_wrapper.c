@@ -35,10 +35,11 @@ static int fill_formatted_callback(const char *name, const char *value, RRDLABEL
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
     RRDR_GROUPING group_method, QUERY_PARAMS *rrdset_query_data)
 {
+    QUERY_TARGET *qt = r->qt;
+
     struct context_param *context_param_list = rrdset_query_data->context_param_list;
     char *chart_label_key = rrdset_query_data->chart_label_key;
 
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
     int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
     uint8_t context_mode = (!context_param_list || (context_param_list->flags & CONTEXT_FLAGS_CONTEXT));
 
@@ -47,11 +48,11 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     long rows = rrdr_rows(r);
     long c, i;
-    RRDDIM *rd;
+    const long used = qt->query.used;
 
     //info("JSONWRAPPER(): %s: BEGIN", r->st->id);
     char kq[2] = "",                    // key quote
-            sq[2] = "";                     // string quote
+         sq[2] = "";                    // string quote
 
     if( options & RRDR_OPTION_GOOGLE_JSON ) {
         kq[0] = '\0';
@@ -66,23 +67,23 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
                        "   %sname%s: %s%s%s,\n"
-                       "   %sview_update_every%s: %d,\n"
-                       "   %supdate_every%s: %d,\n"
-                       "   %sfirst_entry%s: %u,\n"
-                       "   %slast_entry%s: %u,\n"
-                       "   %sbefore%s: %u,\n"
-                       "   %safter%s: %u,\n"
+                       "   %sview_update_every%s: %ld,\n"
+                       "   %supdate_every%s: %ld,\n"
+                       "   %sfirst_entry%s: %ld,\n"
+                       "   %slast_entry%s: %ld,\n"
+                       "   %sbefore%s: %ld,\n"
+                       "   %safter%s: %ld,\n"
                        "   %sgroup%s: %s%s%s,\n"
                        "   %soptions%s: %s"
                    , kq, kq
-                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):rrdset_id(r->st), sq
-                   , kq, kq, sq, context_mode && temp_rd?rrdset_context(r->st):rrdset_name(r->st), sq
+                   , kq, kq, sq, qt->id, sq
+                   , kq, kq, sq, qt->id, sq
                    , kq, kq, r->update_every
-                   , kq, kq, r->st->minimum_latest_update_every
-                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t(r->st))
-                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t(r->st))
-                   , kq, kq, (uint32_t)r->before
-                   , kq, kq, (uint32_t)r->after
+                   , kq, kq, qt->db.minimum_latest_update_every
+                   , kq, kq, qt->db.first_time_t
+                   , kq, kq, qt->db.last_time_t
+                   , kq, kq, r->before
+                   , kq, kq, r->after
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
                    , kq, kq, sq);
 
@@ -90,19 +91,19 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     buffer_sprintf(wb, "%s,\n   %sdimension_names%s: [", sq, kq, kq);
 
-    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0; c < used ;c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
         buffer_strcat(wb, sq);
-        buffer_strcat(wb, rrddim_name(rd));
+        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
         buffer_strcat(wb, sq);
         i++;
     }
     if(!i) {
 #ifdef NETDATA_INTERNAL_CHECKS
-        error("RRDR is empty for %s (RRDR has %d dimensions, options is 0x%08x)", rrdset_id(r->st), r->d, options);
+        error("QUERY: '%s', RRDR is empty, %zu dimensions, options is 0x%08x", qt->id, r->d, options);
 #endif
         rows = 0;
         buffer_strcat(wb, sq);
@@ -114,13 +115,13 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sdimension_ids%s: ["
                    , kq, kq);
 
-    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0; c < used ;c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
         buffer_strcat(wb, sq);
-        buffer_strcat(wb, rrddim_id(rd));
+        buffer_strcat(wb, string2str(qt->query.array[c].dimension.id));
         buffer_strcat(wb, sq);
         i++;
     }
@@ -141,45 +142,64 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         struct value_output co = {.c = 0, .wb = wb};
 
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-        for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrddim_id(rd), rrddim_name(rd));
-            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrddim_id(rd), rrddim_name(rd));
-            dictionary_set(dict, name, output, len+1);
+        for (c = 0; c < qt->metrics.used ;c++) {
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s",
+                      rrdmetric_acquired_id(qt->metrics.array[c]),
+                      rrdmetric_acquired_name(qt->metrics.array[c]));
+
+            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]",
+                                rrdmetric_acquired_id(qt->metrics.array[c]),
+                                rrdmetric_acquired_name(qt->metrics.array[c]));
+
+            dictionary_set(dict, name, output, len + 1);
         }
         dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
+        DICTIONARY *rrdlabels = rrdlabels_create();
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
         dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-        for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s", rrdset_id(rd->rrdset), rrdset_name(rd->rrdset));
-            dictionary_set(dict, name, output, len + 1);
-        }
+        for (c = 0; c < qt->instances.used ; c++) {
+            RRDINSTANCE_ACQUIRED *ria = qt->instances.array[c];
 
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s",
+                      rrdinstance_acquired_id(ria),
+                      rrdinstance_acquired_name(ria));
+
+            int len = snprintfz(output, RRD_ID_LENGTH_MAX * 2 + 7, "[\"%s\",\"%s\"]",
+                                rrdinstance_acquired_id(ria),
+                                rrdinstance_acquired_name(ria));
+
+            dictionary_set(dict, name, output, len + 1);
+
+            rrdlabels_copy(rrdlabels, rrdinstance_acquired_labels(ria));
+        }
         dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
-        RRDSET *st;
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_labels%s: [", kq, kq);
         dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-        for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            st = rd->rrdset;
-            if (st->rrdlabels)
-                rrdlabels_walkthrough_read(st->rrdlabels, fill_formatted_callback, dict);
-        }
+        rrdlabels_walkthrough_read(rrdlabels, fill_formatted_callback, dict);
         dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
         buffer_strcat(wb, "],\n");
+
+        dictionary_destroy(rrdlabels);
     }
 
     // functions
     {
         DICTIONARY *funcs = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for (i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd; rd = rd->next) {
-            chart_functions_to_dict(rd->rrdset, funcs);
+        RRDINSTANCE_ACQUIRED *ria = NULL;
+        for (c = 0; c < used ; c++) {
+            QUERY_METRIC *qm = &qt->query.array[c];
+            if(qm->link.ria == ria)
+                continue;
+
+            ria = qm->link.ria;
+            chart_functions_to_dict(rrdinstance_acquired_functions(ria), funcs);
         }
 
         buffer_sprintf(wb, "   %sfunctions%s: [", kq, kq);
@@ -195,7 +215,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     }
 
     // Composite charts
-    if (context_mode && temp_rd) {
+    if (qt->instances.used > 1) {
         buffer_sprintf(
             wb,
             "   %schart_ids%s: [",

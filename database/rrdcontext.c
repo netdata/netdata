@@ -337,6 +337,16 @@ static inline void rrdmetric_release(RRDMETRIC_ACQUIRED *rma) {
     dictionary_acquired_item_release(rm->ri->rrdmetrics, (DICTIONARY_ITEM *)rma);
 }
 
+const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return string2str(rm->id);
+}
+
+const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return string2str(rm->name);
+}
+
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDINSTANCE
 
@@ -352,6 +362,27 @@ static inline RRDINSTANCE_ACQUIRED *rrdinstance_acquired_dup(RRDINSTANCE_ACQUIRE
 static inline void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     dictionary_acquired_item_release(ri->rc->rrdinstances, (DICTIONARY_ITEM *)ria);
+}
+
+const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return string2str(ri->id);
+}
+
+const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return string2str(ri->name);
+}
+
+DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return ri->rrdlabels;
+}
+
+DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    if(!ri->rrdset) return NULL;
+    return ri->rrdset->functions_view;
 }
 
 // ----------------------------------------------------------------------------
@@ -2118,7 +2149,7 @@ void query_target_release(QUERY_TARGET *qt) {
         string_freez(qt->query.array[i].chart.id);
         string_freez(qt->query.array[i].chart.name);
 
-        for(int tier = 0; tier < storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
             STORAGE_ENGINE *eng = storage_engine_get(qt->query.array[i].link.host->rrd_memory_mode);
             eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
         }
@@ -2158,8 +2189,6 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->db.first_time_t = 0;
     qt->db.last_time_t = 0;
 
-    rrdlabels_flush(qt->rrdlabels);
-
     qt->id[0] = '\0';
 }
 void query_target_free(void) {
@@ -2183,9 +2212,6 @@ void query_target_free(void) {
     thread_query_target.instances.size = 0;
     thread_query_target.contexts.size = 0;
     thread_query_target.hosts.size = 0;
-
-    rrdlabels_destroy(thread_query_target.rrdlabels);
-    thread_query_target.rrdlabels = NULL;
 }
 
 static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri, bool instance_matches_label_filters) {
@@ -2288,13 +2314,13 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             if (!qt->db.last_time_t || rm->last_time_t > qt->db.last_time_t)
                 qt->db.last_time_t = rm->last_time_t;
 
-            for (int tier = 0; tier < storage_tiers; tier++) {
+            for (size_t tier = 0; tier < storage_tiers; tier++) {
                 STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
                 struct storage_engine_query_ops *ops = qm->tiers[tier].db_ops = &eng->api.query_ops;
                 qm->tiers[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
                 qm->tiers[tier].db_first_time_t = ops->oldest_time(qm->tiers[tier].db_metric_handle);
                 qm->tiers[tier].db_last_time_t = ops->latest_time(qm->tiers[tier].db_metric_handle);
-                qm->tiers[tier].db_update_every = storage_tiers_grouping_iterations[tier] * ri->update_every;
+                qm->tiers[tier].db_update_every = (time_t)(storage_tiers_grouping_iterations[tier] * ri->update_every);
             }
         }
     }
@@ -2323,11 +2349,16 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
         (qtl->charts_labels_filter_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qtl->charts_labels_filter_sp, ':')))
         instance_matches_label_filters = false;
 
+    size_t added = 0;
     RRDMETRIC *rm;
     dfe_start_read(ri->rrdmetrics, rm) {
         query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *)rm_dfe.item, ri, instance_matches_label_filters);
+        added++;
     }
     dfe_done(rm);
+
+    if(!added)
+        qt->instances.used--;
 }
 
 static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIRED *rca) {
@@ -2441,9 +2472,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
 
     qt->used = true;
     qt->start_ut = now_realtime_usec();
-
-    if(!qt->rrdlabels)
-        qt->rrdlabels = rrdlabels_create();
 
     // copy the request into query_thread_target
     qt->request = qtr;
@@ -2724,7 +2752,7 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
 #ifdef ENABLE_DBENGINE
     else if (dbengine_enabled) {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
-        for (int tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
             if(!rrdhost->storage_instance[tier]) continue;
 
             time_t first_time_t, last_time_t;

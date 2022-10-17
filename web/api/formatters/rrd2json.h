@@ -77,7 +77,7 @@ int rrdset2value_api_v1(
         , long long before
         , int group_method
         , const char *group_options
-        , size_t resampling_time
+        , time_t resampling_time
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
@@ -89,9 +89,5 @@ int rrdset2value_api_v1(
         , int timeout
         , int tier
 );
-
-void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);
-void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_param_list, time_t after_requested);
-void free_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list);
 
 #endif /* NETDATA_RRD2JSON_H */

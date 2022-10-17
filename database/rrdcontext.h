@@ -8,11 +8,18 @@
 
 typedef struct rrdmetric_acquired RRDMETRIC_ACQUIRED;
 
+const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
+const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
 
 // ----------------------------------------------------------------------------
 // RRDINSTANCE
 
 typedef struct rrdinstance_acquired RRDINSTANCE_ACQUIRED;
+
+const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
+const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
+struct dictionary *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
+struct dictionary *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
@@ -211,9 +218,6 @@ typedef struct query_target {
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
     } hosts;
-
-    DICTIONARY *rrdlabels;
-
 } QUERY_TARGET;
 
 void query_target_free(void);

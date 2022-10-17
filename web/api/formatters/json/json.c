@@ -104,17 +104,17 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     // -------------------------------------------------------------------------
     // print the JSON header
 
-    long c, i;
-    QUERY_METRIC *qm;
     QUERY_TARGET *qt = r->qt;
+    long c, i;
+    const long used = qt->query.used;
 
     // print the header lines
-    for(c = 0, i = 0, qm = &qt->query.array[c]; c < r->qt->query.used && c < (long)r->d ; qm = &qt->query.array[c++]) {
+    for(c = 0, i = 0; c < used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, string2str(qm->dimension.name));
+        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
@@ -126,7 +126,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     }
     size_t total_number_of_dimensions = i;
 
-    // print the begin of row data
+    // print the beginning of row data
     buffer_strcat(wb, data_begin);
 
     // if all dimensions are hidden, print a null
@@ -179,7 +179,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(unlikely(row_annotations)) {
                 // google supports one annotation per row
                 int annotation_found = 0;
-                for(c = 0, qm = &qt->query.array[c]; c < qt->query.used && c < (long)r->d ; qm = &qt->query.array[c++]) {
+                for(c = 0; c < used ; c++) {
                     if(unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
 
                     if(unlikely(co[c] & RRDR_VALUE_RESET)) {
@@ -214,7 +214,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
-            for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+            for(c = 0; c < used ;c++) {
                 NETDATA_DOUBLE n;
                 if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
                     n = ar[c];
@@ -232,7 +232,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         }
 
         // for each dimension
-        for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+        for(c = 0; c < used ;c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -245,7 +245,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
-                buffer_sprintf(wb, "%s%s%s: ", kq, rrddim_name(rd), kq);
+                buffer_sprintf(wb, "%s%s%s: ", kq, string2str(qt->query.array[c].dimension.name), kq);
 
             if(co[c] & RRDR_VALUE_EMPTY && !(options & RRDR_OPTION_INTERNAL_AR)) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))

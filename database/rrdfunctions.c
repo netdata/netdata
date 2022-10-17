@@ -745,14 +745,14 @@ void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, co
     functions2json(host->functions, wb, ident, kq, sq);
 }
 
-void chart_functions_to_dict(RRDSET *st, DICTIONARY *dict) {
-    if(!st || !st->functions_view) return;
+void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst) {
+    if(!rrdset_functions_view || !dst) return;
 
     struct rrd_collector_function *t;
-    dfe_start_read(st->functions_view, t) {
+    dfe_start_read(rrdset_functions_view, t) {
         if(!t->collector->running) continue;
 
-        dictionary_set(dict, t_dfe.name, NULL, 0);
+        dictionary_set(dst, t_dfe.name, NULL, 0);
     }
     dfe_done(t);
 }

@@ -187,7 +187,7 @@ int rrdset2value_api_v1(
         , long long before
         , int group_method
         , const char *group_options
-        , size_t resampling_time
+        , time_t resampling_time
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
@@ -253,7 +253,7 @@ int rrdset2value_api_v1(
     if(db_before) *db_before = r->before;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
-    *n = rrdr2value(r, i, options, value_is_null, anomaly_rate, NULL);
+    *n = rrdr2value(r, i, options, value_is_null, anomaly_rate);
     ret = HTTP_RESP_OK;
 
 cleanup:
@@ -292,19 +292,18 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     // FIXME - added these for temporary compilation - they should be fixed
     QUERY_PARAMS *query_params = NULL;
-    RRDDIM *temp_rd = NULL;
 
     switch(format) {
     case DATASOURCE_SSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
-            rrdr2ssv(r, wb, options, "", " ", "", temp_rd);
+            rrdr2ssv(r, wb, options, "", " ", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2ssv(r, wb, options, "", " ", "", temp_rd);
+            rrdr2ssv(r, wb, options, "", " ", "");
         }
         break;
 
@@ -312,12 +311,12 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
-            rrdr2ssv(r, wb, options, "", ",", "", temp_rd);
+            rrdr2ssv(r, wb, options, "", ",", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2ssv(r, wb, options, "", ",", "", temp_rd);
+            rrdr2ssv(r, wb, options, "", ",", "");
         }
         break;
 
@@ -325,12 +324,12 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
-            rrdr2ssv(r, wb, options, "[", ",", "]", temp_rd);
+            rrdr2ssv(r, wb, options, "[", ",", "]");
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
         else {
             wb->contenttype = CT_APPLICATION_JSON;
-            rrdr2ssv(r, wb, options, "[", ",", "]", temp_rd);
+            rrdr2ssv(r, wb, options, "[", ",", "]");
         }
         break;
 
@@ -338,12 +337,12 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
-            rrdr2csv(r, wb, format, options, "", ",", "\\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "", ",", "\\n", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2csv(r, wb, format, options, "", ",", "\r\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "", ",", "\r\n", "");
         }
         break;
 
@@ -351,12 +350,12 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
-            rrdr2csv(r, wb, format, options, "", "|", "\\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "", "|", "\\n", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2csv(r, wb, format, options, "", "|", "\r\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "", "|", "\r\n", "");
         }
         break;
 
@@ -365,14 +364,14 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
             buffer_strcat(wb, "[\n");
-            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n", temp_rd);
+            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
         else {
             wb->contenttype = CT_APPLICATION_JSON;
             buffer_strcat(wb, "[\n");
-            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n", temp_rd);
+            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");
         }
         break;
@@ -381,12 +380,12 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
-            rrdr2csv(r, wb, format, options, "", "\t", "\\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "", "\t", "\\n", "");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2csv(r, wb, format, options, "", "\t", "\r\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "", "\t", "\r\n", "");
         }
         break;
 
@@ -395,14 +394,14 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1, group_method, query_params);
             buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
-            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "");
             buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_HTML;
             buffer_strcat(wb, "<html>\n<center>\n<table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">\n");
-            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\n", "", temp_rd);
+            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\n", "");
             buffer_strcat(wb, "</table>\n</center>\n</html>\n");
         }
         break;
@@ -413,7 +412,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
-        rrdr2json(r, wb, options, 1, query_params->context_param_list);
+        rrdr2json(r, wb, options, 1);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -425,7 +424,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
-        rrdr2json(r, wb, options, 1, query_params->context_param_list);
+        rrdr2json(r, wb, options, 1);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -436,7 +435,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
-        rrdr2json(r, wb, options, 0, query_params->context_param_list);
+        rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -449,12 +448,12 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, group_method, query_params);
 
-        rrdr2json(r, wb, options, 0, query_params->context_param_list);
+        rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
             if(options & RRDR_OPTION_RETURN_JWAR) {
                 rrdr_json_wrapper_anomaly_rates(r, wb, format, options, 0);
-                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0, query_params->context_param_list);
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0);
             }
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
