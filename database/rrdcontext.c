@@ -2241,52 +2241,41 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     if(timeframe_matches) {
         RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
 
-        if(unlikely(qt->request.options & RRDR_OPTION_PERCENTAGE)) {
-            // this is a percentage query
-            // we need all the dimensions to calculate it
-            options |= RRDR_DIMENSION_SELECTED;
-            options &= ~RRDR_DIMENSION_HIDDEN;
+        if (rrd_flag_check(rm, RRD_FLAG_HIDDEN)
+            || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
+            options |= RRDR_DIMENSION_HIDDEN;
+            options &= ~RRDR_DIMENSION_SELECTED;
         }
-        else {
-            // this is not a percentage query
-            // let the caller decide which dimensions are needed
 
-            if (rrd_flag_check(rm, RRD_FLAG_HIDDEN)
-                || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
+        if (qt->query.pattern) {
+            // we have a dimensions pattern
+            // lets see if this dimension is selected
+
+            if ((qtl->match_ids   && simple_pattern_matches(qt->query.pattern, string2str(rm->id)))
+             || (qtl->match_names && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
+                    ) {
+                // it matches the pattern
+                options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
+                options &= ~RRDR_DIMENSION_HIDDEN;
+            }
+            else {
+                // it does not match the pattern
                 options |= RRDR_DIMENSION_HIDDEN;
                 options &= ~RRDR_DIMENSION_SELECTED;
             }
-
-            if (qt->query.pattern) {
-                // we have a dimensions pattern
-                // lets see if this dimension is selected
-
-                if ((qtl->match_ids   && simple_pattern_matches(qt->query.pattern, string2str(rm->id)))
-                 || (qtl->match_names && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
-                        ) {
-                    // it matches the pattern
-                    options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
-                    options &= ~RRDR_DIMENSION_HIDDEN;
-                }
-                else {
-                    // it does not match the pattern
-                    options |= RRDR_DIMENSION_HIDDEN;
-                    options &= ~RRDR_DIMENSION_SELECTED;
-                }
-            }
-            else {
-                // we don't have a dimensions pattern
-                // so this is a selected dimension
-                // if it is not hidden
-                if(!(options & RRDR_DIMENSION_HIDDEN))
-                    options |= RRDR_DIMENSION_SELECTED;
-            }
+        }
+        else {
+            // we don't have a dimensions pattern
+            // so this is a selected dimension
+            // if it is not hidden
+            if(!(options & RRDR_DIMENSION_HIDDEN))
+                options |= RRDR_DIMENSION_SELECTED;
         }
 
         if((options & RRDR_DIMENSION_HIDDEN) && (options & RRDR_DIMENSION_SELECTED))
             options &= ~RRDR_DIMENSION_HIDDEN;
 
-        if(!(options & RRDR_DIMENSION_HIDDEN)) {
+        if(!(options & RRDR_DIMENSION_HIDDEN) || (qt->request.options & RRDR_OPTION_PERCENTAGE)) {
             // we have a non-hidden dimension
             // let's add it to the query metrics
 
@@ -2326,7 +2315,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 qm->tiers[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
                 qm->tiers[tier].db_first_time_t = ops->oldest_time(qm->tiers[tier].db_metric_handle);
                 qm->tiers[tier].db_last_time_t = ops->latest_time(qm->tiers[tier].db_metric_handle);
-                qm->tiers[tier].db_update_every = (time_t)(storage_tiers_grouping_iterations[tier] * ri->update_every);
+                qm->tiers[tier].db_update_every = (time_t)(get_tier_grouping(tier) * ri->update_every);
             }
         }
     }

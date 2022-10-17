@@ -747,7 +747,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 //        long time_coverage = (common_before - common_after) * 1000 / (before_wanted - after_wanted);
 //        if(time_coverage < 0) time_coverage = 0;
 
-        long points_available = (before_wanted - after_wanted) / qt->db.minimum_latest_update_every;
+        long points_available = (before_wanted - after_wanted) / common_update_every;
         long points_delta = (long)(points_available - points_wanted);
         long points_coverage = (points_delta < 0) ? (long)(points_available * 1000 / points_wanted): 1000;
 
