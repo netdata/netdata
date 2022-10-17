@@ -2352,8 +2352,10 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     }
     dfe_done(rm);
 
-    if(!added)
+    if(!added) {
         qt->instances.used--;
+        rrdinstance_release(ria);
+    }
 }
 
 static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIRED *rca) {

@@ -205,7 +205,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         buffer_strcat(wb, "],\n");
     }
 
-    // Composite charts
+    // context query
     if (!qt->request.st) {
         buffer_sprintf(
             wb,

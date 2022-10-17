@@ -112,7 +112,7 @@ typedef struct query_metric {
         struct storage_engine_query_ops *db_ops;
         time_t db_first_time_t;
         time_t db_last_time_t;
-        time_t db_update_every;
+        time_t db_update_every;     // latest update every for this tier
     } tiers[RRD_STORAGE_TIERS];
 
     struct {
