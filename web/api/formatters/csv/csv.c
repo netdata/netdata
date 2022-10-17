@@ -7,7 +7,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
     rrdset_check_rdlock(r->st);
 
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
-    QUERY_TARGET *qt = r->qt;
+    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
     const long used = qt->query.used;
 

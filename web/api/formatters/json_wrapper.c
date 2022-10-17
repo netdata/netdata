@@ -35,7 +35,7 @@ static int fill_formatted_callback(const char *name, const char *value, RRDLABEL
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
     RRDR_GROUPING group_method)
 {
-    QUERY_TARGET *qt = r->qt;
+    QUERY_TARGET *qt = r->internal.qt;
 
     long rows = rrdr_rows(r);
     long c, i;

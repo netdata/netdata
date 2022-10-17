@@ -917,10 +917,10 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 // The main function
 
 int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
-                        RRDR_GROUPING group, const char *group_options,
-                        long long baseline_after, long long baseline_before,
-                        long long after, long long before,
-                        long long points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, int tier, int timeout) {
+                       RRDR_GROUPING group, const char *group_options,
+                       time_t baseline_after, time_t baseline_before,
+                       time_t after, time_t before,
+                       size_t points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, size_t tier, size_t timeout) {
     WEIGHTS_STATS stats = {};
 
     DICTIONARY *results = register_result_init();

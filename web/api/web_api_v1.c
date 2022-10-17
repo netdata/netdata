@@ -718,7 +718,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .hosts = NULL,
             .contexts = context,
             .charts = chart,
-            .dimensions = buffer_tostring(dimensions),
+            .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
             .timeout = timeout,
             .max_anomaly_rates = max_anomaly_rates,
             .points = points,

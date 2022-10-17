@@ -104,7 +104,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     // -------------------------------------------------------------------------
     // print the JSON header
 
-    QUERY_TARGET *qt = r->qt;
+    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
     const long used = qt->query.used;
 

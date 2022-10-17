@@ -71,8 +71,6 @@ typedef enum rrdr_result_flags {
 } RRDR_RESULT_OPTIONS;
 
 typedef struct rrdresult {
-    struct query_target *qt;
-
     RRDR_RESULT_OPTIONS result_options; // RRDR_RESULT_OPTION_*
 
     size_t d;                 // the number of dimensions
@@ -97,6 +95,8 @@ typedef struct rrdresult {
 
     // internal rrd2rrdr() members below this point
     struct {
+        struct query_target *qt;
+
         size_t query_tier;                   // the selected tier
         RRDR_OPTIONS query_options;       // RRDR_OPTION_* (as run by the query)
 
@@ -135,7 +135,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);
 
-int rrdr_relative_window_to_absolute(long long *after, long long *before);
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before);
 
 #ifdef __cplusplus
 }

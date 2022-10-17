@@ -673,11 +673,11 @@ static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
 
     internal_error(rrdr_line >= (long)r->n,
                    "QUERY: requested to step above RRDR size for query '%s'",
-                   r->qt->id);
+                   r->internal.qt->id);
 
     internal_error(r->t[rrdr_line] != 0 && r->t[rrdr_line] != t,
                    "QUERY: overwriting the timestamp of RRDR line %zu from %zu to %zu, of query '%s'",
-                   (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->qt->id);
+                   (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->internal.qt->id);
 
     // save the time
     r->t[rrdr_line] = t;
@@ -777,7 +777,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
     return best_tier;
 }
 
-static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, long points_wanted, RRDR_OPTIONS options, size_t tier) {
+static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier) {
     size_t best_tier;
     if((options & RRDR_OPTION_SELECTED_TIER) && tier < storage_tiers)
         best_tier = tier;
@@ -945,7 +945,7 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         selected_tier = ops->r->internal.query_tier;
     }
     else {
-        selected_tier = rrddim_find_best_tier_for_timeframe(ops->r->qt, after_wanted, before_wanted, points_wanted);
+        selected_tier = rrddim_find_best_tier_for_timeframe(ops->r->internal.qt, after_wanted, before_wanted, points_wanted);
 
         if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)
             ops->r->internal.query_options &= ~RRDR_OPTION_SELECTED_TIER;
@@ -1073,8 +1073,8 @@ static void query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     (ops).group_anomaly_rate += (point).anomaly;                        \
 } while(0)
 
-static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr){
-    QUERY_TARGET *qt = r->qt;
+static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr) {
+    QUERY_TARGET *qt = r->internal.qt;
     QUERY_METRIC *qm = &qt->query.array[dim_id_in_rrdr];
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
@@ -1462,8 +1462,8 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
         , const char *msg
         ) {
 
-    time_t first_entry_t = r->qt->db.first_time_t;
-    time_t last_entry_t = r->qt->db.last_time_t;
+    time_t first_entry_t = r->internal.qt->db.first_time_t;
+    time_t last_entry_t = r->internal.qt->db.last_time_t;
 
     info("INTERNAL ERROR: rrd2rrdr() on %s update every %ld with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %ld, db: %zu), "
@@ -1472,8 +1472,8 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          //"slot (after: %zu, before: %zu, delta: %zu), "
          "points (got: %ld, want: %ld, req: %ld), "
          "%s"
-         , r->qt->id
-         , r->qt->window.query_granularity
+         , r->internal.qt->id
+         , r->internal.qt->window.query_granularity
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
@@ -1495,10 +1495,10 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , (size_t)last_entry_t
 
          // duration
-         , (size_t)(r->before - r->after + r->qt->window.query_granularity)
-         , (size_t)(before_wanted - after_wanted + r->qt->window.query_granularity)
+         , (size_t)(r->before - r->after + r->internal.qt->window.query_granularity)
+         , (size_t)(before_wanted - after_wanted + r->internal.qt->window.query_granularity)
          , before_requested - after_requested
-         , (size_t)((last_entry_t - first_entry_t) + r->qt->window.query_granularity)
+         , (size_t)((last_entry_t - first_entry_t) + r->internal.qt->window.query_granularity)
 
          // slot
          /*
@@ -1519,7 +1519,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 #endif // NETDATA_INTERNAL_CHECKS
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-int rrdr_relative_window_to_absolute(long long *after, long long *before) {
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before) {
     time_t now = now_realtime_sec() - 1;
 
     int absolute_period_requested = -1;
@@ -1579,7 +1579,7 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before) {
     *before = before_requested;
     *after = after_requested;
 
-    return absolute_period_requested;
+    return (absolute_period_requested != 1);
 }
 
 // #define DEBUG_QUERY_LOGIC 1
@@ -1603,9 +1603,9 @@ int rrdr_relative_window_to_absolute(long long *after, long long *before) {
 bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (unlikely(!qt)) return false;
 
-    long points_requested = (long)qt->request.points;
-    long long after_requested = qt->request.after;
-    long long before_requested = qt->request.before;
+    size_t points_requested = (long)qt->request.points;
+    time_t after_requested = qt->request.after;
+    time_t before_requested = qt->request.before;
     RRDR_GROUPING group_method = qt->request.group_method;
     time_t resampling_time_requested = qt->request.resampling_time;
     RRDR_OPTIONS options = qt->request.options;
@@ -1625,9 +1625,9 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     // when natural points are wanted, the query has to be aligned to the update_every
     // of the database
 
-    long points_wanted = points_requested;
-    long long after_wanted = after_requested;
-    long long before_wanted = before_requested;
+    size_t points_wanted = points_requested;
+    time_t after_wanted = after_requested;
+    time_t before_wanted = before_requested;
 
     bool aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
     bool automatic_natural_points = (points_wanted == 0);
@@ -1636,12 +1636,6 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     bool before_is_aligned_to_db_end = false;
 
     query_debug_log_init();
-
-    // make sure points_wanted is positive
-    if (points_wanted < 0) {
-        points_wanted = -points_wanted;
-        query_debug_log(":-points_wanted %ld", points_wanted);
-    }
 
     if (ABS(before_requested) <= API_RELATIVE_TIME_MAX || ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
         relative_period_requested = true;
@@ -1762,7 +1756,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // the available points of the query
-    long points_available = (duration + 1) / query_granularity;
+    size_t points_available = (duration + 1) / query_granularity;
     if (unlikely(points_available <= 0)) points_available = 1;
     query_debug_log(":points_available %ld", points_available);
 
@@ -1772,8 +1766,8 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // calculate the desired grouping of source data points
-    long group = points_available / points_wanted;
-    if (group <= 0) group = 1;
+    size_t group = points_available / points_wanted;
+    if (group == 0) group = 1;
 
     // round "group" to the closest integer
     if (points_available % points_wanted > points_wanted / 2)
@@ -1781,7 +1775,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 
     query_debug_log(":group %ld", group);
 
-    if (points_wanted * group * query_granularity < duration) {
+    if (points_wanted * group * query_granularity < (size_t)duration) {
         // the grouping we are going to do, is not enough
         // to cover the entire duration requested, so
         // we have to change the number of points, to make sure we will
@@ -1793,7 +1787,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         if (points_wanted * group < points_available)
             points_wanted++;
 
-        if (unlikely(points_wanted <= 0))
+        if (unlikely(points_wanted == 0))
             points_wanted = 1;
 
         query_debug_log(":optimal points %ld", points_wanted);
@@ -1801,7 +1795,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 
     // resampling_time_requested enforces a certain grouping multiple
     NETDATA_DOUBLE resampling_divisor = 1.0;
-    long resampling_group = 1;
+    size_t resampling_group = 1;
     if (unlikely(resampling_time_requested > query_granularity)) {
         // the points we should group to satisfy gtime
         resampling_group = resampling_time_requested / query_granularity;
@@ -1828,13 +1822,13 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     // now that we have group, align the requested timeframe to fit it.
     if (aligned && before_wanted % (group * query_granularity)) {
         if (before_is_aligned_to_db_end)
-            before_wanted -= before_wanted % (group * query_granularity);
+            before_wanted -= before_wanted % (time_t)(group * query_granularity);
         else
-            before_wanted += (group * query_granularity) - before_wanted % (group * query_granularity);
+            before_wanted += (time_t)(group * query_granularity) - before_wanted % (time_t)(group * query_granularity);
         query_debug_log(":align before_wanted %lld", before_wanted);
     }
 
-    after_wanted = before_wanted - (points_wanted * group * query_granularity) + query_granularity;
+    after_wanted = before_wanted - (time_t)(points_wanted * group * query_granularity) + query_granularity;
     query_debug_log(":final after_wanted %lld", after_wanted);
 
     duration = before_wanted - after_wanted;
@@ -1873,6 +1867,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 }
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
+    if(!qt || !owa) return NULL;
 
     time_t timeout = qt->request.timeout;
     time_t resampling_time_requested = qt->request.resampling_time;

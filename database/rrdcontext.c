@@ -2030,13 +2030,8 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
-    if(after != 0 && before != 0) {
-        long long after_wanted = after;
-        long long before_wanted = before;
-        rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
-        after = after_wanted;
-        before = before_wanted;
-    }
+    if(after != 0 && before != 0)
+        rrdr_relative_window_to_absolute(&after, &before);
 
     struct rrdcontext_to_json t_contexts = {
         .wb = wb,
@@ -2070,13 +2065,8 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
     if(host->node_id)
         uuid_unparse(*host->node_id, node_uuid);
 
-    if(after != 0 && before != 0) {
-        long long after_wanted = after;
-        long long before_wanted = before;
-        rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
-        after = after_wanted;
-        before = before_wanted;
-    }
+    if(after != 0 && before != 0)
+        rrdr_relative_window_to_absolute(&after, &before);
 
     buffer_sprintf(wb, "{\n"
                           "\t\"hostname\": \"%s\""
@@ -2246,7 +2236,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
     rrdmetric_update_retention(rm);
 
-    bool timeframe_matches = (rm->first_time_t <= qtl->before && rm->last_time_t >= qtl->after) ? true : false;
+    bool timeframe_matches = (rm->first_time_t <= qt->window.before && rm->last_time_t >= qt->window.after) ? true : false;
 
     if(timeframe_matches) {
         RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
@@ -2400,7 +2390,7 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
                 || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
                 || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
                 ) {
-                query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *) &ri_dfe.item);
+                query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *)ri_dfe.item);
                 added++;
             }
         }
@@ -2494,10 +2484,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     qt->request = qtr;
 
     query_target_generate_name(qt);
-    if(!query_target_calculate_window(qt)) {
-        query_target_release(qt);
-        return false;
-    }
+    rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before);
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
@@ -2510,8 +2497,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
         .dimensions = qt->request.dimensions,
         .chart_label_key = qt->request.chart_label_key,
         .charts_labels_filter = qt->request.charts_labels_filter,
-        .after = qt->request.after,
-        .before = qt->request.before,
     };
 
     qt->db.minimum_latest_update_every = 0; // it will be updated by query_target_add_query()
@@ -2561,6 +2546,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     // make sure everything is good
     if(!qt->query.used || !qt->metrics.used || !qt->instances.used || !qt->contexts.used || !qt->hosts.used) {
         internal_error(true, "QUERY TARGET: query '%s' does not have all the data required. Aborting it.", qt->id);
+        query_target_release(qt);
+        return NULL;
+    }
+
+    if(!query_target_calculate_window(qt)) {
         query_target_release(qt);
         return NULL;
     }

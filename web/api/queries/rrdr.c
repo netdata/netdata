@@ -61,7 +61,7 @@ static void rrdr_dump(RRDR *r)
 inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     if(unlikely(!r)) return;
 
-    query_target_release(r->qt);
+    query_target_release(r->internal.qt);
     onewayalloc_freez(owa, r->t);
     onewayalloc_freez(owa, r->v);
     onewayalloc_freez(owa, r->o);
@@ -85,6 +85,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // create the rrdr
     RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
     r->internal.owa = owa;
+    r->internal.qt = qt;
 
     r->before = qt->window.before;
     r->after = qt->window.after;

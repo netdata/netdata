@@ -1933,14 +1933,14 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
         } else {
-            assert(r->qt->request.st == st[i]);
+            assert(r->internal.qt->request.st == st[i]);
             for (c = 0; c != (long)rrdr_rows(r) ; ++c) {
                 RRDDIM *d;
                 time_now = time_start + (c + 1) * update_every;
                 time_retrieved = r->t[c];
 
                 // for each dimension
-                rrddim_foreach_read(d, r->qt->request.st) {
+                rrddim_foreach_read(d, r->internal.qt->request.st) {
                     if(unlikely(d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
 
                     j = (int)d_dfe.counter;
@@ -2079,7 +2079,7 @@ int test_dbengine(void)
         } else {
             long c;
 
-            assert(r->qt->request.st == st[i]);
+            assert(r->internal.qt->request.st == st[i]);
             // test current region values only, since they must be left unchanged
             for (c = point_offset ; c < (long)(point_offset + rrdr_rows(r) / REGIONS / 2) ; ++c) {
                 RRDDIM *d;
@@ -2087,7 +2087,7 @@ int test_dbengine(void)
                 time_t time_retrieved = r->t[c];
 
                 // for each dimension
-                rrddim_foreach_read(d, r->qt->request.st) {
+                rrddim_foreach_read(d, r->internal.qt->request.st) {
                     if(unlikely(d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
 
                     j = (int)d_dfe.counter;

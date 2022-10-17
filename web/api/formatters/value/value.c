@@ -4,7 +4,7 @@
 
 
 inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate) {
-    QUERY_TARGET *qt = r->qt;
+    QUERY_TARGET *qt = r->internal.qt;
     long c;
     const long used = qt->query.used;
 
