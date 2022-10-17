@@ -86,7 +86,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rd->aclk_live_status = -1;
 #endif
 
-    (void) find_dimension_uuid(st, rd, &(rd->metric_uuid));
+    if (unlikely(find_dimension_uuid(st, rd, &(rd->metric_uuid)))) {
+        uuid_generate(rd->metric_uuid);
+    }
 
     // initialize the db tiers
     {
@@ -197,7 +199,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             /* This metric has no data and no references */
-            delete_dimension_uuid(&rd->metric_uuid);
+            metaqueue_delete_dimension_uuid(&rd->metric_uuid);
         }
     }
 
@@ -276,10 +278,13 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDDIM *rd = rrddim;
     RRDSET *st = ctr->st;
 
-    if(ctr->react_action == RRDDIM_REACT_UPDATED) {
-        debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rrddim_id(rd));
-        (void)sql_store_dimension(&rd->metric_uuid, &rd->rrdset->chart_uuid, rrddim_id(rd), rrddim_name(rd), rd->multiplier, rd->divisor, rd->algorithm);
+    if(ctr->react_action & (RRDDIM_REACT_UPDATED | RRDDIM_REACT_NEW)) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+    }
 
+    if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -421,29 +426,6 @@ time_t rrddim_first_entry_t(RRDDIM *rd) {
     return oldest;
 }
 
-// Return either
-//   0 : Dimension is live
-//   last collected time : Dimension is not live
-
-#ifdef ENABLE_ACLK
-#define RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER   (3)
-#define RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER (30)
-time_t calc_dimension_liveness(RRDDIM *rd, time_t now)
-{
-    time_t last_updated = rd->last_collected_time.tv_sec;
-    int live;
-
-    if(rd->aclk_live_status == 1) {
-        int offline_time = RRDSET_MINIMUM_DIM_OFFLINE_MULTIPLIER * rd->update_every;
-        live = ((now - last_updated) < MIN(rrdset_free_obsolete_time, offline_time));
-    }
-    else
-        live = ((now - last_updated) < RRDSET_MINIMUM_DIM_LIVE_MULTIPLIER * rd->update_every);
-
-    return live ? 0 : last_updated;
-}
-#endif
-
 RRDDIM *rrddim_add_custom(RRDSET *st
                           , const char *id
                           , const char *name
@@ -499,11 +481,12 @@ int rrddim_hide(RRDSET *st, const char *id) {
         error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
-    if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
-        (void)sql_set_dimension_option(&rd->metric_uuid, "hidden");
+    if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
+        metaqueue_dimension_update_flags(rd);
+    }
 
     rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
-    rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
     rrdcontext_updated_rrddim_flags(rd);
     return 0;
 }
@@ -517,11 +500,12 @@ int rrddim_unhide(RRDSET *st, const char *id) {
         error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
-    if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN))
-        (void)sql_set_dimension_option(&rd->metric_uuid, NULL);
+    if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
+        rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
+        metaqueue_dimension_update_flags(rd);
+    }
 
     rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
     rrdcontext_updated_rrddim_flags(rd);
     return 0;
 }
@@ -549,22 +533,28 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
 // ----------------------------------------------------------------------------
 // RRDDIM - collect values for a dimension
 
-inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, collected_number value) {
+inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value) {
+    struct timeval now;
+    now_realtime_timeval(&now);
+
+    return rrddim_timed_set_by_pointer(st, rd, now, value);
+}
+
+collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
-    now_realtime_timeval(&rd->last_collected_time);
+    rd->last_collected_time = collected_time;
     rd->collected_value = value;
     rd->updated = 1;
-
     rd->collections_counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
-
-    // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " NETDATA_DOUBLE_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (NETDATA_DOUBLE)((value - rd->last_collected_value) * (NETDATA_DOUBLE)rd->multiplier / (NETDATA_DOUBLE)rd->divisor * 1000000.0 / (NETDATA_DOUBLE)st->usec_since_last_update));
+    if (unlikely(v > rd->collected_value_max))
+        rd->collected_value_max = v;
 
     return rd->last_collected_value;
 }
+
 
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) {
     RRDHOST *host = st->rrdhost;

@@ -748,6 +748,8 @@ set(RRD_PLUGIN_FILES
         database/storage_engine.h
         database/ram/rrddim_mem.c
         database/ram/rrddim_mem.h
+        database/sqlite/sqlite_metadata.c
+        database/sqlite/sqlite_metadata.h
         database/sqlite/sqlite_functions.c
         database/sqlite/sqlite_functions.h
 		database/sqlite/sqlite_context.c
@@ -779,16 +781,6 @@ set(RRD_PLUGIN_FILES
         database/engine/pagecache.h
         database/engine/rrdenglocking.c
         database/engine/rrdenglocking.h
-        database/engine/metadata_log/metadatalog.h
-        database/engine/metadata_log/metadatalogapi.c
-        database/engine/metadata_log/metadatalogapi.h
-        database/engine/metadata_log/logfile.h
-        database/engine/metadata_log/logfile.c
-        database/engine/metadata_log/metadatalogprotocol.h
-        database/engine/metadata_log/metalogpluginsd.c
-        database/engine/metadata_log/metalogpluginsd.h
-        database/engine/metadata_log/compaction.c
-        database/engine/metadata_log/compaction.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )
@@ -904,22 +896,6 @@ set(ACLK_FILES
         aclk/aclk_alarm_api.h
         aclk/aclk_contexts_api.c
         aclk/aclk_contexts_api.h
-        mqtt_websockets/src/mqtt_wss_client.c
-        mqtt_websockets/src/include/mqtt_wss_client.h
-        mqtt_websockets/src/mqtt_wss_log.c
-        mqtt_websockets/src/include/mqtt_wss_log.h
-        mqtt_websockets/src/ws_client.c
-        mqtt_websockets/src/include/ws_client.h
-        mqtt_websockets/src/mqtt_ng.c
-        mqtt_websockets/src/include/mqtt_ng.h
-        mqtt_websockets/src/common_public.c
-        mqtt_websockets/src/include/common_public.h
-        mqtt_websockets/src/include/common_internal.h
-        mqtt_websockets/c-rbuf/src/ringbuffer.c
-        mqtt_websockets/c-rbuf/include/ringbuffer.h
-        mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
-        mqtt_websockets/MQTT-C/src/mqtt.c
-        mqtt_websockets/MQTT-C/include/mqtt.h
         aclk/schema-wrappers/connection.cc
         aclk/schema-wrappers/connection.h
         aclk/schema-wrappers/node_connection.cc
@@ -943,6 +919,27 @@ set(ACLK_FILES
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
+        aclk/helpers/mqtt_wss_pal.h
+        aclk/helpers/ringbuffer_pal.h
+        )
+
+set(MQTT_WEBSOCKETS_FILES
+        mqtt_websockets/src/mqtt_wss_client.c
+        mqtt_websockets/src/include/mqtt_wss_client.h
+        mqtt_websockets/src/mqtt_wss_log.c
+        mqtt_websockets/src/include/mqtt_wss_log.h
+        mqtt_websockets/src/ws_client.c
+        mqtt_websockets/src/include/ws_client.h
+        mqtt_websockets/src/mqtt_ng.c
+        mqtt_websockets/src/include/mqtt_ng.h
+        mqtt_websockets/src/common_public.c
+        mqtt_websockets/src/include/common_public.h
+        mqtt_websockets/src/include/common_internal.h
+        mqtt_websockets/c-rbuf/src/ringbuffer.c
+        mqtt_websockets/c-rbuf/include/ringbuffer.h
+        mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
+        mqtt_websockets/MQTT-C/src/mqtt.c
+        mqtt_websockets/MQTT-C/include/mqtt.h
         )
 
 set(SPAWN_PLUGIN_FILES
@@ -1267,6 +1264,18 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
+
+ADD_LIBRARY(mqttwebsockets STATIC
+            ${MQTT_WEBSOCKETS_FILES})
+
+target_compile_options(mqttwebsockets PUBLIC
+                        -DMQTT_WSS_CUSTOM_ALLOC
+                        -DRBUF_CUSTOM_MALLOC)
+
+target_include_directories(mqttwebsockets PUBLIC
+             ${CMAKE_SOURCE_DIR}/aclk/helpers)
+
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} mqttwebsockets)
 
 ENDIF()
 

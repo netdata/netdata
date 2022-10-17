@@ -195,7 +195,7 @@ typedef enum rrddim_flags {
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
     RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
-    RRDDIM_FLAG_ACLK                            = (1 << 4),
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 4),  // Metadata needs to go to the database
 
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 
@@ -504,6 +504,8 @@ typedef enum rrdset_flags {
                                                      // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
+    RRDSET_FLAG_METADATA_UPDATE         = (1 << 16), // Mark that metadata needs to be stored
+    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
@@ -730,6 +732,8 @@ typedef enum rrdhost_flags {
 
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
+    // Metadata
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -1215,8 +1219,10 @@ static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 
 void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 void rrdset_next_usec(RRDSET *st, usec_t microseconds);
+void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
+void rrdset_timed_done(RRDSET *st, struct timeval now);
 void rrdset_done(RRDSET *st);
 
 void rrdset_is_obsolete(RRDSET *st);
@@ -1262,12 +1268,16 @@ int rrddim_unhide(RRDSET *st, const char *id);
 void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd);
 void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 
+collected_number rrddim_timed_set_by_pointer(RRDSET *st, RRDDIM *rd, struct timeval collected_time, collected_number value);
 collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
+
 #ifdef ENABLE_ACLK
 time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 #endif
 long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
+
+void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
 
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
@@ -1314,6 +1324,7 @@ size_t get_tier_grouping(size_t tier);
 #endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"
+#include "sqlite/sqlite_metadata.h"
 #include "sqlite/sqlite_aclk.h"
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"
