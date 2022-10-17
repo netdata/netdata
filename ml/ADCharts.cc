@@ -142,18 +142,20 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
     qtr.group_method = Cfg.AnomalyDetectionGroupingMethod;
 
     RRDR *R = rrd2rrdr(OWA, query_target_create(qtr));
-    assert(R->d == 1 && R->n == 1 && R->rows == 1);
+    if(R) {
+        assert(R->d == 1 && R->n == 1 && R->rows == 1);
 
-    static thread_local bool PrevAboveThreshold = false;
-    bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
-    bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
-    PrevAboveThreshold = AboveThreshold;
+        static thread_local bool PrevAboveThreshold = false;
+        bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
+        bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
+        PrevAboveThreshold = AboveThreshold;
 
-    rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
-    rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
-    rrdset_done(AnomalyDetectionRS);
+        rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
+        rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
+        rrdset_done(AnomalyDetectionRS);
 
-    rrdr_free(OWA, R);
+        rrdr_free(OWA, R);
+    }
     onewayalloc_destroy(OWA);
 }
 
