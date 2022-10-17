@@ -435,16 +435,29 @@ static void read_extent_cb(uv_fs_t *req)
 static void read_mmap_extent_cb(uv_work_t *req, int status __maybe_unused)
 {
     struct rrdengine_worker_config *wc = req->loop->data;
+    struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
     xt_io_descr = req->data;
 
-    // If mmap fails it will it null, us_fs_read has been triggered
-    if (unlikely(!xt_io_descr->map_base))
+    if (likely(xt_io_descr->map_base)) {
+        do_extent_processing(wc, xt_io_descr, false);
+        munmap(xt_io_descr->map_base, xt_io_descr->map_length);
+        freez(xt_io_descr);
         return;
+    }
 
-    do_extent_processing(wc, xt_io_descr, false);
-    munmap(xt_io_descr->map_base, xt_io_descr->map_length);
-    freez(xt_io_descr);
+    // MMAP failed, so do uv_fs_read
+    int ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(xt_io_descr->bytes));
+    if (unlikely(ret)) {
+        fatal("posix_memalign:%s", strerror(ret));
+    }
+    unsigned real_io_size = ALIGN_BYTES_CEILING( xt_io_descr->bytes);
+    xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
+    xt_io_descr->req.data = xt_io_descr;
+    ret = uv_fs_read(req->loop, &xt_io_descr->req, xt_io_descr->file, &xt_io_descr->iov, 1, (unsigned) xt_io_descr->pos, read_extent_cb);
+    fatal_assert(-1 != ret);
+    ctx->stats.io_read_bytes += real_io_size;
+    ctx->stats.io_read_extent_bytes += real_io_size;
 }
 
 static void do_mmap_read_extent(uv_work_t *req)
@@ -462,21 +475,9 @@ static void do_mmap_read_extent(uv_work_t *req)
         xt_io_descr->map_base = data;
         xt_io_descr->map_length = length;
         xt_io_descr->buf = data + (xt_io_descr->pos - map_start);
+        ctx->stats.io_read_bytes += real_io_size;
+        ctx->stats.io_read_extent_bytes += real_io_size;
     }
-    else
-    {
-        int ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(xt_io_descr->bytes));
-        if (unlikely(ret)) {
-            fatal("posix_memalign:%s", strerror(ret));
-        }
-        real_io_size = ALIGN_BYTES_CEILING( xt_io_descr->bytes);
-        xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
-        xt_io_descr->req.data = xt_io_descr;
-        ret = uv_fs_read(req->loop, &xt_io_descr->req, xt_io_descr->file, &xt_io_descr->iov, 1, (unsigned) xt_io_descr->pos, read_extent_cb);
-        fatal_assert(-1 != ret);
-    }
-    ctx->stats.io_read_bytes += real_io_size;
-    ctx->stats.io_read_extent_bytes += real_io_size;
 }
 
 static void do_read_extent(struct rrdengine_worker_config* wc,
