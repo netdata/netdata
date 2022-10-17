@@ -20,7 +20,6 @@ typedef struct rrdset RRDSET;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
-typedef struct context_param CONTEXT_PARAM;
 
 typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
@@ -36,7 +35,6 @@ typedef void *ml_dimension_t;
 
 // forward declarations
 struct rrddim_tier;
-struct context_param;
 
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
