@@ -32,6 +32,7 @@
 - Initialize st-\>rrdvars from rrdset insert callback [\#13786](https://github.com/netdata/netdata/pull/13786) ([MrZammler](https://github.com/MrZammler))
 - Add Ubuntu 22.10 to supported distros, CI, and package builds. [\#13785](https://github.com/netdata/netdata/pull/13785) ([Ferroin](https://github.com/Ferroin))
 - minor - add host labels for ephemerality and nodes with unstable connections [\#13784](https://github.com/netdata/netdata/pull/13784) ([underhood](https://github.com/underhood))
+- Add a thread to asynchronously process metadata updates [\#13783](https://github.com/netdata/netdata/pull/13783) ([stelfrag](https://github.com/stelfrag))
 - Parser cleanup  [\#13782](https://github.com/netdata/netdata/pull/13782) ([stelfrag](https://github.com/stelfrag))
 - allow netdata installer to install and run netdata as any user [\#13780](https://github.com/netdata/netdata/pull/13780) ([ktsaou](https://github.com/ktsaou))
 - Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -349,8 +350,6 @@
 - Fix data query on stale chart [\#13159](https://github.com/netdata/netdata/pull/13159) ([stelfrag](https://github.com/stelfrag))
 - enable ml by default [\#13158](https://github.com/netdata/netdata/pull/13158) ([andrewm4894](https://github.com/andrewm4894))
 - Fix labels unit test [\#13156](https://github.com/netdata/netdata/pull/13156) ([stelfrag](https://github.com/stelfrag))
-- Query Engine multi-granularity support \(and MC improvements\) [\#13155](https://github.com/netdata/netdata/pull/13155) ([ktsaou](https://github.com/ktsaou))
-- add CAP\_SYS\_RAWIO to Netdata's systemd unit CapabilityBoundingSet [\#13154](https://github.com/netdata/netdata/pull/13154) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
