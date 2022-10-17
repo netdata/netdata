@@ -113,7 +113,7 @@ install_generic_service() {
     ENABLE="enable"
   fi
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" /etc/init.d/netdata; then
+  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" "${svc_file}"; then
     error "Failed to install service file."
     exit 4
   fi
