@@ -132,7 +132,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         struct value_output co = {.c = 0, .wb = wb};
 
-        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
         for (c = 0; c < qt->metrics.used ;c++) {
             snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s",
                       rrdmetric_acquired_id(qt->metrics.array[c]),
@@ -147,10 +147,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
-        DICTIONARY *rrdlabels = rrdlabels_create();
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
-        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
         for (c = 0; c < qt->instances.used ; c++) {
             RRDINSTANCE_ACQUIRED *ria = qt->instances.array[c];
 
@@ -163,21 +162,20 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                                 rrdinstance_acquired_name(ria));
 
             dictionary_set(dict, name, output, len + 1);
-
-            rrdlabels_copy(rrdlabels, rrdinstance_acquired_labels(ria));
         }
         dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
 
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_labels%s: [", kq, kq);
-        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-        rrdlabels_walkthrough_read(rrdlabels, fill_formatted_callback, dict);
+        dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+        for (c = 0; c < qt->instances.used ; c++) {
+            RRDINSTANCE_ACQUIRED *ria = qt->instances.array[c];
+            rrdlabels_walkthrough_read(rrdinstance_acquired_labels(ria), fill_formatted_callback, dict);
+        }
         dictionary_walkthrough_read(dict, value_list_output_callback, &co);
         dictionary_destroy(dict);
         buffer_strcat(wb, "],\n");
-
-        dictionary_destroy(rrdlabels);
     }
 
     // functions

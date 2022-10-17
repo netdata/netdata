@@ -4,8 +4,6 @@
 #include "csv.h"
 
 void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
-    rrdset_check_rdlock(r->st);
-
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
     QUERY_TARGET *qt = r->internal.qt;
     long c, i;
