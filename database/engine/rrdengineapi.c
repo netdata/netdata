@@ -114,7 +114,6 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, c
 
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
-    struct rrdengine_instance *ctx = page_index->ctx;
 
     unsigned short refcount = __atomic_sub_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
     if(refcount == 0 && page_index->alignment) {
