@@ -1534,12 +1534,13 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
     time_t first_entry_t = r->internal.qt->db.first_time_t;
     time_t last_entry_t = r->internal.qt->db.last_time_t;
 
-    info("INTERNAL ERROR: rrd2rrdr() on %s update every %ld with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
-         "after (got: %zu, want: %zu, req: %ld, db: %zu), "
-         "before (got: %zu, want: %zu, req: %ld, db: %zu), "
-         "duration (got: %zu, want: %zu, req: %ld, db: %zu), "
-         //"slot (after: %zu, before: %zu, delta: %zu), "
-         "points (got: %ld, want: %ld, req: %ld), "
+    internal_error(
+         true,
+         "rrd2rrdr() on %s update every %ld with %s grouping %s (group: %zu, resampling_time: %ld, resampling_group: %zu), "
+         "after (got: %ld, want: %ld, req: %ld, db: %ld), "
+         "before (got: %ld, want: %ld, req: %ld, db: %ld), "
+         "duration (got: %ld, want: %ld, req: %ld, db: %ld), "
+         "points (got: %zu, want: %zu, req: %zu), "
          "%s"
          , r->internal.qt->id
          , r->internal.qt->window.query_granularity
@@ -1552,29 +1553,22 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , resampling_group
 
          // after
-         , (size_t)r->after
-         , (size_t)after_wanted
+         , r->after
+         , after_wanted
          , after_requested
-         , (size_t)first_entry_t
+         , first_entry_t
 
          // before
-         , (size_t)r->before
-         , (size_t)before_wanted
+         , r->before
+         , before_wanted
          , before_requested
-         , (size_t)last_entry_t
+         , last_entry_t
 
          // duration
-         , (size_t)(r->before - r->after + r->internal.qt->window.query_granularity)
-         , (size_t)(before_wanted - after_wanted + r->internal.qt->window.query_granularity)
-         , before_requested - after_requested
-         , (size_t)((last_entry_t - first_entry_t) + r->internal.qt->window.query_granularity)
-
-         // slot
-         /*
-         , after_slot
-         , before_slot
-         , (after_slot > before_slot) ? (r->st->entries - after_slot + before_slot) : (before_slot - after_slot)
-          */
+         , (long)(r->before - r->after + r->internal.qt->window.query_granularity)
+         , (long)(before_wanted - after_wanted + r->internal.qt->window.query_granularity)
+         , (long)before_requested - after_requested
+         , (long)((last_entry_t - first_entry_t) + r->internal.qt->window.query_granularity)
 
          // points
          , r->rows
@@ -1657,7 +1651,7 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before) {
 #define query_debug_log_init() BUFFER *debug_log = buffer_create(1000)
 #define query_debug_log(args...) buffer_sprintf(debug_log, ##args)
 #define query_debug_log_fin() { \
-        info("QUERY: chart '%s', after:%lld, before:%lld, duration:%lld, points:%ld, res:%ld - wanted => after:%lld, before:%lld, points:%ld, group:%ld, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", st->name, after_requested, before_requested, before_requested - after_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
+        info("QUERY: '%s', after:%ld, before:%ld, duration:%ld, points:%zu, res:%ld - wanted => after:%ld, before:%ld, points:%zu, group:%zu, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", qt->id, after_requested, before_requested, before_requested - after_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
         buffer_free(debug_log); \
         debug_log = NULL; \
     }
@@ -1747,36 +1741,36 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 
         if (after_wanted == 0) {
             after_wanted = first_entry_t;
-            query_debug_log(":zero after_wanted %lld", after_wanted);
+            query_debug_log(":zero after_wanted %ld", after_wanted);
         }
 
         if (before_wanted == 0) {
             before_wanted = last_entry_t;
             before_is_aligned_to_db_end = true;
-            query_debug_log(":zero before_wanted %lld", before_wanted);
+            query_debug_log(":zero before_wanted %ld", before_wanted);
         }
 
         if (points_wanted == 0) {
             points_wanted = (last_entry_t - first_entry_t) / update_every;
-            query_debug_log(":zero points_wanted %ld", points_wanted);
+            query_debug_log(":zero points_wanted %zu", points_wanted);
         }
     }
 
     if (points_wanted == 0) {
         points_wanted = 600;
-        query_debug_log(":zero600 points_wanted %ld", points_wanted);
+        query_debug_log(":zero600 points_wanted %zu", points_wanted);
     }
 
     // convert our before_wanted and after_wanted to absolute
     rrdr_relative_window_to_absolute(&after_wanted, &before_wanted);
-    query_debug_log(":relative2absolute after %lld, before %lld", after_wanted, before_wanted);
+    query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
     if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
         update_every = rrdset_find_natural_update_every_for_timeframe(
                 qt, after_wanted, before_wanted, points_wanted, options, tier);
 
         if (update_every <= 0) update_every = qt->db.minimum_latest_update_every;
-        query_debug_log(":natural update every %d", update_every);
+        query_debug_log(":natural update every %ld", update_every);
     }
 
     // this is the update_every of the query
@@ -1788,19 +1782,19 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     // align before_wanted and after_wanted to query_granularity
     if (before_wanted % query_granularity) {
         before_wanted -= before_wanted % query_granularity;
-        query_debug_log(":granularity align before_wanted %lld", before_wanted);
+        query_debug_log(":granularity align before_wanted %ld", before_wanted);
     }
 
     if (after_wanted % query_granularity) {
         after_wanted -= after_wanted % query_granularity;
-        query_debug_log(":granularity align after_wanted %lld", after_wanted);
+        query_debug_log(":granularity align after_wanted %ld", after_wanted);
     }
 
     // automatic_natural_points is set when the user wants all the points available in the database
     if (automatic_natural_points) {
         points_wanted = (before_wanted - after_wanted + 1) / query_granularity;
         if (unlikely(points_wanted <= 0)) points_wanted = 1;
-        query_debug_log(":auto natural points_wanted %ld", points_wanted);
+        query_debug_log(":auto natural points_wanted %zu", points_wanted);
     }
 
     time_t duration = before_wanted - after_wanted;
@@ -1809,7 +1803,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (unlikely(resampling_time_requested > duration)) {
         after_wanted = before_wanted - resampling_time_requested;
         duration = before_wanted - after_wanted;
-        query_debug_log(":resampling after_wanted %lld", after_wanted);
+        query_debug_log(":resampling after_wanted %ld", after_wanted);
     }
 
     // if the duration is not aligned to resampling time
@@ -1820,18 +1814,18 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         if (delta > resampling_time_requested / 10) {
             after_wanted -= resampling_time_requested - delta;
             duration = before_wanted - after_wanted;
-            query_debug_log(":resampling2 after_wanted %lld", after_wanted);
+            query_debug_log(":resampling2 after_wanted %ld", after_wanted);
         }
     }
 
     // the available points of the query
     size_t points_available = (duration + 1) / query_granularity;
     if (unlikely(points_available <= 0)) points_available = 1;
-    query_debug_log(":points_available %ld", points_available);
+    query_debug_log(":points_available %zu", points_available);
 
     if (points_wanted > points_available) {
         points_wanted = points_available;
-        query_debug_log(":max points_wanted %ld", points_wanted);
+        query_debug_log(":max points_wanted %zu", points_wanted);
     }
 
     // calculate the desired grouping of source data points
@@ -1842,7 +1836,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (points_available % points_wanted > points_wanted / 2)
         group++;
 
-    query_debug_log(":group %ld", group);
+    query_debug_log(":group %zu", group);
 
     if (points_wanted * group * query_granularity < (size_t)duration) {
         // the grouping we are going to do, is not enough
@@ -1859,7 +1853,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         if (unlikely(points_wanted == 0))
             points_wanted = 1;
 
-        query_debug_log(":optimal points %ld", points_wanted);
+        query_debug_log(":optimal points %zu", points_wanted);
     }
 
     // resampling_time_requested enforces a certain grouping multiple
@@ -1871,16 +1865,16 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         if (unlikely(resampling_time_requested % query_granularity))
             resampling_group++;
 
-        query_debug_log(":resampling group %ld", resampling_group);
+        query_debug_log(":resampling group %zu", resampling_group);
 
         // adapt group according to resampling_group
         if (unlikely(group < resampling_group)) {
             group = resampling_group; // do not allow grouping below the desired one
-            query_debug_log(":group less res %ld", group);
+            query_debug_log(":group less res %zu", group);
         }
         if (unlikely(group % resampling_group)) {
             group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
-            query_debug_log(":group mod res %ld", group);
+            query_debug_log(":group mod res %zu", group);
         }
 
         // resampling_divisor = group / resampling_group;
@@ -1894,25 +1888,27 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
             before_wanted -= before_wanted % (time_t)(group * query_granularity);
         else
             before_wanted += (time_t)(group * query_granularity) - before_wanted % (time_t)(group * query_granularity);
-        query_debug_log(":align before_wanted %lld", before_wanted);
+        query_debug_log(":align before_wanted %ld", before_wanted);
     }
 
     after_wanted = before_wanted - (time_t)(points_wanted * group * query_granularity) + query_granularity;
-    query_debug_log(":final after_wanted %lld", after_wanted);
+    query_debug_log(":final after_wanted %ld", after_wanted);
 
     duration = before_wanted - after_wanted;
     query_debug_log(":final duration %ld", duration + 1);
 
+    query_debug_log_fin();
+
     internal_error(points_wanted != duration / (query_granularity * group) + 1,
-                   "QUERY: points_wanted %ld is not points %ld",
-                   points_wanted, duration / (query_granularity * group) + 1);
+                   "QUERY: points_wanted %zu is not points %zu",
+                   points_wanted, (size_t)(duration / (query_granularity * group) + 1));
 
     internal_error(group < resampling_group,
-                   "QUERY: group %ld is less than the desired group points %ld",
+                   "QUERY: group %zu is less than the desired group points %zu",
                    group, resampling_group);
 
     internal_error(group > resampling_group && group % resampling_group,
-                   "QUERY: group %ld is not a multiple of the desired group points %ld",
+                   "QUERY: group %zu is not a multiple of the desired group points %zu",
                    group, resampling_group);
 
     // -------------------------------------------------------------------------
@@ -1992,8 +1988,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     // allocate any memory required by the grouping method
     r->internal.grouping_create(r, qt->window.group_options);
-
-    query_debug_log_fin();
 
     // -------------------------------------------------------------------------
     // do the work for each dimension

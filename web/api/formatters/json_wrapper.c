@@ -134,7 +134,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
         for (c = 0; c < qt->metrics.used ;c++) {
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s",
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdmetric_acquired_id(qt->metrics.array[c]),
                       rrdmetric_acquired_name(qt->metrics.array[c]));
 
@@ -153,7 +153,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         for (c = 0; c < qt->instances.used ; c++) {
             RRDINSTANCE_ACQUIRED *ria = qt->instances.array[c];
 
-            snprintfz(name, RRD_ID_LENGTH_MAX * 2, "%s:%s",
+            snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdinstance_acquired_id(ria),
                       rrdinstance_acquired_name(ria));
 
