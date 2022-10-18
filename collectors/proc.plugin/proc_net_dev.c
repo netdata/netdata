@@ -869,7 +869,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if (read_single_number_file(d->filename_carrier, &d->carrier)) {
                 if (d->carrier_file_exists)
                     error(
-                        "Cannot refresh interface %s carrier state by reading '%s'. Next update is in %s seconds.",
+                        "Cannot refresh interface %s carrier state by reading '%s'. Next update is in %d seconds.",
                         d->name,
                         d->filename_carrier,
                         CARRIER_READ_RETRY_PERIOD);
