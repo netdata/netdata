@@ -2492,7 +2492,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   );
 }
 
-QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
+QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     QUERY_TARGET *qt = &thread_query_target;
 
     if(qt->used)
@@ -2502,7 +2502,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr) {
     qt->start_ut = now_realtime_usec();
 
     // copy the request into query_thread_target
-    qt->request = qtr;
+    qt->request = *qtr;
 
     query_target_generate_name(qt);
     rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before);

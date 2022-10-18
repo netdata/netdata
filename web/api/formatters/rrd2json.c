@@ -80,19 +80,19 @@ int rrdset2value_api_v1(
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     ONEWAYALLOC *owa = onewayalloc_create(0);
-    RRDR *r = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
-            .st = st,
-            .dimensions = dimensions,
-            .points = (int)points,
-            .after = after,
-            .before = before,
-            .resampling_time = resampling_time,
-            .group_method = group_method,
-            .group_options = group_options,
-            .options = options,
-            .timeout = timeout,
-            .tier = tier,
-    }));
+    RRDR *r = rrd2rrdr_legacy(
+            owa,
+            st,
+            points,
+            after,
+            before,
+            group_method,
+            resampling_time,
+            options,
+            dimensions,
+            group_options,
+            timeout,
+            tier);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;

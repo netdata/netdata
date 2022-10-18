@@ -1922,15 +1922,9 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
     long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
-                .st = st[i],
-                .after = time_start,
-                .before = time_end,
-                .points = (int)points,
-                .group_method = RRDR_GROUPING_AVERAGE,
-                .options = RRDR_OPTION_NATURAL_POINTS,
-        }));
-
+        RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start, time_end,
+                                  RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
+                                  NULL, NULL, 0, 0);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
@@ -2066,14 +2060,9 @@ int test_dbengine(void)
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
-        RRDR *r = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
-                .st = st[i],
-                .after = time_start[0] + update_every,
-                .before = time_end[REGIONS - 1],
-                .points = (int)points,
-                .group_method = RRDR_GROUPING_AVERAGE,
-                .options = RRDR_OPTION_NATURAL_POINTS,
-        }));
+        RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start[0] + update_every,
+                                  time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
+                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0);
 
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));

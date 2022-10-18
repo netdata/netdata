@@ -229,7 +229,7 @@ typedef struct query_target {
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
 
-QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST qtr);
+QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
 
 #endif // NETDATA_RRDCONTEXT_H
 

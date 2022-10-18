@@ -131,17 +131,20 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
     time_t Now = now_realtime_sec();
     time_t Before = Now - RH->rrd_update_every;
     time_t After = Before - Cfg.AnomalyDetectionQueryDuration;
+    RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
 
-    QUERY_TARGET_REQUEST qtr;
-    memset(&qtr, 0, sizeof(qtr));
-    qtr.st = HostRateRS;
-    qtr.dimensions = "anomaly_rate";
-    qtr.after = After;
-    qtr.before = Before;
-    qtr.points = 1;
-    qtr.group_method = Cfg.AnomalyDetectionGroupingMethod;
-
-    RRDR *R = rrd2rrdr(OWA, query_target_create(qtr));
+    RRDR *R = rrd2rrdr_legacy(
+            OWA, HostRateRS,
+            1 /* points wanted */,
+            After,
+            Before,
+            Cfg.AnomalyDetectionGroupingMethod,
+            0 /* resampling time */,
+            Options, "anomaly_rate",
+            NULL /* group options */,
+            0, /* timeout */
+            0 /* tier */
+    );
     if(R) {
         assert(R->d == 1 && R->n == 1 && R->rows == 1);
 

@@ -1931,6 +1931,29 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     return true;
 }
 
+RRDR *rrd2rrdr_legacy(
+        ONEWAYALLOC *owa,
+        RRDSET *st, size_t points, time_t after, time_t before,
+        RRDR_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
+        const char *group_options, time_t timeout, size_t tier) {
+
+    QUERY_TARGET_REQUEST qtr = {
+            .st = st,
+            .points = points,
+            .after = after,
+            .before = before,
+            .group_method = group_method,
+            .resampling_time = resampling_time,
+            .options = options,
+            .dimensions = dimensions,
+            .group_options = group_options,
+            .timeout = timeout,
+            .tier = tier,
+    };
+
+    return rrd2rrdr(owa, query_target_create(&qtr));
+}
+
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(!qt || !owa) return NULL;
 

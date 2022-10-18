@@ -529,12 +529,12 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
                                           time_t baseline_after, time_t baseline_before,
                                           time_t after, time_t before,
                                           size_t points, RRDR_OPTIONS options,
-                                          RRDR_GROUPING group, const char *group_options, size_t tier,
+                                          RRDR_GROUPING group_method, const char *group_options, size_t tier,
                                           uint32_t shifts, time_t timeout,
                                           WEIGHTS_STATS *stats, bool register_zero) {
     options |= RRDR_OPTION_NATURAL_POINTS;
 
-    long group_time = 0;
+    time_t resampling_time = 0;
 
     int examined_dimensions = 0;
 
@@ -545,18 +545,10 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
     stats->db_queries++;
     usec_t started_usec = now_realtime_usec();
     ONEWAYALLOC *owa = onewayalloc_create(0);
-    high_rrdr = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
-            .st = st,
-            .after = after,
-            .before = before,
-            .points = points,
-            .options = options,
-            .group_method = group,
-            .group_options = group_options,
-            .resampling_time = group_time,
-            .timeout = timeout,
-            .tier = tier,
-    }));
+    high_rrdr = rrd2rrdr_legacy(owa, st, points,
+                                after, before, group_method,
+                                resampling_time, options, NULL, group_options,
+                                timeout, tier);
 
     if(!high_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", rrdset_name(st));
@@ -579,7 +571,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         info("Metric correlations: rrd2rrdr() on highlighted window timed out '%s'.", rrdset_name(st));
         goto cleanup;
     }
-    int high_points = rrdr_rows(high_rrdr);
+    size_t high_points = rrdr_rows(high_rrdr);
 
     usec_t now_usec = now_realtime_usec();
     if(now_usec - started_usec > timeout * USEC_PER_MS)
@@ -587,18 +579,10 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
 
     // get the baseline, requesting the same number of points as the highlight
     stats->db_queries++;
-    base_rrdr = rrd2rrdr(owa, query_target_create((QUERY_TARGET_REQUEST) {
-            .st = st,
-            .after = baseline_after,
-            .before = baseline_before,
-            .points = (high_points << shifts),
-            .options = options,
-            .group_method = group,
-            .group_options = group_options,
-            .resampling_time = group_time,
-            .timeout = (time_t)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-            .tier = tier,
-    }));
+    base_rrdr = rrd2rrdr_legacy(owa, st,high_points << shifts,
+                         baseline_after, baseline_before, group_method,
+                         resampling_time, options, NULL, group_options,
+                         (time_t)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), tier);
     if(!base_rrdr) {
         info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", rrdset_name(st));
         goto cleanup;
@@ -658,7 +642,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         // there is no need to check for empty values, since empty values are already zero
         // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
         NETDATA_DOUBLE highlight[high_points];
-        for(int c = 0; c < high_points; c++)
+        for(size_t c = 0; c < high_points; c++)
             highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
 
         stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);

@@ -710,7 +710,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
     int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
-    QUERY_TARGET *qt = query_target_create((QUERY_TARGET_REQUEST) {
+    QUERY_TARGET_REQUEST qtr = {
             .after = after,
             .before = before,
             .host = host,
@@ -730,7 +730,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .tier = tier,
             .chart_label_key = chart_label_key,
             .charts_labels_filter = chart_labels_filter,
-    });
+    };
+    QUERY_TARGET *qt = query_target_create(&qtr);
 
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
