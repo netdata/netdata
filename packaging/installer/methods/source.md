@@ -47,11 +47,12 @@ Additionally, the following build time features require additional dependencies:
     -   libelf 0.0.6 or newer (for legacy eBPF) _or_ libelf 0.5 or newer (for CO-RE)
 
 ## If using a git checkout
+
 ### Submodules
 
 Our git repository uses submodules for certain copoments. To obtain a complete build when using a git checkout,
 make sure you either clone the repository with the `--recursive` option, or that you run `git submodule update
---init --recursivea` in your local copy of the repository before attempting to build Netdata.
+--init --recursive` in your local copy of our GitHub repository before attempting to build Netdata.
 
 ### Handling version numbers with git checkouts
 
@@ -67,6 +68,7 @@ libraries and their header files must be copied into specific locations
 in the source tree to be used.
 
 ### Netdata cloud support
+
 #### JSON-C
 
 Netdata requires the use of JSON-C for JSON parsing when using Netdata
@@ -91,6 +93,7 @@ you can do the following to prepare a copy for the build system:
     to `externaldeps/jsonc/json-c` in the Netdata source tree.
 
 ### eBPF support
+
 #### libbpf
 
 Netdata requires a custom version of libbpf for eBPF support on Linux, which will be statically linked by the
@@ -114,45 +117,44 @@ build system. You can do the following to prepare a copy for the build system:
 8.  Copy the `include/uapi` directory from the libbpf source tree to `externaldeps/libbpf/include/uapi` in the
     Netdata source tree.
 
-## Building Netdata
+## Build Netdata
 
 Once the source tree has been prepared, Netdata is ready to be configured
 and built. Netdata currently uses GNU autotools as it's primary build
 system. To build Netdata this way:
 
-1.  Run `autoreconf -ivf` in the Netdata source tree.
-2.  Run `./configure` in the Netdata source tree.
-3.  Run `make` in the Netdata source tree.
-
-### Configure options
-
-Netdata provides a number of build time configure options. This section
+:::info
+Netdata provides a number of build time configure options for the `./configure` script. This section
 lists some of the ones you are most likely to need:
 
--   `--prefix`: Specify the prefix under which Netdata will be installed.
+-   `--prefix`: Specify the prefix under which Netdata will be installed. (default: `/usr/local`)
 -   `--with-webdir`: Specify a path relative to the prefix in which to install the web UI files.
 -   `--disable-cloud`: Disables all Netdata Cloud functionality for this build.
 -   `--disable-ml`: Disable ML support in Netdata (results in a much faster and smaller build).
+:::
 
-### Using Clang
 
-Netdata is primarily developed using GCC, but in most cases we also
-build just fine using Clang. Under some build configurations of Clang
-itself, you may see build failures with the linker reporting errors
-about `nonrepresentable section on output`. We currently do not have a
-conclusive fix for this issue (the obvious fix leads to other issues which
-we haven't been able to fix yet), and unfortunately the only workaround
-is to use a different build of Clang or to use GCC.
+**Inside the Netdata source tree**:
 
-### Linking errors relating to OpenSSL
+1. Generate the configuration files of Netdata
 
-Netdata's build system currently does not reliably support building
-on systems which have multiple ABI incompatible versions of OpenSSL
-installed. In such situations, you may encounter linking errors due to
-Netdata trying to build against headers for one version but link to a
-different version.
+    ```bash
+    autoreconf -ivf
+    ```
 
-## Additional components
+2. Set up the build process
+
+    ```bash
+    ./configure
+    ```
+
+3.  Build Netdata
+
+    ```bash
+    make
+    ```
+
+## Additional Netdata components
 
 A full featured install of Netdata requires some additional components
 which must be built and installed separately from the main Netdata
@@ -236,3 +238,23 @@ instructions, please consult [the README file for our kernel-collector
 repository](https://github.com/netdata/kernel-collector/blob/master/README.md),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
+
+## Known issues
+
+### Using Clang
+
+Netdata is primarily developed using GCC, but in most cases we also
+build just fine using Clang. Under some build configurations of Clang
+itself, you may see build failures with the linker reporting errors
+about `nonrepresentable section on output`. We currently do not have a
+conclusive fix for this issue (the obvious fix leads to other issues which
+we haven't been able to fix yet), and unfortunately the only workaround
+is to use a different build of Clang or to use GCC.
+
+### Linking errors relating to OpenSSL
+
+Netdata's build system currently does not reliably support building
+on systems which have multiple ABI incompatible versions of OpenSSL
+installed. In such situations, you may encounter linking errors due to
+Netdata trying to build against headers for one version but link to a
+different version.

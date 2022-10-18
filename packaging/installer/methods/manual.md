@@ -6,21 +6,26 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on Linux from a Git checkout
 
-These instructions are for building netdata locally from a checkout of the git repository. They are primary of
+These instructions will guide you through building Netdata locally, from a checkout of our GitHub repository. They are primary of
 interest to developers and contributors. Normal users are strongly encouraged to instead use [our official install
 script](./kickstart.md).
+
+## Prerequisites
+
+- git
+
 
 ## Check out the repository
 
 To clone the repository, run:
 
-```sh
+```bash
 git clone --recursive https://github.com/netdata/netdata
 ```
 
 If your version of `git` does not support the `--recursive` option for the `clone` command, you can instead use:
 
-```sh
+```bash
 git clone https://github.com/netdata/netdata
 ( cd netdata && git submodule update --init --recursive )
 ```
@@ -29,41 +34,41 @@ git clone https://github.com/netdata/netdata
 
 Netdata needs the following tools at build time:
 
--     autoconf
--     autoconf-archive
--     autogen
--     automake
--     CMake
--     GCC or a recent version of Clang
--     git
--     GNU make
--     G++ or a recent version of Clang++
--     gzip
--     libtool
--     pkg-config
--     tar
--     xz (Linux only)
--     cURL or wget
+- autoconf
+- autoconf-archive
+- autogen
+- automake
+- CMake
+- GCC or a recent version of Clang
+- GNU make
+- G++ or a recent version of Clang++
+- gzip
+- libtool
+- pkg-config
+- tar
+- xz (Linux only)
+- cURL or wget
 
 Headers and development files for the following libraries are also required at build time:
 
--     JSON-C
--     libatomic (Linux only)
--     libelf (Linux only)
--     libuuid
--     libuv 1.0 or newer
--     LZ4
--     OpenSSL 1.0.2 or newer or LibreSSL 3.0.0 or newer
--     zlib
+- JSON-C
+- libatomic (Linux only)
+- libelf (Linux only)
+- libuuid
+- libuv 1.0 or newer
+- LZ4
+- OpenSSL 1.0.2 or newer or LibreSSL 3.0.0 or newer
+- zlib
 
-We provide a script for handling required dependencies which is located at
-`packaging/installer/install-required-packages.sh` in our Git repository. This script should work on most common
+We provide a script for handling required dependencies. It is located under
+ `packaging/installer/install-required-packages.sh` in our Git repository. This script should work on most common
 Linux distributons, as well as macOS and FreeBSD.  To use the automatic dependency handling script, you will need
 GNU bash version 4.0 or newer.
 
-To use this script from your checkout of the Netdata git repository, run the following from the root of the repository:
+To use this script from your checkout of the Netdata git repository, run the following command **inside the root of the repository
+of `netdata`**:
 
-```sh
+```bash
 packaging/installer/install-required-packages.sh netdata
 ```
 
@@ -72,7 +77,7 @@ packaging/installer/install-required-packages.sh netdata
 We provide a script that encapsulates the entire build and install process as a single command. You can run it
 from the root of your checkout of the Netdata git repository like so:
 
-```sh
+```bash
 ./netdata-installer.sh
 ```
 
@@ -80,7 +85,7 @@ from the root of your checkout of the Netdata git repository like so:
 -   If you don't want to install netdata on the default directories, you can run the installer like this:
     `./netdata-installer.sh --install /opt`. This will install Netdata in `/opt/netdata`.
 
-### Optional parameters to alter your installation
+:::info
 
 `netdata-installer.sh` accepts a few parameters to customize your installation:
 
@@ -89,7 +94,9 @@ from the root of your checkout of the Netdata git repository like so:
 -   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
     Netdata better.
 
-### Connect node to Netdata Cloud during installation
+:::
+
+## Connect node to Netdata Cloud during installation
 
 Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
 not allow you to automatically [connect](/claim/README.md) your node to Netdata Cloud immediately after installation.
@@ -97,16 +104,24 @@ not allow you to automatically [connect](/claim/README.md) your node to Netdata 
 See the [connect to cloud](/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ## Known Issues
-### 'nonrepresentable section on output' errors
 
-Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux.
+### 'nonrepresentable section on output' errors.
 
-If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o):
-relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`,
-and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully
-functional install.
+Our current build process face some issues when certain configurations of the `clang` C compiler are set.
 
-In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
+In those cases, the installation fails with errors messages like:
+
+
+```output
+/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o):
+relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC
+```
+
+Netdata's installation suggested compiler is `GCC`, try to compile it with `GCC`.
+
+```bash
+CC=gcc ./netdata-installer.sh
+```
 
 ## What's next?
 
