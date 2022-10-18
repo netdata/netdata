@@ -1953,14 +1953,14 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     RRDR *r = rrdr_create(owa, qt);
     if(unlikely(!r)) {
-        internal_error(true, "QUERY: cannot create RRDR for %s, after=%u, before=%u, points=%ld",
-                       qt->id, (uint32_t)after_wanted, (uint32_t)before_wanted, points_wanted);
+        internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, points=%zu",
+                       qt->id, after_wanted, before_wanted, points_wanted);
         return NULL;
     }
 
     if(unlikely(!r->d || !points_wanted)) {
         internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, points=%ld",
-                       qt->id, (uint32_t)after_wanted, (uint32_t)before_wanted, points_wanted);
+                       qt->id, after_wanted, before_wanted, points_wanted);
         return r;
     }
 
