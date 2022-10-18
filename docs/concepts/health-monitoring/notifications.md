@@ -1,47 +1,3 @@
-<!--
-title: "Notifications"
-sidebar_label: "Notifications"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md"
-sidebar_position: 7
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "health-monitoring"
-learn_docs_purpose: "Explain the notifications mechanism, methods to receive notification and give a visual overview of the integrations "
--->
-
-**********************************************************************
-Template:
-
-Small intro, what we are about to cover
-
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Alarm notifications"
-description: "Reference documentation for Netdata's alarm notification feature, which supports dozens of endpoints, user roles, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/README.md
--->
-
-# Alarm notifications
-
 The `exec` line in health configuration defines an external script that will be called once
 the alarm is triggered. The default script is `alarm-notify.sh`.
 
@@ -62,7 +18,7 @@ method.
 
 Each role may have one or more destinations.
 
-So, for example the `sysadmin` role may send:
+So, for example, the `sysadmin` role may send:
 
 1.  emails to admin1@example.com and admin2@example.com
 2.  pushover.net notifications to USERTOKENS `A`, `B` and `C`.
@@ -92,7 +48,7 @@ role_recipients_slack[sysadmin]="${DEFAULT_RECIPIENT_SLACK}"
 ...
 ```
 
-## Testing Notifications
+## Test Notifications
 
 You can run the following command by hand, to test alarms configuration:
 
