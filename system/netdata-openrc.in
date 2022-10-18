@@ -4,7 +4,7 @@
 # The user netdata is configured to run as.
 # If you edit its configuration file to set a different
 # user, set it here too, to have its files switch ownership
-: "${NETDATA_OWNER:=netdata:netdata}"
+: "${NETDATA_OWNER:=@netdata_user_POST@:@netdata_user_POST@}"
 
 # The timeout in seconds to wait for netdata
 # to save its database on disk and exit.
