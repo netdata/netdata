@@ -7,6 +7,8 @@
 
 #define STATE_LENGTH_MAX 32
 
+#define CARRIER_READ_RETRY_PERIOD 60 // seconds
+
 enum {
     NETDEV_DUPLEX_UNKNOWN,
     NETDEV_DUPLEX_HALF,
@@ -55,6 +57,8 @@ static struct netdev {
     int configured;
     int enabled;
     int updated;
+    int carrier_file_exists;
+    time_t carrier_file_lost_time;
 
     int do_bandwidth;
     int do_packets;
@@ -859,21 +863,33 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if ((d->do_carrier != CONFIG_BOOLEAN_NO ||
              d->do_duplex != CONFIG_BOOLEAN_NO ||
              d->do_speed != CONFIG_BOOLEAN_NO) &&
-            d->filename_carrier) {
+             d->filename_carrier &&
+            (d->carrier_file_exists ||
+             now_monotonic_sec() - d->carrier_file_lost_time > CARRIER_READ_RETRY_PERIOD)) {
             if (read_single_number_file(d->filename_carrier, &d->carrier)) {
-                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
-                freez(d->filename_carrier);
-                d->filename_carrier = NULL;
+                if (d->carrier_file_exists)
+                    error(
+                        "Cannot refresh interface %s carrier state by reading '%s'. Next update is in %s seconds.",
+                        d->name,
+                        d->filename_carrier,
+                        CARRIER_READ_RETRY_PERIOD);
+                d->carrier_file_exists = 0;
+                d->carrier_file_lost_time = now_monotonic_sec();
+            } else {
+                d->carrier_file_exists = 1;
+                d->carrier_file_lost_time = 0;
             }
         }
 
-        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && (d->carrier || !d->filename_carrier)) {
+        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && (d->carrier || d->carrier_file_exists)) {
             char buffer[STATE_LENGTH_MAX + 1];
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
-                error("Cannot refresh interface %s duplex state by reading '%s'. I will stop updating it.", d->name, d->filename_duplex);
-                freez(d->filename_duplex);
-                d->filename_duplex = NULL;
+                error(
+                    "Cannot refresh interface %s duplex state by reading '%s'.",
+                    d->name,
+                    d->filename_duplex);
+                d->duplex = NETDEV_DUPLEX_UNKNOWN;
             } else {
                 // values can be unknown, half or full -- just check the first letter for speed
                 if (buffer[0] == 'f')
@@ -884,7 +900,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->duplex = NETDEV_DUPLEX_UNKNOWN;
             }
         } else {
-            d->duplex = 0;
+            d->duplex = NETDEV_DUPLEX_UNKNOWN;
         }
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
@@ -979,16 +995,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 if(d->filename_speed && d->chart_var_speed) {
                     int ret = 0;
 
-                    if (d->carrier || !d->filename_carrier) {
+                    if (d->carrier || d->carrier_file_exists) {
                         ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
                     } else {
                         d->speed = 0;
                     }
 
                     if(ret) {
-                        error("Cannot refresh interface %s speed by reading '%s'. Will not update its speed anymore.", d->name, d->filename_speed);
-                        freez(d->filename_speed);
-                        d->filename_speed = NULL;
+                        error("Cannot refresh interface %s speed by reading '%s'.", d->name, d->filename_speed);
                     }
                     else {
                         if(d->do_speed != CONFIG_BOOLEAN_NO) {
@@ -1106,7 +1120,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
+        if(d->do_carrier != CONFIG_BOOLEAN_NO && d->carrier_file_exists) {
             if(unlikely(!d->st_carrier)) {
                 d->st_carrier = rrdset_create_localhost(
                         d->chart_type_net_carrier
