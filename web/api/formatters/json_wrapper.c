@@ -133,7 +133,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         struct value_output co = {.c = 0, .wb = wb};
 
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for (c = 0; c < qt->metrics.used ;c++) {
+        for (c = 0; c < (long)qt->metrics.used ;c++) {
             snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdmetric_acquired_id(qt->metrics.array[c]),
                       rrdmetric_acquired_name(qt->metrics.array[c]));
@@ -150,7 +150,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_list%s: [", kq, kq);
         dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for (c = 0; c < qt->instances.used ; c++) {
+        for (c = 0; c < (long)qt->instances.used ; c++) {
             RRDINSTANCE_ACQUIRED *ria = qt->instances.array[c];
 
             snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
@@ -169,7 +169,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         co.c = 0;
         buffer_sprintf(wb, "],\n   %sfull_chart_labels%s: [", kq, kq);
         dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for (c = 0; c < qt->instances.used ; c++) {
+        for (c = 0; c < (long)qt->instances.used ; c++) {
             RRDINSTANCE_ACQUIRED *ria = qt->instances.array[c];
             rrdlabels_walkthrough_read(rrdinstance_acquired_labels(ria), fill_formatted_callback, dict);
         }
