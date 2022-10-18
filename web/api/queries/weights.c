@@ -545,6 +545,9 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
         goto cleanup;
     }
 
+    query_target_release(high_rrdr->internal.qt);
+    high_rrdr->internal.qt = NULL;
+
     for(size_t i = 0; i < storage_tiers ;i++)
         stats->db_points_per_tier[i] += high_rrdr->internal.tier_points_read[i];
 
