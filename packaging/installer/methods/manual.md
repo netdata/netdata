@@ -104,7 +104,7 @@ See the [connect to cloud](/claim/README.md) doc for details on connecting a nod
 
 ## Known Issues
 
-### 'nonrepresentable section on output' errors.
+### 'nonrepresentable section on output' errors
 
 Our current build process face some issues when certain configurations of the `clang` C compiler are set.
 
