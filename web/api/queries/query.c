@@ -836,7 +836,7 @@ static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, t
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
 
     // find the db minimum update every for this tier for all metrics
-    time_t common_update_every;
+    time_t common_update_every = default_rrd_update_every;
     for(size_t i = 0, used = qt->query.used; i < used ; i++) {
         QUERY_METRIC *qm = &qt->query.array[i];
 
