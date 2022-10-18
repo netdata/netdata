@@ -12,8 +12,7 @@ script](./kickstart.md).
 
 ## Prerequisites
 
-- git
-
+-   git
 
 ## Check out the repository
 
@@ -34,31 +33,31 @@ git clone https://github.com/netdata/netdata
 
 Netdata needs the following tools at build time:
 
-- autoconf
-- autoconf-archive
-- autogen
-- automake
-- CMake
-- GCC or a recent version of Clang
-- GNU make
-- G++ or a recent version of Clang++
-- gzip
-- libtool
-- pkg-config
-- tar
-- xz (Linux only)
-- cURL or wget
+-   autoconf
+-   autoconf-archive
+-   autogen
+-   automake
+-   CMake
+-   GCC or a recent version of Clang
+-   GNU make
+-   G++ or a recent version of Clang++
+-   gzip
+-   libtool
+-   pkg-config
+-   tar
+-   xz (Linux only)
+-   cURL or wget
 
 Headers and development files for the following libraries are also required at build time:
 
-- JSON-C
-- libatomic (Linux only)
-- libelf (Linux only)
-- libuuid
-- libuv 1.0 or newer
-- LZ4
-- OpenSSL 1.0.2 or newer or LibreSSL 3.0.0 or newer
-- zlib
+-   JSON-C
+-   libatomic (Linux only)
+-   libelf (Linux only)
+-   libuuid
+-   libuv 1.0 or newer
+-   LZ4
+-   OpenSSL 1.0.2 or newer or LibreSSL 3.0.0 or newer
+-   zlib
 
 We provide a script for handling required dependencies. It is located under
  `packaging/installer/install-required-packages.sh` in our Git repository. This script should work on most common
@@ -110,7 +109,6 @@ See the [connect to cloud](/claim/README.md) doc for details on connecting a nod
 Our current build process face some issues when certain configurations of the `clang` C compiler are set.
 
 In those cases, the installation fails with errors messages like:
-
 
 ```output
 /bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o):

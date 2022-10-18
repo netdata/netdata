@@ -79,7 +79,7 @@ you can do the following to prepare a copy for the build system:
 1.  Verify the tag that Netdata expects to be used by checking the contents
     of `packaging/jsonc.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/json-c/json-c and downloading
+    -   Navigating to <https://github.com/json-c/json-c> and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the JSON-C sources by running `cmake -DBUILD_SHARED_LIBS=OFF .`
@@ -102,7 +102,7 @@ build system. You can do the following to prepare a copy for the build system:
 1.  Verify the tag that Netdata expects to be used by checking the contents of `packaging/libbpf_current.version`
     in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/libbpf and downloading and unpacking the source code archive for
+    -   Navigating to <https://github.com/netdata/libbpf> and downloading and unpacking the source code archive for
         that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the libbpf sources by running `make -p src/root src/build` in the libbpf source tree.
@@ -124,6 +124,7 @@ and built. Netdata currently uses GNU autotools as it's primary build
 system. To build Netdata this way:
 
 :::info
+
 Netdata provides a number of build time configure options for the `./configure` script. This section
 lists some of the ones you are most likely to need:
 
@@ -131,18 +132,18 @@ lists some of the ones you are most likely to need:
 -   `--with-webdir`: Specify a path relative to the prefix in which to install the web UI files.
 -   `--disable-cloud`: Disables all Netdata Cloud functionality for this build.
 -   `--disable-ml`: Disable ML support in Netdata (results in a much faster and smaller build).
-:::
 
+:::
 
 **Inside the Netdata source tree**:
 
-1. Generate the configuration files of Netdata
+1.  Generate the configuration files of Netdata
 
     ```bash
     autoreconf -ivf
     ```
 
-2. Set up the build process
+2.  Set up the build process
 
     ```bash
     ./configure
@@ -176,7 +177,7 @@ we officially support. To use one of these:
 
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/go.d.version` in your Netdata sources.
-2.  Go to https://github.com/netdata/go.d.plugin/releases, select the
+2.  Go to <https://github.com/netdata/go.d.plugin/releases>, select the
     required release, and download the `go.d.plugin-*.tar.gz` file
     for your system type and CPu architecture and the `config.tar.gz`
     configuration file archive.
@@ -197,7 +198,7 @@ newer. Once you have the required tools, do the following:
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/go.d.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/go.d.plugin and downloading
+    -   Navigating to <https://github.com/netdata/go.d.plugin> and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `make` in the go.d.plugin source tree.
@@ -223,7 +224,7 @@ using glibc or musl. To use one of these:
 
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/ebpf.version` in your Netdata sources.
-2.  Go to https://github.com/netdata/kernel-collector/releases, select the
+2.  Go to <https://github.com/netdata/kernel-collector/releases>, select the
     required release, and download the `netdata-kernel-collector-*.tar.xz`
     file for the libc variant your system uses (either rmusl or glibc).
 3.  Extract the contents of the archive to a temporary location, and then
