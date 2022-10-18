@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- fix tiers update frequency [\#13844](https://github.com/netdata/netdata/pull/13844) ([ktsaou](https://github.com/ktsaou))
+- Fix service installation on FreeBSD. [\#13842](https://github.com/netdata/netdata/pull/13842) ([Ferroin](https://github.com/Ferroin))
+- chore\(health\): rm pihole\_blocklist\_gravity\_file\_existence\_state [\#13826](https://github.com/netdata/netdata/pull/13826) ([ilyam8](https://github.com/ilyam8))
+- Improve error and warning messages in the kickstart script. [\#13825](https://github.com/netdata/netdata/pull/13825) ([Ferroin](https://github.com/Ferroin))
 - extended processes function info from apps.plugin [\#13822](https://github.com/netdata/netdata/pull/13822) ([ktsaou](https://github.com/ktsaou))
 - Fix crash on child reconnect and lost metrics [\#13821](https://github.com/netdata/netdata/pull/13821) ([stelfrag](https://github.com/stelfrag))
 - Remove NFS readahead histogram [\#13819](https://github.com/netdata/netdata/pull/13819) ([vlvkobal](https://github.com/vlvkobal))
 - minor - add trace alloc to buildinfo [\#13817](https://github.com/netdata/netdata/pull/13817) ([underhood](https://github.com/underhood))
 - Fix exporting unit tests [\#13816](https://github.com/netdata/netdata/pull/13816) ([vlvkobal](https://github.com/vlvkobal))
+- Inject costallocz to mqtt\_websockets library and its children [\#13813](https://github.com/netdata/netdata/pull/13813) ([underhood](https://github.com/underhood))
 - overload libc memory allocators with custom ones to trace all allocations [\#13810](https://github.com/netdata/netdata/pull/13810) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.40.4 [\#13808](https://github.com/netdata/netdata/pull/13808) ([ilyam8](https://github.com/ilyam8))
 - fix post-processing of contexts [\#13807](https://github.com/netdata/netdata/pull/13807) ([ktsaou](https://github.com/ktsaou))
@@ -38,6 +43,7 @@
 - Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump websockets submodule [\#13776](https://github.com/netdata/netdata/pull/13776) ([underhood](https://github.com/underhood))
 - Rename variable for old CentOS version [\#13775](https://github.com/netdata/netdata/pull/13775) ([thiagoftsm](https://github.com/thiagoftsm))
+- Further improvements to the new service installation code. [\#13774](https://github.com/netdata/netdata/pull/13774) ([Ferroin](https://github.com/Ferroin))
 - dbengine free from RRDSET and RRDDIM [\#13772](https://github.com/netdata/netdata/pull/13772) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.40.3 [\#13771](https://github.com/netdata/netdata/pull/13771) ([ilyam8](https://github.com/ilyam8))
 - Update fping plugin documentation with better details about the required version. [\#13765](https://github.com/netdata/netdata/pull/13765) ([Ferroin](https://github.com/Ferroin))
@@ -342,14 +348,6 @@
 - Revert "Configurable storage engine for Netdata agents: step 3 \(\#12892\)" [\#13171](https://github.com/netdata/netdata/pull/13171) ([vkalintiris](https://github.com/vkalintiris))
 - Remove warnings when openssl 3 is used. [\#13170](https://github.com/netdata/netdata/pull/13170) ([thiagoftsm](https://github.com/thiagoftsm))
 - Don’t manipulate positional parameters in DEB postinst script. [\#13169](https://github.com/netdata/netdata/pull/13169) ([Ferroin](https://github.com/Ferroin))
-- Fix coverity issues [\#13168](https://github.com/netdata/netdata/pull/13168) ([stelfrag](https://github.com/stelfrag))
-- feat\(proc/proc\_net\_dev\): add dim per operstate to the "Interface Operational State" chart [\#13167](https://github.com/netdata/netdata/pull/13167) ([ilyam8](https://github.com/ilyam8))
-- feat\(proc/proc\_net\_dev\): add dim per duplex state to the "Interface Duplex State" chart [\#13165](https://github.com/netdata/netdata/pull/13165) ([ilyam8](https://github.com/ilyam8))
-- allow traversing null-value dictionaries [\#13162](https://github.com/netdata/netdata/pull/13162) ([ktsaou](https://github.com/ktsaou))
-- Use memset to mark the empty words in the quoted\_strings\_splitter function [\#13161](https://github.com/netdata/netdata/pull/13161) ([stelfrag](https://github.com/stelfrag))
-- Fix data query on stale chart [\#13159](https://github.com/netdata/netdata/pull/13159) ([stelfrag](https://github.com/stelfrag))
-- enable ml by default [\#13158](https://github.com/netdata/netdata/pull/13158) ([andrewm4894](https://github.com/andrewm4894))
-- Fix labels unit test [\#13156](https://github.com/netdata/netdata/pull/13156) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
