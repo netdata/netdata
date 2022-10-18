@@ -11,7 +11,7 @@ learn_docs_purpose: "Explain the Netdata approach, every Agent a standalone data
 
 ## The Netdata approach
 
-Netdata was build with a distributed data architecture mindset. All data are collected and stored on the edge, whenever
+Netdata was built with a distributed data architecture mindset. All data are collected and stored on the edge, whenever
 it's possible. This approach has a number of benefits:
 
 - **Easy maintenance**: There is no centralized data lake to purchase, allocate, monitor or update. This removes the
