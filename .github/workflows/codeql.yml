@@ -31,7 +31,7 @@ jobs:
         id: always
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            if [ "${{ contains(github.event.pull_request.labels.*.name, 'ci/codeql') }}" = "true" ]; then
+            if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/codeql') }}" = "true" ]; then
               echo '::set-output name=run::true'
               echo '::notice::Found ci/codeql label, unconditionally running all CodeQL checks.'
             else
