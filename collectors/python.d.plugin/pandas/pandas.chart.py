@@ -48,6 +48,9 @@ class Service(SimpleService):
         if not HAS_REQUESTS:
             self.warn('requests library could not be imported')
 
+        if not self.chart_configs:
+            self.error('chart_configs must be defined')
+
         data = dict()
 
         # add each chart as defined by the config
