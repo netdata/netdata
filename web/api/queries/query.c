@@ -1959,7 +1959,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     }
 
     if(unlikely(!r->d || !points_wanted)) {
-        internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, points=%ld",
+        internal_error(true, "QUERY: returning empty RRDR (no dimensions in RRDSET) for %s, after=%ld, before=%ld, points=%zu",
                        qt->id, after_wanted, before_wanted, points_wanted);
         return r;
     }

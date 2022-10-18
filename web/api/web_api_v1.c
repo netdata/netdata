@@ -751,7 +751,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         }
     }
 
-    debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
+    debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
           , w->id, chart, (dimensions)?buffer_tostring(dimensions):"", after, before , points, group, format, options);
 
     if(outFileName && *outFileName) {
