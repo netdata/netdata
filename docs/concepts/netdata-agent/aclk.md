@@ -10,36 +10,6 @@ learn_docs_purpose: "Explain that the ACLK is // a mechanism for secure connecti
 -->
 
 **********************************************************************
-Template:
-
-Small intro, what we are about to cover
-
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
-
-## Related topics
-
-list of related topics
-
-*****************Suggested document to be transformed**************************
-From netdata repo's commit : 3a672f5b4ba23d455b507c8276b36403e10f953d<!--
-title: "Agent-Cloud link (ACLK)"
-description: "The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud."
-date: 2020-05-11
-custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
--->
 
 # Agent-cloud link (ACLK)
 
@@ -55,13 +25,12 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
  
 :::caution
 
-This list of IPs can change without notice, we strongly advise you to whitelist the domain `app.netdata.cloud`, if
-this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
+This list of IPs can change without notice; we strongly advise you to whitelist the domain `app.netdata.cloud`, if
+this is not an option in your case, always verify the current domain resolution (e.g via the `host` command).
 
 :::
 
-For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [get
-started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or the full [connect to Cloud
+For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our full [connect to Cloud
 documentation](/claim/README.md).
 
 ## Data privacy
@@ -105,7 +74,7 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 
 ## Disable the ACLK
 
-You have two options if you prefer to disable the ACLK and not use Netdata Cloud.
+You have two options if you prefer to disable the ACLK and not use Netdata Cloud. The following subsections provide expalantion and instruction for these options.
 
 ### Disable at installation
 
