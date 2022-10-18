@@ -4,7 +4,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import pandas as pd
-import requests
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -39,6 +44,9 @@ class Service(SimpleService):
 
     def check(self):
         """ensure charts and dims all configured and that we can get data"""
+
+        if not HAS_REQUESTS:
+            self.warn('requests library could not be imported')
 
         data = dict()
 
