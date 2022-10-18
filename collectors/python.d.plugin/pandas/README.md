@@ -35,7 +35,7 @@ temperature:
       - name: "temperature_by_city"
         title: "Temperature By City"
         family: "temperature.today"
-        context: "temperature"
+        context: "pandas.temperature"
         type: "line"
         units: "Celsius"
         df_steps: >
