@@ -62,10 +62,10 @@ int rrdset2value_api_v1(
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
-        , long points
-        , long long after
-        , long long before
-        , int group_method
+        , size_t points
+        , time_t after
+        , time_t before
+        , RRDR_GROUPING group_method
         , const char *group_options
         , time_t resampling_time
         , uint32_t options
@@ -76,8 +76,8 @@ int rrdset2value_api_v1(
         , size_t *result_points_generated
         , int *value_is_null
         , NETDATA_DOUBLE *anomaly_rate
-        , int timeout
-        , int tier
+        , time_t timeout
+        , size_t tier
 );
 
 #endif /* NETDATA_RRD2JSON_H */

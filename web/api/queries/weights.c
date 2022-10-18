@@ -131,18 +131,18 @@ static void register_result(DICTIONARY *results,
 // Generation of JSON output for the results
 
 static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *wb,
-                                   long long after, long long before,
-                                   long long baseline_after, long long baseline_before,
-                                   long points, WEIGHTS_METHOD method,
+                                   time_t after, time_t before,
+                                   time_t baseline_after, time_t baseline_before,
+                                   size_t points, WEIGHTS_METHOD method,
                                    RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
     buffer_sprintf(wb, "{\n"
-                       "\t\"after\": %lld,\n"
-                       "\t\"before\": %lld,\n"
-                       "\t\"duration\": %lld,\n"
-                       "\t\"points\": %ld,\n",
+                       "\t\"after\": %ld,\n"
+                       "\t\"before\": %ld,\n"
+                       "\t\"duration\": %ld,\n"
+                       "\t\"points\": %zu,\n",
                        after,
                        before,
                        before - after,
@@ -151,10 +151,10 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME)
         buffer_sprintf(wb, ""
-                           "\t\"baseline_after\": %lld,\n"
-                           "\t\"baseline_before\": %lld,\n"
-                           "\t\"baseline_duration\": %lld,\n"
-                           "\t\"baseline_points\": %ld,\n",
+                           "\t\"baseline_after\": %ld,\n"
+                           "\t\"baseline_before\": %ld,\n"
+                           "\t\"baseline_duration\": %ld,\n"
+                           "\t\"baseline_points\": %zu,\n",
                            baseline_after,
                            baseline_before,
                            baseline_before - baseline_after,
@@ -192,9 +192,9 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
 }
 
 static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
-                                                long long after, long long before,
-                                                long long baseline_after, long long baseline_before,
-                                                long points, WEIGHTS_METHOD method,
+                                                time_t after, time_t before,
+                                                time_t baseline_after, time_t baseline_before,
+                                                size_t points, WEIGHTS_METHOD method,
                                                 RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
@@ -245,9 +245,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 }
 
 static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *wb,
-                                                  long long after, long long before,
-                                                  long long baseline_after, long long baseline_before,
-                                                  long points, WEIGHTS_METHOD method,
+                                                  time_t after, time_t before,
+                                                  time_t baseline_after, time_t baseline_before,
+                                                  size_t points, WEIGHTS_METHOD method,
                                                   RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
@@ -273,13 +273,19 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     buffer_strcat(wb, "\",\n\t\"contexts\": {\n");
 
-    size_t contexts = 0, total_dimensions = 0, charts = 0, context_dims = 0, chart_dims = 0;
+    size_t contexts = 0, total_dimensions = 0, context_dims = 0, chart_dims = 0;
     NETDATA_DOUBLE contexts_total_weight = 0.0, charts_total_weight = 0.0;
     RRDSET *last_st = NULL; // never access this - we use it only for comparison
     dfe_start_read(context_results, t) {
 
         if(contexts)
-            buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t},\n", charts_total_weight / chart_dims, contexts_total_weight / context_dims);
+            buffer_sprintf(wb, "\n"
+                               "\t\t\t\t\t},\n"
+                               "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                               "\t\t\t\t}\n\t\t\t},\n"
+                               "\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t},\n"
+                               , charts_total_weight / (double)chart_dims
+                               , contexts_total_weight / (double)context_dims);
 
         contexts++;
         context_dims = 0;
@@ -289,7 +295,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
         buffer_strcat(wb, t->context);
         buffer_strcat(wb, "\": {\n\t\t\t\"charts\":{\n");
 
-        charts = 0;
+        size_t charts = 0;
         chart_dims = 0;
         struct register_result *tt;
         for(tt = t; tt ; tt = tt->next) {
@@ -297,7 +303,11 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                 last_st = tt->st;
 
                 if(charts)
-                    buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t},\n", charts_total_weight / chart_dims);
+                    buffer_sprintf(wb, "\n"
+                                       "\t\t\t\t\t},\n"
+                                       "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                                       "\t\t\t\t},\n"
+                                       , charts_total_weight / (double)chart_dims);
 
                 buffer_strcat(wb, "\t\t\t\t\"");
                 buffer_strcat(wb, tt->chart_id);
@@ -323,7 +333,15 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     // close dimensions and chart
     if (total_dimensions)
-        buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t}\n", charts_total_weight / chart_dims, contexts_total_weight / context_dims);
+        buffer_sprintf(wb, "\n"
+                           "\t\t\t\t\t},\n"
+                           "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                           "\t\t\t\t}\n"
+                           "\t\t\t},\n"
+                           "\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                           "\t\t}\n"
+                           , charts_total_weight / (double)chart_dims
+                           , contexts_total_weight / (double)context_dims);
 
     // close correlated_charts
     buffer_sprintf(wb, "\t},\n"
@@ -406,7 +424,7 @@ static double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMB
     // This would require a lot of multiplications and divisions.
     //
     // To speed it up, we do the binary search to find the index of each number
-    // but then we divide the base index by the power of two number (shifts) it
+    // but, then we divide the base index by the power of two number (shifts) it
     // is bigger than high index. So the 2 indexes are now comparable.
     // We also keep track of the original indexes with min and max, to properly
     // calculate their percentages once the loops finish.
@@ -508,11 +526,11 @@ static double kstwo(
 
 
 static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
-                                          long long baseline_after, long long baseline_before,
-                                          long long after, long long before,
-                                          long long points, RRDR_OPTIONS options,
-                                          RRDR_GROUPING group, const char *group_options, int tier,
-                                          uint32_t shifts, int timeout,
+                                          time_t baseline_after, time_t baseline_before,
+                                          time_t after, time_t before,
+                                          size_t points, RRDR_OPTIONS options,
+                                          RRDR_GROUPING group, const char *group_options, size_t tier,
+                                          uint32_t shifts, time_t timeout,
                                           WEIGHTS_STATS *stats, bool register_zero) {
     options |= RRDR_OPTION_NATURAL_POINTS;
 
@@ -659,7 +677,7 @@ static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
             }
 
             // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
-            // so we flip the result of kstwo()
+            // so, we flip the result of kstwo()
             register_result(results, st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
         }
     }
@@ -676,10 +694,10 @@ cleanup:
 // VOLUME algorithm functions
 
 static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
-                                             long long baseline_after, long long baseline_before,
-                                             long long after, long long before,
+                                             time_t baseline_after, time_t baseline_before,
+                                             time_t after, time_t before,
                                              RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
-                                             int tier, int timeout,
+                                             size_t tier, time_t timeout,
                                              WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
@@ -789,9 +807,9 @@ static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
 // ANOMALY RATE algorithm functions
 
 static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
-                                       long long after, long long before,
+                                       time_t after, time_t before,
                                        RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
-                                       int tier, int timeout,
+                                       size_t tier, size_t timeout,
                                        WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT | RRDR_OPTION_NATURAL_POINTS;
@@ -1016,7 +1034,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
         baseline_after = baseline_before - (high_delta << shifts);
     }
 
-    // dont lock here and wait for results
+    // don't lock here and wait for results
     // get the charts and run mc after
     RRDSET *st;
     rrdset_foreach_read(st, host) {

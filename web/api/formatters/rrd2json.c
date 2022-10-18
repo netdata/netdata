@@ -60,10 +60,10 @@ int rrdset2value_api_v1(
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
-        , long points
-        , long long after
-        , long long before
-        , int group_method
+        , size_t points
+        , time_t after
+        , time_t before
+        , RRDR_GROUPING group_method
         , const char *group_options
         , time_t resampling_time
         , uint32_t options
@@ -74,8 +74,8 @@ int rrdset2value_api_v1(
         , size_t *result_points_generated
         , int *value_is_null
         , NETDATA_DOUBLE *anomaly_rate
-        , int timeout
-        , int tier
+        , time_t timeout
+        , size_t tier
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -130,7 +130,7 @@ int rrdset2value_api_v1(
     if(db_after)  *db_after  = r->after;
     if(db_before) *db_before = r->before;
 
-    long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
+    long i = (!(options & RRDR_OPTION_REVERSED))?(long)rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null, anomaly_rate);
     ret = HTTP_RESP_OK;
 
