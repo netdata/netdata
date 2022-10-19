@@ -10,24 +10,10 @@ learn_docs_purpose: "Present an overview of what we will cover about Netdata Age
 -->
 
 **********************************************************************
-Template:
 
-Small intro, what we are about to cover
+Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
-// every concept we will explain to this document (grouped) should be a different heading (h2) and followed by an example
-// we need at any given moment to provide a reference (a anchored link to this concept)
-## concept title
-
-A concept introduces a single feature or concept. A concept should answer the questions:
-
-1. What is this?
-2. Why would I use it?
-
-For instance, for example etc etc
-
-Give a small taste for this concept, not trying to cover it's reference page. 
-
-In the end of the document:
+You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no sudo required.
 
 ## Related topics
 
