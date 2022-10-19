@@ -10,10 +10,6 @@ These instructions will guide you through building Netdata locally, from a check
 interest to developers and contributors. Normal users are strongly encouraged to instead use [our official install
 script](./kickstart.md).
 
-## Prerequisites
-
--   git
-
 ## Check out the repository
 
 To clone the repository, run:
@@ -38,6 +34,7 @@ Netdata needs the following tools at build time:
 -   autogen
 -   automake
 -   CMake
+-   git
 -   GCC or a recent version of Clang
 -   GNU make
 -   G++ or a recent version of Clang++
