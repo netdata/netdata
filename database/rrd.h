@@ -948,16 +948,18 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // health monitoring options
 
-    unsigned int health_enabled;                    // 1 when this host has health enabled
-    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
-    STRING *health_default_exec;                    // the full path of the alarms notifications program
-    STRING *health_default_recipient;               // the default recipient for all alarms
-    char *health_log_filename;                      // the alarms event log filename
-    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
-
+    unsigned int health_enabled;                   // 1 when this host has health enabled
+    bool health_spawn;                             // true when health thread is running
+    netdata_thread_t health_thread;                // the health thread
+    unsigned int aclk_alert_reloaded;              // 1 on thread start and health reload, 0 after removed are sent
+    time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                   // the full path of the alarms notifications program
+    STRING *health_default_recipient;              // the default recipient for all alarms
+    char *health_log_filename;                     // the alarms event log filename
+    size_t health_log_entries_written;             // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                           // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
 
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
