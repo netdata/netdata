@@ -10,7 +10,7 @@ import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/
 # Installation guide
 
 Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even
-IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and all their derivatives.
+IoT/edge devices. Netdata runs on [Linux](/packaging/installer/methods/manual.md), [FreeBSD](/packaging/installer/methods/freebsd.md), [macOS](/packaging/installer/methods/macos.md), [Kubernetes](/packaging/installer/methods/kubernetes.md), Docker, and all their derivatives.
 
 The best way to install Netdata is with our [**automatic one-line installation
 script**](#automatic-one-line-installation-script), which works with all Linux distributions and most macOS environments.
@@ -34,7 +34,7 @@ _actively_ contributing to Netdata's future.
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others, as well as on mac OS environments.
+This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others, as well as on macOS environments.
 
 To install Netdata, including all dependencies required to connect to Netdata Cloud, and get _automatic nightly
 updates_, run the following as your normal user:
