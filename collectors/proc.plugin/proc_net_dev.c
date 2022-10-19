@@ -7,7 +7,7 @@
 
 #define STATE_LENGTH_MAX 32
 
-#define CARRIER_READ_RETRY_PERIOD 60 // seconds
+#define READ_RETRY_PERIOD 60 // seconds
 
 enum {
     NETDEV_DUPLEX_UNKNOWN,
@@ -57,8 +57,15 @@ static struct netdev {
     int configured;
     int enabled;
     int updated;
+    
     int carrier_file_exists;
     time_t carrier_file_lost_time;
+
+    int duplex_file_exists;
+    time_t duplex_file_lost_time;
+
+    int speed_file_exists;
+    time_t speed_file_lost_time;
 
     int do_bandwidth;
     int do_packets;
@@ -865,14 +872,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
              d->do_speed != CONFIG_BOOLEAN_NO) &&
              d->filename_carrier &&
             (d->carrier_file_exists ||
-             now_monotonic_sec() - d->carrier_file_lost_time > CARRIER_READ_RETRY_PERIOD)) {
+             now_monotonic_sec() - d->carrier_file_lost_time > READ_RETRY_PERIOD)) {
             if (read_single_number_file(d->filename_carrier, &d->carrier)) {
                 if (d->carrier_file_exists)
                     error(
                         "Cannot refresh interface %s carrier state by reading '%s'. Next update is in %d seconds.",
                         d->name,
                         d->filename_carrier,
-                        CARRIER_READ_RETRY_PERIOD);
+                        READ_RETRY_PERIOD);
                 d->carrier_file_exists = 0;
                 d->carrier_file_lost_time = now_monotonic_sec();
             } else {
@@ -881,14 +888,18 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
         }
 
-        if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex && (d->carrier || d->carrier_file_exists)) {
+        if (d->do_duplex != CONFIG_BOOLEAN_NO &&
+            d->filename_duplex &&
+            (d->carrier || d->carrier_file_exists) &&
+            (d->duplex_file_exists ||
+             now_monotonic_sec() - d->duplex_file_lost_time > READ_RETRY_PERIOD)) {
             char buffer[STATE_LENGTH_MAX + 1];
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
-                error(
-                    "Cannot refresh interface %s duplex state by reading '%s'.",
-                    d->name,
-                    d->filename_duplex);
+                if (d->duplex_file_exists)
+                    error("Cannot refresh interface %s duplex state by reading '%s'.", d->name, d->filename_duplex);
+                d->duplex_file_exists = 0;
+                d->duplex_file_lost_time = now_monotonic_sec();
                 d->duplex = NETDEV_DUPLEX_UNKNOWN;
             } else {
                 // values can be unknown, half or full -- just check the first letter for speed
@@ -898,6 +909,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->duplex = NETDEV_DUPLEX_HALF;
                 else
                     d->duplex = NETDEV_DUPLEX_UNKNOWN;
+                d->duplex_file_exists = 1;
+                d->duplex_file_lost_time = 0;
             }
         } else {
             d->duplex = NETDEV_DUPLEX_UNKNOWN;
@@ -920,7 +933,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if (d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
             if (read_single_number_file(d->filename_mtu, &d->mtu)) {
-                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_mtu);
+                error(
+                    "Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_mtu);
                 freez(d->filename_mtu);
                 d->filename_mtu = NULL;
             }
@@ -986,23 +1000,29 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->chart_var_speed =
                         rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
                     if(!d->chart_var_speed) {
-                        error("Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.", d->name);
+                        error(
+                            "Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.",
+                            d->name);
                         freez(d->filename_speed);
                         d->filename_speed = NULL;
                     }
                 }
 
-                if(d->filename_speed && d->chart_var_speed) {
+                if (d->filename_speed && d->chart_var_speed) {
                     int ret = 0;
 
-                    if (d->carrier || d->carrier_file_exists) {
+                    if ((d->carrier || d->carrier_file_exists) &&
+                        (d->speed_file_exists || now_monotonic_sec() - d->speed_file_lost_time > READ_RETRY_PERIOD)) {
                         ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
                     } else {
                         d->speed = 0;
                     }
 
                     if(ret) {
-                        error("Cannot refresh interface %s speed by reading '%s'.", d->name, d->filename_speed);
+                        if (d->speed_file_exists)
+                            error("Cannot refresh interface %s speed by reading '%s'.", d->name, d->filename_speed);
+                        d->speed_file_exists = 0;
+                        d->speed_file_lost_time = now_monotonic_sec();
                     }
                     else {
                         if(d->do_speed != CONFIG_BOOLEAN_NO) {
@@ -1034,7 +1054,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                             rrdset_done(d->st_speed);
                         }
 
-                        rrdsetvar_custom_chart_variable_set(d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE) d->speed * KILOBITS_IN_A_MEGABIT);
+                        rrdsetvar_custom_chart_variable_set(
+                            d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE)d->speed * KILOBITS_IN_A_MEGABIT);
+
+                        d->speed_file_exists = 1;
+                        d->speed_file_lost_time = 0;
                     }
                 }
             }
