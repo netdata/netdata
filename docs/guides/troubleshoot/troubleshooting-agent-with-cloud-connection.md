@@ -65,7 +65,7 @@ With the introduction of our new architecture, Agents running versions lower tha
 
 ### Verify that your IP is whitelisted from Netdata Cloud
 
-Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `app.netdata.cloud` due to security concerns.
+Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `api.netdata.cloud` due to security concerns.
 
 To verify this:
 
@@ -75,7 +75,7 @@ To verify this:
     sudo netdatacli aclk-state | grep "Banned By Cloud"
     ```
 
-    The output will contain a line indicating if the IP is banned from `app.netdata.cloud`:
+    The output will contain a line indicating if the IP is banned from `api.netdata.cloud`:
 
     ```bash
     Banned By Cloud: yes
@@ -97,13 +97,13 @@ To verify this:
 2. If you can reach external IPs, then check your domain resolution.
 
     ```bash
-    host app.netdata.cloud
+    host api.netdata.cloud
     ```
 
     The expected output should be something like this:
 
     ```bash
-    app.netdata.cloud is an alias for main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com.
+    api.netdata.cloud is an alias for main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com.
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 54.198.178.11
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.207.131.212
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.196.50.41
@@ -111,7 +111,7 @@ To verify this:
 
     :::info
 
-    There will be cases in which the firewall restricts network access. In those cases, you need to whitelist the `app.netdata.cloud` domain to be able to see your nodes in Netdata Cloud.  
+    There will be cases in which the firewall restricts network access. In those cases, you need to whitelist `api.netdata.cloud` and `mqtt.netdata.cloud` domains to be able to see your nodes in Netdata Cloud.  
     If you can't whitelist domains in your firewall, you can whitelist the IPs that the above command will produce, but keep in mind that they can change without any notice.
 
     :::
