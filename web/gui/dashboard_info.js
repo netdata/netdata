@@ -4151,50 +4151,56 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // CASSANDRA
 
-    'cassandra.throughput': {
-        info: '<p>I/O requests per seconds.</p><p><b>Read</b> - read request from client. <b>Write</b> - write request from client.</p>'
+    'cassandra.client_requests_rate': {
+        info: 'Client requests received per second. Consider whether your workload is read-heavy or write-heavy while choosing a compaction strategy.'
     },
-    'cassandra.latency': {
-        info: '<p>I/O responses per second.</p><p><b>Read</b> - read requesponse from server. <b>Write</b> - write response from server.</p>'
+    'cassandra.client_requests_latency': {
+        info: 'Response latency of requests received per second. Latency could be impacted by disk access, network latency or replication configuration.'
     },
-    'cassandra.cache': {
-        info: 'Percentage of read requests for which key location was found in cache.'
+    'cassandra.cache_hit_ratio': {
+        info: 'Key cache hit ratio indicates the efficiency of the key cache. If ratio is consistently < 80% consider increasing cache size.'
     },
-    'cassandra.node': {
-        info: 'Disk space used on a node.'
+    'cassandra.cache_hit_rate': {
+        info: 'Key cache hit rate measures the cache hits and misses per second.'
     },
-    'cassandra.disk_column': {
-        info: 'Total disk space used by server.'
+    'cassandra.storage_live_disk_space_used': {
+        info: 'Amount of live disk space used.'
     },
-    'cassandra.compaction_completed': {
-        info: 'Total count of completed compaction tasks.'
+    'cassandra.storage_total_disk_space_used': {
+        info: 'Amount of total disk space used - indicates overall size of Cassandra data store.'
     },
-    'cassandra.compaction_queued': {
-        info: 'Total count of pending compaction tasks in queue.'
+    'cassandra.compaction_completed_tasks_rate': {
+        info: 'Compaction tasks completed per second.'
     },
-    'cassandra.gc_parnew_count': {
-        info: 'Number of young-generation collection.'
+    'cassandra.compaction_pending_tasks_count': {
+        info: 'Total compaction tasks in queue.'
     },
-    'cassandra.gc_parnew_time': {
-        info: 'Elpased time of young-generation collection.'
+    'cassandra.thread_pools_active_tasks_count': {
+        info: 'Total tasks currently being processed.'
     },
-    'cassandra.gc_sweep_count': {
-        info: 'Number of old-generation collection.'
+    'cassandra.thread_pools_pending_tasks_count': {
+        info: 'Total tasks in queue awaiting a thread for processing.'
     },
-    'cassandra.gc_sweep_time': {
-        info: 'Elapsed time of old-generation collection in milliseconds.'
+    'cassandra.thread_pools_blocked_tasks_rate': {
+        info: 'Tasks that cannot be queued for processing yet.'
     },
-    'cassandra.error_timeout': {
-        info: 'Requests not unacknowledged within timeout window.'
+    'cassandra.thread_pools_blocked_tasks_count': {
+        info: 'Total tasks that cannot yet be queued for processing.'
     },
-    'cassandra.error_unavailable': {
-        info: 'Requests for which required number of nodes was unavailable.'
+    'cassandra.jvm_gc_rate': {
+        info: 'Rate of garbage collections.</p><p><b>ParNew</b> - Number of young-generation collections. <b>cms (ConcurrentMarkSweep)</b> - Number of old-generation collections.</p>'
     },
-    'cassandra.task_queued': {
-        info: 'Tasks in queue awaiting a thread for processing.'
+    'cassandra.jvm_gc_time': {
+        info: 'Elapsed time of garbage collection.</p><p><b>ParNew</b> - Elapsed time of young-generation collections. <b>cms (ConcurrentMarkSweep)</b> - Elapsed time of old-generation collections.</p>'
     },
-    'cassandra.task_blocked': {
-        info: 'Tasks that have not yet ben queued for processing.'
+    'cassandra.client_requests_timeout_rate': {
+        info: 'Requests which were not acknowledged within the configurable timeout window.'
+    },
+    'cassandra.client_requests_unavailables_rate': {
+        info: 'Requests for which the required number of nodes was unavailable.'
+    },
+    'cassandra.storage_exceptions_rate': {
+        info: 'Requests for which a storage exception was encountered.'
     },
 
     // ------------------------------------------------------------------------
