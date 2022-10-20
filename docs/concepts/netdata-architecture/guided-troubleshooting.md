@@ -17,6 +17,8 @@ issues. These components are:
 1. The [Anomaly Advisor](#anomaly-advisor)
 2. The [Metric Correlation](#metric-corellation) component
 
+The ML driving our Anomaly Adviser and Metric Correlations feature works at the edge to learn what anomalies look like, so it can identify and alert you to them immediately. And the algorithm behind our Cloud-based Metric Correlations tool can take you straight to the potential root cause of your problem in seconds.
+
 ## Anomaly Advisor
 
 ## Metric correlation
@@ -53,7 +55,6 @@ Anomaly Rate - Run MC on the corresponding anomaly rate for each metric.
 ##### Data Aggregation methods
 
 By default, Netdata will just `Average` raw data when needed as part of pre-processing. You can pick and choose more aggregation methods like `Median`, `Min`, `Max` and `Stddev`.
-
 
 ##### Algorithms
 
