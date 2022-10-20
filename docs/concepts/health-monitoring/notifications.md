@@ -27,7 +27,7 @@ menu](#manage-alert-notifications-per-user).
 
 :::note
 
-Centralized alert notifications from Netdata Cloud is a independent process from[notifications from
+Centralized alert notifications from Netdata Cloud is a independent process from notifications from
 Netdata. You can enable one or the other, or both, based on your needs. However,
 the alerts you see in Netdata Cloud are based on those streamed from your Netdata-monitoring nodes. If you want to tweak
 or add new alert that you see in Netdata Cloud, and receive via centralized alert notifications, you must
