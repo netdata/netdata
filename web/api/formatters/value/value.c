@@ -101,3 +101,61 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 
     return v;
 }
+
+QUERY_VALUE rrdmetric2value(RRDHOST *host,
+                            struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria, struct rrdmetric_acquired *rma,
+                            time_t after, time_t before,
+                            RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+                            size_t tier, time_t timeout
+) {
+    QUERY_TARGET_REQUEST qtr = {
+            .host = host,
+            .rca = rca,
+            .ria = ria,
+            .rma = rma,
+            .after = after,
+            .before = before,
+            .points = 1,
+            .options = options,
+            .group_method = group_method,
+            .group_options = group_options,
+            .tier = tier,
+            .timeout = timeout,
+    };
+
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
+    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+
+    QUERY_VALUE qv;
+
+    if(!r || rrdr_rows(r) == 0) {
+        qv = (QUERY_VALUE) {
+                .value = NAN,
+                .anomaly_rate = NAN,
+        };
+    }
+    else {
+        qv = (QUERY_VALUE) {
+                .after = r->after,
+                .before = r->before,
+                .points_read = r->internal.db_points_read,
+                .result_points = r->internal.result_points_generated,
+        };
+
+        for(size_t t = 0; t < storage_tiers ;t++)
+            qv.storage_points_per_tier[t] = r->internal.tier_points_read[t];
+
+        long i = (!(options & RRDR_OPTION_REVERSED))?(long)rrdr_rows(r) - 1:0;
+        int all_values_are_null = 0;
+        qv.value = rrdr2value(r, i, options, &all_values_are_null, &qv.anomaly_rate);
+        if(all_values_are_null) {
+            qv.value = NAN;
+            qv.anomaly_rate = NAN;
+        }
+    }
+
+    rrdr_free(owa, r);
+    onewayalloc_destroy(owa);
+
+    return qv;
+}

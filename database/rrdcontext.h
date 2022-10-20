@@ -64,6 +64,11 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions);
 
 // ----------------------------------------------------------------------------
+// public API for rrdcontexts
+
+const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca);
+
+// ----------------------------------------------------------------------------
 // public API for rrddims
 
 void rrdcontext_updated_rrddim(RRDDIM *rd);
@@ -97,6 +102,17 @@ void rrdcontext_db_rotation(void);
 void *rrdcontext_main(void *);
 
 // ----------------------------------------------------------------------------
+// public API for weights
+
+struct metric_entry {
+    RRDCONTEXT_ACQUIRED *rca;
+    RRDINSTANCE_ACQUIRED *ria;
+    RRDMETRIC_ACQUIRED *rma;
+};
+
+DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts);
+
+// ----------------------------------------------------------------------------
 // public API for queries
 
 typedef struct query_metric {
@@ -105,7 +121,7 @@ typedef struct query_metric {
     time_t first_time_t;
     time_t last_time_t;
 
-    int latest_update_every;
+    time_t latest_update_every;
 
     struct query_metric_tier {
         STORAGE_METRIC_HANDLE *db_metric_handle;
@@ -139,7 +155,10 @@ typedef struct query_metric {
 
 typedef struct query_target_request {
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
-    RRDSET *st;                         // the chart to be queries (NULL, for context queries)
+    RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
+    RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
+    RRDMETRIC_ACQUIRED *rma;            // the metric to be queried (can be NULL)
+    RRDSET *st;                         // the chart to be queried (NULL, for context queries)
     const char *hosts;                  // hosts simple pattern
     const char *contexts;               // contexts simple pattern (context queries)
     const char *charts;                 // charts simple pattern (for context queries)

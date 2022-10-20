@@ -401,6 +401,11 @@ static inline RRDCONTEXT *rrdcontext_acquired_value(RRDCONTEXT_ACQUIRED *rca) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)rca);
 }
 
+const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca) {
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return string2str(rc->id);
+}
+
 static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquired_dup(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     return (RRDCONTEXT_ACQUIRED *)dictionary_acquired_item_dup((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
@@ -2106,6 +2111,64 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 }
 
 // ----------------------------------------------------------------------------
+// weights API
+
+static void metric_entry_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct metric_entry *t = value;
+    t->rca = rrdcontext_acquired_dup(t->rca);
+    t->ria = rrdinstance_acquired_dup(t->ria);
+    t->rma = rrdmetric_acquired_dup(t->rma);
+}
+static void metric_entry_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct metric_entry *t = value;
+    rrdcontext_release(t->rca);
+    rrdinstance_release(t->ria);
+    rrdmetric_release(t->rma);
+}
+static bool metric_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
+    fatal("RRDCONTEXT: %s() detected a conflict on a metric pointer!", __FUNCTION__);
+    return false;
+}
+
+DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts) {
+    if(!host || !host->rrdctx)
+        return NULL;
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(dict, metric_entry_insert_callback, NULL);
+    dictionary_register_delete_callback(dict, metric_entry_delete_callback, NULL);
+    dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);
+
+    RRDCONTEXT *rc;
+    dfe_start_reentrant((DICTIONARY *)host->rrdctx, rc) {
+
+        if(contexts && !simple_pattern_matches(contexts, string2str(rc->id)))
+            continue;
+
+        RRDINSTANCE *ri;
+        dfe_start_read(rc->rrdinstances, ri) {
+            RRDMETRIC *rm;
+            dfe_start_read(ri->rrdmetrics, rm) {
+                struct metric_entry tmp = {
+                    .rca = (RRDCONTEXT_ACQUIRED *)rc_dfe.item,
+                    .ria = (RRDINSTANCE_ACQUIRED *)ri_dfe.item,
+                    .rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item,
+                };
+
+                char buffer[20 + 1];
+                ssize_t len = snprintfz(buffer, 20, "%p", rm);
+                dictionary_set_advanced(dict, buffer, len + 1, &tmp, sizeof(struct metric_entry), NULL);
+            }
+            dfe_done(rm);
+        }
+        dfe_done(ri);
+    }
+    dfe_done(rc);
+
+    return dict;
+}
+
+// ----------------------------------------------------------------------------
 // query API
 
 typedef struct query_target_locals {
@@ -2251,9 +2314,52 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
 
-    rrdmetric_update_retention(rm);
+    time_t common_first_time_t = 0;
+    time_t common_last_time_t = 0;
+    time_t common_update_every = 0;
+    size_t tiers_added = 0;
+    struct {
+        struct storage_engine_query_ops *ops;
+        STORAGE_METRIC_HANDLE *db_metric_handle;
+        time_t db_first_time_t;
+        time_t db_last_time_t;
+        time_t db_update_every;
+    } tier_retention[storage_tiers];
 
-    bool timeframe_matches = (rm->first_time_t <= qt->window.before && rm->last_time_t >= qt->window.after) ? true : false;
+    for (size_t tier = 0; tier < storage_tiers; tier++) {
+        STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
+        tier_retention[tier].ops = &eng->api.query_ops;
+        tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
+        if(tier_retention[tier].db_metric_handle) {
+            tier_retention[tier].db_first_time_t = tier_retention[tier].ops->oldest_time(tier_retention[tier].db_metric_handle);
+            tier_retention[tier].db_last_time_t = tier_retention[tier].ops->latest_time(tier_retention[tier].db_metric_handle);
+            tier_retention[tier].db_update_every = (time_t) (get_tier_grouping(tier) * ri->update_every);
+
+            if(!common_first_time_t)
+                common_first_time_t = tier_retention[tier].db_first_time_t;
+            else
+                common_first_time_t = MIN(common_first_time_t, tier_retention[tier].db_first_time_t);
+
+            if(!common_last_time_t)
+                common_last_time_t = tier_retention[tier].db_last_time_t;
+            else
+                common_last_time_t = MAX(common_last_time_t, tier_retention[tier].db_last_time_t);
+
+            if(!common_update_every)
+                common_update_every = tier_retention[tier].db_update_every;
+            else
+                common_update_every = MIN(common_update_every, tier_retention[tier].db_update_every);
+
+            tiers_added++;
+        }
+        else {
+            tier_retention[tier].db_first_time_t = 0;
+            tier_retention[tier].db_last_time_t = 0;
+            tier_retention[tier].db_update_every = 0;
+        }
+    }
+
+    bool timeframe_matches = (tiers_added && common_first_time_t <= qt->window.before && common_last_time_t >= qt->window.after) ? true : false;
 
     if(timeframe_matches) {
         RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
@@ -2310,44 +2416,35 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             qm->link.ria = qtl->ria;
             qm->link.rma = rma;
 
-            qm->first_time_t = rm->first_time_t;
-            qm->last_time_t = rm->last_time_t;
-            qm->latest_update_every = ri->update_every;
+            qm->chart.id = string_dup(ri->id);
+            qm->chart.name = string_dup(ri->name);
 
-            if (!qt->db.first_time_t || rm->first_time_t < qt->db.first_time_t)
-                qt->db.first_time_t = rm->first_time_t;
+            qm->dimension.id = string_dup(rm->id);
+            qm->dimension.name = string_dup(rm->name);
 
-            if (!qt->db.last_time_t || rm->last_time_t > qt->db.last_time_t)
-                qt->db.last_time_t = rm->last_time_t;
+            qm->first_time_t = common_first_time_t;
+            qm->last_time_t = common_last_time_t;
+            qm->latest_update_every = common_update_every;
 
-            size_t tiers_added = 0;
+            if (!qt->db.first_time_t || common_first_time_t < qt->db.first_time_t)
+                qt->db.first_time_t = common_first_time_t;
+
+            if (!qt->db.last_time_t || common_last_time_t > qt->db.last_time_t)
+                qt->db.last_time_t = common_last_time_t;
+
             for (size_t tier = 0; tier < storage_tiers; tier++) {
-                STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
-                struct storage_engine_query_ops *ops = qm->tiers[tier].db_ops = &eng->api.query_ops;
-                qm->tiers[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
-                if(qm->tiers[tier].db_metric_handle) {
-                    qm->tiers[tier].db_first_time_t = ops->oldest_time(qm->tiers[tier].db_metric_handle);
-                    qm->tiers[tier].db_last_time_t = ops->latest_time(qm->tiers[tier].db_metric_handle);
-                    qm->tiers[tier].db_update_every = (time_t) (get_tier_grouping(tier) * ri->update_every);
-                    tiers_added++;
-                }
-                else {
-                    qm->tiers[tier].db_first_time_t = 0;
-                    qm->tiers[tier].db_last_time_t = 0;
-                    qm->tiers[tier].db_update_every = 0;
-                }
-            }
-
-            if(!tiers_added) {
-                qt->query.used--;
-            }
-            else {
-                qm->chart.id = string_dup(ri->id);
-                qm->chart.name = string_dup(ri->name);
-                qm->dimension.id = string_dup(rm->id);
-                qm->dimension.name = string_dup(rm->name);
+                qm->tiers[tier].db_ops = tier_retention[tier].ops;
+                qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
+                qm->tiers[tier].db_first_time_t = tier_retention[tier].db_first_time_t;
+                qm->tiers[tier].db_last_time_t = tier_retention[tier].db_last_time_t;
+                qm->tiers[tier].db_update_every = tier_retention[tier].db_update_every;
             }
         }
+    }
+    else {
+        // cleanup anything we allocated to get retention
+        // none needed currently
+        ;
     }
 }
 
@@ -2375,12 +2472,20 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
         instance_matches_label_filters = false;
 
     size_t added = 0;
-    RRDMETRIC *rm;
-    dfe_start_read(ri->rrdmetrics, rm) {
-        query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *)rm_dfe.item, ri, instance_matches_label_filters);
+
+    if(unlikely(qt->request.rma)) {
+        query_target_add_metric(qtl, qt->request.rma, ri, instance_matches_label_filters);
         added++;
     }
-    dfe_done(rm);
+    else {
+        RRDMETRIC *rm;
+        dfe_start_read(ri->rrdmetrics, rm){
+                    query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri,
+                                            instance_matches_label_filters);
+                    added++;
+                }
+        dfe_done(rm);
+    }
 
     if(!added) {
         qt->instances.used--;
@@ -2398,7 +2503,11 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
     qtl->rca = qt->contexts.array[qt->contexts.used++] = rrdcontext_acquired_dup(rca);
 
     size_t added = 0;
-    if(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance) {
+    if(unlikely(qt->request.ria)) {
+        query_target_add_instance(qtl, qt->request.ria);
+        added++;
+    }
+    else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
         query_target_add_instance(qtl, qtl->st->rrdinstance);
         added++;
     }
@@ -2444,7 +2553,11 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
     }
 
     size_t added = 0;
-    if(qtl->st) {
+    if(unlikely(qt->request.rca)) {
+        query_target_add_context(qtl, qt->request.rca);
+        added++;
+    }
+    else if(unlikely(qtl->st)) {
         // single chart data queries
         query_target_add_context(qtl, qtl->st->rrdcontext);
         added++;
@@ -2452,7 +2565,7 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
     else {
         // context pattern queries
         RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)qtl->host->rrdctx, qtl->contexts);
-        if(rca) {
+        if(likely(rca)) {
             // we found it!
             query_target_add_context(qtl, rca);
             rrdcontext_release(rca);
