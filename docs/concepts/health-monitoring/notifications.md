@@ -35,7 +35,7 @@ configure each node's alert watchdog.
 
 :::
 
-## Manage alert notifications for a Cloud Space
+## Alert notifications for a Cloud Space
 
 To enable notifications for a Space, click **Manage Space** in the [Space](/docs/cloud/spaces) management area.
 
@@ -49,7 +49,7 @@ notifications](https://user-images.githubusercontent.com/1153921/99722010-3f7eab
 
 Click on the toggle to enable or disable a notification method.
 
-## Manage alert notifications per Cloud user
+## Alert notifications per Cloud user
 
 You, and other individual users in your Space, can also enable and disable notification methods.
 
