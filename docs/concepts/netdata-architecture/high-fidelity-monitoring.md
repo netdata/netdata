@@ -44,3 +44,5 @@ You need to inspect:
 
 ☑ See the actual effect in multiple resources
 
+WIth Netdata's tools and resources, each of those steps becomes a whole lot easier, faster, cheaper, and more productive. 
+
