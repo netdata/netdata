@@ -22,9 +22,8 @@ sudo pip install pandas requests
 
 ## Configuration
 
-Below is an example configuration to query some csv data from 
-[london Netdata demo server](http://london.my-netdata.io/), do some data wrangling on it and save in 
-format as expected by Netdata.
+Below is an example configuration to query some json weather data from [Open-Meteo](https://open-meteo.com), 
+do some data wrangling on it and save in format as expected by Netdata.
 
 ```yaml
 # example pulling some hourly temperature data
