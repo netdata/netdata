@@ -293,7 +293,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     payload_offset = sizeof(*header) + sizeof(header->descr[0]) * count;
     trailer = xt_io_descr->buf + xt_io_descr->bytes - sizeof(*trailer);
 
-    if (read_failed) {
+    if (unlikely(read_failed)) {
         struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
 
         ++ctx->stats.io_errors;
