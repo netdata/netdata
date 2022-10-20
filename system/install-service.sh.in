@@ -243,7 +243,9 @@ install_systemd_service() {
   fi
 
   if [ "${ENABLE}" = "auto" ]; then
-    IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+    if [ "$(check_systemd)" = "YES" ]; then
+      IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+    fi
 
     if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
       ENABLE="disable"
@@ -258,7 +260,7 @@ install_systemd_service() {
     exit 4
   fi
 
-  if check_systemd; then
+  if [ "$(check_systemd)" = "YES" ]; then
     if ! systemctl daemon-reload; then
         warning "Failed to reload systemd unit files."
     fi
@@ -270,7 +272,7 @@ install_systemd_service() {
 }
 
 systemd_cmds() {
-  if check_systemd; then
+  if [ "$(check_systemd)" = "YES" ]; then
     NETDATA_START_CMD='systemctl start netdata'
     NETDATA_STOP_CMD='systemctl stop netdata'
   else # systemd is not running, use external defaults by providing no commands
@@ -316,8 +318,12 @@ check_openrc() {
 }
 
 enable_openrc() {
-  runlevel="$(rc-status -r)"
+  if [ "$(check_openrc)" = "YES" ]; then
+    runlevel="$(rc-status -r)"
+  fi
+
   runlevel="${runlevel:-default}"
+
   if ! rc-update add netdata "${runlevel}"; then
     warning "Failed to enable Netdata service in runlevel ${runlevel}."
   fi
@@ -339,7 +345,7 @@ install_openrc_service() {
 }
 
 openrc_cmds() {
-  if check_openrc; then
+  if [ "$(check_openrc)" = "YES" ]; then
     NETDATA_START_CMD='rc-service netdata start'
     NETDATA_STOP_CMD='rc-service netdata stop'
   else # Not booted using OpenRC, use external defaults by not providing commands.

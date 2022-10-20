@@ -15,14 +15,19 @@ uint64_t debug_flags = 0;
 int access_log_syslog = 1;
 int error_log_syslog = 1;
 int output_log_syslog = 1;  // debug log
+int health_log_syslog = 1;
 
 int stdaccess_fd = -1;
 FILE *stdaccess = NULL;
+
+int stdhealth_fd = -1;
+FILE *stdhealth = NULL;
 
 const char *stdaccess_filename = NULL;
 const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
 const char *facility_log = NULL;
+const char *stdhealth_filename = NULL;
 
 #ifdef ENABLE_ACLK
 const char *aclklog_filename = NULL;
@@ -580,7 +585,10 @@ void reopen_all_log_files() {
 #endif
 
     if(stdaccess_filename)
-         stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
+        stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
+
+    if(stdhealth_filename)
+        stdhealth = open_log_file(stdhealth_fd, stdhealth, stdhealth_filename, &health_log_syslog, 1, &stdhealth_fd);
 }
 
 void open_all_log_files() {
@@ -596,6 +604,8 @@ void open_all_log_files() {
 #endif
 
     stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
+
+    stdhealth = open_log_file(stdhealth_fd, stdhealth, stdhealth_filename, &health_log_syslog, 1, &stdhealth_fd);
 }
 
 // ----------------------------------------------------------------------------
@@ -960,6 +970,38 @@ void log_access( const char *fmt, ... ) {
 
         if(web_server_is_multithreaded)
             netdata_mutex_unlock(&access_mutex);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// health log
+
+void log_health( const char *fmt, ... ) {
+    va_list args;
+
+    if(health_log_syslog) {
+        va_start( args, fmt );
+        vsyslog(LOG_INFO,  fmt, args );
+        va_end( args );
+    }
+
+    if(stdhealth) {
+        static netdata_mutex_t health_mutex = NETDATA_MUTEX_INITIALIZER;
+
+        if(web_server_is_multithreaded)
+            netdata_mutex_lock(&health_mutex);
+
+        char date[LOG_DATE_LENGTH];
+        log_date(date, LOG_DATE_LENGTH);
+        fprintf(stdhealth, "%s: ", date);
+
+        va_start( args, fmt );
+        vfprintf( stdhealth, fmt, args );
+        va_end( args );
+        fputc('\n', stdhealth);
+
+        if(web_server_is_multithreaded)
+            netdata_mutex_unlock(&health_mutex);
     }
 }
 

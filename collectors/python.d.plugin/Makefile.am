@@ -72,6 +72,7 @@ include nsd/Makefile.inc
 include ntpd/Makefile.inc
 include openldap/Makefile.inc
 include oracledb/Makefile.inc
+include pandas/Makefile.inc
 include postfix/Makefile.inc
 include proxysql/Makefile.inc
 include puppet/Makefile.inc

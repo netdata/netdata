@@ -25,6 +25,7 @@ savedb_cmd="netdata_savedb"
 netdata_prestart()
 {
 	[ ! -d "${piddir}" ] && mkdir -p "${piddir}"
+	chown @netdata_user_POST@:@netdata_user_POST@ "${piddir}"
 	return 0
 }
 

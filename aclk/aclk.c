@@ -47,8 +47,6 @@ time_t last_disconnect_time = 0;
 time_t next_connection_attempt = 0;
 float last_backoff_value = 0;
 
-int aclk_alert_reloaded = 0; //1 on health log exchange, and again on health_reload
-
 time_t aclk_block_until = 0;
 
 #ifdef ENABLE_ACLK

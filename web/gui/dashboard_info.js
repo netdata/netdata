@@ -711,6 +711,10 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-dragon"></i>',
         info: 'VPN network interfaces and peers traffic.'
     },
+
+    'pandas': {
+        icon: '<i class="fas fa-teddy-bear"></i>'
+    },
 };
 
 

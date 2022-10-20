@@ -27,6 +27,7 @@ service_start()
 {
 	[ -x $DAEMON_PATH ] || exit 5
 	[ ! -d $PIDFILE_PATH ] && mkdir -p $PIDFILE_PATH
+	chown @netdata_user_POST@:@netdata_user_POST@ $PIDFILE_PATH
 	echo -n "Starting $DAEMON..."
 	daemon $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?

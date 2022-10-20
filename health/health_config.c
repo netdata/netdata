@@ -1163,7 +1163,7 @@ void sql_refresh_hashes(void)
 }
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
-    if(unlikely(!host->health_enabled)) {
+    if(unlikely(!host->health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) {
         debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;
     }
@@ -1172,10 +1172,11 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
                                                 CONFIG_BOOLEAN_YES);
 
     if (!stock_enabled) {
-        info("Netdata will not load stock alarms.");
+        log_health("[%s]: Netdata will not load stock alarms.", rrdhost_hostname(host));
         stock_path = user_path;
     }
 
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
+    log_health("[%s]: Read health configuration.", rrdhost_hostname(host));
     sql_store_hashes = 0;
 }
