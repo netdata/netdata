@@ -190,11 +190,6 @@ cookies by [editing `netdata.conf`](/docs/configure/nodes.md#use-edit-config-to-
     enable cookies SameSite and Secure = no
 ```
 
-## The future
-
-The registry opens a whole world of new possibilities for Netdata. Check here what we think:
-<https://github.com/netdata/netdata/issues/416>
-
 ## Troubleshooting the registry
 
 The registry URL should be set to the URL of a Netdata dashboard. This server has to have `[registry].enabled = yes`.
