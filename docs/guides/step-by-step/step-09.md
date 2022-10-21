@@ -37,9 +37,9 @@ Let's look at your `netdata.conf` file again. Under the `[global]` section, you'
 
 ```conf
 [db]
-        # mode = dbengine
-        # dbengine page cache size MB = 32
-        # dbengine disk space MB = 256
+    # mode = dbengine
+    # dbengine page cache size MB = 32
+    # dbengine disk space MB = 256
 ```
 
 The `memory mode` option is set, by default, to `dbengine`. `page cache size` determines the amount of RAM, in MiB, that
@@ -57,9 +57,9 @@ metrics your Agent collects, and more.
 
 ```conf
 [db]
-        # mode = dbengine
-        # dbengine page cache size MB = 32
-        # dbengine disk space MB = 256
+    mode = dbengine
+    dbengine page cache size MB = 64
+    dbengine disk space MB = 512
 ```
 
 After you've made your changes, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
