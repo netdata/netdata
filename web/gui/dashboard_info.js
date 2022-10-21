@@ -4157,10 +4157,10 @@ netdataDashboard.context = {
     'cassandra.client_requests_latency': {
         info: 'Response latency of requests received per second. Latency could be impacted by disk access, network latency or replication configuration.'
     },
-    'cassandra.cache_hit_ratio': {
+    'cassandra.key_cache_hit_ratio': {
         info: 'Key cache hit ratio indicates the efficiency of the key cache. If ratio is consistently < 80% consider increasing cache size.'
     },
-    'cassandra.cache_hit_rate': {
+    'cassandra.key_cache_hit_rate': {
         info: 'Key cache hit rate measures the cache hits and misses per second.'
     },
     'cassandra.storage_live_disk_space_used': {
