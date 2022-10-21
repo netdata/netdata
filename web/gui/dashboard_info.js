@@ -4172,16 +4172,16 @@ netdataDashboard.context = {
     'cassandra.compaction_pending_tasks_count': {
         info: 'Total compaction tasks in queue.'
     },
-    'cassandra.thread_pools_active_tasks_count': {
+    'cassandra.thread_pool_active_tasks_count': {
         info: 'Total tasks currently being processed.'
     },
-    'cassandra.thread_pools_pending_tasks_count': {
+    'cassandra.thread_pool_pending_tasks_count': {
         info: 'Total tasks in queue awaiting a thread for processing.'
     },
-    'cassandra.thread_pools_blocked_tasks_rate': {
+    'cassandra.thread_pool_blocked_tasks_rate': {
         info: 'Tasks that cannot be queued for processing yet.'
     },
-    'cassandra.thread_pools_blocked_tasks_count': {
+    'cassandra.thread_pool_blocked_tasks_count': {
         info: 'Total tasks that cannot yet be queued for processing.'
     },
     'cassandra.jvm_gc_rate': {
