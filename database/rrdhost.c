@@ -366,9 +366,13 @@ int is_legacy = 1;
         if (is_legacy) {
             // initialize legacy dbengine instance as needed
 
+            host->db[0].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[0].eng = storage_engine_get(host->db[0].mode);
+            host->db[0].tier_grouping = get_tier_grouping(0);
+
             ret = rrdeng_init(
                 host,
-                (struct rrdengine_instance **)&host->storage_instance[0],
+                (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
                 default_rrdeng_page_cache_mb,
                 default_rrdeng_disk_quota_mb,
@@ -377,13 +381,21 @@ int is_legacy = 1;
             if(ret == 0) {
                 // assign the rest of the shared storage instances to it
                 // to allow them collect its metrics too
-                for(size_t tier = 1; tier < storage_tiers ; tier++)
-                    host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                for(size_t tier = 1; tier < storage_tiers ; tier++) {
+                    host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                    host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+                    host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+                    host->db[tier].tier_grouping = get_tier_grouping(tier);
+                }
             }
         }
         else {
-            for(size_t tier = 0; tier < storage_tiers ; tier++)
-                host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+            for(size_t tier = 0; tier < storage_tiers ; tier++) {
+                host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+                host->db[tier].instance = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                host->db[tier].tier_grouping = get_tier_grouping(tier);
+            }
         }
         if (ret) { // check legacy or multihost initialization success
             error(
@@ -401,10 +413,19 @@ int is_legacy = 1;
 #endif
     }
     else {
+        host->db[0].mode = host->rrd_memory_mode;
+        host->db[0].eng = storage_engine_get(host->db[0].mode);
+        host->db[0].instance = NULL;
+        host->db[0].tier_grouping = get_tier_grouping(0);
+
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes
-        for(size_t tier = 1; tier < storage_tiers ; tier++)
-            host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+        for(size_t tier = 1; tier < storage_tiers ; tier++) {
+            host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+            host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+            host->db[tier].tier_grouping = get_tier_grouping(tier);
+        }
 #endif
     }
 
@@ -1036,10 +1057,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
 #ifdef ENABLE_DBENGINE
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            host->storage_instance[tier] &&
-            !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[tier]);
+        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
+            && host->db[tier].instance
+            && !is_storage_engine_shared(host->db[tier].instance))
+            rrdeng_prepare_exit((struct rrdengine_instance *)host->db[tier].instance);
     }
 #endif
 
@@ -1055,10 +1076,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
 #ifdef ENABLE_DBENGINE
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            host->storage_instance[tier] &&
-            !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_exit((struct rrdengine_instance *)host->storage_instance[tier]);
+        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
+            && host->db[tier].instance
+            && !is_storage_engine_shared(host->db[tier].instance))
+            rrdeng_exit((struct rrdengine_instance *)host->db[tier].instance);
     }
 #endif
 
@@ -1399,7 +1420,7 @@ void rrdhost_cleanup_all(void) {
     rrdhost_foreach_read(host) {
         if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
             /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
+            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
         )
             rrdhost_delete_charts(host);
         else

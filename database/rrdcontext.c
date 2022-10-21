@@ -2340,23 +2340,18 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     } tier_retention[storage_tiers];
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
-        STORAGE_ENGINE *eng;
+        STORAGE_ENGINE *eng = qtl->host->db[tier].eng;
+        tier_retention[tier].eng = eng;
+        tier_retention[tier].db_update_every = (time_t) (qtl->host->db[tier].tier_grouping * ri->update_every);
 
-        if(rm->rrddim && rm->rrddim->tiers[tier]->db_metric_handle) {
-            eng = storage_engine_get(rm->rrddim->tiers[tier]->mode);
-            tier_retention[tier].eng = eng;
+        if(rm->rrddim && rm->rrddim->tiers[tier]->db_metric_handle)
             tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
-        }
-        else {
-            eng = storage_engine_get(qtl->host->rrd_memory_mode);
-            tier_retention[tier].eng = eng;
-            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
-        }
+        else
+            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid, NULL);
 
         if(tier_retention[tier].db_metric_handle) {
             tier_retention[tier].db_first_time_t = tier_retention[tier].eng->api.query_ops.oldest_time(tier_retention[tier].db_metric_handle);
             tier_retention[tier].db_last_time_t = tier_retention[tier].eng->api.query_ops.latest_time(tier_retention[tier].db_metric_handle);
-            tier_retention[tier].db_update_every = (time_t) (get_tier_grouping(tier) * ri->update_every);
 
             if(!common_first_time_t)
                 common_first_time_t = tier_retention[tier].db_first_time_t;
@@ -2919,10 +2914,10 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
     else if (dbengine_enabled) {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if(!rrdhost->storage_instance[tier]) continue;
+            if(!rrdhost->db[tier].instance) continue;
 
             time_t first_time_t, last_time_t;
-            if (rrdeng_metric_retention_by_uuid(rrdhost->storage_instance[tier], &rm->uuid, &first_time_t, &last_time_t) == 0) {
+            if (rrdeng_metric_retention_by_uuid(rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t) == 0) {
                 if (first_time_t < min_first_time_t)
                     min_first_time_t = first_time_t;
 

@@ -1460,7 +1460,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
     struct rrddim_tier *t = rd->tiers[tier];
     if(unlikely(!t)) return;
 
-    time_t latest_time_t = t->query_ops.latest_time(t->db_metric_handle);
+    time_t latest_time_t = t->query_ops->latest_time(t->db_metric_handle);
     time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
     time_t time_diff   = now - latest_time_t;
 
@@ -1476,21 +1476,21 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
 
     // for each lower tier
     for(int tr = (int)tier - 1; tr >= 0 ;tr--){
-        time_t smaller_tier_first_time = rd->tiers[tr]->query_ops.oldest_time(rd->tiers[tr]->db_metric_handle);
-        time_t smaller_tier_last_time = rd->tiers[tr]->query_ops.latest_time(rd->tiers[tr]->db_metric_handle);
+        time_t smaller_tier_first_time = rd->tiers[tr]->query_ops->oldest_time(rd->tiers[tr]->db_metric_handle);
+        time_t smaller_tier_last_time = rd->tiers[tr]->query_ops->latest_time(rd->tiers[tr]->db_metric_handle);
         if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
 
         long after_wanted = (latest_time_t < smaller_tier_first_time) ? smaller_tier_first_time : latest_time_t;
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = rd->tiers[tr];
-        tmp->query_ops.init(tmp->db_metric_handle, &handle, after_wanted, before_wanted);
+        tmp->query_ops->init(tmp->db_metric_handle, &handle, after_wanted, before_wanted);
 
         size_t points = 0;
 
-        while(!tmp->query_ops.is_finished(&handle)) {
+        while(!tmp->query_ops->is_finished(&handle)) {
 
-            STORAGE_POINT sp = tmp->query_ops.next_metric(&handle);
+            STORAGE_POINT sp = tmp->query_ops->next_metric(&handle);
 
             if(sp.end_time > latest_time_t) {
                 latest_time_t = sp.end_time;
@@ -1500,7 +1500,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
         }
 
         all_points_read += points;
-        tmp->query_ops.finalize(&handle);
+        tmp->query_ops->finalize(&handle);
 
         //internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
         //               rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);

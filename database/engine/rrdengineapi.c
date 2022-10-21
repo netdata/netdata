@@ -36,16 +36,6 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
-
-// ----------------------------------------------------------------------------
-// helpers
-
-static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier) {
-    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
-    if(!host->storage_instance[tier]) tier = 0;
-    return (struct rrdengine_instance *)host->storage_instance[tier];
-}
-
 // ----------------------------------------------------------------------------
 // metrics groups
 

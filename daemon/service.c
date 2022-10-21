@@ -51,7 +51,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
             if(rd->tiers[tier]) {
                 tiers_available++;
 
-                if(rd->tiers[tier]->collect_ops.finalize(rd->tiers[tier]->db_collection_handle))
+                if(rd->tiers[tier]->collect_ops->finalize(rd->tiers[tier]->db_collection_handle))
                     tiers_said_yes++;
 
                 rd->tiers[tier]->db_collection_handle = NULL;
@@ -217,7 +217,7 @@ restart_after_removal:
 
             if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
                 /* don't delete multi-host DB host files */
-                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
+                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
             ) {
                 worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
                 rrdhost_delete_charts(host);

@@ -176,8 +176,9 @@ DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 // options are permanent configuration options (no atomics to alter/access them)
 typedef enum rrddim_options {
     RRDDIM_OPTION_NONE                              = 0,
-    RRDDIM_OPTION_HIDDEN                            = (1 << 0),  // this dimension will not be offered to callers
-    RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1),  // do not offer RESET or OVERFLOW info to callers
+    RRDDIM_OPTION_HIDDEN                            = (1 << 0), // this dimension will not be offered to callers
+    RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
+    RRDDIM_OPTION_BACKFILLED_HIGH_TIERS             = (1 << 2), // when set, we have backfilled higher tiers
 
     // this is 8-bit
 } RRDDIM_OPTIONS;
@@ -284,17 +285,10 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // operational state members
 
-#ifdef ENABLE_ACLK
-    int aclk_live_status;
-#endif
-
     ml_dimension_t ml_dimension;                    // machine learning data about this dimension
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
-
-    struct rrddim *next;                            // linking of dimensions within the same data set
-    struct rrddim *prev;                            // linking of dimensions within the same data set
 
     struct rrdset *rrdset;
 
@@ -469,19 +463,20 @@ struct storage_engine {
     STORAGE_ENGINE_API api;
 };
 
+STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
+STORAGE_ENGINE* storage_engine_find(const char* name);
+
 // ----------------------------------------------------------------------------
 // Storage tier data for every dimension
 
 struct rrddim_tier {
     size_t tier_grouping;
-    RRD_MEMORY_MODE mode;                           // the memory mode of this tier
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     STORAGE_POINT virtual_point;
     time_t next_point_time;
-    usec_t last_collected_ut;
-    struct storage_engine_collect_ops collect_ops;
-    struct storage_engine_query_ops query_ops;
+    struct storage_engine_collect_ops *collect_ops;
+    struct storage_engine_query_ops *query_ops;
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now);
@@ -574,10 +569,6 @@ struct rrdset {
     DICTIONARY *rrdsetvar_root_index;               // chart variables
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
-
-    // TODO - dimensions linked list and lock to be removed
-    netdata_rwlock_t rrdset_rwlock;                 // protects the  dimensions linked list
-    RRDDIM *dimensions;                             // chart metrics
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -678,10 +669,6 @@ struct rrdset {
 #define rrdset_context(st) string2str((st)->context)
 #define rrdset_name(st) string2str((st)->name)
 #define rrdset_id(st) string2str((st)->id)
-
-#define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
-#define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
-#define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
 
 STRING *rrd_string_strdupz(const char *s);
 
@@ -923,10 +910,19 @@ struct rrdhost {
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
-    RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
+
+    RRD_MEMORY_MODE rrd_memory_mode;                // the configured memory more for the charts of this host
+                                                    // the actual per tier is at .db[tier].mode
 
     char *cache_dir;                                // the directory to save RRD cache files
     char *varlib_dir;                               // the directory to save health log
+
+    struct {
+        RRD_MEMORY_MODE mode;                       // the db mode for this tier
+        STORAGE_ENGINE *eng;                        // the storage engine API for this tier
+        STORAGE_INSTANCE *instance;                 // the db instance for this tier
+        size_t tier_grouping;                       // tier 0 iterations aggregated on this tier
+    } db[RRD_STORAGE_TIERS];
 
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
@@ -1011,8 +1007,6 @@ struct rrdhost {
     DICTIONARY *rrdfamily_root_index;               // the host's chart families index
     DICTIONARY *rrdvars;                            // the host's chart variables index
                                                     // this includes custom host variables
-
-    STORAGE_INSTANCE *storage_instance[RRD_STORAGE_TIERS];  // the database instances of the storage tiers
 
     RRDCONTEXTS *rrdctx_hub_queue;
     RRDCONTEXTS *rrdctx_post_processing_queue;
@@ -1242,8 +1236,8 @@ void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
 #define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
-#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
-#define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
+#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
+#define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
 
 time_t rrddim_first_entry_t(RRDDIM *rd);
 time_t rrddim_last_entry_t(RRDDIM *rd);
