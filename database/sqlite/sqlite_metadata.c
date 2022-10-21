@@ -1320,7 +1320,7 @@ error_after_loop_init:
     worker_unregister();
 }
 
-struct metadata_wc metasync_worker;
+struct metadata_wc metasync_worker = {.loop = NULL};
 
 void metadata_sync_shutdown(void)
 {
@@ -1447,6 +1447,8 @@ void metaqueue_host_update_info(const char *machine_guid)
 
 void metaqueue_delete_dimension_uuid(uuid_t *uuid)
 {
+    if (unlikely(!metasync_worker.loop))
+        return;
     uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
     queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
