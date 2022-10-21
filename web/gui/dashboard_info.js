@@ -4164,7 +4164,7 @@ netdataDashboard.context = {
         info: 'Key cache hit rate measures the cache hits and misses per second.'
     },
     'cassandra.storage_live_disk_space_used': {
-        info: 'Amount of live disk space used.'
+        info: 'Amount of live disk space used. This does not include obsolete data waiting to be garbage collected.'
     },
     'cassandra.compaction_completed_tasks_rate': {
         info: 'Compaction tasks completed per second.'
