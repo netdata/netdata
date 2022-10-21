@@ -4166,9 +4166,6 @@ netdataDashboard.context = {
     'cassandra.storage_live_disk_space_used': {
         info: 'Amount of live disk space used. This does not include obsolete data waiting to be garbage collected.'
     },
-    'cassandra.storage_total_disk_space_used': {
-        info: 'Amount of total disk space used - indicates overall size of Cassandra data store.'
-    },
     'cassandra.compaction_completed_tasks_rate': {
         info: 'Compaction tasks completed per second.'
     },
