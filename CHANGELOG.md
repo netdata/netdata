@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix typo [\#13853](https://github.com/netdata/netdata/pull/13853) ([andrewm4894](https://github.com/andrewm4894))
 - Properly guard commands when installing services for offline service managers. [\#13848](https://github.com/netdata/netdata/pull/13848) ([Ferroin](https://github.com/Ferroin))
 - fix tiers update frequency [\#13844](https://github.com/netdata/netdata/pull/13844) ([ktsaou](https://github.com/ktsaou))
 - Fix service installation on FreeBSD. [\#13842](https://github.com/netdata/netdata/pull/13842) ([Ferroin](https://github.com/Ferroin))
@@ -346,8 +347,6 @@
 - make configuration example clearer [\#13182](https://github.com/netdata/netdata/pull/13182) ([andrewm4894](https://github.com/andrewm4894))
 - add k8s\_state dashboard\_info [\#13181](https://github.com/netdata/netdata/pull/13181) ([ilyam8](https://github.com/ilyam8))
 - Docs housekeeping [\#13179](https://github.com/netdata/netdata/pull/13179) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update dashboard to version v2.26.2. [\#13177](https://github.com/netdata/netdata/pull/13177) ([netdatabot](https://github.com/netdatabot))
-- feat\(proc/proc\_net\_dev\): add dim per phys link state to the "Interface Physical Link State" chart [\#13176](https://github.com/netdata/netdata/pull/13176) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
