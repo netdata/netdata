@@ -950,10 +950,10 @@ static bool query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
 
     ops->tier = ops->plan.data[plan_id].tier;
     ops->tier_ptr = &ops->qm->tiers[ops->tier];
-    ops->tier_ptr->db_ops->init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before);
-    ops->next_metric = ops->tier_ptr->db_ops->next_metric;
-    ops->is_finished = ops->tier_ptr->db_ops->is_finished;
-    ops->finalize = ops->tier_ptr->db_ops->finalize;
+    ops->tier_ptr->eng->api.query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before);
+    ops->next_metric = ops->tier_ptr->eng->api.query_ops.next_metric;
+    ops->is_finished = ops->tier_ptr->eng->api.query_ops.is_finished;
+    ops->finalize = ops->tier_ptr->eng->api.query_ops.finalize;
     ops->current_plan = plan_id;
     ops->current_plan_expire_time = ops->plan.data[plan_id].before;
 

@@ -120,15 +120,14 @@ typedef struct query_metric {
 
     time_t first_time_t;
     time_t last_time_t;
-
     time_t latest_update_every;
 
     struct query_metric_tier {
+        struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
-        struct storage_engine_query_ops *db_ops;
-        time_t db_first_time_t;
-        time_t db_last_time_t;
-        time_t db_update_every;     // latest update every for this tier
+        time_t db_first_time_t;         // the oldest timestamp available for this tier
+        time_t db_last_time_t;          // the latest timestamp available for this tier
+        time_t db_update_every;         // latest update every for this tier
     } tiers[RRD_STORAGE_TIERS];
 
     struct {

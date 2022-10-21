@@ -5,7 +5,6 @@
 static Pvoid_t rrddim_JudyHS_array = NULL;
 static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-
 // ----------------------------------------------------------------------------
 // metrics groups
 
@@ -39,7 +38,8 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_un
     return (STORAGE_METRIC_HANDLE *)rd;
 }
 
-STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+STORAGE_METRIC_HANDLE *
+rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, STORAGE_METRICS_GROUP *smg __maybe_unused) {
     RRDDIM *rd = NULL;
     netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
     Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
@@ -48,6 +48,10 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_u
     netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
 
     return (STORAGE_METRIC_HANDLE *)rd;
+}
+
+STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle) {
+    return db_metric_handle;
 }
 
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {

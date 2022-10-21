@@ -349,21 +349,6 @@ size_t rrddim_memory_file_header_size(void);
 void rrddim_memory_file_save(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
-// engine-specific iterator state for dimension data collection
-typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
-
-// ----------------------------------------------------------------------------
-// engine-specific iterator state for dimension data queries
-typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
-
-// ----------------------------------------------------------------------------
-// iterator state for RRD dimension data queries
-struct storage_engine_query_handle {
-    RRDDIM *rd;
-    time_t start_time_s;
-    time_t end_time_s;
-    STORAGE_QUERY_HANDLE* handle;
-};
 
 typedef struct storage_point {
     NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
@@ -401,6 +386,14 @@ typedef struct storage_point {
 #define storage_point_is_unset(x) (!(x).count)
 #define storage_point_is_empty(x) (!netdata_double_isnumber((x).sum))
 
+// ----------------------------------------------------------------------------
+// engine-specific iterator state for dimension data collection
+typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
+
+// ----------------------------------------------------------------------------
+// engine-specific iterator state for dimension data queries
+typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
+
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
 struct storage_engine_collect_ops {
@@ -424,6 +417,15 @@ struct storage_engine_collect_ops {
     void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
 };
 
+// ----------------------------------------------------------------------------
+// iterator state for RRD dimension data queries
+struct storage_engine_query_handle {
+    RRDDIM *rd;
+    time_t start_time_s;
+    time_t end_time_s;
+    STORAGE_QUERY_HANDLE* handle;
+};
+
 // function pointers that handle database queries
 struct storage_engine_query_ops {
     // run this before starting a series of next_metric() database queries
@@ -445,6 +447,31 @@ struct storage_engine_query_ops {
     time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
 };
 
+typedef struct storage_engine STORAGE_ENGINE;
+
+// ------------------------------------------------------------------------
+// function pointers for all APIs provided by a storage engine
+typedef struct storage_engine_api {
+    // metric management
+    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg);
+    STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *instance, STORAGE_METRICS_GROUP *smg);
+    void (*metric_release)(STORAGE_METRIC_HANDLE *);
+    STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
+
+    // metrics groups management
+    STORAGE_METRICS_GROUP *(*group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+    void (*group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+
+    // operations
+    struct storage_engine_collect_ops collect_ops;
+    struct storage_engine_query_ops query_ops;
+} STORAGE_ENGINE_API;
+
+struct storage_engine {
+    RRD_MEMORY_MODE id;
+    const char* name;
+    STORAGE_ENGINE_API api;
+};
 
 // ----------------------------------------------------------------------------
 // Storage tier data for every dimension

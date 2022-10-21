@@ -122,6 +122,12 @@ void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
     }
 }
 
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle) {
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
+    return db_metric_handle;
+}
+
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     struct pg_alignment *pa = (struct pg_alignment *)smg;

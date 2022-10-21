@@ -2141,14 +2141,22 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 
     RRDCONTEXT *rc;
     dfe_start_reentrant((DICTIONARY *)host->rrdctx, rc) {
+        if(rrd_flag_is_deleted(rc))
+            continue;
 
         if(contexts && !simple_pattern_matches(contexts, string2str(rc->id)))
             continue;
 
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
+            if(rrd_flag_is_deleted(ri))
+                continue;
+
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
+                if(rrd_flag_is_deleted(rm))
+                    continue;
+
                 struct metric_entry tmp = {
                     .rca = (RRDCONTEXT_ACQUIRED *)rc_dfe.item,
                     .ria = (RRDINSTANCE_ACQUIRED *)ri_dfe.item,
@@ -2231,7 +2239,7 @@ void query_target_release(QUERY_TARGET *qt) {
 
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if(qt->query.array[i].tiers[tier].db_metric_handle) {
-                STORAGE_ENGINE *eng = storage_engine_get(qt->query.array[i].link.host->rrd_memory_mode);
+                STORAGE_ENGINE *eng = qt->query.array[i].tiers[tier].eng;
                 eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
                 qt->query.array[i].tiers[tier].db_metric_handle = NULL;
             }
@@ -2303,6 +2311,10 @@ void query_target_free(void) {
 static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri, bool instance_matches_label_filters) {
     QUERY_TARGET *qt = qtl->qt;
 
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    if(rrd_flag_is_deleted(rm))
+        return;
+
     if(qt->metrics.used == qt->metrics.size) {
         qt->metrics.size = (qt->metrics.size) ? qt->metrics.size * 2 : 1;
         qt->metrics.array = reallocz(qt->metrics.array, qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *));
@@ -2312,14 +2324,12 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     if(!instance_matches_label_filters)
         return;
 
-    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-
     time_t common_first_time_t = 0;
     time_t common_last_time_t = 0;
     time_t common_update_every = 0;
     size_t tiers_added = 0;
     struct {
-        struct storage_engine_query_ops *ops;
+        STORAGE_ENGINE *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
         time_t db_first_time_t;
         time_t db_last_time_t;
@@ -2328,11 +2338,16 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
         STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
-        tier_retention[tier].ops = &eng->api.query_ops;
-        tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
+        tier_retention[tier].eng = eng;
+
+        if(rm->rrddim && rm->rrddim->tiers[tier]->db_metric_handle)
+            tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
+        else
+            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
+
         if(tier_retention[tier].db_metric_handle) {
-            tier_retention[tier].db_first_time_t = tier_retention[tier].ops->oldest_time(tier_retention[tier].db_metric_handle);
-            tier_retention[tier].db_last_time_t = tier_retention[tier].ops->latest_time(tier_retention[tier].db_metric_handle);
+            tier_retention[tier].db_first_time_t = tier_retention[tier].eng->api.query_ops.oldest_time(tier_retention[tier].db_metric_handle);
+            tier_retention[tier].db_last_time_t = tier_retention[tier].eng->api.query_ops.latest_time(tier_retention[tier].db_metric_handle);
             tier_retention[tier].db_update_every = (time_t) (get_tier_grouping(tier) * ri->update_every);
 
             if(!common_first_time_t)
@@ -2433,7 +2448,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 qt->db.last_time_t = common_last_time_t;
 
             for (size_t tier = 0; tier < storage_tiers; tier++) {
-                qm->tiers[tier].db_ops = tier_retention[tier].ops;
+                qm->tiers[tier].eng = tier_retention[tier].eng;
                 qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
                 qm->tiers[tier].db_first_time_t = tier_retention[tier].db_first_time_t;
                 qm->tiers[tier].db_last_time_t = tier_retention[tier].db_last_time_t;
@@ -2442,14 +2457,20 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         }
     }
     else {
-        // cleanup anything we allocated to get retention
-        // none needed currently
-        ;
+        // cleanup anything we allocated to the retention we will not use
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
+            if (tier_retention[tier].db_metric_handle)
+                tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
+        }
     }
 }
 
 static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQUIRED *ria) {
     QUERY_TARGET *qt = qtl->qt;
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    if(rrd_flag_is_deleted(ri))
+        return;
 
     if(qt->instances.used == qt->instances.size) {
         qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 1;
@@ -2457,8 +2478,6 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     }
 
     qtl->ria = qt->instances.array[qt->instances.used++] = rrdinstance_acquired_dup(ria);
-
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
 
     if(ri->rrdset)
         ri->rrdset->last_accessed_time = (time_t)(qtl->qt->start_ut / USEC_PER_SEC);
@@ -2496,6 +2515,10 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
 static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIRED *rca) {
     QUERY_TARGET *qt = qtl->qt;
 
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    if(rrd_flag_is_deleted(rc))
+        return;
+
     if(qt->contexts.used == qt->contexts.size) {
         qt->contexts.size = (qt->contexts.size) ? qt->contexts.size * 2 : 1;
         qt->contexts.array = reallocz(qt->contexts.array, qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *));
@@ -2512,8 +2535,6 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
         added++;
     }
     else {
-        RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
             if(!qt->instances.pattern
@@ -2596,6 +2617,13 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   , rrdhost_hostname(qt->request.st->rrdhost)
                   , rrdset_name(qt->request.st)
                   );
+    else if(qt->request.host && qt->request.rca && qt->request.ria && qt->request.rma)
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s"
+                , rrdhost_hostname(qt->request.host)
+                , rrdcontext_acquired_id(qt->request.rca)
+                , rrdinstance_acquired_id(qt->request.ria)
+                , rrdmetric_acquired_id(qt->request.rma)
+        );
     else
         snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/context:%s/instance:%s/dimension:%s"
                   , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
