@@ -4185,10 +4185,10 @@ netdataDashboard.context = {
         info: 'Total tasks that cannot yet be queued for processing.'
     },
     'cassandra.jvm_gc_rate': {
-        info: 'Rate of garbage collections.</p><p><b>ParNew</b> - Number of young-generation collections. <b>cms (ConcurrentMarkSweep)</b> - Number of old-generation collections.</p>'
+        info: 'Rate of garbage collections.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
     },
     'cassandra.jvm_gc_time': {
-        info: 'Elapsed time of garbage collection.</p><p><b>ParNew</b> - Elapsed time of young-generation collections. <b>cms (ConcurrentMarkSweep)</b> - Elapsed time of old-generation collections.</p>'
+        info: 'Elapsed time of garbage collection.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
     },
     'cassandra.client_requests_timeout_rate': {
         info: 'Requests which were not acknowledged within the configurable timeout window.'
