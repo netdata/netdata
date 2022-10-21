@@ -222,7 +222,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if (i)
                 buffer_strcat(wb, ", ");
             buffer_strcat(wb, sq);
-            buffer_strcat(wb, string2str(qm->dimension.id));
+            buffer_strcat(wb, string2str(qm->chart.id));
             buffer_strcat(wb, sq);
             i++;
         }

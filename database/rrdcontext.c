@@ -2152,6 +2152,9 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
             if(rrd_flag_is_deleted(ri))
                 continue;
 
+            if(ri->rrdset && rrdset_is_ar_chart(ri->rrdset))
+                continue;
+
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
                 if(rrd_flag_is_deleted(rm))
