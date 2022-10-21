@@ -2340,13 +2340,18 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     } tier_retention[storage_tiers];
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
-        STORAGE_ENGINE *eng = storage_engine_get(qtl->host->rrd_memory_mode);
-        tier_retention[tier].eng = eng;
+        STORAGE_ENGINE *eng;
 
-        if(rm->rrddim && rm->rrddim->tiers[tier]->db_metric_handle)
+        if(rm->rrddim && rm->rrddim->tiers[tier]->db_metric_handle) {
+            eng = storage_engine_get(rm->rrddim->tiers[tier]->mode);
+            tier_retention[tier].eng = eng;
             tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
-        else
+        }
+        else {
+            eng = storage_engine_get(qtl->host->rrd_memory_mode);
+            tier_retention[tier].eng = eng;
             tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->storage_instance[tier], &rm->uuid, NULL);
+        }
 
         if(tier_retention[tier].db_metric_handle) {
             tier_retention[tier].db_first_time_t = tier_retention[tier].eng->api.query_ops.oldest_time(tier_retention[tier].db_metric_handle);

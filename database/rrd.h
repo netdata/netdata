@@ -458,10 +458,6 @@ typedef struct storage_engine_api {
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
 
-    // metrics groups management
-    STORAGE_METRICS_GROUP *(*group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-    void (*group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
-
     // operations
     struct storage_engine_collect_ops collect_ops;
     struct storage_engine_query_ops query_ops;

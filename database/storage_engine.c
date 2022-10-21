@@ -34,8 +34,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
-            .group_get = rrddim_metrics_group_get,
-            .group_release = rrddim_metrics_group_release,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -48,8 +46,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
-            .group_get = rrddim_metrics_group_get,
-            .group_release = rrddim_metrics_group_release,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -62,8 +58,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
-            .group_get = rrddim_metrics_group_get,
-            .group_release = rrddim_metrics_group_release,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -76,8 +70,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
-            .group_get = rrddim_metrics_group_get,
-            .group_release = rrddim_metrics_group_release,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -90,8 +82,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
-            .group_get = rrddim_metrics_group_get,
-            .group_release = rrddim_metrics_group_release,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops
         }
@@ -105,8 +95,6 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrdeng_metric_get_or_create,
             .metric_dup = rrdeng_metric_dup,
             .metric_release = rrdeng_metric_release,
-            .group_get = rrdeng_metrics_group_get,
-            .group_release = rrdeng_metrics_group_release,
             .collect_ops = {
                 .init = rrdeng_store_metric_init,
                 .store_metric = rrdeng_store_metric_next,
