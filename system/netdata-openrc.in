@@ -27,7 +27,6 @@ command="${command_prefix}/netdata"
 command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
 command_args_foreground="-D"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
-required_files="/etc/netdata/netdata.conf"
 if [ "${NETDATA_FORCE_EXIT}" -eq 1 ]; then
     retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}/KILL/1"
 else
