@@ -1669,7 +1669,7 @@ static struct api_command {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-      { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_info            },
+      { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
       { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
