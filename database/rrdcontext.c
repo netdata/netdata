@@ -2620,7 +2620,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
     web_client_api_request_v1_data_options_to_string(options_buffer, 100, qt->request.options);
 
     if(qt->request.st)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
                   , rrdhost_hostname(qt->request.st->rrdhost)
                   , rrdset_name(qt->request.st)
                   , (qt->request.dimensions) ? qt->request.dimensions : "*"
@@ -2645,7 +2645,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , options_buffer
                 );
     else
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/context:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://hosts:%s/contexts:%s/instances:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
                 , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.charts) ? qt->request.charts : "*"
