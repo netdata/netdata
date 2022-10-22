@@ -158,8 +158,8 @@ typedef struct query_target_request {
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
     const char *charts_labels_filter;   // select only the charts having this combo of label key:value
-    long long after;                    // the requested timeframe
-    long long before;                   // the requested timeframe
+    time_t after;                       // the requested timeframe
+    time_t before;                      // the requested timeframe
     size_t points;                      // the requested number of points
     time_t timeout;                     // the timeout of the query in seconds
     int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it

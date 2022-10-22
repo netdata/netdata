@@ -168,7 +168,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                        weights_method_to_string(method)
                    );
 
-    web_client_api_request_v1_data_options_to_string(wb, options);
+    web_client_api_request_v1_data_options_to_buffer(wb, options);
 }
 
 static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,

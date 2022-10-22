@@ -185,17 +185,44 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     return ret;
 }
 
-void web_client_api_request_v1_data_options_to_string(BUFFER *wb, RRDR_OPTIONS options) {
+void web_client_api_request_v1_data_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options) {
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     int added = 0;
     for(int i = 0; api_v1_data_options[i].name ; i++) {
         if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
-            if(added) buffer_strcat(wb, ",");
-            buffer_strcat(wb, api_v1_data_options[i].name);
+            const char *name = api_v1_data_options[i].name;
             used |= api_v1_data_options[i].value;
+
+            if(added) buffer_strcat(wb, ",");
+            buffer_strcat(wb, name);
+
             added++;
         }
     }
+}
+
+void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {
+    char *write = buf;
+    char *end = &buf[size - 1];
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    int added = 0;
+    for(int i = 0; api_v1_data_options[i].name ; i++) {
+        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
+            const char *name = api_v1_data_options[i].name;
+            used |= api_v1_data_options[i].value;
+
+            if(added && write < end)
+                *write++ = ',';
+
+            while(*name && write < end)
+                *write++ = *name++;
+
+            added++;
+        }
+    }
+
+    *end = '\0';
 }
 
 inline DATASOURCE_FORMAT web_client_api_request_v1_data_format(char *name) {

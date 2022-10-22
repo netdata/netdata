@@ -2204,6 +2204,8 @@ typedef struct query_target_locals {
     RRDHOST *host;
     RRDCONTEXT_ACQUIRED *rca;
     RRDINSTANCE_ACQUIRED *ria;
+
+    size_t metrics_skipped_due_to_not_matching_timeframe;
 } QUERY_TARGET_LOCALS;
 
 static __thread QUERY_TARGET thread_query_target = {};
@@ -2457,6 +2459,8 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         }
     }
     else {
+        qtl->metrics_skipped_due_to_not_matching_timeframe++;
+
         // cleanup anything we allocated to the retention we will not use
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if (tier_retention[tier].db_metric_handle)
@@ -2612,25 +2616,47 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
 }
 
 void query_target_generate_name(QUERY_TARGET *qt) {
+    char options_buffer[100 + 1];
+    web_client_api_request_v1_data_options_to_string(options_buffer, 100, qt->request.options);
+
     if(qt->request.st)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
                   , rrdhost_hostname(qt->request.st->rrdhost)
                   , rrdset_name(qt->request.st)
+                  , (qt->request.dimensions) ? qt->request.dimensions : "*"
+                  , qt->request.after
+                  , qt->request.before
+                  , qt->request.points
+                  , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
+                  , qt->request.group_options?qt->request.group_options:""
+                  , options_buffer
                   );
     else if(qt->request.host && qt->request.rca && qt->request.ria && qt->request.rma)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
                 , rrdhost_hostname(qt->request.host)
                 , rrdcontext_acquired_id(qt->request.rca)
                 , rrdinstance_acquired_id(qt->request.ria)
                 , rrdmetric_acquired_id(qt->request.rma)
-        );
+                , qt->request.after
+                , qt->request.before
+                , qt->request.points
+                , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
+                , qt->request.group_options?qt->request.group_options:""
+                , options_buffer
+                );
     else
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/context:%s/instance:%s/dimension:%s"
-                  , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
-                  , (qt->request.contexts) ? qt->request.contexts : "*"
-                  , (qt->request.charts) ? qt->request.charts : "*"
-                  , (qt->request.dimensions) ? qt->request.dimensions : "*"
-                  );
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/context:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
+                , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
+                , (qt->request.contexts) ? qt->request.contexts : "*"
+                , (qt->request.charts) ? qt->request.charts : "*"
+                , (qt->request.dimensions) ? qt->request.dimensions : "*"
+                , qt->request.after
+                , qt->request.before
+                , qt->request.points
+                , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
+                , qt->request.group_options?qt->request.group_options:""
+                , options_buffer
+                );
 }
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
@@ -2709,7 +2735,21 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     // make sure everything is good
     if(!qt->query.used || !qt->metrics.used || !qt->instances.used || !qt->contexts.used || !qt->hosts.used) {
-        internal_error(true, "QUERY TARGET: query '%s' does not have all the data required. Aborting it.", qt->id);
+        internal_error(
+                true
+                , "QUERY TARGET: query '%s' does not have all the data required. "
+                  "Matched %u hosts, %u contexts, %u instances, %u dimensions, %u metrics to query, "
+                  "%zu metrics skipped because they don't have data in the desired time-frame. "
+                  "Aborting it."
+                , qt->id
+                , qt->hosts.used
+                , qt->contexts.used
+                , qt->instances.used
+                , qt->metrics.used
+                , qt->query.used
+                , qtl.metrics_skipped_due_to_not_matching_timeframe
+                );
+        
         query_target_release(qt);
         return NULL;
     }
