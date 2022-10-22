@@ -2183,6 +2183,8 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // query API
 
 typedef struct query_target_locals {
+    time_t start_s;
+
     QUERY_TARGET *qt;
 
     RRDSET *st;
@@ -2426,7 +2428,6 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             }
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
 
-            qm->metric_uuid = &rm->uuid;
             qm->dimension.options = options;
 
             qm->link.host = qtl->host;
@@ -2439,10 +2440,6 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             qm->dimension.id = string_dup(rm->id);
             qm->dimension.name = string_dup(rm->name);
-
-            qm->first_time_t = common_first_time_t;
-            qm->last_time_t = common_last_time_t;
-            qm->latest_update_every = common_update_every;
 
             if (!qt->db.first_time_t || common_first_time_t < qt->db.first_time_t)
                 qt->db.first_time_t = common_first_time_t;
@@ -2483,7 +2480,7 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     qtl->ria = qt->instances.array[qt->instances.used++] = rrdinstance_acquired_dup(ria);
 
     if(ri->rrdset)
-        ri->rrdset->last_accessed_time = (time_t)(qtl->qt->start_ut / USEC_PER_SEC);
+        ri->rrdset->last_accessed_time = qtl->start_s;
 
     if(qt->db.minimum_latest_update_every == 0 || ri->update_every < qt->db.minimum_latest_update_every)
         qt->db.minimum_latest_update_every = ri->update_every;
@@ -2643,7 +2640,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         fatal("QUERY TARGET: this query target is already used.");
 
     qt->used = true;
-    qt->start_ut = now_realtime_usec();
 
     // copy the request into query_thread_target
     qt->request = *qtr;
@@ -2656,6 +2652,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
         .qt = qt,
+        .start_s = now_realtime_sec(),
         .host = qt->request.host,
         .st = qt->request.st,
         .hosts = qt->request.hosts,

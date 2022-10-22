@@ -116,12 +116,6 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // public API for queries
 
 typedef struct query_metric {
-    uuid_t *metric_uuid;
-
-    time_t first_time_t;
-    time_t last_time_t;
-    time_t latest_update_every;
-
     struct query_metric_tier {
         struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
@@ -182,7 +176,6 @@ typedef struct query_target {
     QUERY_TARGET_REQUEST request;
 
     bool used;                              // when true, this query is currently being used
-    usec_t start_ut;                        // the time this query was prepared
 
     struct {
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute
