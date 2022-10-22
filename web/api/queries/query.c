@@ -1002,9 +1002,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     size_t selected_tier;
 
     if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER
-       && ops->r->internal.query_tier < storage_tiers
-       && query_metric_is_valid_tier(ops->qm, ops->r->internal.query_tier)) {
-        selected_tier = ops->r->internal.query_tier;
+       && ops->r->internal.qt->window.tier < storage_tiers
+       && query_metric_is_valid_tier(ops->qm, ops->r->internal.qt->window.tier)) {
+        selected_tier = ops->r->internal.qt->window.tier;
     }
     else {
         selected_tier = query_metric_best_tier_for_timeframe(ops->qm, after_wanted, before_wanted, points_wanted);
@@ -2003,7 +2003,6 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     r->internal.resampling_group = qt->window.resampling_group;
     r->internal.resampling_divisor = qt->window.resampling_divisor;
     r->internal.query_options = qt->window.options;
-    r->internal.query_tier = qt->window.tier;
 
     // -------------------------------------------------------------------------
     // assign the processor functions

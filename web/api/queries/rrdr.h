@@ -95,31 +95,33 @@ typedef struct rrdresult {
 
     // internal rrd2rrdr() members below this point
     struct {
-        struct query_target *qt;
+        ONEWAYALLOC *owa;                   // the allocator used
+        struct query_target *qt;            // the QUERY_TARGET
 
-        size_t query_tier;                   // the selected tier
-        RRDR_OPTIONS query_options;       // RRDR_OPTION_* (as run by the query)
+        RRDR_OPTIONS query_options;         // RRDR_OPTION_* (as run by the query)
 
-        size_t points_wanted;
-        size_t resampling_group;
-        NETDATA_DOUBLE resampling_divisor;
+        size_t points_wanted;               // used by SES and DES
+        size_t resampling_group;            // used by AVERAGE
+        NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE
 
+        // grouping function pointers
         void (*grouping_create)(struct rrdresult *r, const char *options);
         void (*grouping_reset)(struct rrdresult *r);
         void (*grouping_free)(struct rrdresult *r);
         void (*grouping_add)(struct rrdresult *r, NETDATA_DOUBLE value);
         NETDATA_DOUBLE (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
-        void *grouping_data;
 
-        TIER_QUERY_FETCH tier_query_fetch;
-        #ifdef NETDATA_INTERNAL_CHECKS
+        TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
+        void *grouping_data;                // the internal data of the grouping function
+
+#ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
-        #endif
+#endif
 
+        // statistics
         size_t db_points_read;
         size_t result_points_generated;
         size_t tier_points_read[RRD_STORAGE_TIERS];
-        ONEWAYALLOC *owa;
     } internal;
 } RRDR;
 
