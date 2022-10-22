@@ -2645,7 +2645,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , options_buffer
                 );
     else
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://hosts:%s/contexts:%s/instances:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/contexts:%s/instances:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s"
                 , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.charts) ? qt->request.charts : "*"
