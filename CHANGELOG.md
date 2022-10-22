@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- add ACLK access to ml\_info \(fix anomalies tab in cloud\) [\#13863](https://github.com/netdata/netdata/pull/13863) ([underhood](https://github.com/underhood))
+- bump go.d.plugin to v0.41.0 [\#13861](https://github.com/netdata/netdata/pull/13861) ([ilyam8](https://github.com/ilyam8))
 - fix typo [\#13853](https://github.com/netdata/netdata/pull/13853) ([andrewm4894](https://github.com/andrewm4894))
+- Retry reading carrier, duplex, and speed files periodically [\#13850](https://github.com/netdata/netdata/pull/13850) ([vlvkobal](https://github.com/vlvkobal))
 - Properly guard commands when installing services for offline service managers. [\#13848](https://github.com/netdata/netdata/pull/13848) ([Ferroin](https://github.com/Ferroin))
 - fix tiers update frequency [\#13844](https://github.com/netdata/netdata/pull/13844) ([ktsaou](https://github.com/ktsaou))
 - Fix service installation on FreeBSD. [\#13842](https://github.com/netdata/netdata/pull/13842) ([Ferroin](https://github.com/Ferroin))
@@ -342,11 +345,6 @@
 - Update dashboard to version v2.26.5. [\#13192](https://github.com/netdata/netdata/pull/13192) ([netdatabot](https://github.com/netdatabot))
 - chore\(netdata-installer\): remove a call to 'cleanup\_old\_netdata\_updater\(\)' because it is no longer exists [\#13189](https://github.com/netdata/netdata/pull/13189) ([ilyam8](https://github.com/ilyam8))
 - feat\(python.d/smartd\_log\): add 2nd job that tries to read from '/var/lib/smartmontools/' [\#13188](https://github.com/netdata/netdata/pull/13188) ([ilyam8](https://github.com/ilyam8))
-- Add type label for network interfaces [\#13187](https://github.com/netdata/netdata/pull/13187) ([vlvkobal](https://github.com/vlvkobal))
-- fix\(freebsd.plugin\): fix wired/cached/avail memory calculation on FreeBSD with ZFS [\#13183](https://github.com/netdata/netdata/pull/13183) ([ilyam8](https://github.com/ilyam8))
-- make configuration example clearer [\#13182](https://github.com/netdata/netdata/pull/13182) ([andrewm4894](https://github.com/andrewm4894))
-- add k8s\_state dashboard\_info [\#13181](https://github.com/netdata/netdata/pull/13181) ([ilyam8](https://github.com/ilyam8))
-- Docs housekeeping [\#13179](https://github.com/netdata/netdata/pull/13179) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
