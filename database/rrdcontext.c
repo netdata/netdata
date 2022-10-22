@@ -2749,7 +2749,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
                 , qt->query.used
                 , qtl.metrics_skipped_due_to_not_matching_timeframe
                 );
-        
+
         query_target_release(qt);
         return NULL;
     }

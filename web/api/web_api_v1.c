@@ -221,8 +221,7 @@ void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RR
             added++;
         }
     }
-
-    *end = '\0';
+    *write = *end = '\0';
 }
 
 inline DATASOURCE_FORMAT web_client_api_request_v1_data_format(char *name) {
