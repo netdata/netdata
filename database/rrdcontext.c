@@ -2657,6 +2657,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , qt->request.group_options?qt->request.group_options:""
                 , options_buffer
                 );
+
+    json_fix_string(qt->id);
 }
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {

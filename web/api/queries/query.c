@@ -1732,7 +1732,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         time_t last_entry_t = qt->db.last_time_t;
 
         if (first_entry_t == 0 || last_entry_t == 0) {
-            internal_error(true, "QUERY: no data detected on query '%s'", qt->id);
+            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld", qt->id, first_entry_t, last_entry_t);
             query_debug_log_free();
             return false;
         }
