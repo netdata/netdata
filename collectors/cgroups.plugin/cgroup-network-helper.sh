@@ -150,6 +150,7 @@ virsh_cgroup_to_domain_name() {
 
     # extract for the cgroup path
     sed -n -e "s|.*/machine-qemu\\\\x2d[0-9]\+\\\\x2d\(.*\)\.scope$|\1|p" \
+           -e "s|.*/machine/qemu-[0-9]\+-\(.*\)\.libvirt-qemu$|\1|p" \
            -e "s|.*/machine/\(.*\)\.libvirt-qemu$|\1|p" \
            <<EOF
 ${c}
