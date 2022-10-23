@@ -2795,6 +2795,8 @@ static void rrdinstance_load_dimension(SQL_DIMENSION_DATA *sd, void *data) {
         .name = string_strdupz(sd->name),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
     };
+    if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
+
     uuid_copy(trm.uuid, sd->dim_id);
 
     dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
