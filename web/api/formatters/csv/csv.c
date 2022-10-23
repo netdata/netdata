@@ -3,15 +3,14 @@
 #include "libnetdata/libnetdata.h"
 #include "csv.h"
 
-void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines, RRDDIM *temp_rd) {
-    rrdset_check_rdlock(r->st);
-
+void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
+    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
-    RRDDIM *d;
+    const long used = qt->query.used;
 
     // print the csv header
-    for(c = 0, i = 0, d = temp_rd?temp_rd:r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+    for(c = 0, i = 0; c < used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -23,7 +22,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         }
         buffer_strcat(wb, separator);
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
-        buffer_strcat(wb, rrddim_name(d));
+        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
         i++;
     }
@@ -31,7 +30,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
     if(format == DATASOURCE_CSV_MARKDOWN) {
         // print the --- line after header
-        for(c = 0, i = 0, d = temp_rd?temp_rd:r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+        for(c = 0, i = 0; c < used ;c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -89,7 +88,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
-            for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+            for(c = 0; c < used ;c++) {
                 NETDATA_DOUBLE n = cn[c];
 
                 if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -103,7 +102,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         }
 
         // for each dimension
-        for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+        for(c = 0; c < used ;c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 

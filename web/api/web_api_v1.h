@@ -11,7 +11,8 @@
 
 #define MAX_CHART_LABELS_FILTER (32)
 RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
-void web_client_api_request_v1_data_options_to_string(BUFFER *wb, RRDR_OPTIONS options);
+void web_client_api_request_v1_data_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options);
+void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
 
 uint32_t web_client_api_request_v1_data_format(char *name);
 uint32_t web_client_api_request_v1_data_google_format(char *name);

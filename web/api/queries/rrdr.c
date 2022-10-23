@@ -61,9 +61,7 @@ static void rrdr_dump(RRDR *r)
 inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     if(unlikely(!r)) return;
 
-    if(likely(r->st_locked_by_rrdr_create))
-        rrdset_unlock(r->st);
-
+    query_target_release(r->internal.qt);
     onewayalloc_freez(owa, r->t);
     onewayalloc_freez(owa, r->v);
     onewayalloc_freez(owa, r->o);
@@ -72,12 +70,28 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r);
 }
 
-RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points) {
+RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
+    if(unlikely(!qt))
+        return NULL;
+
+    if(unlikely(!qt->query.used || !qt->window.points)) {
+        query_target_release(qt);
+        return NULL;
+    }
+
+    size_t dimensions = qt->query.used;
+    size_t points = qt->window.points;
+
+    // create the rrdr
     RRDR *r = onewayalloc_callocz(owa, 1, sizeof(RRDR));
     r->internal.owa = owa;
+    r->internal.qt = qt;
 
-    r->d = dimensions;
-    r->n = points;
+    r->before = qt->window.before;
+    r->after = qt->window.after;
+    r->internal.points_wanted = qt->window.points;
+    r->d = (int)dimensions;
+    r->n = (int)points;
 
     r->t = onewayalloc_callocz(owa, points, sizeof(time_t));
     r->v = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
@@ -87,45 +101,6 @@ RRDR *rrdr_create_for_x_dimensions(ONEWAYALLOC *owa, int dimensions, long points
 
     r->group = 1;
     r->update_every = 1;
-
-    return r;
-}
-
-RRDR *rrdr_create(ONEWAYALLOC *owa, struct rrdset *st, long n, struct context_param *context_param_list) {
-    if (unlikely(!st)) return NULL;
-
-    bool st_locked_by_rrdr_create = false;
-    if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
-        rrdset_rdlock(st);
-        st_locked_by_rrdr_create = true;
-    }
-
-    // count the number of dimensions
-    int dimensions = 0;
-    RRDDIM *temp_rd =  context_param_list ? context_param_list->rd : NULL;
-    RRDDIM *rd;
-    if (temp_rd) {
-        RRDDIM *t = temp_rd;
-        while (t) {
-            dimensions++;
-            t = t->next;
-        }
-    } else
-        dimensions = rrdset_number_of_dimensions(st);
-
-    // create the rrdr
-    RRDR *r = rrdr_create_for_x_dimensions(owa, dimensions, n);
-    r->st = st;
-    r->st_locked_by_rrdr_create = st_locked_by_rrdr_create;
-
-    // set the hidden flag on hidden dimensions
-    int c;
-    for (c = 0, rd = temp_rd ? temp_rd : st->dimensions; rd; c++, rd = rd->next) {
-        if (unlikely(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)))
-            r->od[c] = RRDR_DIMENSION_HIDDEN;
-        else
-            r->od[c] = RRDR_DIMENSION_DEFAULT;
-    }
 
     return r;
 }

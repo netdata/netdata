@@ -36,16 +36,6 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
-
-// ----------------------------------------------------------------------------
-// helpers
-
-static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host, int tier) {
-    if(tier < 0 || tier >= RRD_STORAGE_TIERS) tier = 0;
-    if(!host->storage_instance[tier]) tier = 0;
-    return (struct rrdengine_instance *)host->storage_instance[tier];
-}
-
 // ----------------------------------------------------------------------------
 // metrics groups
 
@@ -114,16 +104,18 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, c
 
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
-    struct rrdengine_instance *ctx = page_index->ctx;
-    struct page_cache *pg_cache = &ctx->pg_cache;
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    page_index->refcount--;
-    if(page_index->alignment && page_index->refcount == 0) {
-        page_index->alignment->refcount--;
+    unsigned short refcount = __atomic_sub_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
+    if(refcount == 0 && page_index->alignment) {
+        __atomic_sub_fetch(&page_index->alignment->refcount, 1, __ATOMIC_SEQ_CST);
         page_index->alignment = NULL;
     }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+}
+
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle) {
+    struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
+    __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
+    return db_metric_handle;
 }
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg) {
@@ -134,9 +126,12 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
+    if (likely(NULL != PValue))
         page_index = *PValue;
-        page_index->refcount++;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if (likely(page_index)) {
+        __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
 
         if(pa) {
             if(page_index->alignment && page_index->alignment != pa)
@@ -144,11 +139,10 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 
             if(!page_index->alignment) {
                 page_index->alignment = pa;
-                pa->refcount++;
+                __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
             }
         }
     }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
     return (STORAGE_METRIC_HANDLE *)page_index;
 }
@@ -572,7 +566,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
 {
     struct pg_cache_page_index *page_index = (struct pg_cache_page_index *)db_metric_handle;
     struct rrdengine_instance *ctx = page_index->ctx;
@@ -603,7 +597,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrd
         handle->wanted_start_time_s = INVALID_TIME;
 }
 
-static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
+static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdengine_instance *ctx = handle->ctx;
@@ -682,7 +676,7 @@ static int rrdeng_load_page_next(struct rrddim_query_handle *rrdimm_handle, bool
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle) {
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
 
@@ -799,7 +793,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle)
     return sp;
 }
 
-int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     return (INVALID_TIME == handle->wanted_start_time_s);
@@ -808,7 +802,7 @@ int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
     struct rrdengine_instance *ctx = handle->ctx;
@@ -1039,7 +1033,7 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
  * Returns 0 on success, negative on error
  */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                unsigned disk_space_mb, int tier) {
+                unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance *ctx;
     int error;
     uint32_t max_open_files;

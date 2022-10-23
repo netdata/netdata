@@ -34,7 +34,9 @@ void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
 int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 
-//Auxiliary function to create a pattern
+// Auxiliary function to create a pattern
 char *simple_pattern_trim_around_equal(char *src);
+
+#define is_valid_sp(x) ((x) && *(x) && !((x)[0] == '*' && (x)[1] == '\0'))
 
 #endif //NETDATA_SIMPLE_PATTERN_H

@@ -8,7 +8,7 @@ namespace ml {
 class Query {
 public:
     Query(RRDDIM *RD) : RD(RD), Initialized(false) {
-        Ops = &RD->tiers[0]->query_ops;
+        Ops = RD->tiers[0]->query_ops;
     }
 
     time_t latestTime() {
@@ -42,8 +42,8 @@ private:
     RRDDIM *RD;
     bool Initialized;
 
-    struct rrddim_query_ops *Ops;
-    struct rrddim_query_handle Handle;
+    struct storage_engine_query_ops *Ops;
+    struct storage_engine_query_handle Handle;
 };
 
 } // namespace ml

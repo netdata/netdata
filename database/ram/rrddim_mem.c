@@ -5,7 +5,6 @@
 static Pvoid_t rrddim_JudyHS_array = NULL;
 static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-
 // ----------------------------------------------------------------------------
 // metrics groups
 
@@ -39,7 +38,8 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_un
     return (STORAGE_METRIC_HANDLE *)rd;
 }
 
-STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+STORAGE_METRIC_HANDLE *
+rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, STORAGE_METRICS_GROUP *smg __maybe_unused) {
     RRDDIM *rd = NULL;
     netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
     Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
@@ -48,6 +48,10 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_u
     netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
 
     return (STORAGE_METRIC_HANDLE *)rd;
+}
+
+STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle) {
+    return db_metric_handle;
 }
 
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unused) {
@@ -186,7 +190,7 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;
@@ -209,7 +213,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_qu
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
+STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle) {
     RRDDIM *rd = handle->rd;
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     size_t entries = rd->rrdset->entries;
@@ -248,12 +252,12 @@ STORAGE_POINT rrddim_query_next_metric(struct rrddim_query_handle *handle) {
     return sp;
 }
 
-int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
+int rrddim_query_is_finished(struct storage_engine_query_handle *handle) {
     struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
     return (h->next_timestamp > handle->end_time_s);
 }
 
-void rrddim_query_finalize(struct rrddim_query_handle *handle) {
+void rrddim_query_finalize(struct storage_engine_query_handle *handle) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(!rrddim_query_is_finished(handle))
         error("QUERY: query for chart '%s' dimension '%s' has been stopped unfinished", rrdset_id(handle->rd->rrdset), rrddim_name(handle->rd));

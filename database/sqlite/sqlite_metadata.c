@@ -664,7 +664,7 @@ static bool dimension_can_be_deleted(uuid_t *dim_uuid)
 {
 #ifdef ENABLE_DBENGINE
     bool no_retention = true;
-    for (int tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < storage_tiers; tier++) {
         if (!multidb_ctx[tier])
             continue;
         time_t first_time_t = 0, last_time_t = 0;
@@ -1320,7 +1320,7 @@ error_after_loop_init:
     worker_unregister();
 }
 
-struct metadata_wc metasync_worker;
+struct metadata_wc metasync_worker = {.loop = NULL};
 
 void metadata_sync_shutdown(void)
 {
@@ -1447,6 +1447,8 @@ void metaqueue_host_update_info(const char *machine_guid)
 
 void metaqueue_delete_dimension_uuid(uuid_t *uuid)
 {
+    if (unlikely(!metasync_worker.loop))
+        return;
     uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
     queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);

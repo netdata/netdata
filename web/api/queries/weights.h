@@ -22,9 +22,9 @@ extern WEIGHTS_METHOD default_metric_correlations_method;
 
 int web_api_v1_weights (RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
                                RRDR_GROUPING group, const char *group_options,
-                               long long baseline_after, long long baseline_before,
-                               long long after, long long before,
-                               long long points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, int tier, int timeout);
+                               time_t baseline_after, time_t baseline_before,
+                               time_t after, time_t before,
+                               size_t points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, size_t tier, size_t timeout);
 
 WEIGHTS_METHOD weights_string_to_method(const char *method);
 const char *weights_method_to_string(WEIGHTS_METHOD method);

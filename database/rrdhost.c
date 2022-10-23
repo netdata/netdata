@@ -4,21 +4,20 @@
 #include "rrd.h"
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-int storage_tiers = 1;
-int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
+size_t storage_tiers = 1;
+size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
-int get_tier_grouping(int tier) {
+size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
-    if(unlikely(tier < 0)) tier = 0;
 
-    int grouping = 1;
+    size_t grouping = 1;
     // first tier is always 1 iteration of whatever update every the chart has
-    for(int i = 1; i <= tier ;i++)
+    for(size_t i = 1; i <= tier ;i++)
         grouping *= storage_tiers_grouping_iterations[i];
 
     return grouping;
@@ -33,7 +32,7 @@ time_t rrdhost_free_orphan_time = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
             return true;
     }
@@ -367,9 +366,13 @@ int is_legacy = 1;
         if (is_legacy) {
             // initialize legacy dbengine instance as needed
 
+            host->db[0].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[0].eng = storage_engine_get(host->db[0].mode);
+            host->db[0].tier_grouping = get_tier_grouping(0);
+
             ret = rrdeng_init(
                 host,
-                (struct rrdengine_instance **)&host->storage_instance[0],
+                (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
                 default_rrdeng_page_cache_mb,
                 default_rrdeng_disk_quota_mb,
@@ -378,13 +381,21 @@ int is_legacy = 1;
             if(ret == 0) {
                 // assign the rest of the shared storage instances to it
                 // to allow them collect its metrics too
-                for(int tier = 1; tier < storage_tiers ; tier++)
-                    host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                for(size_t tier = 1; tier < storage_tiers ; tier++) {
+                    host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                    host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+                    host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+                    host->db[tier].tier_grouping = get_tier_grouping(tier);
+                }
             }
         }
         else {
-            for(int tier = 0; tier < storage_tiers ; tier++)
-                host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+            for(size_t tier = 0; tier < storage_tiers ; tier++) {
+                host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+                host->db[tier].instance = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                host->db[tier].tier_grouping = get_tier_grouping(tier);
+            }
         }
         if (ret) { // check legacy or multihost initialization success
             error(
@@ -402,10 +413,19 @@ int is_legacy = 1;
 #endif
     }
     else {
+        host->db[0].mode = host->rrd_memory_mode;
+        host->db[0].eng = storage_engine_get(host->db[0].mode);
+        host->db[0].instance = NULL;
+        host->db[0].tier_grouping = get_tier_grouping(0);
+
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes
-        for(int tier = 1; tier < storage_tiers ; tier++)
-            host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+        for(size_t tier = 1; tier < storage_tiers ; tier++) {
+            host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+            host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+            host->db[tier].tier_grouping = get_tier_grouping(tier);
+        }
 #endif
     }
 
@@ -725,14 +745,14 @@ void dbengine_init(char *hostname) {
     else
         rrdeng_page_descr_use_malloc();
 
-    int created_tiers = 0;
+    size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%d", netdata_configured_cache_dir, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -742,25 +762,25 @@ void dbengine_init(char *hostname) {
 
         int page_cache_mb = default_rrdeng_page_cache_mb;
         int disk_space_mb = default_multidb_disk_quota_mb;
-        int grouping_iterations = storage_tiers_grouping_iterations[tier];
+        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
         if(tier > 0) {
-            snprintfz(dbengineconfig, 200, "dbengine tier %d page cache size MB", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu page cache size MB", tier);
             page_cache_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, page_cache_mb);
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %d multihost disk space MB", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %d update every iterations", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu update every iterations", tier);
             grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
             if(grouping_iterations < 2) {
                 grouping_iterations = 2;
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
+                error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
             }
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %d backfill", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
             const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
             if(strcmp(bf, "new") == 0) backfill = RRD_BACKFILL_NEW;
             else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
@@ -777,14 +797,14 @@ void dbengine_init(char *hostname) {
 
         if(tier > 0 && get_tier_grouping(tier) > 65535) {
             storage_tiers_grouping_iterations[tier] = 1;
-            error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", hostname, tier, tier);
+            error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu", hostname, tier, tier);
             break;
         }
 
-        internal_error(true, "DBENGINE tier %d grouping iterations is set to %d", tier, storage_tiers_grouping_iterations[tier]);
+        internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, storage_tiers_grouping_iterations[tier]);
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
-            error("DBENGINE on '%s': Failed to initialize multi-host database tier %d on path '%s'",
+            error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
                   hostname, tier, dbenginepath);
             break;
         }
@@ -793,7 +813,7 @@ void dbengine_init(char *hostname) {
     }
 
     if(created_tiers && created_tiers < storage_tiers) {
-        error("DBENGINE on '%s': Managed to create %d tiers instead of %d. Continuing with %d available.",
+        error("DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
               hostname, created_tiers, storage_tiers, created_tiers);
         storage_tiers = created_tiers;
     }
@@ -840,7 +860,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
     if(!dbengine_enabled) {
         if (storage_tiers > 1) {
-            error("dbengine is not enabled, but %d tiers have been requested. Resetting tiers to 1", storage_tiers);
+            error("dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1", storage_tiers);
             storage_tiers = 1;
         }
 
@@ -1036,11 +1056,11 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            host->storage_instance[tier] &&
-            !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[tier]);
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
+            && host->db[tier].instance
+            && !is_storage_engine_shared(host->db[tier].instance))
+            rrdeng_prepare_exit((struct rrdengine_instance *)host->db[tier].instance);
     }
 #endif
 
@@ -1055,11 +1075,11 @@ void rrdhost_free(RRDHOST *host, bool force) {
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            host->storage_instance[tier] &&
-            !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_exit((struct rrdengine_instance *)host->storage_instance[tier]);
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
+            && host->db[tier].instance
+            && !is_storage_engine_shared(host->db[tier].instance))
+            rrdeng_exit((struct rrdengine_instance *)host->db[tier].instance);
     }
 #endif
 
@@ -1400,7 +1420,7 @@ void rrdhost_cleanup_all(void) {
     rrdhost_foreach_read(host) {
         if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
             /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
+            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
         )
             rrdhost_delete_charts(host);
         else

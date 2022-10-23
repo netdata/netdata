@@ -6,25 +6,6 @@
 #include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
-
-void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRD_CALLS, "Checking read lock on chart '%s'", rrdset_id(st));
-
-    int ret = netdata_rwlock_trywrlock(&st->rrdset_rwlock);
-    if(ret == 0)
-        fatal("RRDSET '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", rrdset_id(st), function, line, file);
-}
-
-void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRD_CALLS, "Checking write lock on chart '%s'", rrdset_id(st));
-
-    int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
-    if(ret == 0)
-        fatal("RRDSET '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", rrdset_id(st), function, line, file);
-}
-
-
-// ----------------------------------------------------------------------------
 // RRDSET name index
 
 static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
@@ -163,7 +144,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(unlikely(st->id == anomaly_rates_chart))
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
 
-    netdata_rwlock_init(&st->rrdset_rwlock);
     netdata_rwlock_init(&st->alerts.rwlock);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
@@ -175,12 +155,11 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // initialize the db tiers
     {
-        RRD_MEMORY_MODE wanted_mode = ctr->memory_mode;
-        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
-            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+        for(size_t tier = 0; tier < storage_tiers ; tier++) {
+            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->storage_instance[tier], &st->chart_uuid);
+            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->db[tier].instance, &st->chart_uuid);
         }
     }
 
@@ -213,12 +192,11 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // cleanup storage engines
     {
-        RRD_MEMORY_MODE wanted_mode = st->rrd_memory_mode;
-        for(int tier = 0; tier < storage_tiers ; tier++, wanted_mode = RRD_MEMORY_MODE_DBENGINE) {
-            STORAGE_ENGINE *eng = storage_engine_get(wanted_mode);
+        for(size_t tier = 0; tier < storage_tiers ; tier++) {
+            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            eng->api.collect_ops.metrics_group_release(host->storage_instance[tier], st->storage_metrics_groups[tier]);
+            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
         }
     }
 
@@ -262,7 +240,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // ------------------------------------------------------------------------
     // free it
 
-    netdata_rwlock_destroy(&st->rrdset_rwlock);
     netdata_rwlock_destroy(&st->alerts.rwlock);
 
     string_freez(st->id);
@@ -313,9 +290,9 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         // switch update every to the storage engine
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            for (int tier = 0; tier < storage_tiers; tier++) {
+            for (size_t tier = 0; tier < storage_tiers; tier++) {
                 if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
-                    rd->tiers[tier]->collect_ops.change_collection_frequency(rd->tiers[tier]->db_collection_handle, get_tier_grouping(tier) * st->update_every);
+                    rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
             }
         }
         rrddim_foreach_done(rd);
@@ -652,7 +629,6 @@ void rrdset_reset(RRDSET *st) {
     st->current_entry = 0;
     st->counter = 0;
     st->counter_done = 0;
-    st->rrddim_page_alignment = 0;
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -661,9 +637,9 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(int tier = 0; tier < storage_tiers ;tier++) {
+            for(size_t tier = 0; tier < storage_tiers ;tier++) {
                 if(rd->tiers[tier])
-                    rd->tiers[tier]->collect_ops.flush(rd->tiers[tier]->db_collection_handle);
+                    rd->tiers[tier]->collect_ops->flush(rd->tiers[tier]->db_collection_handle);
             }
         }
     }
@@ -1043,7 +1019,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
     if(unlikely(sp.start_time > t->next_point_time)) {
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
-            t->collect_ops.store_metric(
+            t->collect_ops->store_metric(
                 t->db_collection_handle,
                 t->next_point_time * USEC_PER_SEC,
                 t->virtual_point.sum,
@@ -1054,7 +1030,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
                 t->virtual_point.flags);
         }
         else {
-            t->collect_ops.store_metric(
+            t->collect_ops->store_metric(
                 t->db_collection_handle,
                 t->next_point_time * USEC_PER_SEC,
                 NAN,
@@ -1097,7 +1073,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
 
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
     // store the metric on tier 0
-    rd->tiers[0]->collect_ops.store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 
     time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
@@ -1112,18 +1088,18 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         .flags = flags
     };
 
-    for(int tier = 1; tier < storage_tiers ;tier++) {
+    for(size_t tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
         struct rrddim_tier *t = rd->tiers[tier];
 
-        if(!t->last_collected_ut) {
+        if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
             // we have not collected this tier before
             // let's fill any gap that may exist
             rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
+            rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
         }
 
-        t->last_collected_ut = point_end_time_ut;
         store_metric_at_tier(rd, t, sp, point_end_time_ut);
     }
 

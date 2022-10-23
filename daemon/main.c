@@ -56,7 +56,7 @@ void netdata_cleanup_and_exit(int ret) {
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            for (int tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
@@ -65,7 +65,7 @@ void netdata_cleanup_and_exit(int ret) {
         metadata_sync_shutdown();
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            for (int tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }
 #endif
