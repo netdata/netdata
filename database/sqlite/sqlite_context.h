@@ -24,6 +24,7 @@ typedef struct ctx_dimension {
     uuid_t dim_id;
     char *id;
     char *name;
+    bool hidden;
 } SQL_DIMENSION_DATA;
 
 typedef struct ctx_label {
