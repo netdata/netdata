@@ -2424,6 +2424,9 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             // we have a non-hidden dimension
             // let's add it to the query metrics
 
+            if(ri->rrdset)
+                ri->rrdset->last_accessed_time = qtl->start_s;
+
             if (qt->query.used == qt->query.size) {
                 qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
                 qt->query.array = reallocz(qt->query.array, qt->query.size * sizeof(QUERY_METRIC));
@@ -2482,9 +2485,6 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     }
 
     qtl->ria = qt->instances.array[qt->instances.used++] = rrdinstance_acquired_dup(ria);
-
-    if(ri->rrdset)
-        ri->rrdset->last_accessed_time = qtl->start_s;
 
     if(qt->db.minimum_latest_update_every == 0 || ri->update_every < qt->db.minimum_latest_update_every)
         qt->db.minimum_latest_update_every = ri->update_every;
