@@ -4190,7 +4190,7 @@ netdataDashboard.context = {
     'cassandra.jvm_gc_time': {
         info: 'Elapsed time of garbage collection.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
     },
-    'cassandra.client_requests_timeout_rate': {
+    'cassandra.client_requests_timeouts_rate': {
         info: 'Requests which were not acknowledged within the configurable timeout window.'
     },
     'cassandra.client_requests_unavailables_rate': {
