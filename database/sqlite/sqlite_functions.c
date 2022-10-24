@@ -474,21 +474,6 @@ void sql_close_database(void)
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
 }
 
-
-// Expect a UUID in column 0
-// Return 0 and store in store_uuid
-// Return 1 if it fails (store_uuid is left unchanged)
-static int expect_uuid_column0(sqlite3_stmt *res, uuid_t *store_uuid)
-{
-    int rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
-        uuid_copy(*store_uuid, *((uuid_t *)sqlite3_column_blob(res, 0)));
-        return 0;
-    }
-    return 1;
-}
-
-
 int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
 {
     int rc, result = 1;
