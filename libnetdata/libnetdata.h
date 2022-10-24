@@ -449,7 +449,7 @@ extern char *netdata_configured_host_prefix;
 #include "worker_utilization/worker_utilization.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
+#define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
 
 #define RRD_STORAGE_TIERS 5
 

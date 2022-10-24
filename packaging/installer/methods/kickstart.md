@@ -107,7 +107,7 @@ To automatically claim nodes after installation:
 - `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
 - `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
   See [connecting through a proxy](/claim/README.md#connect-through-a-proxy) for details.
-- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
+- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
 
 For example:
 

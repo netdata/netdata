@@ -19,7 +19,7 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
  
 :::caution
 
-This list of IPs can change without notice, we strongly advise you to whitelist the domain `app.netdata.cloud`, if
+This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if
 this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
 :::
@@ -49,7 +49,7 @@ configuration uses two settings:
 ```conf
 [global]
   enabled = yes
-  cloud base url = https://app.netdata.cloud
+  cloud base url = https://api.netdata.cloud
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
@@ -112,7 +112,7 @@ must contain only `EOF`.
 ```bash
 [global]
     enabled = no
-    cloud base url = https://app.netdata.cloud
+    cloud base url = https://api.netdata.cloud
 EOF
 ```
 
