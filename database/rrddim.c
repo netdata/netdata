@@ -82,7 +82,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrd_memory_mode = ctr->memory_mode;
 
-    if (unlikely(find_dimension_uuid(st, rd, &(rd->metric_uuid)))) {
+    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid)))) {
         uuid_generate(rd->metric_uuid);
     }
 

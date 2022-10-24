@@ -367,7 +367,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
-            if (find_chart_uuid(host, string2str(st->parts.type), string2str(st->parts.id), &st->chart_uuid)) {
+            if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid))) {
                 uuid_generate(st->chart_uuid);
             }
         }
