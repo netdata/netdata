@@ -105,8 +105,12 @@ struct rrdeng_cmdqueue {
 
 struct extent_io_descriptor {
     uv_fs_t req;
+    uv_work_t req_worker;
     uv_buf_t iov;
+    uv_file file;
     void *buf;
+    void *map_base;
+    size_t map_length;
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
