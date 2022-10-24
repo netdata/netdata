@@ -722,7 +722,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         wc->check_metadata_after = now + METADATA_MAINTENANCE_RETRY;
     } else
         wc->row_id = 0;
-    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %ld seconds", total_checked, total_deleted, wc->row_id,
+    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %"PRId64" seconds", total_checked, total_deleted, wc->row_id,
          wc->check_metadata_after - now);
 
 skip_run:
@@ -1527,7 +1527,7 @@ static void *metadata_unittest_threads(void)
     int threads_to_create = 4;
     fprintf(
         stderr,
-        "\nChecking metadata queue using %d threads for %ld seconds...\n",
+        "\nChecking metadata queue using %d threads for %"PRId64" seconds...\n",
         threads_to_create,
         seconds_to_run);
 

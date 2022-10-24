@@ -1708,8 +1708,8 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
 
     buffer_sprintf(wb,
                    "\n\t\t\t\t\t\t\t\"name\":\"%s\""
-                   ",\n\t\t\t\t\t\t\t\"first_time_t\":%ld"
-                   ",\n\t\t\t\t\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\t\t\t\t\"first_time_t\":%"PRId64""
+                   ",\n\t\t\t\t\t\t\t\"last_time_t\":%"PRId64""
                    ",\n\t\t\t\t\t\t\t\"collected\":%s"
                    , string2str(rm->name)
                    , rm->first_time_t
@@ -1823,8 +1823,8 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
                    ",\n\t\t\t\t\t\"chart_type\":\"%s\""
                    ",\n\t\t\t\t\t\"priority\":%u"
                    ",\n\t\t\t\t\t\"update_every\":%d"
-                   ",\n\t\t\t\t\t\"first_time_t\":%ld"
-                   ",\n\t\t\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\t\t\"first_time_t\":%"PRId64""
+                   ",\n\t\t\t\t\t\"last_time_t\":%"PRId64""
                    ",\n\t\t\t\t\t\"collected\":%s"
                    , string2str(ri->name)
                    , string2str(ri->rc->id)
@@ -1949,8 +1949,8 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
                    ",\n\t\t\t\"family\":\"%s\""
                    ",\n\t\t\t\"chart_type\":\"%s\""
                    ",\n\t\t\t\"priority\":%u"
-                   ",\n\t\t\t\"first_time_t\":%ld"
-                   ",\n\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\"first_time_t\":%"PRId64""
+                   ",\n\t\t\t\"last_time_t\":%"PRId64""
                    ",\n\t\t\t\"collected\":%s"
                    , string2str(rc->title)
                    , string2str(rc->units)
@@ -2621,14 +2621,14 @@ void query_target_generate_name(QUERY_TARGET *qt) {
 
     char resampling_buffer[20 + 1] = "";
     if(qt->request.resampling_time > 1)
-        snprintfz(resampling_buffer, 20, "/resampling:%ld", qt->request.resampling_time);
+        snprintfz(resampling_buffer, 20, "/resampling:%"PRId64"", qt->request.resampling_time);
 
     char tier_buffer[20 + 1] = "";
     if(qt->request.options & RRDR_OPTION_SELECTED_TIER)
         snprintfz(tier_buffer, 20, "/tier:%zu", qt->request.tier);
 
     if(qt->request.st)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimensions:%s/after:%"PRId64"/before:%"PRId64"/points:%zu/group:%s%s/options:%s%s%s"
                   , rrdhost_hostname(qt->request.st->rrdhost)
                   , rrdset_name(qt->request.st)
                   , (qt->request.dimensions) ? qt->request.dimensions : "*"
@@ -2642,7 +2642,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   , tier_buffer
                   );
     else if(qt->request.host && qt->request.rca && qt->request.ria && qt->request.rma)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s/after:%"PRId64"/before:%"PRId64"/points:%zu/group:%s%s/options:%s%s%s"
                 , rrdhost_hostname(qt->request.host)
                 , rrdcontext_acquired_id(qt->request.rca)
                 , rrdinstance_acquired_id(qt->request.ria)
@@ -2657,7 +2657,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , tier_buffer
                 );
     else
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/contexts:%s/instances:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/contexts:%s/instances:%s/dimensions:%s/after:%"PRId64"/before:%"PRId64"/points:%zu/group:%s%s/options:%s%s%s"
                 , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.charts) ? qt->request.charts : "*"

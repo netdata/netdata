@@ -545,7 +545,7 @@ int string_unittest(size_t entries) {
         int threads_to_create = 2;
         fprintf(
             stderr,
-            "Checking string concurrency with %d threads for %ld seconds...\n",
+            "Checking string concurrency with %d threads for %"PRId64" seconds...\n",
             threads_to_create,
             seconds_to_run);
         // check string concurrency
