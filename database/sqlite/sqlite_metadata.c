@@ -34,8 +34,8 @@ extern DICTIONARY *rrdhost_root_index;
     "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
     "history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
 
-#define SQL_STORE_DIMENSION "INSERT OR REPLACE INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) " \
-        "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm);"
+#define SQL_STORE_DIMENSION "INSERT OR REPLACE INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm, options) " \
+        "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm, @options);"
 
 #define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
 
@@ -595,7 +595,7 @@ bind_fail:
  */
 static int sql_store_dimension(
     uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
-    collected_number divisor, int algorithm)
+    collected_number divisor, int algorithm, bool hidden)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
@@ -640,6 +640,13 @@ static int sql_store_dimension(
         goto bind_fail;
 
     rc = sqlite3_bind_int(res, ++param, algorithm);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (hidden)
+        rc = sqlite3_bind_text(res, ++param, "hidden", -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -967,7 +974,8 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
                     string2str(rd->name),
                     rd->multiplier,
                     rd->divisor,
-                    rd->algorithm);
+                    rd->algorithm,
+                    rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN));
 
                 if (unlikely(rc))
                     error_report("METADATA: Failed to store dimension %s", string2str(rd->id));
@@ -1165,7 +1173,8 @@ static void metadata_event_loop(void *arg)
                         string2str(rd->name),
                         rd->multiplier,
                         rd->divisor,
-                        rd->algorithm);
+                        rd->algorithm,
+                        rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN));
 
                     if (unlikely(rc))
                         error_report("Failed to store dimension %s", rrddim_id(rd));
