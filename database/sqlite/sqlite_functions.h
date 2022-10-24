@@ -60,8 +60,6 @@ void add_migrated_file(char *path, uint64_t file_size);
 void db_execute(const char *cmd);
 
 // Look up functions
-int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid);
-int find_chart_uuid(RRDHOST *host, const char *type, const char *id, uuid_t *store_uuid);
 int get_node_id(uuid_t *host_id, uuid_t *node_id);
 int get_host_id(uuid_t *node_id, uuid_t *host_id);
 struct node_instance_list *get_node_list(void);
