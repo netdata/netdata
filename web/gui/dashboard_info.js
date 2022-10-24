@@ -4201,6 +4201,34 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI
+
+    'wmi.tcp_conns_active': {
+        info: 'Connections that changed state from `CLOSED` to `SYN-SENT`.'
+    },
+    'wmi.tcp_conns_established': {
+        info: 'Connections with state `ESTABLISHED` or `CLOSE-WAIT`.'
+    },
+    'wmi.tcp_conns_failures': {
+        info: '<p>Maps two different state transitions: </p> <p> - From `SYN-SENT` or `SYN-RCVD` to `CLOSED`.<br> - From `SYN-RCVD` to `LISTEN`.</p>'
+    },
+    'wmi.tcp_conns_passive': {
+        info: 'Connections with state `ESTABLISHED` or `CLOSE-WAIT`.'
+    },
+    'wmi.tcp_conns_resets': {
+        info: 'Connections with state transition from `LISTEN` to `SYN-RCVD`.'
+    },
+    'wmi.tcp_segments_received': {
+        info: 'Number of segmentts received (successful or error).'
+    },
+    'wmi.tcp_segments_retransmitted': {
+        info: 'Segments transmitted that has segments with bytes already transmitted.'
+    },
+    'wmi.tcp_segments_sent': {
+        info: 'Segments sent excluiding segments that contains "only" retransmitted bytes.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
