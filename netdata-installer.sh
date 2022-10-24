@@ -453,6 +453,22 @@ if [ "$(id -u)" -ne 0 ]; then
   fi
 fi
 
+# Set prefix handling info correctly
+if [ -n "${NETDATA_PREFIX}" ] && [ "${NETDATA_PREFIX}" != "/" ]; then
+  NETDATA_CONFIGURE_PREFIX_ARGS="--prefix=${NETDATA_PREFIX}"
+  NETDATA_BINDIR="${NETDATA_PREFIX}/sbin"
+  NETDATA_DATADIR="${NETDATA_PREFIX}/share/netdata"
+  NETDATA_LIBDIR="${NETDATA_PREFIX}/lib/netdata"
+  NETDATA_LIBEXECDIR="${NETDATA_PREFIX}/libexec/netdata"
+else
+  NETDATA_CONFIGURE_PREFIX_ARGS="--prefix=/usr --sysconfdir=/etc --localstatedir=/var"
+  NETDATA_BINDIR="/usr/sbin"
+  NETDATA_DATADIR="/usr/share/netdata"
+  NETDATA_LIBDIR="/usr/lib/netdata"
+  NETDATA_LIBEXECDIR="/usr/libexec/netdata"
+fi
+
+
 netdata_banner
 progress "real-time performance monitoring, done right!"
 cat << BANNER1
@@ -465,10 +481,10 @@ cat << BANNER1
 
   It will be installed at these locations:
 
-   - the daemon     at ${TPUT_CYAN}${NETDATA_PREFIX}/usr/sbin/netdata${TPUT_RESET}
+   - the daemon     at ${TPUT_CYAN}${NETDATA_BINDIR}/netdata${TPUT_RESET}
    - config files   in ${TPUT_CYAN}${NETDATA_PREFIX}/etc/netdata${TPUT_RESET}
-   - web files      in ${TPUT_CYAN}${NETDATA_PREFIX}/usr/share/netdata${TPUT_RESET}
-   - plugins        in ${TPUT_CYAN}${NETDATA_PREFIX}/usr/libexec/netdata${TPUT_RESET}
+   - web files      in ${TPUT_CYAN}${NETDATA_DATADIR}${TPUT_RESET}
+   - plugins        in ${TPUT_CYAN}${NETDATA_LIBEXECDIR}${TPUT_RESET}
    - cache files    in ${TPUT_CYAN}${NETDATA_PREFIX}/var/cache/netdata${TPUT_RESET}
    - db files       in ${TPUT_CYAN}${NETDATA_PREFIX}/var/lib/netdata${TPUT_RESET}
    - log files      in ${TPUT_CYAN}${NETDATA_PREFIX}/var/log/netdata${TPUT_RESET}
@@ -993,8 +1009,8 @@ config_option() {
   key="${2}"
   value="${3}"
 
-  if [ -x "${NETDATA_PREFIX}/usr/sbin/netdata" ] && [ -r "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
-    "${NETDATA_PREFIX}/usr/sbin/netdata" \
+  if [ -x "${NETDATA_BINDIR}/netdata" ] && [ -r "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
+    "${NETDATA_BINDIR}/netdata" \
       -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
       -W get "${section}" "${key}" "${value}" ||
       echo "${value}"
@@ -1017,11 +1033,7 @@ echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
 # shellcheck disable=SC2086
 if ! run ./configure \
-         --prefix="${NETDATA_PREFIX}/usr" \
-         --sysconfdir="${NETDATA_PREFIX}/etc" \
-         --localstatedir="${NETDATA_PREFIX}/var" \
-         --libexecdir="${NETDATA_PREFIX}/usr/libexec" \
-         --libdir="${NETDATA_PREFIX}/usr/lib" \
+         ${NETDATA_CONFIGURE_PREFIX_ARGS} \
          --with-zlib \
          --with-math \
          --with-user="${NETDATA_USER}" \
@@ -1111,14 +1123,14 @@ defport=19999
 NETDATA_PORT="$(config_option "web" "default port" ${defport})"
 
 # directories
-NETDATA_LIB_DIR="$(config_option "global" "lib directory" "${NETDATA_PREFIX}/var/lib/netdata")"
+NETDATA_VAR_LIB_DIR="$(config_option "global" "lib directory" "${NETDATA_PREFIX}/var/lib/netdata")"
 NETDATA_CACHE_DIR="$(config_option "global" "cache directory" "${NETDATA_PREFIX}/var/cache/netdata")"
-NETDATA_WEB_DIR="$(config_option "global" "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web")"
+NETDATA_WEB_DIR="$(config_option "global" "web files directory" "${NETDATA_DATADIR}/web")"
 NETDATA_LOG_DIR="$(config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata")"
 NETDATA_USER_CONFIG_DIR="$(config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata")"
-NETDATA_STOCK_CONFIG_DIR="$(config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d")"
+NETDATA_STOCK_CONFIG_DIR="$(config_option "global" "stock config directory" "${NETDATA_LIBDIR}/conf.d")"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
-NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
+NETDATA_CLAIMING_DIR="${NETDATA_VAR_LIB_DIR}/cloud.d"
 
 cat << OPTIONSEOF
 
@@ -1132,7 +1144,7 @@ cat << OPTIONSEOF
     - netdata stock config dir : ${NETDATA_STOCK_CONFIG_DIR}
     - netdata log dir          : ${NETDATA_LOG_DIR}
     - netdata run dir          : ${NETDATA_RUN_DIR}
-    - netdata lib dir          : ${NETDATA_LIB_DIR}
+    - netdata lib dir          : ${NETDATA_VAR_LIB_DIR}
     - netdata web dir          : ${NETDATA_WEB_DIR}
     - netdata cache dir        : ${NETDATA_CACHE_DIR}
 
@@ -1168,7 +1180,7 @@ run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 
 # --- data dirs ----
 
-for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
+for x in "${NETDATA_VAR_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
   if [ ! -d "${x}" ]; then
     echo >&2 "Creating directory '${x}'"
     if ! run mkdir -p "${x}"; then
@@ -1204,100 +1216,100 @@ if [ "$(id -u)" -eq 0 ]; then
   test -z "${admin_group}" && admin_group="${NETDATA_GROUP}"
 
   run chown "${NETDATA_USER}:${admin_group}" "${NETDATA_LOG_DIR}"
-  run chown -R "root:${admin_group}" "${NETDATA_PREFIX}/usr/libexec/netdata"
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
+  run chown -R "root:${admin_group}" "${NETDATA_LIBEXECDIR}"
+  run find "${NETDATA_LIBEXECDIR}" -type d -exec chmod 0755 {} \;
+  run find "${NETDATA_LIBEXECDIR}" -type f -exec chmod 0644 {} \;
   # shellcheck disable=SC2086
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chown :${NETDATA_GROUP} {} \;
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0750 {} \;
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
+  run find "${NETDATA_LIBEXECDIR}" -type f -a -name \*.plugin -exec chown :${NETDATA_GROUP} {} \;
+  run find "${NETDATA_LIBEXECDIR}" -type f -a -name \*.plugin -exec chmod 0750 {} \;
+  run find "${NETDATA_LIBEXECDIR}" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
-      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-      if run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"; then
+      run chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"
+      if run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"; then
         # if we managed to setcap, but we fail to execute apps.plugin setuid to root
-        "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
+        "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
       fi
     fi
 
     if [ $capabilities -eq 0 ]; then
       # fix apps.plugin to be setuid to root
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+      run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"
     fi
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/debugfs.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/debugfs.plugin"
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
-      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
-      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+      run chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/debugfs.plugin"
+      if run setcap cap_dac_read_search+ep "${NETDATA_LIBEXECDIR}/plugins.d/debugfs.plugin"; then
         # if we managed to setcap, but we fail to execute debugfs.plugin setuid to root
-        "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
+        "${NETDATA_LIBEXECDIR}/plugins.d/debugfs.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
       fi
     fi
 
     if [ $capabilities -eq 0 ]; then
       # fix debugfs.plugin to be setuid to root
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+      run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/debugfs.plugin"
     fi
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/freeipmi.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/freeipmi.plugin"
+    run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/freeipmi.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/nfacct.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/nfacct.plugin"
+    run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/nfacct.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/xenstat.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/xenstat.plugin"
+    run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/xenstat.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
-    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
-    run sh -c "setcap cap_perfmon+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin\" || setcap cap_sys_admin+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin\""
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/perf.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/perf.plugin"
+    run chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/perf.plugin"
+    run sh -c "setcap cap_perfmon+ep \"${NETDATA_LIBEXECDIR}/plugins.d/perf.plugin\" || setcap cap_sys_admin+ep \"${NETDATA_LIBEXECDIR}/plugins.d/perf.plugin\""
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
-    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
-    run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/slabinfo.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/slabinfo.plugin"
+    run chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/slabinfo.plugin"
+    run setcap cap_dac_read_search+ep "${NETDATA_LIBEXECDIR}/plugins.d/slabinfo.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/ioping" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/ioping"
+    run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/ioping"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.plugin"
+    run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/cgroup-network" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/cgroup-network"
+    run chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/cgroup-network"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
-    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/cgroup-network-helper.sh" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/cgroup-network-helper.sh"
+    run chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/cgroup-network-helper.sh"
   fi
 else
   # non-privileged user installation
   run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_LOG_DIR}"
-  run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata"
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
-  run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
+  run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}"
+  run find "${NETDATA_LIBEXECDIR}" -type f -exec chmod 0755 {} \;
+  run find "${NETDATA_LIBEXECDIR}" -type d -exec chmod 0755 {} \;
 fi
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -1356,7 +1368,7 @@ should_install_go() {
   fi
 
   version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
-  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
+  binary_version=$("${NETDATA_LIBEXECDIR}/plugins.d/go.d.plugin" -v 2> /dev/null)
 
   govercomp "$version_in_file" "$binary_version"
   case $? in
@@ -1445,11 +1457,11 @@ install_go() {
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
   run tar --no-same-owner -xf "${tmp}/${GO_PACKAGE_BASENAME}"
-  run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_LIBEXECDIR}/plugins.d/go.d.plugin"
   if [ "$(id -u)" -eq 0 ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_LIBEXECDIR}/plugins.d/go.d.plugin"
   fi
-  run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  run chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/go.d.plugin"
   rm -rf "${tmp}"
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -1457,9 +1469,9 @@ install_go() {
 
 install_go
 
-if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
+if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/go.d.plugin" ]; then
   if command -v setcap 1>/dev/null 2>&1; then
-    run setcap "cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+    run setcap "cap_net_admin+epi cap_net_raw=eip" "${NETDATA_LIBEXECDIR}/plugins.d/go.d.plugin"
   fi
 fi
 
@@ -1486,14 +1498,14 @@ should_install_ebpf() {
 }
 
 remove_old_ebpf() {
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/ebpf_process.plugin" ]; then
     echo >&2 "Removing alpha eBPF collector."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/ebpf_process.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
+  if [ -f "${NETDATA_LIBDIR}/conf.d/ebpf_process.conf" ]; then
     echo >&2 "Removing alpha eBPF stock file"
-    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf"
+    rm -f "${NETDATA_LIBDIR}/conf.d/ebpf_process.conf"
   fi
 
   if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
@@ -1502,34 +1514,34 @@ remove_old_ebpf() {
   fi
 
   # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
     echo >&2 "Removing old eBPF programs with patch."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.*.o
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/rnetdata_ebpf"*.?.*.*.o
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/pnetdata_ebpf"*.?.*.*.o
   fi
 
   # Remove old eBPF program to store new eBPF program inside subdirectory
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.o" ]; then
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/pnetdata_ebpf_process.3.10.o" ]; then
     echo >&2 "Removing old eBPF programs installed in old directory."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.o
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/rnetdata_ebpf"*.?.*.o
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/pnetdata_ebpf"*.?.*.o
   fi
 
   # Remove old eBPF programs that did not have "rhf" suffix
-  if [ ! -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process.3.10.rhf.o" ]; then
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/"*.o
+  if [ ! -f "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.d/pnetdata_ebpf_process.3.10.rhf.o" ]; then
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.d/"*.o
   fi
 
   # Remove old reject list from previous directory
-  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt" ]; then
+  if [ -f "${NETDATA_LIBDIR}/conf.d/ebpf_kernel_reject_list.txt" ]; then
     echo >&2 "Removing old ebpf_kernel_reject_list.txt."
-    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
+    rm -f "${NETDATA_LIBDIR}/conf.d/ebpf_kernel_reject_list.txt"
   fi
 
   # Remove old reset script
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh" ]; then
+  if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/reset_netdata_trace.sh" ]; then
     echo >&2 "Removing old reset_netdata_trace.sh."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh"
+    rm -f "${NETDATA_LIBEXECDIR}/plugins.d/reset_netdata_trace.sh"
   fi
 }
 
@@ -1571,8 +1583,8 @@ install_ebpf() {
   # chown everything to root:netdata before we start copying out of our package
   run chown -R root:netdata "${tmp}"
 
-  if [ ! -d "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-    mkdir "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
+  if [ ! -d "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.d" ]; then
+    mkdir "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.d"
     RET=$?
     if [ "${RET}" != "0" ]; then
       rm -rf "${tmp}"
@@ -1582,7 +1594,7 @@ install_ebpf() {
     fi
   fi
 
-  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
+  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_LIBEXECDIR}/plugins.d/ebpf.d"
 
   rm -rf "${tmp}"
 
@@ -1608,8 +1620,8 @@ progress "Install netdata at system init"
 # By default we assume the shutdown/startup of the Netdata Agent are effectively
 # without any system supervisor/init like SystemD or SysV. So we assume the most
 # basic startup/shutdown commands...
-NETDATA_STOP_CMD="${NETDATA_PREFIX}/usr/sbin/netdatacli shutdown-agent"
-NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
+NETDATA_STOP_CMD="${NETDATA_BINDIR}/netdatacli shutdown-agent"
+NETDATA_START_CMD="${NETDATA_BINDIR}/netdata"
 
 if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
   # If docker runs systemd for some weird reason, let the install proceed
@@ -1639,7 +1651,7 @@ started=0
 if [ ${DONOTSTART} -eq 1 ]; then
   create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 else
-  if ! restart_netdata "${NETDATA_PREFIX}/usr/sbin/netdata" "${@}"; then
+  if ! restart_netdata "${NETDATA_BINDIR}/netdata" "${@}"; then
     fatal "Cannot start netdata!" I000D
   fi
 
@@ -1714,7 +1726,7 @@ https://docs.netdata.cloud/packaging/installer/
 VERMSG
 fi
 
-if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
+if [ -f "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin" ]; then
   # -----------------------------------------------------------------------------
   progress "Check apps.plugin"
 
@@ -1729,14 +1741,14 @@ either of the following sets of commands:
 
 To run apps.plugin with escalated capabilities:
 
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 0750 "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"${TPUT_RESET}
 
 or, to run apps.plugin as root:
 
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 4750 "${NETDATA_LIBEXECDIR}/plugins.d/apps.plugin"${TPUT_RESET}
 
 apps.plugin is performing a hard-coded function of data collection for all
 running processes. It cannot be instructed from the netdata daemon to perform
@@ -1748,13 +1760,13 @@ fi
 
 # -----------------------------------------------------------------------------
 progress "Copy uninstaller"
-if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh ]; then
+if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh" ]; then
   echo >&2 "Removing uninstaller from old location"
-  rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh
+  rm -f "${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh"
 fi
 
-sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
-chmod 750 "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
+sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > "${NETDATA_LIBEXECDIR}/netdata-uninstaller.sh"
+chmod 750 "${NETDATA_LIBEXECDIR}/netdata-uninstaller.sh"
 
 # -----------------------------------------------------------------------------
 progress "Basic netdata instructions"
@@ -1775,7 +1787,7 @@ To start netdata run:
   ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_START_CMD}${TPUT_RESET}
 
 END
-echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh${TPUT_RESET}"
+echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_LIBEXECDIR}/netdata-uninstaller.sh${TPUT_RESET}"
 echo >&2
 
 # -----------------------------------------------------------------------------
@@ -1802,12 +1814,12 @@ NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
-NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
+NETDATA_VAR_LIB_DIR="${NETDATA_VAR_LIB_DIR}"
 EOF
 run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 
 echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
-cat << EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
+cat << EOF > "${NETDATA_VAR_LIB_DIR}/netdata.tarball.checksum"
 new_installation
 EOF
 
