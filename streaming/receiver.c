@@ -472,6 +472,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
     char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
+    bool rrdpush_enable_replication = default_rrdpush_enable_replication;
+    time_t rrdpush_seconds_to_replicate = default_rrdpush_seconds_to_replicate;
+    time_t rrdpush_replication_step = default_rrdpush_replication_step;
     time_t alarms_delay = 60;
 
     rpt->update_every = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "update every", rpt->update_every);
@@ -506,6 +509,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+
+    rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->key, "enable replication", rrdpush_enable_replication);
+    rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable replication", rrdpush_enable_replication);
+
+    rrdpush_seconds_to_replicate = appconfig_get_number(&stream_config, rpt->key, "seconds to replicate", rrdpush_seconds_to_replicate);
+    rrdpush_seconds_to_replicate = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds to replicate", rrdpush_seconds_to_replicate);
+
+    rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rrdpush_replication_step);
+    rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rrdpush_replication_step);
 
 #ifdef  ENABLE_COMPRESSION
     unsigned int rrdpush_compression = default_compression_enabled;
@@ -556,6 +568,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , rrdpush_enable_replication
+                , rrdpush_seconds_to_replicate
+                , rrdpush_replication_step
                 , rpt->system_info
                 , 0
         );
@@ -601,6 +616,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
             rrdpush_destination,
             rrdpush_api_key,
             rrdpush_send_charts_matching,
+            rrdpush_enable_replication,
+            rrdpush_seconds_to_replicate,
+            rrdpush_replication_step,
             rpt->system_info);
         rrd_unlock();
     }

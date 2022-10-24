@@ -285,18 +285,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     }
 
     if (unlikely(st->update_every != ctr->update_every)) {
-        st->update_every = ctr->update_every;
-
-        // switch update every to the storage engine
-        RRDDIM *rd;
-        rrddim_foreach_read(rd, st) {
-            for (size_t tier = 0; tier < storage_tiers; tier++) {
-                if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
-                    rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
-            }
-        }
-        rrddim_foreach_done(rd);
-
+        rrdset_set_update_every(st, ctr->update_every);
         ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
@@ -936,7 +925,6 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
 
     if(discarded && discarded != duration_since_last_update)
         info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", rrdhost_hostname(st->rrdhost), rrdset_id(st), discarded, duration_since_last_update, discard_reason?discard_reason:"UNDEFINED");
-
     #endif
 
     st->usec_since_last_update = duration_since_last_update;
@@ -1895,6 +1883,26 @@ after_second_database_work:
     netdata_thread_enable_cancelability();
 }
 
+time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
+    time_t prev_update_every = st->update_every;
+    st->update_every = update_every;
+
+    // switch update every to the storage engine
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
+            if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
+                rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+        }
+
+        assert(rd->update_every == prev_update_every &&
+               "chart's update every differs from the update every of its dimensions");
+        rd->update_every = st->update_every;
+    }
+    rrddim_foreach_done(rd);
+
+    return prev_update_every;
+}
 
 // ----------------------------------------------------------------------------
 // compatibility layer for RRDSET files v019

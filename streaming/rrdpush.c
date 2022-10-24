@@ -46,6 +46,9 @@ unsigned int default_compression_enabled = 1;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
+bool default_rrdpush_enable_replication = true;
+time_t default_rrdpush_seconds_to_replicate = 3600;
+time_t default_rrdpush_replication_step = 600;
 #ifdef ENABLE_HTTPS
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_ca_path = NULL;
@@ -100,6 +103,11 @@ int rrdpush_init() {
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
+
+    default_rrdpush_enable_replication = config_get_boolean(CONFIG_SECTION_DB, "enable replication", default_rrdpush_enable_replication);
+    default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
+    default_rrdpush_replication_step = config_get_number(CONFIG_SECTION_DB, "seconds per replication step", default_rrdpush_replication_step);
+
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time);
 
 #ifdef ENABLE_COMPRESSION
@@ -295,6 +303,14 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the chart local custom variables
     rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
 
+    if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
+        time_t first_entry_local = rrdset_first_entry_t(st);
+        time_t last_entry_local = rrdset_last_entry_t(st);
+        buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
+    } else {
+        rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
+    }
+
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
 
@@ -418,7 +434,8 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(need_to_send_chart_definition(st)))
         rrdpush_send_chart_definition(wb, st);
 
-    rrdpush_send_chart_metrics(wb, st, host->sender);
+    if (rrdset_flag_check(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS))
+        rrdpush_send_chart_metrics(wb, st, host->sender);
 
     sender_commit(host->sender, wb);
 }
@@ -950,6 +967,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
     if(caps & STREAM_CAP_GAP_FILLING) buffer_strcat(wb, "GAP_FILLING ");
+    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

@@ -627,6 +627,8 @@ STREAMING_PLUGIN_FILES = \
     streaming/compression.c \
     streaming/sender.c \
     streaming/receiver.c \
+    streaming/replication.h \
+    streaming/replication.cc \
     streaming/rrdpush.h \
     $(NULL)
 

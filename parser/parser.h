@@ -105,6 +105,7 @@ PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
 PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_chart_definition_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
@@ -116,5 +117,10 @@ PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION  *plugins_a
 PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+
+PARSER_RC pluginsd_replay_rrdset_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_header(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_done(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 
 #endif

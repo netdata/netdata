@@ -231,6 +231,27 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     return PARSER_RC_OK;
 }
 
+PARSER_RC pluginsd_chart_definition_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    UNUSED(plugins_action);
+
+    long first_entry_child = str2l(words[1]);
+    long last_entry_child = str2l(words[2]);
+
+    PARSER_USER_OBJECT *user_object = (PARSER_USER_OBJECT *) user;
+
+    RRDHOST *host = user_object->host;
+    assert(host && "host missing from parser's user object");
+
+    RRDSET *st = user_object->st;
+    assert(st && "chart missing from parser's user object");
+
+    FILE *outfp = user_object->parser->output;
+
+    bool ok = replicate_chart_request(outfp, host, st, first_entry_child, last_entry_child, 0, 0);
+    return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
+}
+
 PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *id = words[1];
@@ -853,6 +874,168 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
     }
 
     return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_replay_rrdset_begin(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(plugins_action);
+
+    const char *chart_id = words[1];
+
+    PARSER_USER_OBJECT *user_object = user;
+    REPLICATION_OBJECT *repl_object = &user_object->repl_object;
+
+    repl_object->host = user_object->host;
+    repl_object->ok = true;
+
+    // look up chart from host to do some extra verification
+    rrdhost_rdlock(repl_object->host);
+    repl_object->st = rrdset_find(repl_object->host, chart_id);
+    rrdhost_unlock(repl_object->host);
+
+    // fail if we can't find the chart
+    if (!repl_object->st) {
+        error("Could not find chart %s.%s to replay", rrdhost_hostname(repl_object->host), chart_id);
+        repl_object->ok = false;
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_replay_rrdset_header(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(plugins_action);
+
+    PARSER_USER_OBJECT *user_object = user;
+    REPLICATION_OBJECT *repl_object = &user_object->repl_object;
+
+    if (!repl_object->ok)
+        return PARSER_RC_OK;
+
+    assert(strcmp(words[0], "REPLAY_RRDSET_HEADER") == 0);
+    assert(strcmp(words[1], "start_time") == 0);
+    assert(strcmp(words[2], "end_time") == 0);
+
+    size_t FirstDimWordIndex = 3;
+    for (size_t i = FirstDimWordIndex; i != PLUGINSD_MAX_WORDS; i++) {
+        // make sure word is not null and that we've added at least 1 dimension
+        if (!words[i]) {
+            if (i == FirstDimWordIndex) {
+                error("child sent an replay rrdset command with 0 dimensions");
+                repl_object->ok = false;
+                return PARSER_RC_OK;
+            }
+
+            repl_object->replay_dimensions[i - FirstDimWordIndex] = NULL;
+            break;
+        }
+
+        repl_object->replay_dimensions[i - FirstDimWordIndex] = rrddim_find(repl_object->st, words[i]);
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_replay_rrdset_done(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(plugins_action);
+
+    PARSER_USER_OBJECT *user_object = user;
+    REPLICATION_OBJECT *repl_object = &user_object->repl_object;
+
+    if (!repl_object->ok)
+        return PARSER_RC_OK;
+
+    // command
+    assert(strcmp(words[0], "REPLAY_RRDSET_DONE") == 0);
+
+    // start_time
+    assert(words[1] && "start_time missing from replay_rrdset_done");
+    time_t start_time = str2l(words[1]);
+
+    // end_time
+    assert(words[2] && "end_time missing from replay_rrdset_done");
+    time_t end_time = str2l(words[2]);
+
+    RRDSET *st = repl_object->st;
+    if (end_time <= rrdset_last_entry_t(st)) {
+        error("replay_rrdset_done contains a start/end time we already have");
+        return PARSER_RC_OK;
+    }
+
+    time_t update_every = end_time - start_time;
+    if (update_every != st->update_every)
+        rrdset_set_update_every(st, update_every);
+
+    // value/flag pairs
+    size_t FirstValueWordIndex = 3;
+    for (size_t i = FirstValueWordIndex; i < (PLUGINSD_MAX_WORDS - 1); i += 2) {
+        if (!words[i] || !words[i + 1]) {
+            if (i == FirstValueWordIndex) {
+                error("child sent an replay rrdset_done command with 0 values");
+                repl_object->ok = false;
+                return PARSER_RC_OK;
+            }
+
+            break;
+        }
+
+        // No value/flag pair for this dimension
+        if (strcmp(words[i], "NULL") == 0)
+            continue;
+
+        NETDATA_DOUBLE value = str2ndd(words[i], NULL);
+        SN_FLAGS flags = str2uint32_t(words[i + 1]);
+
+        RRDDIM *rd = repl_object->replay_dimensions[(i - FirstValueWordIndex) / 2];
+        if (!rd)
+            continue;
+
+        usec_t end_time_usec = end_time * USEC_PER_SEC;
+        rrddim_store_metric(rd, end_time_usec, value, flags);
+        rd->collections_counter++;
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_replay_rrdset_end(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(plugins_action);
+
+    time_t update_every_child = str2l(words[1]);
+    time_t first_entry_child = str2l(words[2]);
+    time_t last_entry_child = str2l(words[3]);
+
+    bool start_streaming = (strcmp(words[4], "true") == 0);
+    time_t first_entry_requested = str2l(words[5]);
+    time_t last_entry_requested = str2l(words[6]);
+
+    PARSER_USER_OBJECT *user_object = user;
+    REPLICATION_OBJECT *repl_object = &user_object->repl_object;
+
+    RRDHOST *host = user_object->host;
+    assert(host && "non-null host expected");
+
+    RRDSET *st = repl_object->st;
+    assert(st && "non-null chart expected");
+
+    if (start_streaming) {
+        if (st->update_every != update_every_child)
+            rrdset_set_update_every(st, update_every_child);
+
+        st->last_updated.tv_sec = rrdset_last_entry_t(st);
+        st->last_updated.tv_usec = 0;
+        st->last_collected_time = st->last_updated;
+        st->counter_done++;
+        return PARSER_RC_OK;
+    }
+
+    FILE *outfp = user_object->parser->output;
+
+    bool ok = replicate_chart_request(outfp, host, st, first_entry_child, last_entry_child,
+                                      first_entry_requested, last_entry_requested);
+    return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
 
 static void pluginsd_process_thread_cleanup(void *ptr) {

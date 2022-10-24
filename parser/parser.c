@@ -51,6 +51,7 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
     if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
@@ -63,7 +64,11 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
-        //parser_add_keyword(parser, PLUGINSD_KEYWORD_GAPS_REQUEST,   pluginsd_gaps_request);
+
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_BEGIN,    pluginsd_replay_rrdset_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_HEADER,   pluginsd_replay_rrdset_header);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_DONE,     pluginsd_replay_rrdset_done);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_END,      pluginsd_replay_rrdset_end);
     }
 
     return parser;

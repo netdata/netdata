@@ -7,6 +7,7 @@
 #include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
+#include "replication.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -35,6 +36,7 @@ typedef enum {
     STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
     STREAM_CAP_GAP_FILLING      = (1 << 12), // gap filling supported
+    STREAM_CAP_REPLICATION      = (1 << 13), // replication supported
 
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
@@ -46,7 +48,10 @@ typedef enum {
 #define STREAM_HAS_COMPRESSION 0
 #endif  //ENABLE_COMPRESSION
 
-#define STREAM_OUR_CAPABILITIES (STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS)
+#define STREAM_OUR_CAPABILITIES ( \
+    STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS |  \
+    STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | \
+    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION )
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
 
@@ -218,6 +223,9 @@ extern unsigned int default_compression_enabled;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
+extern bool default_rrdpush_enable_replication;
+extern time_t default_rrdpush_seconds_to_replicate;
+extern time_t default_rrdpush_replication_step;
 extern unsigned int remote_clock_resync_iterations;
 
 void rrdpush_destinations_init(RRDHOST *host);

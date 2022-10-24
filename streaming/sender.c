@@ -34,6 +34,8 @@ extern char *netdata_ssl_ca_file;
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
 
+static __thread size_t replication_requests_pending = 0;
+
 void sender_thread_buffer_free(void) {
     if(sender_thread_buffer) {
         buffer_free(sender_thread_buffer);
@@ -154,6 +156,16 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+
+    // clear streaming flag from each chart because we want
+    // to start replication on the next possible reconnection
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        rrdset_flag_clear(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
+
+        st->replay_request.pending = false;
+    }
+    rrdset_foreach_done(st);
 
     if(host->sender->rrdpush_sender_socket != -1) {
         close(host->sender->rrdpush_sender_socket);
@@ -879,9 +891,41 @@ void execute_commands(struct sender_state *s) {
                     stream_execute_function_callback(wb, code, tmp);
                 }
             }
-        }
-        else
+        } else if (words[0] && strcmp(words[0], PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
+            if (!words[1] || !words[2] || !words[3]) {
+                error("STREAM %s [send to %s] %s command is incomplete"
+                      " (chart=%s, start_streaming=%s, after=%s, before=%s)",
+                      rrdhost_hostname(s->host), s->connected_to,
+                      words[0],
+                      words[1] ? words[1] : "(unset)",
+                      words[2] ? words[2] : "(unset)",
+                      words[3] ? words[3] : "(unset)",
+                      words[4] ? words[4] : "(unset)");
+            } else {
+                const char *chart_id = words[1];
+
+                rrdhost_rdlock(s->host);
+                RRDSET *rs = rrdset_find(s->host, chart_id);
+                if (!rs) {
+                    rrdhost_unlock(s->host);
+                    fatal("Could not find chart %s.%s to replicate", rrdhost_hostname(s->host), chart_id);
+                }
+
+                assert((rs->replay_request.pending == false) &&
+                       "Chart has already a replay request pending");
+
+                rs->replay_request.pending = true;
+                rs->replay_request.start_streaming = !strcmp(words[2], "true");
+                rs->replay_request.after = strtoll(words[3], NULL, 0);
+                rs->replay_request.before = strtoll(words[4], NULL, 0);
+
+                rrdhost_unlock(s->host);
+
+                replication_requests_pending++;
+            }
+        } else {
             error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, words[0]?words[0]:"(unset)");
+        }
 
         start = newline + 1;
     }
@@ -1043,6 +1087,37 @@ void sender_init(RRDHOST *parent)
 #endif
 
     netdata_mutex_init(&parent->sender->mutex);
+}
+
+static void process_replication_requests(struct sender_state *s) {
+    if (replication_requests_pending == 0)
+        return;
+
+    bool overutilized_buffer = false;
+
+    RRDSET *st;
+    rrdset_foreach_read(st, s->host) {
+        if (st->replay_request.pending == false)
+            continue;
+
+        netdata_mutex_lock(&s->mutex);
+        size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
+        netdata_mutex_unlock(&s->mutex);
+
+        NETDATA_DOUBLE buffer_utilization = (s->host->sender->buffer->max_size - available) * 100.0 / s->host->sender->buffer->max_size;
+        if ((buffer_utilization > 75.00) && !overutilized_buffer)
+            overutilized_buffer = true;
+
+        if (overutilized_buffer)
+            continue;
+
+        replicate_chart_response(s->host, st, st->replay_request.start_streaming,
+                                              st->replay_request.after,
+                                              st->replay_request.before);
+        st->replay_request.pending = false;
+        replication_requests_pending--;
+    }
+    rrdset_foreach_done(st);
 }
 
 void *rrdpush_sender_thread(void *ptr) {
@@ -1286,6 +1361,8 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
             execute_commands(s);
         }
+
+        process_replication_requests(s);
 
         if(unlikely(fds[Collector].revents & (POLLERR|POLLHUP|POLLNVAL))) {
             char *error = NULL;
