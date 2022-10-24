@@ -4149,6 +4149,58 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // CASSANDRA
+
+    'cassandra.client_requests_rate': {
+        info: 'Client requests received per second. Consider whether your workload is read-heavy or write-heavy while choosing a compaction strategy.'
+    },
+    'cassandra.client_requests_latency': {
+        info: 'Response latency of requests received per second. Latency could be impacted by disk access, network latency or replication configuration.'
+    },
+    'cassandra.key_cache_hit_ratio': {
+        info: 'Key cache hit ratio indicates the efficiency of the key cache. If ratio is consistently < 80% consider increasing cache size.'
+    },
+    'cassandra.key_cache_hit_rate': {
+        info: 'Key cache hit rate measures the cache hits and misses per second.'
+    },
+    'cassandra.storage_live_disk_space_used': {
+        info: 'Amount of live disk space used. This does not include obsolete data waiting to be garbage collected.'
+    },
+    'cassandra.compaction_completed_tasks_rate': {
+        info: 'Compaction tasks completed per second.'
+    },
+    'cassandra.compaction_pending_tasks_count': {
+        info: 'Total compaction tasks in queue.'
+    },
+    'cassandra.thread_pool_active_tasks_count': {
+        info: 'Total tasks currently being processed.'
+    },
+    'cassandra.thread_pool_pending_tasks_count': {
+        info: 'Total tasks in queue awaiting a thread for processing.'
+    },
+    'cassandra.thread_pool_blocked_tasks_rate': {
+        info: 'Tasks that cannot be queued for processing yet.'
+    },
+    'cassandra.thread_pool_blocked_tasks_count': {
+        info: 'Total tasks that cannot yet be queued for processing.'
+    },
+    'cassandra.jvm_gc_rate': {
+        info: 'Rate of garbage collections.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
+    },
+    'cassandra.jvm_gc_time': {
+        info: 'Elapsed time of garbage collection.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
+    },
+    'cassandra.client_requests_timeouts_rate': {
+        info: 'Requests which were not acknowledged within the configurable timeout window.'
+    },
+    'cassandra.client_requests_unavailables_rate': {
+        info: 'Requests for which the required number of nodes was unavailable.'
+    },
+    'cassandra.storage_exceptions_rate': {
+        info: 'Requests for which a storage exception was encountered.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
