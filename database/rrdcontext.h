@@ -78,6 +78,7 @@ void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd);
 void rrdcontext_updated_rrddim_divisor(RRDDIM *rd);
 void rrdcontext_updated_rrddim_flags(RRDDIM *rd);
 void rrdcontext_collected_rrddim(RRDDIM *rd);
+int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uuid);
 
 // ----------------------------------------------------------------------------
 // public API for rrdsets
@@ -87,6 +88,7 @@ void rrdcontext_removed_rrdset(RRDSET *st);
 void rrdcontext_updated_rrdset_name(RRDSET *st);
 void rrdcontext_updated_rrdset_flags(RRDSET *st);
 void rrdcontext_collected_rrdset(RRDSET *st);
+int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid);
 
 // ----------------------------------------------------------------------------
 // public API for ACLK

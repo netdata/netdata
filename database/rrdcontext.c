@@ -1486,6 +1486,63 @@ void rrdcontext_host_child_connected(RRDHOST *host) {
     ;
 }
 
+int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uuid) {
+    if(!st->rrdhost) return 1;
+    if(!st->context) return 2;
+
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(st->context));
+    if(!rca) return 3;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, string2str(st->id));
+    if(!ria) {
+        rrdcontext_release(rca);
+        return 4;
+    }
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+
+    RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_get_and_acquire_item(ri->rrdmetrics, id);
+    if(!rma) {
+        rrdinstance_release(ria);
+        rrdcontext_release(rca);
+        return 5;
+    }
+
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+
+    uuid_copy(*store_uuid, rm->uuid);
+
+    rrdmetric_release(rma);
+    rrdinstance_release(ria);
+    rrdcontext_release(rca);
+    return 0;
+}
+
+int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid) {
+    if(!st->rrdhost) return 1;
+    if(!st->context) return 2;
+
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)st->rrdhost->rrdctx, string2str(st->context));
+    if(!rca) return 3;
+
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, string2str(st->id));
+    if(!ria) {
+        rrdcontext_release(rca);
+        return 4;
+    }
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    uuid_copy(*store_uuid, ri->uuid);
+
+    rrdinstance_release(ria);
+    rrdcontext_release(rca);
+    return 0;
+}
+
 void rrdcontext_host_child_disconnected(RRDHOST *host) {
     rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
 }
