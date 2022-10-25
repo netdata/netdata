@@ -119,25 +119,25 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    WEIGHTS_STATS *stats) {
 
     buffer_sprintf(wb, "{\n"
-                       "\t\"after\": %"PRId64",\n"
-                       "\t\"before\": %"PRId64",\n"
-                       "\t\"duration\": %"PRId64",\n"
+                       "\t\"after\": %lld,\n"
+                       "\t\"before\": %lld,\n"
+                       "\t\"duration\": %lld,\n"
                        "\t\"points\": %zu,\n",
-                       after,
-                       before,
-                       before - after,
+                       (long long)after,
+                       (long long)before,
+                       (long long)(before - after),
                        points
                        );
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME)
         buffer_sprintf(wb, ""
-                           "\t\"baseline_after\": %"PRId64",\n"
-                           "\t\"baseline_before\": %"PRId64",\n"
-                           "\t\"baseline_duration\": %"PRId64",\n"
+                           "\t\"baseline_after\": %lld,\n"
+                           "\t\"baseline_before\": %lld,\n"
+                           "\t\"baseline_duration\": %lld,\n"
                            "\t\"baseline_points\": %zu,\n",
-                           baseline_after,
-                           baseline_before,
-                           baseline_before - baseline_after,
+                           (long long)baseline_after,
+                           (long long)baseline_before,
+                           (long long)(baseline_before - baseline_after),
                            points << shifts
                        );
 
