@@ -256,7 +256,13 @@ ML_FILES += \
     $(NULL)
 
 # Disable warnings from dlib library
-ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
+ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow -Wno-psabi
+
+# Disable ml warnings
+ml/Dimension.$(OBJEXT) : CXXFLAGS += -Wno-psabi
+ml/Host.$(OBJEXT) : CXXFLAGS += -Wno-psabi
+ml/KMeans.$(OBJEXT) : CXXFLAGS += -Wno-psabi
+ml/ml.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 
 endif
 
