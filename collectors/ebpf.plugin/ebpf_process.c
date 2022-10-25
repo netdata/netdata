@@ -1150,8 +1150,6 @@ static void process_collector(ebpf_module_t *em)
             update_apps_list = 0;
             cleanup_exited_pids();
             collect_data_for_all_processes(pid_fd);
-
-            ebpf_create_apps_charts(apps_groups_root_target);
         }
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1162,6 +1160,8 @@ static void process_collector(ebpf_module_t *em)
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);
+
+            ebpf_create_apps_charts(apps_groups_root_target);
             if (all_pids_count > 0) {
                 if (apps_enabled) {
                     ebpf_process_update_apps_data();
