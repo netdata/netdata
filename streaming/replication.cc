@@ -112,7 +112,7 @@ private:
         void *RDP;
         rrddim_foreach_read(RDP, RS) {
             RRDDIM *RD = static_cast<RRDDIM *>(RDP);
-            buffer_sprintf(WB, " %s", rrddim_id(RD));
+            buffer_sprintf(WB, " \"%s\"", rrddim_id(RD));
         }
         rrddim_foreach_done(RDP);
 
@@ -262,7 +262,7 @@ void replicate_chart_response(RRDHOST *host, RRDSET *st,
     {
         // pass the original after/before so that the parent knows about
         // which time range we responded
-        buffer_sprintf(wb, "REPLAY_RRDSET_BEGIN %s\n", rrdset_id(st));
+        buffer_sprintf(wb, "REPLAY_RRDSET_BEGIN \"%s\"\n", rrdset_id(st));
 
         // fill the data table
         (void) ChartQuery::get(wb, st, after, before);
@@ -272,12 +272,11 @@ void replicate_chart_response(RRDHOST *host, RRDSET *st,
         buffer_sprintf(wb, "REPLAY_RRDSET_END %ld %ld %ld %s %ld %ld\n",
                        (time_t) st->update_every, first_entry_local, last_entry_local,
                        start_streaming ? "true" : "false", after, before);
-
-        if (start_streaming)
-            rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
     }
-
     sender_commit(host->sender, wb);
+
+    if (start_streaming)
+        rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
 }
 
 static bool send_replay_chart_cmd(FILE *outfp, const char *chart,

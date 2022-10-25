@@ -160,7 +160,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     // clear streaming flag from each chart because we want
     // to start replication on the next possible reconnection
     RRDSET *st;
-    rrdset_foreach_read(st, host) {
+    rrdset_foreach_reentrant(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
 
         st->replay_request.pending = false;
@@ -1105,11 +1105,11 @@ static void process_replication_requests(struct sender_state *s) {
         netdata_mutex_unlock(&s->mutex);
 
         NETDATA_DOUBLE buffer_utilization = (s->host->sender->buffer->max_size - available) * 100.0 / s->host->sender->buffer->max_size;
-        if ((buffer_utilization > 75.00) && !overutilized_buffer)
+        if ((buffer_utilization > 50.00) && !overutilized_buffer)
             overutilized_buffer = true;
 
         if (overutilized_buffer)
-            continue;
+            break;
 
         replicate_chart_response(s->host, st, st->replay_request.start_streaming,
                                               st->replay_request.after,
