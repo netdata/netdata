@@ -8,23 +8,35 @@
 // ----------------------------------------------------------------------------
 // RRDSET name index
 
-static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
-    RRDSET *st = rrdset;
-    rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
-}
-static void rrdset_name_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
-    RRDSET *st = rrdset;
-    rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
-}
-
 static inline void rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
     if(!st->name) return;
-    dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET));
+
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(host, rrdset_id(st));
+    if(rsa && dictionary_acquired_item_value((DICTIONARY_ITEM *)rsa) == st) {
+
+        RRDSET_ACQUIRED *rsa_name = (RRDSET_ACQUIRED *)
+                dictionary_view_set_and_acquire_item(host->rrdset_root_index_name, rrdset_name(st), (DICTIONARY_ITEM *) rsa);
+
+        if(dictionary_acquired_item_value((DICTIONARY_ITEM *)rsa_name) == st)
+            rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
+        else
+            error("RRDSET: failed to index rrdset '%s' with name '%s'", rrdset_id(st), rrdset_name(st));
+
+        if(rsa_name)
+            dictionary_acquired_item_release(host->rrdset_root_index_name, (DICTIONARY_ITEM *)rsa_name);
+    }
+    else
+        error("RRDSET: failed to find the dictionary item of rrdset with id '%s'", rrdset_id(st));
+
+    if(rsa)
+        dictionary_acquired_item_release(host->rrdset_root_index, (DICTIONARY_ITEM *)rsa);
 }
 
 static inline void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME))
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME)) {
         dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
+        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
+    }
 }
 
 static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
@@ -112,11 +124,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     const char *chart_full_id = dictionary_acquired_item_name(item);
 
     st->id = string_strdupz(chart_full_id);
-
-    st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
-    if(!st->name)
-        st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
-    rrdset_index_add_name(host, st);
 
     st->parts.id = string_strdupz(ctr->id);
     st->parts.type = string_strdupz(ctr->type);
@@ -360,6 +367,19 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
+    if(ctr->react_action == RRDSET_REACT_NEW) {
+        // The name has to be indexed in the dictionary VIEW, after the original item has been inserted
+        // into the RRDSET index - so we do it at the REACT callback
+
+        const char *chart_full_id = dictionary_acquired_item_name(item);
+
+        st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
+        if(!st->name)
+            st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
+
+        rrdset_index_add_name(host, st);
+    }
+
     if((host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) && !rrdset_is_ar_chart(st)) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -388,13 +408,8 @@ void rrdset_index_init(RRDHOST *host) {
         dictionary_register_delete_callback(host->rrdset_root_index, rrdset_delete_callback, host);
     }
 
-    if(!host->rrdset_root_index_name) {
-        host->rrdset_root_index_name = dictionary_create(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
-
-        dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
-        dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
-    }
+    if(!host->rrdset_root_index_name)
+        host->rrdset_root_index_name = dictionary_create_view(host->rrdset_root_index);
 }
 
 void rrdset_index_destroy(RRDHOST *host) {
@@ -416,17 +431,32 @@ static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
         dictionary_del(host->rrdset_root_index, rrdset_id(st));
 }
 
-static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
-    // TODO - the name index should have an acquired dictionary item, not just a pointer to RRDSET
-    return dictionary_get(host->rrdset_root_index, id);
+static RRDSET_ACQUIRED *rrdset_index_find_and_acquire(RRDHOST *host, const char *id) {
+    return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+}
+
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa) {
+    RRDSET *st = dictionary_acquired_item_value((DICTIONARY_ITEM *)rsa);
+    dictionary_acquired_item_release(st->rrdhost->rrdset_root_index, (DICTIONARY_ITEM *)rsa);
 }
 
 // ----------------------------------------------------------------------------
 // RRDSET - find charts
 
+inline RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
+    debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
+    RRDSET_ACQUIRED *rsa = rrdset_index_find_and_acquire(host, id);
+    return(rsa);
+}
+
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
-    RRDSET *st = rrdset_index_find(host, id);
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(host, id);
+    if(!rsa) return NULL;
+
+    RRDSET *st = dictionary_acquired_item_value((DICTIONARY_ITEM *)rsa);
+    rrdset_acquired_release(rsa);
+
     return(st);
 }
 

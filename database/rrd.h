@@ -1190,6 +1190,8 @@ int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now
 
 void rrdset_update_heterogeneous_flag(RRDSET *st);
 
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
 /* This will not return charts that are archived */
