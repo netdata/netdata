@@ -100,24 +100,6 @@ void ebpf_map_cgroup_shared_memory()
 // Close and Cleanup
 
 /**
- * Close shared memory
- */
-void ebpf_close_cgroup_shm()
-{
-    if (shm_sem_ebpf_cgroup != SEM_FAILED) {
-        sem_close(shm_sem_ebpf_cgroup);
-        sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
-        shm_sem_ebpf_cgroup = SEM_FAILED;
-    }
-
-    if (shm_fd_ebpf_cgroup > 0) {
-        close(shm_fd_ebpf_cgroup);
-        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-        shm_fd_ebpf_cgroup = -1;
-    }
-}
-
-/**
  * Clean Specific cgroup pid
  *
  * Clean all PIDs associated with cgroup.
