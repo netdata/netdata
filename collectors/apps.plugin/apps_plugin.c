@@ -4281,8 +4281,8 @@ static void apps_plugin_function_processes_help(const char *transaction) {
         buffer_sprintf(wb, "\n         \"type\":\"%s\",", type);                                                \
         if(units)                                                                                               \
            buffer_sprintf(wb, "\n         \"units\":\"%s\",", (char*)(units));                                  \
-        if(!isnan(max))                                                                                         \
-           buffer_sprintf(wb, "\n         \"max\":\"%f\",", (NETDATA_DOUBLE)(max));                             \
+        if(netdata_double_isnumber(max))                                                                        \
+           buffer_sprintf(wb, "\n         \"max\":%f,", (NETDATA_DOUBLE)(max));                                 \
         if(pointer_to)                                                                                          \
             buffer_sprintf(wb, "\n         \"pointer_to\":\"%s\",", (char *)(pointer_to));                      \
         buffer_sprintf(wb, "\n         \"sort\":\"%s\",", sort);                                                \
@@ -4385,7 +4385,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(func_processes_fields, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
 
 #ifdef NETDATA_DEV_MODE
-        add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:cmd", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(func_processes_fields, "CmdLine", "Command Line", false, "detail-string:Cmd", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
 #endif
         add_table_field(func_processes_fields, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, true, false, "Pid", "count_unique");
         add_table_field(func_processes_fields, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
@@ -4398,23 +4398,23 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(func_processes_fields, "Uptime", "Uptime in seconds", true, "duration", "seconds", NAN, "descending", true, false, false, NULL, "max");
 
         // minor page faults
-        add_table_field(func_processes_fields, "MinFlt", "Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "MinFlt", "Minor Page Faults/s", false, "bar", "pgflts/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "pgflts/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "pgflts/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // major page faults
-        add_table_field(func_processes_fields, "MajFlt", "Major Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "CMajFlt", "Children Major Page Faults/s", false, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "TMajFlt", "Total Major Page Faults/s", true, "bar", "page faults/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "MajFlt", "Major Page Faults/s", false, "bar", "pgflts/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CMajFlt", "Children Major Page Faults/s", false, "bar", "pgflts/s", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "TMajFlt", "Total Major Page Faults/s", true, "bar", "pgflts/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // CPU utilization
-        add_table_field(func_processes_fields, "UserCPU", "User CPU time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "SysCPU", "System CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "GuestCPU", "Guest CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time", false, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "CPU", "Total CPU Time", true, "bar-only", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "UserCPU", "User CPU time", false, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "SysCPU", "System CPU Time", false, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "GuestCPU", "Guest CPU Time", false, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CUserCPU", "Children User CPU Time", false, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CSysCPU", "Children System CPU Time", false, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CGuestCPU", "Children Guest CPU Time", false, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "CPU", "Total CPU Time", true, "bar", "%", NAN, "descending", true, false, false, NULL, "sum");
 
         // memory
         add_table_field(func_processes_fields, "VMSize", "Virtual Memory Size", false, "bar", "MiB", NAN, "descending", true, false, false, NULL, "sum");
@@ -4440,16 +4440,16 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(func_processes_fields, "WCalls", "I/O Write Calls", false, "bar", "calls/s", NAN, "descending", true, false, false, NULL, "sum");
 
         // open file descriptors
-        add_table_field(func_processes_fields, "Files", "Open Files", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "Pipes", "Open Pipes", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "Sockets", "Open Sockets", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "EventFDs", "Open Event Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "TimerFDs", "Open Timer Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "SigFDs", "Open Signal Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "OtherFDs", "Other Open Descriptors", false, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
-        add_table_field(func_processes_fields, "FDs", "All Open File Descriptors", true, "bar", "generic", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Files", "Open Files", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Pipes", "Open Pipes", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "Sockets", "Open Sockets", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "EventFDs", "Open Event Descriptors", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "TimerFDs", "Open Timer Descriptors", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "SigFDs", "Open Signal Descriptors", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "OtherFDs", "Other Open Descriptors", false, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
+        add_table_field(func_processes_fields, "FDs", "All Open File Descriptors", true, "bar", "fds", NAN, "descending", true, false, false, NULL, "sum");
 
         buffer_strcat(
             func_processes_fields,
