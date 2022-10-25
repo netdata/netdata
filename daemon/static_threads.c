@@ -14,6 +14,10 @@ void *service_main(void *ptr);
 void *statsd_main(void *ptr);
 void *timex_main(void *ptr);
 void *replication_thread_main(void *ptr __maybe_unused);
+#ifdef ENABLE_LOGSMANAGEMENT
+void *logsmanagement_plugin_main(void *ptr);
+void *logsmanagement_main(void *ptr);
+#endif
 
 extern bool global_statistics_enabled;
 
@@ -165,7 +169,11 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 
     {
+<<<<<<< HEAD
         .name = "REPLAY[1]",
+=======
+        .name = "REPLICATION",
+>>>>>>> bd9f1f131 (Squash all previous logs management commits to one)
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,
@@ -173,6 +181,27 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = replication_thread_main
     },
+
+#if defined(ENABLE_LOGSMANAGEMENT)
+    {
+        .name = "PLUGIN[logsmanagement]",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = logsmanagement_plugin_main
+    },
+    {
+        .name = "LOGSMANAGEMENT",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = logsmanagement_main
+    },
+#endif
 
     // terminator
     {

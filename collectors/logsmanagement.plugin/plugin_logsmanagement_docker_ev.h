@@ -1,0 +1,40 @@
+/** @file plugins_logsmanagement_docker_ev.h
+ *  @brief Incudes the structure and function definitions to use docker event log charts.
+ *
+ *  @author Dimitris Pantazis
+ */
+
+#ifndef PLUGIN_LOGSMANAGEMENT_DOCKER_EV_H_
+#define PLUGIN_LOGSMANAGEMENT_DOCKER_EV_H_
+
+#include "../../daemon/common.h"
+#include "../../logsmanagement/file_info.h"
+#include "../../logsmanagement/circular_buffer.h"
+
+typedef struct Chart_data_docker_ev chart_data_docker_ev_t;
+
+#include "plugin_logsmanagement.h"
+
+/* NETDATA_CHART_PRIO for Docker_ev_chart_data */
+#define NETDATA_CHART_PRIO_DOCKER_EV_TYPE       NETDATA_CHART_PRIO_LOGS_BASE + 10
+
+struct Chart_data_docker_ev {
+    char *rrd_type;
+
+    /* Number of lines */
+    RRDSET *st_lines;
+    RRDDIM *dim_lines_total;
+    RRDDIM *dim_lines_rate;
+    collected_number num_lines_total, num_lines_rate;
+
+    /* Docker events metrics - event type */
+    RRDSET *st_dock_ev_type;
+    RRDDIM *dim_dock_ev_type[NUM_OF_DOCKER_EV_TYPES];
+    collected_number num_dock_ev_type[NUM_OF_DOCKER_EV_TYPES];
+};
+
+void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
+void docker_ev_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
+void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update);
+
+#endif // PLUGIN_LOGSMANAGEMENT_DOCKER_EV_H_

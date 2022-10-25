@@ -1,0 +1,51 @@
+/** @file plugins_logsmanagement_systemd.h
+ *  @brief Incudes the structure and function definitions to use system log charts.
+ *
+ *  @author Dimitris Pantazis
+ */
+
+#ifndef PLUGIN_LOGSMANAGEMENT_SYSTEMD_H_
+#define PLUGIN_LOGSMANAGEMENT_SYSTEMD_H_
+
+#include "../../daemon/common.h"
+#include "../../logsmanagement/file_info.h"
+#include "../../logsmanagement/circular_buffer.h"
+
+typedef struct Chart_data_systemd chart_data_systemd_t;
+
+#include "plugin_logsmanagement.h"
+
+/* NETDATA_CHART_PRIO for Systemd_chart_data */
+#define NETDATA_CHART_PRIO_SYSLOG_PRIOR         NETDATA_CHART_PRIO_LOGS_BASE + 7
+#define NETDATA_CHART_PRIO_SYSLOG_SEVER         NETDATA_CHART_PRIO_LOGS_BASE + 8
+#define NETDATA_CHART_PRIO_SYSLOG_FACIL         NETDATA_CHART_PRIO_LOGS_BASE + 9
+
+struct Chart_data_systemd {
+
+    /* Number of lines */
+    RRDSET *st_lines;
+    RRDDIM *dim_lines_total;
+    RRDDIM *dim_lines_rate;
+    collected_number num_lines_total, num_lines_rate;
+    
+    /* Systemd metrics - Syslog Priority value */
+    RRDSET *st_prior;
+    RRDDIM *dim_prior[193];
+    collected_number num_prior[193];
+
+    /* Systemd metrics - Syslog Severity value */
+    RRDSET *st_sever;
+    RRDDIM *dim_sever[9];
+    collected_number num_sever[9];
+
+    /* Systemd metrics - Syslog Facility value */
+    RRDSET *st_facil;
+    RRDDIM *dim_facil[25];
+    collected_number num_facil[25];
+};
+
+void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
+void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
+void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update);
+
+#endif // PLUGIN_LOGSMANAGEMENT_SYSTEMD_H_

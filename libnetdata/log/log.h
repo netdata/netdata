@@ -47,6 +47,7 @@ extern "C" {
 #define D_ACLK_SYNC         0x0000000800000000
 #define D_META_SYNC         0x0000001000000000
 #define D_REPLICATION       0x0000002000000000
+#define D_LOGS_MANAG        0x0000004000000000
 #define D_SYSTEM            0x8000000000000000
 
 extern int web_server_is_multithreaded;

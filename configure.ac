@@ -213,6 +213,35 @@ AC_ARG_ENABLE(
     [aclk_ssl_debug="yes"],
     [aclk_ssl_debug="no"]
 )
+AC_ARG_ENABLE(
+    [logsmanagement],
+    [AS_HELP_STRING([--enable-logsmanagement],
+                    [Enable logsmanagement @<:@default disabled@:>@])],
+    ,
+    [enable_logsmanagement="detect"]
+)
+
+if test "${enable_logsmanagement}" = "yes"; then
+    AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
+fi
+
+AC_MSG_RESULT([${enable_logsmanagement}])
+AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${enable_logsmanagement}" = "yes"])
+
+AC_ARG_ENABLE(
+    [logsmanagement_tests],
+    [AS_HELP_STRING([--enable-logsmanagement-tests],
+                    [Enable logsmanagement tests @<:@default disabled@:>@])],
+    ,
+    [enable_logsmanagement_tests="detect"]
+)
+
+if test "${enable_logsmanagement_tests}" = "yes"; then
+    AC_DEFINE([ENABLE_LOGSMANAGEMENT_TESTS], [1], [enable logs management tests functionality])
+fi
+
+AC_MSG_RESULT([${enable_logsmanagement_tests}])
+AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT_TESTS], [test "${enable_logsmanagement_tests}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -494,10 +523,10 @@ AC_CHECK_SIZEOF(void *)
 if test "$ac_cv_sizeof_void_p" = 8; then 
     AC_MSG_RESULT(Detected 64-bit Build Environment)
     	LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -DJU_64BIT"
-else 
+                else
     AC_MSG_RESULT(Detected 32-bit Build Environment)
         LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -UJU_64BIT"
-fi
+                fi
 
 AC_SUBST([LIBJUDY_CFLAGS])
 
@@ -840,7 +869,6 @@ else
 fi
 AC_MSG_RESULT([${enable_plugin_apps}])
 AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${enable_plugin_apps}" = "yes"])
-
 
 # -----------------------------------------------------------------------------
 # freeipmi.plugin - libipmimonitoring
@@ -1792,6 +1820,7 @@ AC_CONFIG_FILES([
     claim/Makefile
     spawn/Makefile
     parser/Makefile
+    logsmanagement/Makefile
 ])
 
 AC_OUTPUT

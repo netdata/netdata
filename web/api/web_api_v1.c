@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_api_v1.h"
+#ifdef ENABLE_LOGSMANAGEMENT
+#include "logsmanagement/query.h"
+#endif
 
 char *api_secret;
 
@@ -1500,7 +1503,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
 #ifndef ENABLE_DBENGINE
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
     return HTTP_RESP_NOT_FOUND;
-}
+    }
 #else
 static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
     RRDENG_SIZE_STATS stats = rrdeng_size_statistics(multidb_ctx[tier]);
@@ -1590,6 +1593,196 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#ifdef ENABLE_LOGSMANAGEMENT
+inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struct web_client *w, char *url) {
+    UNUSED(host);
+    UNUSED(url);
+    if (unlikely(!netdata_ready)) return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+
+    buffer_strcat(w->response.data, "{\n");
+    buffer_sprintf(w->response.data, "\t\"version\": %s,\n", QUERY_VERSION);
+    buffer_strcat(w->response.data, "\t\"log sources\": {\n");
+    LOGS_QUERY_RESULT_TYPE err_code = fetch_log_sources(w->response.data);
+    buffer_strcat(w->response.data, "\n\t},\n");
+    buffer_sprintf(w->response.data, "\t\"error code\": %d,\n", err_code);
+    buffer_sprintf(w->response.data, "\t\"error\": \"");
+    switch(err_code){
+        case GENERIC_ERROR:
+            buffer_strcat(w->response.data, "query generic error");
+            break;
+        case NO_RESULTS_FOUND:
+            buffer_strcat(w->response.data, "no results found");
+            break;
+        default:
+            buffer_strcat(w->response.data, "no error");
+            break;
+    } 
+    buffer_strcat(w->response.data, "\"\n}");
+
+    buffer_no_cacheable(w->response.data);
+    return HTTP_RESP_OK;
+}
+
+inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_client *w, char *url) {
+    UNUSED(host);
+    if (unlikely(!netdata_ready)) return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    struct rusage start, end;
+    getrusage(RUSAGE_THREAD, &start);
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+
+    logs_query_params_t query_params = {0};
+    query_params.quota = 524288; // Default query quota size 0.5 MiB
+    
+    int fn_off = 0;
+    int cn_off = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "from")) {
+            query_params.start_timestamp = strtol(value, NULL, 10);
+        }
+        else if(!strcmp(name, "until")) {
+            query_params.end_timestamp = strtol(value, NULL, 10);
+        }
+        else if(!strcmp(name, "quota")) {
+            query_params.quota = strtol(value, NULL, 10);
+        }
+        else if(!strcmp(name, "filename")) {
+            query_params.filename[fn_off++] = value;
+        }
+        else if(!strcmp(name, "chart_name")) {
+            query_params.chart_name[cn_off++] = value;
+        }
+        else if(!strcmp(name, "keyword")) {
+            query_params.keyword = value;
+        }
+        else if(!strcmp(name, "ignore_case")) {
+            query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
+        }
+        else if(!strcmp(name, "sanitise_keyword")) {
+            query_params.sanitise_keyword = strtol(value, NULL, 10) ? 1 : 0;
+        }
+    }
+
+    fn_off = cn_off = 0;
+
+    query_params.results_buff = buffer_create(query_params.quota);
+    
+    buffer_strcat(w->response.data, "{\n");
+    buffer_sprintf(w->response.data, "\t\"version\": %s,\n", QUERY_VERSION);
+    buffer_sprintf(w->response.data, "\t\"requested from\": %" PRIu64 ",\n", query_params.start_timestamp);
+    buffer_sprintf(w->response.data, "\t\"requested until\": %" PRIu64 ",\n", query_params.end_timestamp);
+    buffer_sprintf(w->response.data, "\t\"requested keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
+    LOGS_QUERY_RESULT_TYPE err_code = execute_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
+    buffer_sprintf(w->response.data, "\t\"actual from\": %" PRIu64 ",\n", query_params.start_timestamp);
+    buffer_sprintf(w->response.data, "\t\"actual until\": %" PRIu64 ",\n", query_params.end_timestamp);
+    buffer_sprintf(w->response.data, "\t\"quota\": %zu,\n", query_params.quota);
+    buffer_sprintf(w->response.data, "\t\"requested filename\":[\n");
+    while(query_params.filename[fn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
+    if(query_params.filename[0])  w->response.data->len -= 2;
+    buffer_strcat(w->response.data, "\n\t],\n");
+    buffer_sprintf(w->response.data, "\t\"requested chart_name\":[\n");
+    while(query_params.chart_name[cn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.chart_name[cn_off++]);
+    if(query_params.chart_name[0])  w->response.data->len -= 2;
+    buffer_strcat(w->response.data, "\n\t],\n");
+    buffer_strcat(w->response.data, "\t\"data\":[\n");
+
+    /* Unfortunately '\n', '\\' and '"' need to be escaped, so we need to go 
+     * through the query_params.results_buff->buffer characters one by one. 
+     * Careful not to escape valid new lines, backslashes and double quotes. */
+    char *p = query_params.results_buff->buffer;
+    int f_quote = 0;
+    while (*p){
+        if(unlikely(*p == '\n' && *(p-1) != ','  && *(p-2) != ']')){
+            buffer_need_bytes(w->response.data, 2);
+            w->response.data->buffer[w->response.data->len++] = '\\';
+            w->response.data->buffer[w->response.data->len++] = 'n';
+        } 
+        else if(unlikely(*p == '\\')) {
+            buffer_need_bytes(w->response.data, 2);
+            w->response.data->buffer[w->response.data->len++] = '\\';
+            w->response.data->buffer[w->response.data->len++] = '\\';
+        }
+        else if(unlikely(*p == '"')) {
+            if(unlikely(f_quote == 0)){
+                f_quote = 1;
+                buffer_need_bytes(w->response.data, 1);
+                w->response.data->buffer[w->response.data->len++] = *p;
+            }
+            else if(unlikely(*(p+1) == ',' && *(p+2) == ' ' && *(p+3) == '\t')){
+                f_quote = 0;
+                buffer_need_bytes(w->response.data, 1);
+                w->response.data->buffer[w->response.data->len++] = *p;
+            } else {
+                buffer_need_bytes(w->response.data, 2);
+                w->response.data->buffer[w->response.data->len++] = '\\';
+                w->response.data->buffer[w->response.data->len++] = '"';
+            }
+        }
+        else {
+            buffer_need_bytes(w->response.data, 1);
+            w->response.data->buffer[w->response.data->len++] = *p;
+        }
+        p++;
+    }
+    // buffer_overflow_check(w->response.data);
+
+    buffer_strcat(w->response.data, "\n\t],\n");
+    buffer_sprintf(w->response.data, "\t\"data array length\": %zu,\n", query_params.results_buff->len);
+    buffer_sprintf(w->response.data, "\t\"keyword matches\": %d,\n", query_params.keyword_matches);
+    getrusage(RUSAGE_THREAD, &end);
+    buffer_sprintf(w->response.data, "\t\"user time\": %llu,\n", end.ru_utime.tv_sec * 1000000ULL + 
+                                                                 end.ru_utime.tv_usec - 
+                                                                 start.ru_utime.tv_sec * 1000000ULL -
+                                                                 start.ru_utime.tv_usec);
+    buffer_sprintf(w->response.data, "\t\"system time\": %llu,\n", end.ru_stime.tv_sec * 1000000ULL + 
+                                                                   end.ru_stime.tv_usec - 
+                                                                   start.ru_stime.tv_sec * 1000000ULL -
+                                                                   start.ru_stime.tv_usec);
+    buffer_sprintf(w->response.data, "\t\"error code\": %d,\n", err_code);
+    buffer_sprintf(w->response.data, "\t\"error\": \"");
+    switch(err_code){
+        case GENERIC_ERROR:
+            buffer_strcat(w->response.data, "query generic error");
+            break;
+        case INVALID_REQUEST_ERROR:
+            buffer_strcat(w->response.data, "invalid request");
+            break;
+        case NO_MATCHING_CHART_OR_FILENAME_ERROR:
+            buffer_strcat(w->response.data, "no matching chart or filename found");
+            break;
+        case NO_RESULTS_FOUND:
+            buffer_strcat(w->response.data, "no results found");
+            break;
+        default:
+            buffer_strcat(w->response.data, "success");
+            break;
+    } 
+    buffer_strcat(w->response.data, "\"\n}");
+        
+    buffer_free(query_params.results_buff);
+
+    buffer_no_cacheable(w->response.data);
+
+    if( unlikely(err_code == INVALID_REQUEST_ERROR || 
+        err_code == NO_MATCHING_CHART_OR_FILENAME_ERROR)) return HTTP_RESP_BAD_REQUEST;
+    if( unlikely(err_code == GENERIC_ERROR)) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    return HTTP_RESP_OK;
+}
+#endif // ENABLE_LOGSMANAGEMENT
+
 #ifdef NETDATA_DEV_MODE
 #define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
 #else
@@ -1621,6 +1814,11 @@ static struct api_command {
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_variables           },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_count               },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
+
+#if defined(ENABLE_LOGSMANAGEMENT)
+        { "logsmanagement_sources",  0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_logsmanagement_sources  },
+        { "logsmanagement",  0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_logsmanagement  },
+#endif
 
 #if defined(ENABLE_ML)
       { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },

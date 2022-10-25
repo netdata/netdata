@@ -1479,6 +1479,11 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
                         }
+#if defined(ENABLE_LOGSMANAGEMENT) && defined(ENABLE_LOGSMANAGEMENT_TESTS)
+                        else if(strcmp(optarg, "logsmantest") == 0) {
+                            return test_logs_management(argc, argv);
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;

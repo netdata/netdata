@@ -91,6 +91,9 @@
 #define CONFIG_SECTION_STATSD             "statsd"
 #define CONFIG_SECTION_PLUGINS            "plugins"
 #define CONFIG_SECTION_CLOUD              "cloud"
+#ifdef ENABLE_LOGSMANAGEMENT
+#define CONFIG_SECTION_LOGS_MANAGEMENT    "logs management"
+#endif // ENABLE_LOGSMANAGEMENT
 #define CONFIG_SECTION_REGISTRY           "registry"
 #define CONFIG_SECTION_HEALTH             "health"
 #define CONFIG_SECTION_STREAM             "stream"

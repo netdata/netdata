@@ -136,12 +136,12 @@ ACLK="${ACLK}"
 
 # keep a log of this command
 {
-	printf "\n# "
-	date
-	printf 'CFLAGS="%s" ' "${CFLAGS}"
-	printf 'LDFLAGS="%s" ' "${LDFLAGS}"
-	printf "%s" "${PROGRAM}" "${@}"
-	printf "\n"
+  printf "\n# "
+  date
+  printf 'CFLAGS="%s" ' "${CFLAGS}"
+  printf 'LDFLAGS="%s" ' "${LDFLAGS}"
+  printf "%s" "${PROGRAM}" "${@}"
+  printf "\n"
 } >> netdata-installer.log
 
 REINSTALL_OPTIONS="$(
@@ -240,6 +240,8 @@ USAGE: ${PROGRAM} [options]
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
+  --enable-logsmanagement    Enable the logs management plugin. Default: disabled.
+  --enable-logsmanagement-tests Enable the logs management tests. Default: disabled.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -332,6 +334,10 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
       NETDATA_ENABLE_ML=0
       ;;
+    "--enable-logsmanagement")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
+      ;;
+    "--enable-logsmanagement-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement-tests)}" | sed 's/$/ --enable-logsmanagement-tests/g')" ;;
     "--disable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-lto)}" | sed 's/$/ --disable-lto/g')" ;;
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
@@ -1034,10 +1040,10 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
         md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
 
         if config_signature_matches "${md5}" "${t}"; then
-	  # it is a stock version - remove it
+    # it is a stock version - remove it
           echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
           run rm -f "${x}"
-	  # shellcheck disable=SC2030
+    # shellcheck disable=SC2030
           deleted_stock_configs=$((deleted_stock_configs + 1))
         else
           # edited by user - keep it

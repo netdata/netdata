@@ -109,6 +109,7 @@ SUBDIRS += \
     claim \
     parser \
     spawn \
+    logsmanagement \
     $(NULL)
 
 AM_CFLAGS = \
@@ -272,6 +273,21 @@ endif
 IDLEJITTER_PLUGIN_FILES = \
     collectors/idlejitter.plugin/plugin_idlejitter.c \
     $(NULL)
+
+if ENABLE_LOGSMANAGEMENT
+LOGSMANAGEMENT_PLUGIN_FILES = \
+    collectors/logsmanagement.plugin/plugin_logsmanagement.c \
+    collectors/logsmanagement.plugin/plugin_logsmanagement.h \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.c \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.h \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.c \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.h \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.c \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.h \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_generic.c \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_generic.h \
+    $(NULL)
+endif
 
 CGROUPS_PLUGIN_FILES = \
     collectors/cgroups.plugin/sys_fs_cgroup.c \
@@ -907,6 +923,38 @@ MONGODB_EXPORTING_FILES = \
     exporting/mongodb/mongodb.h \
     $(NULL)
 
+if ENABLE_LOGSMANAGEMENT
+LOGSMANAGEMENT_FILES = \
+    logsmanagement/circular_buffer.c \
+    logsmanagement/circular_buffer.h \
+    logsmanagement/compression.c \
+    logsmanagement/compression.h \
+    logsmanagement/logsmanagement_conf.h \
+    logsmanagement/db_api.c \
+    logsmanagement/db_api.h \
+    logsmanagement/file_info.h \
+    logsmanagement/helper.h \
+    logsmanagement/logsmanagement.c \
+    logsmanagement/parser.c \
+    logsmanagement/parser.h \
+    logsmanagement/query.c \
+    logsmanagement/query.h \
+    logsmanagement/query_test.c \
+    logsmanagement/query_test.h \
+    logsmanagement/flb_plugin.c \
+    logsmanagement/flb_plugin.h \
+    logsmanagement/tail_plugin.c \
+    logsmanagement/tail_plugin.h \
+    $(NULL)
+endif
+
+if ENABLE_LOGSMANAGEMENT_TESTS
+LOGSMANAGEMENT_TESTS_FILES = \
+    logsmanagement/unit_test/unit_test.c \
+    logsmanagement/unit_test/unit_test.h \
+    $(NULL)
+endif
+
 DAEMON_FILES = \
     daemon/buildinfo.c \
     daemon/buildinfo.h \
@@ -942,6 +990,7 @@ NETDATA_FILES = \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
+    $(LOGSMANAGEMENT_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
     $(RRD_PLUGIN_FILES) \
@@ -954,6 +1003,8 @@ NETDATA_FILES = \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
+    $(LOGSMANAGEMENT_FILES) \
+    $(LOGSMANAGEMENT_TESTS_FILES) \
     $(NULL)
 
 if FREEBSD

@@ -29,6 +29,10 @@ int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char
 int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
+#ifdef ENABLE_LOGSMANAGEMENT
+int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_client *w, char *url);
+#endif
 void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
 
 void web_client_api_v1_init(void);
