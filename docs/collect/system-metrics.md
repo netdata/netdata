@@ -43,7 +43,7 @@ First, [download windows_exporter](https://github.com/prometheus-community/windo
 with the following collectors enabled, changing `0.14.0` to the version you downloaded.
 
 ```powershell
-windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon"
+windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon,tcp"
 ```
 
 Next, [configure the WMI

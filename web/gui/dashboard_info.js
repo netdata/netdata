@@ -4201,6 +4201,34 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI
+
+    'wmi.tcp_conns_active': {
+        info: 'Number of times TCP connections have made a direct transition from the CLOSED state to the SYN-SENT state.'
+    },
+    'wmi.tcp_conns_established': {
+        info: 'Number of TCP connections for which the current state is either ESTABLISHED or CLOSE-WAIT.'
+    },
+    'wmi.tcp_conns_failures': {
+        info: 'Number of times TCP connections have made a direct transition to the CLOSED state from the SYN-SENT state or the SYN-RCVD state, plus the number of times TCP connections have made a direct transition from the SYN-RCVD state to the LISTEN state.'
+    },
+    'wmi.tcp_conns_passive': {
+        info: 'Number of times TCP connections have made a direct transition from the LISTEN state to the SYN-RCVD state.'
+    },
+    'wmi.tcp_conns_resets': {
+        info: 'Number of times TCP connections have made a direct transition from the LISTEN state to the SYN-RCVD state.'
+    },
+    'wmi.tcp_segments_received': {
+        info: 'Rate at which segments are received, including those received in error. This count includes segments received on currently established connections.'
+    },
+    'wmi.tcp_segments_retransmitted': {
+        info: 'Rate at which segments are retransmitted, that is, segments transmitted that contain one or more previously transmitted bytes.'
+    },
+    'wmi.tcp_segments_sent': {
+        info: 'Rate at which segments are sent, including those on current connections, but excluding those containing only retransmitted bytes.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
