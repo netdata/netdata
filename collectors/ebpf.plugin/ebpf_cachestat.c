@@ -906,7 +906,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
  *
  * Send collected data to Netdata.
  */
-static int ebpf_send_systemd_cachestat_charts()
+static void ebpf_send_systemd_cachestat_charts()
 {
     ebpf_cgroup_target_t *ect;
 
