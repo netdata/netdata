@@ -2069,8 +2069,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         dimensions_used++;
         if (timeout && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > (NETDATA_DOUBLE)timeout) {
-            log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %ld ms)",
-                       (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, timeout);
+            log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
+                       (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)timeout);
             r->result_options |= RRDR_RESULT_OPTION_CANCEL;
             break;
         }

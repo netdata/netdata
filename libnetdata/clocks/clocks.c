@@ -197,28 +197,28 @@ void sleep_to_absolute_time(usec_t usec) {
                 if (!einval_printed) {
                     einval_printed++;
                     error(
-                        "Invalid time given to clock_nanosleep(): clockid = %d, tv_sec = %ld, tv_nsec = %ld",
+                        "Invalid time given to clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
                         clock,
-                        req.tv_sec,
+                        (long long)req.tv_sec,
                         req.tv_nsec);
                 }
             } else if (ret == ENOTSUP) {
                 if (!enotsup_printed) {
                     enotsup_printed++;
                     error(
-                        "Invalid clock id given to clock_nanosleep(): clockid = %d, tv_sec = %ld, tv_nsec = %ld",
+                        "Invalid clock id given to clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
                         clock,
-                        req.tv_sec,
+                        (long long)req.tv_sec,
                         req.tv_nsec);
                 }
             } else {
                 if (!eunknown_printed) {
                     eunknown_printed++;
                     error(
-                        "Unknown return value %d from clock_nanosleep(): clockid = %d, tv_sec = %ld, tv_nsec = %ld",
+                        "Unknown return value %d from clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
                         ret,
                         clock,
-                        req.tv_sec,
+                        (long long)req.tv_sec,
                         req.tv_nsec);
                 }
             }

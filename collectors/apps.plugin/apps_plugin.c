@@ -4709,7 +4709,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     buffer_free(wb);
 
     fprintf(stdout, "\n   ]");
-    fprintf(stdout, ",\n   \"expires\":%ld", expires);
+    fprintf(stdout, ",\n   \"expires\":%lld", (long long)expires);
     fprintf(stdout, "\n}");
 
     pluginsd_function_result_end_to_stdout();

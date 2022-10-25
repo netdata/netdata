@@ -1538,11 +1538,11 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"metrics_pages\":%zu"
                    ",\n\t\t\"extents_compressed_bytes\":%zu"
                    ",\n\t\t\"pages_uncompressed_bytes\":%zu"
-                   ",\n\t\t\"pages_duration_secs\":%ld"
+                   ",\n\t\t\"pages_duration_secs\":%lld"
                    ",\n\t\t\"single_point_pages\":%zu"
                    ",\n\t\t\"first_t\":%llu"
                    ",\n\t\t\"last_t\":%llu"
-                   ",\n\t\t\"database_retention_secs\":%ld"
+                   ",\n\t\t\"database_retention_secs\":%lld"
                    ",\n\t\t\"average_compression_savings\":%0.2f"
                    ",\n\t\t\"average_point_duration_secs\":%0.2f"
                    ",\n\t\t\"average_metric_retention_secs\":%0.2f"
@@ -1573,11 +1573,11 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.metrics_pages
                    , stats.extents_compressed_bytes
                    , stats.pages_uncompressed_bytes
-                   , stats.pages_duration_secs
+                   , (long long)stats.pages_duration_secs
                    , stats.single_point_pages
                    , stats.first_t
                    , stats.last_t
-                   , stats.database_retention_secs
+                   , (long long)stats.database_retention_secs
                    , stats.average_compression_savings
                    , stats.average_point_duration_secs
                    , stats.average_metric_retention_secs

@@ -1708,12 +1708,12 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
 
     buffer_sprintf(wb,
                    "\n\t\t\t\t\t\t\t\"name\":\"%s\""
-                   ",\n\t\t\t\t\t\t\t\"first_time_t\":%ld"
-                   ",\n\t\t\t\t\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\t\t\t\t\"first_time_t\":%lld"
+                   ",\n\t\t\t\t\t\t\t\"last_time_t\":%lld"
                    ",\n\t\t\t\t\t\t\t\"collected\":%s"
                    , string2str(rm->name)
-                   , rm->first_time_t
-                   , rrd_flag_is_collected(rm) ? t->now : rm->last_time_t
+                   , (long long)rm->first_time_t
+                   , rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_t
                    , rrd_flag_is_collected(rm) ? "true" : "false"
                    );
 
@@ -1823,8 +1823,8 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
                    ",\n\t\t\t\t\t\"chart_type\":\"%s\""
                    ",\n\t\t\t\t\t\"priority\":%u"
                    ",\n\t\t\t\t\t\"update_every\":%d"
-                   ",\n\t\t\t\t\t\"first_time_t\":%ld"
-                   ",\n\t\t\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\t\t\"first_time_t\":%lld"
+                   ",\n\t\t\t\t\t\"last_time_t\":%lld"
                    ",\n\t\t\t\t\t\"collected\":%s"
                    , string2str(ri->name)
                    , string2str(ri->rc->id)
@@ -1834,8 +1834,8 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
                    , rrdset_type_name(ri->chart_type)
                    , ri->priority
                    , ri->update_every
-                   , first_time_t
-                   , (flags & RRD_FLAG_COLLECTED) ? t_parent->now : last_time_t
+                   , (long long)first_time_t
+                   , (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_t
                    , (flags & RRD_FLAG_COLLECTED) ? "true" : "false"
     );
 
@@ -1949,16 +1949,16 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
                    ",\n\t\t\t\"family\":\"%s\""
                    ",\n\t\t\t\"chart_type\":\"%s\""
                    ",\n\t\t\t\"priority\":%u"
-                   ",\n\t\t\t\"first_time_t\":%ld"
-                   ",\n\t\t\t\"last_time_t\":%ld"
+                   ",\n\t\t\t\"first_time_t\":%lld"
+                   ",\n\t\t\t\"last_time_t\":%lld"
                    ",\n\t\t\t\"collected\":%s"
                    , string2str(rc->title)
                    , string2str(rc->units)
                    , string2str(rc->family)
                    , rrdset_type_name(rc->chart_type)
                    , rc->priority
-                   , first_time_t
-                   , (flags & RRD_FLAG_COLLECTED) ? t_parent->now : last_time_t
+                   , (long long)first_time_t
+                   , (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_t
                    , (flags & RRD_FLAG_COLLECTED) ? "true" : "false"
                    );
 
@@ -2621,19 +2621,19 @@ void query_target_generate_name(QUERY_TARGET *qt) {
 
     char resampling_buffer[20 + 1] = "";
     if(qt->request.resampling_time > 1)
-        snprintfz(resampling_buffer, 20, "/resampling:%ld", qt->request.resampling_time);
+        snprintfz(resampling_buffer, 20, "/resampling:%lld", (long long)qt->request.resampling_time);
 
     char tier_buffer[20 + 1] = "";
     if(qt->request.options & RRDR_OPTION_SELECTED_TIER)
         snprintfz(tier_buffer, 20, "/tier:%zu", qt->request.tier);
 
     if(qt->request.st)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
                   , rrdhost_hostname(qt->request.st->rrdhost)
                   , rrdset_name(qt->request.st)
                   , (qt->request.dimensions) ? qt->request.dimensions : "*"
-                  , qt->request.after
-                  , qt->request.before
+                  , (long long)qt->request.after
+                  , (long long)qt->request.before
                   , qt->request.points
                   , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
                   , qt->request.group_options?qt->request.group_options:""
@@ -2642,13 +2642,13 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   , tier_buffer
                   );
     else if(qt->request.host && qt->request.rca && qt->request.ria && qt->request.rma)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
                 , rrdhost_hostname(qt->request.host)
                 , rrdcontext_acquired_id(qt->request.rca)
                 , rrdinstance_acquired_id(qt->request.ria)
                 , rrdmetric_acquired_id(qt->request.rma)
-                , qt->request.after
-                , qt->request.before
+                , (long long)qt->request.after
+                , (long long)qt->request.before
                 , qt->request.points
                 , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
                 , qt->request.group_options?qt->request.group_options:""
@@ -2657,13 +2657,13 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , tier_buffer
                 );
     else
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/contexts:%s/instances:%s/dimensions:%s/after:%ld/before:%ld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/contexts:%s/instances:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
                 , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.charts) ? qt->request.charts : "*"
                 , (qt->request.dimensions) ? qt->request.dimensions : "*"
-                , qt->request.after
-                , qt->request.before
+                , (long long)qt->request.after
+                , (long long)qt->request.before
                 , qt->request.points
                 , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
                 , qt->request.group_options?qt->request.group_options:""

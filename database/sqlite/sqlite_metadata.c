@@ -729,8 +729,8 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         wc->check_metadata_after = now + METADATA_MAINTENANCE_RETRY;
     } else
         wc->row_id = 0;
-    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %ld seconds", total_checked, total_deleted, wc->row_id,
-         wc->check_metadata_after - now);
+    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %lld seconds", total_checked, total_deleted, wc->row_id,
+         (long long)(wc->check_metadata_after - now));
 
 skip_run:
     rc = sqlite3_finalize(res);
@@ -1536,9 +1536,9 @@ static void *metadata_unittest_threads(void)
     int threads_to_create = 4;
     fprintf(
         stderr,
-        "\nChecking metadata queue using %d threads for %ld seconds...\n",
+        "\nChecking metadata queue using %d threads for %lld seconds...\n",
         threads_to_create,
-        seconds_to_run);
+        (long long)seconds_to_run);
 
     netdata_thread_t threads[threads_to_create];
     tu.join = 0;

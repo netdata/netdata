@@ -58,23 +58,23 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
                        "   %sname%s: %s%s%s,\n"
-                       "   %sview_update_every%s: %ld,\n"
-                       "   %supdate_every%s: %ld,\n"
-                       "   %sfirst_entry%s: %ld,\n"
-                       "   %slast_entry%s: %ld,\n"
-                       "   %sbefore%s: %ld,\n"
-                       "   %safter%s: %ld,\n"
+                       "   %sview_update_every%s: %lld,\n"
+                       "   %supdate_every%s: %lld,\n"
+                       "   %sfirst_entry%s: %lld,\n"
+                       "   %slast_entry%s: %lld,\n"
+                       "   %sbefore%s: %lld,\n"
+                       "   %safter%s: %lld,\n"
                        "   %sgroup%s: %s%s%s,\n"
                        "   %soptions%s: %s"
                    , kq, kq
                    , kq, kq, sq, qt->id, sq
                    , kq, kq, sq, qt->id, sq
-                   , kq, kq, r->update_every
-                   , kq, kq, qt->db.minimum_latest_update_every
-                   , kq, kq, qt->db.first_time_t
-                   , kq, kq, qt->db.last_time_t
-                   , kq, kq, r->before
-                   , kq, kq, r->after
+                   , kq, kq, (long long)r->update_every
+                   , kq, kq, (long long)qt->db.minimum_latest_update_every
+                   , kq, kq, (long long)qt->db.first_time_t
+                   , kq, kq, (long long)qt->db.last_time_t
+                   , kq, kq, (long long)r->before
+                   , kq, kq, (long long)r->after
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
                    , kq, kq, sq);
 

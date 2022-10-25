@@ -545,9 +545,9 @@ int string_unittest(size_t entries) {
         int threads_to_create = 2;
         fprintf(
             stderr,
-            "Checking string concurrency with %d threads for %ld seconds...\n",
+            "Checking string concurrency with %d threads for %lld seconds...\n",
             threads_to_create,
-            seconds_to_run);
+            (long long)seconds_to_run);
         // check string concurrency
         netdata_thread_t threads[threads_to_create];
         tu.join = 0;

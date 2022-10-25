@@ -1910,7 +1910,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                                     int current_region, time_t time_start, time_t time_end)
 {
     int update_every = REGION_UPDATE_EVERY[current_region];
-    fprintf(stderr, "%s() running on region %d, start time %ld, end time %ld, update every %d...\n", __FUNCTION__, current_region, time_start, time_end, update_every);
+    fprintf(stderr, "%s() running on region %d, start time %lld, end time %lld, update every %d...\n", __FUNCTION__, current_region, (long long)time_start, (long long)time_end, update_every);
     uint8_t same;
     time_t time_now, time_retrieved;
     int i, j, errors, value_errors = 0, time_errors = 0;
@@ -2495,7 +2495,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     test_duration = now_realtime_sec() - (time_start - HISTORY_SECONDS);
     if (!test_duration)
         test_duration = 1;
-    fprintf(stderr, "\nDB-engine stress test finished in %ld seconds.\n", test_duration);
+    fprintf(stderr, "\nDB-engine stress test finished in %lld seconds.\n", (long long)test_duration);
     unsigned long stored_metrics_nr = 0;
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         stored_metrics_nr += chart_threads[i]->stored_metrics_nr;
@@ -2510,8 +2510,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     fprintf(stderr, "%lu metric data points were queried by %u reader threads.\n", queried_metrics_nr, QUERY_THREADS);
     fprintf(stderr, "Query starting time is randomly chosen from the beginning of the time-series up to the time of\n"
                     "the latest data point, and ending time from 1 second up to 1 hour after the starting time.\n");
-    fprintf(stderr, "Performance is %lu written data points/sec and %lu read data points/sec.\n",
-            stored_metrics_nr / test_duration, queried_metrics_nr / test_duration);
+    fprintf(stderr, "Performance is %lld written data points/sec and %lld read data points/sec.\n",
+            (long long)(stored_metrics_nr / test_duration), (long long)(queried_metrics_nr / test_duration));
 
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         freez(chart_threads[i]);
