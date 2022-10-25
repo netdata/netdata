@@ -4204,28 +4204,28 @@ netdataDashboard.context = {
     // WMI
 
     'wmi.tcp_conns_active': {
-        info: 'Connections that changed state from `CLOSED` to `SYN-SENT`.'
+        info: 'Number of times `TCP` connections have made a direct transition from the `CLOSED` state to the `SYN-SENT` state.'
     },
     'wmi.tcp_conns_established': {
-        info: 'Connections with state `ESTABLISHED` or `CLOSE-WAIT`.'
+        info: 'Number of `TCP` connections for which the current state is either `ESTABLISHED` or `CLOSE-WAIT`.'
     },
     'wmi.tcp_conns_failures': {
-        info: '<p>Maps two different state transitions: </p> <p> - From `SYN-SENT` or `SYN-RCVD` to `CLOSED`.<br> - From `SYN-RCVD` to `LISTEN`.</p>'
+        info: 'Number of times `TCP` connections have made a direct transition to the CLOSED state from the `SYN-SENT` state or the `SYN-RCVD` state, plus the number of times `TCP` connections have made a direct transition from the `SYN-RCVD` state to the `LISTEN` state.'
     },
     'wmi.tcp_conns_passive': {
-        info: 'Connections with state `ESTABLISHED` or `CLOSE-WAIT`.'
+        info: 'Number of times `TCP` connections have made a direct transition from the `LISTEN` state to the `SYN-RCVD` state.'
     },
     'wmi.tcp_conns_resets': {
-        info: 'Connections with state transition from `LISTEN` to `SYN-RCVD`.'
+        info: 'Number of times `TCP` connections have made a direct transition from the `LISTEN` state to the `SYN-RCVD` state.'
     },
     'wmi.tcp_segments_received': {
-        info: 'Number of segmentts received (successful or error).'
+        info: 'Rate at which segments are received, including those received in error. This count includes segments received on currently established connections.'
     },
     'wmi.tcp_segments_retransmitted': {
-        info: 'Segments transmitted that has segments with bytes already transmitted.'
+        info: 'Rate at which segments are retransmitted, that is, segments transmitted that contain one or more previously transmitted bytes.'
     },
     'wmi.tcp_segments_sent': {
-        info: 'Segments sent excluiding segments that contains "only" retransmitted bytes.'
+        info: 'Rate at which segments are sent, including those on current connections, but excluding those containing only retransmitted bytes.'
     },
 
     // ------------------------------------------------------------------------
