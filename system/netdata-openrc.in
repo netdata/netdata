@@ -15,16 +15,18 @@
 # to exit.
 : "${NETDATA_FORCE_EXIT:=0}"
 
-# Netdata will use these services, only if they
-# are enabled to start.
-: "${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}"
+# When set to 1, we use netdatacli for reload/rotate/save commands instead of s-s-d.
+: "${NETDATA_USE_NETDATACLI:=0}"
+
+# Specifies the pidfile to use when running in the background.
+: "${NETDATA_PIDFILE:=@localstatedir_POST@/run/netdata/netdata.pid}"
 
 extra_started_commands="reload rotate save"
-pidfile="@localstatedir_POST@/run/netdata/netdata.pid"
-command="@sbindir_POST@/netdata"
-command_args="-P ${pidfile} ${NETDATA_EXTRA_ARGS}"
+command_prefix="@sbindir_POST@"
+command="${command_prefix}/netdata"
+command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
+command_args_foreground="-D"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
-required_files="/etc/netdata/netdata.conf"
 if [ "${NETDATA_FORCE_EXIT}" -eq 1 ]; then
     retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}/KILL/1"
 else
@@ -34,27 +36,53 @@ fi
 depend() {
     use logger
     need net
-    after ${NETDATA_START_AFTER_SERVICES}
+    after apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors
 }
 
 start_pre() {
     checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata @localstatedir_POST@/run/netdata
+
+    if [ -z "${supervisor}" ]; then
+        pidfile="${NETDATA_PIDFILE}"
+    fi
+}
+
+run_cmd() {
+    cmd="${1}"
+    msg="${2}"
+    failmsg="${3}"
+    signal="${4}"
+
+    ebegin "${msg}"
+    if [ "${NETDATA_USE_NETDATACLI}" = 1 ]; then
+        "${command_prefix}/netdatacli" "${cmd}" >/dev/null
+        eend $? "${failmsg}"
+    elif [ "${supervisor}" = "supervise-daemon" ]; then
+        supervise-daemon "${RC_SVCNAME}" --signal "${signal}"
+        eend $? "${failmsg}"
+    else
+        start-stop-daemon --signal "${signal}" --pidfile "${pidfile}"
+        eend $? "${failmsg}"
+    fi
 }
 
 reload() {
-    ebegin "Reloading Netdata"
-    start-stop-daemon --signal SIGUSR2 --pidfile "${pidfile}"
-    eend $? "Failed to reload Netdata"
+    run_cmd reload-health \
+            "Reloading Netdata health configuration" \
+            "Failed to reload Netdata health configuration" \
+            SIGUSR2
 }
 
 rotate() {
-    ebegin "Logrotating Netdata"
-    start-stop-daemon --signal SIGHUP --pidfile "${pidfile}"
-    eend $? "Failed to logrotate Netdata"
+    run_cmd reopen-logs \
+            "Reopening Netdata log files" \
+            "Failed to reopen Netdata log files" \
+            SIGHUP
 }
 
 save() {
-    ebegin "Saving Netdata database"
-    start-stop-daemon --signal SIGUSR1 --pidfile "${pidfile}"
-    eend $? "Failed to save Netdata database"
+    run_cmd save-database \
+            "Saving Netdata database" \
+            "Failed to save Netdata database" \
+            SIGUSR1
 }
