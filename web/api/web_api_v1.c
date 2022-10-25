@@ -723,7 +723,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         goto cleanup;
     }
 
-    if(chart) {
+    if(chart && !context) {
         // check if this is a specific chart
         st = rrdset_find(host, chart);
         if (!st) st = rrdset_find_byname(host, chart);
