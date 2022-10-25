@@ -289,33 +289,35 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
     time_t now = now_realtime_sec();
 
-    ALARM_ENTRY *ae = health_create_alarm_entry(
-        host,
-        rc->id,
-        rc->next_event_id++,
-        rc->config_hash_id,
-        now,
-        rc->name,
-        rc->rrdset->id,
-        rc->rrdset->context,
-        rc->rrdset->family,
-        rc->classification,
-        rc->component,
-        rc->type,
-        rc->exec,
-        rc->recipient,
-        now - rc->last_status_change,
-        rc->old_value,
-        rc->value,
-        rc->status,
-        RRDCALC_STATUS_REMOVED,
-        rc->source,
-        rc->units,
-        rc->info,
-        0,
-        0);
+    if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
+        ALARM_ENTRY *ae = health_create_alarm_entry(
+            host,
+            rc->id,
+            rc->next_event_id++,
+            rc->config_hash_id,
+            now,
+            rc->name,
+            rc->rrdset->id,
+            rc->rrdset->context,
+            rc->rrdset->family,
+            rc->classification,
+            rc->component,
+            rc->type,
+            rc->exec,
+            rc->recipient,
+            now - rc->last_status_change,
+            rc->old_value,
+            rc->value,
+            rc->status,
+            RRDCALC_STATUS_REMOVED,
+            rc->source,
+            rc->units,
+            rc->info,
+            0,
+            0);
 
-    health_alarm_log_add_entry(host, ae);
+        health_alarm_log_add_entry(host, ae);
+    }
 
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
