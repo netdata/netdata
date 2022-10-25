@@ -114,7 +114,7 @@ include:
     version: "36"
     packages:
       <<: *fedora_packages
-      repo_distro: fedora/35
+      repo_distro: fedora/36
       arches:
         - x86_64
         - armhfp
