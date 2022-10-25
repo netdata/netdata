@@ -6,6 +6,7 @@
 #include "ebpf_cgroup.h"
 
 ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
+int send_cgroup_chart = 0;
 
 // --------------------------------------------------------------------------------------------------------------------
 // Map shared memory
@@ -259,7 +260,7 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
  *
  * Set variable remove. If this variable is not reset, the structure will be removed from link list.
  */
- void ebpf_reset_updated_var()
+void ebpf_reset_updated_var()
  {
      ebpf_cgroup_target_t *ect;
      for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -274,6 +275,7 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
  */
 void ebpf_parse_cgroup_shm_data()
 {
+    static int previous = 0;
     if (shm_ebpf_cgroup.header) {
         sem_wait(shm_sem_ebpf_cgroup);
         int i, end = shm_ebpf_cgroup.header->cgroup_root_count;
@@ -291,6 +293,11 @@ void ebpf_parse_cgroup_shm_data()
                 ebpf_update_pid_link_list(ect, ptr->path);
             }
         }
+        send_cgroup_chart = previous != shm_ebpf_cgroup.header->cgroup_root_count;
+        previous = shm_ebpf_cgroup.header->cgroup_root_count;
+#ifdef NETDATA_DEV_MODE
+        error("Updating cgroup %d (Previous: %d, Current: %d)", send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
+#endif
         pthread_mutex_unlock(&mutex_cgroup_shm);
 
         sem_post(shm_sem_ebpf_cgroup);
