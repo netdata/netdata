@@ -277,11 +277,8 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
 static bool send_replay_chart_cmd(FILE *outfp, const char *chart,
                                   bool start_streaming, time_t after, time_t before)
 {
-
-    fprintf(stdout, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
-                    chart, start_streaming ? "true" : "false",
-                    after, before);
-    fflush(stdout);
+    debug(D_REPLICATION, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
+          chart, start_streaming ? "true" : "false", after, before);
 
     int ret = fprintf(outfp, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
                       chart, start_streaming ? "true" : "false",

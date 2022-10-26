@@ -1071,7 +1071,8 @@ static void process_replication_requests(struct sender_state *s) {
                                                         st->replay_request.after,
                                                         st->replay_request.before);
         if (start_streaming) {
-            error("Enabling metric streaming for chart %s.%s", rrdhost_hostname(s->host), rrdset_id(st));
+            debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
+                  rrdhost_hostname(s->host), rrdset_id(st));
             rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
         }
 
