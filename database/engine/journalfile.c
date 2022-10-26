@@ -692,12 +692,10 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
 
-    // Check if it exists, ok if not found
-    if (stat(path, &statbuf))
-        return 1;
-
     fd = open(path, O_RDONLY);
     if (fd < 0) {
+        if (errno == ENOENT)
+            return 1;
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         error("Failed to open %s", path);
