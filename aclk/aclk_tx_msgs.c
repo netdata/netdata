@@ -61,7 +61,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     uint16_t packet_id;
     const char *str;
     char *full_msg = NULL;
-    int len, rc;
+    int len;
 
     if (unlikely(!topic || topic[0] != '/')) {
         error ("Full topic required!");
