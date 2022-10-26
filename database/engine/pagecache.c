@@ -621,16 +621,9 @@ static struct journal_page_list *find_matching_page_index(struct journal_page_he
 
     int selected = right - 1;
     if(selected < 0)
-        return NULL;
+        selected = 0;
 
-    page_entry = &page_list[selected];
-    middle_delta_start_s = page_entry->delta_start_s;
-    middle_delta_end_s = page_entry->delta_end_s;
-
-    if (delta_start_time_s < middle_delta_start_s || delta_start_time_s > middle_delta_end_s)
-        return NULL;
-
-    return page_entry;
+    return &page_list[selected];
 }
 
 
