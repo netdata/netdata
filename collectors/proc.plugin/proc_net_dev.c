@@ -1015,7 +1015,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         (d->speed_file_exists || now_monotonic_sec() - d->speed_file_lost_time > READ_RETRY_PERIOD)) {
                         ret = read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed);
                     } else {
-                        d->speed = 0;
+                        d->speed = 0; // TODO: this is wrong, shouldn't use 0 value, but NULL.
                     }
 
                     if(ret) {
@@ -1057,8 +1057,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         rrdsetvar_custom_chart_variable_set(
                             d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE)d->speed * KILOBITS_IN_A_MEGABIT);
 
-                        d->speed_file_exists = 1;
-                        d->speed_file_lost_time = 0;
+                        if (d->speed) {
+                            d->speed_file_exists = 1;
+                            d->speed_file_lost_time = 0;
+                        }
                     }
                 }
             }
