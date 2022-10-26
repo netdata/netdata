@@ -44,6 +44,7 @@ INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
+NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
@@ -272,6 +273,7 @@ telemetry_event() {
     "install_options": "${KICKSTART_OPTIONS}",
     "install_interactivity": "${INTERACTIVE}",
     "install_auto_updates": "${NETDATA_AUTO_UPDATES}",
+    "install_command": "${NETDATA_COMMAND}",
     "total_runtime": "${total_duration}",
     "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
@@ -2051,9 +2053,18 @@ parse_args() {
             ;;
         esac
         ;;
-      "--reinstall") NETDATA_REINSTALL=1 ;;
-      "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
-      "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
+      "--reinstall")
+        NETDATA_REINSTALL=1
+        NETDATA_COMMAND="reinstall"
+        ;;
+      "--reinstall-even-if-unsafe")
+        NETDATA_UNSAFE_REINSTALL=1
+        NETDATA_COMMAND="unsafe-reinstall"
+        ;;
+      "--claim-only")
+        NETDATA_CLAIM_ONLY=1
+        NETDATA_COMMAND="claim-only"
+        ;;
       "--disable-cloud")
         NETDATA_DISABLE_CLOUD=1
         NETDATA_REQUIRE_CLOUD=0
@@ -2090,12 +2101,15 @@ parse_args() {
         ;;
       "--uninstall")
         ACTION="uninstall"
+        NETDATA_COMMAND="uninstall"
         ;;
       "--reinstall-clean")
         ACTION="reinstall-clean"
+        NETDATA_COMMAND="reinstall-clean"
         ;;
       "--repositories-only")
         REPO_ACTION="repositories-only"
+        NETDATA_COMMAND="repositories"
         ;;
       "--native-only")
         NETDATA_ONLY_NATIVE=1
@@ -2153,6 +2167,7 @@ parse_args() {
       "--prepare-offline-install-source")
         if [ -n "${2}" ]; then
           ACTION="prepare-offline"
+          NETDATA_COMMAND="prepare-offline"
           OFFLINE_TARGET="${2}"
           shift 1
         else
