@@ -942,43 +942,8 @@ void execute_commands(struct sender_state *s) {
 struct rrdpush_sender_thread_data {
     struct sender_state *sender_state;
     RRDHOST *host;
-    DICTFE dictfe;
-    enum {
-        SENDING_DEFINITIONS_RESTART,
-        SENDING_DEFINITIONS_CONTINUE,
-        SENDING_DEFINITIONS_DONE,
-    } sending_definitions_status;
     char *pipe_buffer;
 };
-
-static size_t cbuffer_available_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
-    netdata_mutex_lock(&thread_data->sender_state->mutex);
-    size_t outstanding = cbuffer_available_size_unsafe(thread_data->sender_state->host->sender->buffer);
-    netdata_mutex_unlock(&thread_data->sender_state->mutex);
-    return outstanding;
-}
-
-static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
-
-    while(rrdhost_flag_check(thread_data->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
-           && thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE
-           && cbuffer_available_bytes_with_lock(thread_data) > (thread_data->sender_state->buffer->max_size / 2)) {
-
-        if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART)
-            info("STREAM %s [send to %s]: sending metric definitions...", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
-
-        bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
-            thread_data->sender_state->host, &thread_data->dictfe,
-            thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
-
-        if (unlikely(!more_defs_available)) {
-            thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
-            info("STREAM %s [send to %s]: sending metric definitions finished.", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
-        }
-        else
-            thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
-    }
-}
 
 static bool rrdpush_sender_pipe_close(RRDHOST *host, int *pipe_fds, bool reopen) {
     static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
@@ -1040,8 +1005,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     worker_unregister();
 
     RRDHOST *host = data->host;
-
-    rrdpush_incremental_transmission_of_chart_definitions(host, &data->dictfe, false, true);
 
     netdata_mutex_lock(&host->sender->mutex);
 
@@ -1202,7 +1165,6 @@ void *rrdpush_sender_thread(void *ptr) {
     thread_data->pipe_buffer = mallocz(pipe_buffer_size);
     thread_data->sender_state = s;
     thread_data->host = s->host;
-    thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
 
     // reset our cleanup flags
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
@@ -1216,7 +1178,6 @@ void *rrdpush_sender_thread(void *ptr) {
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
-            thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
             rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
             s->flags &= ~SENDER_FLAG_OVERFLOW;
             s->read_len = 0;
@@ -1253,9 +1214,6 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        if(unlikely(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE))
-            rrdpush_queue_incremental_definitions(thread_data);
-
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
@@ -1266,10 +1224,8 @@ void *rrdpush_sender_thread(void *ptr) {
         if(outstanding)
             s->send_attempts++;
         else {
-            if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE
-                         && rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
-                         && !rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS)
-                             )) {
+            if(unlikely(rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+                        !rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
                 // let the data collection threads know we are ready to push metrics
                 rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
                 info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);

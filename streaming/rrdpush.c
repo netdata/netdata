@@ -366,38 +366,6 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     return true;
 }
 
-bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop) {
-    if(stop || restart)
-        dictionary_foreach_done(dictfe);
-
-    if(stop)
-        return false;
-
-    RRDSET *st = NULL;
-
-    if(unlikely(!dictfe->dict)) {
-        st = dictionary_foreach_start_rw(dictfe, host->rrdset_root_index, DICTIONARY_LOCK_REENTRANT);
-    }
-    else
-        st = dictionary_foreach_next(dictfe);
-
-    do {
-        while(st && !need_to_send_chart_definition(st))
-            st = dictionary_foreach_next(dictfe);
-
-        if(st && rrdset_push_chart_definition_now(st))
-            break;
-
-    } while((st = dictionary_foreach_next(dictfe)));
-
-    if (!st) {
-        dictionary_foreach_done(dictfe);
-        return false;
-    }
-
-    return true;
-}
-
 void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 

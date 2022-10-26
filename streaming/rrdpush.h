@@ -240,7 +240,6 @@ bool rrdpush_receiver_needs_dbengine();
 int configured_as_parent();
 void rrdset_done_push(RRDSET *st);
 bool rrdset_push_chart_definition_now(RRDSET *st);
-bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_claimed_id(RRDHOST *host);
