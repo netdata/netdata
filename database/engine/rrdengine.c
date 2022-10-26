@@ -307,7 +307,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     crc = crc32(crc, xt_io_descr->buf, xt_io_descr->bytes - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
 #ifdef NETDATA_INTERNAL_CHECKS
-    {
+    if(xt_io_descr->descr_array[0]->extent) {
         struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
         debug(D_RRDENGINE, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u-%u. CRC32 check: %s", __func__,
               xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno, ret ? "FAILED" : "SUCCEEDED");
