@@ -20,7 +20,7 @@ void *dbengine_page_alloc() {
     if (unlikely(db_engine_use_malloc))
         page = mallocz(RRDENG_BLOCK_SIZE);
     else {
-        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
+        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm, false);
         if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
     }
     return page;
