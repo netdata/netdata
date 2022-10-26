@@ -135,6 +135,22 @@ static void health_silencers_init(void) {
     }
 }
 
+/**
+ * Health Init
+ *
+ * Initialize the health thread.
+ */
+void health_init(void) {
+    debug(D_HEALTH, "Health configuration initializing");
+
+    if(!(default_health_enabled = (unsigned int)config_get_boolean(CONFIG_SECTION_HEALTH, "enabled", default_health_enabled))) {
+        debug(D_HEALTH, "Health is disabled.");
+        return;
+    }
+
+    health_silencers_init();
+}
+
 // ----------------------------------------------------------------------------
 // re-load health configuration
 
