@@ -849,6 +849,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         goto unittest;
     }
 
+    health_init();
     rrdpush_init();
 
     if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || storage_tiers > 1 || rrdpush_receiver_needs_dbengine()) {
