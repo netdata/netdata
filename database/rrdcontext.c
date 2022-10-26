@@ -2372,7 +2372,8 @@ void query_target_free(void) {
     thread_query_target.hosts.size = 0;
 }
 
-static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri, bool instance_matches_label_filters) {
+static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri,
+                                    bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
@@ -2385,7 +2386,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     }
     qt->metrics.array[qt->metrics.used++] = rrdmetric_acquired_dup(rma);
 
-    if(!instance_matches_label_filters)
+    if(!queryable_instance)
         return;
 
     time_t common_first_time_t = 0;
@@ -2529,7 +2530,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     }
 }
 
-static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQUIRED *ria) {
+static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQUIRED *ria, bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
@@ -2546,24 +2547,24 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     if(qt->db.minimum_latest_update_every == 0 || ri->update_every < qt->db.minimum_latest_update_every)
         qt->db.minimum_latest_update_every = ri->update_every;
 
-    bool instance_matches_label_filters = true;
-    if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, ':')) ||
-        (qt->instances.charts_labels_filter_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.charts_labels_filter_pattern, ':')))
-        instance_matches_label_filters = false;
+    if(queryable_instance) {
+        if ((qt->instances.chart_label_key_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.chart_label_key_pattern, ':')) ||
+            (qt->instances.charts_labels_filter_pattern && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, qt->instances.charts_labels_filter_pattern, ':')))
+            queryable_instance = false;
+    }
 
     size_t added = 0;
 
     if(unlikely(qt->request.rma)) {
-        query_target_add_metric(qtl, qt->request.rma, ri, instance_matches_label_filters);
+        query_target_add_metric(qtl, qt->request.rma, ri, queryable_instance);
         added++;
     }
     else {
         RRDMETRIC *rm;
-        dfe_start_read(ri->rrdmetrics, rm){
-                    query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri,
-                                            instance_matches_label_filters);
-                    added++;
-                }
+        dfe_start_read(ri->rrdmetrics, rm) {
+            query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri, queryable_instance);
+            added++;
+        }
         dfe_done(rm);
     }
 
@@ -2588,23 +2589,25 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
-        query_target_add_instance(qtl, qt->request.ria);
+        query_target_add_instance(qtl, qt->request.ria, true);
         added++;
     }
     else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
-        query_target_add_instance(qtl, qtl->st->rrdinstance);
+        query_target_add_instance(qtl, qtl->st->rrdinstance, true);
         added++;
     }
     else {
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
+            bool queryable_instance = false;
             if(!qt->instances.pattern
                 || (qtl->match_ids   && simple_pattern_matches(qt->instances.pattern, string2str(ri->id)))
                 || (qtl->match_names && simple_pattern_matches(qt->instances.pattern, string2str(ri->name)))
-                ) {
-                query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *)ri_dfe.item);
-                added++;
-            }
+                )
+                queryable_instance = true;
+
+            query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, queryable_instance);
+            added++;
         }
         dfe_done(ri);
     }
