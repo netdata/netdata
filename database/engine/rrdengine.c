@@ -337,33 +337,33 @@ after_crc_check:
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
-    {
-        uint8_t xt_is_cached = 0;
-        unsigned xt_idx;
-        struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
-
-        xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-        if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
-            struct extent_cache *xt_cache = &wc->xt_cache;
-            struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
-            struct extent_io_descriptor *curr, *next;
-
-            if (have_read_error) {
-                memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
-            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
-            } else {
-                (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
-            }
-            /* complete all connected in-flight read requests */
-            for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = next) {
-                next = curr->next;
-                read_cached_extent_cb(wc, xt_idx, curr);
-            }
-            xt_cache_elem->inflight_io_descr = NULL;
-            modify_bit(&xt_cache->inflight_bitmap, xt_idx, 0); /* not in-flight anymore */
-        }
-    }
+//    {
+//        uint8_t xt_is_cached = 0;
+//        unsigned xt_idx;
+//        struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
+//
+//        xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
+//        if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
+//            struct extent_cache *xt_cache = &wc->xt_cache;
+//            struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
+//            struct extent_io_descriptor *curr, *next;
+//
+//            if (have_read_error) {
+//                memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
+//            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+//                (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
+//            } else {
+//                (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
+//            }
+//            /* complete all connected in-flight read requests */
+//            for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = next) {
+//                next = curr->next;
+//                read_cached_extent_cb(wc, xt_idx, curr);
+//            }
+//            xt_cache_elem->inflight_io_descr = NULL;
+//            modify_bit(&xt_cache->inflight_bitmap, xt_idx, 0); /* not in-flight anymore */
+//        }
+//    }
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
         uint8_t is_prefetched_page;
@@ -378,6 +378,7 @@ after_crc_check:
                 header->descr[i].start_time_ut == descrj->start_time_ut &&
                 header->descr[i].end_time_ut == descrj->end_time_ut) {
                 descr = descrj;
+                bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, j, 0);
                 break;
             }
         }
@@ -410,6 +411,21 @@ after_crc_check:
             pg_cache_put(ctx, descr);
         } else {
             debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
+            pg_cache_wake_up_waiters(ctx, descr);
+        }
+    }
+    for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
+        struct rrdeng_page_descr *descr =  xt_io_descr->descr_array[j];
+//        if (!(descr->pg_cache_descr->flags & RRD_PAGE_READ_PENDING))
+//            continue;
+
+        if (unlikely(bitmap256_get_bit(&xt_io_descr->descr_array_wakeup, j))) {
+            if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
+                info("DEBUG: Setting page to invalid");
+                abort();
+                descr->pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
+                descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
+            }
             pg_cache_wake_up_waiters(ctx, descr);
         }
     }
@@ -494,10 +510,21 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     struct extent_info *extent = descr[0]->extent;
     uint8_t xt_is_cached = 0, xt_is_inflight = 0;
     unsigned xt_idx;
+    uv_file file_to_use;
 
-    datafile = extent->datafile;
-    pos = extent->offset;
-    size_bytes = extent->size;
+    //
+    if (extent) {
+        datafile = extent->datafile;
+        file_to_use = datafile->file;
+        pos = extent->offset;
+        size_bytes = extent->size;
+    }
+    else {
+        struct journal_extent_list *extent_entry = (struct journal_extent_list *) descr[0]->extent_entry;
+        file_to_use = descr[0]->datafile_fd;
+        pos = extent_entry->datafile_offset;
+        size_bytes = extent_entry->datafile_size;
+    }
 
     xt_io_descr = callocz(1, sizeof(*xt_io_descr));
     for (i = 0 ; i < count; ++i) {
@@ -506,9 +533,10 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         pg_cache_descr->flags |= RRD_PAGE_READ_PENDING;
         rrdeng_page_descr_mutex_unlock(ctx, descr[i]);
         xt_io_descr->descr_array[i] = descr[i];
+        bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, i, 1);
     }
     xt_io_descr->descr_count = count;
-    xt_io_descr->file = datafile->file;
+    xt_io_descr->file = file_to_use;
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->pos = pos;
     xt_io_descr->req_worker.data = xt_io_descr;
@@ -516,23 +544,23 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     xt_io_descr->release_descr = release_descr;
     xt_io_descr->buf = NULL;
 
-    xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-    if (xt_is_cached) {
-        xt_cache_replaceQ_set_hot(wc, &wc->xt_cache.extent_array[xt_idx]);
-        xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
-        if (xt_is_inflight) {
-            enqueue_inflight_read_to_xt_cache(wc, xt_idx, xt_io_descr);
-            return;
-        }
-        return read_cached_extent_cb(wc, xt_idx, xt_io_descr);
-    } else {
-        ret = try_insert_into_xt_cache(wc, extent);
-        if (-1 != ret) {
-            xt_idx = (unsigned)ret;
-            modify_bit(&wc->xt_cache.inflight_bitmap, xt_idx, 1);
-            wc->xt_cache.extent_array[xt_idx].inflight_io_descr = xt_io_descr;
-        }
-    }
+//    xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
+//    if (xt_is_cached) {
+//        xt_cache_replaceQ_set_hot(wc, &wc->xt_cache.extent_array[xt_idx]);
+//        xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
+//        if (xt_is_inflight) {
+//            enqueue_inflight_read_to_xt_cache(wc, xt_idx, xt_io_descr);
+//            return;
+//        }
+//        return read_cached_extent_cb(wc, xt_idx, xt_io_descr);
+//    } else {
+//        ret = try_insert_into_xt_cache(wc, extent);
+//        if (-1 != ret) {
+//            xt_idx = (unsigned)ret;
+//            modify_bit(&wc->xt_cache.inflight_bitmap, xt_idx, 1);
+//            wc->xt_cache.extent_array[xt_idx].inflight_io_descr = xt_io_descr;
+//        }
+//    }
 
     ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_read_extent, read_mmap_extent_cb);
     fatal_assert(-1 != ret);
@@ -647,7 +675,7 @@ static void invalidate_oldest_committed(void *arg)
 
             goto out;
         }
-        pg_cache_punch_hole(ctx, descr, 1, 1, NULL);
+        pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true);
 
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
@@ -847,7 +875,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     header->number_of_pages = count;
     pos += sizeof(*header);
 
-    extent = mallocz(sizeof(*extent) + count * sizeof(extent->pages[0]));
+    extent = mallocz(sizeof(*extent) + count * sizeof(&extent->pages[0]));
     datafile = ctx->datafiles.last;  /* TODO: check for exceeded size quota */
     extent->offset = datafile->pos;
     extent->number_of_pages = count;
@@ -933,7 +961,7 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     journalfile = datafile->journalfile;
     datafile_bytes = datafile->pos;
     journalfile_bytes = journalfile->pos;
-    deleted_bytes = 0;
+    deleted_bytes = journalfile->journal_data_size;
 
     info("Deleting data and journal file pair.");
     datafile_list_delete(ctx, datafile);
@@ -988,7 +1016,7 @@ static void delete_old_data(void *arg)
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
+            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id, true);
             if (unlikely(can_delete_metric)) {
                 /*
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
@@ -1236,6 +1264,8 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
+//    static int journal_deactivation=0;
+
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
     struct rrdengine_worker_config* wc = handle->data;
@@ -1285,6 +1315,12 @@ void timer_cb(uv_timer_t* handle)
     }
 #endif
 
+//    if (unlikely(!journal_deactivation)) {
+//        journal_deactivation = 1;
+//        struct rrdeng_cmd cmd;
+//        cmd.opcode = RRDENG_DEACTIVATE_PAGES;
+//        rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+//    }
     worker_is_idle();
 }
 
@@ -1408,6 +1444,28 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_COMMIT_PAGE:
                 do_commit_transaction(wc, STORE_DATA, NULL);
+                break;
+            case RRDENG_INDEX_JOURNAL:
+                ;
+                struct rrdeng_work  *work_request;
+                work_request = mallocz(sizeof(*work_request));
+                work_request->req.data = work_request;
+                work_request->journalfile = cmd.journalfile;
+                if (unlikely(
+                        uv_queue_work(loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
+                        freez(work_request);
+                }
+                break;
+            case RRDENG_DEACTIVATE_PAGES:
+                ;
+                struct rrdeng_work  *work_request1;
+                work_request1 = mallocz(sizeof(*work_request1));
+                work_request1->req.data = work_request;
+                work_request1->journalfile = NULL;
+                if (unlikely(
+                        uv_queue_work(loop, &work_request1->req, start_page_deactivation, after_page_deactivation))) {
+                    freez(work_request1);
+                }
                 break;
             case RRDENG_FLUSH_PAGES: {
                 if (wc->now_invalidating_dirty_pages) {

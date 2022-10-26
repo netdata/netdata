@@ -74,6 +74,8 @@ enum rrdeng_opcode {
     RRDENG_SHUTDOWN,
     RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
     RRDENG_QUIESCE,
+    RRDENG_INDEX_JOURNAL,
+    RRDENG_DEACTIVATE_PAGES,
 
     RRDENG_MAX_OPCODE
 };
@@ -92,11 +94,19 @@ struct rrdeng_cmd {
     union {
         struct rrdeng_read_page read_page;
         struct rrdeng_read_extent read_extent;
+        struct rrdengine_journalfile *journalfile;
         struct completion *completion;
     };
 };
 
 #define RRDENG_CMD_Q_MAX_SIZE (2048)
+
+struct rrdeng_work {
+    uv_work_t req;
+    struct rrdengine_journalfile *journalfile;
+    struct completion *completion;
+};
+
 
 struct rrdeng_cmdqueue {
     unsigned head, tail;
@@ -117,6 +127,7 @@ struct extent_io_descriptor {
     unsigned descr_count;
     int release_descr;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
+    BITMAP256 descr_array_wakeup;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
@@ -125,6 +136,7 @@ struct generic_io_descriptor {
     uv_fs_t req;
     uv_buf_t iov;
     void *buf;
+    void *data;
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
@@ -277,5 +289,9 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc);
 void rrdeng_worker(void* arg);
 void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc);
-
+int page_header_is_corrupted(struct journal_v2_header *j2_header, void *page_header);
+void after_journal_indexing(uv_work_t *req, int status);
+void start_journal_indexing(uv_work_t *req);
+void after_page_deactivation(uv_work_t *req, int status);
+void start_page_deactivation(uv_work_t *req);
 #endif /* NETDATA_RRDENGINE_H */
