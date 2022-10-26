@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F050A
+# Next unused error code: F050C
 
 # ======================================================================
 # Constants
@@ -1087,7 +1087,7 @@ claim() {
   fi
 
   if [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
-    fatal "Unable to find usable claiming script. Reinstalling Netdata may resolve this." F0106
+    fatal "Unable to find usable claiming script. Reinstalling Netdata may resolve this." F050B
   fi
 
   if ! is_netdata_running; then
