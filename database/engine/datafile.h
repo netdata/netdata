@@ -26,6 +26,7 @@ struct extent_info {
     uint8_t number_of_pages;
     struct rrdengine_datafile *datafile;
     struct extent_info *next;
+    uint32_t index;                    // This is the entent index for version 2
     struct rrdeng_page_descr *pages[];
 };
 
@@ -44,6 +45,7 @@ struct rrdengine_datafile {
     struct rrdengine_instance *ctx;
     struct rrdengine_df_extents extents;
     struct rrdengine_journalfile *journalfile;
+    // FIXME: Add double link list
     struct rrdengine_datafile *next;
 };
 
