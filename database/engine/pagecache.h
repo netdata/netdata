@@ -20,6 +20,7 @@ struct rrdeng_page_descr;
 #define RRD_PAGE_READ_PENDING   (1LU << 2)
 #define RRD_PAGE_WRITE_PENDING  (1LU << 3)
 #define RRD_PAGE_POPULATED      (1LU << 4)
+#define RRD_PAGE_INVALID        (1LU << 5)
 
 struct page_cache_descr {
     struct rrdeng_page_descr *descr; /* parent descriptor */
@@ -49,6 +50,11 @@ struct page_cache_descr {
  * -----------------------------+------------+------------+-----------|
  * number of descriptor users   |    DESTROY |     LOCKED | ALLOCATED |
  */
+
+//FIXME: To check if v2 add macros
+// Is v2
+// is v1
+// is collected
 struct rrdeng_page_descr {
     uuid_t *id; /* never changes */
     struct extent_info *extent;
@@ -65,6 +71,8 @@ struct rrdeng_page_descr {
     uint32_t update_every_s:24;
     uint8_t type;
     uint32_t page_length;
+    uv_file datafile_fd;
+    void *extent_entry;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)
@@ -79,7 +87,7 @@ struct rrdeng_page_info {
 /* returns 1 for success, 0 for failure */
 typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
-#define PAGE_CACHE_MAX_PRELOAD_PAGES    (256)
+#define PAGE_CACHE_MAX_PRELOAD_PAGES    (64)
 
 struct pg_alignment {
     uint32_t page_length;
@@ -122,6 +130,7 @@ struct pg_cache_page_index {
 struct pg_cache_metrics_index {
     uv_rwlock_t lock;
     Pvoid_t JudyHS_array;
+    Pvoid_t migration_JudyHS_array;
     struct pg_cache_page_index *last_page_index;
 };
 
@@ -177,10 +186,21 @@ struct rrdeng_page_descr *pg_cache_create_descr(void);
 int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access);
 void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
 void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
-                            struct rrdeng_page_descr *descr);
-uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
-                                   uint8_t remove_dirty, uint8_t is_exclusive_holder, uuid_t *metric_id);
+bool pg_cache_insert(
+    struct rrdengine_instance *ctx,
+    struct pg_cache_page_index *index,
+    struct rrdeng_page_descr *descr,
+    bool lock_page_index);
+bool pg_cache_insert_unsafe(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
+                     struct rrdeng_page_descr *descr);
+
+uint8_t pg_cache_punch_hole(
+    struct rrdengine_instance *ctx,
+    struct rrdeng_page_descr *descr,
+    uint8_t remove_dirty,
+    uint8_t is_exclusive_holder,
+    uuid_t(*metric_id),
+    bool update_page_duration);
 usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
                                             usec_t start_time_ut, usec_t end_time_ut);
 void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
@@ -191,9 +211,6 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_
 unsigned
         pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut,
                          struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp);
-struct rrdeng_page_descr *
-        pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                        usec_t point_in_time_ut);
 struct rrdeng_page_descr *
         pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
                      usec_t start_time_ut, usec_t end_time_ut);

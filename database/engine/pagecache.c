@@ -48,7 +48,7 @@ bool rrdeng_page_descr_is_mmap(void) {
 }
 
 /* Forward declarations */
-static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
+static struct rrdeng_page_descr *pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
 /* always inserts into tail */
 static inline void pg_cache_replaceQ_insert_unsafe(struct rrdengine_instance *ctx,
@@ -322,9 +322,14 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     if (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1)
         debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
+
+    struct rrdeng_page_descr *list_to_destroy[number];
+    struct rrdeng_page_descr *descr;
+    unsigned deleted=0;
     while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
 
-        if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
+        // TODO: If it succeeds, return the descr and then we can punch hole to it
+        if (!(descr = pg_cache_try_evict_one_page_unsafe(ctx))) {
             /* failed to evict */
             struct completion compl;
             struct rrdeng_cmd cmd;
@@ -354,9 +359,23 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             }
             uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
         }
+        else {
+            if (deleted < number)
+                list_to_destroy[deleted++] = descr;
+        }
     }
     pg_cache->populated_pages += number;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+    for (unsigned i=0; i < deleted; i++) {
+        //FIXME: Use macro to decide if V2
+        if (descr->extent == NULL) {
+            char uuid_str[UUID_STR_LEN];
+//            time_t index_time = list_to_destroy[i]->start_time_ut / USEC_PER_SEC;
+            uuid_unparse_lower(*list_to_destroy[i]->id, uuid_str);
+            pg_cache_punch_hole(ctx, list_to_destroy[i], 0, 0, NULL, false);
+//            internal_error(true,"JOURNALV2: Removed %s @ %ld", uuid_str, index_time);
+        }
+    }
 }
 
 /*
@@ -372,14 +391,21 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
 
     assert(number < ctx->max_cache_pages);
 
+    // TODO: CHECK FOR EVICTION
+//    struct rrdeng_page_descr *list_to_destroy[number];
+    struct rrdeng_page_descr *descr;
+//    unsigned deleted=0;
+
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
         debug(D_RRDENGINE,
               "==Page cache full. Trying to reserve %u pages.==",
               number);
         do {
-            if (!pg_cache_try_evict_one_page_unsafe(ctx))
+            if (!(descr = pg_cache_try_evict_one_page_unsafe(ctx)))
                 break;
+//            if (deleted < number)
+//                list_to_destroy[deleted++] = descr;
             ++count;
         } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
         debug(D_RRDENGINE, "Evicted %u pages.", count);
@@ -390,6 +416,9 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
         ret = 1; /* success */
     }
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+
+    //for (unsigned i=0; i < deleted; i++)
+    //    pg_cache_punch_hole(ctx, list_to_destroy[i], 0, 1, NULL);
 
     return ret;
 }
@@ -413,9 +442,9 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
  * If it fails it sets in_flight_descr to the oldest descriptor that has write-back in progress,
  * or it sets it to NULL if no write-back is in progress.
  *
- * Returns 1 on success and 0 on failure.
+ * Returns the evicted descr on success and NULL on failure.
  */
-static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
+static struct rrdeng_page_descr *pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned long old_flags;
@@ -439,14 +468,14 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
 
             rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
 
-            return 1;
+            return descr;
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     uv_rwlock_wrunlock(&pg_cache->replaceQ.lock);
 
     /* failed to evict */
-    return 0;
+    return NULL;
 }
 
 /**
@@ -460,8 +489,13 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
  *        NULL. Otherwise, metric_id is not set.
  * @return 1 if it's safe to delete the metric, 0 otherwise.
  */
-uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty,
-                         uint8_t is_exclusive_holder, uuid_t *metric_id)
+uint8_t pg_cache_punch_hole(
+    struct rrdengine_instance *ctx,
+    struct rrdeng_page_descr *descr,
+    uint8_t remove_dirty,
+    uint8_t is_exclusive_holder,
+    uuid_t(*metric_id),
+    bool update_page_duration)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct page_cache_descr *pg_cache_descr = NULL;
@@ -512,7 +546,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         }
     }
     if (remove_dirty) {
-        pg_cache_descr->flags &= ~RRD_PAGE_DIRTY;
+        pg_cache_descr->flags &= ~(RRD_PAGE_DIRTY | RRD_PAGE_INVALID);
     } else {
         /* even a locked page could be dirty */
         while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
@@ -540,7 +574,8 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
     }
 destroy:
     rrdeng_page_descr_freez(descr);
-    pg_cache_update_metric_times(page_index);
+    if (update_page_duration)
+        pg_cache_update_metric_times(page_index);
 
     return can_delete_metric;
 }
@@ -639,8 +674,7 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
 }
 
 /* If index is NULL lookup by UUID (descr->id) */
-void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
-                     struct rrdeng_page_descr *descr)
+bool pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr, bool lock_page_index)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
@@ -669,44 +703,27 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         page_index = index;
     }
 
-    uv_rwlock_wrlock(&page_index->lock);
+    if (lock_page_index)
+        uv_rwlock_wrlock(&page_index->lock);
+
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
-    *PValue = descr;
+    if (unlikely(*PValue)) {
+        if (lock_page_index)
+            uv_rwlock_wrunlock(&page_index->lock);
+        return false;
+    }
     ++page_index->page_count;
+    *PValue = descr;
     pg_cache_add_new_metric_time(page_index, descr);
-    uv_rwlock_wrunlock(&page_index->lock);
+
+    if (lock_page_index)
+        uv_rwlock_wrunlock(&page_index->lock);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     ++ctx->stats.pg_cache_insertions;
     ++pg_cache->page_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-}
-
-usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut)
-{
-    struct page_cache *pg_cache = &ctx->pg_cache;
-    struct rrdeng_page_descr *descr = NULL;
-    Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
-
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
-        page_index = *PValue;
-    }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (NULL == PValue) {
-        return INVALID_TIME;
-    }
-
-    uv_rwlock_rdlock(&page_index->lock);
-    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
-    if (NULL == descr) {
-        uv_rwlock_rdunlock(&page_index->lock);
-        return INVALID_TIME;
-    }
-    uv_rwlock_rdunlock(&page_index->lock);
-    return descr->start_time_ut;
+    return true;
 }
 
 /**
@@ -933,7 +950,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
             if (NULL == next) {
                 continue;
             }
-            if (descr->extent == next->extent) {
+            if (descr->extent && descr->extent == next->extent) {
                 /* same extent, consolidate */
                 if (!pg_cache_try_reserve_pages(ctx, 1)) {
                     failed_to_reserve = 1;

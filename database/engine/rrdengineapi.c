@@ -285,7 +285,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
         if (page_is_empty) {
             print_page_cache_descr(descr, "Page has empty metrics only, deleting", true);
             pg_cache_put(ctx, descr);
-            pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
+            pg_cache_punch_hole(ctx, descr, 1, 0, NULL, true);
         } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
     } else {
@@ -420,7 +420,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
             }
         }
 
-        pg_cache_insert(ctx, page_index, descr);
+        pg_cache_insert(ctx, page_index, descr, true);
     } else {
         pg_cache_add_new_metric_time(page_index, descr);
     }
@@ -928,44 +928,6 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     }
 
     pg_cache_put(ctx, descr);
-}
-
-/* Gets a reference for the page */
-void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle)
-{
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-
-    debug(D_RRDENGINE, "Reading existing page:");
-    descr = pg_cache_lookup(ctx, NULL, id, INVALID_TIME);
-    if (NULL == descr) {
-        *handle = NULL;
-
-        return NULL;
-    }
-    *handle = descr;
-    pg_cache_descr = descr->pg_cache_descr;
-
-    return pg_cache_descr->page;
-}
-
-/* Gets a reference for the page */
-void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time_ut, void **handle)
-{
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-
-    debug(D_RRDENGINE, "Reading existing page:");
-    descr = pg_cache_lookup(ctx, NULL, id, point_in_time_ut);
-    if (NULL == descr) {
-        *handle = NULL;
-
-        return NULL;
-    }
-    *handle = descr;
-    pg_cache_descr = descr->pg_cache_descr;
-
-    return pg_cache_descr->page;
 }
 
 /*
