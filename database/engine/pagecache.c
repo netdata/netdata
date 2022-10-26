@@ -591,27 +591,46 @@ static inline int is_page_in_time_range(struct rrdeng_page_descr *descr, usec_t 
            (pg_start >= start_time && pg_start <= end_time);
 }
 
-static uint32_t find_matching_page_index(struct journal_page_header *page_list_header, uint32_t delta_start_time_s)
+static struct journal_page_list *find_matching_page_index(struct journal_page_header *page_list_header, uint32_t delta_start_time_s)
 {
     struct journal_page_list *page_list = (struct journal_page_list *) ((void *) page_list_header + sizeof(*page_list_header));
+    struct journal_page_list *page_entry;
+    uint32_t middle_delta_start_s;
+    uint32_t middle_delta_end_s;
 
-    uint32_t left_index = 0;
-    uint32_t right_index = page_list_header->entries - 1;
-    uint32_t middle;
+    int left = 0;
+    int right = (int)(page_list_header->entries);
 
-    while (left_index < right_index) {
-        middle = (left_index + right_index) >> 1;
-        uint32_t middle_delta_start_s = page_list[middle].delta_start_s;
+    while (left < right) {
+        int middle = (left + right) >> 1;
 
-        if (delta_start_time_s >= middle_delta_start_s && delta_start_time_s <= page_list[middle].delta_end_s)
-            return middle;
+        internal_fatal(middle >= (int)(page_list_header->entries),
+                       "DBENGINE: binary search invalid middle slot.");
+
+        page_entry = &page_list[middle];
+        middle_delta_start_s = page_entry->delta_start_s;
+        middle_delta_end_s = page_entry->delta_end_s;
 
         if (delta_start_time_s < middle_delta_start_s)
-            right_index = middle;
+            right = middle;
+        else if(delta_start_time_s > middle_delta_end_s)
+            left = middle + 1;
         else
-            left_index = middle + 1;
+            return page_entry;
     }
-    return right_index - 1;
+
+    int selected = right - 1;
+    if(selected < 0)
+        return NULL;
+
+    page_entry = &page_list[selected];
+    middle_delta_start_s = page_entry->delta_start_s;
+    middle_delta_end_s = page_entry->delta_end_s;
+
+    if (delta_start_time_s < middle_delta_start_s || delta_start_time_s > middle_delta_end_s)
+        return NULL;
+
+    return page_entry;
 }
 
 
@@ -622,20 +641,22 @@ static void add_pages_from_timerange(struct journal_page_header *page_list_heade
                               struct pg_cache_page_index *page_index, struct journal_extent_list *extent_list, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = page_index->ctx;
-    struct journal_page_list *page_list = (struct journal_page_list *) ((void *) page_list_header + sizeof(*page_list_header));
     struct journal_page_list *page_entry = NULL;
 
     Pvoid_t *PValue;
 //    info("JOURVALV2: Validating UUID PAGE LIST is %d", page_header_is_valid(page_list_header));
 
-    page_entry = &page_list[find_matching_page_index(page_list_header, delta_start_time_s)];
+    page_entry = find_matching_page_index(page_list_header, delta_start_time_s);
+    if(!page_entry)
+        return;
+
     Word_t Index = journal_start_time_ut + (usec_t)page_entry->delta_start_s * USEC_PER_SEC;
 
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
     struct rrdeng_page_descr *descr = (PValue && *PValue) ? *PValue : NULL;
 
     if (unlikely(descr && descr->start_time_ut == Index)) {
-        internal_error(true, "Page with start time %llu already exists; skipping", Index);
+        internal_error(true, "Page with start time %lu already exists; skipping", Index);
         return;
     }
 
