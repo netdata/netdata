@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- apps.plugin function processes cosmetic changes [\#13880](https://github.com/netdata/netdata/pull/13880) ([ktsaou](https://github.com/ktsaou))
+- allow single chart to be filtered in context queries [\#13879](https://github.com/netdata/netdata/pull/13879) ([ktsaou](https://github.com/ktsaou))
+- Add description for TCP WMI [\#13878](https://github.com/netdata/netdata/pull/13878) ([thiagoftsm](https://github.com/thiagoftsm))
+- Use print macros [\#13876](https://github.com/netdata/netdata/pull/13876) ([MrZammler](https://github.com/MrZammler))
+- Suppress ML and dlib ABI warnings [\#13875](https://github.com/netdata/netdata/pull/13875) ([Dim-P](https://github.com/Dim-P))
 - bump go.d.plugin v0.41.1 [\#13874](https://github.com/netdata/netdata/pull/13874) ([ilyam8](https://github.com/ilyam8))
+- Don't create a REMOVED alert event after a REMOVED. [\#13871](https://github.com/netdata/netdata/pull/13871) ([MrZammler](https://github.com/MrZammler))
 - Store hidden status when creating / updating dimension metadata [\#13869](https://github.com/netdata/netdata/pull/13869) ([stelfrag](https://github.com/stelfrag))
 - fix\(cgroup.plugin\): handle qemu-1- prefix when extracting virsh domain [\#13866](https://github.com/netdata/netdata/pull/13866) ([ilyam8](https://github.com/ilyam8))
 - Update step-09 for dbmode update.md [\#13864](https://github.com/netdata/netdata/pull/13864) ([DShreve2](https://github.com/DShreve2))
@@ -334,12 +340,6 @@
 - Migrate data when machine GUID changes [\#13232](https://github.com/netdata/netdata/pull/13232) ([stelfrag](https://github.com/stelfrag))
 - Add more sqlite unittests [\#13227](https://github.com/netdata/netdata/pull/13227) ([stelfrag](https://github.com/stelfrag))
 - ci: add issues to the Agent Board project workflow [\#13225](https://github.com/netdata/netdata/pull/13225) ([ilyam8](https://github.com/ilyam8))
-- Exporting/send variables [\#13221](https://github.com/netdata/netdata/pull/13221) ([boxjan](https://github.com/boxjan))
-- fix\(cgroups.plugin\): fix qemu VMs and LXC containers name resolution [\#13220](https://github.com/netdata/netdata/pull/13220) ([ilyam8](https://github.com/ilyam8))
-- netdata doubles [\#13217](https://github.com/netdata/netdata/pull/13217) ([ktsaou](https://github.com/ktsaou))
-- deduplicate mountinfo based on mount point [\#13215](https://github.com/netdata/netdata/pull/13215) ([ktsaou](https://github.com/ktsaou))
-- feat\(python.d\): load modules from user plugin directories \(NETDATA\_USER\_PLUGINS\_DIRS\) [\#13214](https://github.com/netdata/netdata/pull/13214) ([ilyam8](https://github.com/ilyam8))
-- Properly handle interactivity in the updater code. [\#13209](https://github.com/netdata/netdata/pull/13209) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
