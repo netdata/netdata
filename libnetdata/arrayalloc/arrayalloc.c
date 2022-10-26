@@ -206,7 +206,7 @@ static void arrayalloc_add_page(ARAL *ar) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->cache_dir, ar->filename, ar->internal.file_number);
         page->filename = strdupz(filename);
-        page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0);
+        page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0, false);
         if (unlikely(!page->data))
             fatal("Cannot allocate arrayalloc buffer of size %zu on filename '%s'", page->size, page->filename);
     }
