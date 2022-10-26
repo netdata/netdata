@@ -672,18 +672,14 @@ static struct rrdeng_page_descr *add_pages_from_timerange(struct journal_page_he
     descr->update_every_s = page_entry->update_every_s;
     descr->datafile_fd = datafile->file;
 
-    if (unlikely(!pg_cache_insert(ctx, page_index, descr, false))) {
+    struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, descr, false);
+    if (unlikely(added_descr != descr))
         rrdeng_page_descr_freez(descr);
-        descr = NULL;
-        error("DBENGINE: It happened!");
-    }
-    else
-        error("DBENGINE: It didn't happen!");
 
     uv_rwlock_wrunlock(&page_index->lock);
     uv_rwlock_rdlock(&page_index->lock);
 
-    return descr;
+    return added_descr;
 };
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
@@ -827,7 +823,7 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
 
 
 /* If index is NULL lookup by UUID (descr->id) */
-bool pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr, bool lock_page_index)
+struct rrdeng_page_descr *pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr, bool lock_page_index)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
@@ -861,9 +857,10 @@ bool pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
 
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
     if (unlikely(*PValue)) {
+        descr = *PValue;
         if (lock_page_index)
             uv_rwlock_wrunlock(&page_index->lock);
-        return false;
+        return descr;
     }
     ++page_index->page_count;
     *PValue = descr;
@@ -876,7 +873,7 @@ bool pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     ++ctx->stats.pg_cache_insertions;
     ++pg_cache->page_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-    return true;
+    return descr;
 }
 
 /**
@@ -1008,9 +1005,11 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
     Word_t Index;
+    Word_t IndexEnd;
     uint8_t failed_to_reserve;
 
     fatal_assert(NULL != ret_page_indexp);
+
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));

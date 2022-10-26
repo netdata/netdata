@@ -425,7 +425,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         if (unlikely(descr && descr->start_time_ut == start_time_ut)) {
             // We have this descriptor already
             descr_found = true;
-            // TODO: Remove this
+#ifdef  NETDATA_INTERNAL_CHECKS
             char uuid_str[UUID_STR_LEN];
             uuid_unparse_lower(page_index->id, uuid_str);
             internal_error(true, "REMOVING UUID %s with %lu, %lu length=%u (fileno=%u), extent database offset = %lu, size = %u",
@@ -434,6 +434,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             internal_error(true, "APPLYING UUID %s with %lu, %lu length=%u (fileno=%u), extent database offset = %lu, size = %u",
                            uuid_str, start_time_ut, end_time_ut, jf_metric_data->descr[i].page_length, extent->datafile->fileno,
                            extent->offset, extent->size);
+#endif
         }
         else {
             descr = pg_cache_create_descr();
@@ -449,15 +450,14 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         if (likely(!descr_found))
-            pg_cache_insert(ctx, page_index, descr, true);
+            (void) pg_cache_insert(ctx, page_index, descr, true);
 
-        if(page_index->latest_time_ut == descr->end_time_ut)
-                page_index->latest_update_every_s = descr->update_every_s;
+        if (page_index->latest_time_ut == descr->end_time_ut)
+            page_index->latest_update_every_s = descr->update_every_s;
 
-            if(descr->update_every_s == 0)
-                fatal(
-                    "DBENGINE: page descriptor update every is zero, end_time_ut = %llu, start_time_ut = %llu, entries = %zu",
-                    (unsigned long long)end_time_ut, (unsigned long long)start_time_ut, entries);
+        if(descr->update_every_s == 0)
+            fatal("DBENGINE: page descriptor update every is zero, end_time_ut = %llu, start_time_ut = %llu, entries = %zu",
+                (unsigned long long)end_time_ut, (unsigned long long)start_time_ut, entries);
     }
 
     extent->number_of_pages = valid_pages;
@@ -886,7 +886,6 @@ void *journal_v2_write_data_page_trailer(struct journal_v2_header *j2_header __m
     crc32set(journal_trailer->checksum, crc);
     return ++journal_trailer;
 }
-
 
 void *journal_v2_write_data_page(struct journal_v2_header *j2_header, void *data, struct rrdeng_page_descr *descr)
 {

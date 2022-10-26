@@ -186,7 +186,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void);
 int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access);
 void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
 void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-bool pg_cache_insert(
+struct rrdeng_page_descr *pg_cache_insert(
     struct rrdengine_instance *ctx,
     struct pg_cache_page_index *index,
     struct rrdeng_page_descr *descr,
