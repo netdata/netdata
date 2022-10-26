@@ -304,10 +304,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
-        info("Scanning file \"%s/%s\"", ctx->dbfiles_path, dent.name);
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &no);
         if (2 == ret) {
-            info("Matched file \"%s/%s\"", ctx->dbfiles_path, dent.name);
             datafile = mallocz(sizeof(*datafile));
             datafile_init(datafile, ctx, tier, no);
             datafiles[matched_files++] = datafile;
@@ -337,6 +335,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         journalfile = mallocz(sizeof(*journalfile));
         datafile->journalfile = journalfile;
         journalfile_init(journalfile, datafile);
+        journalfile->file_index = i;
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */
@@ -346,6 +345,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
+            // TODO: Also delete the version 2
             error("Deleting invalid data and journal file pair.");
             ret = unlink_journal_file(journalfile);
             if (!ret) {
