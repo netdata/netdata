@@ -1052,7 +1052,7 @@ static void process_replication_requests(struct sender_state *s) {
     bool overutilized_buffer = false;
 
     RRDSET *st;
-    rrdset_foreach_read(st, s->host) {
+    rrdset_foreach_reentrant(st, s->host) {
         if (st->replay_request.pending == false)
             continue;
 
