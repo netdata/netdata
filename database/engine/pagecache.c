@@ -630,9 +630,11 @@ static struct journal_page_list *find_matching_page_index(struct journal_page_he
 // Note we have read lock on page index
 // We release and escalate to write lock
 // Return to read lock when done
-static void add_pages_from_timerange(struct journal_page_header *page_list_header, uint32_t delta_start_time_s, usec_t journal_start_time_ut,
+static struct rrdeng_page_descr *add_pages_from_timerange(struct journal_page_header *page_list_header, uint32_t delta_start_time_s, usec_t journal_start_time_ut,
                               struct pg_cache_page_index *page_index, struct journal_extent_list *extent_list, struct rrdengine_datafile *datafile)
 {
+    time_t journal_start_time_s = (time_t)(journal_start_time_ut / USEC_PER_SEC);
+
     struct rrdengine_instance *ctx = page_index->ctx;
     struct journal_page_list *page_entry = NULL;
 
@@ -640,17 +642,18 @@ static void add_pages_from_timerange(struct journal_page_header *page_list_heade
 //    info("JOURVALV2: Validating UUID PAGE LIST is %d", page_header_is_valid(page_list_header));
 
     page_entry = find_matching_page_index(page_list_header, delta_start_time_s);
-    if(!page_entry)
-        return;
 
-    Word_t Index = journal_start_time_ut + (usec_t)page_entry->delta_start_s * USEC_PER_SEC;
+    time_t page_entry_start_time_s = journal_start_time_s + page_entry->delta_start_s;
+    Word_t Index = page_entry_start_time_s;
+
+    struct rrdeng_page_descr *descr;
 
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
-    struct rrdeng_page_descr *descr = (PValue && *PValue) ? *PValue : NULL;
+    descr = (PValue && *PValue) ? *PValue : NULL;
 
-    if (unlikely(descr && descr->start_time_ut == Index)) {
-        internal_error(true, "Page with start time %lu already exists; skipping", Index);
-        return;
+    if (unlikely(descr && (time_t)(descr->start_time_ut / USEC_PER_SEC) == page_entry_start_time_s)) {
+        internal_error(true, "Page with start time %lu already exists; skipping", page_entry_start_time_s);
+        return descr;
     }
 
     // FIXME: Safety of rd -> write lock
@@ -659,8 +662,8 @@ static void add_pages_from_timerange(struct journal_page_header *page_list_heade
 
     descr = pg_cache_create_descr();
     descr->page_length = page_entry->page_length;
-    descr->start_time_ut = journal_start_time_ut + (usec_t)page_entry->delta_start_s * USEC_PER_SEC;
-    descr->end_time_ut = journal_start_time_ut + (usec_t)page_entry->delta_end_s * USEC_PER_SEC;
+    descr->start_time_ut = (journal_start_time_s + page_entry->delta_start_s) * USEC_PER_SEC;
+    descr->end_time_ut = (journal_start_time_s + page_entry->delta_end_s) * USEC_PER_SEC;
     descr->id = &page_index->id;
     descr->extent = NULL;
     // FIXME: Check valid offset within file
@@ -669,11 +672,18 @@ static void add_pages_from_timerange(struct journal_page_header *page_list_heade
     descr->update_every_s = page_entry->update_every_s;
     descr->datafile_fd = datafile->file;
 
-    if (unlikely(!pg_cache_insert(ctx, page_index, descr, false)))
+    if (unlikely(!pg_cache_insert(ctx, page_index, descr, false))) {
         rrdeng_page_descr_freez(descr);
+        descr = NULL;
+        error("DBENGINE: It happened!");
+    }
+    else
+        error("DBENGINE: It didn't happen!");
 
     uv_rwlock_wrunlock(&page_index->lock);
     uv_rwlock_rdlock(&page_index->lock);
+
+    return descr;
 };
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
@@ -687,7 +697,7 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 // 2. Find the UUID in that journal
 // 3. Find the array of times for that UUID (convert from the journal header to the offset needed)
 // Note: We have page_index lock
-void populate_metric_time_from_journal(struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
+static struct rrdeng_page_descr *populate_metric_time_from_journal(struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
 {
     struct rrdengine_instance *ctx = page_index->ctx;
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
@@ -696,8 +706,7 @@ void populate_metric_time_from_journal(struct pg_cache_page_index *page_index, u
     struct journal_v2_header *journal_header = NULL;
     uint32_t delta_start_time = 0;
 
-    bool page_added = false;
-    while (!page_added && datafile) {
+    while (datafile) {
         journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
         if (!journal_header) {
             datafile = datafile->next;
@@ -725,27 +734,29 @@ void populate_metric_time_from_journal(struct pg_cache_page_index *page_index, u
                 page_list_header = (struct journal_page_header *) (datafile->journalfile->journal_data + uuid_entry->page_offset);
 
                 //info("JOURVALV2: Validating UUID PAGE LIST is %d", page_header_is_corrupted(journal_header, page_list_header));
-                add_pages_from_timerange(page_list_header, delta_start_time, journal_header->start_time_ut,
+                return add_pages_from_timerange(page_list_header, delta_start_time, journal_header->start_time_ut,
                         page_index, (void *) journalfile->journal_data + journal_header->extent_offset, datafile);
-                page_added = true;
             }
         }
         datafile = datafile->next;
     }
+
+    return NULL;
 }
 
 /* The caller must hold the page index lock */
 static inline struct rrdeng_page_descr *
         find_first_page_in_time_range(struct pg_cache_page_index *page_index, usec_t start_time, usec_t end_time)
 {
-    struct rrdeng_page_descr *descr = NULL;
+
+    struct rrdeng_page_descr *descr = populate_metric_time_from_journal(page_index, start_time, end_time);
+//    if(descr)
+//        return descr;
+
     Pvoid_t *PValue;
     Word_t Index;
 
-
-    populate_metric_time_from_journal(page_index, start_time, end_time);
-
-    Index = (Word_t)(start_time / USEC_PER_SEC);
+    Index = (Word_t) (start_time / USEC_PER_SEC);
     PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
     if (likely(NULL != PValue)) {
         descr = *PValue;
@@ -754,7 +765,7 @@ static inline struct rrdeng_page_descr *
         }
     }
 
-    Index = (Word_t)(start_time / USEC_PER_SEC);
+    Index = (Word_t) (start_time / USEC_PER_SEC);
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
     if (likely(NULL != PValue)) {
         descr = *PValue;
