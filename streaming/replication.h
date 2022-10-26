@@ -7,7 +7,7 @@ extern "C" {
 
 #include "daemon/common.h"
 
-void replicate_chart_response(RRDHOST *rh, RRDSET *rs,
+bool replicate_chart_response(RRDHOST *rh, RRDSET *rs,
                               bool start_streaming, time_t after, long before);
 
 bool replicate_chart_request(FILE *outfp, RRDHOST *rh, RRDSET *rs,

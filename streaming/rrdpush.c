@@ -161,8 +161,10 @@ int rrdpush_init() {
 // this is for the first iterations of each chart
 unsigned int remote_clock_resync_iterations = 60;
 
-
 static inline bool should_send_chart_matching(RRDSET *st) {
+    if (rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED) == 0)
+        return false;
+
     // get all the flags we need to check, with one atomic operation
     RRDSET_FLAGS flags = rrdset_flag_check(st,
              RRDSET_FLAG_UPSTREAM_SEND
@@ -308,6 +310,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         time_t last_entry_local = rrdset_last_entry_t(st);
         buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
     } else {
+        error("No replication capability for %s.%s (enabling streaming)", rrdhost_hostname(host), rrdset_id(st));
         rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
     }
 

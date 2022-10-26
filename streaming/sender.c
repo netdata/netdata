@@ -157,16 +157,6 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
-    // clear streaming flag from each chart because we want
-    // to start replication on the next possible reconnection
-    RRDSET *st;
-    rrdset_foreach_reentrant(st, host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
-
-        st->replay_request.pending = false;
-    }
-    rrdset_foreach_done(st);
-
     if(host->sender->rrdpush_sender_socket != -1) {
         close(host->sender->rrdpush_sender_socket);
         host->sender->rrdpush_sender_socket = -1;
@@ -225,9 +215,12 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
+    error("Clearing stream_collected_metrics flag in charts of host %s", rrdhost_hostname(host));
+
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdset_flag_clear(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
 
         st->upstream_resync_time = 0;
 
@@ -1074,9 +1067,14 @@ static void process_replication_requests(struct sender_state *s) {
         if (overutilized_buffer)
             break;
 
-        replicate_chart_response(s->host, st, st->replay_request.start_streaming,
-                                              st->replay_request.after,
-                                              st->replay_request.before);
+        bool start_streaming = replicate_chart_response(s->host, st, st->replay_request.start_streaming,
+                                                        st->replay_request.after,
+                                                        st->replay_request.before);
+        if (start_streaming) {
+            error("Enabling metric streaming for chart %s.%s", rrdhost_hostname(s->host), rrdset_id(st));
+            rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
+        }
+
         st->replay_request.pending = false;
         replication_requests_pending--;
     }

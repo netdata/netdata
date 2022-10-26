@@ -141,6 +141,10 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->rrdhost = host;
 
     st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
+
+    if (host == localhost)
+        st->flags |= RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED;
+
     if(unlikely(st->id == anomaly_rates_chart))
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
 

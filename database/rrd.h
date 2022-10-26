@@ -532,6 +532,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 22),
 
     RRDSET_FLAG_STREAM_COLLECTED_METRICS = (1 << 23),
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 24)
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))

@@ -225,6 +225,9 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
             rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
+
+        if (host != localhost)
+            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
     }
     ((PARSER_USER_OBJECT *)user)->st = st;
 
@@ -1028,6 +1031,8 @@ PARSER_RC pluginsd_replay_rrdset_end(char **words, void *user, PLUGINSD_ACTION *
         st->last_updated.tv_usec = 0;
         st->last_collected_time = st->last_updated;
         st->counter_done++;
+
+        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return PARSER_RC_OK;
     }
 
