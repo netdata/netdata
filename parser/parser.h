@@ -35,7 +35,7 @@ typedef enum parser_input_type {
 
 #define PARSER_INPUT_FULL   (PARSER_INPUT_SPLIT|PARSER_INPUT_ORIGINAL)
 
-typedef PARSER_RC (*keyword_function)(char **, void *, PLUGINSD_ACTION  *plugins_action);
+typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user_data, PLUGINSD_ACTION  *plugins_action);
 
 typedef struct parser_keyword {
     size_t      worker_job_id;
@@ -101,26 +101,26 @@ int parser_recover_input(PARSER *working_parser);
 
 size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
-PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_chart_definition_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_flush(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_disable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_guid(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_context(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_tombstone(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_clabel_commit(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 
-PARSER_RC pluginsd_replay_rrdset_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_replay_rrdset_header(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_replay_rrdset_done(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_replay_rrdset_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_header(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 
 #endif

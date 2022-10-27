@@ -65,17 +65,21 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC streaming_timestamp(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
+
     char *remote_time_txt = words[1];
     time_t remote_time = 0;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
+
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
     if (!(cd->capabilities & STREAM_CAP_GAP_FILLING)) {
         error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd, cd->capabilities);
         return PARSER_RC_OK;    // Ignore error and continue stream
     }
+
     if (remote_time_txt && *remote_time_txt) {
         remote_time = str2ull(remote_time_txt);
         time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
@@ -126,8 +130,9 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
 
     uuid_t uuid;

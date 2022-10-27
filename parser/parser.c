@@ -308,10 +308,11 @@ inline int parser_action(PARSER *parser, char *input)
     if (unlikely(!find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
         return 0;
 
+    size_t num_words = 0;
     if ((parser->flags & PARSER_INPUT_KEEP_ORIGINAL) == PARSER_INPUT_KEEP_ORIGINAL)
-        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
+        num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
-        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
     uint32_t command_hash = simple_hash(command);
 
@@ -328,7 +329,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     if (unlikely(!action_function_list)) {
         if (unlikely(parser->unknown_function))
-            rc = parser->unknown_function(words, parser->user, NULL);
+            rc = parser->unknown_function(words, num_words, parser->user, NULL);
         else
             rc = PARSER_RC_ERROR;
 
@@ -337,7 +338,7 @@ inline int parser_action(PARSER *parser, char *input)
     else {
         worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
-                rc = action_function(words, parser->user, parser->plugins_action);
+                rc = action_function(words, num_words, parser->user, parser->plugins_action);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
                     internal_error(true, "action_function() failed with rc = %u", rc);
                     break;

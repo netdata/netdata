@@ -4,8 +4,10 @@
 
 #define LOG_FUNCTIONS false
 
-PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     char *dimension = words[1];
     char *value = words[2];
 
@@ -47,8 +49,10 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     char *id = words[1];
     char *microseconds_txt = words[2];
 
@@ -86,9 +90,11 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
+    UNUSED(num_words);
+
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
@@ -107,8 +113,10 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
         debug(D_PLUGINSD, "Ignoring chart belonging to missing or ignored host.");
@@ -234,8 +242,9 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_chart_definition_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
 
     long first_entry_child = str2l(words[1]);
@@ -255,8 +264,10 @@ PARSER_RC pluginsd_chart_definition_end(char **words, void *user, PLUGINSD_ACTIO
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     char *id = words[1];
     char *name = words[2];
     char *algorithm = words[3];
@@ -485,8 +496,10 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
     return HTTP_RESP_OK;
 }
 
-PARSER_RC pluginsd_function(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_function(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     bool global = false;
     int i = 1;
     if(strcmp(words[i], "GLOBAL") == 0) {
@@ -532,8 +545,10 @@ static void pluginsd_function_result_end(struct parser *parser, void *action_dat
     string_freez(key);
 }
 
-PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     char *key = words[1];
     char *status = words[2];
     char *format = words[3];
@@ -588,8 +603,10 @@ PARSER_RC pluginsd_function_result_begin(char **words, void *user, PLUGINSD_ACTI
 
 // ----------------------------------------------------------------------------
 
-PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     char *name = words[1];
     char *value = words[2];
     NETDATA_DOUBLE v;
@@ -665,26 +682,32 @@ PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_flush(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
+    UNUSED(num_words);
+
     debug(D_PLUGINSD, "requested a FLUSH");
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_disable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(user);
+
     UNUSED(words);
+    UNUSED(num_words);
+    UNUSED(user);
 
     info("called DISABLE. Disabling it.");
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     char *store;
 
     if (!words[1] || !words[2] || !words[3]) {
@@ -724,9 +747,10 @@ PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
+    UNUSED(num_words);
 
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     debug(D_PLUGINSD, "requested to OVERWRITE host labels");
@@ -743,8 +767,10 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
 }
 
 
-PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
+    UNUSED(num_words);
+
     if (!words[1] || !words[2] || !words[3]) {
         error("Ignoring malformed or empty CHART LABEL command.");
         return PARSER_RC_OK;
@@ -760,9 +786,10 @@ PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_ac
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_clabel_commit(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     UNUSED(words);
+    UNUSED(num_words);
 
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
@@ -786,8 +813,10 @@ PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plu
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_guid(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
+
     char *uuid_str = words[1];
     uuid_t uuid;
 
@@ -808,8 +837,10 @@ PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_actio
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_context(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
+
     char *uuid_str = words[1];
     uuid_t uuid;
 
@@ -830,8 +861,10 @@ PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION *plugins_ac
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_tombstone(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
+
     char *uuid_str = words[1];
     uuid_t uuid;
 
@@ -852,8 +885,10 @@ PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION *plugins_
     return PARSER_RC_OK;
 }
 
-PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC metalog_pluginsd_host(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
+    UNUSED(num_words);
+
     char *machine_guid = words[1];
     char *hostname = words[2];
     char *registry_hostname = words[3];
@@ -879,8 +914,9 @@ PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plug
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrdset_begin(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
 
     const char *chart_id = words[1];
@@ -905,8 +941,9 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, void *user, PLUGINSD_ACTION
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrdset_header(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_replay_rrdset_header(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
 
     PARSER_USER_OBJECT *user_object = user;
@@ -939,8 +976,9 @@ PARSER_RC pluginsd_replay_rrdset_header(char **words, void *user, PLUGINSD_ACTIO
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrdset_done(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
 
     PARSER_USER_OBJECT *user_object = user;
@@ -1002,8 +1040,9 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, void *user, PLUGINSD_ACTION 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrdset_end(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
+    UNUSED(num_words);
     UNUSED(plugins_action);
 
     time_t update_every_child = str2l(words[1]);
