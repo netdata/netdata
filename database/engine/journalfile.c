@@ -1035,7 +1035,7 @@ void migrate_journal_file_v2(
         extent->index = number_of_extents++;
         extent = extent->next;
     }
-    info("DEBUG: Scan and extbuild metric %d", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    info("DEBUG: Scan and extbuild metric %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
     // Calculate total jourval file size
     size_t total_file_size = 0;
@@ -1078,7 +1078,7 @@ void migrate_journal_file_v2(
 
     // Write all the extents we have
     data = journal_v2_write_extent_list(journalfile, data_start + extent_offset);
-    info("DEBUG: Write extent list so far %d", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    info("DEBUG: Write extent list so far %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
     // Allocate array to sort UUIDs and keep them sorted in the journal because we want to do binary search when we do lookups
     struct journal_metric_list_to_sort *uuid_list = mallocz(number_of_metrics * sizeof(struct journal_metric_list_to_sort));
@@ -1106,7 +1106,7 @@ void migrate_journal_file_v2(
     JudyHSFreeArray(&metrics_JudyHS_array, PJE0);
 
     qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journal_metric_compare);
-    info("DEBUG: Traverse and qsort  UUID %d", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    info("DEBUG: Traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
     // Write sorted UUID LIST
     for (Index = 0; Index < number_of_metrics; Index++) {
         metric_info = uuid_list[Index].metric_info;
@@ -1134,7 +1134,7 @@ void migrate_journal_file_v2(
         if (!keep_live)
             freez(metric_info);
     }
-    info("DEBUG: WRITE METRICS AND PAGES  %d", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    info("DEBUG: WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
     // If we failed and didnt process the entire list, free the rest
     if (!keep_live) {
         for (; Index < number_of_metrics; Index++)
@@ -1154,7 +1154,7 @@ void migrate_journal_file_v2(
     // File size counts
     ctx->disk_space += total_file_size;
 
-    info("DEBUG: FILE COMPLETED --------> %d", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    info("DEBUG: FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
     info("Migrated journal file %s, File size %lu", path, total_file_size);
     if (keep_live) {
         journalfile->journal_data = data_start;
@@ -1169,7 +1169,7 @@ void migrate_journal_file_v2(
             bytes_after += JudyLMemUsed(uuid_list[Index].metric_info->page_index->JudyL_array);
             freez(uuid_list[Index].metric_info);
         }
-        info("DEBUG: ACTIVATING NEW INDEX JNL %d   Number of deletions %d, memory released = %u (Memory before = %u, Memory after = %u)",
+        info("DEBUG: ACTIVATING NEW INDEX JNL %llu   Number of deletions %lu, memory released = %u (Memory before = %u, Memory after = %u)",
              (now_realtime_usec() - start_loading) / USEC_PER_MS, number_of_metrics,
              bytes_before - bytes_after, bytes_before, bytes_after);
         freez(uuid_list);
@@ -1355,10 +1355,9 @@ void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
 
 void start_page_deactivation(uv_work_t *req)
 {
-    struct rrdeng_work  *work_request = req->data;
+//    struct rrdeng_work  *work_request = req->data;
     struct rrdengine_worker_config *wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
-    char path[RRDENG_PATH_MAX];
 
     info("Checking all journal files for page descriptors deactivation");
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
