@@ -31,13 +31,13 @@ it's possible. This approach has a number of benefits:
 
 Netdata Cloud bridges the gap between many distributed databases by centralizing only the interface. You query and
 visualize your nodes' metrics real time and whenever your need to. When
-you [look at charts in Netdata Cloud](/docs/visualize/interact-dashboards-charts.md), the metrics values are queried
+you [look at charts in Netdata Cloud](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md), the metrics values are queried
 directly from that node's database and securely streamed to Netdata Cloud, which proxies them to your browser.
 
 ## Integrity of metrics in a distributed data architecture approach
 
 Netdata Agents will collect and store the data for your nodes in any given moment even at partial outages. To ensure
 though accessibility of your data in any given moment, Netdata Agents utilize technologies such
-as [replication and streaming](https://github.com/netdata/netdata/docs/concepts/netdata-agent/metrics-streamind-replication.md)
+as [replication and streaming](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md)
 of data. 
 
