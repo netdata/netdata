@@ -30,10 +30,10 @@ by Anomaly Advisor.
 ## Learn more 
 <Grid columns="2">
   <Box
-    title="Netdata Cloud Basics">
+    title="Guided troubleshooting tools">
     <BoxList>
-      <BoxListItem to="/docs/cloud/visualize/overview" title="Anamoly Advisor" />
-      <BoxListItem to="/docs/cloud/visualize/nodes" title="Metrics Correlations" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md" title="Anamoly Advisor" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md" title="Metrics Correlations" />
     </BoxList>
   </Box>
 </Grid>
