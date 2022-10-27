@@ -218,7 +218,7 @@ static void read_file_cb(uv_fs_t *req) {
 
     if (likely(req->result > 0)) {
         buff->in->timestamp = get_unix_time_ms();
-        m_assert(buff->in->timestamp > 1649175852000 && buff->in->timestamp < 2532788652000, "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
+        m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
         buff->in->text_size = (size_t) req->result;
 
         /* Check if a half-line was read */

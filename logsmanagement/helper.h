@@ -42,6 +42,12 @@ typedef enum { LOGS_MANAG_ERROR,
 #endif  // LOGS_MANAG_DEBUG_LEV
 #endif  // m_assert
 
+/* Test if a timestamp is within a valid range 
+ * 1649175852000 equals Tuesday, 5 April 2022 16:24:12, 
+ * 2532788652000 equals Tuesday, 5 April 2050 16:24:12
+ */
+#define TEST_MS_TIMESTAMP_VALID(x) (((x) > 1649175852000 && (x) < 2532788652000)? 1:0)
+
 // Portable thread local, see https://stackoverflow.com/questions/18298280/how-to-declare-a-variable-as-thread-local-portably
 #ifndef thread_local
 #if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__

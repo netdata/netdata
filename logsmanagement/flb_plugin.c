@@ -338,7 +338,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             //         *buff->in->data == 0, "buff->in->timestamp == 0 but *buff->in->text != 0");
 
             buff->in->timestamp = (uint64_t) tmp_time.tm.tv_sec * MS_IN_SEC + (uint64_t) tmp_time.tm.tv_nsec / (MS_IN_SEC * MS_IN_SEC);
-            m_assert(buff->in->timestamp > 1649175852000 && buff->in->timestamp < 2532788652000, "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
+            m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
         }
 
         if(likely(x->type == MSGPACK_OBJECT_MAP)){
