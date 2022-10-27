@@ -884,7 +884,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     header->number_of_pages = count;
     pos += sizeof(*header);
 
-    extent = mallocz(sizeof(*extent) + count * sizeof(&extent->pages[0]));
+    extent = mallocz(sizeof(*extent) + count * sizeof(extent->pages[0]));
     datafile = ctx->datafiles.last;  /* TODO: check for exceeded size quota */
     extent->offset = datafile->pos;
     extent->number_of_pages = count;
