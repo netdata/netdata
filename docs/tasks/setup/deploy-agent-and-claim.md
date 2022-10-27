@@ -1,12 +1,12 @@
 <!--
-title: "Silence Alerts"
-sidebar_label: "Silence Alerts"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/silence-alerts.md"
+title: "Install Agent and add it to your space"
+sidebar_label: "Install Agent and add it to your space"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-agent-and-claim.md"
 learn_status: "Published"
-sidebar_position: 10
+sidebar_position: 20
 learn_topic_type: "Tasks"
-learn_rel_path: "alerting"
-learn_docs_purpose: "Instructions on how to silence an alert"
+learn_rel_path: "Setup"
+learn_docs_purpose: "Step by step instruction to deploy an Agent"
 -->
 
 To accurately monitor the health of your systems and applications, you need to know _immediately_ when there's something

@@ -1,13 +1,149 @@
 <!--
-title: "Reverse proxy Netdata backend"
-sidebar_label: "Reverse proxy Netdata backend"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/reverse-proxy-netdata-backend.md"
-sidebar_position : 4
+title: "Secure Agent Netdata deployments"
+sidebar_label: "Secure Netdata deployments"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/secure-netdata-deployments.md"
+sidebar_position : 50
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "security"
-learn_docs_purpose: "Hardening Netdata Agent's web server"
+learn_docs_purpose: "Present all the Agent interconnection ports and Cloud IPs for the user to whitelist them and hardening it"
 -->
+
+## Intro
+
+The Netdata Agent started as a standalone deployment. A lightweight Web server serves the legacy dashboard and the API
+at port `19999` of every Agent deployment. Although Netdata is read-only and runs without special privileges, if left
+accessible to the internet at large, the local dashboard could reveal sensitive information about your infrastructure
+so, we advise you to secure those endpoints. To do that, we give you many options to establish security best practices
+that align with your goals and your organization's standards.
+
+1. Restrict access via the Agent Web server's rules/options (Recommended)
+2. Reverse proxy this Web Server via a Web server and secure in it's end (advanced users).
+3. Secure Netdata Agent's ports via your firewall rules (advanced users)
+
+## Restrict access via the Agent Web server's rules/options
+
+We advise you to leave at least access to from your `localhost`, in any case it's up to you.
+
+#### Steps:
+
+
+```conf
+[web]
+    # Allow only localhost connections
+    allow connections from = localhost
+
+    # Allow only from management LAN running on `10.X.X.X`
+    allow connections from = 10.*
+
+    # Allow connections only from a specific FQDN/hostname
+    allow connections from = example*
+```
+
+Note-internal:: Corner case streaming, you need to allow from the streaming source
+The `allow connections from` setting is global and restricts access to the dashboard, badges, streaming, API, and
+`netdata.conf`, but you can also set each of those access lists more granularly if you choose:
+
+```conf
+[web]
+    allow connections from = localhost *
+    allow dashboard from = localhost *
+    allow badges from = *
+    allow streaming from = *
+    allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
+    allow management from = localhost
+```
+
+
+
+Despite this design decision, your [data](/docs/netdata-security.md#your-data-is-safe-with-netdata) and your
+[systems](/docs/netdata-security.md#your-systems-are-safe-with-netdata) are safe with Netdata. Netdata is read-only,
+cannot do anything other than present metrics, and runs without special/`sudo` privileges. Also, the local dashboard
+only exposes chart metadata and metric values, not raw data.
+
+While Netdata is secure by design, we believe you
+should [protect your nodes](/docs/netdata-security.md#why-netdata-should-be-protected). If left accessible to the
+internet at large, the local dashboard could reveal sensitive information about your infrastructure. For example, an
+attacker can view which applications you run (databases, webservers, and so on), or see every user account on a node.
+
+Instead of dictating how to secure your infrastructure, 
+
+- [Disable the local dashboard](#disable-the-local-dashboard): **Simplest and recommended method** for those who have
+  added nodes to Netdata Cloud and view dashboards and metrics there.
+- [Restrict access to the local dashboard](#restrict-access-to-the-local-dashboard): Allow local dashboard access from
+  only certain IP addresses, such as a trusted static IP or connections from behind a management LAN. Full support for
+  Netdata Cloud.
+- [Use a reverse proxy](#use-a-reverse-proxy): Password-protect a local dashboard and enable TLS to secure it. Full
+  support for Netdata Cloud.
+
+## Disable the local dashboard
+
+This is the _recommended method for those who have connected their nodes to Netdata Cloud_ and prefer viewing real-time
+metrics using the War Room Overview, Nodes view, and Cloud dashboards.
+
+You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link ([ACLK](/aclk/README.md)) that
+allows you to stream metrics on demand from your nodes via the Netdata Cloud interface. This change mitigates all
+concerns about revealing metrics and system design to the internet at large, while keeping all the functionality you
+need to view metrics and troubleshoot issues with Netdata Cloud.
+
+Open `netdata.conf` with `./edit-config netdata.conf`. Scroll down to the `[web]` section, and find
+the `mode = static-threaded` setting, and change it to `none`.
+
+```conf
+[web]
+    mode = none
+```
+
+Save and close the editor, then [restart your Agent](/docs/configure/start-stop-restart.md)
+using `sudo systemctl restart netdata`. If you try to visit the local dashboard to `http://NODE:19999` again, the
+connection will fail because that node no longer serves its local dashboard.
+
+> See the [configuration basics doc](/docs/configure/nodes.md) for details on how to find `netdata.conf` and use
+> `edit-config`.
+
+## Restrict access to the local dashboard
+
+If you want to keep using the local dashboard, but don't want it exposed to the internet, you can restrict access with
+[access lists](/web/server/README.md#access-lists). This method also fully retains the ability to stream metrics
+on-demand through Netdata Cloud.
+
+The `allow connections from` setting helps you allow only certain IP addresses or FQDN/hostnames, such as a trusted
+static IP, only `localhost`, or connections from behind a management LAN.
+
+By default, this setting is `localhost *`. This setting allows connections from `localhost` in addition to _all_
+connections, using the `*` wildcard. You can change this setting using
+Netdata's [simple patterns](/libnetdata/simple_pattern/README.md).
+
+```conf
+[web]
+    # Allow only localhost connections
+    allow connections from = localhost
+
+    # Allow only from management LAN running on `10.X.X.X`
+    allow connections from = 10.*
+
+    # Allow connections only from a specific FQDN/hostname
+    allow connections from = example*
+```
+
+## Use your firewall
+
+
+See the [web server](/web/server/README.md#access-lists) docs for additional details about access lists. You can take
+access lists one step further by [enabling SSL](/web/server/README.md#enabling-tls-support) to encrypt data from local
+dashboard in transit. The connection to Netdata Cloud is always secured with TLS.
+
+## Use a reverse proxy
+
+You can also put Netdata behind a reverse proxy for additional security while retaining the functionality of both the
+local dashboard and Netdata Cloud dashboards. You can use a reverse proxy to password-protect the local dashboard and
+enable HTTPS to encrypt metadata and metric values in transit.
+
+We recommend Nginx, as it's what we use for our [demo server](https://london.my-netdata.io/), and we have a guide
+dedicated to [running Netdata behind Nginx](/docs/Running-behind-nginx.md).
+
+We also have guides for [Apache](/docs/Running-behind-apache.md), [Lighttpd](/docs/Running-behind-lighttpd.md),
+[HAProxy](/docs/Running-behind-haproxy.md), and [Caddy](/docs/Running-behind-caddy.md).
 
 You can put Netdata behind a reverse proxy for additional security while retaining the functionality of both the
 local dashboard and Netdata Cloud dashboards. You can use a reverse proxy to password-protect the local dashboard and

@@ -1,16 +1,171 @@
 <!--
-title: "Configure the Agent"
-sidebar_label: "Configure the Agent"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md"
+title: "Agent configuration"
+sidebar_label: "Agent configuration"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/agent-configuration.md"
 learn_status: "Published"
-sidebar_position: 1
+sidebar_position: 40
 learn_topic_type: "Tasks"
-learn_rel_path: "general-configuration"
-learn_docs_purpose: "demonstrate an edit-config, reference to the ref-doc of netdata.conf, plus add an admonition in case user want to change metric retention to follow the corresponding doc"
+learn_rel_path: "Setup"
+learn_docs_purpose: "The most common configuration task for an Agent deployment"
 -->
 
-In this task you will learn how to edit the configuration files of the Agent, and also how to use **Host labels**.  
-All of our configuration Tasks point to this one for editing the configurtion files correctly.
+Agent is pre-configured and optimized for general purpose. You can change its settings to tailor made it base to your
+deployments and needs. In this document you will guide you through the most common task you can make to the Agent
+configuration.
+
+
+## General tasks
+
+:::info
+
+1. You need to locate your Agent's configuration directory of your Agent. (default: `/etc/netdata`)
+2. You need privileged access to perform those tasks.
+
+:::
+
+### See the effective configuration
+
+All the configuration files have the default options (commended in) of Agent's version you installed. Furthermore, you
+can see the options you may have changed in the past (commended out). If you have updated the Agent, these default
+values may be invalid. To see the effective configuration of a particular Agent, visit the `NODE_IP:19999/netdata.conf`
+
+### Override your Agent's configuration with the effective configuration.
+
+Download the latest version of this file with `wget` or `curl` 
+
+```bash
+wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
+```
+
+or
+
+```bash
+curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
+```
+
+
+### List all the available configuration files 
+
+Under your configuration directory, you will see only some necessary configuration files and the configuration files
+you already have touched. To explore all the configuration files execute the following steps.
+
+#### Steps:
+
+1. Navigate under the Agent's configuration directory
+    ```bash
+    cd /etc/netdata   # Replace this path with your Netdata config directory if different.
+    ```
+
+
+3. Run the `edit-config` helper script
+    ```bash
+    sudo ./edit-config
+    ```
+
+#### Expected result:
+
+You will see all the configuration files available:
+
+```bash
+
+$ sudo ./edit-config  
+USAGE:
+  ./edit-config FILENAME
+
+  Copy and edit the stock config file named: FILENAME
+  if FILENAME is already copied, it will be edited as-is.
+
+  The EDITOR shell variable is used to define the editor to be used.
+
+  Stock config files at: '/usr/lib/netdata/conf.d'
+  User  config files at: '/etc/netdata'
+
+  Available files in '/usr/lib/netdata/conf.d' to copy and edit:
+
+./apps_groups.conf         ./go.d/consul.conf              ./go.d/pgbouncer.conf          ./health.d/anomalies.conf           ./health.d/memcached.conf        ./health.d/wmi.conf             ./python.d/ntpd.conf
+./charts.d/ap.conf         ./go.d/coredns.conf             ./go.d/phpdae
+. . . 
+```
+
+#### Relative documents
+
+## Global configuration
+
+## Database configuration
+
+## Agent's directories and files
+
+## Daemon's environment variables
+
+## Agent's machine learning component
+
+## Global Health settings
+
+## Change Health settings for a specific alert
+
+### Silence an alert
+
+#### Steps:
+
+All of Netdata's health configuration files are in Netdata's config directory, inside the `health.d/` directory. You can
+edit them by following
+the [Configure the Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md)
+Task.
+
+For example, lets take a look at the `health/cpu.conf` file.
+
+```bash
+ template: 10min_cpu_usage
+       on: system.cpu
+    class: Utilization
+     type: System
+component: CPU
+       os: linux
+    hosts: *
+   lookup: average -10m unaligned of user,system,softirq,irq,guest
+    units: %
+    every: 1m
+     warn: $this > (($status >= $WARNING)  ? (75) : (85))
+     crit: $this > (($status == $CRITICAL) ? (85) : (95))
+    delay: down 15m multiplier 1.5 max 1h
+     info: average CPU utilization over the last 10 minutes (excluding iowait, nice and steal)
+       to: sysadmin
+```
+
+1. Navigate under the Agent's configuration directory
+    ```bash
+    cd /etc/netdata   # Replace this path with your Netdata config directory if different.
+    ```
+
+
+2. `edit-config` it's configuration file
+    ```bash
+    sudo ./edit-config health.d/cpu.conf
+    ```
+
+3. Change it's `to: ...` field.
+   ```sh
+     to: silent
+   ```
+
+4. Reload health settings
+    ```bash
+    sudo netdatacli reload-health
+    ```
+
+## Agent's web server
+
+## Setup registry
+
+## Global settings for plugins
+
+## Global settings (per plugin)
+
+## Streaming engine
+
+## Exporting engine
+
+
 
 ## Prerequisites
 
@@ -19,10 +174,9 @@ All of our configuration Tasks point to this one for editing the configurtion fi
 
 ## Edit configuration files using the `edit-config` script
 
-:::tip
-The most reliable method of finding your Netdata config directory is loading your `netdata.conf` on your browser. Open a
-tab and navigate to `http://HOST:19999/netdata.conf`, replacing `HOST` with your node's IP address, or if you want to
-access the node you are locally using, you can also use `localhost`.
+:::tip The most reliable method of finding your Netdata config directory is loading your `netdata.conf` on your browser.
+Open a tab and navigate to `http://HOST:19999/netdata.conf`, replacing `HOST` with your node's IP address, or if you
+want to access the node you are locally using, you can also use `localhost`.
 
 Look for the line that begins with `# config directory =` . The text after that will be the path to your Netdata config
 directory.
@@ -34,8 +188,7 @@ in the stock configuration directory and in the user directory. If you haven't e
 upon saving, the script will copy the file and place it in the user configuration directory, which will in turn override
 the stock configuration.
 
-:::tip
-you can run:
+:::tip you can run:
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory if different.
@@ -56,8 +209,7 @@ sudo ./edit-config netdata.conf
 
 You should now see `netdata.conf` in your editor!
 
-:::caution
-After making changes to the Netdata configuration files you need
+:::caution After making changes to the Netdata configuration files you need
 to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md#restarting-the-agent)
 for these changes to take effect! This action though isn't necessary for health configuration files, in which you just
 need to
@@ -144,8 +296,8 @@ You may have noticed a handful of labels that begin with an underscore (`_`). Th
 ### Automatic labels
 
 When Netdata starts, it captures relevant information about the system and converts them into automatically-generated
-host labels. You can use these to logically organize your systems via health entities, exporting metrics,
-parent-child status, and more.
+host labels. You can use these to logically organize your systems via health entities, exporting metrics, parent-child
+status, and more.
 
 They capture the following:
 
@@ -162,25 +314,23 @@ below.
 
 ### Host labels in streaming
 
-You may have noticed the `_is_parent` and `_is_child` automatic labels from above. Host labels are also now
-streamed from a child to its parent node, which concentrates an entire infrastructure's OS, hardware, container,
-and virtualization information in one place: the parent.
+You may have noticed the `_is_parent` and `_is_child` automatic labels from above. Host labels are also now streamed
+from a child to its parent node, which concentrates an entire infrastructure's OS, hardware, container, and
+virtualization information in one place: the parent.
 
 Now, if you'd like to remind yourself of how much RAM a certain child node has, you can access
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info` and reference the automatically-generated host labels from the
 child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
-:::caution
-Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
+:::caution Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
 kernel and operating system versions, you should secure streaming connections with SSL. See
 the [Configure streaming](https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-streaming.md#enable-tlsssl-on-streaming-optional)
 Task for details. You may also want to use
-[access lists](MISSING LINK) or [expose the API only to LAN/localhost
-connections](MISSING LINK).
+[access lists](MISSING LINK) or [expose the API only to LAN/localhost connections](MISSING LINK).
 :::
 
-You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
-exporting. Speaking of which...
+You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics exporting.
+Speaking of which...
 
 ### Host labels in health entities
 
@@ -227,14 +377,14 @@ Or when ephemeral Docker nodes are involved:
  host labels: _container = docker
 ```
 
-Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
-Reference](MISSING LINK/ no file in the repo yet) documentation for more details, and then get creative!
+Of course, there are many more possibilities for intuitively organizing your systems with host labels. See
+the [health Reference](MISSING LINK/ no file in the repo yet) documentation for more details, and then get creative!
 
 ### Host labels in metrics exporting
 
 If you have enabled any metrics exporting via our
-experimental [exporters](https://github.com/netdata/netdata/blob/master/exporting/README.md), any new host
-labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
+experimental [exporters](https://github.com/netdata/netdata/blob/master/exporting/README.md), any new host labels you
+created manually are sent to the destination database alongside metrics. You can change this behavior by
 editing `exporting.conf`, and you can even send automatically-generated labels on with exported metrics.
 
 ```conf
