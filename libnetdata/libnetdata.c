@@ -1892,8 +1892,8 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
             s++;
     }
 
-    // terminate the words
-    memset(&words[i], 0, (max_words - i) * sizeof (char *));
+    if (i < max_words)
+        words[i] = NULL;
 
     return i;
 }

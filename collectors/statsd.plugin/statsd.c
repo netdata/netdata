@@ -1469,7 +1469,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             }
             else if (!strcmp(name, "dimension")) {
                 // metric [name [type [multiplier [divisor]]]]
-                char *words[10];
+                char *words[10] = { NULL };
                 pluginsd_split_words(value, words, 10, NULL, NULL, 0);
 
                 int pattern = 0;

@@ -40,7 +40,11 @@
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
 #define PLUGINSD_LINE_MAX_SSL_READ 512
-#define PLUGINSD_MAX_WORDS 200
+
+// The only user expected to consume these many words, is the receiver's
+// parser when parsing replication commands. 512 words will give us
+// the ability to replicate charts with up to ~256 dims.
+#define PLUGINSD_MAX_WORDS 512
 
 #define PLUGINSD_MAX_DIRECTORIES 20
 extern char *plugin_directories[PLUGINSD_MAX_DIRECTORIES];
