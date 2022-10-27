@@ -157,9 +157,9 @@ void circ_buff_search(  Circ_buff_t *const buff, logs_query_params_t *const p_qu
 
 size_t circ_buffer_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space){
     size_t const requested_text_compressed_space = LZ4_compressBound(requested_text_space);
-	m_assert(requested_text_compressed_space != 0, "requested_text_compressed_space is zero");
-	size_t const required_space = requested_text_space + requested_text_compressed_space;
-	
+    m_assert(requested_text_compressed_space != 0, "requested_text_compressed_space is zero");
+    size_t const required_space = requested_text_space + requested_text_compressed_space;
+    
     size_t total_cached_mem = 0;
     for (int i = 0; i < buff->num_of_items; i++){
         total_cached_mem += buff->items[i].data_max_size;

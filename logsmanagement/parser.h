@@ -19,7 +19,7 @@ typedef struct log_parser_metrics Log_parser_metrics_t;
 
 typedef enum{
 
-	/* WEB_LOG or FLB_WEB_LOG charts */
+    /* WEB_LOG or FLB_WEB_LOG charts */
     CHART_VHOST = 1 << 0,            
     CHART_PORT = 1 << 1,             
     CHART_IP_VERSION = 1 << 2,
@@ -35,18 +35,18 @@ typedef enum{
     CHART_SSL_PROTO = 1 << 12,
     CHART_SSL_CIPHER = 1 << 13,
 
-	/* FLB_SYSTEMD charts */
-	CHART_SYSLOG_PRIOR = 1 << 14,
-	CHART_SYSLOG_SEVER = 1 << 15,
-	CHART_SYSLOG_FACIL = 1 << 16,
+    /* FLB_SYSTEMD charts */
+    CHART_SYSLOG_PRIOR = 1 << 14,
+    CHART_SYSLOG_SEVER = 1 << 15,
+    CHART_SYSLOG_FACIL = 1 << 16,
 
-	/* FLB_DOCKER_EV charts */
-	CHART_DOCKER_EV_TYPE = 1 << 17
+    /* FLB_DOCKER_EV charts */
+    CHART_DOCKER_EV_TYPE = 1 << 17
 
 } chart_type_t;
 
 typedef struct log_parser_config{
-	void *gen_config;					/**< Pointer to (optional) generic configuration, as per use case. */
+    void *gen_config;					/**< Pointer to (optional) generic configuration, as per use case. */
     unsigned long int chart_config;		/**< Configuration of which charts to enable according to chart_type_t **/
 } Log_parser_config_t;
 
@@ -88,111 +88,111 @@ typedef struct log_parser_config{
 
 
 typedef enum{
-	VHOST_WITH_PORT,  // nginx: $host:$server_port      apache: %v:%p
-	VHOST, 		      // nginx: $host ($http_host)      apache: %v
-	PORT,             // nginx: $server_port            apache: %p
-	REQ_SCHEME,       // nginx: $scheme                 apache: -
-	REQ_CLIENT,       // nginx: $remote_addr            apache: %a (%h)
-	REQ,			  // nginx: $request                apache: %r
-	REQ_METHOD,       // nginx: $request_method         apache: %m
-	REQ_URL,          // nginx: $request_uri            apache: %U
-	REQ_PROTO,        // nginx: $server_protocol        apache: %H
-	REQ_SIZE,         // nginx: $request_length         apache: %I
-	REQ_PROC_TIME,    // nginx: $request_time           apache: %D  
-	RESP_CODE,        // nginx: $status                 apache: %s, %>s
-	RESP_SIZE,        // nginx: $bytes_sent, $body_bytes_sent apache: %b, %O, %B // Should separate %b from %O ?
-	UPS_RESP_TIME,    // nginx: $upstream_response_time apache: -
-	SSL_PROTO,        // nginx: $ssl_protocol           apache: -
-	SSL_CIPHER_SUITE, // nginx: $ssl_cipher             apache: -
-	TIME,             // nginx: $time_local             apache: %t
-	CUSTOM
+    VHOST_WITH_PORT,  // nginx: $host:$server_port      apache: %v:%p
+    VHOST, 		      // nginx: $host ($http_host)      apache: %v
+    PORT,             // nginx: $server_port            apache: %p
+    REQ_SCHEME,       // nginx: $scheme                 apache: -
+    REQ_CLIENT,       // nginx: $remote_addr            apache: %a (%h)
+    REQ,			  // nginx: $request                apache: %r
+    REQ_METHOD,       // nginx: $request_method         apache: %m
+    REQ_URL,          // nginx: $request_uri            apache: %U
+    REQ_PROTO,        // nginx: $server_protocol        apache: %H
+    REQ_SIZE,         // nginx: $request_length         apache: %I
+    REQ_PROC_TIME,    // nginx: $request_time           apache: %D  
+    RESP_CODE,        // nginx: $status                 apache: %s, %>s
+    RESP_SIZE,        // nginx: $bytes_sent, $body_bytes_sent apache: %b, %O, %B // Should separate %b from %O ?
+    UPS_RESP_TIME,    // nginx: $upstream_response_time apache: -
+    SSL_PROTO,        // nginx: $ssl_protocol           apache: -
+    SSL_CIPHER_SUITE, // nginx: $ssl_cipher             apache: -
+    TIME,             // nginx: $time_local             apache: %t
+    CUSTOM
 } web_log_line_field_t;
 
 typedef struct web_log_parser_config{
-	web_log_line_field_t *fields;  
-	int num_fields;             		/**< Number of strings in the fields array. **/
-	char delimiter;       				/**< Delimiter that separates the fields in the log format. **/
-	int verify_parsed_logs;				/**< Boolean whether to try and verify parsed log fields or not **/
+    web_log_line_field_t *fields;  
+    int num_fields;             		/**< Number of strings in the fields array. **/
+    char delimiter;       				/**< Delimiter that separates the fields in the log format. **/
+    int verify_parsed_logs;				/**< Boolean whether to try and verify parsed log fields or not **/
 } Web_log_parser_config_t;
 
 typedef struct web_log_metrics{
-	/* Web log metrics */
+    /* Web log metrics */
     struct log_parser_metrics_vhosts_array{
-    	struct log_parser_metrics_vhost{
-	    	char name[VHOST_MAX_LEN];   /**< Name of the vhost **/
-	    	int count;					/**< Occurences of the vhost **/
-	    } *vhosts;
-	    int size;						/**< Size of vhosts array **/
-	    int size_max;
+        struct log_parser_metrics_vhost{
+            char name[VHOST_MAX_LEN];   /**< Name of the vhost **/
+            int count;					/**< Occurences of the vhost **/
+        } *vhosts;
+        int size;						/**< Size of vhosts array **/
+        int size_max;
     } vhost_arr;
     struct log_parser_metrics_ports_array{
-    	struct log_parser_metrics_port{
-	    	int port;   				/**< Number of port **/
-	    	int count;					/**< Occurences of the port **/
-	    } *ports;
-	    int size;						/**< Size of ports array **/
-	    int size_max;
+        struct log_parser_metrics_port{
+            int port;   				/**< Number of port **/
+            int count;					/**< Occurences of the port **/
+        } *ports;
+        int size;						/**< Size of ports array **/
+        int size_max;
     } port_arr;
     struct log_parser_metrics_ip_ver{
-		int v4, v6, invalid;
-	} ip_ver;
-	/**< req_clients_current_arr is used by parser.c to save unique client IPs 
-	 * extracted per circular buffer item and also in p_file_info to save unique 
-	 * client IPs per collection (poll) iteration of plugin_logsmanagement.c. 
-	 * req_clients_alltime_arr is used in p_file_info to save unique client IPs 
-	 * of all time (and so ipv4_size and ipv6_size can only grow and are never reset to 0). **/
-	struct log_parser_metrics_req_clients_array{
-		char (*ipv4_req_clients)[REQ_CLIENT_MAX_LEN];
-	    int ipv4_size;						   		 
-	    int ipv4_size_max;
-	    char (*ipv6_req_clients)[REQ_CLIENT_MAX_LEN];
-	    int ipv6_size;						   		 
-	    int ipv6_size_max;
+        int v4, v6, invalid;
+    } ip_ver;
+    /**< req_clients_current_arr is used by parser.c to save unique client IPs 
+     * extracted per circular buffer item and also in p_file_info to save unique 
+     * client IPs per collection (poll) iteration of plugin_logsmanagement.c. 
+     * req_clients_alltime_arr is used in p_file_info to save unique client IPs 
+     * of all time (and so ipv4_size and ipv6_size can only grow and are never reset to 0). **/
+    struct log_parser_metrics_req_clients_array{
+        char (*ipv4_req_clients)[REQ_CLIENT_MAX_LEN];
+        int ipv4_size;						   		 
+        int ipv4_size_max;
+        char (*ipv6_req_clients)[REQ_CLIENT_MAX_LEN];
+        int ipv6_size;						   		 
+        int ipv6_size_max;
     } req_clients_current_arr, req_clients_alltime_arr; 
     struct log_parser_metrics_req_method{
-		int acl, baseline_control, bind, checkin, checkout, connect, copy, delet, get,
-		head, label, link, lock, merge, mkactivity, mkcalendar, mkcol, mkredirectref,
-		mkworkspace, move, options, orderpatch, patch, post, pri, propfind, proppatch,
-		put, rebind, report, search, trace, unbind, uncheckout, unlink, unlock, update,
-		updateredirectref;
-	} req_method;  
-	struct log_parser_metrics_req_proto{
-		int http_1, http_1_1, http_2, other;
-	} req_proto;
-	struct log_parser_metrics_bandwidth{
-		long long int req_size, resp_size;
-	} bandwidth;
-	struct log_parser_metrics_req_proc_time{
-		int min, max, sum, count;
-	} req_proc_time;
-	struct log_parser_metrics_resp_code_family{
-		int resp_1xx, resp_2xx, resp_3xx, resp_4xx, resp_5xx, other; // TODO: Can there be "other"?
-	} resp_code_family; 
-	/**< Array counting occurences of response codes. Each item represents the 
-	 * respective response code by adding 100 to its index, e.g. resp_code[102] 
-	 * counts how many 202 codes were detected. 501st item represents "other" */  
-	unsigned int resp_code[501]; 
-	struct log_parser_metrics_resp_code_type{ /* Note: 304 and 401 should be treated as resp_success */
-		int resp_success, resp_redirect, resp_bad, resp_error, other; // TODO: Can there be "other"?
-	} resp_code_type;
-	struct log_parser_metrics_ssl_proto{
-		int tlsv1, tlsv1_1, tlsv1_2, tlsv1_3, sslv2, sslv3, other;
-	} ssl_proto;
-	struct log_parser_metrics_ssl_cipher_array{
-    	struct log_parser_metrics_ssl_cipher{
-	    	char string[SSL_CIPHER_SUITE_MAX_LEN];    /**< SSL cipher suite string **/
-	    	int count;								/**< Occurences of the SSL cipher **/
-	    } *ssl_ciphers;
-	    int size;									/**< Size of SSL ciphers array **/
-	    int size_max;
+        int acl, baseline_control, bind, checkin, checkout, connect, copy, delet, get,
+        head, label, link, lock, merge, mkactivity, mkcalendar, mkcol, mkredirectref,
+        mkworkspace, move, options, orderpatch, patch, post, pri, propfind, proppatch,
+        put, rebind, report, search, trace, unbind, uncheckout, unlink, unlock, update,
+        updateredirectref;
+    } req_method;  
+    struct log_parser_metrics_req_proto{
+        int http_1, http_1_1, http_2, other;
+    } req_proto;
+    struct log_parser_metrics_bandwidth{
+        long long int req_size, resp_size;
+    } bandwidth;
+    struct log_parser_metrics_req_proc_time{
+        int min, max, sum, count;
+    } req_proc_time;
+    struct log_parser_metrics_resp_code_family{
+        int resp_1xx, resp_2xx, resp_3xx, resp_4xx, resp_5xx, other; // TODO: Can there be "other"?
+    } resp_code_family; 
+    /**< Array counting occurences of response codes. Each item represents the 
+     * respective response code by adding 100 to its index, e.g. resp_code[102] 
+     * counts how many 202 codes were detected. 501st item represents "other" */  
+    unsigned int resp_code[501]; 
+    struct log_parser_metrics_resp_code_type{ /* Note: 304 and 401 should be treated as resp_success */
+        int resp_success, resp_redirect, resp_bad, resp_error, other; // TODO: Can there be "other"?
+    } resp_code_type;
+    struct log_parser_metrics_ssl_proto{
+        int tlsv1, tlsv1_1, tlsv1_2, tlsv1_3, sslv2, sslv3, other;
+    } ssl_proto;
+    struct log_parser_metrics_ssl_cipher_array{
+        struct log_parser_metrics_ssl_cipher{
+            char string[SSL_CIPHER_SUITE_MAX_LEN];    /**< SSL cipher suite string **/
+            int count;								/**< Occurences of the SSL cipher **/
+        } *ssl_ciphers;
+        int size;									/**< Size of SSL ciphers array **/
+        int size_max;
     } ssl_cipher_arr;
 } Web_log_metrics_t;
 
 Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, const char delimiter);
 Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter);
 int parse_web_log_buf(  char *text, size_t text_size, 
-						Log_parser_config_t *parser_config, 
-						Log_parser_metrics_t *parser_metrics);
+                        Log_parser_config_t *parser_config, 
+                        Log_parser_metrics_t *parser_metrics);
 
 /* -------------------------------------------------------------------------- */
 
@@ -202,10 +202,10 @@ int parse_web_log_buf(  char *text, size_t text_size,
 /* -------------------------------------------------------------------------- */
 
 typedef struct systemd_metrics{
-	unsigned int num_lines;				/**< Number of parsed lines **/
-	unsigned int sever[9];				/**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
-	unsigned int facil[25];				/**< Syslog facility, 0-23 plus 1 space for 'unknown' **/
-	unsigned int prior[193];			/**< Syslog priority value, 0-191 plus 1 space for 'unknown' **/
+    unsigned int num_lines;				/**< Number of parsed lines **/
+    unsigned int sever[9];				/**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
+    unsigned int facil[25];				/**< Syslog facility, 0-23 plus 1 space for 'unknown' **/
+    unsigned int prior[193];			/**< Syslog priority value, 0-191 plus 1 space for 'unknown' **/
 } Systemd_metrics_t;
 
 /* -------------------------------------------------------------------------- */
@@ -249,8 +249,8 @@ static const char *docker_ev_type_string[] = {
 // #define NUM_OF_DOCKER_EV_ACTIONS ((int) (sizeof docker_ev_action_string / sizeof docker_ev_action_string[0]))
 
 typedef struct docker_ev_metrics{
-	unsigned int num_lines;				/**< Number of parsed lines **/
-	unsigned int ev_type[NUM_OF_DOCKER_EV_TYPES];				
+    unsigned int num_lines;				/**< Number of parsed lines **/
+    unsigned int ev_type[NUM_OF_DOCKER_EV_TYPES];				
 } Docker_ev_metrics_t;
 
 /* -------------------------------------------------------------------------- */
@@ -264,9 +264,9 @@ typedef struct docker_ev_metrics{
 #define MAX_REGEX_SIZE MAX_KEYWORD_LEN + 7 /**< Max size of regular expression (used in keyword search) in bytes **/
 
 int search_keyword(	char *src, size_t src_sz, 
-					char *dest, size_t *dest_sz, 
-					const char *keyword, regex_t *regex, 
-					const int ignore_case);
+                    char *dest, size_t *dest_sz, 
+                    const char *keyword, regex_t *regex, 
+                    const int ignore_case);
 
 /* -------------------------------------------------------------------------- */
 
@@ -276,14 +276,14 @@ int search_keyword(	char *src, size_t src_sz,
 /* -------------------------------------------------------------------------- */
 
 typedef struct log_parser_cus_config{
-	char *chart_name;					/**< Chart name where the regex will be placed in **/
-	char *regex_name;					/**< If regex is named, this is where its name is stored **/
-	char *regex_str;					/**< String representation of the regex **/
-	regex_t regex;						/**< The compiled regex **/
+    char *chart_name;					/**< Chart name where the regex will be placed in **/
+    char *regex_name;					/**< If regex is named, this is where its name is stored **/
+    char *regex_str;					/**< String representation of the regex **/
+    regex_t regex;						/**< The compiled regex **/
 } Log_parser_cus_config_t;
 
 typedef struct log_parser_cus_metrics{
-	unsigned long long count;
+    unsigned long long count;
 } Log_parser_cus_metrics_t;
 
 /* -------------------------------------------------------------------------- */
@@ -296,12 +296,12 @@ typedef struct log_parser_cus_metrics{
 struct log_parser_metrics{
     unsigned long long num_lines_total; /**< Number of total lines parsed in log source file. */
     unsigned long long num_lines_rate;  /**< Number of new lines parsed. */
-	union {
+    union {
         Web_log_metrics_t *web_log;
         Systemd_metrics_t *systemd;
         Docker_ev_metrics_t *docker_ev;
     };	
-	Log_parser_cus_metrics_t **parser_cus; /**< Array storing custom chart metrics structs **/
+    Log_parser_cus_metrics_t **parser_cus; /**< Array storing custom chart metrics structs **/
 } ;
 
 #endif  // PARSER_H_

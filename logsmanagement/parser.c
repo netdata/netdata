@@ -35,22 +35,22 @@ const char* const csv_auto_format_guess_matrix[] = {
 ;
 
 typedef struct log_line_parsed{
-	char vhost[VHOST_MAX_LEN];
-	int  port;
-	char req_scheme[REQ_SCHEME_MAX_LEN];
-	char req_client[REQ_CLIENT_MAX_LEN];
-	char req_method[REQ_METHOD_MAX_LEN];
-	char req_URL[REQ_URL_MAX_LEN];
-	char req_proto[REQ_PROTO_MAX_LEN];
-	int req_size;
-	int req_proc_time;
-	int resp_code;
-	int resp_size;
-	int ups_resp_time;
-	char ssl_proto[SSL_PROTO_MAX_LEN];
-	char ssl_cipher[SSL_CIPHER_SUITE_MAX_LEN];
-	int64_t timestamp;
-	int parsing_errors;
+    char vhost[VHOST_MAX_LEN];
+    int  port;
+    char req_scheme[REQ_SCHEME_MAX_LEN];
+    char req_client[REQ_CLIENT_MAX_LEN];
+    char req_method[REQ_METHOD_MAX_LEN];
+    char req_URL[REQ_URL_MAX_LEN];
+    char req_proto[REQ_PROTO_MAX_LEN];
+    int req_size;
+    int req_proc_time;
+    int resp_code;
+    int resp_size;
+    int ups_resp_time;
+    char ssl_proto[SSL_PROTO_MAX_LEN];
+    char ssl_cipher[SSL_CIPHER_SUITE_MAX_LEN];
+    int64_t timestamp;
+    int parsing_errors;
 } Log_line_parsed_t;
 
 static inline int count_fields(const char *line, const char delimiter){
@@ -268,7 +268,7 @@ int search_keyword( char *src, size_t src_sz,
     m_assert((dest && dest_sz) || (!dest && !dest_sz), "either both dest and dest_sz exist, or none does");
     
     regex_t regex_compiled;
-	
+    
     if(regex) regex_compiled = *regex;
     else{
         char regexString[MAX_REGEX_SIZE];
@@ -283,13 +283,13 @@ int search_keyword( char *src, size_t src_sz,
     int matches = 0;
     char *cursor = src;
     if(dest_sz) *dest_sz = 0;
-	for ( ; ; matches++){
-		if (regexec(&regex_compiled, cursor, 1, groupArray, REG_NOTBOL | REG_NOTEOL)) break;  // No more matches
-		if (groupArray[0].rm_so == -1) break;  // No more groups
+    for ( ; ; matches++){
+        if (regexec(&regex_compiled, cursor, 1, groupArray, REG_NOTBOL | REG_NOTEOL)) break;  // No more matches
+        if (groupArray[0].rm_so == -1) break;  // No more groups
 
         size_t match_len = (size_t) (groupArray[0].rm_eo - groupArray[0].rm_so);
 
-		debug(D_LOGS_MANAG, "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
+        debug(D_LOGS_MANAG, "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
                 groupArray[0].rm_eo, (int) match_len, cursor + groupArray[0].rm_so);
 
         if(dest){
@@ -297,11 +297,11 @@ int search_keyword( char *src, size_t src_sz,
             *dest_sz += match_len + 1;
             dest[*dest_sz - 1] = '\n';
         }
-		
-		cursor += groupArray[0].rm_eo;
-	}
+        
+        cursor += groupArray[0].rm_eo;
+    }
 
-	if(!regex) regfree(&regex_compiled);
+    if(!regex) regfree(&regex_compiled);
 
     return matches;
 }
@@ -345,111 +345,111 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
             continue;
         }
 
-		if(strcmp(parsed_format[i], "$host") == 0 || 
-		   strcmp(parsed_format[i], "$http_host") == 0 ||
-		   strcmp(parsed_format[i], "%v") == 0) {
-			wblp_config->fields[fields_off++] = VHOST;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$host") == 0 || 
+           strcmp(parsed_format[i], "$http_host") == 0 ||
+           strcmp(parsed_format[i], "%v") == 0) {
+            wblp_config->fields[fields_off++] = VHOST;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$server_port") == 0 || 
-		   strcmp(parsed_format[i], "%p") == 0) {
-			wblp_config->fields[fields_off++] = PORT;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$server_port") == 0 || 
+           strcmp(parsed_format[i], "%p") == 0) {
+            wblp_config->fields[fields_off++] = PORT;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$scheme") == 0) {
-			wblp_config->fields[fields_off++] = REQ_SCHEME;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$scheme") == 0) {
+            wblp_config->fields[fields_off++] = REQ_SCHEME;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$remote_addr") == 0 || 
-		   strcmp(parsed_format[i], "%a") == 0 ||
-		   strcmp(parsed_format[i], "%h") == 0) {
-			wblp_config->fields[fields_off++] = REQ_CLIENT;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$remote_addr") == 0 || 
+           strcmp(parsed_format[i], "%a") == 0 ||
+           strcmp(parsed_format[i], "%h") == 0) {
+            wblp_config->fields[fields_off++] = REQ_CLIENT;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$request") == 0 || 
-		   strcmp(parsed_format[i], "%r") == 0) {
-			wblp_config->fields[fields_off++] = REQ;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$request") == 0 || 
+           strcmp(parsed_format[i], "%r") == 0) {
+            wblp_config->fields[fields_off++] = REQ;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$request_method") == 0 || 
-		   strcmp(parsed_format[i], "%m") == 0) {
-			wblp_config->fields[fields_off++] = REQ_METHOD;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$request_method") == 0 || 
+           strcmp(parsed_format[i], "%m") == 0) {
+            wblp_config->fields[fields_off++] = REQ_METHOD;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$request_uri") == 0 || 
-		   strcmp(parsed_format[i], "%U") == 0) {
-			wblp_config->fields[fields_off++] = REQ_URL;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$request_uri") == 0 || 
+           strcmp(parsed_format[i], "%U") == 0) {
+            wblp_config->fields[fields_off++] = REQ_URL;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$server_protocol") == 0 || 
-		   strcmp(parsed_format[i], "%H") == 0) {
-			wblp_config->fields[fields_off++] = REQ_PROTO;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$server_protocol") == 0 || 
+           strcmp(parsed_format[i], "%H") == 0) {
+            wblp_config->fields[fields_off++] = REQ_PROTO;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$request_length") == 0 || 
-		   strcmp(parsed_format[i], "%I") == 0) {
-			wblp_config->fields[fields_off++] = REQ_SIZE;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$request_length") == 0 || 
+           strcmp(parsed_format[i], "%I") == 0) {
+            wblp_config->fields[fields_off++] = REQ_SIZE;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$request_time") == 0 || 
-		   strcmp(parsed_format[i], "%D") == 0) {
-			wblp_config->fields[fields_off++] = REQ_PROC_TIME;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$request_time") == 0 || 
+           strcmp(parsed_format[i], "%D") == 0) {
+            wblp_config->fields[fields_off++] = REQ_PROC_TIME;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$status") == 0 || 
-		   strcmp(parsed_format[i], "%>s") == 0 ||
-		   strcmp(parsed_format[i], "%s") == 0) {
-			wblp_config->fields[fields_off++] = RESP_CODE;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$status") == 0 || 
+           strcmp(parsed_format[i], "%>s") == 0 ||
+           strcmp(parsed_format[i], "%s") == 0) {
+            wblp_config->fields[fields_off++] = RESP_CODE;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$bytes_sent") == 0 || 
-		   strcmp(parsed_format[i], "$body_bytes_sent") == 0 ||
-		   strcmp(parsed_format[i], "%b") == 0 ||
-		   strcmp(parsed_format[i], "%O") == 0 ||
-		   strcmp(parsed_format[i], "%B") == 0) {
-			wblp_config->fields[fields_off++] = RESP_SIZE;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$bytes_sent") == 0 || 
+           strcmp(parsed_format[i], "$body_bytes_sent") == 0 ||
+           strcmp(parsed_format[i], "%b") == 0 ||
+           strcmp(parsed_format[i], "%O") == 0 ||
+           strcmp(parsed_format[i], "%B") == 0) {
+            wblp_config->fields[fields_off++] = RESP_SIZE;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$upstream_response_time") == 0) {
-			wblp_config->fields[fields_off++] = UPS_RESP_TIME;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$upstream_response_time") == 0) {
+            wblp_config->fields[fields_off++] = UPS_RESP_TIME;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$ssl_protocol") == 0) {
-			wblp_config->fields[fields_off++] = SSL_PROTO;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$ssl_protocol") == 0) {
+            wblp_config->fields[fields_off++] = SSL_PROTO;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$ssl_cipher") == 0) {
-			wblp_config->fields[fields_off++] = SSL_CIPHER_SUITE;
-			continue;
-		}
+        if(strcmp(parsed_format[i], "$ssl_cipher") == 0) {
+            wblp_config->fields[fields_off++] = SSL_CIPHER_SUITE;
+            continue;
+        }
 
-		if(strcmp(parsed_format[i], "$time_local") == 0 || strcmp(parsed_format[i], "[$time_local]") == 0 ||
-		   strcmp(parsed_format[i], "%t") == 0 || strcmp(parsed_format[i], "[%t]") == 0) {
+        if(strcmp(parsed_format[i], "$time_local") == 0 || strcmp(parsed_format[i], "[$time_local]") == 0 ||
+           strcmp(parsed_format[i], "%t") == 0 || strcmp(parsed_format[i], "[%t]") == 0) {
             wblp_config->fields = reallocz(wblp_config->fields, (num_fields + 1) * sizeof(web_log_line_field_t));
-			wblp_config->fields[fields_off++] = TIME;
+            wblp_config->fields[fields_off++] = TIME;
             wblp_config->fields[fields_off++] = TIME; // TIME takes 2 fields
             wblp_config->num_fields++;                // TIME takes 2 fields
-			continue;
-		}
+            continue;
+        }
 
-		wblp_config->fields[fields_off++] = CUSTOM;
-		continue;
+        wblp_config->fields[fields_off++] = CUSTOM;
+        continue;
 
-	}
+    }
 
     for(int i = 0; parsed_format[i] != NULL; i++) freez(parsed_format[i]);
     return wblp_config;

@@ -220,7 +220,7 @@ static void logs_manag_config_init(){
             goto next_section;
         } 
         debug(D_LOGS_MANAG, "Processing logs management config section: %s", config_section->name);
-    	
+        
         /* Check if log parsing is enabled in configuration */
         int enabled = appconfig_get_boolean(&log_management_config, config_section->name, "enabled", 0);
         debug(D_LOGS_MANAG, "Config section: %s %s", config_section->name, enabled ? "enabled!" : "disabled. Skipping.");

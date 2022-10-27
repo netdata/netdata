@@ -255,15 +255,15 @@ static inline str2xx_errno str2float(float *out, char *s) {
  * @return Pointer to a string holding the line that was read, or NULL if error.
  */
 static inline char *read_last_line(const char *filename, int max_line_width){
-	const int default_max_line_width = 4 * 1024;
-	uv_fs_t stat_req, open_req, read_req;
-	int64_t start_pos, end_pos;
-	uv_file file_handle;
-	uv_buf_t uvBuf;
-	char *buff;
-	int rc, line_pos, found_ln, bytes_read;
+    const int default_max_line_width = 4 * 1024;
+    uv_fs_t stat_req, open_req, read_req;
+    int64_t start_pos, end_pos;
+    uv_file file_handle;
+    uv_buf_t uvBuf;
+    char *buff;
+    int rc, line_pos, found_ln, bytes_read;
 
-	if(max_line_width <= 0) max_line_width = default_max_line_width;
+    if(max_line_width <= 0) max_line_width = default_max_line_width;
 
     rc = uv_fs_stat(main_loop, &stat_req, filename, NULL);
     if (unlikely(rc)) {
@@ -293,9 +293,9 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     uvBuf = uv_buf_init(buff, (unsigned int) (end_pos - start_pos + 1));
     rc = uv_fs_read(main_loop, &read_req, file_handle, &uvBuf, 1, start_pos, NULL);
     if (unlikely(rc < 0)){ 
-    	error("uv_fs_read() error for %s (%d) %s\n", filename, rc, uv_strerror(rc));
-    	uv_fs_req_cleanup(&read_req);
-    	return NULL;
+        error("uv_fs_read() error for %s (%d) %s\n", filename, rc, uv_strerror(rc));
+        uv_fs_req_cleanup(&read_req);
+        return NULL;
     }
     uv_fs_req_cleanup(&read_req);
 
@@ -305,21 +305,21 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     line_pos = found_ln = 0;
 
     for(int i = bytes_read - 2; i >= 0; i--){
-    	char ch = buff[i];
-    	if (ch == '\n'){
-    		found_ln = 1;
-    		line_pos = i;
-    		break;
-    	}
+        char ch = buff[i];
+        if (ch == '\n'){
+            found_ln = 1;
+            line_pos = i;
+            break;
+        }
     }
     if(found_ln){
-    	char *line = callocz(1, (size_t) (bytes_read - line_pos - 1) * sizeof(char));
-    	memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 2));
-    	freez(buff);
-    	return line;
+        char *line = callocz(1, (size_t) (bytes_read - line_pos - 1) * sizeof(char));
+        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 2));
+        freez(buff);
+        return line;
     }
     if(start_pos == 0){
-    	return buff;
+        return buff;
     }
 
     // Should not get here - error line too long
