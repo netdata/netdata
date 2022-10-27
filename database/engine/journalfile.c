@@ -705,6 +705,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     ret = fstat(fd, &statbuf);
     if (ret) {
         error("Failed to get file information for %s", path);
+        close(fd);
         return 1;
     }
 
@@ -712,6 +713,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     if (file_size < sizeof(struct journal_v2_header)) {
         error_report("Invalid file %s. Not the expected size", path);
+        close(fd);
         return 1;
     }
 
@@ -1096,8 +1098,10 @@ void migrate_journal_file_v2(
         fatal_assert(Index < number_of_metrics);
         uuid_list[Index].metric_info = metric_info;
 
+        // FIXME: Lock check
         PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric_info->id, sizeof(uuid_t));
-        page_index = (NULL == PValue) ? NULL : *PValue;
+        fatal_assert(NULL != PValue);
+        page_index = *PValue;
         metric_info->page_index = page_index;
         metric_info->page_count = JudyLCount(page_index->JudyL_array, 0, -1, PJE0);
     }
