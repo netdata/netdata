@@ -203,11 +203,15 @@ int parse_web_log_buf(  char *text, size_t text_size,
 /*                             Systemd metrics                                */
 /* -------------------------------------------------------------------------- */
 
+#define SYSLOG_SEVER_ARR_SIZE 9         /**< Number of severity levels plus 1 for 'unknown' **/
+#define SYSLOG_FACIL_ARR_SIZE 25        /**< Number of facility levels plus 1 for 'unknown' **/
+#define SYSLOG_PRIOR_ARR_SIZE 193       /**< Number of priority values plus 1 for 'unknown' **/
+
 typedef struct systemd_metrics{
-    unsigned int num_lines;				/**< Number of parsed lines **/
-    unsigned int sever[9];				/**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
-    unsigned int facil[25];				/**< Syslog facility, 0-23 plus 1 space for 'unknown' **/
-    unsigned int prior[193];			/**< Syslog priority value, 0-191 plus 1 space for 'unknown' **/
+    unsigned int num_lines;				            /**< Number of parsed lines **/
+    unsigned int sever[SYSLOG_SEVER_ARR_SIZE];      /**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
+    unsigned int facil[SYSLOG_FACIL_ARR_SIZE];      /**< Syslog facility, 0-23 plus 1 space for 'unknown' **/
+    unsigned int prior[SYSLOG_PRIOR_ARR_SIZE];      /**< Syslog priority value, 0-191 plus 1 space for 'unknown' **/
 } Systemd_metrics_t;
 
 /* -------------------------------------------------------------------------- */

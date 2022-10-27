@@ -42,13 +42,13 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
-        for(int j = 0; j < 192; j++){
+        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE - 1; j++){
             char dim_prior_name[4];
             sprintf(dim_prior_name, "%d", j);
             chart_data->dim_prior[j] = rrddim_add(chart_data->st_prior, dim_prior_name, 
                                                             NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        chart_data->dim_prior[192] = rrddim_add(chart_data->st_prior, "Unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1] = rrddim_add(chart_data->st_prior, "Unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     /* Syslog severity level (== Systemd priority) - initialise */
@@ -134,7 +134,7 @@ void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 
     /* Syslog priority value - collect */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
-        for(int j = 0; j < 193; j++){
+        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE; j++){
             chart_data->num_prior[j] += p_file_info->parser_metrics->systemd->prior[j];
             p_file_info->parser_metrics->systemd->prior[j] = 0;
         }
@@ -142,7 +142,7 @@ void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 
     /* Syslog severity level (== Systemd priority) - collect */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        for(int j = 0; j < 9; j++){
+        for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
             chart_data->num_sever[j] += p_file_info->parser_metrics->systemd->sever[j];
             p_file_info->parser_metrics->systemd->sever[j] = 0;
         }
@@ -150,7 +150,7 @@ void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 
     /* Syslog facility level - collect */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
-        for(int j = 0; j < 25; j++){
+        for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++){
             chart_data->num_facil[j] += p_file_info->parser_metrics->systemd->facil[j];
             p_file_info->parser_metrics->systemd->facil[j] = 0;
         }
@@ -173,7 +173,7 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     /* Syslog priority value - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
         if(likely(!first_update)) rrdset_next(chart_data->st_prior);
-        for(int j = 0; j < 193; j++){
+        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE; j++){
             rrddim_set_by_pointer(  chart_data->st_prior, 
                                     chart_data->dim_prior[j], 
                                     chart_data->num_prior[j]);
@@ -184,7 +184,7 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     /* Syslog severity level (== Systemd priority) - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
         if(likely(!first_update)) rrdset_next(chart_data->st_sever);
-        for(int j = 0; j < 9; j++){
+        for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
             rrddim_set_by_pointer(  chart_data->st_sever, 
                                     chart_data->dim_sever[j], 
                                     chart_data->num_sever[j]);
@@ -195,7 +195,7 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     /* Syslog facility value - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
         if(likely(!first_update)) rrdset_next(chart_data->st_facil);
-        for(int j = 0; j < 25; j++){
+        for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++){
             rrddim_set_by_pointer(  chart_data->st_facil, 
                                     chart_data->dim_facil[j], 
                                     chart_data->num_facil[j]);

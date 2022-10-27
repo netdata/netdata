@@ -239,15 +239,15 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
         p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_systemd_metrics.num_lines;
         p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_systemd_metrics.num_lines;
         p_file_info->flb_tmp_systemd_metrics.num_lines = 0;
-        for(int i = 0; i < 9; i++){
+        for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
             p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
             p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
         }
-        for(int i = 0; i < 25; i++){
+        for(int i = 0; i < SYSLOG_FACIL_ARR_SIZE; i++){
             p_file_info->parser_metrics->systemd->facil[i] = p_file_info->flb_tmp_systemd_metrics.facil[i];
             p_file_info->flb_tmp_systemd_metrics.facil[i] = 0;
         }
-        for(int i = 0; i < 193; i++){
+        for(int i = 0; i < SYSLOG_PRIOR_ARR_SIZE; i++){
             p_file_info->parser_metrics->systemd->prior[i] = p_file_info->flb_tmp_systemd_metrics.prior[i];
             p_file_info->flb_tmp_systemd_metrics.prior[i] = 0;
         }
@@ -561,12 +561,12 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         /* Temporary variables for null-terminated severity, facility and 
          * priority value strings and their conversions to integers */
         char syslog_severity_s[2];
-        int syslog_severity_d = 8; // Initialise to 'unknown'
+        int syslog_severity_d = SYSLOG_SEVER_ARR_SIZE - 1; // Initialise to 'unknown'
         char syslog_facility_s[3];
-        int syslog_facility_d = 24; // Initialise to 'unknown'
+        int syslog_facility_d = SYSLOG_FACIL_ARR_SIZE - 1; // Initialise to 'unknown'
         char syslog_prival_s[4];
         size_t syslog_prival_s_size = 0;
-        int syslog_prival_d = 192; // Initialise to 'unknown'
+        int syslog_prival_d = SYSLOG_PRIOR_ARR_SIZE - 1; // Initialise to 'unknown'
 
         /* Parse number of log lines */
         p_file_info->flb_tmp_systemd_metrics.num_lines++;
@@ -579,7 +579,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             if(likely(str2int(&syslog_severity_d, syslog_severity_s, 10) == STR2XX_SUCCESS)){
                 p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
             } // else parsing errors ++ ??
-        } else p_file_info->flb_tmp_systemd_metrics.sever[8]++; // 'unknown'
+        } else p_file_info->flb_tmp_systemd_metrics.sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
 
         /* Parse syslog_facility char* field into int and extract metrics. 
          * syslog_facility_s will consist of up to 2 chars (plus '\0'), 
@@ -589,7 +589,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             if(likely(str2int(&syslog_facility_d, syslog_facility_s, 10) == STR2XX_SUCCESS)){
                 p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
             } // else parsing errors ++ ??
-        } else p_file_info->flb_tmp_systemd_metrics.facil[24]++; // 'unknown'
+        } else p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
 
         if(likely(syslog_severity && syslog_facility)){
             /* Definition of syslog priority value == facility * 8 + severity */
@@ -602,7 +602,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             p_file_info->flb_tmp_systemd_metrics.prior[syslog_prival_d]++;
         } else {
             new_tmp_text_size += 3; // +3 for "<->" string
-            p_file_info->flb_tmp_systemd_metrics.prior[192]++; // 'unknown'
+            p_file_info->flb_tmp_systemd_metrics.prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
         } 
 
         char syslog_time_from_flb_time[25]; // 25 just to be on the safe side, but 16 + 1 chars bytes needed only.
