@@ -44,7 +44,6 @@ SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
-NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="https://api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
@@ -924,7 +923,7 @@ handle_existing_install() {
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
 
-      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+      if [ "${ACTION}" = "reinstall" ] || [ "${ACTION}" = "unsafe-reinstall" ]; then
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
@@ -932,7 +931,7 @@ handle_existing_install() {
           *-build) NETDATA_ONLY_BUILD=1 ;;
           *-static) NETDATA_ONLY_STATIC=1 ;;
           *)
-            if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+            if [ "${ACTION}" = "unsafe-reinstall" ]; then
               warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
             elif [ "${INTERACTIVE}" -eq 0 ]; then
               fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
@@ -975,7 +974,7 @@ handle_existing_install() {
 
       ret=0
 
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+      if [ "${ACTION}" != "claim" ]; then
         if ! update; then
           warning "Failed to update existing Netdata install at ${ndprefix}."
         else
@@ -990,7 +989,7 @@ handle_existing_install() {
         INSTALL_PREFIX="${ndprefix}"
         claim
         ret=$?
-      elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+      elif [ "${ACTION}" = "claim" ]; then
         fatal "User asked to claim, but did not proide a claiming token." F0202
       else
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
@@ -1006,8 +1005,8 @@ handle_existing_install() {
       fatal "This is an OCI container, use the regular container lifecycle management commands for your container tools instead of this script for managing it." F0203
       ;;
     *)
-      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
-        if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+      if [ "${ACTION}" = "reinstall" ] || [ "${ACTION}" = "unsafe-reinstall" ]; then
+        if [ "${ACTION}" = "unsafe-reinstall" ]; then
           warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
         elif [ "${INTERACTIVE}" -eq 0 ]; then
           fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
@@ -1028,7 +1027,7 @@ handle_existing_install() {
           cleanup
           trap - EXIT
           exit $ret
-        elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+        elif [ "${ACTION}" = "claim" ]; then
           fatal "User asked to claim, but did not proide a claiming token." F0202
         else
           fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported by this script, refusing to proceed." F0103
@@ -1550,8 +1549,8 @@ try_package_install() {
     progress "Repository configuration is already present, attempting to install netdata."
   fi
 
-  if [ "${REPO_ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuration package."
+  if [ "${ACTION}" = "repositories-only" ]; then
+    progress "Successfully installed repository configuraion package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -2063,6 +2062,10 @@ install_on_freebsd() {
 validate_args() {
   check_claim_opts
 
+  if [ "${ACTION}" = "repositories-only" ] && [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "Repositories can only be installed for native installs." F050D
+  fi
+
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ] || [ "${NETDATA_ONLY_BUILD}" -eq 1 ]; then
       fatal "Offline installs are only supported for static builds currently." F0502
@@ -2162,16 +2165,16 @@ parse_args() {
         esac
         ;;
       "--reinstall")
-        NETDATA_REINSTALL=1
+        ACTION="reinstall"
         NETDATA_COMMAND="reinstall"
         ;;
       "--reinstall-even-if-unsafe")
-        NETDATA_UNSAFE_REINSTALL=1
+        ACTION="unsafe-reinstall"
         NETDATA_COMMAND="unsafe-reinstall"
         ;;
       "--claim-only")
-        NETDATA_CLAIM_ONLY=1
-        NETDATA_COMMAND="claim-only"
+        ACTION="claim"
+        NETDATA_COMMAND="claim"
         ;;
       "--disable-cloud")
         NETDATA_DISABLE_CLOUD=1
@@ -2227,8 +2230,12 @@ parse_args() {
         NETDATA_COMMAND="reinstall-clean"
         ;;
       "--repositories-only")
-        REPO_ACTION="repositories-only"
+        ACTION="repositories-only"
         NETDATA_COMMAND="repositories"
+        NETDATA_ONLY_NATIVE=1
+        NETDATA_ONLY_STATIC=0
+        NETDATA_ONLY_BUILD=0
+        SELECTED_INSTALL_METHOD="native"
         ;;
       "--native-only")
         NETDATA_ONLY_NATIVE=1
