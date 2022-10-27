@@ -74,7 +74,7 @@ extern struct plugind *pluginsd_root;
 
 size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
-int pluginsd_initialize_plugin_directories();
+size_t pluginsd_initialize_plugin_directories();
 
 
 
