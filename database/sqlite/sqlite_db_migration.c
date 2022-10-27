@@ -166,7 +166,7 @@ static int do_migration_v6_v7(sqlite3 *database, const char *name)
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          char *table = strdupz((char *) sqlite3_column_text(res, 0));
-         if (!column_exists_in_table(table, "chart_context")) {
+         if (!column_exists_in_table(table, "filtered_alert_unique_id")) {
              snprintfz(sql, 255, "ALTER TABLE %s ADD filtered_alert_unique_id", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
              snprintfz(sql, 255, "UPDATE %s SET filtered_alert_unique_id = alert_unique_id", table);
