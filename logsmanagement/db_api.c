@@ -35,7 +35,6 @@ static char *main_db_path; /**< Path of MAIN_DB **/
  * @param[in] line_no Line number where the error occurred 
  */
 static inline void fatal_sqlite3_err(int rc, int line_no){
-    debug(D_LOGS_MANAG, "SQL ERROR:%s", sqlite3_errstr(rc));
     fatal("SQLite error: %s (line %d)", sqlite3_errstr(rc), line_no);
 }
 
