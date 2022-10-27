@@ -312,6 +312,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     } else {
         error("No replication capability for %s.%s (enabling streaming)", rrdhost_hostname(host), rrdset_id(st));
         rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
+        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
