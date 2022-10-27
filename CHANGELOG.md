@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix reading health "enable" from the configuration [\#13894](https://github.com/netdata/netdata/pull/13894) ([stelfrag](https://github.com/stelfrag))
+- fix\(proc.plugin\): fix read retry logic when reading interface speed [\#13893](https://github.com/netdata/netdata/pull/13893) ([ilyam8](https://github.com/ilyam8))
+- tune rrdcontext timings [\#13889](https://github.com/netdata/netdata/pull/13889) ([ktsaou](https://github.com/ktsaou))
+- filtering out charts in context queries, includes them in full\_xxx variables [\#13886](https://github.com/netdata/netdata/pull/13886) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin function processes cosmetic changes [\#13880](https://github.com/netdata/netdata/pull/13880) ([ktsaou](https://github.com/ktsaou))
 - allow single chart to be filtered in context queries [\#13879](https://github.com/netdata/netdata/pull/13879) ([ktsaou](https://github.com/ktsaou))
 - Add description for TCP WMI [\#13878](https://github.com/netdata/netdata/pull/13878) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -14,6 +18,7 @@
 - bump go.d.plugin v0.41.1 [\#13874](https://github.com/netdata/netdata/pull/13874) ([ilyam8](https://github.com/ilyam8))
 - Don't create a REMOVED alert event after a REMOVED. [\#13871](https://github.com/netdata/netdata/pull/13871) ([MrZammler](https://github.com/MrZammler))
 - Store hidden status when creating / updating dimension metadata [\#13869](https://github.com/netdata/netdata/pull/13869) ([stelfrag](https://github.com/stelfrag))
+- Find the chart and dimension UUID from the context [\#13868](https://github.com/netdata/netdata/pull/13868) ([stelfrag](https://github.com/stelfrag))
 - fix\(cgroup.plugin\): handle qemu-1- prefix when extracting virsh domain [\#13866](https://github.com/netdata/netdata/pull/13866) ([ilyam8](https://github.com/ilyam8))
 - Update step-09 for dbmode update.md [\#13864](https://github.com/netdata/netdata/pull/13864) ([DShreve2](https://github.com/DShreve2))
 - add ACLK access to ml\_info \(fix anomalies tab in cloud\) [\#13863](https://github.com/netdata/netdata/pull/13863) ([underhood](https://github.com/underhood))
@@ -335,11 +340,6 @@
 - Delay health until obsoletions check is complete [\#13239](https://github.com/netdata/netdata/pull/13239) ([MrZammler](https://github.com/MrZammler))
 - Improve anomaly detection guide [\#13238](https://github.com/netdata/netdata/pull/13238) ([andrewm4894](https://github.com/andrewm4894))
 - Implement PackageCloud cleanup [\#13236](https://github.com/netdata/netdata/pull/13236) ([maneamarius](https://github.com/maneamarius))
-- Bump repoconfig package version used in kickstart.sh [\#13235](https://github.com/netdata/netdata/pull/13235) ([Ferroin](https://github.com/Ferroin))
-- Updates the sqlite version in the agent [\#13233](https://github.com/netdata/netdata/pull/13233) ([stelfrag](https://github.com/stelfrag))
-- Migrate data when machine GUID changes [\#13232](https://github.com/netdata/netdata/pull/13232) ([stelfrag](https://github.com/stelfrag))
-- Add more sqlite unittests [\#13227](https://github.com/netdata/netdata/pull/13227) ([stelfrag](https://github.com/stelfrag))
-- ci: add issues to the Agent Board project workflow [\#13225](https://github.com/netdata/netdata/pull/13225) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
