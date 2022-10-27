@@ -13,7 +13,7 @@ learn_repo_doc: "True"
 
 **********************************************************************
 
-Our Machine-Learning-powered guided, troubleshooting tools are designed to give you a cutting edge advantage in your troubleshooting battles. 
+Our Machine-Learning-powered guided troubleshooting tools are designed to give you a cutting edge advantage in your troubleshooting battles. 
 
 Netdata's **Metric Correlations** feature uses a Two Sample Kolmogorov-Smirnov test to look for which metrics have a significant distributional change 
 around a highlighted window of interest. This can be useful when you are interested in short term “change detection” and want to try answer the 
