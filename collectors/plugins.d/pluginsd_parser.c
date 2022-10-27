@@ -6,10 +6,8 @@
 
 PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
-    char *dimension = words[1];
-    char *value = words[2];
+    char *dimension = get_word(words, num_words, 1);
+    char *value = get_word(words, num_words, 2);
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -51,10 +49,8 @@ disable:
 
 PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
-    char *id = words[1];
-    char *microseconds_txt = words[2];
+    char *id = get_word(words, num_words, 1);
+    char *microseconds_txt = get_word(words, num_words, 2);
 
     RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
@@ -115,26 +111,24 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user, PLUGINSD_ACTI
 
 PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
         debug(D_PLUGINSD, "Ignoring chart belonging to missing or ignored host.");
         return PARSER_RC_OK;
     }
 
-    char *type = words[1];
-    char *name = words[2];
-    char *title = words[3];
-    char *units = words[4];
-    char *family = words[5];
-    char *context = words[6];
-    char *chart = words[7];
-    char *priority_s = words[8];
-    char *update_every_s = words[9];
-    char *options = words[10];
-    char *plugin = words[11];
-    char *module = words[12];
+    char *type = get_word(words, num_words, 1);
+    char *name = get_word(words, num_words, 2);
+    char *title = get_word(words, num_words, 3);
+    char *units = get_word(words, num_words, 4);
+    char *family = get_word(words, num_words, 5);
+    char *context = get_word(words, num_words, 6);
+    char *chart = get_word(words, num_words, 7);
+    char *priority_s = get_word(words, num_words, 8);
+    char *update_every_s = get_word(words, num_words, 9);
+    char *options = get_word(words, num_words, 10);
+    char *plugin = get_word(words, num_words, 11);
+    char *module = get_word(words, num_words, 12);
 
     // parse the id from type
     char *id = NULL;
@@ -244,11 +238,10 @@ PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_AC
 
 PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
-    UNUSED(num_words);
     UNUSED(plugins_action);
 
-    long first_entry_child = str2l(words[1]);
-    long last_entry_child = str2l(words[2]);
+    long first_entry_child = str2l(get_word(words, num_words, 1));
+    long last_entry_child = str2l(get_word(words, num_words, 2));
 
     PARSER_USER_OBJECT *user_object = (PARSER_USER_OBJECT *) user;
 
@@ -266,14 +259,12 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 
 PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
-    char *id = words[1];
-    char *name = words[2];
-    char *algorithm = words[3];
-    char *multiplier_s = words[4];
-    char *divisor_s = words[5];
-    char *options = words[6];
+    char *id = get_word(words, num_words, 1);
+    char *name = get_word(words, num_words, 2);
+    char *algorithm = get_word(words, num_words, 3);
+    char *multiplier_s = get_word(words, num_words, 4);
+    char *divisor_s = get_word(words, num_words, 5);
+    char *options = get_word(words, num_words, 6);
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -498,18 +489,16 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
     bool global = false;
-    int i = 1;
-    if(strcmp(words[i], "GLOBAL") == 0) {
+    size_t i = 1;
+    if(strcmp(get_word(words, num_words, 1), "GLOBAL") == 0) {
         i++;
         global = true;
     }
 
-    char *name      = words[i++];
-    char *timeout_s = words[i++];
-    char *help      = words[i++];
+    char *name      = get_word(words, num_words, i++);
+    char *timeout_s = get_word(words, num_words, i++);
+    char *help      = get_word(words, num_words, i++);
 
     RRDSET *st = (global)?NULL:((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -547,12 +536,10 @@ static void pluginsd_function_result_end(struct parser *parser, void *action_dat
 
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
-    char *key = words[1];
-    char *status = words[2];
-    char *format = words[3];
-    char *expires = words[4];
+    char *key = get_word(words, num_words, 1);
+    char *status = get_word(words, num_words, 2);
+    char *format = get_word(words, num_words, 3);
+    char *expires = get_word(words, num_words, 4);
 
     if (unlikely(!key || !*key || !status || !*status || !format || !*format || !expires || !*expires)) {
         error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s', format = '%s', expires = '%s')."
@@ -605,10 +592,8 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *u
 
 PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
-    char *name = words[1];
-    char *value = words[2];
+    char *name = get_word(words, num_words, 1);
+    char *value = get_word(words, num_words, 2);
     NETDATA_DOUBLE v;
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
@@ -619,12 +604,12 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD
     if (name && *name) {
         if ((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
             global = 1;
-            name = words[2];
-            value = words[3];
+            name = get_word(words, num_words, 2);
+            value = get_word(words, num_words, 3);
         } else if ((strcmp(name, "LOCAL") == 0 || strcmp(name, "CHART") == 0)) {
             global = 0;
-            name = words[2];
-            value = words[3];
+            name = get_word(words, num_words, 2);
+            value = get_word(words, num_words, 3);
         }
     }
 
@@ -706,33 +691,36 @@ PARSER_RC pluginsd_disable(char **words, size_t num_words, void *user, PLUGINSD_
 
 PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
     char *store;
 
-    if (!words[1] || !words[2] || !words[3]) {
+    if (!get_word(words, num_words, 1) ||
+        !get_word(words, num_words, 2) ||
+        !get_word(words, num_words, 3)) {
         error("Ignoring malformed or empty LABEL command.");
         return PARSER_RC_OK;
     }
-    if (!words[4])
-        store = words[3];
+    if (!get_word(words, num_words, 4))
+        store = get_word(words, num_words, 3);
     else {
-        store = callocz(PLUGINSD_LINE_MAX + 1, sizeof(char));
-        size_t remaining = PLUGINSD_LINE_MAX;
+        store = callocz(num_words + 1, sizeof(char));
+        size_t remaining = num_words;
         char *move = store;
-        int i = 3;
-        while (i < PLUGINSD_MAX_WORDS) {
-            size_t length = strlen(words[i]);
+        size_t i = 3;
+        while (i < num_words) {
+            char *word = get_word(words, num_words, i);
+            assert(word && "got NULL word");
+
+            size_t length = strlen(word);
             if ((length + 1) >= remaining)
                 break;
 
             remaining -= (length + 1);
-            memcpy(move, words[i], length);
+            memcpy(move, word, length);
             move += length;
             *move++ = ' ';
 
             i++;
-            if (!words[i])
+            if (!word)
                 break;
         }
     }
@@ -740,9 +728,12 @@ PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_AC
     if(unlikely(!((PARSER_USER_OBJECT *) user)->new_host_labels))
         ((PARSER_USER_OBJECT *) user)->new_host_labels = rrdlabels_create();
 
-    rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels, words[1], store, strtol(words[2], NULL, 10));
+    rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels,
+                  get_word(words, num_words, 1),
+                  store,
+                  strtol(get_word(words, num_words, 2), NULL, 10));
 
-    if (store != words[3])
+    if (store != get_word(words, num_words, 3))
         freez(store);
     return PARSER_RC_OK;
 }
@@ -769,9 +760,9 @@ PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user, PLUGINS
 
 PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(num_words);
-
-    if (!words[1] || !words[2] || !words[3]) {
+    if (!get_word(words, num_words, 1) ||
+        !get_word(words, num_words, 2) ||
+        !get_word(words, num_words, 3)) {
         error("Ignoring malformed or empty CHART LABEL command.");
         return PARSER_RC_OK;
     }
@@ -781,7 +772,10 @@ PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_A
         rrdlabels_unmark_all(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
     }
 
-    rrdlabels_add(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily, words[1], words[2], strtol(words[3], NULL, 10));
+    rrdlabels_add(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily,
+                  get_word(words, num_words, 1),
+                  get_word(words, num_words, 2),
+                  strtol(get_word(words, num_words, 3), NULL, 10));
 
     return PARSER_RC_OK;
 }
@@ -815,9 +809,7 @@ PARSER_RC pluginsd_clabel_commit(char **words, size_t num_words, void *user, PLU
 
 PARSER_RC pluginsd_guid(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
-
-    char *uuid_str = words[1];
+    char *uuid_str = get_word(words, num_words, 1);
     uuid_t uuid;
 
     if (unlikely(!uuid_str)) {
@@ -839,9 +831,7 @@ PARSER_RC pluginsd_guid(char **words, size_t num_words, void *user, PLUGINSD_ACT
 
 PARSER_RC pluginsd_context(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
-
-    char *uuid_str = words[1];
+    char *uuid_str = get_word(words, num_words, 1);
     uuid_t uuid;
 
     if (unlikely(!uuid_str)) {
@@ -863,9 +853,7 @@ PARSER_RC pluginsd_context(char **words, size_t num_words, void *user, PLUGINSD_
 
 PARSER_RC pluginsd_tombstone(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
-
-    char *uuid_str = words[1];
+    char *uuid_str = get_word(words, num_words, 1);
     uuid_t uuid;
 
     if (unlikely(!uuid_str)) {
@@ -887,15 +875,13 @@ PARSER_RC pluginsd_tombstone(char **words, size_t num_words, void *user, PLUGINS
 
 PARSER_RC metalog_pluginsd_host(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
-    UNUSED(num_words);
-
-    char *machine_guid = words[1];
-    char *hostname = words[2];
-    char *registry_hostname = words[3];
-    char *update_every_s = words[4];
-    char *os = words[5];
-    char *timezone = words[6];
-    char *tags = words[7];
+    char *machine_guid = get_word(words, num_words, 1);
+    char *hostname = get_word(words, num_words, 2);
+    char *registry_hostname = get_word(words, num_words, 3);
+    char *update_every_s = get_word(words, num_words, 4);
+    char *os = get_word(words, num_words, 5);
+    char *timezone = get_word(words, num_words, 6);
+    char *tags = get_word(words, num_words, 7);
 
     int update_every = 1;
     if (likely(update_every_s && *update_every_s))
@@ -916,10 +902,9 @@ PARSER_RC metalog_pluginsd_host(char **words, size_t num_words, void *user, PLUG
 
 PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
     UNUSED(plugins_action);
 
-    const char *chart_id = words[1];
+    const char *chart_id = get_word(words, num_words, 1);
 
     PARSER_USER_OBJECT *user_object = user;
     REPLICATION_OBJECT *repl_object = &user_object->repl_object;
@@ -943,7 +928,6 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
 
 PARSER_RC pluginsd_replay_rrdset_header(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
     UNUSED(plugins_action);
 
     PARSER_USER_OBJECT *user_object = user;
@@ -952,14 +936,17 @@ PARSER_RC pluginsd_replay_rrdset_header(char **words, size_t num_words, void *us
     if (!repl_object->ok)
         return PARSER_RC_OK;
 
-    assert(strcmp(words[0], "REPLAY_RRDSET_HEADER") == 0);
-    assert(strcmp(words[1], "start_time") == 0);
-    assert(strcmp(words[2], "end_time") == 0);
+    assert(get_word(words, num_words, 0) &&
+           !strcmp(get_word(words, num_words, 0), "REPLAY_RRDSET_HEADER"));
+    assert(get_word(words, num_words, 1) &&
+           !strcmp(get_word(words, num_words, 1), "start_time"));
+    assert(get_word(words, num_words, 2) &&
+           !strcmp(get_word(words, num_words, 2), "end_time"));
 
     size_t FirstDimWordIndex = 3;
-    for (size_t i = FirstDimWordIndex; i != PLUGINSD_MAX_WORDS; i++) {
+    for (size_t i = FirstDimWordIndex; i != num_words; i++) {
         // make sure word is not null and that we've added at least 1 dimension
-        if (!words[i]) {
+        if (!get_word(words, num_words, i)) {
             if (i == FirstDimWordIndex) {
                 error("child sent an replay rrdset command with 0 dimensions");
                 repl_object->ok = false;
@@ -970,7 +957,7 @@ PARSER_RC pluginsd_replay_rrdset_header(char **words, size_t num_words, void *us
             break;
         }
 
-        repl_object->replay_dimensions[i - FirstDimWordIndex] = rrddim_find(repl_object->st, words[i]);
+        repl_object->replay_dimensions[i - FirstDimWordIndex] = rrddim_find(repl_object->st, get_word(words, num_words, i));
     }
 
     return PARSER_RC_OK;
@@ -978,7 +965,6 @@ PARSER_RC pluginsd_replay_rrdset_header(char **words, size_t num_words, void *us
 
 PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
     UNUSED(plugins_action);
 
     PARSER_USER_OBJECT *user_object = user;
@@ -988,15 +974,20 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
         return PARSER_RC_OK;
 
     // command
-    assert(strcmp(words[0], "REPLAY_RRDSET_DONE") == 0);
+    assert(get_word(words, num_words, 0) &&
+           !strcmp(get_word(words, num_words, 0), "REPLAY_RRDSET_DONE"));
 
     // start_time
-    assert(words[1] && "start_time missing from replay_rrdset_done");
-    time_t start_time = str2l(words[1]);
+    assert(get_word(words, num_words, 1) &&
+           "start_time missing from replay_rrdset_done");
+
+    time_t start_time = str2l(get_word(words, num_words, 1));
 
     // end_time
-    assert(words[2] && "end_time missing from replay_rrdset_done");
-    time_t end_time = str2l(words[2]);
+    assert(get_word(words, num_words, 2) &&
+           "end_time missing from replay_rrdset_done");
+
+    time_t end_time = str2l(get_word(words, num_words, 2));
 
     RRDSET *st = repl_object->st;
     if (end_time <= rrdset_last_entry_t(st)) {
@@ -1010,8 +1001,11 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
 
     // value/flag pairs
     size_t FirstValueWordIndex = 3;
-    for (size_t i = FirstValueWordIndex; i < (PLUGINSD_MAX_WORDS - 1); i += 2) {
-        if (!words[i] || !words[i + 1]) {
+    for (size_t i = FirstValueWordIndex; i < num_words - 1; i += 2) {
+        const char *value_str = get_word(words, num_words, i);
+        const char *flags_str = get_word(words, num_words, i + 1);
+
+        if (!value_str || !flags_str) {
             if (i == FirstValueWordIndex) {
                 error("child sent an replay rrdset_done command with 0 values");
                 repl_object->ok = false;
@@ -1022,11 +1016,11 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
         }
 
         // No value/flag pair for this dimension
-        if (strcmp(words[i], "NULL") == 0)
+        if (strcmp(value_str, "NULL") == 0)
             continue;
 
-        NETDATA_DOUBLE value = str2ndd(words[i], NULL);
-        SN_FLAGS flags = str2uint32_t(words[i + 1]);
+        NETDATA_DOUBLE value = str2ndd(value_str, NULL);
+        SN_FLAGS flags = str2uint32_t(flags_str);
 
         RRDDIM *rd = repl_object->replay_dimensions[(i - FirstValueWordIndex) / 2];
         if (!rd)
@@ -1042,16 +1036,20 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
 
 PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
     UNUSED(plugins_action);
 
-    time_t update_every_child = str2l(words[1]);
-    time_t first_entry_child = str2l(words[2]);
-    time_t last_entry_child = str2l(words[3]);
+    if (num_words < 6) {
+        error("Malformed REPLAY_RRDSET_END command");
+        return PARSER_RC_ERROR;
+    }
 
-    bool start_streaming = (strcmp(words[4], "true") == 0);
-    time_t first_entry_requested = str2l(words[5]);
-    time_t last_entry_requested = str2l(words[6]);
+    time_t update_every_child = str2l(get_word(words, num_words, 1));
+    time_t first_entry_child = str2l(get_word(words, num_words, 2));
+    time_t last_entry_child = str2l(get_word(words, num_words, 3));
+
+    bool start_streaming = (strcmp(get_word(words, num_words, 4), "true") == 0);
+    time_t first_entry_requested = str2l(get_word(words, num_words, 5));
+    time_t last_entry_requested = str2l(get_word(words, num_words, 6));
 
     PARSER_USER_OBJECT *user_object = user;
     REPLICATION_OBJECT *repl_object = &user_object->repl_object;

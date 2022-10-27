@@ -70,7 +70,7 @@ PARSER_RC streaming_timestamp(char **words, size_t num_words, void *user, PLUGIN
     UNUSED(num_words);
     UNUSED(plugins_action);
 
-    char *remote_time_txt = words[1];
+    char *remote_time_txt = get_word(words, num_words, 1);
     time_t remote_time = 0;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 
@@ -132,37 +132,41 @@ PARSER_RC streaming_timestamp(char **words, size_t num_words, void *user, PLUGIN
 
 PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(num_words);
     UNUSED(plugins_action);
+
+    const char *host_uuid_str = get_word(words, num_words, 1);
+    const char *claim_id_str = get_word(words, num_words, 2);
+
+    if (!host_uuid_str || !claim_id_str) {
+        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
+              host_uuid_str ? host_uuid_str : "[unset]",
+              claim_id_str ? claim_id_str : "[unset]");
+        return PARSER_RC_ERROR;
+    }
 
     uuid_t uuid;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 
-    if (!words[1] || !words[2]) {
-        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'", words[1]?words[1]:"[unset]", words[2]?words[2]:"[unset]");
-        return PARSER_RC_ERROR;
-    }
-
     // We don't need the parsed UUID
     // just do it to check the format
-    if(uuid_parse(words[1], uuid)) {
-        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[1]);
+    if(uuid_parse(host_uuid_str, uuid)) {
+        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
         return PARSER_RC_ERROR;
     }
-    if(uuid_parse(words[2], uuid) && strcmp(words[2], "NULL")) {
-        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[2]);
+    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL")) {
+        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
         return PARSER_RC_ERROR;
     }
 
-    if(strcmp(words[1], host->machine_guid)) {
-        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
+    if(strcmp(host_uuid_str, host->machine_guid)) {
+        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
         return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
     rrdhost_aclk_state_lock(host);
     if (host->aclk_state.claimed_id)
         freez(host->aclk_state.claimed_id);
-    host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
 
     metaqueue_store_claim_id(&host->host_uuid, host->aclk_state.claimed_id ? &uuid : NULL);
 
