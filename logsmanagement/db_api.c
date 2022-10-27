@@ -301,12 +301,12 @@ static void db_writer(void *arg){
 /**
  * @brief Process the events of the uv_loop_t related to the DB API
  */
-static void db_loop_run(void *arg){
+static inline void db_loop_run(void *arg){
 	UNUSED(arg);
     uv_run(db_loop, UV_RUN_DEFAULT);
 }
 
-void db_set_main_dir(char *dir){
+inline void db_set_main_dir(char *dir){
 	main_db_dir = dir;
 }
 
