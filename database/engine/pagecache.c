@@ -779,6 +779,8 @@ static inline struct rrdeng_page_descr *
         }
     }
 
+    populate_metric_time_from_journal(page_index, start_time, end_time, true);
+
     Index = (Word_t) (start_time / USEC_PER_SEC);
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
     if (likely(NULL != PValue)) {
