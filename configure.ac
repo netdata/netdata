@@ -42,7 +42,17 @@ AC_PROG_CXX
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
-AC_PROG_RANLIB
+
+AC_LANG_PUSH([C])
+AX_COMPILER_VENDOR
+AC_LANG_POP([C])
+if test "$ax_cv_c_compiler_vendor" = "clang"; then
+  AC_CHECK_TOOL([AR], [llvm-ar])
+  AC_CHECK_TOOL([RANLIB], [llvm-ranlib])
+else
+  AC_CHECK_TOOL([RANLIB], [ranlib])
+  AC_CHECK_TOOL([AR], [ar])
+fi
 
 # -----------------------------------------------------------------------------
 # configurable options
