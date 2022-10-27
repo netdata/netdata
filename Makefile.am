@@ -203,11 +203,6 @@ APPS_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-PROFILE_PLUGIN_FILES = \
-    collectors/profile.plugin/plugin_profile.cc \
-    collectors/profile.plugin/plugin_profile.h \
-    $(NULL)
-
 CHECKS_PLUGIN_FILES = \
     collectors/checks.plugin/plugin_checks.c \
     $(NULL)
@@ -922,7 +917,6 @@ NETDATA_FILES = \
     $(API_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
-    $(PROFILE_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
     $(ML_TESTS_FILES) \

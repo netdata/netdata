@@ -7,11 +7,11 @@ extern void *analytics_main(void *ptr);
 extern void *checks_main(void *ptr);
 extern void *cpuidlejitter_main(void *ptr);
 extern void *global_statistics_main(void *ptr);
+extern void *health_main(void *ptr);
 extern void *pluginsd_main(void *ptr);
 extern void *service_main(void *ptr);
 extern void *statsd_main(void *ptr);
 extern void *timex_main(void *ptr);
-extern void *profile_main(void *ptr);
 
 extern bool global_statistics_enabled;
 
@@ -20,7 +20,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "PLUGIN[timex]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "timex",
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = timex_main
@@ -38,7 +38,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "PLUGIN[idlejitter]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "idlejitter",
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = cpuidlejitter_main
@@ -58,7 +58,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .config_name = "netdata monitoring",
         .env_name = "NETDATA_INTERNALS_MONITORING",
         .global_variable = &global_statistics_enabled,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_main
@@ -67,7 +67,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "PLUGINSD",
         .config_section = NULL,
         .config_name = NULL,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = pluginsd_main
@@ -85,7 +85,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "STATSD",
         .config_section = NULL,
         .config_name = NULL,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = statsd_main
@@ -94,7 +94,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "EXPORTING",
         .config_section = NULL,
         .config_name = NULL,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = exporting_main
@@ -117,22 +117,13 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = socket_listen_main_static_threaded
     },
-    {
-        .name = "PROFILE",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = profile_main
-    },
 
 #ifdef ENABLE_ACLK
     {
         .name = "ACLK_Main",
         .config_section = NULL,
         .config_name = NULL,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = aclk_main
