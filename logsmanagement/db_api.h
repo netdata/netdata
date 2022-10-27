@@ -14,8 +14,6 @@
 
 #define LOGS_MANAG_DB_SUBPATH "/logs_management_db"
 
-void db_set_lock(uv_mutex_t *db_mut);
-void db_release_lock(uv_mutex_t *db_mut);
 char *db_get_sqlite_version(void);
 void db_set_main_dir(char *dir);
 void db_init(void);

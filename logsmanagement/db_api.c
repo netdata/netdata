@@ -26,13 +26,6 @@ static sqlite3 *main_db;
 static char *main_db_dir;  /**< Directory where all the log management databases and log blobs are stored in **/
 static char *main_db_path; /**< Path of MAIN_DB **/
 
-void db_set_lock(uv_mutex_t *db_mut) { 
-	uv_mutex_lock(db_mut); 
-}
-
-void db_release_lock(uv_mutex_t *db_mut) { 
-	uv_mutex_unlock(db_mut);
-}
 
 /**
  * @brief Throws fatal SQLite3 error
@@ -154,7 +147,7 @@ static void db_writer(void *arg){
 	if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
 		
 	while(1){
-		db_set_lock(p_file_info->db_mut);
+		uv_mutex_lock(p_file_info->db_mut);
 		rc = sqlite3_exec(p_file_info->db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 		if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
 		Circ_buff_item_t *item = circ_buff_read_item(p_file_info->circ_buff);
@@ -299,8 +292,8 @@ static void db_writer(void *arg){
 		rc = sqlite3_reset(stmt_blobs_get_total_filesize);
 		if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
 
-		// TODO: Can db_release_lock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
-		db_release_lock(p_file_info->db_mut);
+		// TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
+		uv_mutex_unlock(p_file_info->db_mut);
 		uv_sleep(p_file_info->buff_flush_to_db_interval * MS_IN_SEC);
 	}
 }
@@ -402,7 +395,7 @@ void db_init() {
 		p_file_infos_arr->data[i]->db_mut = mallocz(sizeof(uv_mutex_t));
 		rc = uv_mutex_init(p_file_infos_arr->data[i]->db_mut);
 	    if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
-		db_set_lock(p_file_infos_arr->data[i]->db_mut);
+		uv_mutex_lock(p_file_infos_arr->data[i]->db_mut);
 
         rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 1, p_file_infos_arr->data[i]->filename, -1, NULL);
         if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
@@ -789,7 +782,7 @@ void db_init() {
 		if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
 
 		/* DB initialisation finished; release lock */
-		db_release_lock(p_file_infos_arr->data[i]->db_mut);
+		uv_mutex_unlock(p_file_infos_arr->data[i]->db_mut);
 		
 		/* Create synchronous writer thread, one for each log source */
 		uv_thread_t *db_writer_thread = mallocz(sizeof(uv_thread_t));

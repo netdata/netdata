@@ -81,7 +81,7 @@ void generic_parser(void *arg){
  * @brief Search circular buffer according to the query_params.
  * @details buff->tail can only be changed through circ_buff_read_item(), and 
  * circ_buff_search() and circ_buff_read_item() are mutually exclusive due 
- * to db_set_lock() and db_release_lock() in queries and when writing to DB.
+ * to uv_mutex_lock() and uv_mutex_unlock() in queries and when writing to DB.
  * @param buff Buffer to be searched
  * @param p_query_params Query parameters to search according to.
  * @param max_query_page_size Max query size; if exceeded, search will stop.

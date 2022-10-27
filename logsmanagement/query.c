@@ -126,7 +126,7 @@ LOGS_QUERY_RESULT_TYPE execute_query(logs_query_params_t *p_query_params) {
     * during the query execution and also no other execute_query will try to access the DB
     * at the same time. The operations happen atomically and the DB searches in series. */
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
-        db_set_lock(p_file_infos[pfi_off]->db_mut);
+        uv_mutex_lock(p_file_infos[pfi_off]->db_mut);
     }
 
 #if MEASURE_QUERY_TIME
@@ -150,7 +150,7 @@ LOGS_QUERY_RESULT_TYPE execute_query(logs_query_params_t *p_query_params) {
     }
 
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
-        db_release_lock(p_file_infos[pfi_off]->db_mut);
+        uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);
     }
 
     /* Results are terminated as ",\n" but should actually be null-terminated, 
