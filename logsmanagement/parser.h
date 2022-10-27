@@ -73,6 +73,8 @@ typedef struct log_parser_config{
 #define SSL_PROTO_MAX_LEN 8             /**< Max SSL protocol length, inclding terminating \0 **/
 #define SSL_CIPHER_SUITE_MAX_LEN 256    /**< TODO: Check max len for ssl cipher suite string is indeed 256 **/
 
+#define RESP_CODE_ARR_SIZE 501          /**< Size of resp_code array, assuming 500 valid resp codes + 1 for "other" **/
+
 #define WEB_LOG_INVALID_HOST_STR "invalid"
 #define WEB_LOG_INVALID_PORT -1
 #define WEB_LOG_INVALID_CLIENT_IP_STR "inv"
@@ -171,7 +173,7 @@ typedef struct web_log_metrics{
     /**< Array counting occurences of response codes. Each item represents the 
      * respective response code by adding 100 to its index, e.g. resp_code[102] 
      * counts how many 202 codes were detected. 501st item represents "other" */  
-    unsigned int resp_code[501]; 
+    unsigned int resp_code[RESP_CODE_ARR_SIZE]; 
     struct log_parser_metrics_resp_code_type{ /* Note: 304 and 401 should be treated as resp_success */
         int resp_success, resp_redirect, resp_bad, resp_error, other; // TODO: Can there be "other"?
     } resp_code_type;

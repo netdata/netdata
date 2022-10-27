@@ -282,12 +282,12 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
-        for(int j = 0; j < 500; j++){
+        for(int j = 0; j < RESP_CODE_ARR_SIZE - 1; j++){
             char dim_resp_code_name[4];
             sprintf(dim_resp_code_name, "%d", j + 100);
             chart_data->dim_resp_code[j] = rrddim_add(chart_data->st_resp_code, dim_resp_code_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        chart_data->dim_resp_code[500] = rrddim_add(chart_data->st_resp_code, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        chart_data->dim_resp_code[RESP_CODE_ARR_SIZE - 1] = rrddim_add(chart_data->st_resp_code, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     /* Response code type - initialise */
@@ -594,7 +594,7 @@ void web_log_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 
     /* Response code - collect */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE){
-        for(int j = 0; j < 501; j++){
+        for(int j = 0; j < RESP_CODE_ARR_SIZE; j++){
             chart_data->num_resp_code[j] += p_file_info->parser_metrics->web_log->resp_code[j];
             p_file_info->parser_metrics->web_log->resp_code[j] = 0;
         }
@@ -929,7 +929,7 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     /* Response code - update chart */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE){
         if(likely(!first_update)) rrdset_next(chart_data->st_resp_code);
-        for(int j = 0; j < 501; j++) rrddim_set_by_pointer( chart_data->st_resp_code, 
+        for(int j = 0; j < RESP_CODE_ARR_SIZE; j++) rrddim_set_by_pointer( chart_data->st_resp_code, 
                                                             chart_data->dim_resp_code[j], 
                                                             chart_data->num_resp_code[j]);
         rrdset_done(chart_data->st_resp_code);

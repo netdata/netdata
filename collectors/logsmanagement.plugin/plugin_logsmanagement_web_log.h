@@ -91,8 +91,8 @@ struct Chart_data_web_log {
 
     /* Response code */
     RRDSET *st_resp_code;
-    RRDDIM *dim_resp_code[501];
-    collected_number num_resp_code[501];
+    RRDDIM *dim_resp_code[RESP_CODE_ARR_SIZE];
+    collected_number num_resp_code[RESP_CODE_ARR_SIZE];
 
     /* Response code type */
     RRDSET *st_resp_code_type;

@@ -1508,7 +1508,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
                 break;
             default:
                 metrics->web_log->resp_code_family.other++;
-                metrics->web_log->resp_code[500]++;
+                metrics->web_log->resp_code[RESP_CODE_ARR_SIZE - 1]++;
                 metrics->web_log->resp_code_type.other++;
                 break;
         }
