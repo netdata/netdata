@@ -15,11 +15,6 @@ typedef struct Chart_data_systemd chart_data_systemd_t;
 
 #include "plugin_logsmanagement.h"
 
-/* NETDATA_CHART_PRIO for Systemd_chart_data */
-#define NETDATA_CHART_PRIO_SYSLOG_PRIOR         NETDATA_CHART_PRIO_LOGS_BASE + 7
-#define NETDATA_CHART_PRIO_SYSLOG_SEVER         NETDATA_CHART_PRIO_LOGS_BASE + 8
-#define NETDATA_CHART_PRIO_SYSLOG_FACIL         NETDATA_CHART_PRIO_LOGS_BASE + 9
-
 struct Chart_data_systemd {
 
     /* Number of lines */

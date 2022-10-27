@@ -2,6 +2,15 @@
 
 #include "plugin_logsmanagement.h"
 
+/* NETDATA_CHART_PRIO for Stats_chart_data */
+#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 1
+#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 2
+#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 3
+#define NETDATA_CHART_PRIO_COMPR_RATIO          NETDATA_CHART_PRIO_LOGS_STATS_BASE + 4
+#define NETDATA_CHART_PRIO_DISK_USAGE           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 5
+
+#define NETDATA_CHART_PRIO_LOGS_INCR            100  /**< PRIO increment step from one log source to another **/
+
 #define WORKER_JOB_COLLECT 0
 #define WORKER_JOB_UPDATE  1
 
@@ -190,6 +199,7 @@ void *logsmanagement_plugin_main(void *ptr){
 
         chart_data_arr[i] = callocz(1, sizeof(struct Chart_meta));
         memcpy(chart_data_arr[i], &chart_types[p_file_info->log_type], sizeof(struct Chart_meta));
+        chart_data_arr[i]->base_prio = NETDATA_CHART_PRIO_LOGS_BASE + (i + 1) * NETDATA_CHART_PRIO_LOGS_INCR;
         chart_data_arr[i]->init(p_file_info, chart_data_arr[i]);
 
         /* Custom charts - initialise */
@@ -212,7 +222,7 @@ void *logsmanagement_plugin_main(void *ptr){
                         , "matches/s"
                         , "logsmanagement.plugin"
                         , NULL
-                        , NETDATA_CHART_PRIO_CUS + cus_off
+                        , chart_data_arr[i]->base_prio + 1000 + cus_off
                         , p_file_info->update_every
                         , RRDSET_TYPE_AREA
                 );

@@ -5,6 +5,7 @@
 void generic_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_meta->chart_data_generic = callocz(1, sizeof (struct Chart_data_generic));
     chart_data_generic_t *chart_data = chart_meta->chart_data_generic;
+    long chart_prio = chart_meta->base_prio;
 
     /* Number of lines - initialise */
     chart_data->st_lines = rrdset_create_localhost(
@@ -17,7 +18,7 @@ void generic_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
             , "lines/s"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_LINES
+            , ++chart_prio
             , p_file_info->update_every
             , RRDSET_TYPE_AREA
     );

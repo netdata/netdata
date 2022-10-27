@@ -5,6 +5,7 @@
 void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_meta->chart_data_web_log = callocz(1, sizeof (struct Chart_data_web_log));
     chart_data_web_log_t *chart_data = chart_meta->chart_data_web_log;
+    long chart_prio = chart_meta->base_prio;
 
     /* Number of lines - initialise */
     chart_data->st_lines = rrdset_create_localhost(
@@ -17,7 +18,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
             , "lines/s"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_LINES
+            , ++chart_prio
             , p_file_info->update_every
             , RRDSET_TYPE_AREA
     );
@@ -37,7 +38,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_VHOST
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -55,7 +56,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_PORT
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -73,7 +74,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_IP_VER
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -94,7 +95,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "unique ips"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_REQ_CLIENT_CURRENT
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -114,7 +115,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "unique ips"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_REQ_CLIENT_ALL_TIME
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -134,7 +135,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_REQ_METHODS
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -190,7 +191,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_REQ_PROTO
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -212,7 +213,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "kilobits/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_BANDWIDTH
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -232,7 +233,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "milliseconds"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_REQ_PROC_TIME
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_LINE
         );
@@ -253,7 +254,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_RESP_CODE_FAMILY
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -277,7 +278,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_RESP_CODE
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -301,7 +302,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_RESP_CODE_TYPE
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -324,7 +325,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_SSL_PROTO
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -349,7 +350,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "requests/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_SSL_CIPHER_SUITE
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );

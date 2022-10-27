@@ -5,6 +5,7 @@
 void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_meta->chart_data_systemd = callocz(1, sizeof (struct Chart_data_systemd));
     chart_data_systemd_t *chart_data = chart_meta->chart_data_systemd;
+    long chart_prio = chart_meta->base_prio;
 
     /* Number of lines - initialise */
     chart_data->st_lines = rrdset_create_localhost(
@@ -17,7 +18,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
             , "lines/s"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_LINES
+            , ++chart_prio
             , p_file_info->update_every
             , RRDSET_TYPE_AREA
     );
@@ -37,7 +38,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "priority values/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_SYSLOG_PRIOR
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -62,7 +63,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "severity levels/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_SYSLOG_SEVER
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
@@ -89,7 +90,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "facility levels/s"
                 , "logsmanagement.plugin"
                 , NULL
-                , NETDATA_CHART_PRIO_SYSLOG_FACIL
+                , ++chart_prio
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );

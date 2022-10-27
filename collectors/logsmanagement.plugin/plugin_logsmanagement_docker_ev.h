@@ -15,9 +15,6 @@ typedef struct Chart_data_docker_ev chart_data_docker_ev_t;
 
 #include "plugin_logsmanagement.h"
 
-/* NETDATA_CHART_PRIO for Docker_ev_chart_data */
-#define NETDATA_CHART_PRIO_DOCKER_EV_TYPE       NETDATA_CHART_PRIO_LOGS_BASE + 10
-
 struct Chart_data_docker_ev {
     char *rrd_type;
 

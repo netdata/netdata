@@ -17,18 +17,6 @@ struct Chart_meta;
 #include "plugin_logsmanagement_systemd.h"
 #include "plugin_logsmanagement_docker_ev.h"
 
-/* NETDATA_CHART_PRIO for Stats_chart_data */
-#define NETDATA_CHART_PRIO_LOGS_BASE            160003
-#define NETDATA_CHART_PRIO_CIRC_BUFF_SIZE       NETDATA_CHART_PRIO_LOGS_BASE + 0
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT    NETDATA_CHART_PRIO_LOGS_BASE + 1
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC    NETDATA_CHART_PRIO_LOGS_BASE + 2
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM    NETDATA_CHART_PRIO_LOGS_BASE + 3
-#define NETDATA_CHART_PRIO_COMPR_RATIO          NETDATA_CHART_PRIO_LOGS_BASE + 4
-#define NETDATA_CHART_PRIO_DISK_USAGE           NETDATA_CHART_PRIO_LOGS_BASE + 5
-
-#define NETDATA_CHART_PRIO_LINES                NETDATA_CHART_PRIO_LOGS_BASE + 6
-#define NETDATA_CHART_PRIO_CUS                  NETDATA_CHART_PRIO_LOGS_BASE + 7
-
 typedef struct Chart_data_cus {
     /* See Log_parser_cus_metrics_t in parser.h for other 
      * dimensions and collected numbers to add here */
@@ -40,6 +28,7 @@ typedef struct Chart_data_cus {
 
 struct Chart_meta {
     enum log_source_t type;
+    long base_prio;
 
     union {
         chart_data_generic_t *chart_data_generic;
