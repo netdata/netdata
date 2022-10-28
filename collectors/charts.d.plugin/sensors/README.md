@@ -5,7 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/chart
 
 # Linux machine sensors monitoring with Netdata
 
-Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperartures). 
+Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures). 
 For all other cases use the [Python collector](/collectors/python.d.plugin/sensors), which supports multiple 
 jobs, is more efficient and performs calculations on top of the kernel provided values.
 
