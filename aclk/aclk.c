@@ -32,7 +32,6 @@ int aclk_connection_counter = 0;
 int disconnect_req = 0;
 
 int aclk_connected = 0;
-int use_mqtt_5 = 0;
 int aclk_ctx_based = 0;
 int aclk_disable_runtime = 0;
 int aclk_stats_enabled;
@@ -459,9 +458,9 @@ static int aclk_block_till_recon_allowed() {
  */
 static int aclk_get_transport_idx(aclk_env_t *env) {
     for (size_t i = 0; i < env->transport_count; i++) {
-        // currently we support only MQTT 3
+        // currently we support only MQTT 5
         // therefore select first transport that matches
-        if (env->transports[i]->type == ACLK_TRP_MQTT_3_1_1) {
+        if (env->transports[i]->type == ACLK_TRP_MQTT_5) {
             return i;
         }
     }
@@ -495,7 +494,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     while (!netdata_exit) {
         char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
         if (cloud_base_url == NULL) {
-            error("Do not move the cloud base url out of post_conf_load!!");
+            error_report("Do not move the cloud base url out of post_conf_load!!");
             return -1;
         }
 
@@ -505,7 +504,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         info("Attempting connection now");
         memset(&base_url, 0, sizeof(url_t));
         if (url_parse(cloud_base_url, &base_url)) {
-            error("ACLK base URL configuration key could not be parsed. Will retry in %d seconds.", CLOUD_BASE_URL_READ_RETRY);
+            error_report("ACLK base URL configuration key could not be parsed. Will retry in %d seconds.", CLOUD_BASE_URL_READ_RETRY);
             sleep(CLOUD_BASE_URL_READ_RETRY);
             url_t_destroy(&base_url);
             continue;
@@ -535,7 +534,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         ret = aclk_get_env(aclk_env, base_url.host, base_url.port);
         url_t_destroy(&base_url);
         if (ret) {
-            error("Failed to Get ACLK environment");
+            error_report("Failed to Get ACLK environment");
             // delay handled by aclk_block_till_recon_allowed
             continue;
         }
@@ -549,14 +548,14 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 
         if (!aclk_env_has_capa("proto")) {
-            error ("Can't use encoding=proto without at least \"proto\" capability.");
+            error_report("Can't use encoding=proto without at least \"proto\" capability.");
             continue;
         }
         info("New ACLK protobuf protocol negotiated successfully (/env response).");
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
-            error("Parsing URL returned by env endpoint for authentication failed. \"%s\"", aclk_env->auth_endpoint);
+            error_report("Parsing URL returned by env endpoint for authentication failed. \"%s\"", aclk_env->auth_endpoint);
             url_t_destroy(&auth_url);
             continue;
         }
@@ -564,7 +563,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         ret = aclk_get_mqtt_otp(aclk_private_key, (char **)&mqtt_conn_params.clientid, (char **)&mqtt_conn_params.username, (char **)&mqtt_conn_params.password, &auth_url);
         url_t_destroy(&auth_url);
         if (ret) {
-            error("Error passing Challenge/Response to get OTP");
+            error_report("Error passing Challenge/Response to get OTP");
             continue;
         }
 
@@ -573,20 +572,20 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_AGENT_CONN);
 
         if (!mqtt_conn_params.will_topic) {
-            error("Couldn't get LWT topic. Will not send LWT.");
+            error_report("Couldn't get LWT topic. Will not send LWT.");
             continue;
         }
 
         // Do the MQTT connection
         ret = aclk_get_transport_idx(aclk_env);
         if (ret < 0) {
-            error("Cloud /env endpoint didn't return any transport usable by this Agent.");
+            error_report("Cloud /env endpoint didn't return any transport usable by this Agent.");
             continue;
         }
 
         memset(&mqtt_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->transports[ret]->endpoint, &mqtt_url)){
-            error("Failed to parse target URL for /env trp idx %d \"%s\"", ret, aclk_env->transports[ret]->endpoint);
+            error_report("Failed to parse target URL for /env trp idx %d \"%s\"", ret, aclk_env->transports[ret]->endpoint);
             url_t_destroy(&mqtt_url);
             continue;
         }
@@ -672,9 +671,7 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
-    use_mqtt_5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_YES);
-
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback, use_mqtt_5))) {
+    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback, 1))) {
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
@@ -919,7 +916,7 @@ char *aclk_state(void)
         "ACLK Version: 2\n"
         "Protocols Supported: Protobuf\n"
     );
-    buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", use_mqtt_5 ? 5 : 3);
+    buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", 5);
 
     char *agent_id = get_agent_claimid();
     if (agent_id == NULL)
@@ -1072,7 +1069,7 @@ char *aclk_state_json(void)
     tmp = json_object_new_string("Protobuf");
     json_object_object_add(msg, "used-cloud-protocol", tmp);
 
-    tmp = json_object_new_int(use_mqtt_5 ? 5 : 3);
+    tmp = json_object_new_int(5);
     json_object_object_add(msg, "mqtt-version", tmp);
 
     tmp = json_object_new_int(aclk_rcvd_cloud_msgs);
@@ -1171,9 +1168,7 @@ void add_aclk_host_labels(void) {
             break;
     }
 
-    int mqtt5 = config_get_boolean(CONFIG_SECTION_CLOUD, "mqtt5", CONFIG_BOOLEAN_YES);
-
-    rrdlabels_add(labels, "_mqtt_version", mqtt5 ? "5" : "3", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_mqtt_version", "5", RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
 #else

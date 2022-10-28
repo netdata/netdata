@@ -74,6 +74,10 @@ configure any of these collectors according to your setup and infrastructure.
 
 - [Prometheus endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus): Gathers
   metrics from any number of Prometheus endpoints, with support to autodetect more than 600 services and applications.
+- [Pandas](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/pandas): A Python collector that gathers
+  metrics from a [pandas](https://pandas.pydata.org/) dataframe. Pandas is a high level data processing library in 
+  Python that can read various formats of data from local files or web endpoints. Custom processing and transformation 
+  logic can also be expressed as part of the collector configuration.
 
 ### APM (application performance monitoring)
 
