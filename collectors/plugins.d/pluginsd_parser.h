@@ -39,12 +39,4 @@ typedef struct parser_user_object {
 PARSER_RC pluginsd_function(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 void inflight_functions_init(PARSER *parser);
-
-static inline char *get_word(char **words, size_t num_words, size_t index) {
-    if (index >= num_words)
-        return NULL;
-
-    return words[index];
-}
-
 #endif //NETDATA_PLUGINSD_PARSER_H

@@ -853,17 +853,19 @@ void execute_commands(struct sender_state *s) {
         internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
-        if(words[0] && strcmp(words[0], PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = words[1];
-            char *timeout_s = words[2];
-            char *function = words[3];
+        const char *keyword = get_word(words, num_words, 0);
+
+        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            char *transaction = get_word(words, num_words, 1);
+            char *timeout_s = get_word(words, num_words, 2);
+            char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                       rrdhost_hostname(s->host), s->connected_to,
-                      words[0],
+                      keyword,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
                       function?function:"(unset)");
@@ -884,35 +886,33 @@ void execute_commands(struct sender_state *s) {
                     stream_execute_function_callback(wb, code, tmp);
                 }
             }
-        } else if (words[0] && strcmp(words[0], PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
-            if (!words[1] || !words[2] || !words[3]) {
+        } else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
+            const char *chart_id = get_word(words, num_words, 1);
+            const char *start_streaming = get_word(words, num_words, 2);
+            const char *after = get_word(words, num_words, 3);
+            const char *before = get_word(words, num_words, 4);
+
+            if (!chart_id || !start_streaming || !after || !before) {
                 error("STREAM %s [send to %s] %s command is incomplete"
                       " (chart=%s, start_streaming=%s, after=%s, before=%s)",
                       rrdhost_hostname(s->host), s->connected_to,
-                      words[0],
-                      words[1] ? words[1] : "(unset)",
-                      words[2] ? words[2] : "(unset)",
-                      words[3] ? words[3] : "(unset)",
-                      words[4] ? words[4] : "(unset)");
+                      keyword,
+                      chart_id ? chart_id : "(unset)",
+                      start_streaming ? start_streaming : "(unset)",
+                      after ? after : "(unset)",
+                      before ? before : "(unset)");
             } else {
-                const char *chart_id = words[1];
-
-                rrdhost_rdlock(s->host);
                 RRDSET *rs = rrdset_find(s->host, chart_id);
-                if (!rs) {
-                    rrdhost_unlock(s->host);
+                if (!rs)
                     fatal("Could not find chart %s.%s to replicate", rrdhost_hostname(s->host), chart_id);
-                }
 
                 assert((rs->replay_request.pending == false) &&
                        "Chart has already a replay request pending");
 
                 rs->replay_request.pending = true;
-                rs->replay_request.start_streaming = !strcmp(words[2], "true");
-                rs->replay_request.after = strtoll(words[3], NULL, 0);
-                rs->replay_request.before = strtoll(words[4], NULL, 0);
-
-                rrdhost_unlock(s->host);
+                rs->replay_request.start_streaming = !strcmp(start_streaming, "true");
+                rs->replay_request.after = strtoll(after, NULL, 0);
+                rs->replay_request.before = strtoll(before, NULL, 0);
 
                 replication_requests_pending++;
             }
