@@ -14,7 +14,6 @@
 #endif /* ENABLE_ACLK */
 
 extern int aclk_connected;
-extern int use_mqtt_5;
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
 extern int aclk_stats_enabled;
