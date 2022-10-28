@@ -21,6 +21,10 @@ The ML driving our Anomaly Adviser and Metric Correlations feature works at the 
 
 ## Anomaly Advisor
 
+Netdata's Anomaly Advisor feature lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of interest. If you are running a Netdata version higher than v1.35.0-29-nightly, you will be able to use the Anomaly Advisor out of the box with zero configuration. If you are on an earlier Netdata version, you will need to first enable ML on your nodes by following the steps below.
+
+Read more [here](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md).
+
 ## Metric correlation
 
 The Metric Correlation (MC) component search and identifies correlations between metrics/charts on a particular window
@@ -29,6 +33,8 @@ are relevant to the window of interest, you can get to the root cause sooner.
 
 Because Metric Correlations uses every available metric from that node, with as high as 1-second granularity, you get
 extraordinary insights for the status of your system.
+
+Read more about Metric Correlations [here](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/metric-correlations.md).
 
 ### Metric Correlation under the hood
 
