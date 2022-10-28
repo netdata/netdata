@@ -26,6 +26,8 @@ There have been reports from users that on certain servers, ACPI ring buffer err
 We are tracking such cases in issue [#827](https://github.com/netdata/netdata/issues/827).
 Please join this discussion for help.
 
+When `lm-sensors` doesn't work on your device (e.g. for RPi temperatures), use [the legacy bash collector](https://learn.netdata.cloud/docs/agent/collectors/charts.d.plugin/sensors)
+
 ---
 
 
