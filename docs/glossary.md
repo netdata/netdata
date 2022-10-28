@@ -6,21 +6,38 @@
 
 - [**Agent-cloud link** or **ACLK**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud. 
 
+- [**Aggregate Function**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
+
 - [**Alerts** (formerly **Alarms**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
-- [Alarm Entity Type](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md#entity-types): Entity types that are attached to specific charts and use the `alarm` label.
+- [**Alarm Entity Type**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md#entity-types): Entity types that are attached to specific charts and use the `alarm` label.
 
 - [**Anomaly Advisor**](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md): A Netdata feature that lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of interest.
+
+## B
+
+- [**Bookmarks**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/rooms.md#bookmarks-for--essential-resources): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all War Rooms in a Space, so any users in your Space will be able to see and use them.
 
 ## C
 
 - [**Child**](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md#streaming-basics): A node, running Netdata, that streams metric data to one or more parent.
 
+- - [**Cloud** or **Netdata Cloud**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+
 - [**Collector**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
 - [**Community**](https://github.com/netdata/netdata/blob/rework-learn/docs/getting-started/introduction.md#community): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
+- [**Composite Charts**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md#composite-charts): Charts used by the **Overview** tab which aggregate metrics from all the nodes (or a filtered selection) in a given War Room.
+
+- [**Context**](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md#context): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
+
+
 ## D
+
+- [**Definition Bar**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#composite-charts): Bar within a composite chart that provides important information and options about the metrics within the chart. 
+
+- [**Dimension** or **Group by**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/from-raw-metrics-to-visualization.md#dimension): A dimension is a value that gets shown on a chart. The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart. 
 
 - [**Distributed Architecture**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/distributed-data-architecture.md): The data architecture mindset with which Netdata was built, where all data are collected and stored on the edge, whenever it's possible, creating countless benefits. 
 
@@ -28,9 +45,17 @@
 
 - [**External Plugins**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md#collector-architecture-and-terminology): These gather metrics from external processes, such as a webserver or database, and run as independent processes that communicate with the Netdata daemon via pipes.
 
+## F
+
+- [Family](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md#family): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
+
+- [**Flood Protection**](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/health-monitoring/notifications.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
+
 ## G
 
 - [**Guided Troubleshooting**](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/Overview.md): Troubleshooting with our Machine-Learning-powered tools designed to give you a cutting edge advantage in your troubleshooting battles.
+
+- [**Group by** or **Dimension**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md#group-by-dimension-node-or-chart): A dimension is a value that gets shown on a chart. The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart. 
 
 ## H
 
@@ -41,6 +66,8 @@
 - [**Health Entity Reference**](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/health-monitoring/alerts.md#health-entity-reference): 
 -
 - [**High Fidelity** or **High Fidelity Architecture**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/high-fidelity-monitoring.md): We consider Netdata's monitoring solution "high fidelity" because it provides real time metrics so you can view metrics/changes in seconds since their occur, the highest resolution of metrics to allow you to observe changes occur between seconds, gixed step metric collection to allow you to quantify your observation windows, and unlimited data to search for patterns in data that you don't even believe they are correlated.
+
+- [**Home** tab](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md#home): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
 
 ## I
 
@@ -69,9 +96,17 @@
 - [**Netdata**](https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md): Netdata is a monitoring tool designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
 metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack. 
 
+- [**Netdata Cloud** or **Cloud]**(https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+
+- [**Notifications**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md): Netdata can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team.
+
 ## O
 
+- [**Obsoletion**(of nodes)](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/spaces.md#obsolete-offline-nodes): Removing nodes from a space.
+
 - [**Orchestrators**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
+
+- [**Overview** tab](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#overview): Tab in Netdata Cloud that uses composite charts. These charts display real-time aggregated metrics from all the nodes (or a filtered selection) in a given War Room.
 
 ## P
 
@@ -85,8 +120,15 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Registry**](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/registry.md): Registry that allows Netdata to provide unified cross-server dashboards.
 
-- [Replication Streaming](https://github.com/netdata/netdata/edit/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`. 
+- [**Replication Streaming**](https://github.com/netdata/netdata/edit/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`. 
 
+- [**Room** or **War Room**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+
+## S
+
+- [Single Node Dashboard](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#jump-to-single-node-dashboards-1): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up. 
+
+- [**Space**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 ## T
 
 - [**Template Entity Type**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
@@ -97,6 +139,10 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Unlimited Scalability**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/unlimited-scalability.md): With Netdata's distributed architecture, you can seamless observe a couple, hundreds or 
 even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
+
+## W
+
+- [**War Room** or **Room**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## Z
 
