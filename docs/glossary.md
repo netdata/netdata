@@ -40,6 +40,8 @@ Use the alphabites list below to find the answer to your single-term questions, 
 
 - [**Context**](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md#context): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
+- [**Custom dashboards**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/dashboards.md#custom-dashboards) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
+
 
 ## D
 
