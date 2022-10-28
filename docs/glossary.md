@@ -1,4 +1,12 @@
 
+The Netdata community welcomes engineers, SREs, admins, etc. of all levels of expertise with engineering and the Netdata tool. And just as a journey of a thousand miles starts with one step, sometimes, the journey to mastery begins with understanding a single term. 
+
+As such, we want to provide a little Glossary as a reference starting point for new users who might be confused about the Netdata vernacular that more familiar users might take for granted.
+
+If you're here looking for the definition of a term you heard elsewhere in our community or products, or if you just want to learn Netdata from the ground up, you've come to the right page.
+
+Use the alphabites list below to find the answer to your single-term questions, and click the bolded list items to explore more on the topics! We'll be sure to keep constantly updating this list, so if you hear a word that you would like for us to cover, just let us know or submit a request!
+
 [A](#a) | [B](#b) | [C](#c) | [D](#d)| [E](#e) | [F](#f) | [G](#g) | [H](#h) | [I](#i) | [J](#j) | [K](#k) | [L](#l) | [M](#m) | [N](#n) | [O](#o) | [P](#p) 
 | [Q](#q) | [R](#r) | [S](#s) | [T](#t) | [U](#u) | [V](#v) | [W](#w) | [X](#x) | [Y](#y) | [Z](#Z)
 
@@ -8,7 +16,7 @@
 
 - [**Aggregate Function**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
 
-- [**Alerts** (formerly **Alarms**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
+- [**Alerts** (formerly **Alarms**)](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
 - [**Alarm Entity Type**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md#entity-types): Entity types that are attached to specific charts and use the `alarm` label.
 
@@ -34,6 +42,8 @@
 
 
 ## D
+
+- [**Dashboards**](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md): Out-of-the box visual presentation of metrics that allows you to make sense of your infrastructure and its health and performance. 
 
 - [**Definition Bar**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#composite-charts): Bar within a composite chart that provides important information and options about the metrics within the chart. 
 
@@ -76,6 +86,8 @@
 ## K
 
 - [**Kickstart** or **Kickstart Script**](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md): An automatic one-line installation script named 'kickstart.sh' that works on all Linux distributions and macOS.
+
+- [**Kubernetes Dashboard** or **Kubernetes View**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/dashboards.md#kubernetes-dashboard): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
 
 ## M
 
@@ -139,6 +151,10 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Unlimited Scalability**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/unlimited-scalability.md): With Netdata's distributed architecture, you can seamless observe a couple, hundreds or 
 even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
+
+## V
+
+- [**Visualizations**](https://github.com/netdata/learn/edit/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understand of your infrastructure and your ability to troubleshoot it, along or on a team.
 
 ## W
 
