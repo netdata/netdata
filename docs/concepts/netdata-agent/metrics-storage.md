@@ -60,7 +60,7 @@ data collected.
 ### Tiering
 
 Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are
-collected and stored, i.e. their resolution) is significantly affecting retention. Every Tier down samples the exact
+collected and stored, i.e. their resolution), significantly affecting retention. Every Tier down samples the exact
 lower tier (lower tiers have greater resolution). You can have up to 5 Tiers [0. . 4] of data (including the Tier 0,
 which has the highest resolution)
 
