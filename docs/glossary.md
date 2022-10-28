@@ -30,7 +30,7 @@ Use the alphabites list below to find the answer to your single-term questions, 
 
 - [**Child**](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md#streaming-basics): A node, running Netdata, that streams metric data to one or more parent.
 
-- - [**Cloud** or **Netdata Cloud**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+- [**Cloud** or **Netdata Cloud**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
 
 - [**Collector**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
