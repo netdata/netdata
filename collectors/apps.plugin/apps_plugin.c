@@ -4392,33 +4392,50 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     );
 
     NETDATA_DOUBLE
-              UserCPU_max
-            , SysCPU_max
-            , GuestCPU_max
-            , CUserCPU_max
-            , CSysCPU_max
-            , CGuestCPU_max
-            , CPU_max
-            , VMSize_max
-            , RSS_max
-            , Shared_max
-            , Swap_max
-            , MemPcnt_max
+              UserCPU_max = 0.0
+            , SysCPU_max = 0.0
+            , GuestCPU_max = 0.0
+            , CUserCPU_max = 0.0
+            , CSysCPU_max = 0.0
+            , CGuestCPU_max = 0.0
+            , CPU_max = 0.0
+            , VMSize_max = 0.0
+            , RSS_max = 0.0
+            , Shared_max = 0.0
+            , Swap_max = 0.0
+            , MemPcnt_max = 0.0
             ;
 
     unsigned long long
-              Processes_max, Threads_max, Uptime_max
-            , MinFlt_max, CMinFlt_max, TMinFlt_max
-            , MajFlt_max, CMajFlt_max, TMajFlt_max
-            , PReads_max, PWrites_max
-            , RCalls_max, WCalls_max
-            , Files_max, Pipes_max, Sockets_max, iNotiFDs_max, EventFDs_max
-            , TimerFDs_max, SigFDs_max, EvPollFDs_max, OtherFDs_max, FDs_max
+              Processes_max = 0
+            , Threads_max = 0
+            , Uptime_max = 0
+            , MinFlt_max = 0
+            , CMinFlt_max = 0
+            , TMinFlt_max = 0
+            , MajFlt_max = 0
+            , CMajFlt_max = 0
+            , TMajFlt_max = 0
+            , PReads_max = 0
+            , PWrites_max = 0
+            , RCalls_max = 0
+            , WCalls_max = 0
+            , Files_max = 0
+            , Pipes_max = 0
+            , Sockets_max = 0
+            , iNotiFDs_max = 0
+            , EventFDs_max = 0
+            , TimerFDs_max = 0
+            , SigFDs_max = 0
+            , EvPollFDs_max = 0
+            , OtherFDs_max = 0
+            , FDs_max = 0
             ;
 
 #ifndef __FreeBSD__
     unsigned long long
-            LReads_max, LWrites_max
+              LReads_max = 0
+            , LWrites_max = 0
             ;
 #endif
 
