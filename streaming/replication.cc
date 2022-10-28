@@ -225,6 +225,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
 {
     time_t query_after = after;
     time_t query_before = before;
+    time_t now = now_realtime_sec();
 
     // only happens when the parent received nonsensical timestamps from
     // us, in which case we want to skip replication and start streaming.
@@ -234,12 +235,16 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
 
     // find the first entry we have
     time_t first_entry_local = rrdset_first_entry_t(st);
+    if(first_entry_local > now)
+        first_entry_local = now;
 
     if (query_after < first_entry_local)
         query_after = first_entry_local;
 
     // find the latest entry we have
     time_t last_entry_local = rrdset_last_entry_t(st);
+    if(last_entry_local > now)
+        last_entry_local = now;
 
     if (query_before > last_entry_local)
         query_before = last_entry_local;
@@ -252,6 +257,8 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
     // should never happen, but nevertheless enable streaming
     if (query_after > query_before)
         return true;
+
+    bool enable_streaming = (start_streaming || query_before == last_entry_local) ? true : false;
 
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
@@ -269,11 +276,11 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
         // last end time of the data we sent
         buffer_sprintf(wb, "REPLAY_RRDSET_END %ld %ld %ld %s %ld %ld\n",
                        (time_t) st->update_every, first_entry_local, last_entry_local,
-                       start_streaming ? "true" : "false", after, before);
+                       enable_streaming ? "true" : "false", after, before);
     }
     sender_commit(host->sender, wb);
 
-    return start_streaming;
+    return enable_streaming;
 }
 
 static bool send_replay_chart_cmd(FILE *outfp, const char *chart,
