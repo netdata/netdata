@@ -517,6 +517,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # go.d.plugin (the capability required for wireguard module)
 %caps(cap_net_admin=epi) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%caps(cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
