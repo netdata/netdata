@@ -138,7 +138,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## S
 
-- [Single Node Dashboard](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#jump-to-single-node-dashboards-1): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up. 
+- [**Single Node Dashboard**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#jump-to-single-node-dashboards-1): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up. 
 
 - [**Space**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 ## T
