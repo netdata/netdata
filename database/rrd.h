@@ -639,13 +639,6 @@ struct rrdset {
     long current_entry;                             // the entry that is currently being updated
                                                     // it goes around in a round-robin fashion
 
-    struct {
-        bool pending;
-        bool start_streaming;
-        time_t after;
-        time_t before;
-    } replay_request;
-
     // ------------------------------------------------------------------------
     // exporting to 3rd party time-series members
     // TODO - they should be managed by exporting engine

@@ -1030,6 +1030,7 @@ void stop_streaming_sender(RRDHOST *host)
     if (host->sender->compressor)
         host->sender->compressor->destroy(&host->sender->compressor);
 #endif
+    dictionary_destroy(host->sender->replication_requests);
     freez(host->sender);
     host->sender = NULL;
 }

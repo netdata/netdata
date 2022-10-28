@@ -169,6 +169,8 @@ struct sender_state {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                  // Structure used to encrypt the connection
 #endif
+
+    DICTIONARY *replication_requests;
 };
 
 struct receiver_state {
@@ -231,7 +233,7 @@ extern unsigned int remote_clock_resync_iterations;
 void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
-void sender_init(RRDHOST *parent);
+void sender_init(RRDHOST *host);
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
