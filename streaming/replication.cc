@@ -139,7 +139,7 @@ private:
                     if (SP.start_time != StartTime) {
                         buffer_sprintf(WB, " NULL 0");
                     } else {
-                        buffer_sprintf(WB, " %lf %u", SP.sum, SP.flags);
+                        buffer_sprintf(WB, " %lf %u", SP.sum, (unsigned int)SP.flags);
                         RSP.Status = StoragePointStatus::Consumed;
                         UsedSP = true;
                     }
