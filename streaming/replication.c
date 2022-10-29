@@ -2,12 +2,8 @@
 
 #include "replication.h"
 
-#define MAX_DIMENSIONS_PER_CHART 99
-
-static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t before) {
+static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time_t before) {
     size_t dimensions = rrdset_number_of_dimensions(st);
-    if(dimensions > MAX_DIMENSIONS_PER_CHART)
-        dimensions = MAX_DIMENSIONS_PER_CHART;
 
     struct storage_engine_query_ops *ops = &st->rrdhost->db[0].eng->api.query_ops;
 
@@ -22,23 +18,21 @@ static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t befo
     memset(data, 0, sizeof(data));
 
     // prepare our array of dimensions
-    buffer_sprintf(wb, "REPLAY_RRDSET_HEADER start_time end_time");
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(rd_dfe.counter >= dimensions)
-            break;
+    {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            if (rd_dfe.counter >= dimensions)
+                break;
 
-        data[rd_dfe.counter].dict = rd_dfe.dict;
-        data[rd_dfe.counter].rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
-        data[rd_dfe.counter].rd = rd;
+            data[rd_dfe.counter].dict = rd_dfe.dict;
+            data[rd_dfe.counter].rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
+            data[rd_dfe.counter].rd = rd;
 
-        ops->init(rd->tiers[0]->db_metric_handle, &data[rd_dfe.counter].handle, after, before);
-        buffer_sprintf(wb, " \"%s\"", rrddim_id(rd));
+            ops->init(rd->tiers[0]->db_metric_handle, &data[rd_dfe.counter].handle, after, before);
+        }
+        rrddim_foreach_done(rd);
     }
-    rrddim_foreach_done(rd);
-    buffer_fast_strcat(wb, "\n", 1);
 
-    // find a point
     time_t now = after, actual_after = 0, actual_before = 0;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
@@ -83,14 +77,14 @@ static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t befo
             actual_before = min_start_time;
 
         // output the replay values for this time
-        buffer_sprintf(wb, "REPLAY_RRDSET_DONE %ld %ld", min_start_time, min_end_time);
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
             if(data[i].sp.start_time >= min_start_time && data[i].sp.start_time <= min_end_time)
-                buffer_sprintf(wb, " %lf %u", data[i].sp.sum, (unsigned int)data[i].sp.flags);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STORAGE_POINT " \"%s\" %ld %ld " NETDATA_DOUBLE_FORMAT_AUTO " %u\n",
+                               rrddim_id(data[i].rd), min_start_time, min_end_time, data[i].sp.sum, (unsigned)data[i].sp.flags);
             else
-                buffer_sprintf(wb, " NULL %u", (unsigned int)SN_EMPTY_SLOT);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STORAGE_POINT " \"%s\" %ld %ld nan %u\n",
+                               rrddim_id(data[i].rd), min_start_time, min_end_time, (unsigned)data[i].sp.flags);
         }
-        buffer_fast_strcat(wb, "\n", 1);
 
         now = min_end_time;
     }
@@ -119,6 +113,27 @@ static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t befo
         ops->finalize(&data[i].handle);
         dictionary_acquired_item_release(data[i].dict, data[i].rda);
     }
+}
+
+static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_COLLECTION_STATE " \"%s\" %llu %llu " NETDATA_DOUBLE_FORMAT_AUTO " " NETDATA_DOUBLE_FORMAT_AUTO "\n",
+                       rrddim_id(rd),
+                       (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
+                       rd->last_collected_value,
+                       rd->last_calculated_value,
+                       rd->last_stored_value
+        );
+    }
+    rrddim_foreach_done(rd);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_COLLECTION_STATE " %llu %llu " TOTAL_NUMBER_FORMAT " " TOTAL_NUMBER_FORMAT "\n",
+                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
+                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec,
+                   st->last_collected_total,
+                   st->collected_total
+    );
 }
 
 bool replicate_chart_response(RRDHOST *host, RRDSET *st,
@@ -176,15 +191,17 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
     {
         // pass the original after/before so that the parent knows about
         // which time range we responded
-        buffer_sprintf(wb, "REPLAY_RRDSET_BEGIN \"%s\"\n", rrdset_id(st));
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_BEGIN " \"%s\"\n", rrdset_id(st));
 
         // fill the data table
-        replicate_do_chart(wb, st, after, before);
-        // (void) ChartQuery::get(wb, st, after, before);
+        replicate_chart_timeframe(wb, st, after, before);
+
+        if(enable_streaming)
+            replicate_chart_collection_state(wb, st);
 
         // end with first/last entries we have, and the first start time and
         // last end time of the data we sent
-        buffer_sprintf(wb, "REPLAY_RRDSET_END %ld %ld %ld %s %ld %ld\n",
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_END " %ld %ld %ld %s %ld %ld\n",
                        (time_t) st->update_every, first_entry_local, last_entry_local,
                        enable_streaming ? "true" : "false", after, before);
     }
@@ -214,10 +231,10 @@ static bool send_replay_chart_cmd(FILE *outfp, RRDSET *st, bool start_streaming,
     }
 #endif
 
-    debug(D_REPLICATION, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
+    debug(D_REPLICATION, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %ld %ld\n",
           rrdset_id(st), start_streaming ? "true" : "false", after, before);
 
-    int ret = fprintf(outfp, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
+    int ret = fprintf(outfp, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %ld %ld\n",
                       rrdset_id(st), start_streaming ? "true" : "false",
                       after, before);
     if (ret < 0) {
