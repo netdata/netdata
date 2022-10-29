@@ -1001,6 +1001,7 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
     if (update_every != st->update_every)
         rrdset_set_update_every(st, update_every);
 
+    total_number total = 0;
     // value/flag pairs
     size_t FirstValueWordIndex = 3;
     for (size_t i = FirstValueWordIndex; i < num_words - 1; i += 2) {
@@ -1030,6 +1031,12 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
 
         usec_t end_time_usec = end_time * USEC_PER_SEC;
         rrddim_store_metric(rd, end_time_usec, value, flags);
+
+        rd->last_collected_time.tv_sec = end_time;
+        rd->last_collected_time.tv_usec = 0;
+        rd->last_calculated_value = rd->last_stored_value = value;
+        rd->last_collected_value = (collected_number)(value * (NETDATA_DOUBLE)rd->divisor / (NETDATA_DOUBLE)rd->multiplier);
+        total += rd->last_collected_value;
         rd->collections_counter++;
     }
 
@@ -1038,6 +1045,7 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
     st->last_updated.tv_usec = 0;
     st->last_collected_time.tv_sec = end_time;
     st->last_collected_time.tv_usec = 0;
+    st->last_collected_total = total;
 
     if(update_every != old_update_every)
         rrdset_set_update_every(st, old_update_every);
