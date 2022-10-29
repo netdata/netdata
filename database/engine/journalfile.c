@@ -597,48 +597,45 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
 
 static int check_journal_v2_extent_list (void *data_start, size_t file_size)
 {
-    UNUSED(data_start);
     UNUSED(file_size);
+    uLong crc;
+
+    struct journal_v2_header *j2_header = (void *) data_start;
+    struct journal_v2_block_trailer *journal_v2_trailer;
+
+    journal_v2_trailer = data_start + j2_header->extent_trailer_offset;
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (void *) data_start + j2_header->extent_offset, j2_header->extent_count * sizeof(struct journal_extent_list));
+    if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
+        error("Extent list CRC32 check: FAILED");
+        return 1;
+    }
 
     return 0;
 }
 
-static int check_journal_v2_uuid_list (void *data_start, size_t file_size)
+static int check_journal_v2_metric_list(void *data_start, size_t file_size)
 {
-    UNUSED(data_start);
     UNUSED(file_size);
+    uLong crc;
 
-    return 0;
-}
+    struct journal_v2_header *j2_header = (void *) data_start;
+    struct journal_v2_block_trailer *journal_v2_trailer;
 
-static int check_journal_v2_page_list (void *data_start, size_t file_size)
-{
-    UNUSED(data_start);
-    UNUSED(file_size);
-
-    return 0;
-}
-
-static int check_journal_v2_header (void *data_start, size_t file_size)
-{
-    UNUSED(data_start);
-    UNUSED(file_size);
-
-    return 0;
-}
-
-
-static int check_journal_v2_trailer (void *data_start, size_t file_size)
-{
-    UNUSED(data_start);
-    UNUSED(file_size);
-
+    journal_v2_trailer = data_start + j2_header->metric_trailer_offset;
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (void *) data_start + j2_header->metric_offset, j2_header->metric_count * sizeof(struct journal_metric_list));
+    if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
+        error("Metric list CRC32 check: FAILED");
+        return 1;
+    }
     return 0;
 }
 
 static int check_journal_v2_file (void *data_start, size_t file_size)
 {
     int rc;
+    uLong crc;
 
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
@@ -650,31 +647,22 @@ static int check_journal_v2_file (void *data_start, size_t file_size)
     if (j2_header->total_file_size != file_size)
         return 1;
 
+
     journal_v2_trailer = data_start + file_size - sizeof(*journal_v2_trailer);
 
-    uLong crc;
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (void *) j2_header, sizeof(*j2_header));
 
     rc = crc32cmp(journal_v2_trailer->checksum, crc);
     if (unlikely(rc)) {
-        error("CRC32 check: FAILED");
+        error("File CRC32 check: FAILED");
         return 1;
     }
-
-    rc = check_journal_v2_header(data_start, file_size);
-    if (rc) return 1;
-
-    rc = check_journal_v2_trailer(data_start, file_size);
-    if (rc) return 1;
 
     rc = check_journal_v2_extent_list(data_start, file_size);
     if (rc) return 1;
 
-    rc = check_journal_v2_uuid_list(data_start, file_size);
-    if (rc) return 1;
-
-    rc = check_journal_v2_page_list(data_start, file_size);
+    rc = check_journal_v2_metric_list(data_start, file_size);
     if (rc) return 1;
 
     return 0;
@@ -784,7 +772,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 struct metric_info_s {
     uuid_t *id;
     struct pg_cache_page_index *page_index;
-    uint32_t page_count;
+    uint32_t entries;
     usec_t min_time_ut;
     usec_t max_time_ut;
     uint32_t extent_index;
@@ -833,7 +821,7 @@ void *journal_v2_write_metric_page(struct journal_v2_header *j2_header, void *da
         return NULL;
 
     uuid_copy(metric->uuid, *metric_info->id);
-    metric->entries = metric_info->page_count;
+    metric->entries = metric_info->entries;
     metric->page_offset = pages_offset;
     metric->delta_start = (metric_info->min_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
     metric->delta_end =   (metric_info->max_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
@@ -847,11 +835,11 @@ void *journal_v2_write_data_page_header(struct journal_v2_header *j2_header __ma
     uLong crc;
 
     uuid_copy(data_page_header->uuid, *metric_info->id);
-    data_page_header->entries = metric_info->page_count;
+    data_page_header->entries = metric_info->entries;
     data_page_header->uuid_offset = uuid_offset;        // data header OFFSET poings to METRIC in the directory
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (void *) data_page_header, sizeof(*data_page_header));
-    crc32set(data_page_header->crc, crc);
+    crc32set(data_page_header->checksum, crc);
     return ++data_page_header;
 }
 
@@ -993,7 +981,7 @@ void migrate_journal_file_v2(
     usec_t max_time_ut = 0;
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
-    info("JOURNALV2: Migrating file %s", path);
+    info("Indexing file %s", path);
 
     usec_t start_loading = now_realtime_usec();
     struct extent_info *extent = journalfile->datafile->extents.first;
@@ -1008,7 +996,7 @@ void migrate_journal_file_v2(
                 PValue = JudyHSIns(&metrics_JudyHS_array, descr->id, sizeof(uuid_t), PJE0);
                 *PValue = metric_info = mallocz(sizeof(*metric_info));
 
-                metric_info->page_count=0;
+                metric_info->entries =0;
                 metric_info->min_time_ut = LONG_LONG_MAX;
                 metric_info->max_time_ut = 0;
                 metric_info->id = descr->id;
@@ -1037,19 +1025,25 @@ void migrate_journal_file_v2(
         extent->index = number_of_extents++;
         extent = extent->next;
     }
-    info("DEBUG: Scan and extbuild metric %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "Scan and extbuild metric %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
     // Calculate total jourval file size
     size_t total_file_size = 0;
-    total_file_size  += sizeof(struct journal_v2_header);
+    total_file_size  += (sizeof(struct journal_v2_header) + JOURNAL_V2_HEADER_PADDING_SZ);
 
     // Extents will start here
     uint32_t extent_offset = total_file_size;
     total_file_size  += (number_of_extents * sizeof(struct journal_extent_list));
 
+    uint32_t extent_offset_trailer = total_file_size;
+    total_file_size  += sizeof(struct journal_v2_block_trailer);
+
     // UUID list will start here
     uint32_t metrics_offset = total_file_size;
     total_file_size  += (number_of_metrics * sizeof(struct journal_metric_list));
+
+    uint32_t metric_offset_trailer = total_file_size;
+    total_file_size  += sizeof(struct journal_v2_block_trailer);
 
     // descr @ time will start here
     uint32_t pages_offset = total_file_size;
@@ -1073,14 +1067,30 @@ void migrate_journal_file_v2(
     j2_header.metric_offset = metrics_offset;
     j2_header.page_count = number_of_pages;
     j2_header.page_offset = pages_offset;
+    j2_header.extent_trailer_offset = extent_offset_trailer;
+    j2_header.metric_trailer_offset = metric_offset_trailer;
     j2_header.total_file_size = total_file_size;
     j2_header.data = data_start;                        // Used during migration
 
-    struct journal_v2_block_trailer *journal_v2_trailer = data_start + trailer_offset;
+    struct journal_v2_block_trailer *journal_v2_trailer;
 
     // Write all the extents we have
     data = journal_v2_write_extent_list(journalfile, data_start + extent_offset);
-    info("DEBUG: Write extent list so far %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "Write extent list so far %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+
+    fatal_assert(data == data_start + extent_offset_trailer);
+
+    // Calculate CRC for extents
+    journal_v2_trailer = data_start + extent_offset_trailer;
+    uLong crc;
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (void *) data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
+    crc32set(journal_v2_trailer->checksum, crc);
+
+    internal_error(true, "CALCULATE CRC FOR EXTENT %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    // Leave space for extent list
+    data += sizeof(struct journal_v2_block_trailer);
+    fatal_assert(data == data_start + metrics_offset);
 
     // Allocate array to sort UUIDs and keep them sorted in the journal because we want to do binary search when we do lookups
     struct journal_metric_list_to_sort *uuid_list = mallocz(number_of_metrics * sizeof(struct journal_metric_list_to_sort));
@@ -1088,7 +1098,6 @@ void migrate_journal_file_v2(
     Word_t Index;
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct pg_cache_page_index *page_index;
-
     for (Index = 0, PValue = JudyLFirst(metrics_JudyL_array, &Index, PJE0),
         metric_info = unlikely(NULL == PValue) ? NULL : *PValue;
          metric_info != NULL;
@@ -1103,14 +1112,14 @@ void migrate_journal_file_v2(
         fatal_assert(NULL != PValue);
         page_index = *PValue;
         metric_info->page_index = page_index;
-        metric_info->page_count = JudyLCount(page_index->JudyL_array, 0, -1, PJE0);
+        metric_info->entries = JudyLCount(page_index->JudyL_array, 0, -1, PJE0);
     }
     // Cleanup judy arrays we no longer need
     JudyLFreeArray(&metrics_JudyL_array, PJE0);
     JudyHSFreeArray(&metrics_JudyHS_array, PJE0);
 
     qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journal_metric_compare);
-    info("DEBUG: Traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "Traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
     // Write sorted UUID LIST
     for (Index = 0; Index < number_of_metrics; Index++) {
         metric_info = uuid_list[Index].metric_info;
@@ -1132,23 +1141,25 @@ void migrate_journal_file_v2(
         void *next_page_address = journal_v2_write_data_page_trailer(&j2_header, page_trailer, data_start + pages_offset);
 
         // Calculate start of the pages start for next descriptor
-        pages_offset += (metric_info->page_count * (sizeof(struct journal_page_list)) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer));
+        pages_offset += (metric_info->entries * (sizeof(struct journal_page_list)) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer));
         // Verify we are at the right location
         fatal_assert(pages_offset == (next_page_address - data_start));
-        if (!keep_live)
-            freez(metric_info);
     }
-    info("DEBUG: WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
-    // If we failed and didnt process the entire list, free the rest
-    if (!keep_live) {
-        for (; Index < number_of_metrics; Index++)
-            freez(uuid_list[Index].metric_info);
+    // Data should be at the UUID trailer offset
+    fatal_assert(data == data_start + metric_offset_trailer);
 
-        freez(uuid_list);
-    }
+    internal_error(true, "WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
+    // Calculate CRC for metrics
+    journal_v2_trailer = data_start + metric_offset_trailer;
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (void *) data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
+    crc32set(journal_v2_trailer->checksum, crc);
+    internal_error(true, "CALCULATE CRC FOR UUIDs  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+
+    // Prepare to write CRC for the file
     j2_header.data = NULL;
-    uLong crc;
+    journal_v2_trailer = data_start + trailer_offset;
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (void *) &j2_header, sizeof(j2_header));
     crc32set(journal_v2_trailer->checksum, crc);
@@ -1158,7 +1169,7 @@ void migrate_journal_file_v2(
     // File size counts
     ctx->disk_space += total_file_size;
 
-    info("DEBUG: FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
     info("Migrated journal file %s, File size %lu", path, total_file_size);
     if (keep_live) {
         journalfile->journal_data = data_start;
@@ -1173,13 +1184,17 @@ void migrate_journal_file_v2(
             bytes_after += JudyLMemUsed(uuid_list[Index].metric_info->page_index->JudyL_array);
             freez(uuid_list[Index].metric_info);
         }
-        info("DEBUG: ACTIVATING NEW INDEX JNL %llu   Number of deletions %lu, memory released = %u (Memory before = %u, Memory after = %u)",
+        internal_error(true, "ACTIVATING NEW INDEX JNL %llu   Number of deletions %lu, memory released = %u (Memory before = %u, Memory after = %u)",
              (now_realtime_usec() - start_loading) / USEC_PER_MS, number_of_metrics,
              bytes_before - bytes_after, bytes_before, bytes_after);
-        freez(uuid_list);
     }
-    else
+    else {
+        // If we failed and didnt process the entire list, free the rest
+        for (Index = 0; Index < number_of_metrics; Index++)
+            freez(uuid_list[Index].metric_info);
         netdata_munmap(data_start, total_file_size);
+    }
+    freez(uuid_list);
 }
 
 int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,

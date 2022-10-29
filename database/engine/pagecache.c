@@ -604,9 +604,6 @@ static struct journal_page_list *find_matching_page(struct journal_page_header *
     while (left < right) {
         uint32_t middle = (left + right) >> 1;
 
-        internal_fatal(middle >= (int)(page_list_header->entries),
-                       "DBENGINE: binary search invalid middle slot.");
-
         page_entry = &page_list[middle];
         middle_delta_start_s = page_entry->delta_start_s;
         middle_delta_end_s = page_entry->delta_end_s;
@@ -637,7 +634,6 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
     struct rrdengine_datafile *datafile)
 {
     time_t journal_start_time_s = (time_t)(journal_start_time_ut / USEC_PER_SEC);
-    struct journal_page_list *page_list = (struct journal_page_list *) ((void *) page_list_header + sizeof(*page_list_header));
     struct rrdengine_instance *ctx = page_index->ctx;
 
     Pvoid_t *PValue;

@@ -33,13 +33,19 @@ struct rrdengine_journalfile {
 #define JOURVAL_V2_MAGIC   (0x01221019)
 
 struct journal_v2_block_trailer {
-    uint8_t checksum[CHECKSUM_SZ]; /* CRC32 */
+    union {
+        uint8_t checksum[CHECKSUM_SZ]; /* CRC32 */
+        uint32_t crc;
+    };
 };
 
 // Journal V2
 // 28 bytes
 struct journal_page_header {
-    uint8_t crc[4];           // CRC check
+    union {
+        uint8_t checksum[4];      // CRC check
+        uint32_t crc;
+    };
     uint32_t uuid_offset;    // Points back to the UUID list which should point here (UUIDs should much)
     uint32_t entries;        // Entries
     uuid_t   uuid;           // Which UUID this is
@@ -73,21 +79,25 @@ struct journal_extent_list {
     uint8_t  pages;             // number of pages (not all are necesssarily valid)
 };
 
-// 64 bytes
+// 72 bytes
 struct journal_v2_header {
     uint32_t magic;
-    uint8_t crc[4];
-    usec_t start_time_ut;           // Min start time of journal
-    usec_t end_time_ut;             // Maximum end time of journal
-    uint32_t extent_count;
-    uint32_t extent_offset;         // extent_entries * struct(journal_extent_list)
-    uint32_t metric_count;
-    uint32_t metric_offset;         // metric_entries * struct(journal_metric_list)
-    uint32_t page_count;
-    uint32_t page_offset;           // metric_entries * struct(journal_metric_list)
-    uint32_t total_file_size;       // This is the total file size
-    void *data;                     // must be NULL;
+    usec_t start_time_ut;               // Min start time of journal
+    usec_t end_time_ut;                 // Maximum end time of journal
+    uint32_t extent_count;              // Count of extents
+    uint32_t extent_offset;
+    uint32_t metric_count;              // Count of metrics (unique UUIDS)
+    uint32_t metric_offset;
+    uint32_t page_count;                // Total count of pages (descriptors @ time)
+    uint32_t page_offset;
+    uint32_t extent_trailer_offset;     // CRC for entent list
+    uint32_t metric_trailer_offset;     // CRC for metric list
+    uint32_t total_file_size;           // This is the total file size
+    void *data;                         // Used when building the index
 };
+
+#define JOURNAL_V2_HEADER_PADDING_SZ (RRDENG_BLOCK_SIZE - (sizeof(struct journal_v2_header)))
+
 
 
 /* only one event loop is supported for now */
