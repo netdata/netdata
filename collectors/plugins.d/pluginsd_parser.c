@@ -996,6 +996,7 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
         return PARSER_RC_OK;
     }
 
+    time_t old_update_every = st->update_every;
     time_t update_every = end_time - start_time;
     if (update_every != st->update_every)
         rrdset_set_update_every(st, update_every);
@@ -1032,6 +1033,15 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
         rd->collections_counter++;
     }
 
+    st->counter_done++;
+    st->last_updated.tv_sec = end_time;
+    st->last_updated.tv_usec = 0;
+    st->last_collected_time.tv_sec = end_time;
+    st->last_collected_time.tv_usec = 0;
+
+    if(update_every != old_update_every)
+        rrdset_set_update_every(st, old_update_every);
+
     return PARSER_RC_OK;
 }
 
@@ -1064,11 +1074,6 @@ PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user,
     if (start_streaming) {
         if (st->update_every != update_every_child)
             rrdset_set_update_every(st, update_every_child);
-
-        st->last_updated.tv_sec = rrdset_last_entry_t(st);
-        st->last_updated.tv_usec = 0;
-        st->last_collected_time = st->last_updated;
-        st->counter_done++;
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return PARSER_RC_OK;
