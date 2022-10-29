@@ -1101,13 +1101,15 @@ PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user,
     time_t last_entry_requested = str2l(get_word(words, num_words, 6));
 
     PARSER_USER_OBJECT *user_object = user;
-    REPLICATION_OBJECT *repl_object = &user_object->repl_object;
 
-    RRDHOST *host = user_object->host;
-    assert(host && "non-null host expected");
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
-    RRDSET *st = repl_object->st;
-    assert(st && "non-null chart expected");
+    if (unlikely(!st)) {
+        error("requested a " PLUGINSD_KEYWORD_REPLAY_RRDSET_END " on host '%s', without a " PLUGINSD_KEYWORD_REPLAY_RRDSET_BEGIN ". Disabling it.",
+              rrdhost_hostname(host));
+        return PARSER_RC_ERROR;
+    }
 
     st->counter++;
     st->counter_done++;
