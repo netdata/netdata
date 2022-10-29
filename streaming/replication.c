@@ -76,7 +76,7 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
         else
             actual_before = min_start_time;
 
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_BEGIN "'' %ld %ld\n", min_start_time, min_end_time);
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %ld %ld\n", min_start_time, min_end_time);
 
         // output the replay values for this time
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
