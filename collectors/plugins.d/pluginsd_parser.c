@@ -1017,7 +1017,7 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
         }
 
         // No value/flag pair for this dimension
-        if (strcmp(value_str, "NULL") == 0)
+        if (strcmp(value_str, "NAN") == 0)
             continue;
 
         NETDATA_DOUBLE value = str2ndd(value_str, NULL);

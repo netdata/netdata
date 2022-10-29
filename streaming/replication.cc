@@ -2,223 +2,99 @@
 
 #include "replication.h"
 
-#include <vector>
-#include <utility>
-#include <limits>
+#define MAX_DIMENSIONS_PER_CHART 99
 
-class Query {
-public:
-    Query(RRDDIM *RD, time_t After, time_t Before) {
-        assert(After <= Before && "Invalid time range: After > Before");
+static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t before) {
+    size_t dimensions = rrdset_number_of_dimensions(st);
+    if(dimensions > MAX_DIMENSIONS_PER_CHART)
+        dimensions = MAX_DIMENSIONS_PER_CHART;
 
-        Ops = RD->tiers[0]->query_ops;
-        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, After, Before);
+    struct storage_engine_query_ops *ops = &st->rrdhost->db[0].eng->api.query_ops;
+
+    struct {
+        DICTIONARY *dict;
+        const DICTIONARY_ITEM *rda;
+        RRDDIM *rd;
+        struct storage_engine_query_handle handle;
+        STORAGE_POINT sp;
+    } data[dimensions];
+
+    memset(data, 0, sizeof(data));
+
+    // prepare our array of dimensions
+    buffer_sprintf(wb, "REPLAY_RRDSET_HEADER start_time end_time");
+    void *rdptr;
+    rrddim_foreach_read(rdptr, st) {
+        if(rdptr_dfe.counter >= dimensions)
+            break;
+
+        RRDDIM *rd = (RRDDIM *)rdptr;
+        data[rdptr_dfe.counter].dict = rdptr_dfe.dict;
+        data[rdptr_dfe.counter].rda = dictionary_acquired_item_dup(rdptr_dfe.dict, rdptr_dfe.item);
+        data[rdptr_dfe.counter].rd = rd;
+
+        ops->init(rd->tiers[0]->db_metric_handle, &data[rdptr_dfe.counter].handle, after, before);
+        buffer_sprintf(wb, " \"%s\"", rrddim_id(rd));
     }
+    rrddim_foreach_done(rdptr);
+    buffer_fast_strcat(wb, "\n", 1);
 
-    bool isFinished() {
-        return Ops->is_finished(&Handle);
-    }
+    // find a point
+    time_t now = after;
+    while(now < before) {
+        time_t min_start_time = 0, min_end_time = 0;
+        for (size_t i = 0; i < dimensions && data[i].rd; i++) {
+            // fetch the first valid point for the dimension
+            int max_skip = 100;
+            while(data[i].sp.start_time < now && !ops->is_finished(&data[i].handle) && max_skip-- > 0)
+                data[i].sp = ops->next_metric(&data[i].handle);
 
-    STORAGE_POINT nextMetric() {
-        assert(!isFinished() && "Tried to get next metric from finished query");
-        return Ops->next_metric(&Handle);
-    }
+            if(max_skip <= 0)
+                error("REPLAY: host '%s', chart '%s', dimension '%s': db does not advance the query beyond time %ld",
+                      rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(data[i].rd), now);
 
-    ~Query() {
-        assert(isFinished() && "Tried to finalize unfinished query");
-        Ops->finalize(&Handle);
-    }
-
-private:
-    struct storage_engine_query_ops *Ops;
-    struct storage_engine_query_handle Handle;
-};
-
-enum class StoragePointStatus : uint8_t {
-    Uninitialized = 0,
-    Unused,
-    Consumed,
-    Finished,
-};
-
-struct ReplicationStoragePoint {
-    StoragePointStatus Status;
-    STORAGE_POINT SP;
-};
-
-class ChartQuery {
-public:
-    static std::pair<time_t, time_t> get(BUFFER *WB, RRDSET *RS, time_t After, time_t Before) {
-        ChartQuery CQ(RS, After, Before);
-        return CQ.fill(WB);
-    }
-
-private:
-    ChartQuery(RRDSET *RS, time_t After, time_t Before) : RS(RS)
-    {
-        this->After = After;
-        this->Before = Before;
-        assert(After <= Before && "Invalid query time range: After > Before");
-        assert(After >= rrdset_first_entry_t(RS) && "After < rrdset's first entry");
-        assert(Before <= RS->last_updated.tv_sec && "Before > rrdset's last entry");
-
-        size_t N = rrdset_number_of_dimensions(RS);
-        assert(N != 0 && "Asked query chart with 0 dimensions");
-
-        // Init queries
-        {
-            Queries.reserve(N);
-
-            void *RDP = nullptr;
-            rrddim_foreach_read(RDP, RS) {
-                RRDDIM *RD = static_cast<RRDDIM *>(RDP);
-                Queries.emplace_back(RD, After, Before);
-            }
-            rrddim_foreach_done(RDP);
-
-            assert(Queries.size() == N && "Unexpected number of queries");
-        }
-
-        // Init storage points
-        {
-            ReplSPs.reserve(N);
-
-            for (size_t Idx = 0; Idx != N; Idx++)
-                ReplSPs.push_back({ StoragePointStatus::Uninitialized, STORAGE_POINT() });
-        }
-    }
-
-    std::pair<time_t, time_t> fill(BUFFER *WB) {
-        fillHeader(WB, RS);
-
-        time_t FirstStartTime = std::numeric_limits<time_t>::max();
-        time_t LastEndTime = std::numeric_limits<time_t>::min();
-
-        time_t StartTime, EndTime;
-        while (advance(&StartTime, &EndTime)) {
-            if (FirstStartTime > StartTime)
-                FirstStartTime = StartTime;
-
-            if (LastEndTime < EndTime)
-                LastEndTime = EndTime;
-
-            fillLine(WB, StartTime, EndTime);
-        }
-
-        return { FirstStartTime, LastEndTime };
-    }
-
-    void fillHeader(BUFFER *WB, RRDSET *RS) {
-        buffer_sprintf(WB, "REPLAY_RRDSET_HEADER start_time end_time");
-
-        void *RDP;
-        rrddim_foreach_read(RDP, RS) {
-            RRDDIM *RD = static_cast<RRDDIM *>(RDP);
-            buffer_sprintf(WB, " \"%s\"", rrddim_id(RD));
-        }
-        rrddim_foreach_done(RDP);
-
-        buffer_strcat(WB, "\n");
-    }
-
-    void fillLine(BUFFER *WB, time_t StartTime, time_t EndTime) {
-        buffer_sprintf(WB, "REPLAY_RRDSET_DONE %ld %ld", StartTime, EndTime);
-
-        bool UsedSP = false;
-        for (ReplicationStoragePoint &RSP : ReplSPs) {
-            switch (RSP.Status) {
-                case StoragePointStatus::Uninitialized:
-                    assert(false && "Found uninitialized replication storage point");
-                    continue;
-                case StoragePointStatus::Consumed:
-                    assert(false && "Found consumed replication storage point");
-                    continue;
-                case StoragePointStatus::Unused: {
-                    STORAGE_POINT &SP = RSP.SP;
-
-                    if (SP.start_time != StartTime) {
-                        buffer_sprintf(WB, " NULL 0");
-                    } else {
-                        buffer_sprintf(WB, " %lf %u", SP.sum, (unsigned int)SP.flags);
-                        RSP.Status = StoragePointStatus::Consumed;
-                        UsedSP = true;
-                    }
-                    continue;
-                }
-                case StoragePointStatus::Finished:
-                    buffer_sprintf(WB, " NULL NULL");
-                    continue;
-            }
-        }
-        assert(UsedSP && "Line produced without consuming a storage point");
-
-        buffer_strcat(WB, "\n");
-    }
-
-    bool advance(time_t *StartTime, time_t *EndTime) {
-        *StartTime = std::numeric_limits<time_t>::max();
-        *EndTime = std::numeric_limits<time_t>::min();
-
-        for (size_t Idx = 0; Idx != ReplSPs.size(); Idx++) {
-            ReplicationStoragePoint &RSP = ReplSPs[Idx];
-            Query &Q = Queries[Idx];
-
-            switch (RSP.Status) {
-            case StoragePointStatus::Uninitialized:
-                /* fall through */
-            case StoragePointStatus::Consumed:
-                if (Q.isFinished())
-                    RSP.Status = StoragePointStatus::Finished;
-                else {
-                    RSP.SP = Q.nextMetric();
-                    if (RSP.SP.start_time < *StartTime) {
-                        *StartTime = RSP.SP.start_time;
-                        *EndTime = RSP.SP.end_time;
-                    }
-                    RSP.Status = StoragePointStatus::Unused;
-                }
-                break;
-            case StoragePointStatus::Unused:
-                if (RSP.SP.start_time < *StartTime) {
-                    *StartTime = RSP.SP.start_time;
-                    *EndTime = RSP.SP.end_time;
-                }
-                break;
-            case StoragePointStatus::Finished:
-                break;
-            }
-        }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        // check that all SPs that have the same start time and the same end time
-        for (size_t Idx = 0; Idx != ReplSPs.size(); Idx++) {
-            ReplicationStoragePoint &RSP = ReplSPs[Idx];
-
-            switch (RSP.Status) {
-            case StoragePointStatus::Unused:
-                if (*StartTime != RSP.SP.start_time)
-                    continue;
-
-                assert(RSP.SP.end_time == *EndTime &&
-                       "Storage points have same start time but different end time");
-                break;
-            default:
+            if(data[i].sp.start_time < now)
                 continue;
+
+            if(!min_start_time) {
+                min_start_time = data[i].sp.start_time;
+                min_end_time = data[i].sp.end_time;
+            }
+            else {
+                min_start_time = MIN(min_start_time, data[i].sp.start_time);
+                min_end_time = MIN(min_end_time, data[i].sp.end_time);
             }
         }
-#endif
 
-        return *StartTime != std::numeric_limits<time_t>::max();
+        if(min_start_time < now) {
+            error("REPLAY: host '%s', chart '%s': no useful dimensions beyond time %ld",
+                  rrdhost_hostname(st->rrdhost), rrdset_id(st), now);
+            break;
+        }
+
+        if(min_end_time <= min_start_time)
+            min_end_time = min_start_time + 1;
+
+        // output the replay values for this time
+        buffer_sprintf(wb, "REPLAY_RRDSET_DONE %ld %ld", min_start_time, min_end_time);
+        for (size_t i = 0; i < dimensions && data[i].rd; i++) {
+            if(data[i].sp.start_time >= min_start_time && data[i].sp.end_time < min_end_time)
+                buffer_sprintf(wb, " %lf %u", data[i].sp.sum, (unsigned int)data[i].sp.flags);
+            else
+                buffer_sprintf(wb, " NAN %u", (unsigned int)SN_EMPTY_SLOT);
+        }
+        buffer_fast_strcat(wb, "\n", 1);
+
+        now = min_end_time;
     }
 
-private:
-    RRDSET *RS;
-    time_t After;
-    time_t Before;
-
-    std::vector<Query> Queries;
-    std::vector<ReplicationStoragePoint> ReplSPs;
-};
+    // release all the dictionary items acquired
+    // finalize the queries
+    for(size_t i = 0; i < dimensions && data[i].rda ;i++) {
+        ops->finalize(&data[i].handle);
+        dictionary_acquired_item_release(data[i].dict, data[i].rda);
+    }
+}
 
 bool replicate_chart_response(RRDHOST *host, RRDSET *st,
                               bool start_streaming, time_t after, time_t before)
@@ -278,7 +154,8 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
         buffer_sprintf(wb, "REPLAY_RRDSET_BEGIN \"%s\"\n", rrdset_id(st));
 
         // fill the data table
-        (void) ChartQuery::get(wb, st, after, before);
+        replicate_do_chart(wb, st, after, before);
+        // (void) ChartQuery::get(wb, st, after, before);
 
         // end with first/last entries we have, and the first start time and
         // last end time of the data we sent
@@ -405,8 +282,7 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     // received
     if (prev_first_entry_wanted && prev_last_entry_wanted) {
         first_entry_wanted = prev_last_entry_wanted + st->update_every;
-        last_entry_wanted = std::min(first_entry_wanted + host->rrdpush_replication_step,
-                                     last_entry_child);
+        last_entry_wanted = MIN(first_entry_wanted + host->rrdpush_replication_step, last_entry_child);
     }
 
     bool start_streaming = (last_entry_wanted == last_entry_child);
