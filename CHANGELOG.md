@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Reference the bash collector for RPi [\#13907](https://github.com/netdata/netdata/pull/13907) ([cakrit](https://github.com/cakrit))
+- Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin v0.41.2 [\#13903](https://github.com/netdata/netdata/pull/13903) ([ilyam8](https://github.com/ilyam8))
 - add pandas collector to collectors.md [\#13895](https://github.com/netdata/netdata/pull/13895) ([andrewm4894](https://github.com/andrewm4894))
 - Fix reading health "enable" from the configuration [\#13894](https://github.com/netdata/netdata/pull/13894) ([stelfrag](https://github.com/stelfrag))
@@ -37,6 +39,7 @@
 - Use mmap to read an extent from a datafile [\#13834](https://github.com/netdata/netdata/pull/13834) ([stelfrag](https://github.com/stelfrag))
 - chore\(health\): rm pihole\_blocklist\_gravity\_file\_existence\_state [\#13826](https://github.com/netdata/netdata/pull/13826) ([ilyam8](https://github.com/ilyam8))
 - Improve error and warning messages in the kickstart script. [\#13825](https://github.com/netdata/netdata/pull/13825) ([Ferroin](https://github.com/Ferroin))
+- Remove option to use MQTT 3 [\#13824](https://github.com/netdata/netdata/pull/13824) ([underhood](https://github.com/underhood))
 - extended processes function info from apps.plugin [\#13822](https://github.com/netdata/netdata/pull/13822) ([ktsaou](https://github.com/ktsaou))
 - Fix crash on child reconnect and lost metrics [\#13821](https://github.com/netdata/netdata/pull/13821) ([stelfrag](https://github.com/stelfrag))
 - Remove NFS readahead histogram [\#13819](https://github.com/netdata/netdata/pull/13819) ([vlvkobal](https://github.com/vlvkobal))
@@ -210,7 +213,6 @@
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
 - Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
-- Fix existing install detection for FreeBSD and macOS. [\#13243](https://github.com/netdata/netdata/pull/13243) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -339,7 +341,6 @@
 - Remove strftime from statements and use unixepoch instead [\#13250](https://github.com/netdata/netdata/pull/13250) ([stelfrag](https://github.com/stelfrag))
 - Query engine with natural and virtual points [\#13248](https://github.com/netdata/netdata/pull/13248) ([ktsaou](https://github.com/ktsaou))
 - Add fstype labels to disk charts [\#13245](https://github.com/netdata/netdata/pull/13245) ([vlvkobal](https://github.com/vlvkobal))
-- Don’t pull in GCC for build if Clang is already present. [\#13244](https://github.com/netdata/netdata/pull/13244) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
