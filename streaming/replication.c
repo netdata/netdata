@@ -118,7 +118,7 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
 static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_COLLECTION_STATE " \"%s\" %llu %llu " NETDATA_DOUBLE_FORMAT_AUTO " " NETDATA_DOUBLE_FORMAT_AUTO "\n",
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_COLLECTION_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT_AUTO " " NETDATA_DOUBLE_FORMAT_AUTO "\n",
                        rrddim_id(rd),
                        (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
                        rd->last_collected_value,
