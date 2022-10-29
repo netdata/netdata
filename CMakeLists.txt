@@ -860,7 +860,7 @@ set(STREAMING_PLUGIN_FILES
         streaming/compression.c
         streaming/receiver.c
         streaming/sender.c
-        streaming/replication.cc
+        streaming/replication.c
         streaming/replication.h
         )
 

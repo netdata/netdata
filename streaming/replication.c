@@ -23,25 +23,24 @@ static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t befo
 
     // prepare our array of dimensions
     buffer_sprintf(wb, "REPLAY_RRDSET_HEADER start_time end_time");
-    void *rdptr;
-    rrddim_foreach_read(rdptr, st) {
-        if(rdptr_dfe.counter >= dimensions)
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        if(rd_dfe.counter >= dimensions)
             break;
 
-        RRDDIM *rd = (RRDDIM *)rdptr;
-        data[rdptr_dfe.counter].dict = rdptr_dfe.dict;
-        data[rdptr_dfe.counter].rda = dictionary_acquired_item_dup(rdptr_dfe.dict, rdptr_dfe.item);
-        data[rdptr_dfe.counter].rd = rd;
+        data[rd_dfe.counter].dict = rd_dfe.dict;
+        data[rd_dfe.counter].rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
+        data[rd_dfe.counter].rd = rd;
 
-        ops->init(rd->tiers[0]->db_metric_handle, &data[rdptr_dfe.counter].handle, after, before);
+        ops->init(rd->tiers[0]->db_metric_handle, &data[rd_dfe.counter].handle, after, before);
         buffer_sprintf(wb, " \"%s\"", rrddim_id(rd));
     }
-    rrddim_foreach_done(rdptr);
+    rrddim_foreach_done(rd);
     buffer_fast_strcat(wb, "\n", 1);
 
     // find a point
-    time_t now = after;
-    while(now < before) {
+    time_t now = after, actual_after = 0, actual_before = 0;
+    while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
             // fetch the first valid point for the dimension
@@ -67,26 +66,52 @@ static void replicate_do_chart(BUFFER *wb, RRDSET *st, time_t after, time_t befo
         }
 
         if(min_start_time < now) {
-            error("REPLAY: host '%s', chart '%s': no useful dimensions beyond time %ld",
-                  rrdhost_hostname(st->rrdhost), rrdset_id(st), now);
+            internal_error(true,
+                           "REPLAY: host '%s', chart '%s': no data on any dimension beyond time %ld",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st), now);
             break;
         }
 
         if(min_end_time <= min_start_time)
             min_end_time = min_start_time + 1;
 
+        if(!actual_after) {
+            actual_after = min_start_time;
+            actual_before = min_start_time;
+        }
+        else
+            actual_before = min_start_time;
+
         // output the replay values for this time
         buffer_sprintf(wb, "REPLAY_RRDSET_DONE %ld %ld", min_start_time, min_end_time);
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
-            if(data[i].sp.start_time >= min_start_time && data[i].sp.end_time < min_end_time)
+            if(data[i].sp.start_time >= min_start_time && data[i].sp.start_time <= min_end_time)
                 buffer_sprintf(wb, " %lf %u", data[i].sp.sum, (unsigned int)data[i].sp.flags);
             else
-                buffer_sprintf(wb, " NAN %u", (unsigned int)SN_EMPTY_SLOT);
+                buffer_sprintf(wb, " NULL %u", (unsigned int)SN_EMPTY_SLOT);
         }
         buffer_fast_strcat(wb, "\n", 1);
 
         now = min_end_time;
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(actual_after) {
+        char actual_after_buf[LOG_DATE_LENGTH + 1], actual_before_buf[LOG_DATE_LENGTH + 1];
+        log_date(actual_after_buf, LOG_DATE_LENGTH, actual_after);
+        log_date(actual_before_buf, LOG_DATE_LENGTH, actual_before);
+        internal_error(true,
+                       "REPLAY: host '%s', chart '%s': sending data %ld [%s] to %ld [%s] (requested %ld [delta %ld] to %ld [delta %ld])",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       actual_after, actual_after_buf, actual_before, actual_before_buf,
+                       after, actual_after - after, before, actual_before - before);
+    }
+    else
+        internal_error(true,
+                       "REPLAY: host '%s', chart '%s': nothing to send (requested %ld to %ld)",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       after, before);
+#endif
 
     // release all the dictionary items acquired
     // finalize the queries
@@ -168,14 +193,32 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
     return enable_streaming;
 }
 
-static bool send_replay_chart_cmd(FILE *outfp, const char *chart,
-                                  bool start_streaming, time_t after, time_t before)
-{
+static bool send_replay_chart_cmd(FILE *outfp, RRDSET *st, bool start_streaming, time_t after, time_t before) {
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(after && before) {
+        char after_buf[LOG_DATE_LENGTH + 1], before_buf[LOG_DATE_LENGTH + 1];
+        log_date(after_buf, LOG_DATE_LENGTH, after);
+        log_date(before_buf, LOG_DATE_LENGTH, before);
+        internal_error(true,
+                       "REPLAY: host '%s', chart '%s': sending replication request %ld [%s] to %ld [%s], start streaming: %s",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       after, after_buf, before, before_buf,
+                       start_streaming?"true":"false");
+    }
+    else {
+        internal_error(true,
+                       "REPLAY: host '%s', chart '%s': sending empty replication request, start streaming: %s",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       start_streaming?"true":"false");
+    }
+#endif
+
     debug(D_REPLICATION, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
-          chart, start_streaming ? "true" : "false", after, before);
+          rrdset_id(st), start_streaming ? "true" : "false", after, before);
 
     int ret = fprintf(outfp, "REPLAY_CHART \"%s\" \"%s\" %ld %ld\n",
-                      chart, start_streaming ? "true" : "false",
+                      rrdset_id(st), start_streaming ? "true" : "false",
                       after, before);
     if (ret < 0) {
         error("failed to send replay request to child (ret=%d)", ret);
@@ -195,47 +238,48 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     // if replication is disabled, send an empty replication request
     // asking no data
     if (!host->rrdpush_enable_replication) {
-        error("REPLAY: host '%s', chart '%s': skipping replication request because replication is disabled",
-              rrdhost_hostname(host), rrdset_id(st));
+        internal_error(true,
+                       "REPLAY: host '%s', chart '%s': sending empty replication request because replication is disabled",
+                       rrdhost_hostname(host), rrdset_id(st));
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
+        return send_replay_chart_cmd(outfp, st, true, 0, 0);
     }
 
     // Child has no stored data
     if (!last_entry_child) {
-        error("REPLAY: host '%s', chart '%s': skipping replication request because child has no stored data",
+        error("REPLAY: host '%s', chart '%s': sending empty replication request because child has no stored data",
               rrdhost_hostname(host), rrdset_id(st));
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
+        return send_replay_chart_cmd(outfp, st, true, 0, 0);
     }
 
     // Nothing to get if the chart has not dimensions
     if (!rrdset_number_of_dimensions(st)) {
-        error("REPLAY: host '%s', chart '%s': skipping replication request because chart has no dimensions",
+        error("REPLAY: host '%s', chart '%s': sending empty replication request because chart has no dimensions",
               rrdhost_hostname(host), rrdset_id(st));
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
+        return send_replay_chart_cmd(outfp, st, true, 0, 0);
     }
 
     // if the child's first/last entries are nonsensical, resume streaming
     // without asking for any data
     if (first_entry_child <= 0) {
-        error("REPLAY: host '%s', chart '%s': skipping replication because first entry of the child is invalid (%ld)",
+        error("REPLAY: host '%s', chart '%s': sending empty replication because first entry of the child is invalid (%ld)",
               rrdhost_hostname(host), rrdset_id(st), first_entry_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
+        return send_replay_chart_cmd(outfp, st, true, 0, 0);
     }
 
     if (first_entry_child > last_entry_child) {
-        error("REPLAY: host '%s', chart '%s': skipping replication because child timings are invalid (first entry %ld > last entry %ld)",
+        error("REPLAY: host '%s', chart '%s': sending empty replication because child timings are invalid (first entry %ld > last entry %ld)",
               rrdhost_hostname(host), rrdset_id(st), first_entry_child, last_entry_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
+        return send_replay_chart_cmd(outfp, st, true, 0, 0);
     }
 
     time_t last_entry_local = rrdset_last_entry_t(st);
@@ -249,45 +293,27 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     // should never happen but it if does, start streaming without asking
     // for any data
     if (last_entry_local > last_entry_child) {
-        error("REPLAY: host '%s', chart '%s': skipping replication request because our last entry (%ld) in later than the child one (%ld)",
+        error("REPLAY: host '%s', chart '%s': sending empty replication request because our last entry (%ld) in later than the child one (%ld)",
               rrdhost_hostname(host), rrdset_id(st), last_entry_local, last_entry_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
+        return send_replay_chart_cmd(outfp, st, true, 0, 0);
     }
 
-    // ask for the next timestamp
-    time_t first_entry_wanted = last_entry_local + 1;
-
-    // make sure the 1st entry is GE than the child's
-    if (first_entry_wanted < first_entry_child)
-        first_entry_wanted = first_entry_child;
-
-    // don't ask for more than `rrdpush_seconds_to_replicate`
-    if ((now - first_entry_wanted) > host->rrdpush_seconds_to_replicate)
-        first_entry_wanted = now - host->rrdpush_seconds_to_replicate;
-
-    // ask the next X points
-    time_t last_entry_wanted = first_entry_wanted + host->rrdpush_replication_step;
-
-    // make sure we don't ask more than the child has
-    if (last_entry_wanted > last_entry_child)
-        last_entry_wanted = last_entry_child;
-
-    // sanity check to make sure our time range is well formed
-    if (first_entry_wanted > last_entry_wanted)
-        first_entry_wanted = last_entry_wanted;
-
-    // on subsequent calls we can use just the end time of the last entry
-    // received
+    time_t first_entry_wanted;
     if (prev_first_entry_wanted && prev_last_entry_wanted) {
-        first_entry_wanted = prev_last_entry_wanted + st->update_every;
-        last_entry_wanted = MIN(first_entry_wanted + host->rrdpush_replication_step, last_entry_child);
+        first_entry_wanted = prev_last_entry_wanted;
+        if ((now - first_entry_wanted) > host->rrdpush_seconds_to_replicate)
+            first_entry_wanted = now - host->rrdpush_seconds_to_replicate;
     }
+    else
+        first_entry_wanted = MAX(last_entry_local, first_entry_child);
+
+    time_t last_entry_wanted = first_entry_wanted + host->rrdpush_replication_step;
+    last_entry_wanted = MIN(last_entry_wanted, last_entry_child);
 
     bool start_streaming = (last_entry_wanted == last_entry_child);
 
-    return send_replay_chart_cmd(outfp, rrdset_id(st), start_streaming,
-                                                       first_entry_wanted,
-                                                       last_entry_wanted);
+    return send_replay_chart_cmd(outfp, st,
+                                 start_streaming, first_entry_wanted, last_entry_wanted);
 }

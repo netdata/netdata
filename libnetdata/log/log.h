@@ -86,6 +86,9 @@ int error_log_limit(int reset);
 void open_all_log_files();
 void reopen_all_log_files();
 
+#define LOG_DATE_LENGTH 26
+void log_date(char *buffer, size_t len, time_t now);
+
 static inline void debug_dummy(void) {}
 
 void error_log_limit_reset(void);
