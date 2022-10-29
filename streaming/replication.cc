@@ -60,7 +60,7 @@ private:
         this->Before = Before;
         assert(After <= Before && "Invalid query time range: After > Before");
         assert(After >= rrdset_first_entry_t(RS) && "After < rrdset's first entry");
-        assert(Before <= rrdset_last_entry_t(RS) && "Before > rrdset's last entry");
+        assert(Before <= RS->last_updated.tv_sec && "Before > rrdset's last entry");
 
         size_t N = rrdset_number_of_dimensions(RS);
         assert(N != 0 && "Asked query chart with 0 dimensions");
@@ -235,16 +235,24 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
 
     // find the first entry we have
     time_t first_entry_local = rrdset_first_entry_t(st);
-    if(first_entry_local > now)
+    if(first_entry_local > now) {
+        internal_error(true,
+                       "RRDSET: '%s' first time %ld is in the future (now is %ld)",
+                       rrdset_id(st), first_entry_local, now);
         first_entry_local = now;
+    }
 
     if (query_after < first_entry_local)
         query_after = first_entry_local;
 
     // find the latest entry we have
-    time_t last_entry_local = rrdset_last_entry_t(st);
-    if(last_entry_local > now)
+    time_t last_entry_local = st->last_updated.tv_sec;
+    if(last_entry_local > now) {
+        internal_error(true,
+                       "RRDSET: '%s' last updated time %ld is in the future (now is %ld)",
+                       rrdset_id(st), last_entry_local, now);
         last_entry_local = now;
+    }
 
     if (query_before > last_entry_local)
         query_before = last_entry_local;
@@ -305,6 +313,8 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
                              time_t first_entry_child, time_t last_entry_child,
                              time_t prev_first_entry_wanted, time_t prev_last_entry_wanted)
 {
+    time_t now = now_realtime_sec();
+
     // if replication is disabled, send an empty replication request
     // asking no data
     if (!host->rrdpush_enable_replication) {
@@ -345,6 +355,12 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     }
 
     time_t last_entry_local = rrdset_last_entry_t(st);
+    if(last_entry_local > now) {
+        internal_error(true,
+                       "RRDSET: '%s' last entry time %ld is in the future (now is %ld)",
+                       rrdset_id(st), last_entry_local, now);
+        last_entry_local = now;
+    }
 
     // should never happen but it if does, start streaming without asking
     // for any data
@@ -363,7 +379,6 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
         first_entry_wanted = first_entry_child;
 
     // don't ask for more than `rrdpush_seconds_to_replicate`
-    time_t now = now_realtime_sec();
     if ((now - first_entry_wanted) > host->rrdpush_seconds_to_replicate)
         first_entry_wanted = now - host->rrdpush_seconds_to_replicate;
 

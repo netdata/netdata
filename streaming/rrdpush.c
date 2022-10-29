@@ -307,7 +307,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
         time_t first_entry_local = rrdset_first_entry_t(st);
-        time_t last_entry_local = rrdset_last_entry_t(st);
+        time_t last_entry_local = st->last_updated.tv_sec;
         buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
     } else {
         error("No replication capability for %s.%s (enabling streaming)", rrdhost_hostname(host), rrdset_id(st));
