@@ -318,23 +318,27 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     // if replication is disabled, send an empty replication request
     // asking no data
     if (!host->rrdpush_enable_replication) {
-        error("Skipping replication request because it's disabled on host %s", rrdhost_hostname(host));
+        error("REPLAY: host '%s', chart '%s': skipping replication request because replication is disabled",
+              rrdhost_hostname(host), rrdset_id(st));
+
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
     }
 
     // Child has no stored data
     if (!last_entry_child) {
-        error("Skipping replication request for %s.%s because child has no stored data",
+        error("REPLAY: host '%s', chart '%s': skipping replication request because child has no stored data",
               rrdhost_hostname(host), rrdset_id(st));
+
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
     }
 
     // Nothing to get if the chart has not dimensions
     if (!rrdset_number_of_dimensions(st)) {
-        error("Skipping replication request for %s.%s because it has no dimensions",
+        error("REPLAY: host '%s', chart '%s': skipping replication request because chart has no dimensions",
               rrdhost_hostname(host), rrdset_id(st));
+
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
     }
@@ -342,14 +346,17 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     // if the child's first/last entries are nonsensical, resume streaming
     // without asking for any data
     if (first_entry_child <= 0) {
-        error("Skipping replication for %s.%s because FEC is %ld",
+        error("REPLAY: host '%s', chart '%s': skipping replication because first entry of the child is invalid (%ld)",
               rrdhost_hostname(host), rrdset_id(st), first_entry_child);
+
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
     }
+
     if (first_entry_child > last_entry_child) {
-        error("Skipping replication for %s.%s because FEC > LEC (%ld > %ld)",
+        error("REPLAY: host '%s', chart '%s': skipping replication because child timings are invalid (first entry %ld > last entry %ld)",
               rrdhost_hostname(host), rrdset_id(st), first_entry_child, last_entry_child);
+
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
     }
@@ -357,16 +364,17 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
     time_t last_entry_local = rrdset_last_entry_t(st);
     if(last_entry_local > now) {
         internal_error(true,
-                       "RRDSET: '%s' last entry time %ld is in the future (now is %ld)",
-                       rrdset_id(st), last_entry_local, now);
+                       "REPLAY: host '%s', chart '%s': local last entry time %ld is in the future (now is %ld). Adjusting it.",
+                       rrdhost_hostname(host), rrdset_id(st), last_entry_local, now);
         last_entry_local = now;
     }
 
     // should never happen but it if does, start streaming without asking
     // for any data
     if (last_entry_local > last_entry_child) {
-        error("Skipping replication for %s.%s because LEP > LEC (%ld > %ld)",
+        error("REPLAY: host '%s', chart '%s': skipping replication request because our last entry (%ld) in later than the child one (%ld)",
               rrdhost_hostname(host), rrdset_id(st), last_entry_local, last_entry_child);
+
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         return send_replay_chart_cmd(outfp, rrdset_id(st), true, 0, 0);
     }

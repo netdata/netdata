@@ -991,7 +991,8 @@ PARSER_RC pluginsd_replay_rrdset_done(char **words, size_t num_words, void *user
 
     RRDSET *st = repl_object->st;
     if (end_time <= rrdset_last_entry_t(st)) {
-        error("replay_rrdset_done contains a start/end time we already have");
+        error("REPLAY: host '%s', chart '%s': received replication data from %ld to %ld, but we already have data for this timeframe (our latest is %ld)",
+              rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time, rrdset_last_entry_t(st));
         return PARSER_RC_OK;
     }
 
