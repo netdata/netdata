@@ -100,6 +100,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
 
     netdata_mutex_lock(&s->mutex);
 
+    if(unlikely(s->host->sender->buffer->max_size < (buffer_strlen(wb) + 1) * 2)) {
+        error("STREAM %s [send to %s]: max buffer size of %zu is too small for data of size %zu. Increasing the max buffer size to twice the max data size.",
+              rrdhost_hostname(s->host), s->connected_to, s->host->sender->buffer->max_size, buffer_strlen(wb) + 1);
+
+        s->host->sender->buffer->max_size = (buffer_strlen(wb) + 1) * 2;
+    }
+
 #ifdef ENABLE_COMPRESSION
     if (s->flags & SENDER_FLAG_COMPRESSION && s->compressor) {
         while(src_len) {
@@ -1098,7 +1105,8 @@ static void process_replication_requests(struct sender_state *s) {
 
     struct replication_request *rr;
     dfe_start_write(s->replication_requests, rr) {
-        if(sender_buffer_used_percent(s) > 50) break;
+        size_t used_percent = sender_buffer_used_percent(s);
+        if(used_percent > 50) break;
 
         // delete it from the dictionary
         // the current item is referenced - it will not go away until the next iteration of the dfe loop

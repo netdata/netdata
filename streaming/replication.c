@@ -76,14 +76,16 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
         else
             actual_before = min_start_time;
 
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_BEGIN "'' %ld %ld\n", min_start_time, min_end_time);
+
         // output the replay values for this time
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
             if(data[i].sp.start_time >= min_start_time && data[i].sp.start_time <= min_end_time)
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STORAGE_POINT " \"%s\" %ld %ld " NETDATA_DOUBLE_FORMAT_AUTO " %u\n",
-                               rrddim_id(data[i].rd), min_start_time, min_end_time, data[i].sp.sum, (unsigned)data[i].sp.flags);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT_AUTO " \"%s\"\n",
+                               rrddim_id(data[i].rd), data[i].sp.sum, data[i].sp.flags & SN_FLAG_RESET ? "R" : "");
             else
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STORAGE_POINT " \"%s\" %ld %ld nan %u\n",
-                               rrddim_id(data[i].rd), min_start_time, min_end_time, (unsigned)data[i].sp.flags);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" NAN \"E\"\n",
+                               rrddim_id(data[i].rd));
         }
 
         now = min_end_time;
@@ -118,7 +120,7 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
 static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_COLLECTION_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT_AUTO " " NETDATA_DOUBLE_FORMAT_AUTO "\n",
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT_AUTO " " NETDATA_DOUBLE_FORMAT_AUTO "\n",
                        rrddim_id(rd),
                        (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
                        rd->last_collected_value,
@@ -128,7 +130,7 @@ static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_COLLECTION_STATE " %llu %llu " TOTAL_NUMBER_FORMAT " " TOTAL_NUMBER_FORMAT "\n",
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu " TOTAL_NUMBER_FORMAT " " TOTAL_NUMBER_FORMAT "\n",
                    (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
                    (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec,
                    st->last_collected_total,
@@ -191,7 +193,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
     {
         // pass the original after/before so that the parent knows about
         // which time range we responded
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_BEGIN " \"%s\"\n", rrdset_id(st));
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
         // fill the data table
         replicate_chart_timeframe(wb, st, after, before);
@@ -201,7 +203,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
 
         // end with first/last entries we have, and the first start time and
         // last end time of the data we sent
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_END " %ld %ld %ld %s %ld %ld\n",
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %ld %ld %ld %s %ld %ld\n",
                        (time_t) st->update_every, first_entry_local, last_entry_local,
                        enable_streaming ? "true" : "false", after, before);
     }

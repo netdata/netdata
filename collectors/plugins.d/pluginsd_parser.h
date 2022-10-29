@@ -19,6 +19,14 @@ typedef struct parser_user_object {
     uint8_t st_exists;
     uint8_t host_exists;
     void *private; // the user can set this for private use
+
+    struct {
+        time_t start_time;
+        time_t end_time;
+
+        usec_t start_time_ut;
+        usec_t end_time_ut;
+    } replay;
 } PARSER_USER_OBJECT;
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
