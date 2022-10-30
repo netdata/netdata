@@ -168,11 +168,7 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
     if(unlikely(!(flags & (RRDSET_FLAG_UPSTREAM_SEND | RRDSET_FLAG_UPSTREAM_IGNORE)))) {
         RRDHOST *host = st->rrdhost;
 
-        // Do not stream anomaly rates charts.
-        if (unlikely(flags & RRDSET_FLAG_ANOMALY_RATE_CHART))
-            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
-
-        else if (flags & RRDSET_FLAG_ANOMALY_DETECTION) {
+        if (flags & RRDSET_FLAG_ANOMALY_DETECTION) {
             if(ml_streaming_enabled())
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
             else

@@ -33,8 +33,6 @@ void Config::readMLConfig(void) {
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
     unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1 * 24);
 
-    unsigned DBEngineAnomalyRateEvery = config_get_number(ConfigSectionML, "dbengine anomaly rate every", 30);
-
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
     unsigned LagN = config_get_number(ConfigSectionML, "num samples to lag", 5);
@@ -56,8 +54,6 @@ void Config::readMLConfig(void) {
     MinTrainSamples = clamp<unsigned>(MinTrainSamples, 1 * 900, 6 * 3600);
     TrainEvery = clamp<unsigned>(TrainEvery, 1 * 3600, 6 * 3600);
     NumModelsToUse = clamp<unsigned>(TrainEvery, 1, 7 * 24);
-
-    DBEngineAnomalyRateEvery = clamp(DBEngineAnomalyRateEvery, 1 * 30u, 15 * 60u);
 
     DiffN = clamp(DiffN, 0u, 1u);
     SmoothN = clamp(SmoothN, 0u, 5u);
@@ -92,8 +88,6 @@ void Config::readMLConfig(void) {
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
     Cfg.NumModelsToUse = NumModelsToUse;
-
-    Cfg.DBEngineAnomalyRateEvery = DBEngineAnomalyRateEvery;
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;

@@ -100,11 +100,6 @@ struct rrdset_constructor {
 
 // the constructor - the dictionary is write locked while this runs
 static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
-    static STRING *anomaly_rates_chart = NULL;
-
-    if(unlikely(!anomaly_rates_chart))
-        anomaly_rates_chart = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
-
     struct rrdset_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
@@ -144,9 +139,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if(host == localhost || !host->receiver || !stream_has_capability(host->receiver, STREAM_CAP_REPLICATION))
         st->flags |= RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED;
-
-    if(unlikely(st->id == anomaly_rates_chart))
-        st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
 
     netdata_rwlock_init(&st->alerts.rwlock);
 
@@ -355,7 +347,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     st->last_accessed_time = now_realtime_sec();
 
-    if((host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) && !rrdset_is_ar_chart(st)) {
+    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }

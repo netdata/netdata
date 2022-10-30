@@ -79,10 +79,7 @@ void ml_new_dimension(RRDDIM *RD) {
     if (simple_pattern_matches(Cfg.SP_ChartsToSkip, rrdset_name(RS)))
         return;
 
-    if (rrdset_is_ar_chart(RS))
-        return;
-
-    Dimension *D = new Dimension(RD, H->getAnomalyRateRS());
+    Dimension *D = new Dimension(RD);
     RD->ml_dimension = static_cast<ml_dimension_t>(D);
     H->addDimension(D);
 }
@@ -145,44 +142,6 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
         return false;
 
     return D->predict(Value, Exists);
-}
-
-void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
-    if (R->rows != 1)
-        return;
-
-    if (MaxAnomalyRates < 1 || MaxAnomalyRates >= (int)R->d)
-        return;
-
-    NETDATA_DOUBLE *CNs = R->v;
-    RRDR_DIMENSION_FLAGS *DimFlags = R->od;
-
-    std::vector<std::pair<NETDATA_DOUBLE, int>> V;
-
-    V.reserve(R->d);
-    for (int Idx = 0; Idx != (int)R->d; Idx++)
-        V.emplace_back(CNs[Idx], Idx);
-
-    std::sort(V.rbegin(), V.rend());
-
-    for (int Idx = MaxAnomalyRates; Idx != (int)R->d; Idx++) {
-        int UnsortedIdx = V[Idx].second;
-
-        int OldFlags = static_cast<int>(DimFlags[UnsortedIdx]);
-        int NewFlags = OldFlags | RRDR_DIMENSION_HIDDEN;
-
-        DimFlags[UnsortedIdx] = static_cast<rrdr_dimension_flag>(NewFlags);
-    }
-}
-
-void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *Name) {
-    (void) RS;
-
-    Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
-    if (!D)
-        return;
-
-    D->setAnomalyRateRDName(Name);
 }
 
 bool ml_streaming_enabled() {

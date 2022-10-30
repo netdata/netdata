@@ -610,7 +610,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *group_time_str = NULL;
     char *points_str = NULL;
     char *timeout_str = NULL;
-    char *max_anomaly_rates_str = NULL;
     char *context = NULL;
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
@@ -695,9 +694,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                     outFileName = tqx_value;
             }
         }
-        else if(!strcmp(name, "max_anomaly_rates")) {
-            max_anomaly_rates_str = value;
-        }
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
             if(tier < storage_tiers)
@@ -734,7 +730,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     int       points = (points_str && *points_str)?str2i(points_str):0;
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
-    int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
             .after = after,
@@ -746,7 +741,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .charts = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
             .timeout = timeout,
-            .max_anomaly_rates = max_anomaly_rates,
             .points = points,
             .format = format,
             .options = options,

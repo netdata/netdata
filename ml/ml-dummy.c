@@ -43,17 +43,6 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     return false;
 }
 
-void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
-    (void) R;
-    (void) MaxAnomalyRates;
-}
-
-void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *name) {
-    (void) RS;
-    (void) RD;
-    (void) name;
-}
-
 bool ml_streaming_enabled() {
     return false;
 }
