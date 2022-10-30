@@ -123,9 +123,11 @@ As of `v1.35.0-22-nightly` metric correlations has been enabled by default on al
 Should you still want to, disabling nodes for Metric Corrleation on the agent is a simple one line config change. Just set `enable metric correlations = no` in the `[global]` section of `netdata.conf`
 
 
-
-## What's next?
-
-You can read more about all the ML powered capabilities of Netdata [here](https://learn.netdata.cloud/guides/monitor/anomaly-detection). If you aren't yet familiar with the power of Netdata Cloud's visualization features, check out the [Nodes view](/docs/cloud/visualize/nodes) and learn how to [build new dashboards](/docs/cloud/visualize/dashboards).
-
 ## Related Documents 
+### Related Concepts
+- [Anomaly Advisor](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
+
+### Related Tasks
+- [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/find-the-root-cause-of-an-issue-with-metric-correlations.md)
+
+
