@@ -2,7 +2,7 @@
 title: "Metrics collection"
 sidebar_label: "Metrics collection"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md"
-sidebar_position: 4
+sidebar_position: 900
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-agent"
@@ -13,7 +13,7 @@ With zero configuration, Netdata auto-detects thousands of data sources upon sta
 per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you [install Netdata](/docs/get-started.mdx).
+when you install Netdata.
 
 Every collector has two primary jobs:
 
@@ -22,8 +22,8 @@ Every collector has two primary jobs:
 
 If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
 Netdata Agent gathers these metrics, sends them to the [database engine for
-storage](/docs/store/change-metrics-storage.md), and immediately [visualizes them
-meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
+storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md), and immediately [visualizes them
+meaningfully](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md) on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
 can be a URL and port, a socket, a file, a web page, and more.
@@ -72,3 +72,16 @@ terms related to collecting metrics.
 
 ## Related Documentation
 
+### Related Concepts
+
+- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- Registry
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
+- [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
+- [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
+- [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
+
+## Related Tasks
+
+- [Claim existing Agent deployments](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
+- [Change database mode](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/manage-retained-metrics/change-database-mode.md)
