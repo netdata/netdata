@@ -1175,12 +1175,15 @@ static inline size_t rrdset_done_interpolate(
         rrdset_debug(st, "last_stored_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
         rrdset_debug(st, "next_store_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
 
+        if(rrdset_flag_check(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
+            internal_error(true, "RRDSET '%s' interpolating values at %llu", rrdset_id(st), next_store_ut / USEC_PER_SEC);
+        }
+        
         last_ut = next_store_ut;
 
         struct rda_item *rda;
         size_t dim_id;
-        uint32_t stored_null = 0;
-
         for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
             rd = rda->rd;
             if(unlikely(!rd)) continue;
@@ -1261,7 +1264,6 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
-                stored_null |= 1;
                 continue;
             }
 
@@ -1283,14 +1285,10 @@ static inline size_t rrdset_done_interpolate(
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rd->last_stored_value = NAN;
-                stored_null |= 2;
             }
 
             stored_entries++;
         }
-
-        internal_error(stored_null,
-                       "RRDSET '%s' stored null = %u at %llu", rrdset_id(st), stored_null, next_store_ut / USEC_PER_SEC);
 
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;
@@ -1358,8 +1356,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now) {
     if(unlikely(netdata_exit)) return;
 
     if(rrdset_flag_check(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE)) {
-        rrdset_flag_clear(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
-
         internal_error(true,
                        "REPLAY: chart '%s' on host '%s' collection state: "
                        "last updated %llu.%llu, "
@@ -1373,8 +1369,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now) {
                        , (unsigned long long)now.tv_sec, (unsigned long long)now.tv_usec
                        , st->usec_since_last_update
         );
-
-
     }
 
     debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
