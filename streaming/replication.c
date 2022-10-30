@@ -2,7 +2,7 @@
 
 #include "replication.h"
 
-static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time_t before) {
+static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time_t before, bool enable_streaming) {
     size_t dimensions = rrdset_number_of_dimensions(st);
 
     struct storage_engine_query_ops *ops = &st->rrdhost->db[0].eng->api.query_ops;
@@ -16,6 +16,15 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
     } data[dimensions];
 
     memset(data, 0, sizeof(data));
+
+    if(enable_streaming && st->last_updated.tv_sec > before) {
+        internal_error(true, "REPLAY: '%s' overwriting replication before from %llu to %llu",
+                       rrdset_id(st),
+                       (unsigned long long)before,
+                       (unsigned long long)st->last_updated.tv_sec
+        );
+        before = st->last_updated.tv_sec;
+    }
 
     // prepare our array of dimensions
     {
@@ -115,6 +124,8 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
         ops->finalize(&data[i].handle);
         dictionary_acquired_item_release(data[i].dict, data[i].rda);
     }
+
+    return before;
 }
 
 static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
@@ -196,7 +207,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st,
         buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
         // fill the data table
-        replicate_chart_timeframe(wb, st, after, before);
+        before = replicate_chart_timeframe(wb, st, after, before, enable_streaming);
 
         if(enable_streaming)
             replicate_chart_collection_state(wb, st);
