@@ -685,15 +685,11 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 // 2. Find the UUID in that journal
 // 3. Find the array of times for that UUID (convert from the journal header to the offset needed)
 // Note: We have page_index lock
-static struct rrdeng_page_descr *
-populate_metric_time_from_journal(struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
+static struct rrdeng_page_descr *populate_page_index(struct pg_cache_page_index *page_index, usec_t start_time_ut)
 {
     struct rrdengine_instance *ctx = page_index->ctx;
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    struct journal_metric_list *uuid_list = NULL;
-    struct journal_page_header *page_list_header = NULL;
     struct journal_v2_header *journal_header = NULL;
-    uint32_t delta_start_time = 0;
 
     while (datafile) {
         journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
@@ -701,34 +697,30 @@ populate_metric_time_from_journal(struct pg_cache_page_index *page_index, usec_t
             datafile = datafile->next;
             continue;
         }
-        struct rrdengine_journalfile *journalfile = datafile->journalfile;
-        if ((start_time_ut >= journal_header->start_time_ut && start_time_ut <= journal_header->end_time_ut)  ||
-             (end_time_ut >= journal_header->start_time_ut && end_time_ut  <= journal_header->end_time_ut)) {
+        if (start_time_ut >= journal_header->start_time_ut && start_time_ut <= journal_header->end_time_ut)  {
 
-            // FIXME: maybe add check
-            uuid_list = (struct journal_metric_list *)(datafile->journalfile->journal_data + journal_header->metric_offset);
-            uint32_t entries = journal_header->metric_count;
+            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((void *) journal_header + journal_header->metric_offset);
 
             struct journal_metric_list *uuid_entry = bsearch(
                 &page_index->id,
                 uuid_list,
-                (size_t)entries,
+                (size_t)journal_header->metric_count,
                 sizeof(struct journal_metric_list),
                 journal_metric_uuid_compare);
 
-                delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+            uint32_t delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
 
             // FIXME: Check valid offset within file
             if (uuid_entry && ((delta_start_time >= uuid_entry->delta_start && delta_start_time <= uuid_entry->delta_end))) {
 
-                page_list_header = (struct journal_page_header *) (datafile->journalfile->journal_data + uuid_entry->page_offset);
+                struct journal_page_header *page_list_header = (struct journal_page_header *) ((void *) journal_header + uuid_entry->page_offset);
                 //info("JOURVALV2: Validating UUID PAGE LIST is %d", page_header_is_corrupted(journal_header, page_list_header));
                 struct rrdeng_page_descr *descr = add_pages_from_timerange(
                     page_list_header,
                     delta_start_time,
                     journal_header->start_time_ut,
                     page_index,
-                    (void *)journalfile->journal_data + journal_header->extent_offset,
+                    (void *)journal_header + journal_header->extent_offset,
                     datafile);
                 return descr;
             }
@@ -757,9 +749,15 @@ find_first_page_in_time_range(struct pg_cache_page_index *page_index, usec_t sta
         }
     }
 
-    descr = populate_metric_time_from_journal(page_index, start_time, end_time);
-    if (descr)
+    descr = populate_page_index(page_index, start_time);
+    if (descr) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(*descr->id, uuid_str);
+        internal_error(true, "Populating page %s @ %llu", uuid_str, descr->start_time_ut / USEC_PER_SEC);
+#endif
         return descr;
+    }
 
     Index = (Word_t) (start_time / USEC_PER_SEC);
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
@@ -1040,12 +1038,8 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     struct rrdeng_page_descr *last_descr = NULL;
     for (count = 0, preload_count = 0 ;
          descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
-         PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
-         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
+         descr = find_first_page_in_time_range(page_index, descr->end_time_ut, descr->end_time_ut)) {
         /* Iterate all pages in range */
-
-        // TODO: Fix multiple page precaching
-//        (void) populate_metric_time_from_journal(page_index, descr->end_time_ut, descr->end_time_ut, true);
 
         if (last_descr == descr)
             break;
