@@ -43,8 +43,14 @@ First, [download windows_exporter](https://github.com/prometheus-community/windo
 with the following collectors enabled, changing `0.14.0` to the version you downloaded.
 
 ```powershell
-windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon,tcp"
+windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon,tcp,process"
 ```
+
+[process](https://github.com/prometheus-community/windows_exporter/blob/master/docs/collector.process.md) exposes
+metrics about all processes in the system by default. This results in thousands of time series and can significantly
+increase CPU usage. It is recommended to
+use [filtering flags](https://github.com/prometheus-community/windows_exporter/blob/master/docs/collector.process.md#flags)
+to keep down the number of returned metrics.
 
 Next, [configure the WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#configuration) to point to the URL
