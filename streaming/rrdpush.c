@@ -174,7 +174,7 @@ static inline bool should_send_chart_matching(RRDSET *st) {
     if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
         return false;
 
-    if(unlikely(!flags)) {
+    if(unlikely(!(flags & (RRDSET_FLAG_UPSTREAM_SEND | RRDSET_FLAG_UPSTREAM_IGNORE)))) {
         RRDHOST *host = st->rrdhost;
 
         // Do not stream anomaly rates charts.
