@@ -122,6 +122,6 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
 PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
-PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
+PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action);
 
 #endif

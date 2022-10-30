@@ -162,15 +162,17 @@ int rrdpush_init() {
 unsigned int remote_clock_resync_iterations = 60;
 
 static inline bool should_send_chart_matching(RRDSET *st) {
-    if (rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED) == 0)
-        return false;
-
     // get all the flags we need to check, with one atomic operation
     RRDSET_FLAGS flags = rrdset_flag_check(st,
-             RRDSET_FLAG_UPSTREAM_SEND
-            |RRDSET_FLAG_UPSTREAM_IGNORE
-            |RRDSET_FLAG_ANOMALY_RATE_CHART
-            |RRDSET_FLAG_ANOMALY_DETECTION);
+              RRDSET_FLAG_UPSTREAM_SEND
+            | RRDSET_FLAG_UPSTREAM_IGNORE
+            | RRDSET_FLAG_ANOMALY_RATE_CHART
+            | RRDSET_FLAG_ANOMALY_DETECTION
+            | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
+            );
+
+    if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
+        return false;
 
     if(unlikely(!flags)) {
         RRDHOST *host = st->rrdhost;
@@ -309,10 +311,6 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         time_t first_entry_local = rrdset_first_entry_t(st);
         time_t last_entry_local = st->last_updated.tv_sec;
         buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
-    } else {
-        error("No replication capability for %s.%s (enabling streaming)", rrdhost_hostname(host), rrdset_id(st));
-        rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
-        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
@@ -323,7 +321,11 @@ static inline void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sen
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
-    buffer_print_llu(wb, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+
+    if(stream_has_capability(s, STREAM_CAP_REPLICATION) || st->last_collected_time.tv_sec > st->upstream_resync_time)
+        buffer_print_llu(wb, st->usec_since_last_update);
+    else
+        buffer_fast_strcat(wb, "0", 1);
 
     if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
         buffer_fast_strcat(wb, " ", 1);
@@ -374,26 +376,26 @@ void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation
-    RRDHOST_FLAGS flags = rrdhost_flag_check(host,
+    RRDHOST_FLAGS host_flags = rrdhost_flag_check(host,
               RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
             | RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS
             | RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN
         );
 
     // check if we are not connected
-    if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
+    if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
 
-        if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
+        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
             rrdpush_sender_thread_spawn(host);
 
-        if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
+        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
             error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
         return;
     }
-    else if(unlikely(flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
+    else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
         info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
@@ -406,7 +408,7 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(need_to_send_chart_definition(st)))
         rrdpush_send_chart_definition(wb, st);
 
-    if (rrdset_flag_check(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS))
+    if (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
         rrdpush_send_chart_metrics(wb, st, host->sender);
 
     sender_commit(host->sender, wb);

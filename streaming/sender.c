@@ -228,10 +228,25 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     error("Clearing stream_collected_metrics flag in charts of host %s", rrdhost_hostname(host));
 
+    bool receive_has_replication = host != localhost && host->receiver && stream_has_capability(host->receiver, STREAM_CAP_REPLICATION);
+    bool send_has_replication = host->sender && stream_has_capability(host->sender, STREAM_CAP_REPLICATION);
+
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        rrdset_flag_clear(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
+
+        if(!receive_has_replication) {
+            rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+            rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
+        }
+
+        if(send_has_replication)
+            // it will be enabled once replication is done on the sending side
+            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        else {
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
+        }
 
         st->upstream_resync_time = 0;
 
@@ -1129,7 +1144,8 @@ static void process_replication_requests(struct sender_state *s) {
         if (start_streaming) {
             debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
                   rrdhost_hostname(s->host), rrdset_id(st));
-            rrdset_flag_set(st, RRDSET_FLAG_STREAM_COLLECTED_METRICS);
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
         }
     }
     dfe_done(rr);

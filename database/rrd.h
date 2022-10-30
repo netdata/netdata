@@ -523,7 +523,6 @@ typedef enum rrdset_flags {
                                                      // least rrdset_free_obsolete_time seconds ago.
     RRDSET_FLAG_ARCHIVED                = (1 << 15),
     RRDSET_FLAG_METADATA_UPDATE         = (1 << 16), // Mark that metadata needs to be stored
-    RRDSET_FLAG_PENDING_FOREACH_ALARMS  = (1 << 17), // contains dims with uninitialized foreach alarms
     RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
@@ -531,8 +530,9 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
     RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 22),
 
-    RRDSET_FLAG_STREAM_COLLECTED_METRICS = (1 << 23),
-    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 24)
+    RRDSET_FLAG_SENDER_REPLICATION_FINISHED   = (1 << 23), // the sending side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 24), // the receiving side has completed replication
+    RRDSET_FLAG_LOG_NEXT_CHART_STATE          = (1 << 25),
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))

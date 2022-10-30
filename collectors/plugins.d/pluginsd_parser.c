@@ -227,9 +227,6 @@ PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_AC
             rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
-
-        if (host != localhost)
-            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
     }
     ((PARSER_USER_OBJECT *)user)->st = st;
 
@@ -246,13 +243,15 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
     PARSER_USER_OBJECT *user_object = (PARSER_USER_OBJECT *) user;
 
     RRDHOST *host = user_object->host;
-    assert(host && "host missing from parser's user object");
-
     RRDSET *st = user_object->st;
-    assert(st && "chart missing from parser's user object");
+    if(unlikely(!host || !st)) {
+        error("REPLAY: received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " command without a chart. Disabling it.");
+        return PARSER_RC_ERROR;
+    }
+
+    rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
 
     FILE *outfp = user_object->parser->output;
-
     bool ok = replicate_chart_request(outfp, host, st, first_entry_child, last_entry_child, 0, 0);
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
@@ -1138,7 +1137,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
+PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
 {
     if (num_words < 7) {
         error("REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
@@ -1164,6 +1163,9 @@ PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user,
         return PARSER_RC_ERROR;
     }
 
+    ((PARSER_USER_OBJECT *) user)->st = NULL;
+    ((PARSER_USER_OBJECT *) user)->count++;
+
     st->counter++;
     st->counter_done++;
 
@@ -1172,6 +1174,7 @@ PARSER_RC pluginsd_replay_rrdset_end(char **words, size_t num_words, void *user,
             rrdset_set_update_every(st, update_every_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
         return PARSER_RC_OK;
     }
 

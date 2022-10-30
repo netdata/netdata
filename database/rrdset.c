@@ -142,9 +142,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
 
-    if (host == localhost)
-        st->flags |= RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED;
-
     if(unlikely(st->id == anomaly_rates_chart))
         st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
 
@@ -1347,6 +1344,24 @@ void rrdset_done(RRDSET *st) {
 
 void rrdset_timed_done(RRDSET *st, struct timeval now) {
     if(unlikely(netdata_exit)) return;
+
+    if(rrdset_flag_check(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE)) {
+        rrdset_flag_clear(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
+
+        internal_error(true,
+                       "REPLAY: chart '%s' on host '%s' collection state: "
+                       "last updated %llu.%llu, "
+                       "last collected %llu.%llu, "
+                       "now %llu.%llu, "
+                       "microseconds %llu"
+        , rrdset_id(st)
+        , rrdhost_hostname(st->rrdhost)
+        , (unsigned long long)st->last_updated.tv_sec, (unsigned long long)st->last_updated.tv_usec
+        , (unsigned long long)st->last_collected_time.tv_sec, (unsigned long long)st->last_collected_time.tv_usec
+        , (unsigned long long)now.tv_sec, (unsigned long long)now.tv_usec
+        , st->usec_since_last_update
+        );
+    }
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", rrdset_name(st));
 
