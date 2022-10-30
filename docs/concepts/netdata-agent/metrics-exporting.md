@@ -98,11 +98,11 @@ Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md).
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 - [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
 
-## Related Tasks
+### Related Tasks
 
 - [Change database mode](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/manage-retained-metrics/change-database-mode.md)
 
-## Related References
+### Related References
 -   [Exporting engine reference](/exporting/README.md)
 
 
