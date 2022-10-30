@@ -9,6 +9,7 @@
 - Reference the bash collector for RPi [\#13907](https://github.com/netdata/netdata/pull/13907) ([cakrit](https://github.com/cakrit))
 - Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin v0.41.2 [\#13903](https://github.com/netdata/netdata/pull/13903) ([ilyam8](https://github.com/ilyam8))
+- apps.plugin function add max value on all value columns [\#13899](https://github.com/netdata/netdata/pull/13899) ([ktsaou](https://github.com/ktsaou))
 - add pandas collector to collectors.md [\#13895](https://github.com/netdata/netdata/pull/13895) ([andrewm4894](https://github.com/andrewm4894))
 - Fix reading health "enable" from the configuration [\#13894](https://github.com/netdata/netdata/pull/13894) ([stelfrag](https://github.com/stelfrag))
 - fix\(proc.plugin\): fix read retry logic when reading interface speed [\#13893](https://github.com/netdata/netdata/pull/13893) ([ilyam8](https://github.com/ilyam8))
@@ -340,7 +341,6 @@
 - Fix issues with DEB postinstall script. [\#13252](https://github.com/netdata/netdata/pull/13252) ([Ferroin](https://github.com/Ferroin))
 - Remove strftime from statements and use unixepoch instead [\#13250](https://github.com/netdata/netdata/pull/13250) ([stelfrag](https://github.com/stelfrag))
 - Query engine with natural and virtual points [\#13248](https://github.com/netdata/netdata/pull/13248) ([ktsaou](https://github.com/ktsaou))
-- Add fstype labels to disk charts [\#13245](https://github.com/netdata/netdata/pull/13245) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
