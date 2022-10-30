@@ -317,7 +317,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static inline void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) {
+void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) {
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);

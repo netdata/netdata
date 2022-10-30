@@ -1887,7 +1887,7 @@ time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
 
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
                    rrdset_id(st), (int)st->update_every, (int)update_every);
-    
+
     time_t prev_update_every = st->update_every;
     st->update_every = update_every;
 
