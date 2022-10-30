@@ -23,7 +23,7 @@ Based on your needs and resources you allocated to your external time-series dat
 that metrics are exported or export only certain charts with filtering. You can also choose whether metrics are exported
 as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
 
-Exporting is an important part of Netdata's effort to be [interoperable](/docs/overview/netdata-monitoring-stack.md)
+Exporting is an important part of Netdata's effort to be interoperable
 with other monitoring software. You can use an external time-series database for long-term metrics retention, further
 analysis, or correlation with other tools, such as application tracing.
 
@@ -87,9 +87,24 @@ connector-specific configuration options.
 Read about one possible use case for exporting metrics in our guide: [_Export and visualize Netdata metrics in
 Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md).
 
-### Related documentation
+## Related documentation
 
+### Related Concepts
+
+- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md)
+- [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
+- [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
+- [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
+
+## Related Tasks
+
+- [Change database mode](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/manage-retained-metrics/change-database-mode.md)
+
+## Related References
 -   [Exporting engine reference](/exporting/README.md)
+
 
 
 *******************************************************************************
