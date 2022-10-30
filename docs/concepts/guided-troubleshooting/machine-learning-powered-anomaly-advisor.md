@@ -3,7 +3,7 @@ title: "Anomaly Advisor"
 sidebar_label: "Anomaly Advisor"
 custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/machine-learning/anomaly-advisor.md"
 learn_status: "Published"
-sidebar_position: 1
+sidebar_position: 2000
 learn_topic_type: "Concepts"
 learn_rel_path: "Guided troubleshooting"
 learn_docs_purpose: "Present the concept of Netdata's Anomaly Advisor feature, it's purpose and use cases"
@@ -70,3 +70,10 @@ Netdata community to build the feature. If you would like to get involved and he
 - Or open a discussion in GitHub if that's more your thing
 
 ## Related Topics
+
+### Related Concepts
+- [Metric Correlations](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/metric-correlations.md)
+
+## Related Tasks
+
+- [Detect anomalies with Anomaly Advisor ](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/detect-anomalies-with-anomaly-advisor.md)
