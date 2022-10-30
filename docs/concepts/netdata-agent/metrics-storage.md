@@ -2,7 +2,7 @@
 title: "Metrics storage"
 sidebar_label: "Metrics storage"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md"
-sidebar_position: 7
+sidebar_position: 1100
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-agent"
@@ -162,4 +162,17 @@ can safely delete some pairs of files when Netdata is stopped to manually free u
 
 _Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
 
-## Related topics
+### Related Concepts
+
+- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md)
+- [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
+- [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
+
+
+## Related Tasks
+
+- [Claim existing Agent deployments](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
+- [Change database mode](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/manage-retained-metrics/change-database-mode.md)
+
