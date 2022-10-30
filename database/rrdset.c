@@ -1179,7 +1179,7 @@ static inline size_t rrdset_done_interpolate(
             rrdset_flag_clear(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
             internal_error(true, "RRDSET '%s' interpolating values at %llu", rrdset_id(st), next_store_ut / USEC_PER_SEC);
         }
-        
+
         last_ut = next_store_ut;
 
         struct rda_item *rda;
@@ -1884,6 +1884,10 @@ after_second_database_work:
 }
 
 time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
+
+    internal_error(true, "RRDSET '%s' switching update every from %d to %d",
+                   rrdset_id(st), (int)st->update_every, (int)update_every);
+    
     time_t prev_update_every = st->update_every;
     st->update_every = update_every;
 
