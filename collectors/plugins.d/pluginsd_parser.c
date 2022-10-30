@@ -730,7 +730,7 @@ PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_AC
     rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels,
                   get_word(words, num_words, 1),
                   store,
-                  strtol(get_word(words, num_words, 2), NULL, 10));
+                  str2l(get_word(words, num_words, 2)));
 
     if (store != get_word(words, num_words, 3))
         freez(store);
@@ -774,7 +774,7 @@ PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_A
     rrdlabels_add(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily,
                   get_word(words, num_words, 1),
                   get_word(words, num_words, 2),
-                  strtol(get_word(words, num_words, 3), NULL, 10));
+                  str2l(get_word(words, num_words, 3)));
 
     return PARSER_RC_OK;
 }
