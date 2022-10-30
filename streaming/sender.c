@@ -1045,10 +1045,10 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item, v
     struct replication_request *rr = old_value;
     struct replication_request *rr_new = new_value;
 
-    error("STREAM %s [send to %s]: duplicate replication command received for chart '%s' (existing from %ld to %ld [%s], new from %ld to %ld [%s])",
+    error("STREAM %s [send to %s]: duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
           rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
-          rr->after, rr->before, rr->start_streaming?"true":"false",
-          rr_new->after, rr_new->before, rr_new->start_streaming?"true":"false");
+          (unsigned long long)rr->after, (unsigned long long)rr->before, rr->start_streaming?"true":"false",
+          (unsigned long long)rr_new->after, (unsigned long long)rr_new->before, rr_new->start_streaming?"true":"false");
 
     bool updated = false;
 

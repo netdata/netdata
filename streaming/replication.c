@@ -151,9 +151,7 @@ static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     );
 }
 
-bool replicate_chart_response(RRDHOST *host, RRDSET *st,
-                              bool start_streaming, time_t after, time_t before)
-{
+bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, time_t after, time_t before) {
     time_t query_after = after;
     time_t query_before = before;
     time_t now = now_realtime_sec();

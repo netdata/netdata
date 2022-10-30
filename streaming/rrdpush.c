@@ -47,7 +47,7 @@ char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
 bool default_rrdpush_enable_replication = true;
-time_t default_rrdpush_seconds_to_replicate = 3600;
+time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
 #ifdef ENABLE_HTTPS
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
