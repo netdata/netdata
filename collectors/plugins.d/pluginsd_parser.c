@@ -1077,12 +1077,12 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
         goto disable;
     }
 
-//    usec_t dim_last_collected_ut = (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec;
-//    usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
-//    if(last_collected_ut > dim_last_collected_ut) {
-//        rd->last_collected_time.tv_sec = last_collected_ut / USEC_PER_SEC;
-//        rd->last_collected_time.tv_usec = last_collected_ut % USEC_PER_SEC;
-//    }
+    usec_t dim_last_collected_ut = (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec;
+    usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
+    if(last_collected_ut > dim_last_collected_ut) {
+        rd->last_collected_time.tv_sec = last_collected_ut / USEC_PER_SEC;
+        rd->last_collected_time.tv_usec = last_collected_ut % USEC_PER_SEC;
+    }
 
     rd->last_collected_value = last_collected_value_str ? str2ll(last_collected_value_str, NULL) : 0;
     rd->last_calculated_value = last_calculated_value_str ? str2ndd(last_calculated_value_str, NULL) : 0;
@@ -1110,19 +1110,19 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
         goto disable;
     }
 
-//    usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
-//    usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
-//    if(last_collected_ut > chart_last_collected_ut) {
-//        st->last_collected_time.tv_sec = last_collected_ut / USEC_PER_SEC;
-//        st->last_collected_time.tv_usec = last_collected_ut % USEC_PER_SEC;
-//    }
-//
-//    usec_t chart_last_updated_ut = (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec;
-//    usec_t last_updated_ut = last_updated_ut_str ? str2ull(last_updated_ut_str) : 0;
-//    if(last_updated_ut > chart_last_updated_ut) {
-//        st->last_updated.tv_sec = last_updated_ut / USEC_PER_SEC;
-//        st->last_updated.tv_usec = last_updated_ut % USEC_PER_SEC;
-//    }
+    usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
+    usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
+    if(last_collected_ut > chart_last_collected_ut) {
+        st->last_collected_time.tv_sec = last_collected_ut / USEC_PER_SEC;
+        st->last_collected_time.tv_usec = last_collected_ut % USEC_PER_SEC;
+    }
+
+    usec_t chart_last_updated_ut = (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec;
+    usec_t last_updated_ut = last_updated_ut_str ? str2ull(last_updated_ut_str) : 0;
+    if(last_updated_ut > chart_last_updated_ut) {
+        st->last_updated.tv_sec = last_updated_ut / USEC_PER_SEC;
+        st->last_updated.tv_usec = last_updated_ut % USEC_PER_SEC;
+    }
 
     st->last_collected_total = last_collected_total_str ? strtoll(last_collected_total_str, NULL, 0) : 0;
     st->collected_total = collected_total_str ? strtoll(collected_total_str, NULL, 0) : 0;

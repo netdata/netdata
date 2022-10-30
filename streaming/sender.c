@@ -1145,9 +1145,9 @@ static void process_replication_requests(struct sender_state *s) {
             debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
                   rrdhost_hostname(s->host), rrdset_id(st));
 
-            BUFFER *wb = sender_start(s);
-            rrdpush_send_chart_metrics(wb, st, s);
-            sender_commit(s, wb);
+//            BUFFER *wb = sender_start(s);
+//            rrdpush_send_chart_metrics(wb, st, s);
+//            sender_commit(s, wb);
 
             rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
             rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
