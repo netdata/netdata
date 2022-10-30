@@ -37,7 +37,7 @@ case:
 To understand more about how and what Netdata can do for your infrastructure, feel free to visit any of the following topics:
 
 ## Learn more 
-<Grid columns="2">
+<Grid columns="5">
   <Box
     title="Netdata Architecture">
     <BoxList>
