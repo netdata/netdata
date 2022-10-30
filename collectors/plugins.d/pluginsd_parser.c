@@ -1174,6 +1174,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGIN
             rrdset_set_update_every(st, update_every_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
         return PARSER_RC_OK;
     }
