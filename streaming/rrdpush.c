@@ -327,11 +327,6 @@ void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) 
     else
         buffer_fast_strcat(wb, "0", 1);
 
-    if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_ll(wb, st->last_collected_time.tv_sec);
-    }
-
     buffer_fast_strcat(wb, "\n", 1);
 
     RRDDIM *rd;
@@ -940,7 +935,6 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_CLABELS) buffer_strcat(wb, "CLABELS ");
     if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
-    if(caps & STREAM_CAP_GAP_FILLING) buffer_strcat(wb, "GAP_FILLING ");
     if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION");
 }
 

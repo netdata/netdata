@@ -2417,7 +2417,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             if(!common_first_time_t)
                 common_first_time_t = tier_retention[tier].db_first_time_t;
-            else
+            else if(tier_retention[tier].db_first_time_t)
                 common_first_time_t = MIN(common_first_time_t, tier_retention[tier].db_first_time_t);
 
             if(!common_last_time_t)
@@ -2427,7 +2427,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             if(!common_update_every)
                 common_update_every = tier_retention[tier].db_update_every;
-            else
+            else if(tier_retention[tier].db_update_every)
                 common_update_every = MIN(common_update_every, tier_retention[tier].db_update_every);
 
             tiers_added++;

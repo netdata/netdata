@@ -35,8 +35,7 @@ typedef enum {
     STREAM_CAP_CLABELS          = (1 << 9), // chart labels supported
     STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
-    STREAM_CAP_GAP_FILLING      = (1 << 12), // gap filling supported
-    STREAM_CAP_REPLICATION      = (1 << 13), // replication supported
+    STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
 
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child

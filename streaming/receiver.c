@@ -65,71 +65,6 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_timestamp(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
-{
-    UNUSED(num_words);
-    UNUSED(plugins_action);
-
-    char *remote_time_txt = get_word(words, num_words, 1);
-    time_t remote_time = 0;
-    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
-
-    struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (!(cd->capabilities & STREAM_CAP_GAP_FILLING)) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd, cd->capabilities);
-        return PARSER_RC_OK;    // Ignore error and continue stream
-    }
-
-    if (remote_time_txt && *remote_time_txt) {
-        remote_time = str2ull(remote_time_txt);
-        time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
-        time_t gap = 0;
-        if (prev == 0)
-            info(
-                "STREAM %s from %s: Initial connection (no gap to check), "
-                "remote=%"PRId64" local=%"PRId64" slew=%"PRId64"",
-                rrdhost_hostname(host),
-                cd->cmd,
-                (int64_t)remote_time,
-                (int64_t)now,
-                (int64_t)now - remote_time);
-        else {
-            gap = now - prev;
-            info(
-                "STREAM %s from %s: Checking for gaps... "
-                "remote=%"PRId64" local=%"PRId64"..%"PRId64" slew=%"PRId64"  %"PRId64"-sec gap",
-                rrdhost_hostname(host),
-                cd->cmd,
-                (int64_t)remote_time,
-                (int64_t)prev,
-                (int64_t)now,
-                (int64_t)(remote_time - now),
-                (int64_t)gap);
-        }
-        char message[128];
-        sprintf(
-            message,
-            "REPLICATE %"PRId64" %"PRId64"\n",
-            (int64_t)(remote_time - gap),
-            (int64_t)remote_time);
-        int ret;
-#ifdef ENABLE_HTTPS
-        SSL *conn = host->receiver->ssl.conn ;
-        if(conn && !host->receiver->ssl.flags) {
-            ret = SSL_write(conn, message, strlen(message));
-        } else {
-            ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-        }
-#else
-        ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-#endif
-        if (ret != (int)strlen(message))
-            error("Failed to send initial timestamp - gaps may appear in charts");
-        return PARSER_RC_OK;
-    }
-    return PARSER_RC_ERROR;
-}
-
 PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
 {
     UNUSED(plugins_action);
@@ -428,7 +363,6 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
 
-    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
     user.parser = parser;

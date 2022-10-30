@@ -235,18 +235,14 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-        if(!receive_has_replication) {
+        if(!receive_has_replication)
             rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-            rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
-        }
 
         if(send_has_replication)
             // it will be enabled once replication is done on the sending side
             rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-        else {
+        else
             rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-            rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
-        }
 
         st->upstream_resync_time = 0;
 
@@ -1145,12 +1141,7 @@ static void process_replication_requests(struct sender_state *s) {
             debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
                   rrdhost_hostname(s->host), rrdset_id(st));
 
-//            BUFFER *wb = sender_start(s);
-//            rrdpush_send_chart_metrics(wb, st, s);
-//            sender_commit(s, wb);
-
             rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-            rrdset_flag_set(st, RRDSET_FLAG_LOG_NEXT_CHART_STATE);
         }
     }
     dfe_done(rr);
@@ -1259,13 +1250,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
             if(unlikely(!attempt_to_connect(s)))
                 continue;
-
-            if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
-                time_t now = now_realtime_sec();
-                BUFFER *wb = sender_start(s);
-                buffer_sprintf(wb, "TIMESTAMP %"PRId64"", (int64_t)now);
-                sender_commit(s, wb);
-            }
 
             rrdpush_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
