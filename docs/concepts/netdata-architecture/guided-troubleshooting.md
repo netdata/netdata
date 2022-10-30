@@ -2,7 +2,7 @@
 title: "Guided troubleshooting"
 sidebar_label: "Guided troubleshooting"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md"
-sidebar_position: 16
+sidebar_position: 600
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "netdata-architecture"
@@ -82,3 +82,13 @@ You can think of these two methods as an extra pair of eyes, eyes that understan
 cause of an issue
 
 ## Related topics
+
+### Related Concepts
+- [Machine learning powered Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
+- [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md)
+
+### Related Tasks
+- [Detect anomalies with Anomaly Advisor](https://github.com/netdata/learn/blob/master/docs/tasks/detect-anomalies-with-anomaly-advisor.md)
+- [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/learn/blob/master/docs/tasks/find-the-root-cause-of-an-issue-with-metric-correlations.md)
+
+
