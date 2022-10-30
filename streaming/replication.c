@@ -39,14 +39,14 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
             // fetch the first valid point for the dimension
             int max_skip = 100;
-            while(data[i].sp.start_time < now && !ops->is_finished(&data[i].handle) && max_skip-- > 0)
+            while(data[i].sp.end_time < now && !ops->is_finished(&data[i].handle) && max_skip-- > 0)
                 data[i].sp = ops->next_metric(&data[i].handle);
 
             if(max_skip <= 0)
                 error("REPLAY: host '%s', chart '%s', dimension '%s': db does not advance the query beyond time %ld",
                       rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(data[i].rd), now);
 
-            if(data[i].sp.start_time < now)
+            if(data[i].sp.end_time < now)
                 continue;
 
             if(!min_start_time) {
@@ -59,7 +59,7 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
             }
         }
 
-        if(min_start_time < now) {
+        if(min_end_time < now) {
             internal_error(true,
                            "REPLAY: host '%s', chart '%s': no data on any dimension beyond time %ld",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st), now);
@@ -67,20 +67,20 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
         }
 
         if(min_end_time <= min_start_time)
-            min_end_time = min_start_time + 1;
+            min_start_time = min_end_time - st->update_every;
 
         if(!actual_after) {
-            actual_after = min_start_time;
-            actual_before = min_start_time;
+            actual_after = min_end_time;
+            actual_before = min_end_time;
         }
         else
-            actual_before = min_start_time;
+            actual_before = min_end_time;
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %ld %ld\n", min_start_time, min_end_time);
 
         // output the replay values for this time
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
-            if(data[i].sp.start_time >= min_start_time && data[i].sp.start_time <= min_end_time)
+            if(data[i].sp.start_time <= min_end_time && data[i].sp.end_time >= min_end_time)
                 buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT_AUTO " \"%s\"\n",
                                rrddim_id(data[i].rd), data[i].sp.sum, data[i].sp.flags & SN_FLAG_RESET ? "R" : "");
             else
@@ -88,7 +88,7 @@ static void replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time
                                rrddim_id(data[i].rd));
         }
 
-        now = min_end_time;
+        now = min_end_time + 1;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
