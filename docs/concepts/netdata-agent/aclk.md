@@ -162,7 +162,7 @@ Restart your Agent and [connect your node](/claim/README.md#how-to-connect-a-nod
 
 ### Related References
 
-- [ACLK[(/aclk/README.md)
+- [ACLK](/aclk/README.md)
 
 
 *******************************************************************************
