@@ -200,7 +200,7 @@ int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrden
     }
     uv_fs_req_cleanup(&req);
 
-    // This is the new journal v2 inedx file
+    // This is the new journal v2 index file
     ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
     if (ret < 0) {
         error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
