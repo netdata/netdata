@@ -490,7 +490,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, void *user, PLUGINSD
 {
     bool global = false;
     size_t i = 1;
-    if(strcmp(get_word(words, num_words, 1), "GLOBAL") == 0) {
+    if(num_words >= 2 && strcmp(get_word(words, num_words, 1), "GLOBAL") == 0) {
         i++;
         global = true;
     }
@@ -666,23 +666,19 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_flush(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(words);
-    UNUSED(num_words);
-
     debug(D_PLUGINSD, "requested a FLUSH");
     ((PARSER_USER_OBJECT *) user)->st = NULL;
+    ((PARSER_USER_OBJECT *) user)->replay.start_time = 0;
+    ((PARSER_USER_OBJECT *) user)->replay.end_time = 0;
+    ((PARSER_USER_OBJECT *) user)->replay.start_time_ut = 0;
+    ((PARSER_USER_OBJECT *) user)->replay.end_time_ut = 0;
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_disable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_disable(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-
-    UNUSED(words);
-    UNUSED(num_words);
-    UNUSED(user);
-
     info("called DISABLE. Disabling it.");
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
     return PARSER_RC_ERROR;
@@ -690,37 +686,39 @@ PARSER_RC pluginsd_disable(char **words, size_t num_words, void *user, PLUGINSD_
 
 PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    char *store;
+    const char *name = get_word(words, num_words, 1);
+    const char *label_source = get_word(words, num_words, 2);
+    const char *value = get_word(words, num_words, 3);
 
-    if (!get_word(words, num_words, 1) ||
-        !get_word(words, num_words, 2) ||
-        !get_word(words, num_words, 3)) {
+    if (!name || !label_source || !value) {
         error("Ignoring malformed or empty LABEL command.");
         return PARSER_RC_OK;
     }
-    if (!get_word(words, num_words, 4))
-        store = get_word(words, num_words, 3);
-    else {
-        store = callocz(num_words + 1, sizeof(char));
-        size_t remaining = num_words;
+
+    char *store = (char *)value;
+    bool allocated_store = false;
+
+    if(unlikely(num_words > 4)) {
+        allocated_store = true;
+        store = mallocz(PLUGINSD_LINE_MAX + 1);
+        size_t remaining = PLUGINSD_LINE_MAX;
         char *move = store;
-        size_t i = 3;
-        while (i < num_words) {
-            char *word = get_word(words, num_words, i);
-            assert(word && "got NULL word");
+        char *word;
+        for(size_t i = 3; i < num_words && remaining > 2 && (word = get_word(words, num_words, i)) ;i++) {
+            if(i > 3) {
+                *move++ = ' ';
+                *move = '\0';
+                remaining--;
+            }
 
             size_t length = strlen(word);
-            if ((length + 1) >= remaining)
-                break;
+            if (length > remaining)
+                length = remaining;
 
-            remaining -= (length + 1);
+            remaining -= length;
             memcpy(move, word, length);
             move += length;
-            *move++ = ' ';
-
-            i++;
-            if (!word)
-                break;
+            *move = '\0';
         }
     }
 
@@ -728,20 +726,18 @@ PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_AC
         ((PARSER_USER_OBJECT *) user)->new_host_labels = rrdlabels_create();
 
     rrdlabels_add(((PARSER_USER_OBJECT *)user)->new_host_labels,
-                  get_word(words, num_words, 1),
+                  name,
                   store,
-                  str2l(get_word(words, num_words, 2)));
+                  str2l(label_source));
 
-    if (store != get_word(words, num_words, 3))
+    if (allocated_store)
         freez(store);
+
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __maybe_unused, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(words);
-    UNUSED(num_words);
-
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
@@ -759,9 +755,11 @@ PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user, PLUGINS
 
 PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    if (!get_word(words, num_words, 1) ||
-        !get_word(words, num_words, 2) ||
-        !get_word(words, num_words, 3)) {
+    const char *name = get_word(words, num_words, 1);
+    const char *value = get_word(words, num_words, 2);
+    const char *label_source = get_word(words, num_words, 3);
+
+    if (!name || !value || !*label_source) {
         error("Ignoring malformed or empty CHART LABEL command.");
         return PARSER_RC_OK;
     }
@@ -772,18 +770,13 @@ PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_A
     }
 
     rrdlabels_add(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily,
-                  get_word(words, num_words, 1),
-                  get_word(words, num_words, 2),
-                  str2l(get_word(words, num_words, 3)));
+                  name, value, str2l(label_source));
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_clabel_commit(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
-    UNUSED(words);
-    UNUSED(num_words);
-
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
 
