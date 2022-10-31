@@ -730,7 +730,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     size_t count = streaming_parser(rpt, &cd, fp_in, fp_out,
 #ifdef ENABLE_HTTPS
-                                    (ssl) ? &rpt->ssl : NULL
+                                    (rpt->ssl.conn) ? &rpt->ssl : NULL
 #else
                                     NULL
 #endif
