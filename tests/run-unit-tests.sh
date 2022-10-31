@@ -24,6 +24,7 @@ install_netdata() {
     --install "$HOME" \
     --dont-wait \
     --dont-start-it \
+    --enable-tests \
     --enable-plugin-nfacct \
     --enable-plugin-freeipmi \
     --disable-lto
@@ -32,6 +33,7 @@ install_netdata() {
 c_unit_tests() {
   echo "Running C code unit tests"
   "$HOME"/netdata/usr/sbin/netdata -W unittest
+  "$HOME"/netdata/usr/sbin/netdata -W tests
 }
 
 install_netdata || exit 1
