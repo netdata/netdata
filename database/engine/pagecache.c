@@ -368,13 +368,9 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     for (unsigned i=0; i < deleted; i++) {
         //FIXME: Use macro to decide if V2
-        if (descr->extent == NULL) {
-            char uuid_str[UUID_STR_LEN];
-//            time_t index_time = list_to_destroy[i]->start_time_ut / USEC_PER_SEC;
-            uuid_unparse_lower(*list_to_destroy[i]->id, uuid_str);
-            pg_cache_punch_hole(ctx, list_to_destroy[i], 0, 0, NULL, false);
-//            internal_error(true,"JOURNALV2: Removed %s @ %ld", uuid_str, index_time);
-        }
+        descr = list_to_destroy[i];
+        if (descr->extent == NULL)
+            pg_cache_punch_hole(ctx, descr, 0, 0, NULL, false);
     }
 }
 
