@@ -156,12 +156,6 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
     time_t query_before = before;
     time_t now = now_realtime_sec();
 
-    // only happens when the parent received nonsensical timestamps from
-    // us, in which case we want to skip replication and start streaming.
-    // (or when replication is disabled)
-    if (start_streaming && after == 0 && before == 0)
-        return true;
-
     // find the first entry we have
     time_t first_entry_local = rrdset_first_entry_t(st);
     if(first_entry_local > now) {
@@ -186,16 +180,17 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
     if (query_before > last_entry_local)
         query_before = last_entry_local;
 
-    // if the parent asked us to start streaming, then fill the rest of the
-    // data that we have
+    // if the parent asked us to start streaming, then fill the rest with the data that we have
     if (start_streaming)
         query_before = last_entry_local;
 
-    // should never happen, but nevertheless enable streaming
-    if (query_after > query_before)
-        return true;
+    if (query_after > query_before) {
+        time_t tmp = query_before;
+        query_before = query_after;
+        query_after = tmp;
+    }
 
-    bool enable_streaming = (start_streaming || query_before == last_entry_local) ? true : false;
+    bool enable_streaming = (start_streaming || query_before == last_entry_local || !after || !before) ? true : false;
 
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
@@ -206,8 +201,13 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
         // which time range we responded
         buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
-        // fill the data table
-        before = replicate_chart_timeframe(wb, st, after, before, enable_streaming);
+        if(after != 0 && before != 0)
+            before = replicate_chart_timeframe(wb, st, query_after, query_before, enable_streaming);
+        else {
+            after = 0;
+            before = 0;
+            enable_streaming = true;
+        }
 
         if(enable_streaming)
             replicate_chart_collection_state(wb, st);
@@ -338,6 +338,5 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
 
     bool start_streaming = (last_entry_wanted == last_entry_child);
 
-    return send_replay_chart_cmd(outfp, st,
-                                 start_streaming, first_entry_wanted, last_entry_wanted);
+    return send_replay_chart_cmd(outfp, st, start_streaming, first_entry_wanted, last_entry_wanted);
 }
