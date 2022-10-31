@@ -303,6 +303,12 @@ netdataDashboard.menu = {
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
+    'ping': {
+        title: 'Ping',
+        icon: '<i class="fas fa-exchange-alt"></i>',
+        info: 'Measures round-tripe time and packet loss by sending ping messages to network hosts.'
+    },
+
     'gearman': {
         title: 'Gearman',
         icon: '<i class="fas fa-tasks"></i>',
@@ -7562,6 +7568,18 @@ netdataDashboard.context = {
     'k8s_state.pod_container_terminated_state_reason': {
         info: 'Reason from the last termination of the container. '+
         '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-state-terminated" target="_blank">More info.</a>'
+    },
+
+    // Ping
+
+    'ping.host_rtt': {
+        info: 'Round-trip time (RTT) is the time it takes for a data packet to reach a destination and return back to its original source.'
+    },
+    'ping.host_packet_loss': {
+        info: 'Packet loss occurs when one or more transmitted data packets do not reach their destination. Usually caused by either data transfer errors, network congestion, or firewall blocking. Also be aware that ICMP echo packets are often treated second-class by routers and target hosts. This means that applications may not experience packet loss while ping tests show packet loss.'
+    },
+    'ping.host_packets': {
+        info: 'Number of ICMP messages sent and received. These counters should be equal if there is no packet loss.'
     },
 
     // ------------------------------------------------------------------------
