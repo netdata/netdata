@@ -1063,7 +1063,9 @@ void migrate_journal_file_v2(
     generate_journalfilepath_v2(datafile, path, sizeof(path));
     info("Indexing file %s", path);
 
+#ifdef NETDATA_INTERNAL_CHECKS
     usec_t start_loading = now_realtime_usec();
+#endif
     struct extent_info *extent = journalfile->datafile->extents.first;
     while (extent) {
         for (uint8_t index = 0; index < extent->number_of_pages; index++) {
