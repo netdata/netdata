@@ -1700,7 +1700,6 @@ AC_CONFIG_FILES([
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
     collectors/charts.d.plugin/Makefile
-    collectors/checks.plugin/Makefile
     collectors/diskspace.plugin/Makefile
     collectors/timex.plugin/Makefile
     collectors/fping.plugin/Makefile

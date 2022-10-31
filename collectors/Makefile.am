@@ -7,7 +7,6 @@ SUBDIRS = \
     apps.plugin \
     cgroups.plugin \
     charts.d.plugin \
-    checks.plugin \
     cups.plugin \
     diskspace.plugin \
     timex.plugin \

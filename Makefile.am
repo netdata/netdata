@@ -203,10 +203,6 @@ APPS_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-CHECKS_PLUGIN_FILES = \
-    collectors/checks.plugin/plugin_checks.c \
-    $(NULL)
-
 FREEBSD_PLUGIN_FILES = \
     collectors/freebsd.plugin/plugin_freebsd.c \
     collectors/freebsd.plugin/plugin_freebsd.h \
@@ -918,7 +914,6 @@ NETDATA_FILES = \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
-    $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
     $(ML_TESTS_FILES) \
