@@ -1000,8 +1000,12 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     if(ssl->conn) {
-        if (!ssl->flags) {
+        if (ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
             return SSL_write(ssl->conn, buf, len);
+        }
+        else {
+            error("cannot write to SSL connection - connection is not ready.");
+            return -1;
         }
     }
 #endif

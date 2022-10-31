@@ -460,16 +460,13 @@ void syslog_init() {
     }
 }
 
-#define LOG_DATE_LENGTH 26
-
-static inline void log_date(char *buffer, size_t len) {
+void log_date(char *buffer, size_t len, time_t now) {
     if(unlikely(!buffer || !len))
         return;
 
-    time_t t;
+    time_t t = now;
     struct tm *tmp, tmbuf;
 
-    t = now_realtime_sec();
     tmp = localtime_r(&t, &tmbuf);
 
     if (tmp == NULL) {
@@ -639,7 +636,7 @@ int error_log_limit(int reset) {
     if(reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH);
+            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
             fprintf(
                 stderr,
                 "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
@@ -662,7 +659,7 @@ int error_log_limit(int reset) {
     if(now - start > error_log_throttle_period) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH);
+            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
             fprintf(
                 stderr,
                 "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
@@ -686,7 +683,7 @@ int error_log_limit(int reset) {
     if(counter > error_log_errors_per_period) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH);
+            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
             fprintf(
                 stderr,
                 "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
@@ -741,7 +738,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
     va_list args;
 
     char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH);
+    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
     va_start( args, fmt );
     printf("%s: %s DEBUG : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
@@ -780,7 +777,7 @@ void info_int( const char *file __maybe_unused, const char *function __maybe_unu
     }
 
     char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH);
+    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -842,7 +839,7 @@ void error_int( const char *prefix, const char *file __maybe_unused, const char 
     }
 
     char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH);
+    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -905,7 +902,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     }
 
     char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH);
+    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
     log_lock();
 
@@ -960,7 +957,7 @@ void log_access( const char *fmt, ... ) {
             netdata_mutex_lock(&access_mutex);
 
         char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH);
+        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
         fprintf(stdaccess, "%s: ", date);
 
         va_start( args, fmt );
@@ -992,7 +989,7 @@ void log_health( const char *fmt, ... ) {
             netdata_mutex_lock(&health_mutex);
 
         char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH);
+        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
         fprintf(stdhealth, "%s: ", date);
 
         va_start( args, fmt );
@@ -1012,7 +1009,7 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
         netdata_mutex_lock(&aclklog_mutex);
 
         char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH);
+        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
         fprintf(aclklog, "%s: %s Msg:\"%s\", MQTT-topic:\"%s\": ", date, tx ? "OUTGOING" : "INCOMING", message_name, mqtt_topic);
 
         fwrite(data, data_len, 1, aclklog);

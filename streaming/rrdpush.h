@@ -7,6 +7,7 @@
 #include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
+#include "replication.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -34,7 +35,7 @@ typedef enum {
     STREAM_CAP_CLABELS          = (1 << 9), // chart labels supported
     STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
-    STREAM_CAP_GAP_FILLING      = (1 << 12), // gap filling supported
+    STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
 
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
@@ -46,7 +47,10 @@ typedef enum {
 #define STREAM_HAS_COMPRESSION 0
 #endif  //ENABLE_COMPRESSION
 
-#define STREAM_OUR_CAPABILITIES (STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS)
+#define STREAM_OUR_CAPABILITIES ( \
+    STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS |  \
+    STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | \
+    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION )
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
 
@@ -164,6 +168,8 @@ struct sender_state {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                  // Structure used to encrypt the connection
 #endif
+
+    DICTIONARY *replication_requests;
 };
 
 struct receiver_state {
@@ -218,12 +224,15 @@ extern unsigned int default_compression_enabled;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
+extern bool default_rrdpush_enable_replication;
+extern time_t default_rrdpush_seconds_to_replicate;
+extern time_t default_rrdpush_replication_step;
 extern unsigned int remote_clock_resync_iterations;
 
 void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
-void sender_init(RRDHOST *parent);
+void sender_init(RRDHOST *host);
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
@@ -232,7 +241,6 @@ bool rrdpush_receiver_needs_dbengine();
 int configured_as_parent();
 void rrdset_done_push(RRDSET *st);
 bool rrdset_push_chart_definition_now(RRDSET *st);
-bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_claimed_id(RRDHOST *host);
@@ -263,5 +271,7 @@ void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+
+void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s);
 
 #endif //NETDATA_RRDPUSH_H

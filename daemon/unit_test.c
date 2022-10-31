@@ -1739,6 +1739,9 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , default_rrdpush_destination
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
+            , default_rrdpush_enable_replication
+            , default_rrdpush_seconds_to_replicate
+            , default_rrdpush_replication_step
             , NULL
             , 0
     );

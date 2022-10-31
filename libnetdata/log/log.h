@@ -45,7 +45,8 @@ extern "C" {
 #define D_ACLK              0x0000000200000000
 #define D_METADATALOG       0x0000000400000000
 #define D_ACLK_SYNC         0x0000000800000000
-#define D_META_SYNC         0x0000002000000000
+#define D_META_SYNC         0x0000001000000000
+#define D_REPLICATION       0x0000002000000000
 #define D_SYSTEM            0x8000000000000000
 
 extern int web_server_is_multithreaded;
@@ -84,6 +85,9 @@ int error_log_limit(int reset);
 
 void open_all_log_files();
 void reopen_all_log_files();
+
+#define LOG_DATE_LENGTH 26
+void log_date(char *buffer, size_t len, time_t now);
 
 static inline void debug_dummy(void) {}
 

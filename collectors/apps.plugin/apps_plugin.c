@@ -4311,7 +4311,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
     struct target *category = NULL, *user = NULL, *group = NULL;
     const char *process_name = NULL;
@@ -4322,51 +4322,52 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     bool filter_pid = false, filter_uid = false, filter_gid = false;
 
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
-        if(!words[i]) break;
+        const char *keyword = get_word(words, num_words, i);
+        if(!keyword) break;
 
-        if(!category && strncmp(words[i], PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
-            category = find_target_by_name(apps_groups_root_target, &words[i][strlen(PROCESS_FILTER_CATEGORY)]);
+        if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
+            category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
                 apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
                 return;
             }
         }
-        else if(!user && strncmp(words[i], PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
-            user = find_target_by_name(users_root_target, &words[i][strlen(PROCESS_FILTER_USER)]);
+        else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
+            user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
                 apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
                 return;
             }
         }
-        else if(strncmp(words[i], PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
-            group = find_target_by_name(groups_root_target, &words[i][strlen(PROCESS_FILTER_GROUP)]);
+        else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
+            group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
                 apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
                 return;
             }
         }
-        else if(!process_name && strncmp(words[i], PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
-            process_name = &words[i][strlen(PROCESS_FILTER_PROCESS)];
+        else if(!process_name && strncmp(keyword, PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
+            process_name = &keyword[strlen(PROCESS_FILTER_PROCESS)];
         }
-        else if(!pid && strncmp(words[i], PROCESS_FILTER_PID, strlen(PROCESS_FILTER_PID)) == 0) {
-            pid = str2i(&words[i][strlen(PROCESS_FILTER_PID)]);
+        else if(!pid && strncmp(keyword, PROCESS_FILTER_PID, strlen(PROCESS_FILTER_PID)) == 0) {
+            pid = str2i(&keyword[strlen(PROCESS_FILTER_PID)]);
             filter_pid = true;
         }
-        else if(!uid && strncmp(words[i], PROCESS_FILTER_UID, strlen(PROCESS_FILTER_UID)) == 0) {
-            uid = str2i(&words[i][strlen(PROCESS_FILTER_UID)]);
+        else if(!uid && strncmp(keyword, PROCESS_FILTER_UID, strlen(PROCESS_FILTER_UID)) == 0) {
+            uid = str2i(&keyword[strlen(PROCESS_FILTER_UID)]);
             filter_uid = true;
         }
-        else if(!gid && strncmp(words[i], PROCESS_FILTER_GID, strlen(PROCESS_FILTER_GID)) == 0) {
-            gid = str2i(&words[i][strlen(PROCESS_FILTER_GID)]);
+        else if(!gid && strncmp(keyword, PROCESS_FILTER_GID, strlen(PROCESS_FILTER_GID)) == 0) {
+            gid = str2i(&keyword[strlen(PROCESS_FILTER_GID)]);
             filter_gid = true;
         }
-        else if(strcmp(words[i], "help") == 0) {
+        else if(strcmp(keyword, "help") == 0) {
             apps_plugin_function_processes_help(transaction);
             return;
         }
         else {
             char msg[PLUGINSD_LINE_MAX];
-            snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", words[i]);
+            snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
             apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
@@ -4779,16 +4780,18 @@ void *reader_main(void *arg __maybe_unused) {
     while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        size_t num_words = pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
-        if(words[0] && strcmp(words[0], PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = words[1];
-            char *timeout_s = words[2];
-            char *function = words[3];
+        const char *keyword = get_word(words, num_words, 0);
+
+        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            char *transaction = get_word(words, num_words, 1);
+            char *timeout_s = get_word(words, num_words, 2);
+            char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                      words[0],
+                      keyword,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
                       function?function:"(unset)");
@@ -4813,7 +4816,7 @@ void *reader_main(void *arg __maybe_unused) {
             }
         }
         else
-            error("Received unknown command: %s", words[0]?words[0]:"(unset)");
+            error("Received unknown command: %s", keyword?keyword:"(unset)");
     }
 
     if(!s || feof(stdin) || ferror(stdin)) {

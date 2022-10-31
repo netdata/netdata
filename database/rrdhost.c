@@ -248,6 +248,9 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_destination,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
+                        bool rrdpush_enable_replication,
+                        time_t rrdpush_seconds_to_replicate,
+                        time_t rrdpush_replication_step,
                         struct rrdhost_system_info *system_info,
                         int is_localhost,
                         bool archived
@@ -285,6 +288,24 @@ int is_legacy = 1;
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+    }
+
+    host->rrdpush_enable_replication = rrdpush_enable_replication;
+    host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
+    host->rrdpush_replication_step = rrdpush_replication_step;
+
+    switch(memory_mode) {
+        default:
+        case RRD_MEMORY_MODE_ALLOC:
+        case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_SAVE:
+        case RRD_MEMORY_MODE_RAM:
+            if(host->rrdpush_seconds_to_replicate > host->rrd_history_entries * host->rrd_update_every)
+                host->rrdpush_seconds_to_replicate = host->rrd_history_entries * host->rrd_update_every;
+            break;
+
+        case RRD_MEMORY_MODE_DBENGINE:
+            break;
     }
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
@@ -520,13 +541,15 @@ void rrdhost_update(RRDHOST *host
                     , char *rrdpush_destination
                     , char *rrdpush_api_key
                     , char *rrdpush_send_charts_matching
+                    , bool rrdpush_enable_replication
+                    , time_t rrdpush_seconds_to_replicate
+                    , time_t rrdpush_replication_step
                     , struct rrdhost_system_info *system_info
 )
 {
     UNUSED(guid);
 
     host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
@@ -560,11 +583,11 @@ void rrdhost_update(RRDHOST *host
     if(host->rrd_update_every != update_every)
         error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_update_every, update_every);
 
-    if(host->rrd_history_entries < history)
-        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
-
     if(host->rrd_memory_mode != mode)
         error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+
+    else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
+        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
 
     // update host tags
     rrdhost_init_tags(host, tags);
@@ -593,6 +616,11 @@ void rrdhost_update(RRDHOST *host
         rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
+        host->rrdpush_enable_replication = rrdpush_enable_replication;
+        host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
+        host->rrdpush_replication_step = rrdpush_replication_step;
+
+
         rrd_hosts_available++;
         ml_new_host(host);
         rrdhost_load_rrdcontext_data(host);
@@ -601,8 +629,6 @@ void rrdhost_update(RRDHOST *host
 
     if (health_enabled)
         health_thread_spawn(host);
-
-    return;
 }
 
 RRDHOST *rrdhost_find_or_create(
@@ -624,6 +650,9 @@ RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_destination
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
+        , bool rrdpush_enable_replication
+        , time_t rrdpush_seconds_to_replicate
+        , time_t rrdpush_replication_step
         , struct rrdhost_system_info *system_info
         , bool archived
 ) {
@@ -658,6 +687,9 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , rrdpush_enable_replication
+                , rrdpush_seconds_to_replicate
+                , rrdpush_replication_step
                 , system_info
                 , 0
                 , archived
@@ -683,6 +715,9 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_destination
            , rrdpush_api_key
            , rrdpush_send_charts_matching
+           , rrdpush_enable_replication
+           , rrdpush_seconds_to_replicate
+           , rrdpush_replication_step
            , system_info);
     }
     if (host) {
@@ -894,6 +929,9 @@ unittest:
         , default_rrdpush_destination
         , default_rrdpush_api_key
         , default_rrdpush_send_charts_matching
+        , default_rrdpush_enable_replication
+        , default_rrdpush_seconds_to_replicate
+        , default_rrdpush_replication_step
         , system_info
         , 1
         , 0
@@ -1003,6 +1041,7 @@ void stop_streaming_sender(RRDHOST *host)
     if (host->sender->compressor)
         host->sender->compressor->destroy(&host->sender->compressor);
 #endif
+    dictionary_destroy(host->sender->replication_requests);
     freez(host->sender);
     host->sender = NULL;
 }
