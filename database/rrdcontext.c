@@ -2441,8 +2441,8 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
     bool timeframe_matches =
             (tiers_added
-            && (common_first_time_t - common_update_every) <= qt->window.before
-            && (common_last_time_t + common_update_every) >= qt->window.after
+            && (common_first_time_t - common_update_every * 2) <= qt->window.before
+            && (common_last_time_t + common_update_every * 2) >= qt->window.after
             ) ? true : false;
 
     if(timeframe_matches) {
