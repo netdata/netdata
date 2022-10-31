@@ -344,7 +344,7 @@ static void streaming_parser_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
-size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out) {
+static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out, void *ssl) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
@@ -355,7 +355,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT, ssl);
 
     rrd_collector_started();
 
@@ -709,8 +709,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdhost_unlock(rpt->host);
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
+    info("STREAM %s [receive from [%s]:%s]: receiving metrics...",
+         rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+
+    log_stream_connection(rpt->client_ip, rpt->client_port,
+                          rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
 
     cd.capabilities = rpt->capabilities;
 
@@ -725,12 +728,20 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdcontext_host_child_connected(rpt->host);
 
-    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out);
+    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out,
+#ifdef ENABLE_HTTPS
+                                    (ssl) ? &rpt->ssl : NULL
+#else
+                                    NULL
+#endif
+                                    );
 
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
+    log_stream_connection(rpt->client_ip, rpt->client_port,
+                          rpt->key, rpt->host->machine_guid, rpt->hostname,
                           "DISCONNECTED");
-    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
-          rpt->client_port, count);
+
+    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).",
+          rpt->hostname, rpt->client_ip, rpt->client_port, count);
 
     rrdcontext_host_child_disconnected(rpt->host);
 

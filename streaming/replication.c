@@ -223,7 +223,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
     return enable_streaming;
 }
 
-static bool send_replay_chart_cmd(FILE *outfp, RRDSET *st, bool start_streaming, time_t after, time_t before) {
+static bool send_replay_chart_cmd(send_command callback, void *callback_data, RRDSET *st, bool start_streaming, time_t after, time_t before) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(after && before) {
@@ -247,19 +247,21 @@ static bool send_replay_chart_cmd(FILE *outfp, RRDSET *st, bool start_streaming,
     debug(D_REPLICATION, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
           rrdset_id(st), start_streaming ? "true" : "false", (unsigned long long)after, (unsigned long long)before);
 
-    int ret = fprintf(outfp, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
+    char buffer[2048 + 1];
+    snprintfz(buffer, 2048, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
                       rrdset_id(st), start_streaming ? "true" : "false",
                       (unsigned long long)after, (unsigned long long)before);
+
+    int ret = callback(buffer, callback_data);
     if (ret < 0) {
         error("failed to send replay request to child (ret=%d)", ret);
         return false;
     }
 
-    fflush(outfp);
     return true;
 }
 
-bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
+bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST *host, RRDSET *st,
                              time_t first_entry_child, time_t last_entry_child,
                              time_t prev_first_entry_wanted, time_t prev_last_entry_wanted)
 {
@@ -272,7 +274,7 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
                        "REPLAY: host '%s', chart '%s': sending empty replication request because replication is disabled",
                        rrdhost_hostname(host), rrdset_id(st));
 
-        return send_replay_chart_cmd(outfp, st, true, 0, 0);
+        return send_replay_chart_cmd(callback, callback_data, st, true, 0, 0);
     }
 
     // Child has no stored data
@@ -280,7 +282,7 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
         error("REPLAY: host '%s', chart '%s': sending empty replication request because child has no stored data",
               rrdhost_hostname(host), rrdset_id(st));
 
-        return send_replay_chart_cmd(outfp, st, true, 0, 0);
+        return send_replay_chart_cmd(callback, callback_data, st, true, 0, 0);
     }
 
     // Nothing to get if the chart has not dimensions
@@ -288,7 +290,7 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
         error("REPLAY: host '%s', chart '%s': sending empty replication request because chart has no dimensions",
               rrdhost_hostname(host), rrdset_id(st));
 
-        return send_replay_chart_cmd(outfp, st, true, 0, 0);
+        return send_replay_chart_cmd(callback, callback_data, st, true, 0, 0);
     }
 
     // if the child's first/last entries are nonsensical, resume streaming
@@ -297,14 +299,14 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
         error("REPLAY: host '%s', chart '%s': sending empty replication because first entry of the child is invalid (%llu)",
               rrdhost_hostname(host), rrdset_id(st), (unsigned long long)first_entry_child);
 
-        return send_replay_chart_cmd(outfp, st, true, 0, 0);
+        return send_replay_chart_cmd(callback, callback_data, st, true, 0, 0);
     }
 
     if (first_entry_child > last_entry_child) {
         error("REPLAY: host '%s', chart '%s': sending empty replication because child timings are invalid (first entry %llu > last entry %llu)",
               rrdhost_hostname(host), rrdset_id(st), (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
 
-        return send_replay_chart_cmd(outfp, st, true, 0, 0);
+        return send_replay_chart_cmd(callback, callback_data, st, true, 0, 0);
     }
 
     time_t last_entry_local = rrdset_last_entry_t(st);
@@ -321,7 +323,7 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
         error("REPLAY: host '%s', chart '%s': sending empty replication request because our last entry (%llu) in later than the child one (%llu)",
               rrdhost_hostname(host), rrdset_id(st), (unsigned long long)last_entry_local, (unsigned long long)last_entry_child);
 
-        return send_replay_chart_cmd(outfp, st, true, 0, 0);
+        return send_replay_chart_cmd(callback, callback_data, st, true, 0, 0);
     }
 
     time_t first_entry_wanted;
@@ -338,5 +340,5 @@ bool replicate_chart_request(FILE *outfp, RRDHOST *host, RRDSET *st,
 
     bool start_streaming = (last_entry_wanted == last_entry_child);
 
-    return send_replay_chart_cmd(outfp, st, start_streaming, first_entry_wanted, last_entry_wanted);
+    return send_replay_chart_cmd(callback, callback_data, st, start_streaming, first_entry_wanted, last_entry_wanted);
 }

@@ -4,6 +4,31 @@
 
 #define LOG_FUNCTIONS false
 
+static int send_to_plugin(const char *txt, void *data) {
+    PARSER *parser = data;
+
+    if(!txt || !*txt)
+        return 0;
+
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl *ssl = parser->ssl_output;
+    if(ssl) {
+        if(ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            size_t size = strlen(txt);
+            return SSL_write(ssl->conn, txt, (int)size);
+        }
+
+        error("cannot write to SSL connection - connection is not ready.");
+        return -1;
+    }
+#endif
+
+    FILE *fp = parser->output;
+    int ret = fprintf(fp, "%s", txt);
+    fflush(fp);
+    return ret;
+}
+
 PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
 {
     char *dimension = get_word(words, num_words, 1);
@@ -251,8 +276,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 
     rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
 
-    FILE *outfp = user_object->parser->output;
-    bool ok = replicate_chart_request(outfp, host, st, first_entry_child, last_entry_child, 0, 0);
+    bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child, 0, 0);
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
 
@@ -366,16 +390,18 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     struct inflight_function *pf = func;
 
     PARSER  *parser = parser_ptr;
-    FILE *fp = parser->output;
 
     // leave this code as default, so that when the dictionary is destroyed this will be sent back to the caller
     pf->code = HTTP_RESP_GATEWAY_TIMEOUT;
 
+    char buffer[2048 + 1];
+    snprintfz(buffer, 2048, "FUNCTION %s %d \"%s\"\n",
+                      dictionary_acquired_item_name(item),
+                      pf->timeout,
+                      string2str(pf->function));
+
     // send the command to the plugin
-    int ret = fprintf(fp, "FUNCTION %s %d \"%s\"\n",
-            dictionary_acquired_item_name(item),
-            pf->timeout,
-            string2str(pf->function));
+    int ret = send_to_plugin(buffer, parser);
 
     pf->sent_ut = now_realtime_usec();
 
@@ -384,11 +410,9 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
     }
     else {
-        fflush(fp);
-
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, fd %d, in %llu usec)",
-                       string2str(pf->function), dictionary_acquired_item_name(item), ret, fileno(fp),
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
 }
@@ -1177,9 +1201,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGIN
         return PARSER_RC_OK;
     }
 
-    FILE *outfp = user_object->parser->output;
-
-    bool ok = replicate_chart_request(outfp, host, st, first_entry_child, last_entry_child,
+    bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child,
                                       first_entry_requested, last_entry_requested);
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
@@ -1224,7 +1246,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     };
 
     // fp_plugin_output = our input; fp_plugin_input = our output
-    PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT, NULL);
 
     rrd_collector_started();
 

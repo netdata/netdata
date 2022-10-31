@@ -29,7 +29,7 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags)
+PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
@@ -38,6 +38,9 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
     parser->user = user;
     parser->input = input;
     parser->output = output;
+#ifdef ENABLE_HTTPS
+    parser->ssl_output = ssl;
+#endif
     parser->flags = flags;
     parser->host = host;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;

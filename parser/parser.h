@@ -57,6 +57,9 @@ typedef struct parser {
     RRDHOST *host;
     void *input;                    // Input source e.g. stream
     void *output;                   // Stream to send commands to plugin
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl *ssl_output;
+#endif
     PARSER_DATA    *data;           // extra input
     PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
     PLUGINSD_ACTION *plugins_action;
@@ -91,7 +94,7 @@ typedef struct parser {
 
 int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags);
+PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags, void *ssl);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser);
 int parser_action(PARSER *working_parser, char *input);
