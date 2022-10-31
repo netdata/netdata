@@ -2439,7 +2439,11 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         }
     }
 
-    bool timeframe_matches = (tiers_added && common_first_time_t <= qt->window.before && common_last_time_t >= qt->window.after) ? true : false;
+    bool timeframe_matches =
+            (tiers_added
+            && (common_first_time_t - common_update_every * 2) <= qt->window.before
+            && (common_last_time_t + common_update_every * 2) >= qt->window.after
+            ) ? true : false;
 
     if(timeframe_matches) {
         RRDR_DIMENSION_FLAGS options = RRDR_DIMENSION_DEFAULT;
