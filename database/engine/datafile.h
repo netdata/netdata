@@ -45,7 +45,6 @@ struct rrdengine_datafile {
     struct rrdengine_instance *ctx;
     struct rrdengine_df_extents extents;
     struct rrdengine_journalfile *journalfile;
-    // FIXME: Add double link list
     struct rrdengine_datafile *next;
 };
 

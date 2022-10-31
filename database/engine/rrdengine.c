@@ -430,7 +430,6 @@ after_crc_check:
         if (unlikely(bitmap256_get_bit(&xt_io_descr->descr_array_wakeup, j))) {
             if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
                 info("DEBUG: Setting page to invalid");
-                abort();
                 descr->pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
                 descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
             }
@@ -684,7 +683,7 @@ static void invalidate_oldest_committed(void *arg)
 
             goto out;
         }
-        pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true);
+        pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true, true);
 
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
@@ -1025,7 +1024,7 @@ static void delete_old_data(void *arg)
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id, true);
+            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id, true, true);
             if (unlikely(can_delete_metric)) {
                 /*
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
@@ -1273,7 +1272,7 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
-//    static int journal_deactivation=0;
+    static time_t next_journal_indexing_check =0;
 
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
@@ -1324,11 +1323,25 @@ void timer_cb(uv_timer_t* handle)
     }
 #endif
 
-//    if (unlikely(!journal_deactivation)) {
-//        journal_deactivation = 1;
-//        struct rrdeng_cmd cmd;
-//        cmd.opcode = RRDENG_DEACTIVATE_PAGES;
-//        rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+//    if (unlikely(!next_journal_indexing_check))
+//        next_journal_indexing_check = now_realtime_sec() + 60;
+//
+//    if (next_journal_indexing_check < now_realtime_sec()) {
+//        next_journal_indexing_check = now_realtime_sec() + 60;
+//        if (!wc->running_journal_migration && ctx->quiesce == NO_QUIESCE) {
+//            internal_error(true, "Checking for journal files that need indexing");
+//
+//            struct rrdeng_work *work_request;
+//            work_request = mallocz(sizeof(*work_request));
+//            work_request->req.data = work_request;
+//            work_request->wc = wc;
+//            wc->running_journal_migration = 1;
+//            if (unlikely(
+//                    uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
+//                freez(work_request);
+//                wc->running_journal_migration = 0;
+//            }
+//        }
 //    }
     worker_is_idle();
 }
@@ -1453,28 +1466,6 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_COMMIT_PAGE:
                 do_commit_transaction(wc, STORE_DATA, NULL);
-                break;
-            case RRDENG_INDEX_JOURNAL:
-                ;
-                struct rrdeng_work  *work_request;
-                work_request = mallocz(sizeof(*work_request));
-                work_request->req.data = work_request;
-                work_request->journalfile = cmd.journalfile;
-                if (unlikely(
-                        uv_queue_work(loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
-                        freez(work_request);
-                }
-                break;
-            case RRDENG_DEACTIVATE_PAGES:
-                ;
-                struct rrdeng_work  *work_request1;
-                work_request1 = mallocz(sizeof(*work_request1));
-                work_request1->req.data = work_request;
-                work_request1->journalfile = NULL;
-                if (unlikely(
-                        uv_queue_work(loop, &work_request1->req, start_page_deactivation, after_page_deactivation))) {
-                    freez(work_request1);
-                }
                 break;
             case RRDENG_FLUSH_PAGES: {
                 if (wc->now_invalidating_dirty_pages) {
