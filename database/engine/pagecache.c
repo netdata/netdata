@@ -688,11 +688,12 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 static struct rrdeng_page_descr *populate_page_index(struct pg_cache_page_index *page_index, usec_t start_time_ut)
 {
     struct rrdengine_instance *ctx = page_index->ctx;
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    struct journal_v2_header *journal_header = NULL;
 
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
     while (datafile) {
-        journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
+        struct journal_v2_header *journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
         if (!journal_header) {
             datafile = datafile->next;
             continue;
@@ -710,7 +711,6 @@ static struct rrdeng_page_descr *populate_page_index(struct pg_cache_page_index 
 
             uint32_t delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
 
-            // FIXME: Check valid offset within file
             if (uuid_entry && ((delta_start_time >= uuid_entry->delta_start && delta_start_time <= uuid_entry->delta_end))) {
 
                 struct journal_page_header *page_list_header = (struct journal_page_header *) ((void *) journal_header + uuid_entry->page_offset);
@@ -722,12 +722,15 @@ static struct rrdeng_page_descr *populate_page_index(struct pg_cache_page_index 
                     page_index,
                     (void *)journal_header + journal_header->extent_offset,
                     datafile);
+
+                uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
                 return descr;
             }
         }
         datafile = datafile->next;
     }
 
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
     return NULL;
 }
 

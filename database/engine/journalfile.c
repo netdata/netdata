@@ -126,7 +126,7 @@ int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengi
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    if (unlikely(journalfile->journal_data)) {
+    if (likely(journalfile->journal_data)) {
         generate_journalfilepath_v2(datafile, path, sizeof(path));
         if (munmap(journalfile->journal_data, journalfile->journal_data_size)) {
             error("Failed to unmap journal index file for %s", path);
@@ -931,7 +931,78 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
     return data_page;
 }
 
-static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *journalfile, struct metric_info_s *metric_info)
+
+void after_page_deactivation(uv_work_t *req, int status)
+{
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_journalfile *journalfile = work_request->journalfile;
+    char path[RRDENG_PATH_MAX];
+
+    if (unlikely(!journalfile))
+        return;
+
+    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
+
+    if (likely(status != UV_ECANCELED)) {
+        info("Old pages for journal file %s were deactivated", path);
+    }
+    freez(work_request);
+}
+
+void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
+{
+    char path[RRDENG_PATH_MAX];
+
+    if (unlikely(!journalfile))
+        return;
+
+    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
+
+    if (!journalfile->journal_data) {
+        info("Journal is not migrated; nothing to do");
+        return;
+    }
+
+    info("Removing page descriptors for extents used by %s", path);
+    unsigned count = 0;
+    struct extent_info *extent = journalfile->datafile->extents.first,  *next_extent;
+    while (extent) {
+        for (uint8_t index = 0; index < extent->number_of_pages; index++) {
+            struct rrdeng_page_descr *descr = extent->pages[index];
+            pg_cache_punch_hole(journalfile->datafile->ctx, descr, 0, 0, NULL, false);
+            count++;
+        }
+        extent = extent->next;
+    }
+
+    extent = journalfile->datafile->extents.first;
+    while (extent) {
+        next_extent = extent->next;
+        freez(extent);
+        extent = next_extent;
+    }
+    journalfile->datafile->extents.first = NULL;
+
+    info("Removed %u page descriptors from memory", count);
+}
+
+void start_page_deactivation(uv_work_t *req)
+{
+    //    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = req->loop->data;
+    struct rrdengine_instance *ctx = wc->ctx;
+
+    info("Checking all journal files for page descriptors deactivation");
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile && datafile->fileno != ctx->last_fileno) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+        deactivate_one_journalfile(journalfile);
+        datafile = datafile->next;
+    }
+    info("Done checking all journal files for page descriptors deactivation");
+}
+
+static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *journalfile, struct metric_info_s *metric_info, bool with_lock)
 {
     Word_t index_time;
     size_t entries;
@@ -941,23 +1012,30 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
     page_index = metric_info->page_index;
 
-    // FIXME: Check locking if not used during startup
-    for (entries = 0, index_time = 0, PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
-        descr = unlikely(NULL == PValue) ? NULL : *PValue; descr != NULL;
-         PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
-        descr = unlikely(NULL == PValue) ? NULL : *PValue,
-        ++entries) {
-        rrdeng_page_descr_freez(descr);
-    }
-    (void ) JudyLFreeArray(&page_index->JudyL_array, PJE0);
+    if (!with_lock) {
+        // This is during startup, so we are the only ones accessing the structures
+        for (entries = 0, index_time = 0, PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
+            descr = unlikely(NULL == PValue) ? NULL : *PValue; descr != NULL;
+             PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
+            descr = unlikely(NULL == PValue) ? NULL : *PValue,
+            ++entries) {
+            rrdeng_page_descr_freez(descr);
+        }
+        (void ) JudyLFreeArray(&page_index->JudyL_array, PJE0);
 
-    struct extent_info *extent = journalfile->datafile->extents.first, *next_extent;
-    while (extent) {
-        next_extent = extent->next;
-        freez(extent);
-        extent = next_extent;
+        struct extent_info *extent = journalfile->datafile->extents.first, *next_extent;
+        while (extent) {
+            next_extent = extent->next;
+            freez(extent);
+            extent = next_extent;
+        }
+        journalfile->datafile->extents.first = NULL;
+        return;
     }
-    journalfile->datafile->extents.first = NULL;
+    // This is while the agent is running.
+    uv_rwlock_wrlock(&page_index->lock);
+    deactivate_one_journalfile(journalfile);
+    uv_rwlock_wrunlock(&page_index->lock);
 }
 
 // Write a new journal file for faster access
@@ -965,7 +1043,8 @@ void migrate_journal_file_v2(
     struct rrdengine_instance *ctx,
     struct rrdengine_journalfile *journalfile,
     struct rrdengine_datafile *datafile,
-    bool keep_live)
+    bool keep_live,
+    bool with_lock)
 {
     char path[RRDENG_PATH_MAX];
     size_t number_of_extents = 0;        // Number of extents
@@ -1179,8 +1258,7 @@ void migrate_journal_file_v2(
         unsigned bytes_after = 0;
         for (Index = 0; Index < number_of_metrics; Index++) {
             bytes_before += JudyLMemUsed(uuid_list[Index].metric_info->page_index->JudyL_array);
-            journal_v2_remove_active_descriptors(journalfile, uuid_list[Index].metric_info);
-            (void ) JudyLFreeArray(&metric_info->page_index->JudyL_array, PJE0);
+            journal_v2_remove_active_descriptors(journalfile, uuid_list[Index].metric_info, with_lock);
             bytes_after += JudyLMemUsed(uuid_list[Index].metric_info->page_index->JudyL_array);
             freez(uuid_list[Index].metric_info);
         }
@@ -1258,7 +1336,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
         return 0;
 
     if (should_try_migration == 1)
-        migrate_journal_file_v2(ctx, journalfile, datafile, true);
+        migrate_journal_file_v2(ctx, journalfile, datafile, true, false);
     else
         error_report("File %s cannot be migrated to the new journal format. Index will be allocated in memory", path);
     return 0;
@@ -1309,83 +1387,12 @@ void start_journal_indexing(uv_work_t *req)
     }
     info("Indexing journal file %s", path);
 
-    migrate_journal_file_v2(journalfile->datafile->ctx, journalfile, journalfile->datafile, true);
+    migrate_journal_file_v2(journalfile->datafile->ctx, journalfile, journalfile->datafile, true, true);
 
     if (unlikely(journalfile->journal_data)) {
         error_report("Failed to create new journal index for %s", path);
         return;
     }
-}
-
-
-void after_page_deactivation(uv_work_t *req, int status)
-{
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_journalfile *journalfile = work_request->journalfile;
-    char path[RRDENG_PATH_MAX];
-
-    if (unlikely(!journalfile))
-        return;
-
-    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
-
-    if (likely(status != UV_ECANCELED)) {
-        info("Old pages for journal file %s were deactivated", path);
-    }
-    freez(work_request);
-}
-
-void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
-{
-    char path[RRDENG_PATH_MAX];
-
-    if (unlikely(!journalfile))
-        return;
-
-    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
-
-    if (!journalfile->journal_data) {
-        info("Journal is not migrated; nothing to do");
-        return;
-    }
-
-    info("Removing page descriptors for extents used by %s", path);
-    unsigned count = 0;
-    struct extent_info *extent = journalfile->datafile->extents.first,  *next_extent;
-    while (extent) {
-        for (uint8_t index = 0; index < extent->number_of_pages; index++) {
-            struct rrdeng_page_descr *descr = extent->pages[index];
-            pg_cache_punch_hole(journalfile->datafile->ctx, descr, 0, 0, NULL, false);
-            count++;
-        }
-        extent = extent->next;
-    }
-
-    extent = journalfile->datafile->extents.first;
-    while (extent) {
-        next_extent = extent->next;
-        freez(extent);
-        extent = next_extent;
-    }
-    journalfile->datafile->extents.first = NULL;
-
-    info("Removed %u page descriptors from memory", count);
-}
-
-void start_page_deactivation(uv_work_t *req)
-{
-//    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_worker_config *wc = req->loop->data;
-    struct rrdengine_instance *ctx = wc->ctx;
-
-    info("Checking all journal files for page descriptors deactivation");
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    while (datafile && datafile->fileno != ctx->last_fileno) {
-        struct rrdengine_journalfile *journalfile = datafile->journalfile;
-        deactivate_one_journalfile(journalfile);
-        datafile = datafile->next;
-    }
-    info("Done checking all journal files for page descriptors deactivation");
 }
 
 void init_commit_log(struct rrdengine_instance *ctx)
