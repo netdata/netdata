@@ -44,8 +44,7 @@ void ml::updateDimensionsChart(RRDHOST *RH,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
         NumAnomalousDimensionsRD = rrddim_add(RS, "anomalous", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
+    }
 
     rrddim_set_by_pointer(RS, NumTotalDimensionsRD, NumNormalDimensions + NumAnomalousDimensions);
     rrddim_set_by_pointer(RS, NumTrainedDimensionsRD, NumTrainedDimensions);
@@ -84,8 +83,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
 
         AnomalyRateRD = rrddim_add(HostRateRS, "anomaly_rate", NULL,
                 1, 100, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(HostRateRS);
+    }
 
     rrddim_set_by_pointer(HostRateRS, AnomalyRateRD, AnomalyRate);
     rrdset_done(HostRateRS);
@@ -121,8 +119,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
                                        1, 1, RRD_ALGORITHM_ABSOLUTE);
         NewAnomalyEventRD = rrddim_add(AnomalyDetectionRS, "new_anomaly_event", NULL,
                                        1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(AnomalyDetectionRS);
+    }
 
     /*
      * Compute the values of the dimensions based on the host rate chart
@@ -189,8 +186,7 @@ void ml::updateDetectionChart(RRDHOST *RH) {
 
         UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(RS);
+    }
 
     struct rusage TRU;
     getrusage(RUSAGE_THREAD, &TRU);
@@ -228,8 +224,7 @@ void ml::updateTrainingChart(RRDHOST *RH, struct rusage *TRU) {
 
         UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(RS);
+    }
 
     rrddim_set_by_pointer(RS, UserRD, TRU->ru_utime.tv_sec * 1000000ULL + TRU->ru_utime.tv_usec);
     rrddim_set_by_pointer(RS, SystemRD, TRU->ru_stime.tv_sec * 1000000ULL + TRU->ru_stime.tv_usec);

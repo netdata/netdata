@@ -1660,7 +1660,6 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
@@ -1699,7 +1698,6 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
@@ -1738,7 +1736,6 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
@@ -1775,7 +1772,6 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     STATSD_METRIC_DICTIONARY_ITEM *t;
     dfe_start_read(m->dictionary.dict, t) {
@@ -1825,7 +1821,6 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_min, m->histogram.ext->last_min);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_max, m->histogram.ext->last_max);
@@ -2226,7 +2221,6 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
         // rrdset_flag_set(chart->st, RRDSET_FLAG_DEBUG);
     }
-    else rrdset_next(chart->st);
 
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
@@ -2742,7 +2736,7 @@ void *statsd_main(void *ptr) {
     heartbeat_init(&hb);
     while(!netdata_exit) {
         worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        heartbeat_next(&hb, step);
 
         worker_is_busy(WORKER_STATSD_FLUSH_GAUGES);
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);
@@ -2772,18 +2766,6 @@ void *statsd_main(void *ptr) {
             break;
 
         if(global_statistics_enabled) {
-            if(likely(hb_dt)) {
-                rrdset_next(st_metrics);
-                rrdset_next(st_useful_metrics);
-                rrdset_next(st_events);
-                rrdset_next(st_reads);
-                rrdset_next(st_bytes);
-                rrdset_next(st_packets);
-                rrdset_next(st_tcp_connects);
-                rrdset_next(st_tcp_connected);
-                rrdset_next(st_pcharts);
-            }
-
             rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
             rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
             rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);

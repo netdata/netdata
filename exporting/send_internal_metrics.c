@@ -40,9 +40,6 @@ void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
     struct rusage thread;
     getrusage(RUSAGE_THREAD, &thread);
 
-    if (likely(st_rusage->counter_done))
-        rrdset_next(st_rusage);
-
     rrddim_set_by_pointer(st_rusage, rd_user,   thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
     rrddim_set_by_pointer(st_rusage, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
 
@@ -132,50 +129,28 @@ void send_internal_metrics(struct instance *instance)
     // ------------------------------------------------------------------------
     // update the monitoring charts
 
-    if (likely(stats->st_metrics->counter_done))
-        rrdset_next(stats->st_metrics);
-
     rrddim_set_by_pointer(stats->st_metrics, stats->rd_buffered_metrics, stats->buffered_metrics);
     rrddim_set_by_pointer(stats->st_metrics, stats->rd_lost_metrics,     stats->lost_metrics);
     rrddim_set_by_pointer(stats->st_metrics, stats->rd_sent_metrics,     stats->sent_metrics);
-
     rrdset_done(stats->st_metrics);
-
-    // ------------------------------------------------------------------------
-
-    if (likely(stats->st_bytes->counter_done))
-        rrdset_next(stats->st_bytes);
 
     rrddim_set_by_pointer(stats->st_bytes, stats->rd_buffered_bytes, stats->buffered_bytes);
     rrddim_set_by_pointer(stats->st_bytes, stats->rd_lost_bytes,     stats->lost_bytes);
     rrddim_set_by_pointer(stats->st_bytes, stats->rd_sent_bytes,     stats->sent_bytes);
     rrddim_set_by_pointer(stats->st_bytes, stats->rd_received_bytes, stats->received_bytes);
-
     rrdset_done(stats->st_bytes);
-
-    // ------------------------------------------------------------------------
-
-    if (likely(stats->st_ops->counter_done))
-        rrdset_next(stats->st_ops);
 
     rrddim_set_by_pointer(stats->st_ops, stats->rd_transmission_successes, stats->transmission_successes);
     rrddim_set_by_pointer(stats->st_ops, stats->rd_data_lost_events,       stats->data_lost_events);
     rrddim_set_by_pointer(stats->st_ops, stats->rd_reconnects,             stats->reconnects);
     rrddim_set_by_pointer(stats->st_ops, stats->rd_transmission_failures,  stats->transmission_failures);
     rrddim_set_by_pointer(stats->st_ops, stats->rd_receptions,             stats->receptions);
-
     rrdset_done(stats->st_ops);
-
-    // ------------------------------------------------------------------------
 
     struct rusage thread;
     getrusage(RUSAGE_THREAD, &thread);
 
-    if (likely(stats->st_rusage->counter_done))
-        rrdset_next(stats->st_rusage);
-
     rrddim_set_by_pointer(stats->st_rusage, stats->rd_user,   thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
     rrddim_set_by_pointer(stats->st_rusage, stats->rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-
     rrdset_done(stats->st_rusage);
 }

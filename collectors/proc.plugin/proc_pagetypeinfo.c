@@ -316,10 +316,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
     // Global system per order
     if (st_order) {
-        rrdset_next(st_order);
-        for (o = 0; o < pageorders_cnt; o++) {
+        for (o = 0; o < pageorders_cnt; o++)
             rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
-        }
         rrdset_done(st_order);
     }
 
@@ -330,10 +328,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             if (!st_nodezonetype[p])
                 continue;
 
-            rrdset_next(st_nodezonetype[p]);
             for (o = 0; o < pageorders_cnt; o++)
                 rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages_size[o]);
-
             rrdset_done(st_nodezonetype[p]);
         }
     }

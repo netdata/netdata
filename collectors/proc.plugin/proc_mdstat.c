@@ -392,8 +392,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
         }
     }
 
-    // --------------------------------------------------------------------
-
     if (likely(do_health && redundant_num)) {
         static RRDSET *st_mdstat_health = NULL;
         if (unlikely(!st_mdstat_health)) {
@@ -413,8 +411,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
             rrdset_isnot_obsolete(st_mdstat_health);
         }
-        else
-            rrdset_next(st_mdstat_health);
 
         if (!redundant_num) {
             if (likely(make_charts_obsolete))
@@ -434,8 +430,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
             rrdset_done(st_mdstat_health);
         }
     }
-
-    // --------------------------------------------------------------------
 
     for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
         struct raid *raid = &raids[raid_idx];
@@ -467,8 +461,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                     add_labels_to_mdstat(raid, raid->st_disks);
                 }
-                else
-                    rrdset_next(raid->st_disks);
 
                 if (unlikely(!raid->rd_inuse && !(raid->rd_inuse = rrddim_find_active(raid->st_disks, "inuse"))))
                     raid->rd_inuse = rrddim_add(raid->st_disks, "inuse", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -477,11 +469,8 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                 rrddim_set_by_pointer(raid->st_disks, raid->rd_inuse, raid->inuse_disks);
                 rrddim_set_by_pointer(raid->st_disks, raid->rd_down, raid->failed_disks);
-
                 rrdset_done(raid->st_disks);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_mismatch)) {
                 snprintfz(id, 50, "%s_mismatch", raid->name);
@@ -507,18 +496,13 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                     add_labels_to_mdstat(raid, raid->st_mismatch_cnt);
                 }
-                else
-                    rrdset_next(raid->st_mismatch_cnt);
 
                 if (unlikely(!raid->rd_mismatch_cnt && !(raid->rd_mismatch_cnt = rrddim_find_active(raid->st_mismatch_cnt, "count"))))
                     raid->rd_mismatch_cnt = rrddim_add(raid->st_mismatch_cnt, "count", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_mismatch_cnt, raid->rd_mismatch_cnt, raid->mismatch_cnt);
-
                 rrdset_done(raid->st_mismatch_cnt);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_operations)) {
                 snprintfz(id, 50, "%s_operation", raid->name);
@@ -544,8 +528,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                     add_labels_to_mdstat(raid, raid->st_operation);
                 }
-                else
-                    rrdset_next(raid->st_operation);
 
                 if(unlikely(!raid->rd_check && !(raid->rd_check = rrddim_find_active(raid->st_operation, "check"))))
                     raid->rd_check = rrddim_add(raid->st_operation, "check", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -560,13 +542,9 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 rrddim_set_by_pointer(raid->st_operation, raid->rd_resync, raid->resync);
                 rrddim_set_by_pointer(raid->st_operation, raid->rd_recovery, raid->recovery);
                 rrddim_set_by_pointer(raid->st_operation, raid->rd_reshape, raid->reshape);
-
                 rrdset_done(raid->st_operation);
 
-                // --------------------------------------------------------------------
-
                 snprintfz(id, 50, "%s_finish", raid->name);
-
                 if (unlikely(!raid->st_finish && !(raid->st_finish = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
@@ -587,20 +565,14 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                     add_labels_to_mdstat(raid, raid->st_finish);
                 }
-                else
-                    rrdset_next(raid->st_finish);
 
                 if(unlikely(!raid->rd_finish_in && !(raid->rd_finish_in = rrddim_find_active(raid->st_finish, "finish_in"))))
                     raid->rd_finish_in = rrddim_add(raid->st_finish, "finish_in", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_finish, raid->rd_finish_in, raid->finish_in);
-
                 rrdset_done(raid->st_finish);
 
-                // --------------------------------------------------------------------
-
                 snprintfz(id, 50, "%s_speed", raid->name);
-
                 if (unlikely(!raid->st_speed && !(raid->st_speed = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
@@ -622,19 +594,14 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                     add_labels_to_mdstat(raid, raid->st_speed);
                 }
-                else
-                    rrdset_next(raid->st_speed);
 
                 if (unlikely(!raid->rd_speed && !(raid->rd_speed = rrddim_find_active(raid->st_speed, "speed"))))
                     raid->rd_speed = rrddim_add(raid->st_speed, "speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_speed, raid->rd_speed, raid->speed);
-
                 rrdset_done(raid->st_speed);
             }
         } else {
-            // --------------------------------------------------------------------
-
             if (likely(do_nonredundant)) {
                 snprintfz(id, 50, "%s_availability", raid->name);
 
@@ -659,14 +626,11 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
                     add_labels_to_mdstat(raid, raid->st_nonredundant);
                 }
-                else
-                    rrdset_next(raid->st_nonredundant);
 
                 if (unlikely(!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find_active(raid->st_nonredundant, "available"))))
                     raid->rd_nonredundant = rrddim_add(raid->st_nonredundant, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_nonredundant, raid->rd_nonredundant, 1);
-
                 rrdset_done(raid->st_nonredundant);
             }
         }

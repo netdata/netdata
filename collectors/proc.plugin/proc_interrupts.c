@@ -146,8 +146,6 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         irr->used = 1;
     }
 
-    // --------------------------------------------------------------------
-
     static RRDSET *st_system_interrupts = NULL;
     if(unlikely(!st_system_interrupts))
         st_system_interrupts = rrdset_create_localhost(
@@ -164,8 +162,6 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 , update_every
                 , RRDSET_TYPE_STACKED
         );
-    else
-        rrdset_next(st_system_interrupts);
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
@@ -189,8 +185,6 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     }
 
     rrdset_done(st_system_interrupts);
-
-    // --------------------------------------------------------------------
 
     if(likely(do_per_core != CONFIG_BOOLEAN_NO)) {
         static RRDSET **core_st = NULL;
@@ -230,7 +224,6 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 snprintfz(core, 50, "cpu%d", c);
                 rrdlabels_add(core_st[c]->rrdlabels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
-            else rrdset_next(core_st[c]);
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);

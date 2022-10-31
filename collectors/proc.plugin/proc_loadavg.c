@@ -52,9 +52,6 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     //
     //unsigned long long next_pid           = str2ull(procfile_lineword(ff, 0, 5));
 
-
-    // --------------------------------------------------------------------
-
     if(next_loadavg_dt <= dt) {
         if(likely(do_loadavg)) {
             static RRDSET *load_chart = NULL;
@@ -80,8 +77,6 @@ int do_proc_loadavg(int update_every, usec_t dt) {
                 rd_load5  = rrddim_add(load_chart, "load5",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rd_load15 = rrddim_add(load_chart, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(load_chart);
 
             rrddim_set_by_pointer(load_chart, rd_load1, (collected_number) (load1 * 1000));
             rrddim_set_by_pointer(load_chart, rd_load5, (collected_number) (load5 * 1000));
@@ -90,11 +85,12 @@ int do_proc_loadavg(int update_every, usec_t dt) {
 
             next_loadavg_dt = load_chart->update_every * USEC_PER_SEC;
         }
-        else next_loadavg_dt =  MIN_LOADAVG_UPDATE_EVERY * USEC_PER_SEC;
+        else
+            next_loadavg_dt =  MIN_LOADAVG_UPDATE_EVERY * USEC_PER_SEC;
     }
-    else next_loadavg_dt -= dt;
+    else
+        next_loadavg_dt -= dt;
 
-    // --------------------------------------------------------------------
 
     if(likely(do_all_processes)) {
         static RRDSET *processes_chart = NULL;
@@ -120,7 +116,6 @@ int do_proc_loadavg(int update_every, usec_t dt) {
             rd_active = rrddim_add(processes_chart, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pidmax = rrdsetvar_custom_chart_variable_add_and_acquire(processes_chart, "pidmax");
         }
-        else rrdset_next(processes_chart);
 
         rrddim_set_by_pointer(processes_chart, rd_active, active_processes);
         rrdsetvar_custom_chart_variable_set(processes_chart, rd_pidmax, max_processes);

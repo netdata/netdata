@@ -149,8 +149,6 @@ int do_ipfw(int update_every, usec_t dt) {
                 dynsz = 0;
         }
 
-        // --------------------------------------------------------------------
-
         if (likely(do_mem)) {
             static RRDSET *st_mem = NULL;
             static RRDDIM *rd_dyn_mem = NULL;
@@ -174,22 +172,19 @@ int do_ipfw(int update_every, usec_t dt) {
 
                 rd_dyn_mem = rrddim_add(st_mem, "dynamic", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_stat_mem = rrddim_add(st_mem, "static", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            } else
-                rrdset_next(st_mem);
+            }
 
             rrddim_set_by_pointer(st_mem, rd_dyn_mem, dynsz);
             rrddim_set_by_pointer(st_mem, rd_stat_mem, *optlen - dynsz);
             rrdset_done(st_mem);
         }
 
-        // --------------------------------------------------------------------
-
         static RRDSET *st_packets = NULL, *st_bytes = NULL;
         RRDDIM *rd_packets = NULL, *rd_bytes = NULL;
 
         if (likely(do_static || do_dynamic)) {
             if (likely(do_static)) {
-                if (unlikely(!st_packets))
+                if (unlikely(!st_packets)) {
                     st_packets = rrdset_create_localhost("ipfw",
                                                          "packets",
                                                          NULL,
@@ -203,10 +198,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                          update_every,
                                                          RRDSET_TYPE_STACKED
                     );
-                else
-                    rrdset_next(st_packets);
+                }
 
-                if (unlikely(!st_bytes))
+                if (unlikely(!st_bytes)) {
                     st_bytes = rrdset_create_localhost("ipfw",
                                                        "bytes",
                                                        NULL,
@@ -220,8 +214,7 @@ int do_ipfw(int update_every, usec_t dt) {
                                                        update_every,
                                                        RRDSET_TYPE_STACKED
                     );
-                else
-                    rrdset_next(st_bytes);
+                }
             }
 
             for (n = seen = 0; n < rcnt; n++, rbase = (ipfw_obj_tlv *) ((caddr_t) rbase + rbase->length)) {
@@ -255,8 +248,6 @@ int do_ipfw(int update_every, usec_t dt) {
                 rrdset_done(st_bytes);
             }
         }
-
-        // --------------------------------------------------------------------
 
         // go through dynamic rules configuration structures
 
@@ -305,12 +296,10 @@ int do_ipfw(int update_every, usec_t dt) {
                 dynbase += tlv->length;
             }
 
-            // --------------------------------------------------------------------
-
             static RRDSET *st_active = NULL, *st_expired = NULL;
             RRDDIM *rd_active = NULL, *rd_expired = NULL;
 
-            if (unlikely(!st_active))
+            if (unlikely(!st_active)) {
                 st_active = rrdset_create_localhost("ipfw",
                                                     "active",
                                                     NULL,
@@ -324,10 +313,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                     update_every,
                                                     RRDSET_TYPE_STACKED
                 );
-            else
-                rrdset_next(st_active);
+            }
 
-            if (unlikely(!st_expired))
+            if (unlikely(!st_expired)) {
                 st_expired = rrdset_create_localhost("ipfw",
                                                      "expired",
                                                      NULL,
@@ -341,8 +329,7 @@ int do_ipfw(int update_every, usec_t dt) {
                                                      update_every,
                                                      RRDSET_TYPE_STACKED
                 );
-            else
-                rrdset_next(st_expired);
+            }
 
             for (srn = 0; (srn < (static_rules_num - 1)) && (dyn_rules_num[srn].rule_num != IPFW_DEFAULT_RULE); srn++) {
                 sprintf(rule_num_str, "%d", dyn_rules_num[srn].rule_num);

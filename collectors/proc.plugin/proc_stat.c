@@ -715,7 +715,6 @@ int do_proc_stat(int update_every, usec_t dt) {
                     if(unlikely(core == 0 && cpus_var == NULL))
                         cpus_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "active_processors");
                 }
-                else rrdset_next(cpu_chart->st);
 
                 rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_user, user);
                 rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_nice, nice);
@@ -756,7 +755,6 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                     rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st_intr);
 
                 rrddim_set_by_pointer(st_intr, rd_interrupts, value);
                 rrdset_done(st_intr);
@@ -786,7 +784,6 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                     rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st_ctxt);
 
                 rrddim_set_by_pointer(st_ctxt, rd_switches, value);
                 rrdset_done(st_ctxt);
@@ -828,7 +825,6 @@ int do_proc_stat(int update_every, usec_t dt) {
 
             rd_started = rrddim_add(st_forks, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_forks);
 
         rrddim_set_by_pointer(st_forks, rd_started, processes);
         rrdset_done(st_forks);
@@ -860,7 +856,6 @@ int do_proc_stat(int update_every, usec_t dt) {
             rd_running = rrddim_add(st_processes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_blocked = rrddim_add(st_processes, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_processes);
 
         rrddim_set_by_pointer(st_processes, rd_running, running);
         rrddim_set_by_pointer(st_processes, rd_blocked, blocked);
@@ -875,7 +870,7 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                 static RRDSET *st_core_throttle_count = NULL;
 
-                if (unlikely(!st_core_throttle_count))
+                if (unlikely(!st_core_throttle_count)) {
                     st_core_throttle_count = rrdset_create_localhost(
                             "cpu"
                             , "core_throttling"
@@ -890,8 +885,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                else
-                    rrdset_next(st_core_throttle_count);
+                }
 
                 chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CORE_THROTTLE_COUNT_INDEX, st_core_throttle_count, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrdset_done(st_core_throttle_count);
@@ -905,7 +899,7 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                 static RRDSET *st_package_throttle_count = NULL;
 
-                if(unlikely(!st_package_throttle_count))
+                if(unlikely(!st_package_throttle_count)) {
                     st_package_throttle_count = rrdset_create_localhost(
                             "cpu"
                             , "package_throttling"
@@ -920,8 +914,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                else
-                    rrdset_next(st_package_throttle_count);
+                }
 
                 chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, PACKAGE_THROTTLE_COUNT_INDEX, st_package_throttle_count, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrdset_done(st_package_throttle_count);
@@ -954,7 +947,7 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                 static RRDSET *st_scaling_cur_freq = NULL;
 
-                if(unlikely(!st_scaling_cur_freq))
+                if(unlikely(!st_scaling_cur_freq)) {
                     st_scaling_cur_freq = rrdset_create_localhost(
                             "cpu"
                             , "cpufreq"
@@ -969,8 +962,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                else
-                    rrdset_next(st_scaling_cur_freq);
+                }
 
                 chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX, st_scaling_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rrdset_done(st_scaling_cur_freq);
@@ -1054,8 +1046,6 @@ int do_proc_stat(int update_every, usec_t dt) {
                                                                                       1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                         }
                     }
-                    else
-                        rrdset_next(cpuidle_charts[core].st);
 
                     rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].active_time_rd, cpuidle_charts[core].active_time);
                     for(state = 0; state < cpuidle_charts[core].cpuidle_state_len; state++) {

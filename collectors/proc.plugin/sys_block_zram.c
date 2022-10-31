@@ -33,8 +33,6 @@ typedef struct zram_device {
     RRDDIM *rd_alloc_efficiency;
 } ZRAM_DEVICE;
 
-    // --------------------------------------------------------------------
-
 static int try_get_zram_major_number(procfile *file) {
     size_t i;
     unsigned int lines = procfile_lines(file);
@@ -179,7 +177,6 @@ static void free_device(DICTIONARY *dict, const char *name)
     rrdset_obsolete_and_pointer_null(d->st_comp_ratio);
     dictionary_del(dict, name);
 }
-    // --------------------------------------------------------------------
 
 static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     ff = procfile_readall(ff);
@@ -204,64 +201,51 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     return 0;
 }
 
-static inline int _collect_zram_metrics(const char* name, ZRAM_DEVICE *d, int advance, DICTIONARY* dict) {
+static int collect_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
+    ZRAM_DEVICE *dev = entry;
+    DICTIONARY *dict = data;
+
     MM_STAT mm;
     int value;
-    if (unlikely(read_mm_stat(d->file, &mm) < 0))
-    {
+
+    if (unlikely(read_mm_stat(dev->file, &mm) < 0)) {
         free_device(dict, name);
         return -1;
     }
 
-    if (likely(advance))
-    {
-        rrdset_next(d->st_usage);
-        rrdset_next(d->st_savings);
-        rrdset_next(d->st_comp_ratio);
-        rrdset_next(d->st_alloc_efficiency);
-    }
     // zram_usage
-    rrddim_set_by_pointer(d->st_usage, d->rd_compr_data_size, mm.compr_data_size);
-    rrddim_set_by_pointer(d->st_usage, d->rd_metadata_size, mm.mem_used_total - mm.compr_data_size);
-    rrdset_done(d->st_usage);
+    rrddim_set_by_pointer(dev->st_usage, dev->rd_compr_data_size, mm.compr_data_size);
+    rrddim_set_by_pointer(dev->st_usage, dev->rd_metadata_size, mm.mem_used_total - mm.compr_data_size);
+    rrdset_done(dev->st_usage);
+
     // zram_savings
-    rrddim_set_by_pointer(d->st_savings, d->rd_savings_size, mm.compr_data_size - mm.orig_data_size);
-    rrddim_set_by_pointer(d->st_savings, d->rd_original_size, mm.orig_data_size);
-    rrdset_done(d->st_savings);
+    rrddim_set_by_pointer(dev->st_savings, dev->rd_savings_size, mm.compr_data_size - mm.orig_data_size);
+    rrddim_set_by_pointer(dev->st_savings, dev->rd_original_size, mm.orig_data_size);
+    rrdset_done(dev->st_savings);
+
     // zram_ratio
     value = mm.compr_data_size == 0 ? 1 : mm.orig_data_size * 100 / mm.compr_data_size;
-    rrddim_set_by_pointer(d->st_comp_ratio, d->rd_comp_ratio, value);
-    rrdset_done(d->st_comp_ratio);
+    rrddim_set_by_pointer(dev->st_comp_ratio, dev->rd_comp_ratio, value);
+    rrdset_done(dev->st_comp_ratio);
+
     // zram_efficiency
     value = mm.mem_used_total == 0 ? 100 : (mm.compr_data_size * 1000000 / mm.mem_used_total);
-    rrddim_set_by_pointer(d->st_alloc_efficiency, d->rd_alloc_efficiency, value);
-    rrdset_done(d->st_alloc_efficiency);
+    rrddim_set_by_pointer(dev->st_alloc_efficiency, dev->rd_alloc_efficiency, value);
+    rrdset_done(dev->st_alloc_efficiency);
+
     return 0;
 }
 
-static int collect_first_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
-    const char *name = dictionary_acquired_item_name(item);
-
-    // collect without calling rrdset_next (init only)
-    return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 0, (DICTIONARY *)data);
-}
-
-static int collect_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
-    const char *name = dictionary_acquired_item_name(item);
-
-    // collect with calling rrdset_next
-    return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 1, (DICTIONARY *)data);
-}
-
-    // --------------------------------------------------------------------
-
 int do_sys_block_zram(int update_every, usec_t dt) {
-    (void)dt;
     static procfile *ff = NULL;
     static DICTIONARY *devices = NULL;
     static int initialized = 0;
     static int device_count = 0;
     int zram_id = -1;
+
+    (void)dt;
+
     if (unlikely(!initialized))
     {
         initialized = 1;
@@ -285,15 +269,11 @@ int do_sys_block_zram(int update_every, usec_t dt) {
 
         devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         device_count = init_devices(devices, (unsigned int)zram_id, update_every);
-        if (device_count < 1)
-            return 1;
-        dictionary_walkthrough_write(devices, collect_first_zram_metrics, devices);
     }
-    else
-    {
-        if (unlikely(device_count < 1))
-            return 1;
-        dictionary_walkthrough_write(devices, collect_zram_metrics, devices);
-    }
+
+    if (unlikely(device_count < 1))
+        return 1;
+
+    dictionary_walkthrough_write(devices, collect_zram_metrics, devices);
     return 0;
 }

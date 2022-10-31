@@ -90,7 +90,6 @@ typedef struct vmmeter vmmeter_t;
 #define NETDATA_COLLECT_LAUNDRY 1
 #endif
 
-// --------------------------------------------------------------------------------------------------------------------
 // FreeBSD plugin initialization
 
 int freebsd_plugin_init()
@@ -114,7 +113,6 @@ int freebsd_plugin_init()
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.loadavg
 
 // FreeBSD calculates load averages once every 5 seconds
@@ -132,9 +130,6 @@ int do_vm_loadavg(int update_every, usec_t dt){
             error("DISABLED: vm.loadavg module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             static RRDSET *st = NULL;
             static RRDDIM *rd_load1 = NULL, *rd_load2 = NULL, *rd_load3 = NULL;
 
@@ -156,8 +151,7 @@ int do_vm_loadavg(int update_every, usec_t dt){
                 rd_load1 = rrddim_add(st, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rd_load2 = rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rd_load3 = rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            } else
-                rrdset_next(st);
+            }
 
             rrddim_set_by_pointer(st, rd_load1, (collected_number) ((double) sysload.ldavg[0] / sysload.fscale * 1000));
             rrddim_set_by_pointer(st, rd_load2, (collected_number) ((double) sysload.ldavg[1] / sysload.fscale * 1000));
@@ -173,7 +167,6 @@ int do_vm_loadavg(int update_every, usec_t dt){
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.vmtotal
 
 int do_vm_vmtotal(int update_every, usec_t dt) {
@@ -200,9 +193,6 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
             error("DISABLED: vm.vmtotal module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             if (likely(do_all_processes)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd = NULL;
@@ -224,13 +214,10 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                     );
                     rd = rrddim_add(st, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd, (vmtotal_data.t_rq + vmtotal_data.t_dw + vmtotal_data.t_pw + vmtotal_data.t_sl + vmtotal_data.t_sw));
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_processes)) {
                 static RRDSET *st = NULL;
@@ -255,14 +242,11 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                     rd_running = rrddim_add(st, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_blocked = rrddim_add(st, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd_running, vmtotal_data.t_rq);
                 rrddim_set_by_pointer(st, rd_blocked, (vmtotal_data.t_dw + vmtotal_data.t_pw));
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_mem_real)) {
                 static RRDSET *st = NULL;
@@ -287,7 +271,6 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 
                     rd = rrddim_add(st, "used", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd, vmtotal_data.t_rm);
                 rrdset_done(st);
@@ -301,7 +284,6 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // kern.cp_time
 
 int do_kern_cp_time(int update_every, usec_t dt) {
@@ -321,9 +303,6 @@ int do_kern_cp_time(int update_every, usec_t dt) {
             error("DISABLED: kern.cp_time module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             static RRDSET *st = NULL;
             static RRDDIM *rd_nice = NULL, *rd_system = NULL, *rd_user = NULL, *rd_interrupt = NULL, *rd_idle = NULL;
 
@@ -350,7 +329,6 @@ int do_kern_cp_time(int update_every, usec_t dt) {
                 rd_idle         = rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                 rrddim_hide(st, "idle");
             }
-            else rrdset_next(st);
 
             rrddim_set_by_pointer(st, rd_nice, cp_time[1]);
             rrddim_set_by_pointer(st, rd_system, cp_time[2]);
@@ -364,7 +342,6 @@ int do_kern_cp_time(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // kern.cp_times
 
 int do_kern_cp_times(int update_every, usec_t dt) {
@@ -388,9 +365,6 @@ int do_kern_cp_times(int update_every, usec_t dt) {
             error("DISABLED: kern.cp_times module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             int i;
             static struct cpu_chart {
                 char cpuid[MAX_INT_DIGITS + 4];
@@ -436,7 +410,7 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                     all_cpu_charts[i].rd_idle       = rrddim_add(all_cpu_charts[i].st, "idle", NULL, 1, 1,
                                                                  RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(all_cpu_charts[i].st, "idle");
-                } else rrdset_next(all_cpu_charts[i].st);
+                }
 
                 rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_nice, pcpu_cp_time[i * 5 + 1]);
                 rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_system, pcpu_cp_time[i * 5 + 2]);
@@ -453,7 +427,6 @@ int do_kern_cp_times(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // dev.cpu.temperature
 
 int do_dev_cpu_temperature(int update_every, usec_t dt) {
@@ -482,8 +455,6 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
         }
     }
 
-    // --------------------------------------------------------------------
-
     static RRDSET *st;
     static RRDDIM **rd_pcpu_temperature;
 
@@ -509,7 +480,6 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
                 RRDSET_TYPE_LINE
         );
     }
-    else rrdset_next(st);
 
     for (i = 0; i < number_of_cpus; i++) {
         if (unlikely(!rd_pcpu_temperature[i])) {
@@ -527,7 +497,6 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // dev.cpu.0.freq
 
 int do_dev_cpu_0_freq(int update_every, usec_t dt) {
@@ -540,9 +509,6 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
         error("DISABLED: dev.cpu.0.freq module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -564,7 +530,6 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
 
             rd = rrddim_add(st, "frequency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd, cpufreq);
         rrdset_done(st);
@@ -606,8 +571,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             for (i = 0; i < nintr; i++)
                 totalintr += intrcnt[i];
 
-            // --------------------------------------------------------------------
-
             static RRDSET *st_intr = NULL;
             static RRDDIM *rd_intr = NULL;
 
@@ -629,13 +592,10 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                 rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
 
                 rd_intr = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            } else
-                rrdset_next(st_intr);
+            }
 
             rrddim_set_by_pointer(st_intr, rd_intr, totalintr);
             rrdset_done(st_intr);
-
-            // --------------------------------------------------------------------
 
             size_t size;
             static int mib_hw_intrnames[2] = {0, 0};
@@ -655,12 +615,9 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                     error("DISABLED: hw.intrcnt module");
                     return 1;
                 } else {
-
-                    // --------------------------------------------------------------------
-
                     static RRDSET *st_interrupts = NULL;
 
-                    if (unlikely(!st_interrupts))
+                    if (unlikely(!st_interrupts)) {
                         st_interrupts = rrdset_create_localhost(
                                 "system",
                                 "interrupts",
@@ -675,8 +632,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                                 update_every,
                                 RRDSET_TYPE_STACKED
                         );
-                    else
-                        rrdset_next(st_interrupts);
+                    }
 
                     for (i = 0; i < nintr; i++) {
                         void *p;
@@ -702,7 +658,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.stats.sys.v_intr
 
 int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
@@ -715,9 +670,6 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.sys.v_intr module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -739,7 +691,6 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
 
             rd = rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd, int_number);
         rrdset_done(st);
@@ -748,7 +699,6 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.stats.sys.v_soft
 
 int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
@@ -761,9 +711,6 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.sys.v_soft module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -785,7 +732,6 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
 
             rd = rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd, soft_intr_number);
         rrdset_done(st);
@@ -794,7 +740,6 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.stats.sys.v_swtch
 
 int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
@@ -807,9 +752,6 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -831,7 +773,6 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 
             rd = rrddim_add(st, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd, ctxt_number);
         rrdset_done(st);
@@ -840,7 +781,6 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.stats.vm.v_forks
 
 int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
@@ -879,7 +819,6 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
 
             rd = rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd, forks_number);
         rrdset_done(st);
@@ -888,7 +827,6 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.swap_info
 
 int do_vm_swap_info(int update_every, usec_t dt) {
@@ -931,8 +869,6 @@ int do_vm_swap_info(int update_every, usec_t dt) {
             total_xsw.bytes_total += xsw.xsw_nblks;
         }
 
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd_free = NULL, *rd_used = NULL;
 
@@ -957,7 +893,6 @@ int do_vm_swap_info(int update_every, usec_t dt) {
             rd_free = rrddim_add(st, "free",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             rd_used = rrddim_add(st, "used",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_free, total_xsw.bytes_total - total_xsw.bytes_used);
         rrddim_set_by_pointer(st, rd_used, total_xsw.bytes_used);
@@ -967,7 +902,6 @@ int do_vm_swap_info(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // system.ram
 
 int do_system_ram(int update_every, usec_t dt) {
@@ -1002,9 +936,6 @@ int do_system_ram(int update_every, usec_t dt) {
         error("DISABLED: system.ram module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL, *st_mem_available = NULL;
         static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL, *rd_wired = NULL,
                       *rd_cache = NULL, *rd_buffers = NULL, *rd_avail = NULL;
@@ -1039,7 +970,6 @@ int do_system_ram(int update_every, usec_t dt) {
 #endif
             rd_buffers  = rrddim_add(st, "buffers",  NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_free,     vmmeter_data.v_free_count);
         rrddim_set_by_pointer(st, rd_active,   vmmeter_data.v_active_count);
@@ -1074,7 +1004,6 @@ int do_system_ram(int update_every, usec_t dt) {
 
             rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_available);
 
 #if __FreeBSD_version < 1200016
         rrddim_set_by_pointer(st_mem_available, rd_avail, vmmeter_data.v_inactive_count + vmmeter_data.v_free_count + vmmeter_data.v_cache_count + zfs_arcstats_shrinkable_cache_size_bytes / system_pagesize);
@@ -1088,7 +1017,6 @@ int do_system_ram(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.stats.vm.v_swappgs
 
 int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
@@ -1102,9 +1030,6 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.vm.v_swappgs module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
@@ -1127,7 +1052,6 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
             rd_in = rrddim_add(st, "in",  NULL, system_pagesize, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st, "out", NULL, -system_pagesize, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_in, vmmeter_data.v_swappgsin);
         rrddim_set_by_pointer(st, rd_out, vmmeter_data.v_swappgsout);
@@ -1137,7 +1061,6 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // vm.stats.vm.v_pgfaults
 
 int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
@@ -1155,9 +1078,6 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.vm.v_pgfaults module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd_memory = NULL, *rd_io_requiring = NULL, *rd_cow = NULL,
                       *rd_cow_optimized = NULL, *rd_in_transit = NULL;
@@ -1186,7 +1106,6 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
             rd_cow_optimized = rrddim_add(st, "cow_optimized", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_in_transit    = rrddim_add(st, "in_transit",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_memory,        vmmeter_data.v_vm_faults);
         rrddim_set_by_pointer(st, rd_io_requiring,  vmmeter_data.v_io_faults);
@@ -1240,8 +1159,6 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                 }
             }
 
-            // --------------------------------------------------------------------
-
             static RRDSET *st_semaphores = NULL, *st_semaphore_arrays = NULL;
             static RRDDIM *rd_semaphores = NULL, *rd_semaphore_arrays = NULL;
 
@@ -1263,12 +1180,9 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
 
                 rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_semaphores);
 
             rrddim_set_by_pointer(st_semaphores, rd_semaphores, ipc_sem.semaphores);
             rrdset_done(st_semaphores);
-
-            // --------------------------------------------------------------------
 
             if (unlikely(!st_semaphore_arrays)) {
                 st_semaphore_arrays = rrdset_create_localhost(
@@ -1288,7 +1202,6 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
 
                 rd_semaphore_arrays = rrddim_add(st_semaphore_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_semaphore_arrays);
 
             rrddim_set_by_pointer(st_semaphore_arrays, rd_semaphore_arrays, ipc_sem.sets);
             rrdset_done(st_semaphore_arrays);
@@ -1298,7 +1211,6 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // kern.ipc.shm
 
 int do_kern_ipc_shm(int update_every, usec_t dt) {
@@ -1340,8 +1252,6 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                 }
             }
 
-            // --------------------------------------------------------------------
-
             static RRDSET *st_segs = NULL, *st_size = NULL;
             static RRDDIM *rd_segments = NULL, *rd_allocated = NULL;
 
@@ -1363,12 +1273,9 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
 
                 rd_segments = rrddim_add(st_segs, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_segs);
 
             rrddim_set_by_pointer(st_segs, rd_segments, ipc_shm.segs);
             rrdset_done(st_segs);
-
-            // --------------------------------------------------------------------
 
             if (unlikely(!st_size)) {
                 st_size = rrdset_create_localhost(
@@ -1388,7 +1295,6 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
 
                 rd_allocated = rrddim_add(st_size, "allocated", NULL, 1, KILO_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_size);
 
             rrddim_set_by_pointer(st_size, rd_allocated, ipc_shm.segsize);
             rrdset_done(st_size);
@@ -1398,7 +1304,6 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // kern.ipc.msq
 
 int do_kern_ipc_msq(int update_every, usec_t dt) {
@@ -1446,8 +1351,6 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                 }
             }
 
-            // --------------------------------------------------------------------
-
             static RRDSET *st_queues = NULL, *st_messages = NULL, *st_size = NULL;
             static RRDDIM *rd_queues = NULL, *rd_messages = NULL, *rd_allocated = NULL, *rd_used = NULL;
 
@@ -1469,12 +1372,9 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
 
                 rd_queues = rrddim_add(st_queues, "queues", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_queues);
 
             rrddim_set_by_pointer(st_queues, rd_queues, ipc_msq.queues);
             rrdset_done(st_queues);
-
-            // --------------------------------------------------------------------
 
             if (unlikely(!st_messages)) {
                 st_messages = rrdset_create_localhost(
@@ -1494,12 +1394,9 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
 
                 rd_messages = rrddim_add(st_messages, "messages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_messages);
 
             rrddim_set_by_pointer(st_messages, rd_messages, ipc_msq.messages);
             rrdset_done(st_messages);
-
-            // --------------------------------------------------------------------
 
             if (unlikely(!st_size)) {
                 st_size = rrdset_create_localhost(
@@ -1520,7 +1417,6 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                 rd_allocated = rrddim_add(st_size, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_used = rrddim_add(st_size, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_size);
 
             rrddim_set_by_pointer(st_size, rd_allocated, ipc_msq.allocsize);
             rrddim_set_by_pointer(st_size, rd_used, ipc_msq.usedsize);
@@ -1531,7 +1427,6 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // uptime
 
 int do_uptime(int update_every, usec_t dt) {
@@ -1539,8 +1434,6 @@ int do_uptime(int update_every, usec_t dt) {
     struct timespec up_time;
 
     clock_gettime(CLOCK_UPTIME, &up_time);
-
-    // --------------------------------------------------------------------
 
     static RRDSET *st = NULL;
     static RRDDIM *rd = NULL;
@@ -1563,15 +1456,12 @@ int do_uptime(int update_every, usec_t dt) {
 
         rd = rrddim_add(st, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(st);
 
     rrddim_set_by_pointer(st, rd, up_time.tv_sec);
     rrdset_done(st);
-
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.isr
 
 int do_net_isr(int update_every, usec_t dt) {
@@ -1668,8 +1558,6 @@ int do_net_isr(int update_every, usec_t dt) {
         return 1;
     }
 
-    // --------------------------------------------------------------------
-
     if (likely(do_netisr)) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_dispatched = NULL, *rd_hybrid_dispatched = NULL, *rd_qdrops = NULL, *rd_queued = NULL;
@@ -1695,7 +1583,6 @@ int do_net_isr(int update_every, usec_t dt) {
             rd_qdrops            = rrddim_add(st, "qdrops",            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_queued            = rrddim_add(st, "queued",            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_dispatched,        netisr_stats[number_of_cpus].dispatched);
         rrddim_set_by_pointer(st, rd_hybrid_dispatched, netisr_stats[number_of_cpus].hybrid_dispatched);
@@ -1703,8 +1590,6 @@ int do_net_isr(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_queued,            netisr_stats[number_of_cpus].queued);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if (likely(do_netisr_per_core)) {
         static struct softnet_chart {
@@ -1752,7 +1637,6 @@ int do_net_isr(int update_every, usec_t dt) {
                 all_softnet_charts[i].rd_queued            = rrddim_add(all_softnet_charts[i].st, "queued",
                                                                 NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-            else rrdset_next(all_softnet_charts[i].st);
 
             rrddim_set_by_pointer(all_softnet_charts[i].st, all_softnet_charts[i].rd_dispatched,
                                   netisr_stats[i].dispatched);
@@ -1769,7 +1653,6 @@ int do_net_isr(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet.tcp.states
 
 int do_net_inet_tcp_states(int update_every, usec_t dt) {
@@ -1783,9 +1666,6 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
         error("DISABLED: net.inet.tcp.states module");
         return 1;
     } else {
-
-        // --------------------------------------------------------------------
-
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -1806,8 +1686,7 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
             );
 
             rd = rrddim_add(st, "CurrEstab", "connections", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        } else
-            rrdset_next(st);
+        }
 
         rrddim_set_by_pointer(st, rd, tcps_states[TCPS_ESTABLISHED]);
         rrdset_done(st);
@@ -1816,7 +1695,6 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet.tcp.stats
 
 int do_net_inet_tcp_stats(int update_every, usec_t dt) {
@@ -1866,9 +1744,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
             error("DISABLED: net.inet.tcp.stats module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             if (likely(do_tcp_packets)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_segs = NULL, *rd_out_segs = NULL;
@@ -1891,15 +1766,12 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                     rd_in_segs  = rrddim_add(st, "InSegs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_segs = rrddim_add(st, "OutSegs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_segs,  tcpstat.tcps_rcvtotal);
                 rrddim_set_by_pointer(st, rd_out_segs, tcpstat.tcps_sndtotal);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_tcp_errors)) {
                 static RRDSET *st = NULL;
@@ -1926,8 +1798,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                     rd_in_errs      = rrddim_add(st, "InErrs",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_csum_errs = rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_retrans_segs = rrddim_add(st, "RetransSegs",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
 #if __FreeBSD__ >= 11
                 rrddim_set_by_pointer(st, rd_in_errs,      tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvreassfull +
@@ -1939,8 +1810,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_retrans_segs, tcpstat.tcps_sndrexmitpack);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_tcp_handshake)) {
                 static RRDSET *st = NULL;
@@ -1969,8 +1838,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                     rd_active_opens  = rrddim_add(st, "ActiveOpens",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_passive_opens = rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_attempt_fails = rrddim_add(st, "AttemptFails", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_estab_resets,  tcpstat.tcps_drops);
                 rrddim_set_by_pointer(st, rd_active_opens,  tcpstat.tcps_connattempt);
@@ -1978,8 +1846,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_attempt_fails, tcpstat.tcps_conndrops);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
                                                                (tcpstat.tcps_rcvpackafterwin ||
@@ -2016,7 +1882,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                     rd_on_timeout = rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_on_linger  = rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd_on_data,    tcpstat.tcps_rcvpackafterwin);
                 rrddim_set_by_pointer(st, rd_on_close,   tcpstat.tcps_rcvafterclose);
@@ -2025,8 +1890,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_on_linger,  tcpstat.tcps_finwait2_drops);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
                                                         (tcpstat.tcps_rcvoopack ||
@@ -2054,13 +1917,10 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                     rd_ofo_queue = rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd_ofo_queue,   tcpstat.tcps_rcvoopack);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_tcpext_syncookies == CONFIG_BOOLEAN_YES || (do_tcpext_syncookies == CONFIG_BOOLEAN_AUTO &&
                                                                (tcpstat.tcps_sc_sendcookie ||
@@ -2092,15 +1952,12 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                     rd_send   = rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_failed = rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd_recv,   tcpstat.tcps_sc_recvcookie);
                 rrddim_set_by_pointer(st, rd_send,   tcpstat.tcps_sc_sendcookie);
                 rrddim_set_by_pointer(st, rd_failed, tcpstat.tcps_sc_zonefail);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if(do_tcpext_listen == CONFIG_BOOLEAN_YES || (do_tcpext_listen == CONFIG_BOOLEAN_AUTO &&
                                                           (tcpstat.tcps_listendrop ||
@@ -2129,15 +1986,10 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                     rd_overflows = rrddim_add(st_listen, "ListenOverflows", "overflows",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else
-                    rrdset_next(st_listen);
 
                 rrddim_set_by_pointer(st_listen, rd_overflows, tcpstat.tcps_listendrop);
-
                 rrdset_done(st_listen);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
                                                  (tcpstat.tcps_ecn_ce ||
@@ -2172,7 +2024,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                     rd_ect0   = rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_ect1   = rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd_ce,     tcpstat.tcps_ecn_ce);
                 rrddim_set_by_pointer(st, rd_no_ect, tcpstat.tcps_ecn_ce - (tcpstat.tcps_ecn_ect0 +
@@ -2191,7 +2042,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet.udp.stats
 
 int do_net_inet_udp_stats(int update_every, usec_t dt) {
@@ -2216,9 +2066,6 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
             error("DISABLED: net.inet.udp.stats module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             if (likely(do_udp_packets)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
@@ -2241,15 +2088,12 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
 
                     rd_in  = rrddim_add(st, "InDatagrams",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out = rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,  udpstat.udps_ipackets);
                 rrddim_set_by_pointer(st, rd_out, udpstat.udps_opackets);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_udp_errors)) {
                 static RRDSET *st = NULL;
@@ -2279,8 +2123,7 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                     rd_recv_buf_errors = rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_csum_errors  = rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_ignored_multi   = rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_errors,       udpstat.udps_hdrops + udpstat.udps_badlen);
                 rrddim_set_by_pointer(st, rd_no_ports,        udpstat.udps_noport);
@@ -2298,7 +2141,6 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet.icmp.stats
 
 int do_net_inet_icmp_stats(int update_every, usec_t dt) {
@@ -2337,8 +2179,6 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
             }
             icmp_total.msgs_in += icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort;
 
-            // --------------------------------------------------------------------
-
             if (likely(do_icmp_packets)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
@@ -2361,16 +2201,12 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
 
                     rd_in  = rrddim_add(st, "InMsgs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out = rrddim_add(st, "OutMsgs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,  icmp_total.msgs_in);
                 rrddim_set_by_pointer(st, rd_out, icmp_total.msgs_out);
-
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_icmp_errors)) {
                 static RRDSET *st = NULL;
@@ -2395,8 +2231,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                     rd_in      = rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out     = rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_csum = rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,      icmpstat.icps_badcode + icmpstat.icps_badlen +
                                                       icmpstat.icps_checksum + icmpstat.icps_tooshort);
@@ -2405,8 +2240,6 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
 
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_icmpmsg)) {
                 static RRDSET *st = NULL;
@@ -2432,14 +2265,12 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                     rd_out_reps = rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in       = rrddim_add(st, "InEchos",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out      = rrddim_add(st, "OutEchos",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_reps, icmpstat.icps_inhist[ICMP_ECHOREPLY]);
                 rrddim_set_by_pointer(st, rd_out_reps, icmpstat.icps_outhist[ICMP_ECHOREPLY]);
                 rrddim_set_by_pointer(st, rd_in, icmpstat.icps_inhist[ICMP_ECHO]);
                 rrddim_set_by_pointer(st, rd_out, icmpstat.icps_outhist[ICMP_ECHO]);
-
                 rrdset_done(st);
             }
         }
@@ -2451,7 +2282,6 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet.ip.stats
 
 int do_net_inet_ip_stats(int update_every, usec_t dt) {
@@ -2482,9 +2312,6 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
             error("DISABLED: net.inet.ip.stats module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             if (likely(do_ip_packets)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_receives = NULL, *rd_out_requests = NULL, *rd_forward_datagrams = NULL,
@@ -2510,8 +2337,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                     rd_out_requests      = rrddim_add(st, "OutRequests",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_forward_datagrams = rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_delivers       = rrddim_add(st, "InDelivers",    "delivered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_receives,       ipstat.ips_total);
                 rrddim_set_by_pointer(st, rd_out_requests,      ipstat.ips_localout);
@@ -2519,8 +2345,6 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_in_delivers,       ipstat.ips_delivered);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsout)) {
                 static RRDSET *st = NULL;
@@ -2547,16 +2371,13 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                     rd_ok      = rrddim_add(st, "FragOKs",     "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_fails   = rrddim_add(st, "FragFails",   "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_created = rrddim_add(st, "FragCreates", "created", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_ok,      ipstat.ips_fragmented);
                 rrddim_set_by_pointer(st, rd_fails,   ipstat.ips_cantfrag);
                 rrddim_set_by_pointer(st, rd_created, ipstat.ips_ofragments);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsin)) {
                 static RRDSET *st = NULL;
@@ -2583,16 +2404,13 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                     rd_ok     = rrddim_add(st, "ReasmOKs",   "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_failed = rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_all    = rrddim_add(st, "ReasmReqds", "all",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_ok,     ipstat.ips_fragments);
                 rrddim_set_by_pointer(st, rd_failed, ipstat.ips_fragdropped);
                 rrddim_set_by_pointer(st, rd_all,    ipstat.ips_reassembled);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_ip_errors)) {
                 static RRDSET *st = NULL;
@@ -2624,8 +2442,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                     rd_out_no_routes     = rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_addr_errors    = rrddim_add(st, "InAddrErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_unknown_protos = rrddim_add(st, "InUnknownProtos", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_discards,       ipstat.ips_badsum + ipstat.ips_tooshort +
                                                                 ipstat.ips_toosmall + ipstat.ips_toolong);
@@ -2646,7 +2463,6 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet6.ip6.stats
 
 int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
@@ -2680,9 +2496,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
             error("DISABLED: net.inet6.ip6.stats module");
             return 1;
         } else {
-
-            // --------------------------------------------------------------------
-
             if (do_ip6_packets == CONFIG_BOOLEAN_YES || (do_ip6_packets == CONFIG_BOOLEAN_AUTO &&
                                                          (ip6stat.ip6s_localout ||
                                                           ip6stat.ip6s_total ||
@@ -2714,8 +2527,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                     rd_sent      = rrddim_add(st, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_forwarded = rrddim_add(st, "forwarded", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_delivers  = rrddim_add(st, "delivers",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_sent,      ip6stat.ip6s_localout);
                 rrddim_set_by_pointer(st, rd_received,  ip6stat.ip6s_total);
@@ -2723,8 +2535,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_delivers,  ip6stat.ip6s_delivered);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ip6_fragsout == CONFIG_BOOLEAN_YES || (do_ip6_fragsout == CONFIG_BOOLEAN_AUTO &&
                                                           (ip6stat.ip6s_fragmented ||
@@ -2757,16 +2567,13 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                     rd_ok     = rrddim_add(st, "ok",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_failed = rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_all    = rrddim_add(st, "all",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_ok,     ip6stat.ip6s_fragmented);
                 rrddim_set_by_pointer(st, rd_failed, ip6stat.ip6s_cantfrag);
                 rrddim_set_by_pointer(st, rd_all,    ip6stat.ip6s_ofragments);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ip6_fragsin == CONFIG_BOOLEAN_YES || (do_ip6_fragsin == CONFIG_BOOLEAN_AUTO &&
                                                          (ip6stat.ip6s_reassembled ||
@@ -2801,8 +2608,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                     rd_failed  = rrddim_add(st, "failed",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_timeout = rrddim_add(st, "timeout", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_all     = rrddim_add(st, "all",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_ok,      ip6stat.ip6s_reassembled);
                 rrddim_set_by_pointer(st, rd_failed,  ip6stat.ip6s_fragdropped);
@@ -2810,8 +2616,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_all,     ip6stat.ip6s_fragments);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ip6_errors == CONFIG_BOOLEAN_YES || (do_ip6_errors == CONFIG_BOOLEAN_AUTO &&
                                                         (ip6stat.ip6s_toosmall ||
@@ -2856,8 +2660,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                     rd_in_truncated_pkts = rrddim_add(st, "InTruncatedPkts", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_no_routes      = rrddim_add(st, "InNoRoutes",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_no_routes     = rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_discards,       ip6stat.ip6s_toosmall);
                 rrddim_set_by_pointer(st, rd_out_discards,      ip6stat.ip6s_odropped);
@@ -2878,7 +2681,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
     return 0;
 }
 
-// --------------------------------------------------------------------------------------------------------------------
 // net.inet6.icmp6.stats
 
 int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
@@ -2966,16 +2768,12 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
 
                     rd_received = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_sent     = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_received, icmp6_total.msgs_out);
                 rrddim_set_by_pointer(st, rd_sent,     icmp6_total.msgs_in);
-
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_redir == CONFIG_BOOLEAN_YES || (do_icmp6_redir == CONFIG_BOOLEAN_AUTO &&
                                                          (icmp6stat.icp6s_inhist[ND_REDIRECT] ||
@@ -3004,15 +2802,12 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
 
                     rd_received = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_sent     = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_received, icmp6stat.icp6s_outhist[ND_REDIRECT]);
                 rrddim_set_by_pointer(st, rd_sent, icmp6stat.icp6s_inhist[ND_REDIRECT]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_errors == CONFIG_BOOLEAN_YES || (do_icmp6_errors == CONFIG_BOOLEAN_AUTO &&
                                                           (icmp6stat.icp6s_badcode ||
@@ -3060,8 +2855,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                     rd_out_dest_unreachs = rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_time_excds    = rrddim_add(st, "OutTimeExcds",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_parm_problems = rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_errors,         icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen +
                                                                 icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort);
@@ -3076,8 +2870,6 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_out_parm_problems, icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_echos == CONFIG_BOOLEAN_YES || (do_icmp6_echos == CONFIG_BOOLEAN_AUTO &&
                                                          (icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST] ||
@@ -3110,8 +2902,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                     rd_out         = rrddim_add(st, "OutEchos",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_replies  = rrddim_add(st, "InEchoReplies",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_replies = rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,          icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST]);
                 rrddim_set_by_pointer(st, rd_out,         icmp6stat.icp6s_outhist[ICMP6_ECHO_REQUEST]);
@@ -3119,8 +2910,6 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_out_replies, icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_router == CONFIG_BOOLEAN_YES || (do_icmp6_router == CONFIG_BOOLEAN_AUTO &&
                                                           (icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT] ||
@@ -3154,8 +2943,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                     rd_out_solicits       = rrddim_add(st, "OutSolicits",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_advertisements  = rrddim_add(st, "InAdvertisements",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_advertisements = rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_solicits,        icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT]);
                 rrddim_set_by_pointer(st, rd_out_solicits,       icmp6stat.icp6s_outhist[ND_ROUTER_SOLICIT]);
@@ -3163,8 +2951,6 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_out_advertisements, icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_neighbor == CONFIG_BOOLEAN_YES || (do_icmp6_neighbor == CONFIG_BOOLEAN_AUTO &&
                                                             (icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT] ||
@@ -3198,8 +2984,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                     rd_out_solicits       = rrddim_add(st, "OutSolicits",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_advertisements  = rrddim_add(st, "InAdvertisements",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_advertisements = rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_solicits,        icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT]);
                 rrddim_set_by_pointer(st, rd_out_solicits,       icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]);
@@ -3207,8 +2992,6 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_out_advertisements, icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_types == CONFIG_BOOLEAN_YES || (do_icmp6_types == CONFIG_BOOLEAN_AUTO &&
                                                          (icmp6stat.icp6s_inhist[1] ||
@@ -3255,8 +3038,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                     rd_out_133 = rrddim_add(st, "OutType133", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_135 = rrddim_add(st, "OutType135", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_143 = rrddim_add(st, "OutType143", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in_1,    icmp6stat.icp6s_inhist[1]);
                 rrddim_set_by_pointer(st, rd_in_128,  icmp6stat.icp6s_inhist[128]);

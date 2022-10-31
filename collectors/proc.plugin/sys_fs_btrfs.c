@@ -587,7 +587,6 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 add_labels_to_btrfs(node, node->st_allocation_disks);
             }
-            else rrdset_next(node->st_allocation_disks);
 
             // unsigned long long disk_used = node->allocation_data_disk_used + node->allocation_metadata_disk_used + node->allocation_system_disk_used;
             unsigned long long disk_total = node->allocation_data_disk_total + node->allocation_metadata_disk_total + node->allocation_system_disk_total;
@@ -642,7 +641,6 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 add_labels_to_btrfs(node, node->st_allocation_data);
             }
-            else rrdset_next(node->st_allocation_data);
 
             rrddim_set_by_pointer(node->st_allocation_data, node->rd_allocation_data_free, node->allocation_data_total_bytes - node->allocation_data_bytes_used);
             rrddim_set_by_pointer(node->st_allocation_data, node->rd_allocation_data_used, node->allocation_data_bytes_used);
@@ -688,7 +686,6 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 add_labels_to_btrfs(node, node->st_allocation_metadata);
             }
-            else rrdset_next(node->st_allocation_metadata);
 
             rrddim_set_by_pointer(node->st_allocation_metadata, node->rd_allocation_metadata_free, node->allocation_metadata_total_bytes - node->allocation_metadata_bytes_used - node->allocation_global_rsv_size);
             rrddim_set_by_pointer(node->st_allocation_metadata, node->rd_allocation_metadata_used, node->allocation_metadata_bytes_used);
@@ -734,7 +731,6 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 add_labels_to_btrfs(node, node->st_allocation_system);
             }
-            else rrdset_next(node->st_allocation_system);
 
             rrddim_set_by_pointer(node->st_allocation_system, node->rd_allocation_system_free, node->allocation_system_total_bytes - node->allocation_system_bytes_used);
             rrddim_set_by_pointer(node->st_allocation_system, node->rd_allocation_system_used, node->allocation_system_bytes_used);
