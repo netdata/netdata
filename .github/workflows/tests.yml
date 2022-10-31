@@ -53,7 +53,8 @@ jobs:
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
           sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
-                                  libnetfilter-acct-dev libmongoc-dev  libcmocka-dev libzstd-dev
+                                  libnetfilter-acct-dev libmongoc-dev  libcmocka-dev libzstd-dev \
+                                  libgtest-dev libgmock-dev
       - name: Configure
         run: |
           autoreconf -ivf
