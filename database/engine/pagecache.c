@@ -387,10 +387,9 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
 
     assert(number < ctx->max_cache_pages);
 
-    // TODO: CHECK FOR EVICTION
-//    struct rrdeng_page_descr *list_to_destroy[number];
+    struct rrdeng_page_descr *list_to_destroy[number];
     struct rrdeng_page_descr *descr;
-//    unsigned deleted=0;
+    unsigned deleted=0;
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
@@ -400,8 +399,8 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
         do {
             if (!(descr = pg_cache_try_evict_one_page_unsafe(ctx)))
                 break;
-//            if (deleted < number)
-//                list_to_destroy[deleted++] = descr;
+            if (deleted < number)
+                list_to_destroy[deleted++] = descr;
             ++count;
         } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
         debug(D_RRDENGINE, "Evicted %u pages.", count);
@@ -413,8 +412,12 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     }
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
-    //for (unsigned i=0; i < deleted; i++)
-    //    pg_cache_punch_hole(ctx, list_to_destroy[i], 0, 1, NULL);
+    for (unsigned i=0; i < deleted; i++) {
+        //FIXME: Use macro to decide if V2
+        descr = list_to_destroy[i];
+        if (descr->extent == NULL)
+            pg_cache_punch_hole(ctx, descr, 0, 0, NULL, false);
+    }
 
     return ret;
 }
