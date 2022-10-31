@@ -933,14 +933,9 @@ typedef struct query_engine_ops {
 
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops).current_plan_expire_time)
 
-static bool query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after) {
+static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after) {
     if(unlikely(plan_id >= ops->plan.entries))
         plan_id = ops->plan.entries - 1;
-
-    if(!query_metric_is_valid_tier(ops->qm, ops->plan.data[plan_id].tier)) {
-        ops->current_plan_expire_time = ops->plan.data[plan_id].before;
-        return false;
-    }
 
     time_t after = ops->plan.data[plan_id].after;
     time_t before = ops->plan.data[plan_id].before;
@@ -956,20 +951,21 @@ static bool query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     ops->finalize = ops->tier_ptr->eng->api.query_ops.finalize;
     ops->current_plan = plan_id;
     ops->current_plan_expire_time = ops->plan.data[plan_id].before;
-
-    return true;
 }
 
 static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
     internal_error(now < ops->current_plan_expire_time && now < ops->plan.data[ops->current_plan].before,
                    "QUERY: switching query plan too early!");
 
+    size_t old_plan = ops->current_plan;
+
     time_t next_plan_before_time;
     do {
         ops->current_plan++;
 
         if (ops->current_plan >= ops->plan.entries) {
-            ops->current_plan = ops->plan.entries - 1;
+            ops->current_plan = old_plan;
+            ops->current_plan_expire_time = ops->r->internal.qt->window.before;
             // let the query run with current plan
             // we will not switch it
             return;
@@ -978,9 +974,16 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
         next_plan_before_time = ops->plan.data[ops->current_plan].before;
     } while(now >= next_plan_before_time || last_point_end_time >= next_plan_before_time);
 
+    if(!query_metric_is_valid_tier(ops->qm, ops->plan.data[ops->current_plan].tier)) {
+        ops->current_plan = old_plan;
+        ops->current_plan_expire_time = ops->r->internal.qt->window.before;
+        return;
+    }
+
     if(ops->finalize) {
         ops->finalize(&ops->handle);
         ops->finalize = NULL;
+        ops->is_finished = NULL;
     }
 
     // internal_error(true, "QUERY: switched plan to %zu (all is %zu), previous expiration was %ld, this starts at %ld, now is %ld, last_point_end_time %ld", ops->current_plan, ops->plan.entries, ops->plan.data[ops->current_plan-1].before, ops->plan.data[ops->current_plan].after, now, last_point_end_time);
@@ -1101,7 +1104,12 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
     //internal_error(true, "%s", buffer_tostring(wb));
 
-    return query_planer_activate_plan(ops, 0, 0);
+    if(!query_metric_is_valid_tier(ops->qm, ops->plan.data[0].tier))
+        return false;
+
+    query_planer_activate_plan(ops, 0, 0);
+
+    return true;
 }
 
 
