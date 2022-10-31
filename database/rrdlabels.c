@@ -577,8 +577,8 @@ void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLAB
     rrdlabels_sanitize_name(n, name, RRDLABELS_MAX_NAME_LENGTH);
     rrdlabels_sanitize_value(v, value, RRDLABELS_MAX_VALUE_LENGTH);
 
-    if(!*n) {
-        error("%s: cannot add name '%s' (value '%s') which is sanitized as empty string", __FUNCTION__, name, value);
+    if (!*n) {
+        // sanitized name is empty
         return;
     }
 

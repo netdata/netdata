@@ -1556,14 +1556,6 @@ if(UNIT_TESTING)
     include(CTest)
 
 if(BUILD_TESTING)
-    add_executable(str2ld_testdriver libnetdata/tests/test_str2ld.c)
-    target_link_libraries(str2ld_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
-    add_test(NAME test_str2ld COMMAND str2ld_testdriver)
-
-    add_executable(storage_number_testdriver libnetdata/storage_number/tests/test_storage_number.c)
-    target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
-    add_test(NAME test_storage_number COMMAND storage_number_testdriver)
-
     set(EXPORTING_ENGINE_TEST_FILES
         exporting/tests/test_exporting_engine.c
         exporting/tests/test_exporting_engine.h
@@ -1722,24 +1714,10 @@ endif()
     target_link_libraries(valid_urls_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
 #    add_test(NAME test_valid_urls COMMAND valid_urls_testdriver)
 
-    set(CGROUPS_TEST_FILES
-        collectors/cgroups.plugin/tests/test_cgroups_plugin.c
-        collectors/cgroups.plugin/tests/test_cgroups_plugin.h
-        collectors/cgroups.plugin/tests/test_doubles.c
-        database/rrdlabels.c
-        database/rrd.h
-    )
-    add_executable(cgroups_testdriver ${CGROUPS_TEST_FILES} ${CGROUPS_PLUGIN_FILES})
-    target_link_libraries(cgroups_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
-    add_test(NAME test_cgroups COMMAND cgroups_testdriver)
-
     set_target_properties(
-        str2ld_testdriver
-        storage_number_testdriver
         exporting_engine_testdriver
         web_api_testdriver
         valid_urls_testdriver
-        cgroups_testdriver
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests
     )
 
