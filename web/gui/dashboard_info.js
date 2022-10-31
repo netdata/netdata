@@ -7573,10 +7573,10 @@ netdataDashboard.context = {
     // Ping
 
     'ping.host_rtt': {
-        info: 'Round-trip time (RTT) is the time it takes for a data packet to reach a destination and return back to its original source.'
+        info: 'Round-trip time (RTT) is the time it takes for a data packet to reach its destination and return back to its original source.'
     },
     'ping.host_packet_loss': {
-        info: 'Packet loss occurs when one or more transmitted data packets do not reach their destination. Usually caused by either data transfer errors, network congestion, or firewall blocking. Also be aware that ICMP echo packets are often treated second-class by routers and target hosts. This means that applications may not experience packet loss while ping tests show packet loss.'
+        info: 'Packet loss occurs when one or more transmitted data packets do not reach their destination. Usually caused by data transfer errors, network congestion or firewall blocking. ICMP echo packets are often treated as lower priority by routers and target hosts, so ping test packet loss may not always translate to application packet loss.'
     },
     'ping.host_packets': {
         info: 'Number of ICMP messages sent and received. These counters should be equal if there is no packet loss.'
