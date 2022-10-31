@@ -550,7 +550,6 @@ void rrdhost_update(RRDHOST *host
     UNUSED(guid);
 
     host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
@@ -584,11 +583,11 @@ void rrdhost_update(RRDHOST *host
     if(host->rrd_update_every != update_every)
         error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_update_every, update_every);
 
-    if(host->rrd_history_entries < history)
-        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
-
     if(host->rrd_memory_mode != mode)
         error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+
+    else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
+        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
 
     // update host tags
     rrdhost_init_tags(host, tags);
@@ -630,8 +629,6 @@ void rrdhost_update(RRDHOST *host
 
     if (health_enabled)
         health_thread_spawn(host);
-
-    return;
 }
 
 RRDHOST *rrdhost_find_or_create(
