@@ -805,8 +805,6 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, bool 
 //    tc_device_index_del(d);
 //}
 
-#define PLUGINSD_MAX_WORDS 20
-
 static inline int tc_space(char c) {
     switch(c) {
     case ' ':

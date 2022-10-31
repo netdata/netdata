@@ -46,6 +46,9 @@ unsigned int default_compression_enabled = 1;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
+bool default_rrdpush_enable_replication = true;
+time_t default_rrdpush_seconds_to_replicate = 86400;
+time_t default_rrdpush_replication_step = 600;
 #ifdef ENABLE_HTTPS
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_ca_path = NULL;
@@ -100,6 +103,11 @@ int rrdpush_init() {
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
+
+    default_rrdpush_enable_replication = config_get_boolean(CONFIG_SECTION_DB, "enable replication", default_rrdpush_enable_replication);
+    default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
+    default_rrdpush_replication_step = config_get_number(CONFIG_SECTION_DB, "seconds per replication step", default_rrdpush_replication_step);
+
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time);
 
 #ifdef ENABLE_COMPRESSION
@@ -153,16 +161,20 @@ int rrdpush_init() {
 // this is for the first iterations of each chart
 unsigned int remote_clock_resync_iterations = 60;
 
-
 static inline bool should_send_chart_matching(RRDSET *st) {
     // get all the flags we need to check, with one atomic operation
     RRDSET_FLAGS flags = rrdset_flag_check(st,
-             RRDSET_FLAG_UPSTREAM_SEND
-            |RRDSET_FLAG_UPSTREAM_IGNORE
-            |RRDSET_FLAG_ANOMALY_RATE_CHART
-            |RRDSET_FLAG_ANOMALY_DETECTION);
+              RRDSET_FLAG_UPSTREAM_SEND
+            | RRDSET_FLAG_UPSTREAM_IGNORE
+            | RRDSET_FLAG_ANOMALY_RATE_CHART
+            | RRDSET_FLAG_ANOMALY_DETECTION
+            | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
+            );
 
-    if(unlikely(!flags)) {
+    if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
+        return false;
+
+    if(unlikely(!(flags & (RRDSET_FLAG_UPSTREAM_SEND | RRDSET_FLAG_UPSTREAM_IGNORE)))) {
         RRDHOST *host = st->rrdhost;
 
         // Do not stream anomaly rates charts.
@@ -295,20 +307,25 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the chart local custom variables
     rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
 
+    if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
+        time_t first_entry_local = rrdset_first_entry_t(st);
+        time_t last_entry_local = st->last_updated.tv_sec;
+        buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
+    }
+
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
 
 // sends the current chart dimensions
-static inline void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) {
+void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) {
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
-    buffer_print_llu(wb, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
-    if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_ll(wb, st->last_collected_time.tv_sec);
-    }
+    if(stream_has_capability(s, STREAM_CAP_REPLICATION) || st->last_collected_time.tv_sec > st->upstream_resync_time)
+        buffer_print_llu(wb, st->usec_since_last_update);
+    else
+        buffer_fast_strcat(wb, "0", 1);
 
     buffer_fast_strcat(wb, "\n", 1);
 
@@ -350,62 +367,30 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     return true;
 }
 
-bool rrdpush_incremental_transmission_of_chart_definitions(RRDHOST *host, DICTFE *dictfe, bool restart, bool stop) {
-    if(stop || restart)
-        dictionary_foreach_done(dictfe);
-
-    if(stop)
-        return false;
-
-    RRDSET *st = NULL;
-
-    if(unlikely(!dictfe->dict)) {
-        st = dictionary_foreach_start_rw(dictfe, host->rrdset_root_index, DICTIONARY_LOCK_REENTRANT);
-    }
-    else
-        st = dictionary_foreach_next(dictfe);
-
-    do {
-        while(st && !need_to_send_chart_definition(st))
-            st = dictionary_foreach_next(dictfe);
-
-        if(st && rrdset_push_chart_definition_now(st))
-            break;
-
-    } while((st = dictionary_foreach_next(dictfe)));
-
-    if (!st) {
-        dictionary_foreach_done(dictfe);
-        return false;
-    }
-
-    return true;
-}
-
 void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation
-    RRDHOST_FLAGS flags = rrdhost_flag_check(host,
+    RRDHOST_FLAGS host_flags = rrdhost_flag_check(host,
               RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
             | RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS
             | RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN
         );
 
     // check if we are not connected
-    if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
+    if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
 
-        if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
+        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
             rrdpush_sender_thread_spawn(host);
 
-        if(unlikely(!(flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
+        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
             error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
         return;
     }
-    else if(unlikely(flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
+    else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
         info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
@@ -418,7 +403,8 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(need_to_send_chart_definition(st)))
         rrdpush_send_chart_definition(wb, st);
 
-    rrdpush_send_chart_metrics(wb, st, host->sender);
+    if (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+        rrdpush_send_chart_metrics(wb, st, host->sender);
 
     sender_commit(host->sender, wb);
 }
@@ -949,7 +935,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_CLABELS) buffer_strcat(wb, "CLABELS ");
     if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
-    if(caps & STREAM_CAP_GAP_FILLING) buffer_strcat(wb, "GAP_FILLING ");
+    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

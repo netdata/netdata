@@ -1816,10 +1816,11 @@ inline int config_isspace(char c)
 }
 
 // split a text into words, respecting quotes
-inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
+inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
 {
     char *s = str, quote = 0;
-    int i = 0, rec = 0;
+    size_t i = 0;
+    int rec = 0;
     char *recover = recover_input;
 
     // skip all white space
@@ -1891,13 +1892,13 @@ inline int quoted_strings_splitter(char *str, char **words, int max_words, int (
             s++;
     }
 
-    // terminate the words
-    memset(&words[i], 0, (max_words - i) * sizeof (char *));
+    if (i < max_words)
+        words[i] = NULL;
 
     return i;
 }
 
-inline int pluginsd_split_words(char *str, char **words, int max_words, char *recover_input, char **recover_location, int max_recover)
+inline size_t pluginsd_split_words(char *str, char **words, size_t max_words, char *recover_input, char **recover_location, int max_recover)
 {
     return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
 }

@@ -251,6 +251,9 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , NULL  //destination
         , NULL  // api key
         , NULL  // send charts matching
+        , false // rrdpush_enable_replication
+        , 0     // rrdpush_seconds_to_replicate
+        , 0     // rrdpush_replication_step
         , system_info
         , 1
     );

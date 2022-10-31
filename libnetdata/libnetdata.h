@@ -405,8 +405,16 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
 int config_isspace(char c);
 int pluginsd_space(char c);
-int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
-int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);
+
+size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
+size_t pluginsd_split_words(char *str, char **words, size_t max_words, char *recover_string, char **recover_location, int max_recover);
+
+static inline char *get_word(char **words, size_t num_words, size_t index) {
+    if (index >= num_words)
+        return NULL;
+
+    return words[index];
+}
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 

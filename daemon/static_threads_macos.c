@@ -12,18 +12,20 @@ const struct netdata_static_thread static_threads_macos[] = {
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = macos_main
+        .start_routine = macos_main,
+        .env_name = NULL,
+        .global_variable = NULL,
     },
 
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
 };
 
 const struct netdata_static_thread static_threads_freebsd[] = {
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
 };
 
 const struct netdata_static_thread static_threads_linux[] = {
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
 };
 
 struct netdata_static_thread *static_threads_get() {
