@@ -306,7 +306,7 @@ netdataDashboard.menu = {
     'ping': {
         title: 'Ping',
         icon: '<i class="fas fa-exchange-alt"></i>',
-        info: 'Measures round-tripe time and packet loss by sending ping messages to network hosts.'
+        info: 'Measures round-trip time and packet loss by sending ping messages to network hosts.'
     },
 
     'gearman': {
