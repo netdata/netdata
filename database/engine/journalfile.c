@@ -123,12 +123,12 @@ int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengi
 {
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
-    int ret;
+    int ret = 0;
     char path[RRDENG_PATH_MAX];
 
     if (likely(journalfile->journal_data)) {
-        generate_journalfilepath_v2(datafile, path, sizeof(path));
         if (munmap(journalfile->journal_data, journalfile->journal_data_size)) {
+            generate_journalfilepath_v2(datafile, path, sizeof(path));
             error("Failed to unmap journal index file for %s", path);
             ++ctx->stats.fs_errors;
             rrd_stat_atomic_add(&global_fs_errors, 1);
@@ -138,15 +138,16 @@ int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengi
         return 0;
     }
 
-    generate_journalfilepath(datafile, path, sizeof(path));
-
-    ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
-    if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+    if (likely(journalfile->file != -1)) {
+        ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
+        if (ret < 0) {
+            generate_journalfilepath(datafile, path, sizeof(path));
+            error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+            ++ctx->stats.fs_errors;
+            rrd_stat_atomic_add(&global_fs_errors, 1);
+        }
+        uv_fs_req_cleanup(&req);
     }
-    uv_fs_req_cleanup(&req);
     return ret;
 }
 
@@ -1265,6 +1266,16 @@ void migrate_journal_file_v2(
         internal_error(true, "ACTIVATING NEW INDEX JNL %llu   Number of deletions %lu, memory released = %u (Memory before = %u, Memory after = %u)",
              (now_realtime_usec() - start_loading) / USEC_PER_MS, number_of_metrics,
              bytes_before - bytes_after, bytes_before, bytes_after);
+
+        uv_fs_t req;
+        int ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
+        if (ret < 0) {
+            error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+            ++ctx->stats.fs_errors;
+            rrd_stat_atomic_add(&global_fs_errors, 1);
+        }
+        journalfile->file = -1;
+        uv_fs_req_cleanup(&req);
     }
     else {
         // If we failed and didnt process the entire list, free the rest
