@@ -25,6 +25,8 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## A
 
+- [**Agent** or **Netdata Agen**t](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
+
 - [**Agent-cloud link** or **ACLK**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud. 
 
 - [**Aggregate Function**](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
@@ -123,7 +125,9 @@ Use the alphabatized list below to find the answer to your single-term questions
 - [**Netdata**](https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md): Netdata is a monitoring tool designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
 metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack. 
 
-- [**Netdata Cloud** or **Cloud]**(https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+- [**Netdata Agent** or **Agent**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/overview.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
+
+- [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
 
 - [**Notifications**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md): Netdata can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team.
 
