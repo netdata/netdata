@@ -294,6 +294,20 @@ int is_legacy = 1;
     host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
     host->rrdpush_replication_step = rrdpush_replication_step;
 
+    switch(memory_mode) {
+        default:
+        case RRD_MEMORY_MODE_ALLOC:
+        case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_SAVE:
+        case RRD_MEMORY_MODE_RAM:
+            if(host->rrdpush_seconds_to_replicate > host->rrd_history_entries)
+                host->rrdpush_seconds_to_replicate = host->rrd_history_entries;
+            break;
+
+        case RRD_MEMORY_MODE_DBENGINE:
+            break;
+    }
+
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_mutex_init(&host->aclk_state_lock);
     netdata_mutex_init(&host->receiver_lock);
