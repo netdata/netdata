@@ -74,8 +74,6 @@ enum rrdeng_opcode {
     RRDENG_SHUTDOWN,
     RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
     RRDENG_QUIESCE,
-    RRDENG_INDEX_JOURNAL,
-    RRDENG_DEACTIVATE_PAGES,
 
     RRDENG_MAX_OPCODE
 };
@@ -103,10 +101,10 @@ struct rrdeng_cmd {
 
 struct rrdeng_work {
     uv_work_t req;
+    struct rrdengine_worker_config *wc;
     struct rrdengine_journalfile *journalfile;
     struct completion *completion;
 };
-
 
 struct rrdeng_cmdqueue {
     unsigned head, tail;
@@ -145,8 +143,8 @@ struct generic_io_descriptor {
 struct extent_cache_element {
     struct extent_info *extent; /* The ABA problem is avoided with the help of fileno below */
     unsigned fileno;
-    struct extent_cache_element *prev; /* LRU */
-    struct extent_cache_element *next; /* LRU */
+    struct extent_cache_element *prev;              /* LRU */
+    struct extent_cache_element *next;              /* LRU */
     struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
     uint8_t pages[MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE];
 };
@@ -157,7 +155,7 @@ struct extent_cache_element {
 struct extent_cache {
     struct extent_cache_element extent_array[MAX_CACHED_EXTENTS];
     unsigned allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
-    unsigned inflight_bitmap; /* 1 if the corresponding position in the extent_array is waiting for I/O */
+    unsigned inflight_bitmap;   /* 1 if the corresponding position in the extent_array is waiting for I/O */
 
     struct extent_cache_element *replaceQ_head; /* LRU */
     struct extent_cache_element *replaceQ_tail; /* MRU */
@@ -167,13 +165,14 @@ struct rrdengine_worker_config {
     struct rrdengine_instance *ctx;
 
     uv_thread_t thread;
-    uv_loop_t* loop;
+    uv_loop_t *loop;
     uv_async_t async;
 
     /* file deletion thread */
     uv_thread_t *now_deleting_files;
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
 
+    uint8_t running_journal_migration;
     /* dirty page deletion thread */
     uv_thread_t *now_invalidating_dirty_pages;
     /* set to 0 when now_invalidating_dirty_pages is still running */
@@ -237,9 +236,9 @@ extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
 extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
 extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
 
-#define NO_QUIESCE  (0) /* initial state when all operations function normally */
+#define NO_QUIESCE (0)  /* initial state when all operations function normally */
 #define SET_QUIESCE (1) /* set it before shutting down the instance, quiesce long running operations */
-#define QUIESCED    (2) /* is set after all threads have finished running */
+#define QUIESCED (2)    /* is set after all threads have finished running */
 
 typedef enum {
     LOAD_ERRORS_PAGE_FLIPPED_TIME = 0,
@@ -269,7 +268,7 @@ struct rrdengine_instance {
     unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
 
-    uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
+    uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
     uint8_t page_type; /* Default page type for this context */
 
     struct rrdengine_statistics stats;
@@ -285,10 +284,10 @@ void dbengine_page_free(void *page);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
-void rrdeng_test_quota(struct rrdengine_worker_config* wc);
-void rrdeng_worker(void* arg);
-void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);
-struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc);
+void rrdeng_test_quota(struct rrdengine_worker_config *wc);
+void rrdeng_worker(void *arg);
+void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
+struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
 int page_header_is_corrupted(struct journal_v2_header *j2_header, void *page_header);
 void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);

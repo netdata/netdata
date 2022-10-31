@@ -6,7 +6,6 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     struct generic_io_descriptor *io_descr = req->data;
     struct rrdengine_worker_config* wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
-    struct rrdengine_journalfile *journalfile = io_descr->data;
 
     debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     if (req->result < 0) {
@@ -15,9 +14,6 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
         error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     } else {
         debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
-    }
-    if (journalfile->datafile->fileno != ctx->last_fileno) {
-        info("JOURNAL FILE HAS BEEN ROTATED; LETS INDEX IT");
     }
 
     uv_fs_req_cleanup(req);
@@ -932,7 +928,10 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
             descr = unlikely(NULL == PValue) ? NULL : *PValue,
             ++entries) {
         // Write one descriptor and return the next data page location
-        data_page = journal_v2_write_data_page(j2_header, (void *) data_page, descr);
+//        if (likely(descr->extent && descr->extent->datafile->journalfile == journalfile)) {
+            data_page = journal_v2_write_data_page(j2_header, (void *)data_page, descr);
+//            metric_info->entries++;
+//        };
         if (unlikely(!data_page))
             break;
     }
@@ -977,7 +976,7 @@ void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
     while (extent) {
         for (uint8_t index = 0; index < extent->number_of_pages; index++) {
             struct rrdeng_page_descr *descr = extent->pages[index];
-            pg_cache_punch_hole(journalfile->datafile->ctx, descr, 0, 0, NULL, false);
+            pg_cache_punch_hole(journalfile->datafile->ctx, descr, 0, 0, NULL, false, true);
             count++;
         }
         extent = extent->next;
@@ -992,6 +991,22 @@ void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
     journalfile->datafile->extents.first = NULL;
 
     info("Removed %u page descriptors from memory", count);
+}
+
+// Caller needs to check journalfile->journal_data
+bool journalfile_ready_to_migrate(struct rrdengine_journalfile *journalfile)
+{
+    struct extent_info *extent = journalfile->datafile->extents.first;
+    while (extent) {
+        for (uint8_t index = 0; index < extent->number_of_pages; index++) {
+            struct rrdeng_page_descr *descr = extent->pages[index];
+            if (descr->extent == NULL)
+                return false;
+        }
+        extent = extent->next;
+    }
+
+    return true;
 }
 
 void start_page_deactivation(uv_work_t *req)
@@ -1022,6 +1037,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
     if (!with_lock) {
         // This is during startup, so we are the only ones accessing the structures
+        // thats why we can safely remote the entire page_index->JudyL_array
         for (entries = 0, index_time = 0, PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue; descr != NULL;
              PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
@@ -1031,6 +1047,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         }
         (void ) JudyLFreeArray(&page_index->JudyL_array, PJE0);
 
+        // Remove also all the extents
         struct extent_info *extent = journalfile->datafile->extents.first, *next_extent;
         while (extent) {
             next_extent = extent->next;
@@ -1041,9 +1058,9 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         return;
     }
     // This is while the agent is running.
-    uv_rwlock_wrlock(&page_index->lock);
-    deactivate_one_journalfile(journalfile);
-    uv_rwlock_wrunlock(&page_index->lock);
+    //uv_rwlock_wrlock(&page_index->lock);
+    //deactivate_one_journalfile(journalfile);
+    //uv_rwlock_wrunlock(&page_index->lock);
 }
 
 // Write a new journal file for faster access
@@ -1201,7 +1218,14 @@ void migrate_journal_file_v2(
         fatal_assert(NULL != PValue);
         page_index = *PValue;
         metric_info->page_index = page_index;
+
+        // Count all entries that exist in the array
+        // This is valid only during startup not when the agent is running
+        // When the agent is running and we do live migration we need to count the exact number of metrics
+        // that belong to the journal file
+        // This works because after migrating each journal file the entire page_index->JudyL_array is destroyed
         metric_info->entries = JudyLCount(page_index->JudyL_array, 0, -1, PJE0);
+
     }
     // Cleanup judy arrays we no longer need
     JudyLFreeArray(&metrics_JudyL_array, PJE0);
@@ -1255,7 +1279,7 @@ void migrate_journal_file_v2(
 
     // Write header to the file
     memcpy(data_start, &j2_header, sizeof(j2_header));
-    // File size counts
+    // File size counts to quota
     ctx->disk_space += total_file_size;
 
     internal_error(true, "FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
@@ -1263,19 +1287,18 @@ void migrate_journal_file_v2(
     if (keep_live) {
         journalfile->journal_data = data_start;
         journalfile->journal_data_size = total_file_size;
-        // HERE we need to remove old descriptors and activate the new ones
-        unsigned bytes_before = 0;
-        unsigned bytes_after = 0;
-        for (Index = 0; Index < number_of_metrics; Index++) {
-            bytes_before += JudyLMemUsed(uuid_list[Index].metric_info->page_index->JudyL_array);
-            journal_v2_remove_active_descriptors(journalfile, uuid_list[Index].metric_info, with_lock);
-            bytes_after += JudyLMemUsed(uuid_list[Index].metric_info->page_index->JudyL_array);
-            freez(uuid_list[Index].metric_info);
-        }
-        internal_error(true, "ACTIVATING NEW INDEX JNL %llu   Number of deletions %lu, memory released = %u (Memory before = %u, Memory after = %u)",
-             (now_realtime_usec() - start_loading) / USEC_PER_MS, number_of_metrics,
-             bytes_before - bytes_after, bytes_before, bytes_after);
 
+        // HERE we need to remove old descriptors and activate the new ones
+        // Note that journal_v2_remove_active_descriptors will destroy page_index->JudyL_array
+        {
+            for (Index = 0; Index < number_of_metrics; Index++) {
+                journal_v2_remove_active_descriptors(journalfile, uuid_list[Index].metric_info, with_lock);
+                freez(uuid_list[Index].metric_info);
+            }
+            internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        }
+
+        // Close old journalfile -- not needed anymore
         uv_fs_t req;
         int ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
         if (ret < 0) {
@@ -1355,10 +1378,16 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     if (ctx->last_fileno == journalfile->datafile->fileno)
         return 0;
 
-    if (should_try_migration == 1)
-        migrate_journal_file_v2(ctx, journalfile, datafile, true, false);
+    int migrate_on_startup = 1;
+
+    if (migrate_on_startup) {
+        if (should_try_migration == 1)
+            migrate_journal_file_v2(ctx, journalfile, datafile, true, false);
+        else
+            error_report("File %s cannot be migrated to the new journal format. Index will be allocated in memory", path);
+    }
     else
-        error_report("File %s cannot be migrated to the new journal format. Index will be allocated in memory", path);
+        info("Migration will happen as the agent is running");
     return 0;
 
     error:
@@ -1376,42 +1405,37 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 void after_journal_indexing(uv_work_t *req, int status)
 {
     struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_journalfile *journalfile = work_request->journalfile;
-    char path[RRDENG_PATH_MAX];
-
-    if (unlikely(!journalfile))
-        return;
-
-    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
+    struct rrdengine_worker_config *wc = work_request->wc;
 
     if (likely(status != UV_ECANCELED)) {
-        info("Journal index for %s activated", path);
+        internal_error(true, "Journal indexing done");
     }
+    wc->running_journal_migration = 0;
     freez(work_request);
 }
 
 void start_journal_indexing(uv_work_t *req)
 {
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_journalfile *journalfile = work_request->journalfile;
-    char path[RRDENG_PATH_MAX];
+    struct rrdengine_journalfile *journalfile;
+    struct rrdengine_worker_config *wc = req->loop->data;
+    struct rrdengine_instance *ctx = wc->ctx;
 
-    if (unlikely(!journalfile))
-        return;
-
-    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
-
-    if (journalfile->journal_data) {
-        info("Journal is migrated; nothing to do");
-        return;
-    }
-    info("Indexing journal file %s", path);
-
-    migrate_journal_file_v2(journalfile->datafile->ctx, journalfile, journalfile->datafile, true, true);
-
-    if (unlikely(journalfile->journal_data)) {
-        error_report("Failed to create new journal index for %s", path);
-        return;
+    internal_error(true, "Checking journal files that need indexing");
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile && datafile->fileno != ctx->last_fileno) {
+        journalfile = datafile->journalfile;
+        if (!journalfile->journal_data) {
+            if (journalfile_ready_to_migrate(journalfile))
+                migrate_journal_file_v2(ctx, journalfile, datafile, true, true);
+#ifdef NETDATA_INTERNAL_CHECKS
+            else {
+                char path[RRDENG_PATH_MAX];
+                generate_journalfilepath(journalfile->datafile, path, sizeof(path));
+                info("Journal %s not ready to be migrated", path);
+            }
+#endif
+        }
+        datafile = datafile->next;
     }
 }
 

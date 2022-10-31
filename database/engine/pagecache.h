@@ -87,7 +87,7 @@ struct rrdeng_page_info {
 /* returns 1 for success, 0 for failure */
 typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
-#define PAGE_CACHE_MAX_PRELOAD_PAGES    (64)
+#define PAGE_CACHE_MAX_PRELOAD_PAGES    (8)
 
 struct pg_alignment {
     uint32_t page_length;
@@ -200,7 +200,8 @@ uint8_t pg_cache_punch_hole(
     uint8_t remove_dirty,
     uint8_t is_exclusive_holder,
     uuid_t(*metric_id),
-    bool update_page_duration);
+    bool update_page_duration,
+    bool spin);
 usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
                                             usec_t start_time_ut, usec_t end_time_ut);
 void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
