@@ -725,6 +725,13 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     struct journal_v2_header *j2_header = (void *) data_start;
 
     size_t entries = j2_header->metric_count;
+
+    if (!entries) {
+        if (unlikely(munmap(data_start, file_size)))
+            error("Failed to unmap %s", path);
+        return 1;
+    }
+
     struct journal_metric_list *metric = data_start + j2_header->metric_offset;
 
     uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
