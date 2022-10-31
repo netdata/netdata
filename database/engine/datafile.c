@@ -16,6 +16,8 @@ void df_extent_insert(struct extent_info *extent)
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
+    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+
     if (likely(NULL != ctx->datafiles.last)) {
         ctx->datafiles.last->next = datafile;
     }
@@ -23,15 +25,20 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
         ctx->datafiles.first = datafile;
     }
     ctx->datafiles.last = datafile;
+
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_datafile *next;
+    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
 
     next = datafile->next;
     fatal_assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
     ctx->datafiles.first = next;
+
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 
@@ -421,6 +428,7 @@ int init_data_files(struct rrdengine_instance *ctx)
 {
     int ret;
 
+    fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
     ret = scan_data_files(ctx);
     if (ret < 0) {
         error("Failed to scan path \"%s\".", ctx->dbfiles_path);

@@ -50,6 +50,7 @@ struct rrdengine_datafile {
 };
 
 struct rrdengine_datafile_list {
+    uv_rwlock_t rwlock;
     struct rrdengine_datafile *first; /* oldest */
     struct rrdengine_datafile *last; /* newest */
 };
