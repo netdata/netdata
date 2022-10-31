@@ -932,28 +932,35 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
         time_t start_time = strtol(start_time_str, NULL, 0);
         time_t end_time = strtol(end_time_str, NULL, 0);
 
-        if (start_time > end_time) {
-            error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_BEGIN " on chart '%s' ('%s') on host '%s', but timings are invalid (%ld to %ld). Disabling it.",
-                  rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost), start_time, end_time);
-            goto disable;
+        if(start_time && end_time) {
+            if (start_time > end_time) {
+                error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_BEGIN " on chart '%s' ('%s') on host '%s', but timings are invalid (%ld to %ld). Disabling it.",
+                      rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost), start_time, end_time);
+                goto disable;
+            }
+
+            if (end_time - start_time != st->update_every)
+                rrdset_set_update_every(st, end_time - start_time);
+
+            st->last_collected_time.tv_sec = end_time;
+            st->last_collected_time.tv_usec = 0;
+
+            st->last_updated.tv_sec = end_time;
+            st->last_updated.tv_usec = 0;
+
+            ((PARSER_USER_OBJECT *) user)->replay.start_time = start_time;
+            ((PARSER_USER_OBJECT *) user)->replay.end_time = end_time;
+            ((PARSER_USER_OBJECT *) user)->replay.start_time_ut = (usec_t) start_time * USEC_PER_SEC;
+            ((PARSER_USER_OBJECT *) user)->replay.end_time_ut = (usec_t) end_time * USEC_PER_SEC;
+
+            st->counter++;
+            st->counter_done++;
+
+            // these are only needed for db mode RAM, SAVE, MAP, ALLOC
+            st->current_entry++;
+            if(st->current_entry >= st->entries)
+                st->current_entry -= st->entries;
         }
-
-        if (end_time - start_time != st->update_every)
-            rrdset_set_update_every(st, end_time - start_time);
-
-        st->last_collected_time.tv_sec = end_time;
-        st->last_collected_time.tv_usec = 0;
-
-        st->last_updated.tv_sec = end_time;
-        st->last_updated.tv_usec = 0;
-
-        ((PARSER_USER_OBJECT *) user)->replay.start_time = start_time;
-        ((PARSER_USER_OBJECT *) user)->replay.end_time = end_time;
-        ((PARSER_USER_OBJECT *) user)->replay.start_time_ut = (usec_t)start_time * USEC_PER_SEC;
-        ((PARSER_USER_OBJECT *) user)->replay.end_time_ut = (usec_t)end_time * USEC_PER_SEC;
-
-        st->counter++;
-        st->counter_done++;
     }
 
     return PARSER_RC_OK;
