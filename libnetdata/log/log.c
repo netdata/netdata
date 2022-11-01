@@ -860,7 +860,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
     vfprintf( stderr, fmt, args );
     va_end( args );
 
-    if(erl->count)
+    if(erl->count > 1)
         fprintf(stderr, " (repeated %zu times in the last %llu secs)", erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
 
     if(erl->sleep_ut)
