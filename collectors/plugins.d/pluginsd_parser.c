@@ -56,14 +56,15 @@ PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTI
         debug(D_PLUGINSD, "is setting dimension '%s'/'%s' to '%s'", rrdset_id(st), dimension, value ? value : "<nothing>");
 
     if (value) {
-        RRDDIM *rd = rrddim_find(st, dimension);
+        RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
         if (unlikely(!rd)) {
-            error(
-                "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
-                dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+            error( "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
+                    dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
             goto disable;
-        } else
-            rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+        }
+        rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+        rrddim_acquired_release(rda);
     }
     return PARSER_RC_OK;
 
@@ -1106,7 +1107,8 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
         goto disable;
     }
 
-    RRDDIM *rd = rrddim_find(st, dimension);
+    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+    RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     if(unlikely(!rd)) {
         error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " to dimension with id '%s' on chart '%s' ('%s') on host '%s', which does not exist. Disabling it.",
               dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
@@ -1123,6 +1125,7 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     rd->last_collected_value = last_collected_value_str ? str2ll(last_collected_value_str, NULL) : 0;
     rd->last_calculated_value = last_calculated_value_str ? str2ndd(last_calculated_value_str, NULL) : 0;
     rd->last_stored_value = last_stored_value_str ? str2ndd(last_stored_value_str, NULL) : 0.0;
+    rrddim_acquired_release(rda);
     return PARSER_RC_OK;
 
 disable:
