@@ -1024,44 +1024,46 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user, PLUGIN
         debug(D_PLUGINSD, "REPLAY: is replaying dimension '%s'/'%s' to '%s'", rrdset_id(st), dimension, value_str);
 
     if (likely(value_str)) {
-        RRDDIM *rd = rrddim_find(st, dimension);
+        RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
         if(unlikely(!rd)) {
             error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_SET " to dimension with id '%s' on chart '%s' ('%s') on host '%s', which does not exist. Disabling it.",
                   dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
             goto disable;
         }
-        else {
-            NETDATA_DOUBLE value = strtondd(value_str, NULL);
-            SN_FLAGS flags = SN_FLAG_NONE;
 
-            char c;
-            while((c = *flags_str++)) {
-                switch(c) {
-                    case 'R':
-                        flags |= SN_FLAG_RESET;
-                        break;
+        NETDATA_DOUBLE value = strtondd(value_str, NULL);
+        SN_FLAGS flags = SN_FLAG_NONE;
 
-                    case 'E':
-                        flags |= SN_EMPTY_SLOT;
-                        value = NAN;
-                        break;
+        char c;
+        while((c = *flags_str++)) {
+            switch(c) {
+                case 'R':
+                    flags |= SN_FLAG_RESET;
+                    break;
 
-                    default:
-                        error("unknown flag '%c'", c);
-                        break;
-                }
+                case 'E':
+                    flags |= SN_EMPTY_SLOT;
+                    value = NAN;
+                    break;
+
+                default:
+                    error("unknown flag '%c'", c);
+                    break;
             }
-
-            if(!netdata_double_isnumber(value)) {
-                value = NAN;
-                flags = SN_EMPTY_SLOT;
-            }
-
-            rrddim_store_metric(rd, ((PARSER_USER_OBJECT *) user)->replay.end_time_ut, value, flags);
-            rd->last_collected_time.tv_sec = ((PARSER_USER_OBJECT *) user)->replay.end_time;
-            rd->last_collected_time.tv_usec = 0;
-            rd->collections_counter++;
         }
+
+        if(!netdata_double_isnumber(value)) {
+            value = NAN;
+            flags = SN_EMPTY_SLOT;
+        }
+
+        rrddim_store_metric(rd, ((PARSER_USER_OBJECT *) user)->replay.end_time_ut, value, flags);
+        rd->last_collected_time.tv_sec = ((PARSER_USER_OBJECT *) user)->replay.end_time;
+        rd->last_collected_time.tv_usec = 0;
+        rd->collections_counter++;
+
+        rrddim_acquired_release(rda);
     }
     return PARSER_RC_OK;
 

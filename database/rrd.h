@@ -1280,6 +1280,9 @@ int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
 int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
 
 RRDDIM *rrddim_find(RRDSET *st, const char *id);
+RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id);
+RRDDIM *rrddim_acquired_to_rrddim(RRDDIM_ACQUIRED *rda);
+void rrddim_acquired_release(RRDDIM_ACQUIRED *rda);
 RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 
 int rrddim_hide(RRDSET *st, const char *id);
