@@ -34,7 +34,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
-    parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
     parser->user = user;
     parser->input = input;
     parser->output = output;
@@ -194,7 +193,6 @@ void parser_destroy(PARSER *parser)
         tmp_parser_data =  tmp_parser_data_next;
     }
 
-    freez(parser->plugins_action);
     freez(parser);
 }
 
@@ -334,7 +332,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     if (unlikely(!action_function_list)) {
         if (unlikely(parser->unknown_function))
-            rc = parser->unknown_function(words, num_words, parser->user, NULL);
+            rc = parser->unknown_function(words, num_words, parser->user);
         else
             rc = PARSER_RC_ERROR;
 
@@ -343,7 +341,7 @@ inline int parser_action(PARSER *parser, char *input)
     else {
         worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
-                rc = action_function(words, num_words, parser->user, parser->plugins_action);
+                rc = action_function(words, num_words, parser->user);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
                     internal_error(true, "action_function() failed with rc = %u", rc);
                     break;
