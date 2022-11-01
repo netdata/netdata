@@ -65,10 +65,8 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
 {
-    UNUSED(plugins_action);
-
     const char *host_uuid_str = get_word(words, num_words, 1);
     const char *claim_id_str = get_word(words, num_words, 2);
 
