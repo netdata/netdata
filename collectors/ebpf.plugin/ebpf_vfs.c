@@ -1336,20 +1336,15 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
  * Send collected data to Netdata.
  *
  *  @param em the main collector structure
- *
- *  @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
- *          otherwise function returns 1 to avoid chart recreation
  */
-static int ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
+static void ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
 {
-    int ret = 1;
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_vfs.unlink_call);
-        } else if (unlikely(ect->systemd))
-            ret = 0;
+        }
     }
     write_end_chart();
 
@@ -1465,8 +1460,6 @@ static int ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
         }
         write_end_chart();
     }
-
-    return ret;
 }
 
 /**
@@ -1487,13 +1480,10 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
     if (has_systemd) {
-        static int systemd_charts = 0;
-        if (!systemd_charts) {
+        if (send_cgroup_chart) {
             ebpf_create_systemd_vfs_charts(em);
-            systemd_charts = 1;
         }
-
-        systemd_charts = ebpf_send_systemd_vfs_charts(em);
+        ebpf_send_systemd_vfs_charts(em);
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
