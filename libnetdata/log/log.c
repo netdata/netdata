@@ -818,7 +818,69 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #error "cannot detect the format of function strerror_r()"
 #endif
 
-void error_int( const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+    if(erl->sleep_ut)
+        sleep_usec(erl->sleep_ut);
+
+    // save a copy of errno - just in case this function generates a new error
+    int __errno = errno;
+
+    va_list args;
+
+    log_lock();
+
+    erl->count++;
+    time_t now = now_boottime_sec();
+    if(now - erl->last_logged < erl->log_every) {
+        log_unlock();
+        return;
+    }
+
+    // prevent logging too much
+    if (error_log_limit(0)) {
+        log_unlock();
+        return;
+    }
+
+    if(error_log_syslog) {
+        va_start( args, fmt );
+        vsyslog(LOG_ERR,  fmt, args );
+        va_end( args );
+    }
+
+    char date[LOG_DATE_LENGTH];
+    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
+
+    va_start( args, fmt );
+#ifdef NETDATA_INTERNAL_CHECKS
+    fprintf(stderr, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+#else
+    fprintf(stderr, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
+#endif
+    vfprintf( stderr, fmt, args );
+    va_end( args );
+
+    if(erl->count > 1)
+        fprintf(stderr, " (repeated %zu times in the last %llu secs)", erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
+
+    if(erl->sleep_ut)
+        fprintf(stderr, " (sleeping for %llu microseconds every time this happens)", erl->sleep_ut);
+
+    if(__errno) {
+        char buf[1024];
+        fprintf(stderr, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
+        errno = 0;
+    }
+    else
+        fputc('\n', stderr);
+
+    erl->last_logged = now;
+    erl->count = 0;
+
+    log_unlock();
+}
+
+void error_int(const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
 
