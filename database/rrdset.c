@@ -1343,11 +1343,14 @@ void rrdset_done(RRDSET *st) {
     struct timeval now;
 
     now_realtime_timeval(&now);
-    rrdset_timed_done(st, now);
+    rrdset_timed_done(st, now, /* pending_rrdset_next = */ true);
 }
 
-void rrdset_timed_done(RRDSET *st, struct timeval now) {
+void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(netdata_exit)) return;
+
+    if (pending_rrdset_next)
+        rrdset_next(st);
 
     debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
 
