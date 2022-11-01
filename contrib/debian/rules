@@ -60,6 +60,12 @@ override_dh_install:
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin \
 	$(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
 
+	# Add free IPMI plugin install rules
+	#
+	mkdir -p $(TOP)-plugin-nfacct/usr/libexec/netdata/plugins.d
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/nfacct.plugin \
+	$(TOP)-plugin-nfacct/usr/libexec/netdata/plugins.d/nfacct.plugin
+
 	# Set the rest of the software in the main package
 	#
 	cp -rp $(TEMPTOP)/usr $(TOP)
@@ -123,6 +129,9 @@ override_dh_fixperms:
 
 	# freeIPMI plugin package
 	chmod 4750 $(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
+
+	# freeIPMI plugin package
+	chmod 4750 $(TOP)-plugin-nfacct/usr/libexec/netdata/plugins.d/nfacct.plugin
 
 override_dh_installlogrotate:
 	cp system/logrotate/netdata debian/netdata.logrotate

@@ -64,3 +64,10 @@ Depends: freeipmi,
          netdata (= ${source:Version})
 Description: The FreeIPMI metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
+
+Package: netdata-plugin-nfacct
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (>= ${source:Version})
+Description: The NFACCT metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.

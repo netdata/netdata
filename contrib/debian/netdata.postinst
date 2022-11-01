@@ -74,13 +74,13 @@ case "$1" in
     fi
 
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network
-    chmod 4750 /usr/libexec/netdata/plugins.d/nfacct.plugin
 
     # Workaround if system does not have ebpf.plugin
     chmod -f 4750 /usr/libexec/netdata/plugins.d/ebpf.plugin || true
 
     # Workaround for other plugins not installed directly by this package
     chmod -f 4750 /usr/libexec/netdata/plugins.d/freeipmi.plugin || true
+    chmod -f 4750 /usr/libexec/netdata/plugins.d/nfacct.plugin || true
     chmod -f 4750 /usr/libexec/netdata/plugins.d/ioping || true
 
     ;;

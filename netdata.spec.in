@@ -532,6 +532,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
+# NFACCT belongs to a different sub-package
+%if 0%{!?ol8} && 0%{!?ol9} && 0%{?centos_ver} != 7
+%exclude %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
+%endif
+
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -563,13 +568,32 @@ Requires: netdata = %{version}
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
+%if 0%{!?ol8} && 0%{!?ol9} && 0%{?centos_ver} != 7
+%package plugin-nfacct
+Summary: The NFACCT metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: libmnl
+%if 0%{?fedora} || 0%{?suse_version} >= 1140
+Requires: libnetfilter_acct
+%endif
+Requires: netdata = %{version}
+
+%description plugin-nfacct
+ This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
+
+%files plugin-nfacct
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
+%endif
+
 %changelog
+* Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
+- Split additional plugins out in their own packages.
 * Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
 - Fix systemd handling to follow BCP.
 - Drop pre-systemd init support.
 * Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
 - Added eBPF build dependency
-* Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
 - Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
