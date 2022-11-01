@@ -7575,6 +7575,9 @@ netdataDashboard.context = {
     'ping.host_rtt': {
         info: 'Round-trip time (RTT) is the time it takes for a data packet to reach its destination and return back to its original source.'
     },
+    'ping.host_std_dev_rtt': {
+        info: 'Round-trip time (RTT) standard deviation. The average value of how far each RTT of a ping differs from the average RTT.'
+    },
     'ping.host_packet_loss': {
         info: 'Packet loss occurs when one or more transmitted data packets do not reach their destination. Usually caused by data transfer errors, network congestion or firewall blocking. ICMP echo packets are often treated as lower priority by routers and target hosts, so ping test packet loss may not always translate to application packet loss.'
     },
