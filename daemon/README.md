@@ -127,8 +127,8 @@ The command line options of the Netdata 1.10.0 version are the following:
  License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
 
  Twitter    : https://twitter.com/linuxnetdata
- LinkedIn   : https://www.facebook.com/linuxnetdata/
- Facebook   : https://linkedin.com/company/netdata-cloud/
+ LinkedIn   : https://linkedin.com/company/netdata-cloud/
+ Facebook   : https://facebook.com/linuxnetdata/
 
 
  SYNOPSIS: netdata [options]
