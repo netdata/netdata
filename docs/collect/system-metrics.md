@@ -37,17 +37,8 @@ can find all system collectors in our [supported collectors list](/collectors/CO
 Netdata is also capable of monitoring Windows systems. The [WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi) integrates with
 [windows_exporter](https://github.com/prometheus-community/windows_exporter), a small Go-based binary that you can run
-on Windows systems. The WMI collector then gathers metrics from an endpoint created by windows_exporter.
-
-First, [download windows_exporter](https://github.com/prometheus-community/windows_exporter#installation) and run it
-with the following collectors enabled, changing `0.14.0` to the version you downloaded.
-
-```powershell
-windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon,tcp"
-```
-
-Netdata also supports [process](https://github.com/prometheus-community/windows_exporter/blob/master/docs/collector.process.md)
-metrics, for more details see [the requirements](https://github.com/netdata/go.d.plugin/tree/master/modules/wmi#requirements).
+on Windows systems. The WMI collector then gathers metrics from an endpoint created by windows_exporter, for more
+details see [the requirements](https://github.com/netdata/go.d.plugin/tree/master/modules/wmi#requirements).
 
 Next, [configure the WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#configuration) to point to the URL
