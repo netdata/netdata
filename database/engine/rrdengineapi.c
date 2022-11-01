@@ -134,13 +134,12 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
         __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
 
         if(pa) {
-            if(page_index->alignment && page_index->alignment != pa)
-                fatal("DBENGINE: page_index has a different alignment.");
+            if(page_index->alignment && page_index->alignment != pa && page_index->writers > 0)
+                fatal("DBENGINE: page_index has a different alignment (page_index refcount is %u, writers is %u).",
+                        page_index->refcount, page_index->writers);
 
-            if(!page_index->alignment) {
-                page_index->alignment = pa;
-                __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
-            }
+            page_index->alignment = pa;
+            __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
         }
     }
 

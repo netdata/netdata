@@ -353,6 +353,8 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
+    st->last_accessed_time = now_realtime_sec();
+
     if((host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) && !rrdset_is_ar_chart(st)) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -420,6 +422,10 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
+
+    if(st)
+        st->last_accessed_time = now_realtime_sec();
+
     return(st);
 }
 
