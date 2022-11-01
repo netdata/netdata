@@ -54,14 +54,13 @@ Architecture: any
 Depends: cups,
          ${shlibs:Depends},
          netdata (>= ${source:Version})
-Description: The Common Unix Printing System plugin for metrics collection from cupsd
+Description: The CUPS metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
 
 Package: netdata-plugin-freeipmi
 Architecture: any
 Depends: freeipmi,
          ${shlibs:Depends},
          netdata (= ${source:Version})
-Description: FreeIPMI - The Intelligent Platform Management System.
- The IPMI specification defines a set of interfaces for platform management.
- It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in
- are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+Description: The FreeIPMI metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
