@@ -425,7 +425,7 @@ inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
 
     if(st)
         st->last_accessed_time = now_realtime_sec();
-    
+
     return(st);
 }
 
