@@ -322,7 +322,7 @@ int help(int exitcode) {
             "\n"
             " Twitter    : https://twitter.com/linuxnetdata\n"
             " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
-            " Facebook   : https://www.facebook.com/linuxnetdata/\n"
+            " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
             "\n"
     );
