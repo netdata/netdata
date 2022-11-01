@@ -874,10 +874,10 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
     else
         fputc('\n', stderr);
 
-    log_unlock();
-
     erl->last_logged = now;
     erl->count = 0;
+
+    log_unlock();
 }
 
 void error_int(const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
