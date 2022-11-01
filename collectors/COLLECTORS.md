@@ -514,6 +514,5 @@ default. To use a third-party collector, visit their GitHub/documentation page a
 
 ## Etc
 
-- [checks.plugin](checks.plugin/README.md): A debugging collector, disabled by default.
 - [charts.d example](charts.d.plugin/example/README.md): An example `charts.d` collector.
 - [python.d example](python.d.plugin/example/README.md): An example `python.d` collector.
