@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrddim_mem.h"
+#include "Judy.h"
 
 static Pvoid_t rrddim_JudyHS_array = NULL;
 static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
