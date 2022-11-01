@@ -66,6 +66,21 @@ override_dh_install:
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/nfacct.plugin \
 	$(TOP)-plugin-nfacct/usr/libexec/netdata/plugins.d/nfacct.plugin
 
+	# Add charts.d plugin install rules
+	#
+	mkdir -p $(TOP)-plugin-chartsd/usr/libexec/netdata/plugins.d/
+	mkdir -p $(TOP)-plugin-chartsd/usr/lib/netdata/conf.d/
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/charts.d.plugin \
+	$(TOP)-plugin-chartsd/usr/libexec/netdata/plugins.d/charts.d.plugin
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/charts.d.dryrun-helper.sh \
+	$(TOP)-plugin-chartsd/usr/libexec/netdata/plugins.d/charts.d.dryrun-helper.sh
+	mv -f $(TEMPTOP)/usr/libexec/netdata/charts.d \
+	$(TOP)-plugin-chartsd/usr/libexec/netdata/charts.d
+	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/charts.d.conf \
+	$(TOP)-plugin-chartsd/usr/lib/netdata/conf.d/charts.d.conf
+	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/charts.d \
+	$(TOP)-plugin-chartsd/usr/lib/netdata/conf.d/charts.d
+
 	# Set the rest of the software in the main package
 	#
 	cp -rp $(TEMPTOP)/usr $(TOP)

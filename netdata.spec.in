@@ -479,7 +479,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(0750,root,netdata,0750)
 
 %dir %{_libexecdir}/%{name}/python.d
-%dir %{_libexecdir}/%{name}/charts.d
 %dir %{_libexecdir}/%{name}/plugins.d
 
 %{_libexecdir}/%{name}/python.d
@@ -537,6 +536,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
 %endif
 
+# Charts.d belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/charts.d.plugin
+%exclude %{_libexecdir}/%{name}/plugins.d/charts.d.dryrun-helper.sh
+%exclude %{_libexecdir}/%{name}/charts.d/
+%exclude %{_libdir}/%{name}/conf.d/charts.d.conf
+%exclude %{_libdir}/%{name}/conf.d/charts.d/
+
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -584,6 +590,31 @@ Requires: netdata = %{version}
 %files plugin-nfacct
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
 %endif
+
+%package plugin-chartsd
+Summary: The charts.d metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: bash
+Requires: netdata = %{version}
+%if 0%{?centos_ver} != 7
+Suggests: nut
+Suggests: apcupsd
+Suggests: iw
+Suggests: sudo
+%endif
+
+%description plugin-chartsd
+  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
+It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
+
+%files plugin-chartsd
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/charts.d.plugin
+%{_libexecdir}/%{name}/plugins.d/charts.d.dryrun-helper.sh
+%{_libexecdir}/%{name}/charts.d/
+%defattr(0644,root,netdata,0644)
+%{_libdir}/%{name}/conf.d/charts.d.conf
+%{_libdir}/%{name}/conf.d/charts.d/
 
 %changelog
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
