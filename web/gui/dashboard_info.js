@@ -4204,7 +4204,7 @@ netdataDashboard.context = {
     // WMI (Process)
 
     'wmi.processes_cpu_time': {
-        info: 'Elapsed time that all of the threads of this process used the processor to execute instructions by mode (privileged, user). An instruction is the basic unit of execution in a computer, a thread is the object that executes instructions, and a process is the object created when a program is run. Code executed to handle some hardware interrupts and trap conditions is included in this count.'
+        info: 'Total CPU utilization. The amount of time spent by the process in <a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and privileged</a> modes.'
     },
     'wmi.processes_handles': {
         info: 'Total number of handles the process has open. This number is the sum of the handles currently open by each thread in the process.'
