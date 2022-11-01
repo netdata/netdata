@@ -327,6 +327,12 @@ netdataDashboard.menu = {
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
+    'ping': {
+        title: 'Ping',
+        icon: '<i class="fas fa-exchange-alt"></i>',
+        info: 'Measures round-trip time and packet loss by sending ping messages to network hosts.'
+    },
+
     'gearman': {
         title: 'Gearman',
         icon: '<i class="fas fa-tasks"></i>',
@@ -734,6 +740,10 @@ netdataDashboard.menu = {
         title: 'WireGuard',
         icon: '<i class="fas fa-dragon"></i>',
         info: 'VPN network interfaces and peers traffic.'
+    },
+
+    'pandas': {
+        icon: '<i class="fas fa-teddy-bear"></i>'
     },
 };
 
@@ -4187,6 +4197,86 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // CASSANDRA
+
+    'cassandra.client_requests_rate': {
+        info: 'Client requests received per second. Consider whether your workload is read-heavy or write-heavy while choosing a compaction strategy.'
+    },
+    'cassandra.client_requests_latency': {
+        info: 'Response latency of requests received per second. Latency could be impacted by disk access, network latency or replication configuration.'
+    },
+    'cassandra.key_cache_hit_ratio': {
+        info: 'Key cache hit ratio indicates the efficiency of the key cache. If ratio is consistently < 80% consider increasing cache size.'
+    },
+    'cassandra.key_cache_hit_rate': {
+        info: 'Key cache hit rate measures the cache hits and misses per second.'
+    },
+    'cassandra.storage_live_disk_space_used': {
+        info: 'Amount of live disk space used. This does not include obsolete data waiting to be garbage collected.'
+    },
+    'cassandra.compaction_completed_tasks_rate': {
+        info: 'Compaction tasks completed per second.'
+    },
+    'cassandra.compaction_pending_tasks_count': {
+        info: 'Total compaction tasks in queue.'
+    },
+    'cassandra.thread_pool_active_tasks_count': {
+        info: 'Total tasks currently being processed.'
+    },
+    'cassandra.thread_pool_pending_tasks_count': {
+        info: 'Total tasks in queue awaiting a thread for processing.'
+    },
+    'cassandra.thread_pool_blocked_tasks_rate': {
+        info: 'Tasks that cannot be queued for processing yet.'
+    },
+    'cassandra.thread_pool_blocked_tasks_count': {
+        info: 'Total tasks that cannot yet be queued for processing.'
+    },
+    'cassandra.jvm_gc_rate': {
+        info: 'Rate of garbage collections.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
+    },
+    'cassandra.jvm_gc_time': {
+        info: 'Elapsed time of garbage collection.</p><p><b>ParNew</b> - young-generation. <b>cms (ConcurrentMarkSweep)</b> - old-generation.</p>'
+    },
+    'cassandra.client_requests_timeouts_rate': {
+        info: 'Requests which were not acknowledged within the configurable timeout window.'
+    },
+    'cassandra.client_requests_unavailables_rate': {
+        info: 'Requests for which the required number of nodes was unavailable.'
+    },
+    'cassandra.storage_exceptions_rate': {
+        info: 'Requests for which a storage exception was encountered.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI
+
+    'wmi.tcp_conns_active': {
+        info: 'Number of times TCP connections have made a direct transition from the CLOSED state to the SYN-SENT state.'
+    },
+    'wmi.tcp_conns_established': {
+        info: 'Number of TCP connections for which the current state is either ESTABLISHED or CLOSE-WAIT.'
+    },
+    'wmi.tcp_conns_failures': {
+        info: 'Number of times TCP connections have made a direct transition to the CLOSED state from the SYN-SENT state or the SYN-RCVD state, plus the number of times TCP connections have made a direct transition from the SYN-RCVD state to the LISTEN state.'
+    },
+    'wmi.tcp_conns_passive': {
+        info: 'Number of times TCP connections have made a direct transition from the LISTEN state to the SYN-RCVD state.'
+    },
+    'wmi.tcp_conns_resets': {
+        info: 'Number of times TCP connections have made a direct transition from the LISTEN state to the SYN-RCVD state.'
+    },
+    'wmi.tcp_segments_received': {
+        info: 'Rate at which segments are received, including those received in error. This count includes segments received on currently established connections.'
+    },
+    'wmi.tcp_segments_retransmitted': {
+        info: 'Rate at which segments are retransmitted, that is, segments transmitted that contain one or more previously transmitted bytes.'
+    },
+    'wmi.tcp_segments_sent': {
+        info: 'Rate at which segments are sent, including those on current connections, but excluding those containing only retransmitted bytes.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
@@ -7520,6 +7610,21 @@ netdataDashboard.context = {
     'k8s_state.pod_container_terminated_state_reason': {
         info: 'Reason from the last termination of the container. '+
         '<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-state-terminated" target="_blank">More info.</a>'
+    },
+
+    // Ping
+
+    'ping.host_rtt': {
+        info: 'Round-trip time (RTT) is the time it takes for a data packet to reach its destination and return back to its original source.'
+    },
+    'ping.host_std_dev_rtt': {
+        info: 'Round-trip time (RTT) standard deviation. The average value of how far each RTT of a ping differs from the average RTT.'
+    },
+    'ping.host_packet_loss': {
+        info: 'Packet loss occurs when one or more transmitted data packets do not reach their destination. Usually caused by data transfer errors, network congestion or firewall blocking. ICMP echo packets are often treated as lower priority by routers and target hosts, so ping test packet loss may not always translate to application packet loss.'
+    },
+    'ping.host_packets': {
+        info: 'Number of ICMP messages sent and received. These counters should be equal if there is no packet loss.'
     },
 
     // ------------------------------------------------------------------------

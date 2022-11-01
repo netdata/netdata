@@ -31,6 +31,12 @@ extern int netdata_use_ssl_on_stream;
 extern char *netdata_ssl_ca_path;
 extern char *netdata_ssl_ca_file;
 
+struct replication_request {
+    bool start_streaming;
+    time_t after;
+    time_t before;
+};
+
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
 
@@ -93,6 +99,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
         return;
 
     netdata_mutex_lock(&s->mutex);
+
+    if(unlikely(s->host->sender->buffer->max_size < (buffer_strlen(wb) + 1) * 2)) {
+        error("STREAM %s [send to %s]: max buffer size of %zu is too small for data of size %zu. Increasing the max buffer size to twice the max data size.",
+              rrdhost_hostname(s->host), s->connected_to, s->host->sender->buffer->max_size, buffer_strlen(wb) + 1);
+
+        s->host->sender->buffer->max_size = (buffer_strlen(wb) + 1) * 2;
+    }
 
 #ifdef ENABLE_COMPRESSION
     if (s->flags & SENDER_FLAG_COMPRESSION && s->compressor) {
@@ -213,9 +226,23 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
+    error("Clearing stream_collected_metrics flag in charts of host %s", rrdhost_hostname(host));
+
+    bool receive_has_replication = host != localhost && host->receiver && stream_has_capability(host->receiver, STREAM_CAP_REPLICATION);
+    bool send_has_replication = host->sender && stream_has_capability(host->sender, STREAM_CAP_REPLICATION);
+
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
+        if(!receive_has_replication)
+            rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+
+        if(send_has_replication)
+            // it will be enabled once replication is done on the sending side
+            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        else
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
         st->upstream_resync_time = 0;
 
@@ -234,6 +261,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 
     rrdpush_sender_thread_reset_all_charts(host);
     rrdpush_sender_thread_send_custom_host_variables(host);
+    dictionary_flush(host->sender->replication_requests);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
@@ -848,17 +876,19 @@ void execute_commands(struct sender_state *s) {
         internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
-        if(words[0] && strcmp(words[0], PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = words[1];
-            char *timeout_s = words[2];
-            char *function = words[3];
+        const char *keyword = get_word(words, num_words, 0);
+
+        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            char *transaction = get_word(words, num_words, 1);
+            char *timeout_s = get_word(words, num_words, 2);
+            char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                       rrdhost_hostname(s->host), s->connected_to,
-                      words[0],
+                      keyword,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
                       function?function:"(unset)");
@@ -879,9 +909,32 @@ void execute_commands(struct sender_state *s) {
                     stream_execute_function_callback(wb, code, tmp);
                 }
             }
-        }
-        else
+        } else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
+            const char *chart_id = get_word(words, num_words, 1);
+            const char *start_streaming = get_word(words, num_words, 2);
+            const char *after = get_word(words, num_words, 3);
+            const char *before = get_word(words, num_words, 4);
+
+            if (!chart_id || !start_streaming || !after || !before) {
+                error("STREAM %s [send to %s] %s command is incomplete"
+                      " (chart=%s, start_streaming=%s, after=%s, before=%s)",
+                      rrdhost_hostname(s->host), s->connected_to,
+                      keyword,
+                      chart_id ? chart_id : "(unset)",
+                      start_streaming ? start_streaming : "(unset)",
+                      after ? after : "(unset)",
+                      before ? before : "(unset)");
+            } else {
+                struct replication_request tmp = {
+                        .start_streaming = !strcmp(start_streaming, "true"),
+                        .after = strtoll(after, NULL, 0),
+                        .before = strtoll(before, NULL, 0),
+                };
+                dictionary_set(s->replication_requests, chart_id, &tmp, sizeof(struct replication_request));
+            }
+        } else {
             error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, words[0]?words[0]:"(unset)");
+        }
 
         start = newline + 1;
     }
@@ -898,43 +951,8 @@ void execute_commands(struct sender_state *s) {
 struct rrdpush_sender_thread_data {
     struct sender_state *sender_state;
     RRDHOST *host;
-    DICTFE dictfe;
-    enum {
-        SENDING_DEFINITIONS_RESTART,
-        SENDING_DEFINITIONS_CONTINUE,
-        SENDING_DEFINITIONS_DONE,
-    } sending_definitions_status;
     char *pipe_buffer;
 };
-
-static size_t cbuffer_available_bytes_with_lock(struct rrdpush_sender_thread_data *thread_data) {
-    netdata_mutex_lock(&thread_data->sender_state->mutex);
-    size_t outstanding = cbuffer_available_size_unsafe(thread_data->sender_state->host->sender->buffer);
-    netdata_mutex_unlock(&thread_data->sender_state->mutex);
-    return outstanding;
-}
-
-static void rrdpush_queue_incremental_definitions(struct rrdpush_sender_thread_data *thread_data) {
-
-    while(rrdhost_flag_check(thread_data->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
-           && thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE
-           && cbuffer_available_bytes_with_lock(thread_data) > (thread_data->sender_state->buffer->max_size / 2)) {
-
-        if(thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART)
-            info("STREAM %s [send to %s]: sending metric definitions...", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
-
-        bool more_defs_available = rrdpush_incremental_transmission_of_chart_definitions(
-            thread_data->sender_state->host, &thread_data->dictfe,
-            thread_data->sending_definitions_status == SENDING_DEFINITIONS_RESTART, false);
-
-        if (unlikely(!more_defs_available)) {
-            thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
-            info("STREAM %s [send to %s]: sending metric definitions finished.", rrdhost_hostname(thread_data->host), thread_data->sender_state->connected_to);
-        }
-        else
-            thread_data->sending_definitions_status = SENDING_DEFINITIONS_CONTINUE;
-    }
-}
 
 static bool rrdpush_sender_pipe_close(RRDHOST *host, int *pipe_fds, bool reopen) {
     static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
@@ -997,8 +1015,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     RRDHOST *host = data->host;
 
-    rrdpush_incremental_transmission_of_chart_definitions(host, &data->dictfe, false, true);
-
     netdata_mutex_lock(&host->sender->mutex);
 
     info("STREAM %s [send]: sending thread cleans up...", rrdhost_hostname(host));
@@ -1021,28 +1037,114 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     freez(data);
 }
 
-void sender_init(RRDHOST *parent)
+static void replication_request_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *sender_state __maybe_unused) {
+    ;
+}
+static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *sender_state) {
+    struct sender_state *s = sender_state;
+    struct replication_request *rr = old_value;
+    struct replication_request *rr_new = new_value;
+
+    error("STREAM %s [send to %s]: duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+          rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
+          (unsigned long long)rr->after, (unsigned long long)rr->before, rr->start_streaming?"true":"false",
+          (unsigned long long)rr_new->after, (unsigned long long)rr_new->before, rr_new->start_streaming?"true":"false");
+
+    bool updated = false;
+
+    if(rr_new->after < rr->after) {
+        rr->after = rr_new->after;
+        updated = true;
+    }
+
+    if(rr_new->before > rr->before) {
+        rr->before = rr_new->before;
+        updated = true;
+    }
+
+    if(rr_new->start_streaming != rr->start_streaming) {
+        rr->start_streaming = true;
+        updated = true;
+    }
+
+    return updated;
+}
+static void replication_request_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *sender_state __maybe_unused) {
+    ;
+}
+
+void sender_init(RRDHOST *host)
 {
-    if (parent->sender)
+    if (host->sender)
         return;
 
-    parent->sender = callocz(1, sizeof(*parent->sender));
-    parent->sender->host = parent;
-    parent->sender->buffer = cbuffer_new(1024, 1024*1024);
-    parent->sender->capabilities = STREAM_OUR_CAPABILITIES;
+    host->sender = callocz(1, sizeof(*host->sender));
+    host->sender->host = host;
+    host->sender->buffer = cbuffer_new(1024, 1024 * 1024);
+    host->sender->capabilities = STREAM_OUR_CAPABILITIES;
 
-    parent->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
-    parent->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    parent->sender->rrdpush_sender_socket  = -1;
+    host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
+    host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
+    host->sender->rrdpush_sender_socket  = -1;
 
 #ifdef ENABLE_COMPRESSION
     if(default_compression_enabled) {
-        parent->sender->flags |= SENDER_FLAG_COMPRESSION;
-        parent->sender->compressor = create_compressor();
+        host->sender->flags |= SENDER_FLAG_COMPRESSION;
+        host->sender->compressor = create_compressor();
     }
 #endif
 
-    netdata_mutex_init(&parent->sender->mutex);
+    netdata_mutex_init(&host->sender->mutex);
+
+    host->sender->replication_requests = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_insert_callback(host->sender->replication_requests, replication_request_insert_callback, host->sender);
+    dictionary_register_conflict_callback(host->sender->replication_requests, replication_request_conflict_callback, host->sender);
+    dictionary_register_delete_callback(host->sender->replication_requests, replication_request_delete_callback, host->sender);
+}
+
+static size_t sender_buffer_used_percent(struct sender_state *s) {
+    netdata_mutex_lock(&s->mutex);
+    size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
+    netdata_mutex_unlock(&s->mutex);
+
+    return (s->host->sender->buffer->max_size - available) * 100 / s->host->sender->buffer->max_size;
+}
+
+static void process_replication_requests(struct sender_state *s) {
+    if(dictionary_entries(s->replication_requests) == 0)
+        return;
+
+    struct replication_request *rr;
+    dfe_start_write(s->replication_requests, rr) {
+        size_t used_percent = sender_buffer_used_percent(s);
+        if(used_percent > 50) break;
+
+        // delete it from the dictionary
+        // the current item is referenced - it will not go away until the next iteration of the dfe loop
+        dictionary_del(s->replication_requests, rr_dfe.name);
+
+        // find the chart
+        RRDSET *st = rrdset_find(s->host, rr_dfe.name);
+        if(unlikely(!st)) {
+            internal_error(true,
+                           "STREAM %s [send to %s]: cannot find chart '%s' to satisfy pending replication command."
+                           , rrdhost_hostname(s->host), s->connected_to, rr_dfe.name);
+            continue;
+        }
+
+        // send the replication data
+        bool start_streaming = replicate_chart_response(st->rrdhost, st,
+                rr->start_streaming, rr->after, rr->before);
+
+        // enable normal streaming if we have to
+        if (start_streaming) {
+            debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
+                  rrdhost_hostname(s->host), rrdset_id(st));
+
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        }
+    }
+    dfe_done(rr);
 }
 
 void *rrdpush_sender_thread(void *ptr) {
@@ -1127,7 +1229,6 @@ void *rrdpush_sender_thread(void *ptr) {
     thread_data->pipe_buffer = mallocz(pipe_buffer_size);
     thread_data->sender_state = s;
     thread_data->host = s->host;
-    thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
 
     // reset our cleanup flags
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
@@ -1141,7 +1242,6 @@ void *rrdpush_sender_thread(void *ptr) {
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
-            thread_data->sending_definitions_status = SENDING_DEFINITIONS_RESTART;
             rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
             s->flags &= ~SENDER_FLAG_OVERFLOW;
             s->read_len = 0;
@@ -1150,13 +1250,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
             if(unlikely(!attempt_to_connect(s)))
                 continue;
-
-            if (stream_has_capability(s, STREAM_CAP_GAP_FILLING)) {
-                time_t now = now_realtime_sec();
-                BUFFER *wb = sender_start(s);
-                buffer_sprintf(wb, "TIMESTAMP %"PRId64"", (int64_t)now);
-                sender_commit(s, wb);
-            }
 
             rrdpush_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
@@ -1178,9 +1271,6 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
-        if(unlikely(thread_data->sending_definitions_status != SENDING_DEFINITIONS_DONE))
-            rrdpush_queue_incremental_definitions(thread_data);
-
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
@@ -1191,10 +1281,8 @@ void *rrdpush_sender_thread(void *ptr) {
         if(outstanding)
             s->send_attempts++;
         else {
-            if(unlikely(thread_data->sending_definitions_status == SENDING_DEFINITIONS_DONE
-                         && rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)
-                         && !rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS)
-                             )) {
+            if(unlikely(rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+                        !rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
                 // let the data collection threads know we are ready to push metrics
                 rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
                 info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
@@ -1286,6 +1374,8 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
             execute_commands(s);
         }
+
+        process_replication_requests(s);
 
         if(unlikely(fds[Collector].revents & (POLLERR|POLLHUP|POLLNVAL))) {
             char *error = NULL;

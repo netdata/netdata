@@ -37,7 +37,7 @@
 #include <openssl/decoder.h>
 #endif
 
-struct netdata_ssl{
+struct netdata_ssl {
     SSL *conn; //SSL connection
     uint32_t flags; //The flags for SSL connection
 };

@@ -47,6 +47,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id, STORAGE_METRICS_GROUP *smg);
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle);
 
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every);
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
@@ -59,16 +60,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
                                      SN_FLAGS flags);
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
-unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time_s, time_t end_time_s,
-                                    struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
-
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *rrdimm_handle,
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle,
                                     time_t start_time_s, time_t end_time_s);
-STORAGE_POINT rrdeng_load_metric_next(struct rrddim_query_handle *rrddim_handle);
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
 
 
-int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
-void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle);
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle);
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 
@@ -76,7 +74,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
 
 /* must call once before using anything */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
-                       unsigned disk_space_mb, int tier);
+                       unsigned disk_space_mb, size_t tier);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_prepare_exit(struct rrdengine_instance *ctx);

@@ -56,14 +56,16 @@ void netdata_cleanup_and_exit(int ret) {
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            for (int tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
+        metadata_sync_shutdown_prepare();
         rrdhost_free_all();
+        metadata_sync_shutdown();
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            for (int tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }
 #endif
@@ -406,6 +408,9 @@ static void log_init(void) {
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
+    stdhealth_filename = config_get(CONFIG_SECTION_LOGS, "health", filename);
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
@@ -1038,6 +1043,9 @@ int main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
                             return rrdlabels_unittest();
+                        }
+                        else if(strcmp(optarg, "metatest") == 0) {
+                            return metadata_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);

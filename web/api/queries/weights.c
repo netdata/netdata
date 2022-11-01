@@ -56,35 +56,14 @@ typedef enum {
 
 struct register_result {
     RESULT_FLAGS flags;
-    RRDSET *st;
-    const char *chart_id;
-    const char *context;
-    const char *dim_name;
+    RRDCONTEXT_ACQUIRED *rca;
+    RRDINSTANCE_ACQUIRED *ria;
+    RRDMETRIC_ACQUIRED *rma;
     NETDATA_DOUBLE value;
-
-    struct register_result *next; // used to link contexts together
 };
-
-static void register_result_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct register_result *t = (struct register_result *)value;
-
-    if(t->chart_id) t->chart_id = strdupz(t->chart_id);
-    if(t->context)  t->context  = strdupz(t->context);
-    if(t->dim_name) t->dim_name = strdupz(t->dim_name);
-}
-
-static void register_result_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct register_result *t = (struct register_result *)value;
-
-    freez((void *)t->chart_id);
-    freez((void *)t->context);
-    freez((void *)t->dim_name);
-}
 
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-    dictionary_register_insert_callback(results, register_result_insert_callback, results);
-    dictionary_register_delete_callback(results, register_result_delete_callback, results);
     return results;
 }
 
@@ -93,8 +72,9 @@ static void register_result_destroy(DICTIONARY *results) {
 }
 
 static void register_result(DICTIONARY *results,
-                            RRDSET *st,
-                            RRDDIM *d,
+                            RRDCONTEXT_ACQUIRED *rca,
+                            RRDINSTANCE_ACQUIRED *ria,
+                            RRDMETRIC_ACQUIRED *rma,
                             NETDATA_DOUBLE value,
                             RESULT_FLAGS flags,
                             WEIGHTS_STATS *stats,
@@ -115,25 +95,25 @@ static void register_result(DICTIONARY *results,
 
     struct register_result t = {
         .flags = flags,
-        .st = st,
-        .chart_id = rrdset_id(st),
-        .context = rrdset_context(st),
-        .dim_name = rrddim_name(d),
+        .rca = rca,
+        .ria = ria,
+        .rma = rma,
         .value = v
     };
 
-    char buf[5000 + 1];
-    snprintfz(buf, 5000, "%s:%s", rrdset_id(st), rrddim_name(d));
-    dictionary_set(results, buf, &t, sizeof(struct register_result));
+    // we can use the pointer address or RMA as a unique key for each metric
+    char buf[20 + 1];
+    ssize_t len = snprintfz(buf, 20, "%p", rma);
+    dictionary_set_advanced(results, buf, len + 1, &t, sizeof(struct register_result), NULL);
 }
 
 // ----------------------------------------------------------------------------
 // Generation of JSON output for the results
 
 static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *wb,
-                                   long long after, long long before,
-                                   long long baseline_after, long long baseline_before,
-                                   long points, WEIGHTS_METHOD method,
+                                   time_t after, time_t before,
+                                   time_t baseline_after, time_t baseline_before,
+                                   size_t points, WEIGHTS_METHOD method,
                                    RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
@@ -142,10 +122,10 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                        "\t\"after\": %lld,\n"
                        "\t\"before\": %lld,\n"
                        "\t\"duration\": %lld,\n"
-                       "\t\"points\": %ld,\n",
-                       after,
-                       before,
-                       before - after,
+                       "\t\"points\": %zu,\n",
+                       (long long)after,
+                       (long long)before,
+                       (long long)(before - after),
                        points
                        );
 
@@ -154,10 +134,10 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                            "\t\"baseline_after\": %lld,\n"
                            "\t\"baseline_before\": %lld,\n"
                            "\t\"baseline_duration\": %lld,\n"
-                           "\t\"baseline_points\": %ld,\n",
-                           baseline_after,
-                           baseline_before,
-                           baseline_before - baseline_after,
+                           "\t\"baseline_points\": %zu,\n",
+                           (long long)baseline_after,
+                           (long long)baseline_before,
+                           (long long)(baseline_before - baseline_after),
                            points << shifts
                        );
 
@@ -176,7 +156,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                        stats->db_points
                    );
 
-    for(int tier = 0; tier < storage_tiers ;tier++)
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
         buffer_sprintf(wb, "%s%zu", tier?", ":"", stats->db_points_per_tier[tier]);
 
     buffer_sprintf(wb, " ]\n"
@@ -188,13 +168,13 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                        weights_method_to_string(method)
                    );
 
-    web_client_api_request_v1_data_options_to_string(wb, options);
+    web_client_api_request_v1_data_options_to_buffer(wb, options);
 }
 
 static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
-                                                long long after, long long before,
-                                                long long baseline_after, long long baseline_before,
-                                                long points, WEIGHTS_METHOD method,
+                                                time_t after, time_t before,
+                                                time_t baseline_after, time_t baseline_before,
+                                                size_t points, WEIGHTS_METHOD method,
                                                 RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
@@ -206,23 +186,23 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 
     size_t charts = 0, chart_dims = 0, total_dimensions = 0;
     struct register_result *t;
-    RRDSET *last_st = NULL; // never access this - we use it only for comparison
+    RRDINSTANCE_ACQUIRED *last_ria = NULL; // never access this - we use it only for comparison
     dfe_start_read(results, t) {
-        if(!last_st || t->st != last_st) {
-            last_st = t->st;
+        if(t->ria != last_ria) {
+            last_ria = t->ria;
 
             if(charts) buffer_strcat(wb, "\n\t\t\t}\n\t\t},\n");
             buffer_strcat(wb, "\t\t\"");
-            buffer_strcat(wb, t->chart_id);
+            buffer_strcat(wb, rrdinstance_acquired_id(t->ria));
             buffer_strcat(wb, "\": {\n");
             buffer_strcat(wb, "\t\t\t\"context\": \"");
-            buffer_strcat(wb, t->context);
+            buffer_strcat(wb, rrdcontext_acquired_id(t->rca));
             buffer_strcat(wb, "\",\n\t\t\t\"dimensions\": {\n");
             charts++;
             chart_dims = 0;
         }
         if (chart_dims) buffer_sprintf(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, t->dim_name, t->value);
+        buffer_sprintf(wb, "\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, rrdmetric_acquired_name(t->rma), t->value);
         chart_dims++;
         total_dimensions++;
     }
@@ -245,9 +225,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 }
 
 static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *wb,
-                                                  long long after, long long before,
-                                                  long long baseline_after, long long baseline_before,
-                                                  long points, WEIGHTS_METHOD method,
+                                                  time_t after, time_t before,
+                                                  time_t baseline_after, time_t baseline_before,
+                                                  size_t points, WEIGHTS_METHOD method,
                                                   RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
@@ -255,75 +235,80 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
 
-    DICTIONARY *context_results = dictionary_create(
-        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_NAME_LINK_DONT_CLONE |
-        DICT_OPTION_DONT_OVERWRITE_VALUE);
-
-    struct register_result *t;
-    dfe_start_read(results, t) {
-        struct register_result *tc = dictionary_set(context_results, t->context, t, sizeof(*t));
-        if(tc == t)
-            t->next = NULL;
-        else {
-            t->next = tc->next;
-            tc->next = t;
-        }
-    }
-    dfe_done(t);
-
     buffer_strcat(wb, "\",\n\t\"contexts\": {\n");
 
-    size_t contexts = 0, total_dimensions = 0, charts = 0, context_dims = 0, chart_dims = 0;
+    size_t contexts = 0, charts = 0, total_dimensions = 0, context_dims = 0, chart_dims = 0;
     NETDATA_DOUBLE contexts_total_weight = 0.0, charts_total_weight = 0.0;
-    RRDSET *last_st = NULL; // never access this - we use it only for comparison
-    dfe_start_read(context_results, t) {
+    struct register_result *t;
+    RRDCONTEXT_ACQUIRED *last_rca = NULL;
+    RRDINSTANCE_ACQUIRED *last_ria = NULL;
+    dfe_start_read(results, t) {
 
-        if(contexts)
-            buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t},\n", charts_total_weight / chart_dims, contexts_total_weight / context_dims);
+        if(t->rca != last_rca) {
+            last_rca = t->rca;
 
-        contexts++;
-        context_dims = 0;
-        contexts_total_weight = 0.0;
+            if(contexts)
+                buffer_sprintf(wb, "\n"
+                                   "\t\t\t\t\t},\n"
+                                   "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                                   "\t\t\t\t}\n\t\t\t},\n"
+                                   "\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t},\n"
+                        , charts_total_weight / (double)chart_dims
+                        , contexts_total_weight / (double)context_dims);
 
-        buffer_strcat(wb, "\t\t\"");
-        buffer_strcat(wb, t->context);
-        buffer_strcat(wb, "\": {\n\t\t\t\"charts\":{\n");
+            buffer_strcat(wb, "\t\t\"");
+            buffer_strcat(wb, rrdcontext_acquired_id(t->rca));
+            buffer_strcat(wb, "\": {\n\t\t\t\"charts\":{\n");
 
-        charts = 0;
-        chart_dims = 0;
-        struct register_result *tt;
-        for(tt = t; tt ; tt = tt->next) {
-            if(!last_st || tt->st != last_st) {
-                last_st = tt->st;
+            contexts++;
+            charts = 0;
+            context_dims = 0;
+            contexts_total_weight = 0.0;
 
-                if(charts)
-                    buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t},\n", charts_total_weight / chart_dims);
-
-                buffer_strcat(wb, "\t\t\t\t\"");
-                buffer_strcat(wb, tt->chart_id);
-                buffer_strcat(wb, "\": {\n");
-                buffer_strcat(wb, "\t\t\t\t\t\"dimensions\": {\n");
-                charts++;
-                chart_dims = 0;
-                charts_total_weight = 0.0;
-            }
-
-            if (chart_dims) buffer_sprintf(wb, ",\n");
-            buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, tt->dim_name, tt->value);
-            charts_total_weight += tt->value;
-            contexts_total_weight += tt->value;
-            chart_dims++;
-            context_dims++;
-            total_dimensions++;
+            last_ria = NULL;
         }
+
+        if(t->ria != last_ria) {
+            last_ria = t->ria;
+
+            if(charts)
+                buffer_sprintf(wb, "\n"
+                                   "\t\t\t\t\t},\n"
+                                   "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                                   "\t\t\t\t},\n"
+                                   , charts_total_weight / (double)chart_dims);
+
+            buffer_strcat(wb, "\t\t\t\t\"");
+            buffer_strcat(wb, rrdinstance_acquired_id(t->ria));
+            buffer_strcat(wb, "\": {\n");
+            buffer_strcat(wb, "\t\t\t\t\t\"dimensions\": {\n");
+
+            charts++;
+            chart_dims = 0;
+            charts_total_weight = 0.0;
+        }
+
+        if (chart_dims) buffer_sprintf(wb, ",\n");
+        buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": " NETDATA_DOUBLE_FORMAT, rrdmetric_acquired_name(t->rma), t->value);
+        charts_total_weight += t->value;
+        contexts_total_weight += t->value;
+        chart_dims++;
+        context_dims++;
+        total_dimensions++;
     }
     dfe_done(t);
-
-    dictionary_destroy(context_results);
 
     // close dimensions and chart
     if (total_dimensions)
-        buffer_sprintf(wb, "\n\t\t\t\t\t},\n\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n\t\t}\n", charts_total_weight / chart_dims, contexts_total_weight / context_dims);
+        buffer_sprintf(wb, "\n"
+                           "\t\t\t\t\t},\n"
+                           "\t\t\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                           "\t\t\t\t}\n"
+                           "\t\t\t},\n"
+                           "\t\t\t\"weight\":" NETDATA_DOUBLE_FORMAT "\n"
+                           "\t\t}\n"
+                           , charts_total_weight / (double)chart_dims
+                           , contexts_total_weight / (double)context_dims);
 
     // close correlated_charts
     buffer_sprintf(wb, "\t},\n"
@@ -383,7 +368,10 @@ static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, NETDATA_DOUBLE *arr, si
     return added;
 }
 
-static double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMBERS highlight_diffs[], int high_size, uint32_t base_shifts) {
+static double ks_2samp(
+        DIFFS_NUMBERS baseline_diffs[], int base_size,
+        DIFFS_NUMBERS highlight_diffs[], int high_size,
+        uint32_t base_shifts) {
 
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
@@ -406,7 +394,7 @@ static double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMB
     // This would require a lot of multiplications and divisions.
     //
     // To speed it up, we do the binary search to find the index of each number
-    // but then we divide the base index by the power of two number (shifts) it
+    // but, then we divide the base index by the power of two number (shifts) it
     // is bigger than high index. So the 2 indexes are now comparable.
     // We also keep track of the original indexes with min and max, to properly
     // calculate their percentages once the loops finish.
@@ -487,7 +475,9 @@ static double ks_2samp(DIFFS_NUMBERS baseline_diffs[], int base_size, DIFFS_NUMB
 
 static double kstwo(
     NETDATA_DOUBLE baseline[], int baseline_points,
-    NETDATA_DOUBLE highlight[], int highlight_points, uint32_t base_shifts) {
+    NETDATA_DOUBLE highlight[], int highlight_points,
+    uint32_t base_shifts) {
+
     // -1 in size, since the calculate_pairs_diffs() returns one less point
     DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
     DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
@@ -506,313 +496,214 @@ static double kstwo(
     return ks_2samp(baseline_diffs, base_size, highlight_diffs, high_size, base_shifts);
 }
 
+NETDATA_DOUBLE *rrd2rrdr_ks2(
+        ONEWAYALLOC *owa, RRDHOST *host,
+        RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
+        time_t after, time_t before, size_t points, RRDR_OPTIONS options,
+        RRDR_GROUPING group_method, const char *group_options, size_t tier,
+        WEIGHTS_STATS *stats,
+        size_t *entries
+        ) {
 
-static int rrdset_metric_correlations_ks2(RRDSET *st, DICTIONARY *results,
-                                          long long baseline_after, long long baseline_before,
-                                          long long after, long long before,
-                                          long long points, RRDR_OPTIONS options,
-                                          RRDR_GROUPING group, const char *group_options, int tier,
-                                          uint32_t shifts, int timeout,
-                                          WEIGHTS_STATS *stats, bool register_zero) {
-    options |= RRDR_OPTION_NATURAL_POINTS;
+    NETDATA_DOUBLE *ret = NULL;
 
-    long group_time = 0;
-    struct context_param  *context_param_list = NULL;
+    QUERY_TARGET_REQUEST qtr = {
+            .host = host,
+            .rca = rca,
+            .ria = ria,
+            .rma = rma,
+            .after = after,
+            .before = before,
+            .points = points,
+            .options = options,
+            .group_method = group_method,
+            .group_options = group_options,
+            .tier = tier
+    };
 
-    int examined_dimensions = 0;
+    RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
+    if(!r)
+        goto cleanup;
 
-    RRDR *high_rrdr = NULL;
-    RRDR *base_rrdr = NULL;
-
-    // get first the highlight to find the number of points available
     stats->db_queries++;
-    usec_t started_usec = now_realtime_usec();
-    ONEWAYALLOC *owa = onewayalloc_create(0);
-    high_rrdr = rrd2rrdr(owa, st, points,
-                         after, before, group,
-                         group_time, options, NULL, context_param_list, group_options,
-                         timeout, tier);
-    if(!high_rrdr) {
-        info("Metric correlations: rrd2rrdr() failed for the highlighted window on chart '%s'.", rrdset_name(st));
+    stats->result_points += r->internal.result_points_generated;
+    stats->db_points += r->internal.db_points_read;
+    for(size_t tr = 0; tr < storage_tiers ; tr++)
+        stats->db_points_per_tier[tr] += r->internal.tier_points_read[tr];
+
+    if(r->d != 1) {
+        error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu", r->internal.qt->id, r->d);
         goto cleanup;
     }
 
-    for(int i = 0; i < storage_tiers ;i++)
-        stats->db_points_per_tier[i] += high_rrdr->internal.tier_points_read[i];
-
-    stats->db_points     += high_rrdr->internal.db_points_read;
-    stats->result_points += high_rrdr->internal.result_points_generated;
-    if(!high_rrdr->d) {
-        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", rrdset_name(st));
-        goto cleanup;
-    }
-    if(high_rrdr->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        info("Metric correlations: rrd2rrdr() on highlighted window timed out '%s'.", rrdset_name(st));
-        goto cleanup;
-    }
-    int high_points = rrdr_rows(high_rrdr);
-
-    usec_t now_usec = now_realtime_usec();
-    if(now_usec - started_usec > timeout * USEC_PER_MS)
+    if(unlikely(r->od[0] & RRDR_DIMENSION_HIDDEN))
         goto cleanup;
 
-    // get the baseline, requesting the same number of points as the highlight
-    stats->db_queries++;
-    base_rrdr = rrd2rrdr(owa, st,high_points << shifts,
-                    baseline_after, baseline_before, group,
-                    group_time, options, NULL, context_param_list, group_options,
-                    (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)), tier);
-    if(!base_rrdr) {
-        info("Metric correlations: rrd2rrdr() failed for the baseline window on chart '%s'.", rrdset_name(st));
-        goto cleanup;
-    }
-
-    for(int i = 0; i < storage_tiers ;i++)
-        stats->db_points_per_tier[i] += base_rrdr->internal.tier_points_read[i];
-
-    stats->db_points     += base_rrdr->internal.db_points_read;
-    stats->result_points += base_rrdr->internal.result_points_generated;
-    if(!base_rrdr->d) {
-        info("Metric correlations: rrd2rrdr() did not return any dimensions on chart '%s'.", rrdset_name(st));
-        goto cleanup;
-    }
-    if (base_rrdr->d != high_rrdr->d) {
-        info("Cannot generate metric correlations for chart '%s' when the baseline and the highlight have different number of dimensions.", rrdset_name(st));
-        goto cleanup;
-    }
-    if(base_rrdr->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        info("Metric correlations: rrd2rrdr() on baseline window timed out '%s'.", rrdset_name(st));
-        goto cleanup;
-    }
-    int base_points = rrdr_rows(base_rrdr);
-
-    now_usec = now_realtime_usec();
-    if(now_usec - started_usec > timeout * USEC_PER_MS)
+    if(unlikely(!(r->od[0] & RRDR_DIMENSION_NONZERO)))
         goto cleanup;
 
-    // we need at least 2 points to do the job
-    if(base_points < 2 || high_points < 2)
+    if(rrdr_rows(r) < 2)
         goto cleanup;
 
-    // for each dimension
-    RRDDIM *d;
-    int i;
-    rrddim_foreach_read(d, base_rrdr->st) {
-        if(unlikely((int)d_dfe.counter >= base_rrdr->d)) break;
-        i = (int)d_dfe.counter; // d_counter is provided by the dictionary
+    *entries = rrdr_rows(r);
+    ret = onewayalloc_mallocz(owa, sizeof(NETDATA_DOUBLE) * rrdr_rows(r));
 
-        // skip the not evaluated ones
-        if(unlikely(base_rrdr->od[i] & RRDR_DIMENSION_HIDDEN) || (high_rrdr->od[i] & RRDR_DIMENSION_HIDDEN))
-            continue;
-
-        examined_dimensions++;
-
-        // skip the dimensions that are just zero for both the baseline and the highlight
-        if(unlikely(!(base_rrdr->od[i] & RRDR_DIMENSION_NONZERO) && !(high_rrdr->od[i] & RRDR_DIMENSION_NONZERO)))
-            continue;
-
-        // copy the baseline points of the dimension to a contiguous array
-        // there is no need to check for empty values, since empty are already zero
-        NETDATA_DOUBLE baseline[base_points];
-        for(int c = 0; c < base_points; c++)
-            baseline[c] = base_rrdr->v[ c * base_rrdr->d + i ];
-
-        // copy the highlight points of the dimension to a contiguous array
-        // there is no need to check for empty values, since empty values are already zero
-        // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
-        NETDATA_DOUBLE highlight[high_points];
-        for(int c = 0; c < high_points; c++)
-            highlight[c] = high_rrdr->v[ c * high_rrdr->d + i ];
-
-        stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
-
-        double prob = kstwo(baseline, base_points, highlight, high_points, shifts);
-        if(!isnan(prob) && !isinf(prob)) {
-
-            // these conditions should never happen, but still let's check
-            if(unlikely(prob < 0.0)) {
-                error("Metric correlations: kstwo() returned a negative number: %f", prob);
-                prob = -prob;
-            }
-            if(unlikely(prob > 1.0)) {
-                error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
-                prob = 1.0;
-            }
-
-            // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
-            // so we flip the result of kstwo()
-            register_result(results, base_rrdr->st, d, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
-        }
-    }
-    rrddim_foreach_done(d);
+    // copy the points of the dimension to a contiguous array
+    // there is no need to check for empty values, since empty values are already zero
+    // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
+    memcpy(ret, r->v, rrdr_rows(r) * sizeof(NETDATA_DOUBLE));
 
 cleanup:
-    rrdr_free(owa, high_rrdr);
-    rrdr_free(owa, base_rrdr);
+    rrdr_free(owa, r);
+    return ret;
+}
+
+static void rrdset_metric_correlations_ks2(
+        RRDHOST *host,
+        RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
+        DICTIONARY *results,
+        time_t baseline_after, time_t baseline_before,
+        time_t after, time_t before,
+        size_t points, RRDR_OPTIONS options,
+        RRDR_GROUPING group_method, const char *group_options, size_t tier,
+        uint32_t shifts,
+        WEIGHTS_STATS *stats, bool register_zero
+        ) {
+
+    options |= RRDR_OPTION_NATURAL_POINTS;
+
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
+
+    size_t high_points = 0;
+    NETDATA_DOUBLE *highlight = rrd2rrdr_ks2(
+            owa, host, rca, ria, rma, after, before, points,
+            options, group_method, group_options, tier, stats, &high_points);
+
+    if(!highlight)
+        goto cleanup;
+
+    size_t base_points = 0;
+    NETDATA_DOUBLE *baseline = rrd2rrdr_ks2(
+            owa, host, rca, ria, rma, baseline_after, baseline_before, high_points << shifts,
+            options, group_method, group_options, tier, stats, &base_points);
+
+    if(!baseline)
+        goto cleanup;
+
+    stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
+
+    double prob = kstwo(baseline, (int)base_points, highlight, (int)high_points, shifts);
+    if(!isnan(prob) && !isinf(prob)) {
+
+        // these conditions should never happen, but still let's check
+        if(unlikely(prob < 0.0)) {
+            error("Metric correlations: kstwo() returned a negative number: %f", prob);
+            prob = -prob;
+        }
+        if(unlikely(prob > 1.0)) {
+            error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
+            prob = 1.0;
+        }
+
+        // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
+        // so, we flip the result of kstwo()
+        register_result(results, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, stats, register_zero);
+    }
+
+cleanup:
     onewayalloc_destroy(owa);
-    return examined_dimensions;
 }
 
 // ----------------------------------------------------------------------------
 // VOLUME algorithm functions
 
-static int rrdset_metric_correlations_volume(RRDSET *st, DICTIONARY *results,
-                                             long long baseline_after, long long baseline_before,
-                                             long long after, long long before,
-                                             RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
-                                             int tier, int timeout,
-                                             WEIGHTS_STATS *stats, bool register_zero) {
+static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats) {
+    stats->db_queries++;
+    stats->result_points += qv->result_points;
+    stats->db_points += qv->points_read;
+    for(size_t tier = 0; tier < storage_tiers ; tier++)
+        stats->db_points_per_tier[tier] += qv->storage_points_per_tier[tier];
+}
+
+static void rrdset_metric_correlations_volume(
+        RRDHOST *host,
+        RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
+        DICTIONARY *results,
+        time_t baseline_after, time_t baseline_before,
+        time_t after, time_t before,
+        RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+        size_t tier,
+        WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
-    long group_time = 0;
 
-    int examined_dimensions = 0;
-    int ret, value_is_null;
-    usec_t started_usec = now_realtime_usec();
+    QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before, options, group_method, group_options, tier, 0);
+    merge_query_value_to_stats(&baseline_average, stats);
 
-    RRDDIM *d;
-    rrddim_foreach_read(d, st) {
-        usec_t now_usec = now_realtime_usec();
-        if(now_usec - started_usec > timeout * USEC_PER_MS)
-            return examined_dimensions;
-
-        // we count how many metrics we evaluated
-        examined_dimensions++;
-
-        // there is no point to pass a timeout to these queries
-        // since the query engine checks for a timeout between
-        // dimensions, and we query a single dimension at a time.
-
-        stats->db_queries++;
-        NETDATA_DOUBLE baseline_average = NAN;
-        NETDATA_DOUBLE base_anomaly_rate = 0;
-        value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &baseline_average, rrddim_id(d), 1,
-                                  baseline_after, baseline_before,
-                                  group, group_options, group_time, options,
-                                  NULL, NULL,
-                                  &stats->db_points, stats->db_points_per_tier,
-                                  &stats->result_points,
-                                  &value_is_null, &base_anomaly_rate, 0, tier);
-
-        if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(baseline_average)) {
-            // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
-            baseline_average = 0.0;
-        }
-
-        stats->db_queries++;
-        NETDATA_DOUBLE highlight_average = NAN;
-        NETDATA_DOUBLE high_anomaly_rate = 0;
-        value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &highlight_average, rrddim_id(d), 1,
-                                  after, before,
-                                  group, group_options, group_time, options,
-                                  NULL, NULL,
-                                  &stats->db_points, stats->db_points_per_tier,
-                                  &stats->result_points,
-                                  &value_is_null, &high_anomaly_rate, 0, tier);
-
-        if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(highlight_average)) {
-            // this means no data for the highlighted duration - so skip it
-            continue;
-        }
-
-        if(baseline_average == highlight_average) {
-            // they are the same - let's move on
-            continue;
-        }
-
-        stats->db_queries++;
-        NETDATA_DOUBLE highlight_countif = NAN;
-        value_is_null = 1;
-
-        char highlighted_countif_options[50 + 1];
-        snprintfz(highlighted_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average < baseline_average ? "<":">", baseline_average);
-
-        ret = rrdset2value_api_v1(st, NULL, &highlight_countif, rrddim_id(d), 1,
-                                  after, before,
-                                  RRDR_GROUPING_COUNTIF,highlighted_countif_options,
-                                  group_time, options,
-                                  NULL, NULL,
-                                  &stats->db_points, stats->db_points_per_tier,
-                                  &stats->result_points,
-                                  &value_is_null, NULL, 0, tier);
-
-        if(ret != HTTP_RESP_OK || value_is_null || !netdata_double_isnumber(highlight_countif)) {
-            info("MC: highlighted countif query failed, but highlighted average worked - strange...");
-            continue;
-        }
-
-        // this represents the percentage of time
-        // the highlighted window was above/below the baseline window
-        // (above or below depending on their averages)
-        highlight_countif = highlight_countif / 100.0; // countif returns 0 - 100.0
-
-        RESULT_FLAGS flags;
-        NETDATA_DOUBLE pcent = NAN;
-        if(isgreater(baseline_average, 0.0) || isless(baseline_average, 0.0)) {
-            flags = RESULT_IS_BASE_HIGH_RATIO;
-            pcent = (highlight_average - baseline_average) / baseline_average * highlight_countif;
-        }
-        else {
-            flags = RESULT_IS_PERCENTAGE_OF_TIME;
-            pcent = highlight_countif;
-        }
-
-        register_result(results, st, d, pcent, flags, stats, register_zero);
+    if(!netdata_double_isnumber(baseline_average.value)) {
+        // this means no data for the baseline window, but we may have data for the highlighted one - assume zero
+        baseline_average.value = 0.0;
     }
-    rrddim_foreach_done(d);
 
-    return examined_dimensions;
+    QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before, options, group_method, group_options, tier, 0);
+    merge_query_value_to_stats(&highlight_average, stats);
+
+    if(!netdata_double_isnumber(highlight_average.value))
+        return;
+
+    if(baseline_average.value == highlight_average.value) {
+        // they are the same - let's move on
+        return;
+    }
+
+    char highlight_countif_options[50 + 1];
+    snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
+    QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before, options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0);
+    merge_query_value_to_stats(&highlight_countif, stats);
+
+    if(!netdata_double_isnumber(highlight_countif.value)) {
+        info("WEIGHTS: highlighted countif query failed, but highlighted average worked - strange...");
+        return;
+    }
+
+    // this represents the percentage of time
+    // the highlighted window was above/below the baseline window
+    // (above or below depending on their averages)
+    highlight_countif.value = highlight_countif.value / 100.0; // countif returns 0 - 100.0
+
+    RESULT_FLAGS flags;
+    NETDATA_DOUBLE pcent = NAN;
+    if(isgreater(baseline_average.value, 0.0) || isless(baseline_average.value, 0.0)) {
+        flags = RESULT_IS_BASE_HIGH_RATIO;
+        pcent = (highlight_average.value - baseline_average.value) / baseline_average.value * highlight_countif.value;
+    }
+    else {
+        flags = RESULT_IS_PERCENTAGE_OF_TIME;
+        pcent = highlight_countif.value;
+    }
+
+    register_result(results, rca, ria, rma, pcent, flags, stats, register_zero);
 }
 
 // ----------------------------------------------------------------------------
 // ANOMALY RATE algorithm functions
 
-static int rrdset_weights_anomaly_rate(RRDSET *st, DICTIONARY *results,
-                                       long long after, long long before,
-                                       RRDR_OPTIONS options, RRDR_GROUPING group, const char *group_options,
-                                       int tier, int timeout,
-                                       WEIGHTS_STATS *stats, bool register_zero) {
+static void rrdset_weights_anomaly_rate(
+        RRDHOST *host,
+        RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
+        DICTIONARY *results,
+        time_t after, time_t before,
+        RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+        size_t tier,
+        WEIGHTS_STATS *stats, bool register_zero) {
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ANOMALY_BIT | RRDR_OPTION_NATURAL_POINTS;
-    long group_time = 0;
 
-    int examined_dimensions = 0;
-    int ret, value_is_null;
-    usec_t started_usec = now_realtime_usec();
+    QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before, options, group_method, group_options, tier, 0);
+    merge_query_value_to_stats(&qv, stats);
 
-    RRDDIM *d;
-    rrddim_foreach_read(d, st) {
-        usec_t now_usec = now_realtime_usec();
-        if(now_usec - started_usec > timeout * USEC_PER_MS)
-            return examined_dimensions;
-
-        // we count how many metrics we evaluated
-        examined_dimensions++;
-
-        // there is no point to pass a timeout to these queries
-        // since the query engine checks for a timeout between
-        // dimensions, and we query a single dimension at a time.
-
-        stats->db_queries++;
-        NETDATA_DOUBLE average = NAN;
-        NETDATA_DOUBLE anomaly_rate = 0;
-        value_is_null = 1;
-        ret = rrdset2value_api_v1(st, NULL, &average, rrddim_id(d), 1,
-                                  after, before,
-                                  group, group_options, group_time, options,
-                                  NULL, NULL,
-                                  &stats->db_points, stats->db_points_per_tier,
-                                  &stats->result_points,
-                                  &value_is_null, &anomaly_rate, 0, tier);
-
-        if(ret == HTTP_RESP_OK || !value_is_null || netdata_double_isnumber(average))
-            register_result(results, st, d, average, 0, stats, register_zero);
-    }
-    rrddim_foreach_done(d);
-
-    return examined_dimensions;
+    if(netdata_double_isnumber(qv.value))
+        register_result(results, rca, ria, rma, qv.value, 0, stats, register_zero);
 }
 
 // ----------------------------------------------------------------------------
@@ -900,15 +791,17 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 // ----------------------------------------------------------------------------
 // The main function
 
-int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
-                        RRDR_GROUPING group, const char *group_options,
-                        long long baseline_after, long long baseline_before,
-                        long long after, long long before,
-                        long long points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, int tier, int timeout) {
+int web_api_v1_weights(
+        RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
+        RRDR_GROUPING group, const char *group_options,
+        time_t baseline_after, time_t baseline_before,
+        time_t after, time_t before,
+        size_t points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, size_t tier, size_t timeout) {
+
     WEIGHTS_STATS stats = {};
 
     DICTIONARY *results = register_result_init();
-    DICTIONARY *charts = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE);;
+    DICTIONARY *metrics = NULL;
     char *error = NULL;
     int resp = HTTP_RESP_OK;
 
@@ -997,19 +890,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
         baseline_after = baseline_before - (high_delta << shifts);
     }
 
-    // dont lock here and wait for results
-    // get the charts and run mc after
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-        if (rrdset_is_available_for_viewers(st)) {
-            if(!contexts || simple_pattern_matches(contexts, rrdset_context(st)))
-                dictionary_set(charts, rrdset_name(st), NULL, 0);
-        }
-    }
-    rrdset_foreach_done(st);
-
     size_t examined_dimensions = 0;
-    void *ptr;
 
     bool register_zero = true;
     if(options & RRDR_OPTION_NONZERO) {
@@ -1017,8 +898,11 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
         options &= ~RRDR_OPTION_NONZERO;
     }
 
-    // for every chart in the dictionary
-    dfe_start_read(charts, ptr) {
+    metrics = rrdcontext_all_metrics_to_dict(host, contexts);
+    struct metric_entry *me;
+
+    // for every metric_entry in the dictionary
+    dfe_start_read(metrics, me) {
         usec_t now_usec = now_realtime_usec();
         if(now_usec - started_usec > timeout_usec) {
             error = "timed out";
@@ -1026,42 +910,48 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
             goto cleanup;
         }
 
-        st = rrdset_find_byname(host, ptr_dfe.name); // ptr_dfe.name is provided by dictionary
-        if(!st) continue;
+        examined_dimensions++;
 
         switch(method) {
             case WEIGHTS_METHOD_ANOMALY_RATE:
                 options |= RRDR_OPTION_ANOMALY_BIT;
-                points = 1;
-                examined_dimensions += rrdset_weights_anomaly_rate(st, results,
-                                                                   after, before,
-                                                                   options, group, group_options, tier,
-                                                                   (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-                                                                   &stats, register_zero);
+                rrdset_weights_anomaly_rate(
+                        host,
+                        me->rca, me->ria, me->rma,
+                        results,
+                        after, before,
+                        options, group, group_options, tier,
+                        &stats, register_zero
+                        );
                 break;
 
             case WEIGHTS_METHOD_MC_VOLUME:
-                points = 1;
-                examined_dimensions += rrdset_metric_correlations_volume(st, results,
-                                                                baseline_after, baseline_before,
-                                                                after, before,
-                                                                options, group, group_options, tier,
-                                                                (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-                                                                &stats, register_zero);
+                rrdset_metric_correlations_volume(
+                        host,
+                        me->rca, me->ria, me->rma,
+                        results,
+                        baseline_after, baseline_before,
+                        after, before,
+                        options, group, group_options, tier,
+                        &stats, register_zero
+                        );
                 break;
 
             default:
             case WEIGHTS_METHOD_MC_KS2:
-                examined_dimensions += rrdset_metric_correlations_ks2(st, results,
-                                                             baseline_after, baseline_before,
-                                                             after, before,
-                                                             points, options, group, group_options, tier, shifts,
-                                                             (int)(timeout - ((now_usec - started_usec) / USEC_PER_MS)),
-                                                             &stats, register_zero);
+                rrdset_metric_correlations_ks2(
+                        host,
+                        me->rca, me->ria, me->rma,
+                        results,
+                        baseline_after, baseline_before,
+                        after, before, points,
+                        options, group, group_options, tier, shifts,
+                        &stats, register_zero
+                        );
                 break;
         }
     }
-    dfe_done(ptr);
+    dfe_done(me);
 
     if(!register_zero)
         options |= RRDR_OPTION_NONZERO;
@@ -1077,22 +967,26 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     size_t added_dimensions = 0;
     switch(format) {
         case WEIGHTS_FORMAT_CHARTS:
-            added_dimensions = registered_results_to_json_charts(results, wb,
-                                                                 after, before,
-                                                                 baseline_after, baseline_before,
-                                                                 points, method, group, options, shifts,
-                                                                 examined_dimensions,
-                                                                 ended_usec - started_usec, &stats);
+            added_dimensions =
+                    registered_results_to_json_charts(
+                            results, wb,
+                            after, before,
+                            baseline_after, baseline_before,
+                            points, method, group, options, shifts,
+                            examined_dimensions,
+                            ended_usec - started_usec, &stats);
             break;
 
         default:
         case WEIGHTS_FORMAT_CONTEXTS:
-            added_dimensions = registered_results_to_json_contexts(results, wb,
-                                                                   after, before,
-                                                                   baseline_after, baseline_before,
-                                                                   points, method, group, options, shifts,
-                                                                   examined_dimensions,
-                                                                   ended_usec - started_usec, &stats);
+            added_dimensions =
+                    registered_results_to_json_contexts(
+                            results, wb,
+                            after, before,
+                            baseline_after, baseline_before,
+                            points, method, group, options, shifts,
+                            examined_dimensions,
+                            ended_usec - started_usec, &stats);
             break;
     }
 
@@ -1102,7 +996,7 @@ int web_api_v1_weights(RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS
     }
 
 cleanup:
-    if(charts) dictionary_destroy(charts);
+    if(metrics) dictionary_destroy(metrics);
     if(results) register_result_destroy(results);
 
     if(error) {

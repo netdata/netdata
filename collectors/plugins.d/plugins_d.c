@@ -6,7 +6,7 @@
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
 struct plugind *pluginsd_root = NULL;
 
-inline int pluginsd_initialize_plugin_directories()
+inline size_t pluginsd_initialize_plugin_directories()
 {
     char plugins_dirs[(FILENAME_MAX * 2) + 1];
     static char *plugins_dir_list = NULL;

@@ -14,8 +14,6 @@
 #endif /* ENABLE_ACLK */
 
 extern int aclk_connected;
-extern int aclk_alert_reloaded;
-extern int use_mqtt_5;
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
 extern int aclk_stats_enabled;
@@ -54,5 +52,6 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 char *aclk_state(void);
 char *aclk_state_json(void);
 void add_aclk_host_labels(void);
+void aclk_queue_node_info(RRDHOST *host);
 
 #endif /* ACLK_H */

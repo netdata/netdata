@@ -548,6 +548,9 @@ void rrdlabels_destroy(DICTIONARY *labels_dict) {
     dictionary_destroy(labels_dict);
 }
 
+void rrdlabels_flush(DICTIONARY *labels_dict) {
+    dictionary_flush(labels_dict);
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels_add()
@@ -633,6 +636,8 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
 // rrdlabels_get_value_to_buffer_or_null()
 
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
+    if(!labels) return;
+
     const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
     RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
 
@@ -952,23 +957,6 @@ int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each,
     return dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
-struct label_str {
-    BUFFER  *sql;
-    int count;
-    char uuid_str[UUID_STR_LEN];
-};
-
-static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    struct label_str *lb = data;
-    if (unlikely(!lb->count))
-        buffer_sprintf(lb->sql, "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");
-    else
-        buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, "(u2h('%s'), %d,'%s','%s', unixepoch())", lb->uuid_str, ls, name, value);
-    lb->count++;
-    return 1;
-}
-
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if(!st->rrdlabels)
         st->rrdlabels = rrdlabels_create();
@@ -976,27 +964,7 @@ void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if (new_rrdlabels)
         rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
-    rrdset_save_rrdlabels_to_sql(st);
-}
-
-void rrdset_save_rrdlabels_to_sql(RRDSET *st) {
-    if(!st->rrdlabels) return;
-
-    size_t old_version = st->rrdlabels_last_saved_version;
-    size_t new_version = dictionary_version(st->rrdlabels);
-
-    if(new_version != old_version) {
-        // TODO - we should also cleanup sqlite from old new_rrdlabels that have been removed
-
-        BUFFER *sql_buf = buffer_create(1024);
-        struct label_str tmp = {.sql = sql_buf, .count = 0};
-        uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
-        rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-        db_execute(buffer_tostring(sql_buf));
-        buffer_free(sql_buf);
-
-        st->rrdlabels_last_saved_version = new_version;
-    }
+    metaqueue_chart_labels(st);
 }
 
 

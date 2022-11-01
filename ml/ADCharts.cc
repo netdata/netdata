@@ -133,31 +133,32 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
     time_t After = Before - Cfg.AnomalyDetectionQueryDuration;
     RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
 
-    RRDR *R = rrd2rrdr(
-        OWA, HostRateRS,
-        1 /* points wanted */,
-        After,
-        Before,
-        Cfg.AnomalyDetectionGroupingMethod,
-        0 /* resampling time */,
-        Options, "anomaly_rate",
-        NULL /* context param list */,
-        NULL /* group options */,
-        0, /* timeout */
-        0 /* tier */
+    RRDR *R = rrd2rrdr_legacy(
+            OWA, HostRateRS,
+            1 /* points wanted */,
+            After,
+            Before,
+            Cfg.AnomalyDetectionGroupingMethod,
+            0 /* resampling time */,
+            Options, "anomaly_rate",
+            NULL /* group options */,
+            0, /* timeout */
+            0 /* tier */
     );
-    assert(R->d == 1 && R->n == 1 && R->rows == 1);
+    if(R) {
+        assert(R->d == 1 && R->n == 1 && R->rows == 1);
 
-    static thread_local bool PrevAboveThreshold = false;
-    bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
-    bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
-    PrevAboveThreshold = AboveThreshold;
+        static thread_local bool PrevAboveThreshold = false;
+        bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
+        bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
+        PrevAboveThreshold = AboveThreshold;
 
-    rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
-    rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
-    rrdset_done(AnomalyDetectionRS);
+        rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
+        rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
+        rrdset_done(AnomalyDetectionRS);
 
-    rrdr_free(OWA, R);
+        rrdr_free(OWA, R);
+    }
     onewayalloc_destroy(OWA);
 }
 

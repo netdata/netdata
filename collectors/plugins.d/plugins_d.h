@@ -11,6 +11,7 @@
 #define PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH 0
 
 #define PLUGINSD_KEYWORD_CHART                  "CHART"
+#define PLUGINSD_KEYWORD_CHART_DEFINITION_END   "CHART_DEFINITION_END"
 #define PLUGINSD_KEYWORD_DIMENSION              "DIMENSION"
 #define PLUGINSD_KEYWORD_BEGIN                  "BEGIN"
 #define PLUGINSD_KEYWORD_SET                    "SET"
@@ -25,16 +26,18 @@
 #define PLUGINSD_KEYWORD_FUNCTION               "FUNCTION"
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN  "FUNCTION_RESULT_BEGIN"
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_END    "FUNCTION_RESULT_END"
-#define PLUGINSD_KEYWORD_GUID                   "GUID"
-#define PLUGINSD_KEYWORD_CONTEXT                "CONTEXT"
-#define PLUGINSD_KEYWORD_TOMBSTONE              "TOMBSTONE"
-#define PLUGINSD_KEYWORD_HOST                   "HOST"
-//#define PLUGINSD_KEYWORD_GAPS_REQUEST           "GAPS_REQUEST" // child -> parent
-//#define PLUGINSD_KEYWORD_CHART_GAP              "CHART_GAP"    // parent <- child
+
+#define PLUGINSD_KEYWORD_REPLAY_CHART           "REPLAY_CHART"
+#define PLUGINSD_KEYWORD_REPLAY_BEGIN           "RBEGIN"
+#define PLUGINSD_KEYWORD_REPLAY_SET             "RSET"
+#define PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE    "RDSTATE"
+#define PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE    "RSSTATE"
+#define PLUGINSD_KEYWORD_REPLAY_END             "REND"
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
 #define PLUGINSD_LINE_MAX_SSL_READ 512
+
 #define PLUGINSD_MAX_WORDS 20
 
 #define PLUGINSD_MAX_DIRECTORIES 20
@@ -69,7 +72,7 @@ extern struct plugind *pluginsd_root;
 
 size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
-int pluginsd_initialize_plugin_directories();
+size_t pluginsd_initialize_plugin_directories();
 
 
 

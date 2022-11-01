@@ -29,15 +29,17 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags)
+PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
-    parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
     parser->user = user;
     parser->input = input;
     parser->output = output;
+#ifdef ENABLE_HTTPS
+    parser->ssl_output = ssl;
+#endif
     parser->flags = flags;
     parser->host = host;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
@@ -51,6 +53,7 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
     if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
@@ -61,9 +64,15 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER
         parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
+
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,              pluginsd_function);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
-        //parser_add_keyword(parser, PLUGINSD_KEYWORD_GAPS_REQUEST,   pluginsd_gaps_request);
+
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_rrdset_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_SET,          pluginsd_replay_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_END,          pluginsd_replay_end);
     }
 
     return parser;
@@ -184,7 +193,6 @@ void parser_destroy(PARSER *parser)
         tmp_parser_data =  tmp_parser_data_next;
     }
 
-    freez(parser->plugins_action);
     freez(parser);
 }
 
@@ -246,7 +254,7 @@ int parser_next(PARSER *parser)
 inline int parser_action(PARSER *parser, char *input)
 {
     PARSER_RC rc = PARSER_RC_OK;
-    char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    char *words[PLUGINSD_MAX_WORDS];
     char command[PLUGINSD_LINE_MAX + 1];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
@@ -303,10 +311,11 @@ inline int parser_action(PARSER *parser, char *input)
     if (unlikely(!find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
         return 0;
 
+    size_t num_words = 0;
     if ((parser->flags & PARSER_INPUT_KEEP_ORIGINAL) == PARSER_INPUT_KEEP_ORIGINAL)
-        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
+        num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
-        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
     uint32_t command_hash = simple_hash(command);
 
@@ -323,7 +332,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     if (unlikely(!action_function_list)) {
         if (unlikely(parser->unknown_function))
-            rc = parser->unknown_function(words, parser->user, NULL);
+            rc = parser->unknown_function(words, num_words, parser->user);
         else
             rc = PARSER_RC_ERROR;
 
@@ -332,7 +341,7 @@ inline int parser_action(PARSER *parser, char *input)
     else {
         worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
-                rc = action_function(words, parser->user, parser->plugins_action);
+                rc = action_function(words, num_words, parser->user);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
                     internal_error(true, "action_function() failed with rc = %u", rc);
                     break;

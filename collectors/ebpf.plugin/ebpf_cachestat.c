@@ -905,21 +905,16 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
  * Send Cache Stat charts
  *
  * Send collected data to Netdata.
- *
- * @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
- *         otherwise function returns 1 to avoid chart recreation
  */
-static int ebpf_send_systemd_cachestat_charts()
+static void ebpf_send_systemd_cachestat_charts()
 {
-    int ret = 1;
     ebpf_cgroup_target_t *ect;
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_cachestat.ratio);
-        } else if (unlikely(ect->systemd))
-            ret = 0;
+        }
     }
     write_end_chart();
 
@@ -946,8 +941,6 @@ static int ebpf_send_systemd_cachestat_charts()
         }
     }
     write_end_chart();
-
-    return ret;
 }
 
 /**
@@ -1071,13 +1064,11 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
     if (has_systemd) {
-        static int systemd_charts = 0;
-        if (!systemd_charts) {
+        if (send_cgroup_chart) {
             ebpf_create_systemd_cachestat_charts(update_every);
-            systemd_charts = 1;
         }
 
-        systemd_charts = ebpf_send_systemd_cachestat_charts();
+        ebpf_send_systemd_cachestat_charts();
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {

@@ -4,21 +4,20 @@
 #include "rrd.h"
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-int storage_tiers = 1;
-int storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
+size_t storage_tiers = 1;
+size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
-int get_tier_grouping(int tier) {
+size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
-    if(unlikely(tier < 0)) tier = 0;
 
-    int grouping = 1;
+    size_t grouping = 1;
     // first tier is always 1 iteration of whatever update every the chart has
-    for(int i = 1; i <= tier ;i++)
+    for(size_t i = 1; i <= tier ;i++)
         grouping *= storage_tiers_grouping_iterations[i];
 
     return grouping;
@@ -33,7 +32,7 @@ time_t rrdhost_free_orphan_time = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
             return true;
     }
@@ -46,7 +45,7 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management
 
-static DICTIONARY *rrdhost_root_index = NULL;
+DICTIONARY *rrdhost_root_index = NULL;
 static DICTIONARY *rrdhost_root_index_hostname = NULL;
 
 static inline void rrdhost_init() {
@@ -231,80 +230,6 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
 }
 
-static void rrdhost_initialize_health(RRDHOST *host,
-                                      int is_localhost
-                                      ) {
-    if(!host->health_enabled || rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) return;
-    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
-
-    rrdfamily_index_init(host);
-    rrdcalctemplate_index_init(host);
-    rrdcalc_rrdhost_index_init(host);
-
-    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-
-    host->health_log.next_log_id = 1;
-    host->health_log.next_alarm_id = 1;
-    host->health_log.max = 1000;
-    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
-    host->health_log.next_alarm_id = 0;
-
-    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
-    if(n < 10) {
-        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
-        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
-    }
-    else
-        host->health_log.max = (unsigned int)n;
-
-    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
-
-    char filename[FILENAME_MAX + 1];
-
-    if(!is_localhost) {
-        int r = mkdir(host->varlib_dir, 0775);
-        if (r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-    }
-
-    {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
-
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(filename);
-
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = string_strdupz("root");
-
-    // ------------------------------------------------------------------------
-    // load health configuration
-
-    health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-
-    if (!file_is_migrated(host->health_log_filename)) {
-        int rc = sql_create_health_log_table(host);
-        if (unlikely(rc)) {
-            error_report("Failed to create health log table in the database");
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
-        }
-        else {
-            health_alarm_log_load(host);
-            add_migrated_file(host->health_log_filename, 0);
-        }
-    } else {
-        sql_create_health_log_table(host);
-        sql_health_alarm_log_load(host);
-    }
-}
-
-
 RRDHOST *rrdhost_create(const char *hostname,
                         const char *registry_hostname,
                         const char *guid,
@@ -323,6 +248,9 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_destination,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
+                        bool rrdpush_enable_replication,
+                        time_t rrdpush_seconds_to_replicate,
+                        time_t rrdpush_replication_step,
                         struct rrdhost_system_info *system_info,
                         int is_localhost,
                         bool archived
@@ -360,6 +288,24 @@ int is_legacy = 1;
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+    }
+
+    host->rrdpush_enable_replication = rrdpush_enable_replication;
+    host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
+    host->rrdpush_replication_step = rrdpush_replication_step;
+
+    switch(memory_mode) {
+        default:
+        case RRD_MEMORY_MODE_ALLOC:
+        case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_SAVE:
+        case RRD_MEMORY_MODE_RAM:
+            if(host->rrdpush_seconds_to_replicate > host->rrd_history_entries * host->rrd_update_every)
+                host->rrdpush_seconds_to_replicate = host->rrd_history_entries * host->rrd_update_every;
+            break;
+
+        case RRD_MEMORY_MODE_DBENGINE:
+            break;
     }
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
@@ -414,20 +360,19 @@ int is_legacy = 1;
     }
 
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-        int rc;
-
-        if(!archived) {
-            rc = sql_store_host_info(host);
-            if (unlikely(rc))
-                error_report("Failed to store machine GUID to the database");
-        }
-
+        if(!archived)
+            metaqueue_host_update_info(host->machine_guid);
         sql_load_node_id(host);
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
 
-    rrdhost_initialize_health(host, is_localhost);
+    rrdfamily_index_init(host);
+    rrdcalctemplate_index_init(host);
+    rrdcalc_rrdhost_index_init(host);
+
+    if (health_enabled)
+        health_thread_spawn(host);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -442,9 +387,13 @@ int is_legacy = 1;
         if (is_legacy) {
             // initialize legacy dbengine instance as needed
 
+            host->db[0].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[0].eng = storage_engine_get(host->db[0].mode);
+            host->db[0].tier_grouping = get_tier_grouping(0);
+
             ret = rrdeng_init(
                 host,
-                (struct rrdengine_instance **)&host->storage_instance[0],
+                (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
                 default_rrdeng_page_cache_mb,
                 default_rrdeng_disk_quota_mb,
@@ -453,13 +402,21 @@ int is_legacy = 1;
             if(ret == 0) {
                 // assign the rest of the shared storage instances to it
                 // to allow them collect its metrics too
-                for(int tier = 1; tier < storage_tiers ; tier++)
-                    host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                for(size_t tier = 1; tier < storage_tiers ; tier++) {
+                    host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                    host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+                    host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+                    host->db[tier].tier_grouping = get_tier_grouping(tier);
+                }
             }
         }
         else {
-            for(int tier = 0; tier < storage_tiers ; tier++)
-                host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+            for(size_t tier = 0; tier < storage_tiers ; tier++) {
+                host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+                host->db[tier].instance = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                host->db[tier].tier_grouping = get_tier_grouping(tier);
+            }
         }
         if (ret) { // check legacy or multihost initialization success
             error(
@@ -477,10 +434,19 @@ int is_legacy = 1;
 #endif
     }
     else {
+        host->db[0].mode = host->rrd_memory_mode;
+        host->db[0].eng = storage_engine_get(host->db[0].mode);
+        host->db[0].instance = NULL;
+        host->db[0].tier_grouping = get_tier_grouping(0);
+
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes
-        for(int tier = 1; tier < storage_tiers ; tier++)
-            host->storage_instance[tier] = (STORAGE_INSTANCE *)multidb_ctx[tier];
+        for(size_t tier = 1; tier < storage_tiers ; tier++) {
+            host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[tier].eng = storage_engine_get(host->db[tier].mode);
+            host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+            host->db[tier].tier_grouping = get_tier_grouping(tier);
+        }
 #endif
     }
 
@@ -541,7 +507,8 @@ int is_legacy = 1;
          , string2str(host->health_default_exec)
          , string2str(host->health_default_recipient)
     );
-    sql_store_host_system_info(&host->host_uuid, system_info);
+    if(!archived)
+        metaqueue_host_update_system_info(host);
 
     rrd_hosts_available++;
 
@@ -574,17 +541,19 @@ void rrdhost_update(RRDHOST *host
                     , char *rrdpush_destination
                     , char *rrdpush_api_key
                     , char *rrdpush_send_charts_matching
+                    , bool rrdpush_enable_replication
+                    , time_t rrdpush_seconds_to_replicate
+                    , time_t rrdpush_replication_step
                     , struct rrdhost_system_info *system_info
 )
 {
     UNUSED(guid);
 
     host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
-    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 
     rrdhost_system_info_free(host->system_info);
     host->system_info = system_info;
-    sql_store_host_system_info(&host->host_uuid, system_info);
+    metaqueue_host_update_system_info(host);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
@@ -614,11 +583,11 @@ void rrdhost_update(RRDHOST *host
     if(host->rrd_update_every != update_every)
         error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_update_every, update_every);
 
-    if(host->rrd_history_entries < history)
-        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
-
     if(host->rrd_memory_mode != mode)
         error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+
+    else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
+        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", rrdhost_hostname(host), host->rrd_history_entries, history);
 
     // update host tags
     rrdhost_init_tags(host, tags);
@@ -643,7 +612,14 @@ void rrdhost_update(RRDHOST *host
                                    rrdpush_api_key,
                                    rrdpush_send_charts_matching);
 
-        rrdhost_initialize_health(host, host == localhost);
+        rrdfamily_index_init(host);
+        rrdcalctemplate_index_init(host);
+        rrdcalc_rrdhost_index_init(host);
+
+        host->rrdpush_enable_replication = rrdpush_enable_replication;
+        host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
+        host->rrdpush_replication_step = rrdpush_replication_step;
+
 
         rrd_hosts_available++;
         ml_new_host(host);
@@ -651,7 +627,8 @@ void rrdhost_update(RRDHOST *host
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
 
-    return;
+    if (health_enabled)
+        health_thread_spawn(host);
 }
 
 RRDHOST *rrdhost_find_or_create(
@@ -673,6 +650,9 @@ RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_destination
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
+        , bool rrdpush_enable_replication
+        , time_t rrdpush_seconds_to_replicate
+        , time_t rrdpush_replication_step
         , struct rrdhost_system_info *system_info
         , bool archived
 ) {
@@ -680,7 +660,7 @@ RRDHOST *rrdhost_find_or_create(
 
     rrd_wrlock();
     RRDHOST *host = rrdhost_find_by_guid(guid);
-    if (unlikely(host && RRD_MEMORY_MODE_DBENGINE != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+    if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
               rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
@@ -707,6 +687,9 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , rrdpush_enable_replication
+                , rrdpush_seconds_to_replicate
+                , rrdpush_replication_step
                 , system_info
                 , 0
                 , archived
@@ -732,6 +715,9 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_destination
            , rrdpush_api_key
            , rrdpush_send_charts_matching
+           , rrdpush_enable_replication
+           , rrdpush_seconds_to_replicate
+           , rrdpush_replication_step
            , system_info);
     }
     if (host) {
@@ -794,14 +780,14 @@ void dbengine_init(char *hostname) {
     else
         rrdeng_page_descr_use_malloc();
 
-    int created_tiers = 0;
+    size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
-    for(int tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%d", netdata_configured_cache_dir, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -811,25 +797,25 @@ void dbengine_init(char *hostname) {
 
         int page_cache_mb = default_rrdeng_page_cache_mb;
         int disk_space_mb = default_multidb_disk_quota_mb;
-        int grouping_iterations = storage_tiers_grouping_iterations[tier];
+        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
         if(tier > 0) {
-            snprintfz(dbengineconfig, 200, "dbengine tier %d page cache size MB", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu page cache size MB", tier);
             page_cache_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, page_cache_mb);
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %d multihost disk space MB", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %d update every iterations", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu update every iterations", tier);
             grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
             if(grouping_iterations < 2) {
                 grouping_iterations = 2;
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                error("DBENGINE on '%s': 'dbegnine tier %d update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
+                error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.", hostname, tier);
             }
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %d backfill", tier);
+            snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
             const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
             if(strcmp(bf, "new") == 0) backfill = RRD_BACKFILL_NEW;
             else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
@@ -846,14 +832,14 @@ void dbengine_init(char *hostname) {
 
         if(tier > 0 && get_tier_grouping(tier) > 65535) {
             storage_tiers_grouping_iterations[tier] = 1;
-            error("DBENGINE on '%s': dbengine tier %d gives aggregation of more than 65535 points of tier 0. Disabling tiers above %d", hostname, tier, tier);
+            error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu", hostname, tier, tier);
             break;
         }
 
-        internal_error(true, "DBENGINE tier %d grouping iterations is set to %d", tier, storage_tiers_grouping_iterations[tier]);
+        internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, storage_tiers_grouping_iterations[tier]);
         ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
-            error("DBENGINE on '%s': Failed to initialize multi-host database tier %d on path '%s'",
+            error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
                   hostname, tier, dbenginepath);
             break;
         }
@@ -862,7 +848,7 @@ void dbengine_init(char *hostname) {
     }
 
     if(created_tiers && created_tiers < storage_tiers) {
-        error("DBENGINE on '%s': Managed to create %d tiers instead of %d. Continuing with %d available.",
+        error("DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
               hostname, created_tiers, storage_tiers, created_tiers);
         storage_tiers = created_tiers;
     }
@@ -898,6 +884,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         goto unittest;
     }
 
+    health_init();
     rrdpush_init();
 
     if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || storage_tiers > 1 || rrdpush_receiver_needs_dbengine()) {
@@ -909,7 +896,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
     if(!dbengine_enabled) {
         if (storage_tiers > 1) {
-            error("dbengine is not enabled, but %d tiers have been requested. Resetting tiers to 1", storage_tiers);
+            error("dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1", storage_tiers);
             storage_tiers = 1;
         }
 
@@ -919,9 +906,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         }
     }
 
-    health_init();
-
 unittest:
+    metadata_sync_init();
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     rrd_wrlock();
     localhost = rrdhost_create(
@@ -943,6 +929,9 @@ unittest:
         , default_rrdpush_destination
         , default_rrdpush_api_key
         , default_rrdpush_send_charts_matching
+        , default_rrdpush_enable_replication
+        , default_rrdpush_seconds_to_replicate
+        , default_rrdpush_replication_step
         , system_info
         , 1
         , 0
@@ -1052,6 +1041,7 @@ void stop_streaming_sender(RRDHOST *host)
     if (host->sender->compressor)
         host->sender->compressor->destroy(&host->sender->compressor);
 #endif
+    dictionary_destroy(host->sender->replication_requests);
     freez(host->sender);
     host->sender = NULL;
 }
@@ -1106,11 +1096,11 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            host->storage_instance[tier] &&
-            !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[tier]);
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
+            && host->db[tier].instance
+            && !is_storage_engine_shared(host->db[tier].instance))
+            rrdeng_prepare_exit((struct rrdengine_instance *)host->db[tier].instance);
     }
 #endif
 
@@ -1121,14 +1111,15 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     freez(host->exporting_flags);
 
+    health_thread_stop(host);
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE
-    for(int tier = 0; tier < storage_tiers ;tier++) {
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            host->storage_instance[tier] &&
-            !is_storage_engine_shared(host->storage_instance[tier]))
-            rrdeng_exit((struct rrdengine_instance *)host->storage_instance[tier]);
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
+            && host->db[tier].instance
+            && !is_storage_engine_shared(host->db[tier].instance))
+            rrdeng_exit((struct rrdengine_instance *)host->db[tier].instance);
     }
 #endif
 
@@ -1306,10 +1297,26 @@ static void rrdhost_load_auto_labels(void) {
     health_add_host_labels();
 
     rrdlabels_add(
-        labels, "_is_parent", (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false", RRDLABEL_SRC_AUTO);
+        labels, "_is_parent", (localhost->senders_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     if (localhost->rrdpush_send_destination)
         rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
+}
+
+void rrdhost_set_is_parent_label(int count) {
+    DICTIONARY *labels = localhost->rrdlabels;
+
+    if (count == 0 || count == 1) {
+        rrdlabels_add(
+                      labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+        //queue a node info
+#ifdef ENABLE_ACLK
+        if (netdata_cloud_setting) {
+            aclk_queue_node_info(localhost);
+        }
+#endif
+    }
 }
 
 static void rrdhost_load_config_labels(void) {
@@ -1369,7 +1376,7 @@ void reload_host_labels(void) {
     rrdhost_load_auto_labels();
 
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
-    sql_store_host_labels(localhost);
+    metaqueue_store_host_labels(localhost->machine_guid);
 
     health_label_log_save(localhost);
 
@@ -1453,7 +1460,7 @@ void rrdhost_cleanup_all(void) {
     rrdhost_foreach_read(host) {
         if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
             /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->storage_instance[0]))
+            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
         )
             rrdhost_delete_charts(host);
         else

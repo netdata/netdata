@@ -151,7 +151,7 @@ void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
     if (R->rows != 1)
         return;
 
-    if (MaxAnomalyRates < 1 || MaxAnomalyRates >= R->d)
+    if (MaxAnomalyRates < 1 || MaxAnomalyRates >= (int)R->d)
         return;
 
     NETDATA_DOUBLE *CNs = R->v;
@@ -160,12 +160,12 @@ void ml_process_rrdr(RRDR *R, int MaxAnomalyRates) {
     std::vector<std::pair<NETDATA_DOUBLE, int>> V;
 
     V.reserve(R->d);
-    for (int Idx = 0; Idx != R->d; Idx++)
+    for (int Idx = 0; Idx != (int)R->d; Idx++)
         V.emplace_back(CNs[Idx], Idx);
 
     std::sort(V.rbegin(), V.rend());
 
-    for (int Idx = MaxAnomalyRates; Idx != R->d; Idx++) {
+    for (int Idx = MaxAnomalyRates; Idx != (int)R->d; Idx++) {
         int UnsortedIdx = V[Idx].second;
 
         int OldFlags = static_cast<int>(DimFlags[UnsortedIdx]);

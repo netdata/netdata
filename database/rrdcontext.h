@@ -8,7 +8,6 @@
 
 typedef struct rrdmetric_acquired RRDMETRIC_ACQUIRED;
 
-
 // ----------------------------------------------------------------------------
 // RRDINSTANCE
 
@@ -23,6 +22,15 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 // ----------------------------------------------------------------------------
 
 #include "rrd.h"
+
+const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
+const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
+NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
+
+const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
+const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
+DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
+DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost
@@ -56,6 +64,11 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions);
 
 // ----------------------------------------------------------------------------
+// public API for rrdcontexts
+
+const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca);
+
+// ----------------------------------------------------------------------------
 // public API for rrddims
 
 void rrdcontext_updated_rrddim(RRDDIM *rd);
@@ -65,6 +78,7 @@ void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd);
 void rrdcontext_updated_rrddim_divisor(RRDDIM *rd);
 void rrdcontext_updated_rrddim_flags(RRDDIM *rd);
 void rrdcontext_collected_rrddim(RRDDIM *rd);
+int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uuid);
 
 // ----------------------------------------------------------------------------
 // public API for rrdsets
@@ -74,6 +88,7 @@ void rrdcontext_removed_rrdset(RRDSET *st);
 void rrdcontext_updated_rrdset_name(RRDSET *st);
 void rrdcontext_updated_rrdset_flags(RRDSET *st);
 void rrdcontext_collected_rrdset(RRDSET *st);
+int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid);
 
 // ----------------------------------------------------------------------------
 // public API for ACLK
@@ -87,6 +102,147 @@ void rrdcontext_hub_stop_streaming_command(void *cmd);
 
 void rrdcontext_db_rotation(void);
 void *rrdcontext_main(void *);
+
+// ----------------------------------------------------------------------------
+// public API for weights
+
+struct metric_entry {
+    RRDCONTEXT_ACQUIRED *rca;
+    RRDINSTANCE_ACQUIRED *ria;
+    RRDMETRIC_ACQUIRED *rma;
+};
+
+DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts);
+
+// ----------------------------------------------------------------------------
+// public API for queries
+
+typedef struct query_metric {
+    struct query_metric_tier {
+        struct storage_engine *eng;
+        STORAGE_METRIC_HANDLE *db_metric_handle;
+        time_t db_first_time_t;         // the oldest timestamp available for this tier
+        time_t db_last_time_t;          // the latest timestamp available for this tier
+        time_t db_update_every;         // latest update every for this tier
+    } tiers[RRD_STORAGE_TIERS];
+
+    struct {
+        RRDHOST *host;
+        RRDCONTEXT_ACQUIRED *rca;
+        RRDINSTANCE_ACQUIRED *ria;
+        RRDMETRIC_ACQUIRED *rma;
+    } link;
+
+    struct {
+        STRING *id;
+        STRING *name;
+        RRDR_DIMENSION_FLAGS options;
+    } dimension;
+
+    struct {
+        STRING *id;
+        STRING *name;
+    } chart;
+
+} QUERY_METRIC;
+
+#define MAX_QUERY_TARGET_ID_LENGTH 255
+
+typedef struct query_target_request {
+    RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
+    RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
+    RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
+    RRDMETRIC_ACQUIRED *rma;            // the metric to be queried (can be NULL)
+    RRDSET *st;                         // the chart to be queried (NULL, for context queries)
+    const char *hosts;                  // hosts simple pattern
+    const char *contexts;               // contexts simple pattern (context queries)
+    const char *charts;                 // charts simple pattern (for context queries)
+    const char *dimensions;             // dimensions simple pattern
+    const char *chart_label_key;        // select only the chart having this label key
+    const char *charts_labels_filter;   // select only the charts having this combo of label key:value
+    time_t after;                       // the requested timeframe
+    time_t before;                      // the requested timeframe
+    size_t points;                      // the requested number of points
+    time_t timeout;                     // the timeout of the query in seconds
+    int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it
+    uint32_t format;                    // DATASOURCE_FORMAT
+    RRDR_OPTIONS options;
+    RRDR_GROUPING group_method;
+    const char *group_options;
+    time_t resampling_time;
+    size_t tier;
+} QUERY_TARGET_REQUEST;
+
+typedef struct query_target {
+    char id[MAX_QUERY_TARGET_ID_LENGTH + 1]; // query identifier (for logging)
+    QUERY_TARGET_REQUEST request;
+
+    bool used;                              // when true, this query is currently being used
+
+    struct {
+        bool relative;                      // true when the request made with relative timestamps, true if it was absolute
+        bool aligned;
+        time_t after;                       // the absolute timestamp this query is about
+        time_t before;                      // the absolute timestamp this query is about
+        time_t query_granularity;
+        size_t points;                        // the number of points the query will return (maybe different from the request)
+        size_t group;
+        RRDR_GROUPING group_method;
+        const char *group_options;
+        size_t resampling_group;
+        NETDATA_DOUBLE resampling_divisor;
+        RRDR_OPTIONS options;
+        size_t tier;
+    } window;
+
+    struct {
+        time_t first_time_t;                // the combined first_time_t of all metrics in the query, across all tiers
+        time_t last_time_t;                 // the combined last_time_T of all metrics in the query, across all tiers
+        time_t minimum_latest_update_every; // the min update every of the metrics in the query
+    } db;
+
+    struct {
+        QUERY_METRIC *array;                // the metrics to be queried (all of them should be queried, no exceptions)
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
+    } query;
+
+    struct {
+        RRDMETRIC_ACQUIRED **array;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
+    } metrics;
+
+    struct {
+        RRDINSTANCE_ACQUIRED **array;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *chart_label_key_pattern;
+        SIMPLE_PATTERN *charts_labels_filter_pattern;
+    } instances;
+
+    struct {
+        RRDCONTEXT_ACQUIRED **array;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
+    } contexts;
+
+    struct {
+        RRDHOST **array;
+        uint32_t used;                      // how many items of the array are used
+        uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *pattern;
+    } hosts;
+
+} QUERY_TARGET;
+
+void query_target_free(void);
+void query_target_release(QUERY_TARGET *qt);
+
+QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
 
 #endif // NETDATA_RRDCONTEXT_H
 

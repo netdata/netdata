@@ -29,10 +29,12 @@ DUMP_CMDS=0
 ENABLE="auto"
 EXPORT_CMDS=0
 INSTALL=1
-LINUX_INIT_TYPES="wsl systemd openrc lsb initd runit"
+LINUX_INIT_TYPES="systemd openrc lsb initd runit"
 PLATFORM="$(uname -s)"
+SHOW_SVC_TYPE=0
 SVC_SOURCE="@libsysdir_POST@"
 SVC_TYPE="detect"
+WSL_ERROR_MSG="We appear to be running in WSL and were unable to find a usable service manager. We currently support systemd, LSB init scripts, and traditional init.d style init scripts when running under WSL."
 
 # =====================================================================
 # Utility functions
@@ -111,7 +113,7 @@ install_generic_service() {
     ENABLE="enable"
   fi
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" /etc/init.d/netdata; then
+  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" "${svc_file}"; then
     error "Failed to install service file."
     exit 4
   fi
@@ -157,6 +159,7 @@ USAGE: install-service.sh [options]
 
   --source      Specify where to find the service files to install (default ${SVC_SOURCE}).
   --type        Specify the type of service file to install. Specify a type of 'help' to get a list of valid types for your platform.
+  --show-type   Display information about what service managers are detected.
   --cmds        Additionally print a list of commands for starting and stopping the agent with the detected service type.
   --export-cmds Export the variables that would be printed by the --cmds option.
   --cmds-only   Don't install, just handle the --cmds or --export-cmds option.
@@ -176,30 +179,27 @@ HEREDOC
 # =====================================================================
 # systemd support functions
 
-issystemd() {
+_check_systemd() {
   pids=''
   p=''
   myns=''
   ns=''
-  systemctl=''
 
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
-    return 1
+    echo "NO" && return 0
   fi
 
   # if there is no systemctl command, it is not systemd
-  systemctl=$(command -v systemctl 2> /dev/null)
-  if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
-    return 1
-  fi
+  [ -z "$(command -v systemctl 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if pid 1 is systemd, it is systemd
-  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && echo "YES" && return 0
 
-  # if systemd is not running, it is not systemd
+  # it ‘is’ systemd at this point, but systemd might not be running
+  # if not, return 2 to indicate ‘systemd, but not running’
   pids=$(safe_pidof systemd 2> /dev/null)
-  [ -z "${pids}" ] && return 1
+  [ -z "${pids}" ] && echo "OFFLINE" && return 0
 
   # check if the running systemd processes are not in our namespace
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
@@ -207,20 +207,19 @@ issystemd() {
     ns="$(readlink "/proc/${p}/ns/pid" 2> /dev/null)"
 
     # if pid of systemd is in our namespace, it is systemd
-    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
+    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && echo "YES" && return 0
   done
 
   # else, it is not systemd
-  return 1
+  echo "NO"
 }
 
 check_systemd() {
   if [ -z "${IS_SYSTEMD}" ]; then
-    issystemd
-    IS_SYSTEMD="$?"
+    IS_SYSTEMD="$(_check_systemd)"
   fi
 
-  return "${IS_SYSTEMD}"
+  echo "${IS_SYSTEMD}"
 }
 
 get_systemd_service_dir() {
@@ -244,7 +243,9 @@ install_systemd_service() {
   fi
 
   if [ "${ENABLE}" = "auto" ]; then
-    IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+    if [ "$(check_systemd)" = "YES" ]; then
+      IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+    fi
 
     if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
       ENABLE="disable"
@@ -259,55 +260,70 @@ install_systemd_service() {
     exit 4
   fi
 
-  if ! systemctl daemon-reload; then
-    warning "Failed to reload systemd unit files."
-  fi
+  if [ "$(check_systemd)" = "YES" ]; then
+    if ! systemctl daemon-reload; then
+        warning "Failed to reload systemd unit files."
+    fi
 
-  if ! systemctl ${ENABLE} netdata; then
-    warning "Failed to ${ENABLE} Netdata service."
+    if ! systemctl ${ENABLE} netdata; then
+        warning "Failed to ${ENABLE} Netdata service."
+    fi
   fi
 }
 
 systemd_cmds() {
-  NETDATA_START_CMD='systemctl start netdata'
-  NETDATA_STOP_CMD='systemctl stop netdata'
+  if [ "$(check_systemd)" = "YES" ]; then
+    NETDATA_START_CMD='systemctl start netdata'
+    NETDATA_STOP_CMD='systemctl stop netdata'
+  else # systemd is not running, use external defaults by providing no commands
+    warning "Detected systemd, but not booted using systemd. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
 }
 
 # =====================================================================
 # OpenRC support functions
 
-isopenrc() {
+_check_openrc() {
   # if /lib/rc/sh/functions.sh does not exist, it's not OpenRC
-  [ ! -f /lib/rc/sh/functions.sh ] && return 1
+  [ ! -f /lib/rc/sh/functions.sh ] && echo "NO" && return 0
 
   # if there is no /etc/init.d, it's not OpenRC
-  [ ! -d /etc/init.d ] && return 1
+  [ ! -d /etc/init.d ] && echo "NO" && return 0
 
-  # if PID 1 is openrc-init, it's OpenRC
-  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && return 0
+  # if there is no rc-update command, it's not OpenRC
+  [ -z "$(command -v rc-update 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # If /run/openrc/softlevel exists, it's OpenRC
-  [ -f /run/openrc/softlevel ] && return 0
+  [ -f /run/openrc/softlevel ] && echo "YES" && return 0
 
-  # if there is an openrc command, it's OpenRC
-  command -v openrc > /dev/null 2>&1 && return 0
+  # if PID 1 is openrc-init, it's OpenRC
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && echo "YES" && return 0
+
+  # if there is an openrc command, it's OpenRC, but not booted as such
+  [ -n "$(command -v openrc 2>/dev/null || true)" ] && echo "OFFLINE" && return 0
+
+  # if /etc/init.d/local exists and has `openrc-run` in it's shebang line, it’s OpenRC, but not booted as such
+  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && echo "OFFLINE" && return 0
 
   # Otherwise, it’s not OpenRC
-  return 1
+  echo "NO" && return 0
 }
 
 check_openrc() {
   if [ -z "${IS_OPENRC}" ]; then
-    isopenrc
-    IS_OPENRC="$?"
+    IS_OPENRC="$(_check_openrc)"
   fi
 
-  return "${IS_OPENRC}"
+  echo "${IS_OPENRC}"
 }
 
 enable_openrc() {
-  runlevel="$(rc-status -r)"
+  if [ "$(check_openrc)" = "YES" ]; then
+    runlevel="$(rc-status -r)"
+  fi
+
   runlevel="${runlevel:-default}"
+
   if ! rc-update add netdata "${runlevel}"; then
     warning "Failed to enable Netdata service in runlevel ${runlevel}."
   fi
@@ -329,39 +345,49 @@ install_openrc_service() {
 }
 
 openrc_cmds() {
-  NETDATA_START_CMD='rc-service netdata start'
-  NETDATA_STOP_CMD='rc-service netdata stop'
+  if [ "$(check_openrc)" = "YES" ]; then
+    NETDATA_START_CMD='rc-service netdata start'
+    NETDATA_STOP_CMD='rc-service netdata stop'
+  else # Not booted using OpenRC, use external defaults by not providing commands.
+    warning "Detected OpenRC, but the system is not booted using OpenRC. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
 }
 
 # =====================================================================
 # LSB init script support functions
 
-islsb() {
+_check_lsb_ignore_systemd() {
   # if there is no /etc/init.d directory, it’s not an LSB system
-  [ ! -d /etc/init.d ] && return 1
+  [ ! -d /etc/init.d ] && echo "NO" && return 0
 
   # If it's an OpenRC system, then it's not an LSB system
-  check_openrc && return 1
+  [ "$(check_openrc)" != "NO" ] && echo "NO" && return 0
 
   # If /lib/lsb/init-functions exists, it’s an LSB system
-  [ -f /lib/lsb/init-functions ] && return 0
+  [ -f /lib/lsb/init-functions ] && echo "YES" && return 0
 
-  return 1
+  echo "NO" && return 0
+}
+
+_check_lsb() {
+  # if there is _any_ systemd, it’s not an LSB system
+  [ "$(check_systemd)" != "NO" ] && echo "NO" && return 0
+
+  _check_lsb_ignore_systemd
 }
 
 check_lsb() {
   if [ -z "${IS_LSB}" ]; then
-    islsb
-    IS_LSB="$?"
+    IS_LSB="$(_check_lsb)"
   fi
 
-  return "${IS_LSB}"
+  echo "${IS_LSB}"
 }
 
 enable_lsb() {
   if ! update-rc.d netdata defaults; then
     warning "Failed to enable Netdata service."
-  elif ! update-rc.d netdata defaults-disable; then
+  elif ! update-rc.d netdata defaults-disabled; then
     warning "Failed to fully enable Netdata service."
   fi
 }
@@ -377,38 +403,42 @@ install_lsb_service() {
 }
 
 lsb_cmds() {
-  if command -v service >/dev/null 2>&1; then
-    NETDATA_START_CMD='service netdata start'
-    NETDATA_STOP_CMD='service netdata stop'
-  else
-    NETDATA_START_CMD='/etc/init.d/netdata start'
-    NETDATA_STOP_CMD='/etc/init.d/netdata stop'
-  fi
+  NETDATA_START_CMD='/etc/init.d/netdata start'
+  NETDATA_STOP_CMD='/etc/init.d/netdata stop'
 }
 
 # =====================================================================
 # init.d init script support functions
 
-isinitd() {
+_check_initd_ignore_systemd() {
   # if there is no /etc/init.d directory, it’s not an init.d system
-  [ ! -d /etc/init.d ] && return 1
+  [ ! -d /etc/init.d ] && echo "NO" && return 1
 
   # if there is no chkconfig command, it's not a (usable) init.d system
-  command -v chkconfig >/dev/null 2>&1 || return 1
+  [ -z "$(command -v chkconfig 2>/dev/null || true)" ] && echo "NO" && return 0
+
+  # if there is _any_ openrc, it’s not init.d
+  [ "$(check_openrc)" != "NO" ] && echo "NO" && return 0
 
   # if it's not an LSB setup, it’s init.d
-  check_initd || return 0
+  [ "$(check_lsb)" != "NO" ] && echo "NO" && return 0
 
-  return 1
+  echo "YES" && return 0
+}
+
+_check_initd() {
+  # if there is _any_ systemd, it’s not init.d
+  [ "$(check_systemd)" != "NO" ] && echo "NO" && return 0
+
+  _check_initd_ignore_systemd
 }
 
 check_initd() {
   if [ -z "${IS_INITD}" ]; then
-    isinitd
-    IS_INITD="$?"
+    IS_INITD="$(_check_initd)"
   fi
 
-  return "${IS_INITD}"
+  echo "${IS_INITD}"
 }
 
 enable_initd() {
@@ -428,13 +458,8 @@ install_initd_service() {
 }
 
 initd_cmds() {
-  if command -v service >/dev/null 2>&1; then
-    NETDATA_START_CMD='service netdata start'
-    NETDATA_STOP_CMD='service netdata stop'
-  else
-    NETDATA_START_CMD='/etc/init.d/netdata start'
-    NETDATA_STOP_CMD='/etc/init.d/netdata stop'
-  fi
+  NETDATA_START_CMD='/etc/init.d/netdata start'
+  NETDATA_STOP_CMD='/etc/init.d/netdata stop'
 }
 
 # =====================================================================
@@ -442,29 +467,28 @@ initd_cmds() {
 #
 # Currently not supported, this exists to provide useful error messages.
 
-isrunit() {
-  # if there is no /lib/rc/sv.d, then it's not runit
-  [ ! -d /lib/rc/sv.d ] && return 1
+_check_runit() {
+  # if there is no runsvdir command, then it's not runit
+  [ -z "$(command -v runsvdir 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if there is no runit command, then it's not runit
-  command -v runit >/dev/null 2>&1 || return 1
+  [ -z "$(command -v runit 2>/dev/null || true)" ] && echo "NO" && return 0
 
   # if /run/runit exists, then it's runit
-  [ -d /run/runit ] && return 0
+  [ -d /run/runit ] && echo "YES" && return 0
 
   # if /etc/runit/1 exists and is executable, then it's runit
-  [ -x /etc/runit/1 ] && return 0
+  [ -x /etc/runit/1 ] && echo "YES" && return 0
 
-  return 1
+  echo "NO" && return 0
 }
 
 check_runit() {
   if [ -z "${IS_RUNIT}" ]; then
-    isrunit
-    IS_RUNIT="$?"
+    IS_RUNIT="$(_check_runit)"
   fi
 
-  return "${IS_RUNIT}"
+  echo "${IS_RUNIT}"
 }
 
 install_runit_service() {
@@ -482,34 +506,33 @@ runit_cmds() {
 #
 # Cannot be supported, this exists to provide useful error messages.
 
-iswsl() {
+_check_wsl() {
   # If uname -r contains the string WSL, then it's WSL.
-  uname -r | grep -q 'WSL' && return 0
+  uname -r | grep -q 'WSL' && echo "YES" && return 0
 
   # If uname -r contains the string Microsoft, then it's WSL.
   # This probably throws a false positive on CBL-Mariner, but it's part of what MS officially recommends for
   # detecting if you're running under WSL.
-  uname -r | grep -q "Microsoft" && return 0
+  uname -r | grep -q "Microsoft" && echo "YES" && return 0
 
-  return 1
+  echo "NO" && return 0
 }
 
 check_wsl() {
   if [ -z "${IS_WSL}" ]; then
-    iswsl
-    IS_WSL="$?"
+    IS_WSL="$(_check_wsl)"
   fi
 
-  return "${IS_WSL}"
+  echo "${IS_WSL}"
 }
 
 install_wsl_service() {
-  error "We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
+  error "${WSL_ERROR_MSG}"
   exit 3
 }
 
 wsl_cmds() {
-  error "We appear to be running in WSL. Netdata cannot be automatically installed as a service under WSL."
+  error "${WSL_ERROR_MSG}"
   exit 3
 }
 
@@ -564,21 +587,47 @@ darwin_cmds() {
 
 detect_linux_svc_type() {
   if [ "${SVC_TYPE}" = "detect" ]; then
-    for t in ${LINUX_INIT_TYPES}; do
-      if "check_${t}"; then
-        SVC_TYPE="${t}"
-        break
-      fi
+    found_types=''
+
+    for t in wsl ${LINUX_INIT_TYPES}; do
+      case "$("check_${t}")" in
+        YES)
+          SVC_TYPE="${t}"
+          break
+          ;;
+        NO) continue ;;
+        OFFLINE)
+          if [ -z "${found_types}" ]; then
+            found_types="${t}"
+          else
+            found_types="${found_types} ${t}"
+          fi
+          ;;
+      esac
     done
 
     if [ "${SVC_TYPE}" = "detect" ]; then
-      error "Failed to detect what type of service manager is in use."
-    else
-      echo "${SVC_TYPE}"
+      if [ -z "${found_types}" ]; then
+        error "Failed to detect what type of service manager is in use."
+      else
+        SVC_TYPE="$(echo "${found_types}" | cut -f 1 -d ' ')"
+        warning "Failed to detect a running service manager, using detected (but not running) ${SVC_TYPE}."
+      fi
+    elif [ "${SVC_TYPE}" = "wsl" ]; then
+      if [ "$(check_systemd)" = "YES" ]; then
+        # Support for systemd in WSL.
+        SVC_TYPE="systemd"
+      elif [ "$(_check_lsb_ignore_systemd)" = "YES" ]; then
+        # Support for LSB init.d in WSL.
+        SVC_TYPE="lsb"
+      elif [ "$(_check_initd_ignore_systemd)" = "YES" ]; then
+        # Support for ‘generic’ init.d in WSL.
+        SVC_TYPE="initd"
+      fi
     fi
-  else
-    echo "${SVC_TYPE}"
   fi
+
+  echo "${SVC_TYPE}"
 }
 
 install_linux_service() {
@@ -602,6 +651,38 @@ linux_cmds() {
 }
 
 # =====================================================================
+# Service type display function
+
+show_service_type() {
+  info "Detected platform: ${PLATFORM}"
+
+  case "${PLATFORM}" in
+    FreeBSD)
+      info "Detected service managers:"
+      info "  - freebsd: YES"
+      info "Would use freebsd service management."
+      ;;
+    Darwin)
+      info "Detected service managers:"
+      info "  - launchd: YES"
+      info "Would use launchd service management."
+      ;;
+    Linux)
+      [ "$(check_wsl)" = "YES" ] && info "Detected WSL environment."
+      info "Detected service managers:"
+      for t in ${LINUX_INIT_TYPES}; do
+        info "  - ${t}: $("check_${t}")"
+      done
+      info "Would use $(detect_linux_svc_type) service management."
+      ;;
+    *)
+      info "${PLATFORM} is not supported by this script. No service file would be installed."
+  esac
+
+  exit 0
+}
+
+# =====================================================================
 # Argument handling
 
 parse_args() {
@@ -620,6 +701,7 @@ parse_args() {
           shift 1
         fi
         ;;
+      "--show-type") SHOW_SVC_TYPE=1 ; INSTALL=0 ;;
       "--save-cmds")
         if [ -z "${2}" ]; then
           info "No path specified to save command variables."
@@ -671,28 +753,33 @@ main() {
 
   parse_args "${@}"
 
-  case "${PLATFORM}" in
-    FreeBSD)
-      [ "${INSTALL}" -eq 1 ] && install_freebsd_service
-      freebsd_cmds
-      ;;
-    Darwin)
-      [ "${INSTALL}" -eq 1 ] && install_darwin_service
-      darwin_cmds
-      ;;
-    Linux)
-      [ "${INSTALL}" -eq 1 ] && install_linux_service
-      linux_cmds
-      ;;
-    *)
-      error "${PLATFORM} is not supported by this script."
-      exit 5
-      ;;
-  esac
+  if [ "${SHOW_SVC_TYPE}" -eq 1 ]; then
+    show_service_type
+  else
+    case "${PLATFORM}" in
+      FreeBSD)
+        [ "${INSTALL}" -eq 1 ] && install_freebsd_service
+        freebsd_cmds
+        ;;
+      Darwin)
+        [ "${INSTALL}" -eq 1 ] && install_darwin_service
+        darwin_cmds
+        ;;
+      Linux)
+        [ "${INSTALL}" -eq 1 ] && install_linux_service
+        linux_cmds
+        ;;
+      *)
+        error "${PLATFORM} is not supported by this script."
+        exit 5
+        ;;
+    esac
 
-  [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
-  [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
-  [ -n "${SAVE_CMDS_PATH}" ] && save_cmds
+    [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
+    [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
+    [ -n "${SAVE_CMDS_PATH}" ] && save_cmds
+  fi
+
   exit 0
 }
 

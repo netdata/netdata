@@ -111,22 +111,6 @@ void aclk_query_free(aclk_query_t query)
             freez(query->data.http_api_v2.query);
         break;
 
-    case NODE_STATE_UPDATE:
-    case REGISTER_NODE:
-    case CHART_DIMS_UPDATE:
-    case CHART_CONFIG_UPDATED:
-    case CHART_RESET:
-    case RETENTION_UPDATED:
-    case UPDATE_NODE_INFO:
-    case ALARM_LOG_HEALTH:
-    case ALARM_PROVIDE_CFG:
-    case ALARM_SNAPSHOT:
-    case UPDATE_NODE_COLLECTORS:
-    case PROTO_BIN_MESSAGE:
-        if (!use_mqtt_5)
-            freez(query->data.bin_payload.payload);
-        break;
-
     default:
         break;
     }

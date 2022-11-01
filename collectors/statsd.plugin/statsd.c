@@ -1469,23 +1469,23 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             }
             else if (!strcmp(name, "dimension")) {
                 // metric [name [type [multiplier [divisor]]]]
-                char *words[10];
-                pluginsd_split_words(value, words, 10, NULL, NULL, 0);
+                char *words[10] = { NULL };
+                size_t num_words = pluginsd_split_words(value, words, 10, NULL, NULL, 0);
 
                 int pattern = 0;
                 size_t i = 0;
-                char *metric_name   = words[i++];
+                char *metric_name   = get_word(words, num_words, i++);
 
                 if(strcmp(metric_name, "pattern") == 0) {
-                    metric_name = words[i++];
+                    metric_name = get_word(words, num_words, i++);
                     pattern = 1;
                 }
 
-                char *dim_name   = words[i++];
-                char *type       = words[i++];
-                char *multiplier = words[i++];
-                char *divisor    = words[i++];
-                char *opts       = words[i++];
+                char *dim_name   = get_word(words, num_words, i++);
+                char *type       = get_word(words, num_words, i++);
+                char *multiplier = get_word(words, num_words, i++);
+                char *divisor    = get_word(words, num_words, i++);
+                char *opts       = get_word(words, num_words, i++);
 
                 RRDDIM_FLAGS flags = RRDDIM_FLAG_NONE;
                 RRDDIM_OPTIONS options = RRDDIM_OPTION_NONE;

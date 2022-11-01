@@ -65,101 +65,43 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
 {
-    UNUSED(plugins_action);
-    char *remote_time_txt = words[1];
-    time_t remote_time = 0;
-    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
-    struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (!(cd->capabilities & STREAM_CAP_GAP_FILLING)) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", rrdhost_hostname(host), cd->cmd, cd->capabilities);
-        return PARSER_RC_OK;    // Ignore error and continue stream
-    }
-    if (remote_time_txt && *remote_time_txt) {
-        remote_time = str2ull(remote_time_txt);
-        time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
-        time_t gap = 0;
-        if (prev == 0)
-            info(
-                "STREAM %s from %s: Initial connection (no gap to check), "
-                "remote=%"PRId64" local=%"PRId64" slew=%"PRId64"",
-                rrdhost_hostname(host),
-                cd->cmd,
-                (int64_t)remote_time,
-                (int64_t)now,
-                (int64_t)now - remote_time);
-        else {
-            gap = now - prev;
-            info(
-                "STREAM %s from %s: Checking for gaps... "
-                "remote=%"PRId64" local=%"PRId64"..%"PRId64" slew=%"PRId64"  %"PRId64"-sec gap",
-                rrdhost_hostname(host),
-                cd->cmd,
-                (int64_t)remote_time,
-                (int64_t)prev,
-                (int64_t)now,
-                (int64_t)(remote_time - now),
-                (int64_t)gap);
-        }
-        char message[128];
-        sprintf(
-            message,
-            "REPLICATE %"PRId64" %"PRId64"\n",
-            (int64_t)(remote_time - gap),
-            (int64_t)remote_time);
-        int ret;
-#ifdef ENABLE_HTTPS
-        SSL *conn = host->receiver->ssl.conn ;
-        if(conn && !host->receiver->ssl.flags) {
-            ret = SSL_write(conn, message, strlen(message));
-        } else {
-            ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-        }
-#else
-        ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-#endif
-        if (ret != (int)strlen(message))
-            error("Failed to send initial timestamp - gaps may appear in charts");
-        return PARSER_RC_OK;
-    }
-    return PARSER_RC_ERROR;
-}
+    const char *host_uuid_str = get_word(words, num_words, 1);
+    const char *claim_id_str = get_word(words, num_words, 2);
 
-PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugins_action)
-{
-    UNUSED(plugins_action);
+    if (!host_uuid_str || !claim_id_str) {
+        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
+              host_uuid_str ? host_uuid_str : "[unset]",
+              claim_id_str ? claim_id_str : "[unset]");
+        return PARSER_RC_ERROR;
+    }
 
     uuid_t uuid;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 
-    if (!words[1] || !words[2]) {
-        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'", words[1]?words[1]:"[unset]", words[2]?words[2]:"[unset]");
-        return PARSER_RC_ERROR;
-    }
-
     // We don't need the parsed UUID
     // just do it to check the format
-    if(uuid_parse(words[1], uuid)) {
-        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[1]);
+    if(uuid_parse(host_uuid_str, uuid)) {
+        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
         return PARSER_RC_ERROR;
     }
-    if(uuid_parse(words[2], uuid) && strcmp(words[2], "NULL")) {
-        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[2]);
+    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL")) {
+        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
         return PARSER_RC_ERROR;
     }
 
-    if(strcmp(words[1], host->machine_guid)) {
-        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
+    if(strcmp(host_uuid_str, host->machine_guid)) {
+        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
         return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
     rrdhost_aclk_state_lock(host);
     if (host->aclk_state.claimed_id)
         freez(host->aclk_state.claimed_id);
-    host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
 
-    store_claim_id(&host->host_uuid, host->aclk_state.claimed_id ? &uuid : NULL);
+    metaqueue_store_claim_id(&host->host_uuid, host->aclk_state.claimed_id ? &uuid : NULL);
 
     rrdhost_aclk_state_unlock(host);
 
@@ -400,7 +342,7 @@ static void streaming_parser_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
-size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out) {
+static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out, void *ssl) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
@@ -411,7 +353,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT);
+    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT, ssl);
 
     rrd_collector_started();
 
@@ -419,7 +361,6 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(streaming_parser_thread_cleanup, parser);
 
-    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
     user.parser = parser;
@@ -472,6 +413,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
     char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
+    bool rrdpush_enable_replication = default_rrdpush_enable_replication;
+    time_t rrdpush_seconds_to_replicate = default_rrdpush_seconds_to_replicate;
+    time_t rrdpush_replication_step = default_rrdpush_replication_step;
     time_t alarms_delay = 60;
 
     rpt->update_every = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "update every", rpt->update_every);
@@ -506,6 +450,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+
+    rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->key, "enable replication", rrdpush_enable_replication);
+    rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable replication", rrdpush_enable_replication);
+
+    rrdpush_seconds_to_replicate = appconfig_get_number(&stream_config, rpt->key, "seconds to replicate", rrdpush_seconds_to_replicate);
+    rrdpush_seconds_to_replicate = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds to replicate", rrdpush_seconds_to_replicate);
+
+    rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rrdpush_replication_step);
+    rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rrdpush_replication_step);
 
 #ifdef  ENABLE_COMPRESSION
     unsigned int rrdpush_compression = default_compression_enabled;
@@ -556,6 +509,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , rrdpush_enable_replication
+                , rrdpush_seconds_to_replicate
+                , rrdpush_replication_step
                 , rpt->system_info
                 , 0
         );
@@ -601,6 +557,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
             rrdpush_destination,
             rrdpush_api_key,
             rrdpush_send_charts_matching,
+            rrdpush_enable_replication,
+            rrdpush_seconds_to_replicate,
+            rrdpush_replication_step,
             rpt->system_info);
         rrd_unlock();
     }
@@ -735,20 +694,24 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             rpt->host->health_delay_up_to = now_realtime_sec() + alarms_delay;
-            info(
-                "Postponing health checks for %" PRId64 " seconds, on host '%s', because it was just connected.",
-                (int64_t)alarms_delay,
-                rrdhost_hostname(rpt->host));
+            log_health(
+                "[%s]: Postponing health checks for %" PRId64 " seconds, because it was just connected.",
+                rrdhost_hostname(rpt->host),
+                (int64_t)alarms_delay);
         }
     }
     rpt->host->senders_connect_time = now_realtime_sec();
     rpt->host->senders_last_chart_command = 0;
     rpt->host->trigger_chart_obsoletion_check = 1;
+
     rrdhost_unlock(rpt->host);
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM %s [receive from [%s]:%s]: receiving metrics...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
+    info("STREAM %s [receive from [%s]:%s]: receiving metrics...",
+         rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+
+    log_stream_connection(rpt->client_ip, rpt->client_port,
+                          rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
 
     cd.capabilities = rpt->capabilities;
 
@@ -759,23 +722,35 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
+    rrdhost_set_is_parent_label(++localhost->senders_count);
+
     rrdcontext_host_child_connected(rpt->host);
 
-    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out);
+    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out,
+#ifdef ENABLE_HTTPS
+                                    (rpt->ssl.conn) ? &rpt->ssl : NULL
+#else
+                                    NULL
+#endif
+                                    );
 
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
+    log_stream_connection(rpt->client_ip, rpt->client_port,
+                          rpt->key, rpt->host->machine_guid, rpt->hostname,
                           "DISCONNECTED");
-    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
-          rpt->client_port, count);
+
+    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).",
+          rpt->hostname, rpt->client_ip, rpt->client_port, count);
 
     rrdcontext_host_child_disconnected(rpt->host);
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
-    // new child connected
+    // a child disconnected
     if (netdata_cloud_setting)
         aclk_host_state_update(rpt->host, 0);
 #endif
+
+    rrdhost_set_is_parent_label(--localhost->senders_count);
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {

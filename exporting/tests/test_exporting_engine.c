@@ -11,6 +11,7 @@ struct config netdata_config;
 char *netdata_configured_user_config_dir = ".";
 char *netdata_configured_stock_config_dir = ".";
 char *netdata_configured_hostname = "test_global_host";
+bool global_statistics_enabled = true;
 
 char log_line[MAX_LOG_LINE + 1];
 
@@ -703,27 +704,14 @@ static void test_simple_connector_worker(void **state)
     buffer_sprintf(simple_connector_data->last_buffer->header, "test header");
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
 
-    expect_function_call(__wrap_connect_to_one_of);
-    expect_string(__wrap_connect_to_one_of, destination, "localhost");
-    expect_value(__wrap_connect_to_one_of, default_port, 2003);
-    expect_not_value(__wrap_connect_to_one_of, reconnects_counter, 0);
-    expect_string(__wrap_connect_to_one_of, connected_to, "localhost");
-    expect_value(__wrap_connect_to_one_of, connected_to_size, CONNECTED_TO_MAX);
-    will_return(__wrap_connect_to_one_of, 2);
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
 
-    expect_function_call(__wrap_send);
-    expect_value(__wrap_send, sockfd, 2);
-    expect_not_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
-    expect_string(__wrap_send, buf, "test header");
-    expect_value(__wrap_send, len, 11);
-    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
 
-    expect_function_call(__wrap_send);
-    expect_value(__wrap_send, sockfd, 2);
-    expect_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
-    expect_string(__wrap_send, buf, "test buffer");
-    expect_value(__wrap_send, len, 11);
-    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
 
     expect_function_call(__wrap_send_internal_metrics);
     expect_value(__wrap_send_internal_metrics, instance, instance);

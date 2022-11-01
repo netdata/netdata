@@ -1000,8 +1000,12 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     if(ssl->conn) {
-        if (!ssl->flags) {
+        if (ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
             return SSL_write(ssl->conn, buf, len);
+        }
+        else {
+            error("cannot write to SSL connection - connection is not ready.");
+            return -1;
         }
     }
 #endif
@@ -1543,8 +1547,9 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
         debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", pi->slot, pf->fd);
 
         if(unlikely(errno == EMFILE)) {
-            error("POLLFD: LISTENER: too many open files - sleeping for 1ms - used by this thread %zu, max for this thread %zu", p->used, p->limit);
-            usleep(1000); // 1ms
+            error_limit_static_global_var(erl, 10, 1000);
+            error_limit(&erl, "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
+                      p->used, p->limit);
         }
         else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
             error("POLLFD: LISTENER: accept() failed.");

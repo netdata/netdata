@@ -471,7 +471,6 @@ paths:
                 - unaligned
                 - match-ids
                 - match-names
-                - showcustomvars
                 - allow_past
                 - anomaly-bit
             default:

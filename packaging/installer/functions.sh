@@ -253,9 +253,17 @@ exit_reason() {
     EXIT_REASON="${1}"
     EXIT_CODE="${2}"
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
-      export EXIT_REASON
-      export EXIT_CODE
-      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+      if [ -n "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
+        {
+          echo "EXIT_REASON=\"${EXIT_REASON}\""
+          echo "EXIT_CODE=\"${EXIT_CODE}\""
+          echo "NETDATA_WARNINGS=\"${NETDATA_WARNINGS}${SAVED_WARNINGS}\""
+        } >> "${NETDATA_SCRIPT_STATUS_PATH}"
+      else
+        export EXIT_REASON
+        export EXIT_CODE
+        export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+      fi
     fi
   fi
 }
@@ -476,10 +484,14 @@ install_non_systemd_init() {
 }
 
 run_install_service_script() {
+  if [ -z "${tmpdir}" ]; then
+    tmpdir="${TMPDIR:-/tmp}"
+  fi
+
   # shellcheck disable=SC2154
   save_path="${tmpdir}/netdata-service-cmds"
   # shellcheck disable=SC2068
-  run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
+  "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
 
   case $? in
     0)
@@ -532,7 +544,7 @@ run_install_service_script() {
 install_netdata_service() {
   if [ "${UID}" -eq 0 ]; then
     if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
-      run_install_service_script
+      run_install_service_script && return 0
     else
       # This is used by netdata-installer.sh
       # shellcheck disable=SC2034

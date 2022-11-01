@@ -35,10 +35,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         return 0;
     }
 
-    if (use_mqtt_5)
-        mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
-    else
-        mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
+    mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
@@ -64,7 +61,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     uint16_t packet_id;
     const char *str;
     char *full_msg = NULL;
-    int len, rc;
+    int len;
 
     if (unlikely(!topic || topic[0] != '/')) {
         error ("Full topic required!");
@@ -87,21 +84,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
         len += payload_len;
     }
 
-    if (use_mqtt_5)
-        mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez_aclk_publish5b : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
-    else {
-        rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
-        freez(full_msg);
-        json_object_put(msg);
-        if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
-            error("Timeout sending binpacked message");
-            return HTTP_RESP_BACKEND_FETCH_FAILED;
-        }
-        if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
-            error("Message is bigger than allowed maximum");
-            return HTTP_RESP_FORBIDDEN;
-        }
-    }
+    mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez_aclk_publish5b : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
@@ -263,8 +246,6 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     }
 
     pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
-    if (!use_mqtt_5)
-        freez(msg);
     if (localhost->aclk_state.prev_claimed_id) {
         freez(localhost->aclk_state.prev_claimed_id);
         localhost->aclk_state.prev_claimed_id = NULL;

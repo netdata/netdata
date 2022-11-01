@@ -32,8 +32,6 @@ include:
     version: "3.15"
   - <<: *alpine
     version: "3.14"
-  - <<: *alpine
-    version: "3.13"
 
   - distro: archlinux
     version: latest
@@ -114,7 +112,7 @@ include:
     version: "36"
     packages:
       <<: *fedora_packages
-      repo_distro: fedora/35
+      repo_distro: fedora/36
       arches:
         - x86_64
         - armhfp

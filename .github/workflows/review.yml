@@ -2,7 +2,8 @@
 # Runs various ReviewDog based checks against PR with suggested changes to improve quality
 name: Review
 on:
-  pull_request: null
+  pull_request:
+    types: [opened, reopened, labeled, synchronize]
 env:
   DISABLE_TELEMETRY: 1
 concurrency:
@@ -27,7 +28,9 @@ jobs:
       - name: Check files for actionlint
         id: actionlint
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.github/workflows/.*' ; then
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/actionlint') }}" = "true" ]; then
+            echo '::set-output name=run::true'
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.github/workflows/.*' ; then
             echo '::set-output name=run::true'
             echo 'GitHub Actions workflows have changed, need to run actionlint.'
           else
@@ -36,7 +39,9 @@ jobs:
       - name: Check files for eslint
         id: eslint
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/dashboard" | grep -Eq '.*\.js|node\.d\.plugin\.in' ; then
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/eslint') }}" = "true" ]; then
+            echo '::set-output name=run::true'
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/dashboard" | grep -Eq '.*\.js|node\.d\.plugin\.in' ; then
             echo '::set-output name=run::true'
             echo 'JS files have changed, need to run ESLint.'
           else
@@ -45,7 +50,9 @@ jobs:
       - name: Check files for hadolint
         id: hadolint
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*Dockerfile.*' ; then
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/hadolint') }}" = "true" ]; then
+            echo '::set-output name=run::true'
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*Dockerfile.*' ; then
             echo '::set-output name=run::true'
             echo 'Dockerfiles have changed, need to run Hadolint.'
           else
@@ -54,7 +61,9 @@ jobs:
       - name: Check files for shellcheck
         id: shellcheck
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.sh.*' ; then
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/shellcheck') }}" = "true" ]; then
+            echo '::set-output name=run::true'
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.sh.*' ; then
             echo '::set-output name=run::true'
             echo 'Shell scripts have changed, need to run shellcheck.'
           else
@@ -63,7 +72,9 @@ jobs:
       - name: Check files for yamllint
         id: yamllint
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.ya?ml|python\.d/.*\.conf' ; then
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/yamllint') }}" = "true" ]; then
+            echo '::set-output name=run::true'
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.ya?ml|python\.d/.*\.conf' ; then
             echo '::set-output name=run::true'
             echo 'YAML files have changed, need to run yamllint.'
           else

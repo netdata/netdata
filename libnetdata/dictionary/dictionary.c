@@ -2913,9 +2913,9 @@ static int dictionary_unittest_threads() {
     int threads_to_create = 2;
     fprintf(
         stderr,
-        "\nChecking dictionary concurrency with %d threads for %ld seconds...\n",
+        "\nChecking dictionary concurrency with %d threads for %lld seconds...\n",
         threads_to_create,
-        seconds_to_run);
+        (long long)seconds_to_run);
 
     netdata_thread_t threads[threads_to_create];
     tu.join = 0;
@@ -3068,8 +3068,8 @@ static int dictionary_unittest_view_threads() {
     time_t seconds_to_run = 5;
     fprintf(
         stderr,
-        "\nChecking dictionary concurrency with 1 master and 1 view threads for %ld seconds...\n",
-        seconds_to_run);
+        "\nChecking dictionary concurrency with 1 master and 1 view threads for %lld seconds...\n",
+        (long long)seconds_to_run);
 
     netdata_thread_t master_thread, view_thread;
     tv.join = 0;

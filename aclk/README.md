@@ -19,7 +19,7 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
  
 :::caution
 
-This list of IPs can change without notice, we strongly advise you to whitelist the domain `app.netdata.cloud`, if
+This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if
 this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
 :::
@@ -49,7 +49,7 @@ configuration uses two settings:
 ```conf
 [global]
   enabled = yes
-  cloud base url = https://app.netdata.cloud
+  cloud base url = https://api.netdata.cloud
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
@@ -60,12 +60,10 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 [cloud]
   statistics = yes
   query thread count = 2
-  mqtt5 = yes
 ```
 
 - `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
 - `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
-- `mqtt5` allows disabling the new MQTT5 implementation which is used now by default in case of issues. This option will be removed in future stable release.
 
 ## Disable the ACLK
 
@@ -112,7 +110,7 @@ must contain only `EOF`.
 ```bash
 [global]
     enabled = no
-    cloud base url = https://app.netdata.cloud
+    cloud base url = https://api.netdata.cloud
 EOF
 ```
 

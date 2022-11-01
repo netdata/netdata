@@ -5,17 +5,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/chart
 
 # Linux machine sensors monitoring with Netdata
 
-> THIS MODULE IS OBSOLETE.
-> USE [THE PYTHON ONE](/collectors/python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
->
-> Unlike the python one, this module can collect temperature on RPi.
+Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures). 
+For all other cases use the [Python collector](/collectors/python.d.plugin/sensors), which supports multiple 
+jobs, is more efficient and performs calculations on top of the kernel provided values.
 
-The plugin will provide charts for all configured system sensors
-
-> This plugin is reading sensors directly from the kernel.
-> The `lm-sensors` package is able to perform calculations on the
-> kernel provided values, this plugin will not perform.
-> So, the values graphed, are the raw hardware values of the sensors.
+This plugin will provide charts for all configured system sensors, by reading sensors directly from the kernel.
+The values graphed are the raw hardware values of the sensors.
 
 The plugin will create Netdata charts for:
 

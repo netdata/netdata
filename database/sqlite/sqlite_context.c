@@ -172,7 +172,8 @@ skip_load:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name FROM meta.dimension d WHERE d.chart_id = @id and d.dim_id is not null;"
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
+        "FROM meta.dimension d WHERE d.chart_id = @id and d.dim_id is not null ORDER BY d.rowid ASC;"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
@@ -198,6 +199,7 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
+        dimension_data.hidden = sqlite3_column_int(res, 3);
         dict_cb(&dimension_data, data);
     }
 

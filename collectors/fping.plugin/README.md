@@ -8,22 +8,30 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/fping
 The fping plugin supports monitoring latency, packet loss and uptime of any number of network end points,
 by pinging them with `fping`.
 
-A recent version of `fping` is required (one that supports option `-N`).
-The supplied plugin can install it, by running:
+This plugin requires version 5.1 or newer of `fping` (earlier versions may or may not work). Our static builds and
+Docker images come bundled with a known working version of `fping`. Native packages and local builds will need to
+have a working version installed before the plugin is usable.
+
+## Installing fping locally
+
+If your distribution’s repositories do not include a working version of `fping`, the supplied plugin can install
+it, by running:
 
 ```sh
 /usr/libexec/netdata/plugins.d/fping.plugin install
 ```
 
-The above will download, build and install the right version as `/usr/local/bin/fping`.
+The above will download, build and install the right version as `/usr/local/bin/fping`. This requires a working C
+compiler, GNU autotools (at least autoconf and automake), and GNU make. On Debian or Ubuntu, you can pull in most
+of the required tools by installing the `build-essential` package (this should include everything except automake
+and autoconf).
+
+## Configuration
 
 Then you need to edit `/etc/netdata/fping.conf` (to edit it on your system run
 `/etc/netdata/edit-config fping.conf`) like this:
 
 ```sh
-# uncomment the following line - it should already be there
-fping="/usr/local/bin/fping"
-
 # set here all the hosts you need to ping
 # I suggest to use hostnames and put their IPs in /etc/hosts
 hosts="host1 host2 host3"

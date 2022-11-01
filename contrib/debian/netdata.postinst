@@ -64,7 +64,7 @@ case "$1" in
     fi
 
     if [ -f "/usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
-      setcap cap_net_admin+epi /usr/libexec/netdata/plugins.d/go.d.plugin
+      setcap "cap_net_admin+epi cap_net_raw=eip" /usr/libexec/netdata/plugins.d/go.d.plugin
     fi
 
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network

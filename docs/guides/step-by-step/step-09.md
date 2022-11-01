@@ -36,10 +36,10 @@ guide, your Netdata agent is already using the database engine.
 Let's look at your `netdata.conf` file again. Under the `[global]` section, you'll find three connected options.
 
 ```conf
-[global]
-    # memory mode = dbengine
-    # page cache size = 32
-    # dbengine disk space = 256
+[db]
+    # mode = dbengine
+    # dbengine page cache size MB = 32
+    # dbengine disk space MB = 256
 ```
 
 The `memory mode` option is set, by default, to `dbengine`. `page cache size` determines the amount of RAM, in MiB, that
@@ -56,10 +56,10 @@ space` based on your needs. The calculator gives an accurate estimate based on h
 metrics your Agent collects, and more.
 
 ```conf
-[global]
-    memory mode = dbengine
-    page cache size = 64
-    dbengine disk space = 512
+[db]
+    mode = dbengine
+    dbengine page cache size MB = 64
+    dbengine disk space MB = 512
 ```
 
 After you've made your changes, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
