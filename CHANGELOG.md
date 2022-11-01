@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- fix crash on query plan switch [\#13920](https://github.com/netdata/netdata/pull/13920) ([ktsaou](https://github.com/ktsaou))
+- add ping dashboard info and alarms [\#13916](https://github.com/netdata/netdata/pull/13916) ([ilyam8](https://github.com/ilyam8))
+- bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
+- do not free hosts if a change on db mode is not needed [\#13912](https://github.com/netdata/netdata/pull/13912) ([ktsaou](https://github.com/ktsaou))
+- timeframe matching should take into account the update frequency of the chart [\#13911](https://github.com/netdata/netdata/pull/13911) ([ktsaou](https://github.com/ktsaou))
+- feat\(packaging\): add CAP\_NET\_RAW to go.d.plugin [\#13909](https://github.com/netdata/netdata/pull/13909) ([ilyam8](https://github.com/ilyam8))
 - Reference the bash collector for RPi [\#13907](https://github.com/netdata/netdata/pull/13907) ([cakrit](https://github.com/cakrit))
 - Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin v0.41.2 [\#13903](https://github.com/netdata/netdata/pull/13903) ([ilyam8](https://github.com/ilyam8))
@@ -14,6 +20,7 @@
 - Fix reading health "enable" from the configuration [\#13894](https://github.com/netdata/netdata/pull/13894) ([stelfrag](https://github.com/stelfrag))
 - fix\(proc.plugin\): fix read retry logic when reading interface speed [\#13893](https://github.com/netdata/netdata/pull/13893) ([ilyam8](https://github.com/ilyam8))
 - Record installation command in telemetry events. [\#13892](https://github.com/netdata/netdata/pull/13892) ([Ferroin](https://github.com/Ferroin))
+- Prompt users about updates/claiming on unknown install types. [\#13890](https://github.com/netdata/netdata/pull/13890) ([Ferroin](https://github.com/Ferroin))
 - tune rrdcontext timings [\#13889](https://github.com/netdata/netdata/pull/13889) ([ktsaou](https://github.com/ktsaou))
 - filtering out charts in context queries, includes them in full\_xxx variables [\#13886](https://github.com/netdata/netdata/pull/13886) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin function processes cosmetic changes [\#13880](https://github.com/netdata/netdata/pull/13880) ([ktsaou](https://github.com/ktsaou))
@@ -22,6 +29,7 @@
 - Use print macros [\#13876](https://github.com/netdata/netdata/pull/13876) ([MrZammler](https://github.com/MrZammler))
 - Suppress ML and dlib ABI warnings [\#13875](https://github.com/netdata/netdata/pull/13875) ([Dim-P](https://github.com/Dim-P))
 - bump go.d.plugin v0.41.1 [\#13874](https://github.com/netdata/netdata/pull/13874) ([ilyam8](https://github.com/ilyam8))
+- Replication of metrics \(gaps filling\) during streaming [\#13873](https://github.com/netdata/netdata/pull/13873) ([vkalintiris](https://github.com/vkalintiris))
 - Don't create a REMOVED alert event after a REMOVED. [\#13871](https://github.com/netdata/netdata/pull/13871) ([MrZammler](https://github.com/MrZammler))
 - Store hidden status when creating / updating dimension metadata [\#13869](https://github.com/netdata/netdata/pull/13869) ([stelfrag](https://github.com/stelfrag))
 - Find the chart and dimension UUID from the context [\#13868](https://github.com/netdata/netdata/pull/13868) ([stelfrag](https://github.com/stelfrag))
@@ -333,14 +341,6 @@
 - Add document explaining how to proxy Netdata via H2O [\#13266](https://github.com/netdata/netdata/pull/13266) ([Ferroin](https://github.com/Ferroin))
 - chore\(python.d\): remove deprecated modules from python.d.conf [\#13264](https://github.com/netdata/netdata/pull/13264) ([ilyam8](https://github.com/ilyam8))
 - Multi-Tier database backend for long term metrics storage [\#13263](https://github.com/netdata/netdata/pull/13263) ([stelfrag](https://github.com/stelfrag))
-- Get rid of extra semicolon in Graphite exporting [\#13261](https://github.com/netdata/netdata/pull/13261) ([vlvkobal](https://github.com/vlvkobal))
-- fix RAM calculation on macOS in system-info [\#13260](https://github.com/netdata/netdata/pull/13260) ([ilyam8](https://github.com/ilyam8))
-- Ebpf issues [\#13259](https://github.com/netdata/netdata/pull/13259) ([thiagoftsm](https://github.com/thiagoftsm))
-- Use old mqtt implementation as default [\#13258](https://github.com/netdata/netdata/pull/13258) ([MrZammler](https://github.com/MrZammler))
-- Remove warnings while compiling ML on FreeBSD [\#13255](https://github.com/netdata/netdata/pull/13255) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix issues with DEB postinstall script. [\#13252](https://github.com/netdata/netdata/pull/13252) ([Ferroin](https://github.com/Ferroin))
-- Remove strftime from statements and use unixepoch instead [\#13250](https://github.com/netdata/netdata/pull/13250) ([stelfrag](https://github.com/stelfrag))
-- Query engine with natural and virtual points [\#13248](https://github.com/netdata/netdata/pull/13248) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
