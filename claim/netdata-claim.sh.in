@@ -71,7 +71,7 @@ ERROR_MESSAGES[14]="processing claiming"
 ERROR_KEYS[15]="ErrInternalServerError"
 ERROR_MESSAGES[15]="Internal Server Error"
 
-# Error: There was a timout processing the claim.
+# Error: There was a timeout processing the claim.
 # HTTP Status code: 504
 # Exit code: 16
 ERROR_KEYS[16]="ErrGatewayTimeout"
@@ -85,15 +85,22 @@ ERROR_MESSAGES[17]="Service Unavailable"
 
 # Exit code: 18 - Agent unique id is not generated yet.
 
+NETDATA_RUNNING=1
+
 get_config_value() {
     conf_file="${1}"
     section="${2}"
     key_name="${3}"
-    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$conf_file|$section|$key_name"; exit $?)
-    # shellcheck disable=SC2181
-    if [ "$?" != "0" ]; then
-       echo >&2 "cli failed, assume netdata is not running and query the on-disk config"
-       config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get2 "$conf_file" "$section" "$key_name" unknown_default)
+    if [ "${NETDATA_RUNNING}" -eq 1 ]; then
+        config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$conf_file|$section|$key_name"; exit $?)
+        result="$?"
+        if [ "${result}" -ne 0 ]; then
+            echo >&2 "Unable to communicate with Netdata daemon, querying config from disk instead."
+            NETDATA_RUNNING=0
+        fi
+    fi
+    if [ "${NETDATA_RUNNING}" -eq 0 ]; then
+        config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get2 "$conf_file" "$section" "$key_name" unknown_default)
     fi
     echo "$config_result"
 }
@@ -116,7 +123,7 @@ if [ "@enable_cloud_POST@" = "no" ]; then
     exit 3
 fi
 # shellcheck disable=SC2050
-if [ "@can_enable_aclk_POST@" != "yes" ]; then
+if [ "@enable_aclk_POST@" != "yes" ]; then
     echo >&2 "This agent was built without the dependencies for Cloud and cannot be claimed"
     exit 3
 fi
@@ -141,13 +148,40 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 [ -z "$EUID" ] && EUID="$(id -u)"
 
 
+gen_id() {
+    local id
+
+    if command -v uuidgen > /dev/null 2>&1; then
+        id="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    elif [ -r /proc/sys/kernel/random/uuid ]; then
+        id="$(cat /proc/sys/kernel/random/uuid)"
+    else
+        echo >&2 "Unable to generate machine ID."
+        exit 18
+    fi
+
+    if [ "${id}" = "8a795b0c-2311-11e6-8563-000c295076a6" ] || [ "${id}" = "4aed1458-1c3e-11e6-a53f-000c290fc8f5" ]; then
+        gen_id
+    else
+        echo "${id}"
+    fi
+}
+
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
         ID="$(cat "${MACHINE_GUID_FILE}")"
         MGUID=$ID
-else
-        echo >&2 "netdata.public.unique.id is not generated yet or not readable. Please run agent at least once before attempting to claim. Agent generates this file on first startup. If the ID is generated already make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
+elif [ -f "${MACHINE_GUID_FILE}" ]; then
+        echo >&2 "netdata.public.unique.id is not readable. Please make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
         exit 18
+else
+        if mkdir -p "${MACHINE_GUID_FILE%/*}" && /bin/echo -n "$(gen_id)" > "${MACHINE_GUID_FILE}"; then
+                ID="$(cat "${MACHINE_GUID_FILE}")"
+                MGUID=$ID
+        else
+                echo >&2 "Failed to write new machine GUID. Please make sure you have rights to write to ${MACHINE_GUID_FILE}."
+                exit 18
+        fi
 fi
 
 # get token from file
@@ -164,8 +198,8 @@ for arg in "$@"
 do
         case $arg in
                 -token=*) TOKEN=${arg:7} ;;
-                -url=*) URL_BASE=${arg:5} ;;
-                -id=*) ID=${arg:4} ;;
+                -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
+                -id=*) ID=$(echo "${arg:4}" | tr '[:upper:]' '[:lower:]');;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;
                 -verbose) VERBOSE=1 ;;
@@ -174,6 +208,7 @@ do
                 -noproxy) NOPROXY=yes ;;
                 -noreload) RELOAD=0 ;;
                 -user=*) NETDATA_USER=${arg:6} ;;
+                -daemon-not-running) NETDATA_RUNNING=0 ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
         esac
@@ -254,14 +289,14 @@ fi
 
 
 if [ "${URLTOOL}" = "curl" ] ; then
-        URLCOMMAND="curl --connect-timeout 5 --retry 0 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+        URLCOMMAND="curl --connect-timeout 30 --retry 0 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"\""
         elif [ -n "${PROXY}" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
         fi
 else
-        URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
+        URLCOMMAND="wget -T 15 -O -  -q --server-response --content-on-error=on --method=PUT \
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} --no-proxy"
@@ -289,26 +324,49 @@ fi
 if [ "${VERBOSE}" == 1 ]; then
     echo "${URLCOMMAND} \"${TARGET_URL}\""
 fi
-eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
-URLCOMMAND_EXIT_CODE=$?
-if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
-# We consider the server issuing an error response a successful attempt at communicating
-        URLCOMMAND_EXIT_CODE=0
-fi
+
+attempt_contact () {
+        if [ "${URLTOOL}" = "curl" ] ; then
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        else
+                eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt" 2>&1
+        fi
+        URLCOMMAND_EXIT_CODE=$?
+        if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
+        # We consider the server issuing an error response a successful attempt at communicating
+                URLCOMMAND_EXIT_CODE=0
+        fi
+
+        # Check if URLCOMMAND connected and received reply
+        if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
+                echo >&2 "Failed to connect to ${URL_BASE}, return code ${URLCOMMAND_EXIT_CODE}"
+                rm -f "${CLAIMING_DIR}/tmpout.txt"
+                return 4
+        fi
+
+        if [ "${VERBOSE}" == 1 ] ; then
+            echo "Response from server:"
+            cat "${CLAIMING_DIR}/tmpout.txt"
+        fi
+
+        return 0
+}
+
+for i in {1..3}
+do
+        if attempt_contact ; then
+                echo "Connection attempt $i successful"
+                break
+        fi
+        echo "Connection attempt $i failed. Retry in ${i}s."
+        if [ "$i" -eq 5 ] ; then
+                rm -f "${CLAIMING_DIR}/tmpin.txt"
+                exit 4
+        fi
+        sleep "$i"
+done
 
 rm -f "${CLAIMING_DIR}/tmpin.txt"
-
-# Check if URLCOMMAND connected and received reply
-if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
-        echo >&2 "Failed to connect to ${URL_BASE}, return code ${URLCOMMAND_EXIT_CODE}"
-        rm -f "${CLAIMING_DIR}/tmpout.txt"
-        exit 4
-fi
-
-if [ "${VERBOSE}" == 1 ] ; then
-    echo "Response from server:"
-    cat "${CLAIMING_DIR}/tmpout.txt"
-fi
 
 ERROR_KEY=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
 case ${ERROR_KEY} in
@@ -325,14 +383,16 @@ case ${ERROR_KEY} in
         *) EXIT_CODE=7 ;;
 esac
 
-HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
+HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | tail -1 | awk -F " " '{print $2}')
 if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         EXIT_CODE=0
 fi
 
 if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
-        echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
+                echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        fi
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
 
         # Rewrite the cloud.conf on the disk
@@ -371,7 +431,7 @@ HERE_DOC
                 exit $EXIT_CODE
         fi
         echo >&2 "${PROXYMSG}The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud."
-        exit 5
+        [ "$NETDATA_RUNNING" -eq 0 ] && exit 0 || exit 5
 fi
 
 echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""

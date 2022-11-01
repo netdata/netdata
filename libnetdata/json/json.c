@@ -82,7 +82,7 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 /**
  * Callback Print
  *
- * Set callback print case necesary and wrinte an information inside a buffer to write in the log.
+ * Set callback print case necessary and wrinte an information inside a buffer to write in the log.
  *
  * @param e a pointer for a structure that has the complete information about json structure.
  *
@@ -102,7 +102,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", e->data.items);
+            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
@@ -111,7 +111,7 @@ int json_callback_print(JSON_ENTRY *e)
             break;
 
         case JSON_NUMBER:
-            sprintf(txt,"%Lf", e->data.number);
+            sprintf(txt, NETDATA_DOUBLE_FORMAT_AUTO, e->data.number);
             buffer_strcat(wb,txt);
 
             break;
@@ -168,7 +168,7 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
     e->type = JSON_NUMBER;
     memcpy(e->name, key, len);
     e->name[len] = 0;
-    e->data.number = value;
+    e->data.number = (NETDATA_DOUBLE)value;
 }
 
 /**
@@ -518,8 +518,8 @@ size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callbac
  * @param callback_data additional data to be used together the callback function
  * @param callback_function function used to create a silencer.
  *
- * @return JSON_OK  case everything happend as expected, JSON_CANNOT_PARSE case there were errors in the
- * parsing procces and JSON_CANNOT_DOWNLOAD case the string given(js) is NULL.
+ * @return JSON_OK  case everything happened as expected, JSON_CANNOT_PARSE case there were errors in the
+ * parsing process and JSON_CANNOT_DOWNLOAD case the string given(js) is NULL.
  */
 int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTRY *))
 {
@@ -554,3 +554,4 @@ int json_test(char *str)
     return json_parse(str, NULL, json_callback_print);
 }
  */
+

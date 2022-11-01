@@ -13,10 +13,10 @@ To learn about more advanced health configurations, visit the [health reference 
 
 ## Edit health configuration files
 
-You should use `edit-config` to edit Netdata's health configuration files. `edit-config` will open your system's default
-terminal editor for you to make your changes. Once you've saved and closed the editor, `edit-config` will copy your
-edited file into `/etc/netdata/health.d/`, which will override the stock file in `/usr/lib/netdata/conf.d/health.d/` and
-ensure your customizations are persistent between updates.
+You should [use `edit-config`](/docs/configure/nodes.md) to edit Netdata's health configuration files. `edit-config`
+will open your system's default terminal editor for you to make your changes. Once you've saved and closed the editor,
+`edit-config` will copy your edited file into `/etc/netdata/health.d/`, which will override the stock file in
+`/usr/lib/netdata/conf.d/health.d/` and ensure your customizations are persistent between updates.
 
 For example, to edit the `cpu.conf` health configuration file, you would run:
 
@@ -24,11 +24,6 @@ For example, to edit the `cpu.conf` health configuration file, you would run:
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
 ./edit-config health.d/cpu.conf
 ```
-
-> You may need to use `sudo` or another method of elevating your privileges: `sudo ./edit-config health.d/cpu.conf`.
->
-> You can also use the `$EDITOR` environment variable to use your preferred terminal editor with `edit-config`. See 
-> [this page](/docs/guides/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
 
 Each health configuration file contains one or more health entities, which always begin with an `alarm:` or `template:`
 line. You can edit these entities based on your needs. To make any changes live, be sure to [reload your health
@@ -46,9 +41,9 @@ address or hostname for your Agent dashboard, looking for the `stock health conf
 here will show the correct path for your installation.
 
 ```conf
-[health]
+[directories]
  ...
- # stock health configuration directory = /usr/lib/netdata/conf.d/health.d
+ # stock health config = /usr/lib/netdata/conf.d/health.d
 ```
 
 Navigate to the health configuration directory to see all the available files and open them for reading.
@@ -57,8 +52,8 @@ Navigate to the health configuration directory to see all the available files an
 cd /usr/lib/netdata/conf.d/health.d/
 ls
 adaptec_raid.conf entropy.conf memory.conf squid.conf
-am2320.conf fping.conf mongodb.conf stiebeleltron.conf
-apache.conf fronius.conf mysql.conf swap.conf
+am2320.conf fping.conf mongodb.conf
+apache.conf mysql.conf swap.conf
 ...
 ```
 
@@ -145,4 +140,4 @@ Or, get guided insights into specific health configurations with our [health gui
 Finally, move on to Netdata's [notification system](/health/notifications/README.md) to learn more about how Netdata can
 let you know when the health of your systems or apps goes awry.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fquickstart%2F&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

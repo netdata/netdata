@@ -63,7 +63,7 @@
  *                                                  (default: null) */
 /*global netdataAlarmsRecipients     *//* array,    an array of alarm recipients to show notifications for
  *                                                  (default: null) */
-/*global netdataAlarmsRemember       *//* boolen,   keep our position in the alarm log at browser local storage
+/*global netdataAlarmsRemember       *//* boolean,  keep our position in the alarm log at browser local storage
  *                                                  (default: true) */
 /*global netdataAlarmsActiveCallback *//* function, a hook for the alarm logs
  *                                                  (default: undefined) */

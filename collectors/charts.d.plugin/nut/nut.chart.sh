@@ -129,7 +129,7 @@ EOF2
 
 nut_update() {
   # the first argument to this function is the microseconds since last update
-  # pass this parameter to the BEGIN statement (see bellow).
+  # pass this parameter to the BEGIN statement (see below).
 
   # do all the work to collect / calculate the values
   # for each dimension

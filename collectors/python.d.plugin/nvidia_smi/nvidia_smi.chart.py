@@ -4,10 +4,10 @@
 # Author: Ilya Mashchenko (ilyam8)
 # User Memory Stat Author: Guido Scatena (scatenag)
 
+import os
+import pwd
 import subprocess
 import threading
-import os
-
 import xml.etree.ElementTree as et
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -16,8 +16,6 @@ from bases.collection import find_binary
 disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
-
-BAD_VALUE = 'N/A'
 
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
@@ -29,9 +27,11 @@ GPU_UTIL = 'gpu_utilization'
 MEM_UTIL = 'mem_utilization'
 ENCODER_UTIL = 'encoder_utilization'
 MEM_USAGE = 'mem_usage'
+BAR_USAGE = 'bar1_mem_usage'
 TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
+POWER_STATE = 'power_state'
 PROCESSES_MEM = 'processes_mem'
 USER_MEM = 'user_mem'
 USER_NUM = 'user_num'
@@ -43,13 +43,18 @@ ORDER = [
     MEM_UTIL,
     ENCODER_UTIL,
     MEM_USAGE,
+    BAR_USAGE,
     TEMPERATURE,
     CLOCKS,
     POWER,
+    POWER_STATE,
     PROCESSES_MEM,
     USER_MEM,
     USER_NUM,
 ]
+
+# https://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpupstate.html
+POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 
 def gpu_charts(gpu):
@@ -96,6 +101,13 @@ def gpu_charts(gpu):
                 ['fb_memory_used', 'used'],
             ]
         },
+        BAR_USAGE: {
+            'options': [None, 'Bar1 Memory Usage', 'MiB', fam, 'nvidia_smi.bar1_memory_usage', 'stacked'],
+            'lines': [
+                ['bar1_memory_free', 'free'],
+                ['bar1_memory_used', 'used'],
+            ]
+        },
         TEMPERATURE: {
             'options': [None, 'Temperature', 'celsius', fam, 'nvidia_smi.temperature', 'line'],
             'lines': [
@@ -116,6 +128,10 @@ def gpu_charts(gpu):
             'lines': [
                 ['power_draw', 'power', 'absolute', 1, 100],
             ]
+        },
+        POWER_STATE: {
+            'options': [None, 'Power State', 'state', fam, 'nvidia_smi.power_state', 'line'],
+            'lines': [['power_state_' + v.lower(), v, 'absolute'] for v in POWER_STATES]
         },
         PROCESSES_MEM: {
             'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
@@ -247,9 +263,12 @@ HOST_PREFIX = os.getenv('NETDATA_HOST_PREFIX')
 ETC_PASSWD_PATH = '/etc/passwd'
 PROC_PATH = '/proc'
 
+IS_INSIDE_DOCKER = False
+
 if HOST_PREFIX:
     ETC_PASSWD_PATH = os.path.join(HOST_PREFIX, ETC_PASSWD_PATH[1:])
     PROC_PATH = os.path.join(HOST_PREFIX, PROC_PATH[1:])
+    IS_INSIDE_DOCKER = True
 
 
 def read_passwd_file():
@@ -271,20 +290,25 @@ def read_passwd_file():
 
 def read_passwd_file_safe():
     try:
-        return read_passwd_file()
+        if IS_INSIDE_DOCKER:
+            return read_passwd_file()
+        return dict((k[2], k) for k in pwd.getpwall())
     except (OSError, IOError):
         return dict()
 
 
 def get_username_by_pid_safe(pid, passwd_file):
-    if not passwd_file:
-        return ''
     path = os.path.join(PROC_PATH, pid)
     try:
         uid = os.stat(path).st_uid
-        return passwd_file[uid][0]
-    except (OSError, IOError, KeyError):
+    except (OSError, IOError):
         return ''
+    try:
+        if IS_INSIDE_DOCKER:
+            return passwd_file[uid][0]
+        return pwd.getpwuid(uid)[0]
+    except KeyError:
+        return str(uid)
 
 
 class GPU:
@@ -339,6 +363,14 @@ class GPU:
         return self.root.find('fb_memory_usage').find('free').text.split()[0]
 
     @handle_attr_error
+    def bar1_memory_used(self):
+        return self.root.find('bar1_memory_usage').find('used').text.split()[0]
+
+    @handle_attr_error
+    def bar1_memory_free(self):
+        return self.root.find('bar1_memory_usage').find('free').text.split()[0]
+
+    @handle_attr_error
     def temperature(self):
         return self.root.find('temperature').find('gpu_temp').text.split()[0]
 
@@ -357,6 +389,10 @@ class GPU:
     @handle_attr_error
     def mem_clock(self):
         return self.root.find('clocks').find('mem_clock').text.split()[0]
+
+    @handle_attr_error
+    def power_state(self):
+        return str(self.root.find('power_readings').find('power_state').text.split()[0])
 
     @handle_value_error
     @handle_attr_error
@@ -393,6 +429,8 @@ class GPU:
             'decoder_util': self.decoder_util(),
             'fb_memory_used': self.fb_memory_used(),
             'fb_memory_free': self.fb_memory_free(),
+            'bar1_memory_used': self.bar1_memory_used(),
+            'bar1_memory_free': self.bar1_memory_free(),
             'gpu_temp': self.temperature(),
             'graphics_clock': self.graphics_clock(),
             'video_clock': self.video_clock(),
@@ -400,6 +438,13 @@ class GPU:
             'mem_clock': self.mem_clock(),
             'power_draw': self.power_draw(),
         }
+
+        for v in POWER_STATES:
+            data['power_state_' + v.lower()] = 0
+        p_state = self.power_state()
+        if p_state:
+            data['power_state_' + p_state.lower()] = 1
+
         processes = self.processes() or []
         users = set()
         for p in processes:
@@ -415,9 +460,7 @@ class GPU:
                     data[key] = p['used_memory']
         data['user_num'] = len(users)
 
-        return dict(
-            ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
-        )
+        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items())
 
 
 class Service(SimpleService):
@@ -426,7 +469,7 @@ class Service(SimpleService):
         self.order = list()
         self.definitions = dict()
         self.loop_mode = configuration.get('loop_mode', True)
-        poll = int(configuration.get('poll_seconds', 1))
+        poll = int(configuration.get('poll_seconds', self.get_update_every()))
         self.exclude_zero_memory_users = configuration.get('exclude_zero_memory_users', False)
         self.poller = NvidiaSMIPoller(poll)
 
@@ -459,7 +502,10 @@ class Service(SimpleService):
         data = dict()
         for idx, root in enumerate(parsed.findall('gpu')):
             gpu = GPU(idx, root, self.exclude_zero_memory_users)
-            data.update(gpu.data())
+            gpu_data = gpu.data()
+            # self.debug(gpu_data)
+            gpu_data = dict((k, v) for k, v in gpu_data.items() if is_gpu_data_value_valid(v))
+            data.update(gpu_data)
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)
 
@@ -533,3 +579,11 @@ class Service(SimpleService):
             order, charts = gpu_charts(GPU(idx, root))
             self.order.extend(order)
             self.definitions.update(charts)
+
+
+def is_gpu_data_value_valid(value):
+    try:
+        int(value)
+    except (TypeError, ValueError):
+        return False
+    return True

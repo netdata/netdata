@@ -1,8 +1,6 @@
 <!--
----
 title: "Collectors configuration reference"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/REFERENCE.md
----
 -->
 
 # Collectors configuration reference
@@ -11,9 +9,6 @@ Welcome to the collector configuration reference guide.
 
 This guide contains detailed information about enabling/disabling plugins or modules, in addition a quick reference to
 the internal plugins API.
-
-To learn the basics of collecting metrics from other applications and services, see the [collector
-quickstart](QUICKSTART.md).
 
 ## Netdata's collector architecture
 
@@ -25,8 +20,7 @@ MySQL database, among many others.
 
 For most users, enabling individual collectors for the application/service you're interested in is far more important
 than knowing which plugin it uses. See our [collectors list](/collectors/COLLECTORS.md) to see whether your favorite app/service has
-a collector, and then read the [collectors quickstart](/collectors/QUICKSTART.md) and the documentation for that specific collector
-to figure out how to enable it.
+a collector, and then read the documentation for that specific collector to figure out how to enable it.
 
 There are three types of plugins:
 
@@ -48,7 +42,6 @@ However, there are cases that auto-detection fails. Usually, the reason is that 
 allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
 metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
 
-View our [collectors quickstart](/collectors/QUICKSTART.md) for explict details on enabling and configuring collector modules.
 
 ## Troubleshoot a collector
 
@@ -74,16 +67,13 @@ field contains `go.d`, that collector uses the Go orchestrator.
 # Python orchestrator (python.d.plugin)
 ./python.d.plugin <MODULE_NAME> debug trace
 
-# Node orchestrator (node.d.plugin)
-./node.d.plugin debug 1 <MODULE_NAME>
-
 # Bash orchestrator (bash.d.plugin)
 ./charts.d.plugin debug 1 <MODULE_NAME>
 ```
 
 The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
 enable the collector using the details from this output, feel free to [create an issue on our
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) to get some
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) to get some
 help from our collectors experts.
 
 ## Enable and disable plugins
@@ -94,10 +84,9 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 
 ```conf
 [plugins]
-	# PATH environment variable = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/var/lib/snapd/snap/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-	# PYTHONPATH environment variable = 
 	# proc = yes
 	# diskspace = yes
+	# timex = yes
 	# cgroups = yes
 	# tc = yes
 	# idlejitter = yes
@@ -106,7 +95,6 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# slabinfo = no
 	# fping = yes
 	# ioping = yes
-	# node.d = yes
 	# python.d = yes
 	# go.d = yes
 	# apps = yes
@@ -114,10 +102,10 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# charts.d = yes
 ```
 
-By default, most plugins are enabled, so you don't need to enable them explicity to use their collectors. To enable or
+By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or
 disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
 
-All **external plugins** are managed by [plugins.d](plugins.d/), which provides additional management options.
+All **external plugins** are managed by [plugins.d](plugins.d/README.md), which provides additional management options.
 
 ## Internal plugins
 
@@ -179,8 +167,9 @@ through this, is to examine what other similar plugins do.
 
 ## External Plugins
 
-**External plugins** use the API and are managed by [plugins.d](plugins.d/).
+**External plugins** use the API and are managed by [plugins.d](plugins.d/README.md).
 
 ## Write a custom collector
 
-You can add custom collectors by following the [external plugins documentation](../collectors/plugins.d/).
+You can add custom collectors by following the [external plugins documentation](/collectors/plugins.d/README.md).
+

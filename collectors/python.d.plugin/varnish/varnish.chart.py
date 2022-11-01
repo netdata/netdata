@@ -103,7 +103,7 @@ CHARTS = {
             ['backend_unhealthy', 'unhealthy', 'incremental'],
             ['backend_reuse', 'reused', 'incremental'],
             ['backend_toolate', 'closed', 'incremental'],
-            ['backend_recycle', 'resycled', 'incremental'],
+            ['backend_recycle', 'recycled', 'incremental'],
             ['backend_fail', 'failed', 'incremental']
         ]
     },
@@ -158,6 +158,7 @@ def backend_charts_template(name):
 def storage_charts_template(name):
     order = [
         'storage_{0}_usage'.format(name),
+        'storage_{0}_alloc_objs'.format(name)
     ]
 
     charts = {
@@ -168,6 +169,12 @@ def storage_charts_template(name):
                 ['{0}.g_bytes'.format(name), 'allocated', 'absolute', 1, 1 << 10]
             ]
         },
+        order[1]: {
+            'options': [None, 'Storage "{0}" Allocated Objects'.format(name), 'objects', 'storage usage', 'varnish.storage_alloc_objs', 'line'],
+            'lines': [
+                ['{0}.g_alloc'.format(name), 'allocated', 'absolute']
+            ]
+        }
     }
 
     return order, charts
@@ -190,7 +197,7 @@ class VarnishVersion:
 
 class Parser:
     _backend_new = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
-    _backend_old = re.compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)')
+    _backend_old = re.compile(r'VBE\.[\d\w-]+\.([\w\d_-]+).(beresp[\w_]+)\s+(\d+)')
     _default = re.compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
 
     def __init__(self):
@@ -227,7 +234,7 @@ class Service(ExecutableService):
         self.parser = Parser()
         self.command = None
         self.collected_vbe = set()
-        self.collected_smf_sma = set()
+        self.collected_storages = set()
 
     def create_command(self):
         varnishstat = find_binary(VARNISHSTAT)
@@ -298,7 +305,7 @@ class Service(ExecutableService):
         data.update(stats)
 
         self.get_vbe_backends(data, raw)
-        self.get_smf_sma_storages(server_stats)
+        self.get_storages(server_stats)
 
         # varnish 5 uses default.g_bytes and default.g_space
         data['memory_allocated'] = data.get('s0.g_bytes') or data.get('default.g_bytes')
@@ -320,7 +327,13 @@ class Service(ExecutableService):
             self.collected_vbe.add(name)
             self.add_backend_charts(name)
 
-    def get_smf_sma_storages(self, server_stats):
+    def get_storages(self, server_stats):
+        # Storage types:
+        #  - SMF: File Storage
+        #  - SMA: Malloc Storage
+        #  - MSE: Massive Storage Engine (Varnish-Plus only)
+        #
+        # Stats example:
         #  [('SMF.', 'ssdStorage.c_req', '47686'),
         #  ('SMF.', 'ssdStorage.c_fail', '0'),
         #  ('SMF.', 'ssdStorage.c_bytes', '668102656'),
@@ -331,14 +344,14 @@ class Service(ExecutableService):
         #  ('SMF.', 'ssdStorage.g_smf', '40130'),
         #  ('SMF.', 'ssdStorage.g_smf_frag', '311'),
         #  ('SMF.', 'ssdStorage.g_smf_large', '66')]
-        storages = [name for typ, name, _ in server_stats if typ.startswith(('SMF', 'SMA')) and name.endswith('g_space')]
+        storages = [name for typ, name, _ in server_stats if typ.startswith(('SMF', 'SMA', 'MSE')) and name.endswith('g_space')]
         if not storages:
             return
         for storage in storages:
             storage = storage.split('.')[0]
-            if storage in self.collected_smf_sma:
+            if storage in self.collected_storages:
                 continue
-            self.collected_smf_sma.add(storage)
+            self.collected_storages.add(storage)
             self.add_storage_charts(storage)
 
     def add_backend_charts(self, backend_name):

@@ -3,15 +3,17 @@ title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
 -->
 
+import { Install, InstallBox } from '../../../src/components/Install/'
+
+import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+
 # Installation guide
 
 Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even
 IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and all their derivatives.
 
 The best way to install Netdata is with our [**automatic one-line installation
-script**](#automatic-one-line-installation-script), which works with all Linux distributions, or our [**.deb/rpm
-packages**](/packaging/installer/methods/packages.md), which seamlessly install with your distribution's package
-manager.
+script**](#automatic-one-line-installation-script), which works with all Linux distributions and most macOS environments.
 
 If you want to install Netdata with Docker, on a Kubernetes cluster, or a different operating system, see [Have a
 different operating system, or want to try another
@@ -21,7 +23,7 @@ Some third parties, such as the packaging teams at various Linux distributions, 
 packages. We recommend you install Netdata using one of the methods listed below to guarantee you get the latest
 checksum-verified packages.
 
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+Netdata collects anonymous usage information by default and sends it to our self hosted [PostHog](https://github.com/PostHog/posthog) installation. PostHog is an open source product analytics platform, you can read
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
@@ -32,98 +34,77 @@ _actively_ contributing to Netdata's future.
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others.
+This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others, as well as on mac OS environments.
 
-To install Netdata from source, including all dependencies required to connect to Netdata Cloud, and get _automatic
-nightly updates_, run the following as your normal user:
+To install Netdata, including all dependencies required to connect to Netdata Cloud, and get _automatic nightly
+updates_, run the following as your normal user:
 
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+<OneLineInstallWget/>
+
+Or, if you have cURL but not wget (such as on macOS):
+
+<OneLineInstallCurl/>
+
+This script will preferentially use native DEB/RPM packages if we provide them for your platform.
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
 stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
-page](/packaging/installer/methods/kickstart.md). 
+page](/packaging/installer/methods/kickstart.md).
 
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
 
-When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
-a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+### Post-installation
 
-Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](/docs/getting-started.md) for a quick overview.
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
 
 ## Have a different operating system, or want to try another method?
 
-Netdata works on many different operating systems, each with a few possible installation methods. To see the full list
-of approved methods for each operating system/version we support, see our [distribution
-matrix](/packaging/DISTRIBUTIONS.md).
+Netdata works on many different platforms. To see all supported platforms, check out our [platform support
+policy](/packaging/PLATFORM_SUPPORT.md).
 
 Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
 operating systems.
 
 ### Alternative methods
 
-<div class="installer-grid" markdown="1">
-
-[![Install with .deb or .rpm
-packages](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png) Install
-with .deb or .rpm packages](/packaging/installer/methods/packages.md)
-
-[![Install with a pre-built static binary for 64-bit
-systems](https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png) Install
-with a pre-built static binary for 64-bit systems](/packaging/installer/methods/kickstart-64.md)
-
-[![Install Netdata on
-Docker](https://user-images.githubusercontent.com/1153921/76029355-85044400-5ef1-11ea-96f4-79edc58f9b5c.png) Install
-Netdata on Docker](/packaging/docker/README.md)
-
-[![Install Netdata on
-Kubernetes](https://user-images.githubusercontent.com/1153921/76029478-cc8ad000-5ef1-11ea-8981-dd04744b00da.png) Install
-Netdata on a Kubernetes cluster](/packaging/installer/methods/kubernetes.md)
-
-[![Install Netdata on cloud providers
-(GCP/AWS/Azure)](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png)
-Install Netdata on cloud providers (GCP/AWS/Azure)](/packaging/installer/methods/cloud-providers.md)
-
-[![Install Netdata on
-macOS](https://user-images.githubusercontent.com/1153921/76029616-1673b600-5ef2-11ea-888a-4a1375a42246.png) Install
-Netdata on macOS](/packaging/installer/methods/macos.md)
-
-[![Install Netdata on
-FreeBSD](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png) Install
-Netdata on FreeBSD](/packaging/installer/methods/freebsd.md)
-
-[![Install from a Git
-checkout](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
-from a Git checkout](/packaging/installer/methods/manual.md)
-
-[![Install on offline/air-gapped
-systems](https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png) Install on
-offline/air-gapped systems](/packaging/installer/methods/offline.md)
-
-[![Installation on
-PFSense](https://user-images.githubusercontent.com/1153921/76030071-cb0dd780-5ef2-11ea-87cd-607d943dc521.png)
-Installation on PFSense](/packaging/installer/methods/pfsense.md)
-
-[![Install Netdata on
-Synology](https://user-images.githubusercontent.com/1153921/76029789-5fc40580-5ef2-11ea-9d35-c022f682da77.png) Install
-Netdata on Synology](/packaging/installer/methods/synology.md)
-
-[![Manual installation on
-FreeNAS](https://user-images.githubusercontent.com/1153921/76030537-1c1dcb80-5ef3-11ea-9cf9-f130e7d41712.png) Manual
-installation on FreeNAS](/packaging/installer/methods/freenas.md)
-
-[![Manual installation on
-Alpine](https://user-images.githubusercontent.com/1153921/76029682-37d4a200-5ef2-11ea-9a2c-a8ffeb1d13c3.png) Manual
-installation on Alpine](/packaging/installer/methods/alpine.md)
-
-[![Build manually from
-source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png)
-Build manually from source](/packaging/installer/methods/source.md)
-
-</div>
+<Install>
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kickstart"
+    os="General Linux with one-line installer (recommended)"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/docker"
+    os="Run with Docker"
+    svg="docker" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kubernetes"
+    os="Deploy on Kubernetes"
+    svg="kubernetes" />
+   <InstallBox
+    to="/docs/agent/packaging/installer/methods/macos"
+    os="Install on macOS"
+    svg="macos" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/manual"
+    os="Linux from Git"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/source"
+    os="Linux from source"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/offline" 
+    os="Linux for offline nodes"
+    svg="linux" />
+</Install>
 
 ## Automatic updates
 
@@ -134,11 +115,22 @@ option when you install or update Netdata using the [automatic one-line installa
 script](#automatic-one-line-installation-script).
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update
 Netdata](/packaging/installer/UPDATE.md).
+
+### Network usage of Netdata’s automatic updater
+
+The auto-update functionality set up by the installation scripts requires working internet access to function
+correctly. In particular, it currently requires access to GitHub (to check if a newer version of the updater script
+is available or not, as well as potentially fetching build-time dependencies that are bundled as part of the install),
+and Google Cloud Storage (to check for newer versions of Netdata and download the sources if there is a newer version).
+
+Note that the auto-update functionality will check for updates to itself independently of updates to Netdata,
+and will try to use the latest version of the updater script whenever possible. This is intended to reduce the
+amount of effort required by users to get updates working again in the event of a bug in the updater code.
 
 ## Nightly vs. stable releases
 
@@ -168,7 +160,7 @@ the community helps fix any bugs that might have been introduced in previous rel
     installation
 -   Retain more control over the Netdata version you use
 
-## Installation notes and known issues
+## Troubleshooting and known issues
 
 We are tracking a few issues related to installation and packaging.
 
@@ -179,9 +171,6 @@ If you're running an older Linux distribution or one that has reached EOL, such 
 versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
 helps securely encrypt SSL connections.
 
-We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
-up-to-date version of OpenSSL with hostname validation enabled.
-
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
 with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
 man-in-the-middle attacks.
@@ -189,8 +178,8 @@ man-in-the-middle attacks.
 ### CentOS 6 and CentOS 8
 
 To install the Agent on certain CentOS and RHEL systems, you must enable non-default repositories, such as EPEL or
-PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos-rehel-6-x) and
-[CentOS 8](/packaging/installer/methods/manual.md#centos-rehel-8-x) sections for more information.
+PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos--rhel-6x) and
+[CentOS 8](/packaging/installer/methods/manual.md#centos--rhel-8x) sections for more information.
 
 ### Access to file is not permitted
 
@@ -199,25 +188,20 @@ visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's p
 system.
 
 Run `ls -la /usr/share/netdata/web/index.html` to find the file's permissions. You may need to change this path based on
-the error you're seeing in your browser. In the below example, the file is owned by the user `netdata` and the group
-`netdata`.
+the error you're seeing in your browser. In the below example, the file is owned by the user `root` and the group
+`root`.
 
 ```bash
 ls -la /usr/share/netdata/web/index.html
--rw-r--r--. 1 netdata netdata 89377 May  5 06:30 /usr/share/netdata/web/index.html
+-rw-r--r--. 1 root root 89377 May  5 06:30 /usr/share/netdata/web/index.html
 ```
 
-Open your `netdata.conf` file and find the `[web]` section, plus the `web files owner`/`web files group` settings. Edit
-the lines to match the output from `ls -la` above and uncomment them if necessary.
+These files need to have the same user and group used to install your netdata. Suppose you installed netdata with user
+`netdata` and group `netdata`, in this scenario you will need to run the following command to fix the error:
 
-```conf
-[web]
-    web files owner = netdata
-    web files group = netdata
+```bash
+# chown -R netdata.netdata /usr/share/netdata/web
 ```
-
-Save the file, [restart the Netdata Agent](/docs/getting-started.md#start-stop-and-restart-netdata), and try accessing
-the dashboard again.
 
 ### Multiple versions of OpenSSL
 
@@ -225,11 +209,10 @@ We've received reports from the community about issues with running the `kicksta
 a distribution-installed version of OpenSSL and a manually-installed local version. The Agent's installer cannot handle
 both.
 
-We recommend you install Netdata with the [static binary](/packaging/installer/methods/kickstart-64.md) to avoid the
-issue altogether. Or, you can manually remove one version of OpenSSL to remove the conflict.
-
 ### Clang compiler on Linux
 
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
+
+

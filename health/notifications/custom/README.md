@@ -1,15 +1,17 @@
 <!--
----
 title: "Custom"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/custom/README.md
----
 -->
 
 # Custom
 
 Netdata allows you to send custom notifications to any endpoint you choose.
 
-To configure custom notifications, you will need to customize `health_alarm_notify.conf`. You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the `custom_sender()` function in `health_alarm_notify.conf`. Ensure you follow the instructions of changing any configuration file to [persist your configuration](/docs/configuration-guide.md#persist-my-configuration).
+To configure custom notifications, you will need to customize `health_alarm_notify.conf`. Open the file for editing
+using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config
+directory](/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
+
+You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the `custom_sender()` function in `health_alarm_notify.conf`.
 
 As with other notifications, you will also need to define the recipient list in `DEFAULT_RECIPIENT_CUSTOM` and/or the `role_recipients_custom` array.
 
@@ -87,4 +89,4 @@ The following are more human friendly:
 -   `${severity}`           like "Escalated to CRITICAL", "Recovered from WARNING"
 -   `${raised_for}`         like "(alarm was raised for 10 minutes)"
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fcustom%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

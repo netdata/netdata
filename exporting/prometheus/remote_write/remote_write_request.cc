@@ -138,6 +138,38 @@ void add_metric(
 }
 
 /**
+ * Adds a metric to a write request
+ *
+ * @param write_request_p the write request
+ * @param name the name of the metric
+ * @param instance the name of the host, the metric belongs to
+ * @param value the value of the metric
+ * @param timestamp the timestamp for the metric in milliseconds
+ */
+void add_variable(
+    void *write_request_p, const char *name, const char *instance, const double value, const int64_t timestamp)
+{
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
+    TimeSeries *timeseries;
+    Sample *sample;
+    Label *label;
+
+    timeseries = write_request->add_timeseries();
+
+    label = timeseries->add_labels();
+    label->set_name("__name__");
+    label->set_value(name);
+
+    label = timeseries->add_labels();
+    label->set_name("instance");
+    label->set_value(instance);
+
+    sample = timeseries->add_samples();
+    sample->set_value(value);
+    sample->set_timestamp(timestamp);
+}
+
+/**
  * Gets the size of a write request
  *
  * @param write_request_p the write request
@@ -173,6 +205,46 @@ int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *si
         return 1;
     write_request->clear_timeseries();
     snappy::RawCompress(uncompressed_write_request.data(), uncompressed_write_request.size(), buffer, size);
+
+    return 0;
+}
+
+/**
+ * Writes an unpacked write request into a text buffer
+ *
+ * @param write_request_p the write request
+ * @param buffer a buffer, where text is written
+ * @param size the size of the buffer
+ * @return Returns 0 on success, 1 on failure
+ */
+int convert_write_request_to_string(
+    const char *compressed_write_request,
+    size_t compressed_size,
+    char *buffer,
+    size_t size)
+{
+    size_t uncompressed_size = 0;
+
+    snappy::GetUncompressedLength(compressed_write_request, compressed_size, &uncompressed_size);
+    if (size < uncompressed_size)
+        return 1;
+    char *uncompressed_write_request = (char *)malloc(size);
+
+    if (snappy::RawUncompress(compressed_write_request, compressed_size, uncompressed_write_request) == false) {
+        free(uncompressed_write_request);
+        return 1;
+    }
+
+    WriteRequest *write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
+    if (write_request->ParseFromString(std::string(uncompressed_write_request, uncompressed_size)) == false) {
+        free(uncompressed_write_request);
+        return 1;
+    }
+
+    std::string text_write_request(write_request->DebugString());
+    text_write_request.copy(buffer, size);
+
+    free(uncompressed_write_request);
 
     return 0;
 }

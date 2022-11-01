@@ -1,16 +1,18 @@
 <p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
 
-<h3 align="center">The best monitoring and troubleshooting for systems, containers, applications, and infrastructure. <br />Preconfigured, opinionated, and always real-time.</h3>
+<h3 align="center">Netdata is high-fidelity infrastructure monitoring and troubleshooting.<br />Open-source, free, preconfigured, opinionated, and always real-time.</h3>
 <br />
 <p align="center">
+  <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
+  <br />
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
+  <a href="https://storage.googleapis.com/netdata-nightlies/latest-version.txt"><img src="https://img.shields.io/badge/dynamic/xml?url=https://storage.googleapis.com/netdata-nightlies/latest-version.txt&label=nightly%20release&query=/text()" alt="Nightly release"></a>
+  <br />
   <a href="https://travis-ci.com/netdata/netdata"><img src="https://travis-ci.com/netdata/netdata.svg?branch=master" alt="Build status"></a>
   <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
-  <a href="<>"><img src="https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3" alt="analytics"></a>
   <br />
   <a href="https://codeclimate.com/github/netdata/netdata"><img src="https://codeclimate.com/github/netdata/netdata/badges/gpa.svg" alt="Code Climate"></a>
-  <a href="https://www.codacy.com/app/netdata/netdata?utm_source=github.com&utm_medium=referral&utm_content=netdata/netdata&utm_campaign=Badge_Grade"><img src="https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498" alt="Codacy"></a>
   <a href="https://lgtm.com/projects/g/netdata/netdata/context:cpp"><img src="https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm" alt="LGTM C"></a>
   <a href="https://lgtm.com/projects/g/netdata/netdata/context:javascript"><img src="https://img.shields.io/lgtm/grade/javascript/g/netdata/netdata.svg?logo=lgtm" alt=""LGTM JS></a>
   <a href="https://lgtm.com/projects/g/netdata/netdata/context:python"><img src="https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm" alt="LGTM PYTHON"></a>
@@ -20,7 +22,8 @@
 
 Netdata's **distributed, real-time monitoring Agent** collects thousands of metrics from systems, hardware, containers,
 and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud
-deployments, and edge/IoT devices.
+deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any
+preparation.
 
 You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container platforms (Kubernetes
 clusters, Docker), and many other operating systems (FreeBSD, macOS). No `sudo` required.
@@ -33,18 +36,16 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.26.0, October 14, 2020**
->
-> The v1.26.0 release of the Netdata Agent brings exciting new collectors written in Go, a new integration with the
-> DevOps startup StackPulse, and massive improvements to the way users navigate Netdata's documentation. We've also
-> added compatibility with an exciting new feature that's coming soon to Netdata Cloud—stay tuned! This release contains
-> 3 new collectors, 1 new notifcation method, 21 improvements, 13 documentation updates, and 12 bug fixes.
-
 ## Menu
 
 - [Features](#features)
 - [Get Netdata](#get-netdata)
+  - [Docker](#docker)
+  - [Other operating systems](#other-operating-systems)
+  - [Post-installation](#post-installation)
+  - [Netdata Cloud](#netdata-cloud)
 - [How it works](#how-it-works)
+- [Infographic](#infographic)
 - [Documentation](#documentation)
 - [Community](#community)
 - [Contribute](#contribute)
@@ -54,7 +55,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 ## Features
 
 ![Netdata in
-action](https://user-images.githubusercontent.com/1153921/95625372-40afc800-0a2d-11eb-8425-3355c8c4a3f3.gif)
+action](https://user-images.githubusercontent.com/1153921/113440964-449c2180-93a2-11eb-9664-663afa1257a8.gif)
 
 Here's what you can expect from Netdata:
 
@@ -71,6 +72,7 @@ Here's what you can expect from Netdata:
     synchronize charts as you pan through time, zoom in on anomalies, and more.
 -   **Visual anomaly detection**: Our UI/UX emphasizes the relationships between charts to help you detect the root
     cause of anomalies.
+-   **Machine learning (ML) features out of the box**: Unsupervised ML-based [anomaly detection](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor), every second, every metric, zero-config! [Metric correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) to help with short-term change detection. And other [additional](https://learn.netdata.cloud/guides/monitor/anomaly-detection) ML-based features to help make your life easier.
 -   **Scales to infinity**: You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not
     centralized by default, so there is no limit.
 -   **Several operating modes**: Autonomous host monitoring (the default), headless data collector, forwarding proxy,
@@ -97,15 +99,15 @@ Netdata works with tons of applications, notifications platforms, and other time
 ## Get Netdata
 
 <p align="center">
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&v43" alt="User base"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&v43" alt="Servers monitored"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&v43" alt="Sessions served"></a>
-  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://frankfurt.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000000&precision=1&units=M&label=docker+hub+pulls" alt="Docker Hub pulls"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&v44" alt="User base"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&options=unaligned&v44" alt="Servers monitored"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&options=unaligned&v44" alt="Sessions served"></a>
+  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000000&precision=1&units=M&label=docker+hub+pulls&options=unaligned&v44" alt="Docker Hub pulls"></a>
   <br />
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42" alt="New users today"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42" alt="New machines today"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42" alt="Sessions today"></a>
-  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://frankfurt.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today" alt="Docker Hub pulls today"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&options=unaligned&v44" alt="New users today"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v44" alt="New machines today"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v44" alt="Sessions today"></a>
+  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
 </p>
 
 To install Netdata from source on most Linux systems (physical, virtual, container, IoT, edge), run our [one-line
@@ -114,9 +116,9 @@ and builds all dependencies, including those required to connect to [Netdata Clo
 choose, and enables [automatic nightly
 updates](https://learn.netdata.cloud/docs/agent/packaging/installer#nightly-vs-stable-releases) and [anonymous
 statistics](https://learn.netdata.cloud/docs/agent/anonymous-statistics).
-
+<!-- candidate for reuse -->
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://NODE:19999`.
@@ -150,14 +152,26 @@ To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://
 See our documentation for [additional operating
 systems](/packaging/installer/README.md#have-a-different-operating-system-or-want-to-try-another-method), including
 [Kubernetes](/packaging/installer/methods/kubernetes.md), [`.deb`/`.rpm`
-packages](/packaging/installer/methods/packages.md), and more.
+packages](/packaging/installer/methods/kickstart.md#native-packages), and more.
 
 ### Post-installation
 
-When you're finished with installation, check out our
-[single-node](https://learn.netdata.cloud/docs/quickstart/single-node) or
-[infrastructure](https://learn.netdata.cloud/docs/quickstart/infrastructure) monitoring quickstart guides based on your
-use case. Then, see our [documentation](https://learn.netdata.cloud/docs) for the full picture.
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
+
+### Netdata Cloud
+
+Netdata Cloud works with Netdata's free, open-source monitoring agent to help you monitor and troubleshoot every 
+layer of your systems to find weaknesses before they turn into outages. [Using both tools](https://learn.netdata.cloud/docs/agent/claim) 
+can help you turn data into insights immediately.
+
+[Get Netdata Cloud now!](https://app.netdata.cloud/)
 
 ## How it works
 
@@ -186,23 +200,30 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## Community
 
-You can find most of the Netdata team in our [community forum](https://community.netdata.cloud). It's the best place to
-ask questions, find resources, and get to know the Netdata team.
+Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
+
+Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
+ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
 
 You can also find Netdata on:
 
--   [Facebook](https://www.facebook.com/linuxnetdata/)
 -   [Twitter](https://twitter.com/linuxnetdata)
+-   [YouTube](https://www.youtube.com/c/Netdata)
+-   [Reddit](https://www.reddit.com/r/netdata/)
+-   [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
 -   [StackShare](https://stackshare.io/netdata)
 -   [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
 -   [Repology](https://repology.org/metapackage/netdata/versions)
+-   [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## Contribute
 
-We welcome [contributions](/CONTRIBUTING.md) to our code and to our
-[documentation](/docs/contributing/contributing-documentation.md). Feel free to join the team!
+Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
 
-To report bugs or get help, use [GitHub's issues](https://github.com/netdata/netdata/issues).
+- Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
+- We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
+- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
+- View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from source and preparing a package.
@@ -221,5 +242,3 @@ _When people first hear about a new product, they frequently ask if it is any go
 
 > Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and
 > the answer shall be “yes.".
-
-So, we follow the tradition...

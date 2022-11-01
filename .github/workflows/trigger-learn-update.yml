@@ -1,0 +1,37 @@
+---
+name: Trigger Netdata Learn documentation update
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "**.mdx?"
+      - "packaging/installer/kickstart.sh"
+concurrency:
+  group: learn-trigger-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  trigger-ingest:
+    name: Trigger Netdata Learn ingest workflow.
+    if: github.repository == 'netdata/netdata'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netdata Learn ingest workflow.
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/learn
+          workflow: Ingest
+          ref: refs/heads/master
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Triggering Netdata Learn documentation update failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+            ${{ github.repository }}: Failed to trigger Netdata Learn documentation update workflow.
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()

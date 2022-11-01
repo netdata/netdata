@@ -75,6 +75,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , RRDSET_TYPE_AREA);
     d->rd_compr_data_size = rrddim_add(d->st_usage, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_metadata_size = rrddim_add(d->st_usage, "metadata", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_usage->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_savings.%s", name);
     d->st_savings = rrdset_create_localhost(
@@ -92,6 +93,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , RRDSET_TYPE_AREA);
     d->rd_savings_size = rrddim_add(d->st_savings, "savings", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_original_size = rrddim_add(d->st_savings, "original", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_savings->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_ratio.%s", name);
     d->st_comp_ratio = rrdset_create_localhost(
@@ -108,6 +110,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , update_every
         , RRDSET_TYPE_LINE);
     d->rd_comp_ratio = rrddim_add(d->st_comp_ratio, "ratio", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_comp_ratio->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
 
     snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_efficiency.%s", name);
     d->st_alloc_efficiency = rrdset_create_localhost(
@@ -124,6 +127,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , update_every
         , RRDSET_TYPE_LINE);
     d->rd_alloc_efficiency = rrddim_add(d->st_alloc_efficiency, "percent", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+    rrdlabels_add(d->st_alloc_efficiency->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
 }
 
 static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_every) {
@@ -165,7 +169,7 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
     return count;
 }
 
-static void free_device(DICTIONARY *dict, char *name)
+static void free_device(DICTIONARY *dict, const char *name)
 {
     ZRAM_DEVICE *d = (ZRAM_DEVICE*)dictionary_get(dict, name);
     info("ZRAM : Disabling monitoring of device %s", name);
@@ -200,7 +204,7 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     return 0;
 }
 
-static inline int _collect_zram_metrics(char* name, ZRAM_DEVICE *d, int advance, DICTIONARY* dict) {
+static inline int _collect_zram_metrics(const char* name, ZRAM_DEVICE *d, int advance, DICTIONARY* dict) {
     MM_STAT mm;
     int value;
     if (unlikely(read_mm_stat(d->file, &mm) < 0))
@@ -235,13 +239,16 @@ static inline int _collect_zram_metrics(char* name, ZRAM_DEVICE *d, int advance,
     return 0;
 }
 
-static int collect_first_zram_metrics(char *name, void *entry, void *data) {
+static int collect_first_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
+
     // collect without calling rrdset_next (init only)
     return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 0, (DICTIONARY *)data);
 }
 
-static int collect_zram_metrics(char *name, void *entry, void *data) {
-    (void)name;
+static int collect_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    const char *name = dictionary_acquired_item_name(item);
+
     // collect with calling rrdset_next
     return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 1, (DICTIONARY *)data);
 }
@@ -276,17 +283,17 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         }
         procfile_close(ff);
 
-        devices = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         device_count = init_devices(devices, (unsigned int)zram_id, update_every);
         if (device_count < 1)
             return 1;
-        dictionary_get_all_name_value(devices, collect_first_zram_metrics, devices);
+        dictionary_walkthrough_write(devices, collect_first_zram_metrics, devices);
     }
     else
     {
         if (unlikely(device_count < 1))
             return 1;
-        dictionary_get_all_name_value(devices, collect_zram_metrics, devices);
+        dictionary_walkthrough_write(devices, collect_zram_metrics, devices);
     }
     return 0;
 }

@@ -226,7 +226,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
     static int do_rc = -1, do_fh = -1, do_io = -1, do_th = -1, do_ra = -1, do_net = -1, do_rpc = -1, do_proc2 = -1, do_proc3 = -1, do_proc4 = -1, do_proc4ops = -1;
-    static int ra_warning = 0, th_warning = 0, proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;
+    static int ra_warning = 0, proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
@@ -270,9 +270,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     char *type;
     unsigned long long rc_hits = 0, rc_misses = 0, rc_nocache = 0;
-    unsigned long long fh_stale = 0, fh_total_lookups = 0, fh_anonymous_lookups = 0, fh_dir_not_in_dcache = 0, fh_non_dir_not_in_dcache = 0;
+    unsigned long long fh_stale = 0;
     unsigned long long io_read = 0, io_write = 0;
-    unsigned long long th_threads = 0, th_fullcnt = 0, th_hist10 = 0, th_hist20 = 0, th_hist30 = 0, th_hist40 = 0, th_hist50 = 0, th_hist60 = 0, th_hist70 = 0, th_hist80 = 0, th_hist90 = 0, th_hist100 = 0;
+    unsigned long long th_threads = 0;
     unsigned long long ra_size = 0, ra_hist10 = 0, ra_hist20 = 0, ra_hist30 = 0, ra_hist40 = 0, ra_hist50 = 0, ra_hist60 = 0, ra_hist70 = 0, ra_hist80 = 0, ra_hist90 = 0, ra_hist100 = 0, ra_none = 0;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
@@ -304,13 +304,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
 
             fh_stale = str2ull(procfile_lineword(ff, l, 1));
-            fh_total_lookups = str2ull(procfile_lineword(ff, l, 2));
-            fh_anonymous_lookups = str2ull(procfile_lineword(ff, l, 3));
-            fh_dir_not_in_dcache = str2ull(procfile_lineword(ff, l, 4));
-            fh_non_dir_not_in_dcache = str2ull(procfile_lineword(ff, l, 5));
+            
+            // other file handler metrics were never used and are always zero
 
-            unsigned long long sum = fh_stale + fh_total_lookups + fh_anonymous_lookups + fh_dir_not_in_dcache + fh_non_dir_not_in_dcache;
-            if(sum == 0ULL) do_fh = -1;
+            if(fh_stale == 0ULL) do_fh = -1;
             else do_fh = 2;
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
@@ -333,35 +330,20 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
 
             th_threads = str2ull(procfile_lineword(ff, l, 1));
-            th_fullcnt = str2ull(procfile_lineword(ff, l, 2));
-            th_hist10 = (unsigned long long)(atof(procfile_lineword(ff, l, 3)) * 1000.0);
-            th_hist20 = (unsigned long long)(atof(procfile_lineword(ff, l, 4)) * 1000.0);
-            th_hist30 = (unsigned long long)(atof(procfile_lineword(ff, l, 5)) * 1000.0);
-            th_hist40 = (unsigned long long)(atof(procfile_lineword(ff, l, 6)) * 1000.0);
-            th_hist50 = (unsigned long long)(atof(procfile_lineword(ff, l, 7)) * 1000.0);
-            th_hist60 = (unsigned long long)(atof(procfile_lineword(ff, l, 8)) * 1000.0);
-            th_hist70 = (unsigned long long)(atof(procfile_lineword(ff, l, 9)) * 1000.0);
-            th_hist80 = (unsigned long long)(atof(procfile_lineword(ff, l, 10)) * 1000.0);
-            th_hist90 = (unsigned long long)(atof(procfile_lineword(ff, l, 11)) * 1000.0);
-            th_hist100 = (unsigned long long)(atof(procfile_lineword(ff, l, 12)) * 1000.0);
 
-            // threads histogram has been disabled on recent kernels
-            // http://permalink.gmane.org/gmane.linux.nfs/24528
-            unsigned long long sum = th_hist10 + th_hist20 + th_hist30 + th_hist40 + th_hist50 + th_hist60 + th_hist70 + th_hist80 + th_hist90 + th_hist100;
-            if(sum == 0ULL) {
-                if(!th_warning) {
-                    info("Disabling /proc/net/rpc/nfsd threads histogram. It seems unused on this machine. It will be enabled automatically when found with data in it.");
-                    th_warning = 1;
-                }
-                do_th = -1;
-            }
-            else do_th = 2;
+            // thread histogram has been disabled since 2009 (kernel 2.6.30)
+            // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=8bbfa9f3889b643fc7de82c0c761ef17097f8faf
+            
+            do_th = 2;
         }
         else if(do_ra == 1 && strcmp(type, "ra") == 0) {
             if(unlikely(words < 13)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
+
+            // readahead cache has been disabled since 2019 (kernel 5.4)
+            // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/fs/nfsd/vfs.c?id=501cb1849f865960501d19d54e6a5af306f9b6fd
 
             ra_size = str2ull(procfile_lineword(ff, l, 1));
             ra_hist10 = str2ull(procfile_lineword(ff, l, 2));
@@ -408,9 +390,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
 
             rpc_calls = str2ull(procfile_lineword(ff, l, 1));
-            rpc_bad_format = str2ull(procfile_lineword(ff, l, 2));
-            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 3));
-            rpc_bad_client = str2ull(procfile_lineword(ff, l, 4));
+            rpc_bad_format = str2ull(procfile_lineword(ff, l, 3));
+            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 4));
+            rpc_bad_client = str2ull(procfile_lineword(ff, l, 5));
 
             unsigned long long sum = rpc_calls + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
             if(sum == 0ULL) do_rpc = -1;
@@ -542,11 +524,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_fh == 2) {
         static RRDSET *st = NULL;
-        static RRDDIM *rd_stale                 = NULL,
-                      *rd_total_lookups         = NULL,
-                      *rd_anonymous_lookups     = NULL,
-                      *rd_dir_not_in_dcache     = NULL,
-                      *rd_non_dir_not_in_dcache = NULL;
+        static RRDDIM *rd_stale                 = NULL;
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
@@ -566,18 +544,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_stale                 = rrddim_add(st, "stale",                 NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_total_lookups         = rrddim_add(st, "total_lookups",         NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_anonymous_lookups     = rrddim_add(st, "anonymous_lookups",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_dir_not_in_dcache     = rrddim_add(st, "dir_not_in_dcache",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_non_dir_not_in_dcache = rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_stale,                 fh_stale);
-        rrddim_set_by_pointer(st, rd_total_lookups,         fh_total_lookups);
-        rrddim_set_by_pointer(st, rd_anonymous_lookups,     fh_anonymous_lookups);
-        rrddim_set_by_pointer(st, rd_dir_not_in_dcache,     fh_dir_not_in_dcache);
-        rrddim_set_by_pointer(st, rd_non_dir_not_in_dcache, fh_non_dir_not_in_dcache);
         rrdset_done(st);
     }
 
@@ -617,116 +587,32 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_th == 2) {
-        {
-            static RRDSET *st = NULL;
-            static RRDDIM *rd_threads = NULL;
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_threads = NULL;
 
-            if(unlikely(!st)) {
-                st = rrdset_create_localhost(
-                        "nfsd"
-                        , "threads"
-                        , NULL
-                        , "threads"
-                        , NULL
-                        , "NFS Server Threads"
-                        , "threads"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_NFSD_NAME
-                        , NETDATA_CHART_PRIO_NFSD_THREADS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "nfsd"
+                    , "threads"
+                    , NULL
+                    , "threads"
+                    , NULL
+                    , "NFS Server Threads"
+                    , "threads"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_THREADS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
-                rd_threads = rrddim_add(st, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else rrdset_next(st);
-
-            rrddim_set_by_pointer(st, rd_threads, th_threads);
-            rrdset_done(st);
+            rd_threads = rrddim_add(st, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
+        else rrdset_next(st);
 
-        {
-            static RRDSET *st = NULL;
-            static RRDDIM *rd_full_count = NULL;
+        rrddim_set_by_pointer(st, rd_threads, th_threads);
+        rrdset_done(st);
 
-            if(unlikely(!st)) {
-                st = rrdset_create_localhost(
-                        "nfsd"
-                        , "threads_fullcnt"
-                        , NULL
-                        , "threads"
-                        , NULL
-                        , "NFS Server Threads Full Count"
-                        , "events"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_NFSD_NAME
-                        , NETDATA_CHART_PRIO_NFSD_THREADS_FULLCNT
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rd_full_count = rrddim_add(st, "full_count", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set_by_pointer(st, rd_full_count, th_fullcnt);
-            rrdset_done(st);
-        }
-
-        {
-            static RRDSET *st = NULL;
-            static RRDDIM *rd_th_hist10  = NULL,
-                          *rd_th_hist20  = NULL,
-                          *rd_th_hist30  = NULL,
-                          *rd_th_hist40  = NULL,
-                          *rd_th_hist50  = NULL,
-                          *rd_th_hist60  = NULL,
-                          *rd_th_hist70  = NULL,
-                          *rd_th_hist80  = NULL,
-                          *rd_th_hist90  = NULL,
-                          *rd_th_hist100 = NULL;
-
-            if(unlikely(!st)) {
-                st = rrdset_create_localhost(
-                        "nfsd"
-                        , "threads_histogram"
-                        , NULL
-                        , "threads"
-                        , NULL
-                        , "NFS Server Threads Usage Histogram"
-                        , "percentage"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_NFSD_NAME
-                        , NETDATA_CHART_PRIO_NFSD_THREADS_HISTOGRAM
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rd_th_hist10  = rrddim_add(st, "0%-10%",   NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist20  = rrddim_add(st, "10%-20%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist30  = rrddim_add(st, "20%-30%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist40  = rrddim_add(st, "30%-40%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist50  = rrddim_add(st, "40%-50%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist60  = rrddim_add(st, "50%-60%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist70  = rrddim_add(st, "60%-70%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist80  = rrddim_add(st, "70%-80%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist90  = rrddim_add(st, "80%-90%",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                rd_th_hist100 = rrddim_add(st, "90%-100%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else rrdset_next(st);
-
-            rrddim_set_by_pointer(st, rd_th_hist10,  th_hist10);
-            rrddim_set_by_pointer(st, rd_th_hist20,  th_hist20);
-            rrddim_set_by_pointer(st, rd_th_hist30,  th_hist30);
-            rrddim_set_by_pointer(st, rd_th_hist40,  th_hist40);
-            rrddim_set_by_pointer(st, rd_th_hist50,  th_hist50);
-            rrddim_set_by_pointer(st, rd_th_hist60,  th_hist60);
-            rrddim_set_by_pointer(st, rd_th_hist70,  th_hist70);
-            rrddim_set_by_pointer(st, rd_th_hist80,  th_hist80);
-            rrddim_set_by_pointer(st, rd_th_hist90,  th_hist90);
-            rrddim_set_by_pointer(st, rd_th_hist100, th_hist100);
-            rrdset_done(st);
-        }
     }
 
     // --------------------------------------------------------------------
@@ -978,7 +864,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     "nfsd"
                     , "proc4ops"
                     , NULL
-                    , "nfsv2ops"
+                    , "nfsv4ops"
                     , NULL
                     , "NFS v4 Server Operations"
                     , "operations/s"

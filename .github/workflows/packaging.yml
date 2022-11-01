@@ -1,0 +1,279 @@
+---
+# Handles building of binary packages for the agent.
+name: Packages
+on:
+  pull_request:
+    branches:
+      - master
+      - develop
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      type:
+        description: Package build type
+        default: devel
+        required: true
+      version:
+        description: Package version
+        required: false
+env:
+  DISABLE_TELEMETRY: 1
+  REPO_PREFIX: netdata/netdata
+concurrency:
+  group: packages-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  matrix:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+      - name: Prepare tools
+        id: prepare
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        shell: python3 {0}
+        env:
+          PR_BODY: "${{ github.event.pull_request.body }}"
+        run: |
+          from ruamel.yaml import YAML
+          import json
+          import re
+          import os
+          FULL_CI_REGEX = '/actions run full ci'
+          ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
+          PR_BODY = os.environ['PR_BODY']
+          yaml = YAML(typ='safe')
+          entries = list()
+          run_limited = False
+
+          with open('.github/data/distros.yml') as f:
+              data = yaml.load(f)
+
+          if "${{ github.event_name }}" == "pull_request" and re.search(FULL_CI_REGEX, PR_BODY, re.I) is None:
+              run_limited = True
+
+          for i, v in enumerate(data['include']):
+              if 'packages' in data['include'][i]:
+                  for arch in data['include'][i]['packages']['arches']:
+                      if arch in ALWAYS_RUN_ARCHES or not run_limited:
+                          entries.append({
+                              'distro': data['include'][i]['distro'],
+                              'version': data['include'][i]['version'],
+                              'repo_distro': data['include'][i]['packages']['repo_distro'],
+                              'format': data['include'][i]['packages']['type'],
+                              'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
+                              'platform': data['platform_map'][arch],
+                              'arch': arch
+                          })
+
+          entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
+          matrix = json.dumps({'include': entries}, sort_keys=True)
+          print('Generated Matrix: ' + matrix)
+          print('::set-output name=matrix::' + matrix)
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Package Build matrix generation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to generate build matrix for package build.
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare Tools: ${{ steps.prepare.outcome }}
+              Read Build Matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}
+
+  version-check:
+    name: Version check
+    runs-on: ubuntu-latest
+    outputs:
+      repo: ${{ steps.check-version.outputs.repo }}
+      version: ${{ steps.check-version.outputs.version }}
+      retention: ${{ steps.check-version.outputs.retention }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+      - name: Check Version
+        id: check-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            case "${{ github.event.inputs.type }}" in
+              "release")
+                echo "::set-output name=repo::${REPO_PREFIX}"
+                echo "::set-output name=version::${{ github.event.inputs.version }}"
+                echo "::set-output name=retention::365"
+                ;;
+              "nightly")
+                echo "::set-output name=repo::${REPO_PREFIX}-edge"
+                echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
+                echo "::set-output name=retention::30"
+                ;;
+              *)
+                echo "::set-output name=repo::${REPO_PREFIX}-devel"
+                echo "::set-output name=version::0.${GITHUB_SHA}"
+                echo "::set-output name=retention::30"
+                ;;
+            esac
+          else
+            echo "::set-output name=version::$(cut -d'-' -f 1 packaging/version | tr -d 'v')"
+            echo "::set-output name=retention::0"
+          fi
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Package Build version check failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to generate version information for package build.
+              Checkout: ${{ steps.checkout.outcome }}
+              Check Version: ${{ steps.check-version.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_CLI_EXPERIMENTAL: enabled
+    needs:
+      - matrix
+      - version-check
+    strategy:
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      # We intentiaonally disable the fail-fast behavior so that a
+      # build failure for one version doesn't prevent us from publishing
+      # successfully built and tested packages for another version.
+      fail-fast: false
+      max-parallel: 8
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # We need full history for versioning
+          submodules: recursive
+      - name: Setup QEMU
+        id: qemu
+        if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
+        uses: docker/setup-qemu-action@v2
+      - name: Prepare Docker Environment
+        id: docker-config
+        shell: bash
+        run: |
+          echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
+          sudo service docker restart
+      - name: Fetch images
+        id: fetch-images
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 900
+          command: |
+            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
+            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+      - name: Build Packages
+        id: build
+        shell: bash
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+      - name: Save Packages
+        id: artifacts
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
+          path: ${{ github.workspace }}/artifacts/*
+      - name: Test Packages
+        id: test
+        shell: bash
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} \
+                     -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+                     /netdata/.github/scripts/pkg-test.sh
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        continue-on-error: true
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        continue-on-error: true
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        run: |
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
+      - name: Upload to PackageCloud
+        id: upload
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
+        run: |
+          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
+          for pkgfile in artifacts/*.${{ matrix.format }} ; do
+            .github/scripts/package_cloud_wrapper.sh yank ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} \
+            "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} "${pkgfile}"
+          done
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Package Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: ${{ matrix.repo_distro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup Docker: ${{ steps.docker-config.outcome }}
+              Fetch images: ${{ steps.fetch-images.outcome }}
+              Build: ${{ steps.build.outcome }}
+              Test: ${{ steps.test.outcome }}
+              Import SSH Key: ${{ steps.ssh-setup.outcome }}
+              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to PackageCloud: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}

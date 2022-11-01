@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "spawn.h"
-#include "../database/engine/rrdenginelib.h"
 
 static uv_thread_t thread;
 int spawn_thread_error;
@@ -62,7 +61,7 @@ uint64_t spawn_enq_cmd(char *command_to_run)
 {
     unsigned queue_size;
     uint64_t serial;
-    avl *avl_ret;
+    avl_t *avl_ret;
     struct spawn_cmd_info *cmdinfo;
 
     cmdinfo = create_spawn_cmd(command_to_run);
@@ -79,8 +78,8 @@ uint64_t spawn_enq_cmd(char *command_to_run)
     cmdinfo->serial = serial; /* No need to take the cmd mutex since it is unreachable at the moment */
 
     /* enqueue command */
-    avl_ret = avl_insert(&spawn_cmd_queue.cmd_tree, (avl *)cmdinfo);
-    fatal_assert(avl_ret == (avl *)cmdinfo);
+    avl_ret = avl_insert(&spawn_cmd_queue.cmd_tree, (avl_t *)cmdinfo);
+    fatal_assert(avl_ret == (avl_t *)cmdinfo);
     uv_mutex_unlock(&spawn_cmd_queue.mutex);
 
     /* wake up event loop */
@@ -93,13 +92,13 @@ uint64_t spawn_enq_cmd(char *command_to_run)
  */
 void spawn_wait_cmd(uint64_t serial, int *exit_status, time_t *exec_run_timestamp)
 {
-    avl *avl_ret;
+    avl_t *avl_ret;
     struct spawn_cmd_info tmp, *cmdinfo;
 
     tmp.serial = serial;
 
     uv_mutex_lock(&spawn_cmd_queue.mutex);
-    avl_ret = avl_search(&spawn_cmd_queue.cmd_tree, (avl *)&tmp);
+    avl_ret = avl_search(&spawn_cmd_queue.cmd_tree, (avl_t *)&tmp);
     uv_mutex_unlock(&spawn_cmd_queue.mutex);
 
     fatal_assert(avl_ret); /* Could be NULL if more than 1 threads wait for the command */
@@ -122,13 +121,13 @@ void spawn_wait_cmd(uint64_t serial, int *exit_status, time_t *exec_run_timestam
 void spawn_deq_cmd(struct spawn_cmd_info *cmdinfo)
 {
     unsigned queue_size;
-    avl *avl_ret;
+    avl_t *avl_ret;
 
     uv_mutex_lock(&spawn_cmd_queue.mutex);
     queue_size = spawn_cmd_queue.size;
     fatal_assert(queue_size);
     /* dequeue command */
-    avl_ret = avl_remove(&spawn_cmd_queue.cmd_tree, (avl *)cmdinfo);
+    avl_ret = avl_remove(&spawn_cmd_queue.cmd_tree, (avl_t *)cmdinfo);
     fatal_assert(avl_ret);
 
     spawn_cmd_queue.size = queue_size - 1;
@@ -183,7 +182,7 @@ struct spawn_cmd_info *spawn_get_unprocessed_cmd(void)
  * The caller has to be the netdata user as configured.
  *
  * @param loop the libuv loop of the caller context
- * @param spawn_channel the birectional libuv IPC pipe that the server and the caller will share
+ * @param spawn_channel the bidirectional libuv IPC pipe that the server and the caller will share
  * @param process the spawn server libuv process context
  * @return 0 on success or the libuv error code
  */
@@ -240,15 +239,15 @@ void spawn_init(void)
 
     init_spawn_cmd_queue();
 
-    init_completion(&completion);
+    completion_init(&completion);
     error = uv_thread_create(&thread, spawn_client, &completion);
     if (error) {
         error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for spawn client thread to initialize */
-    wait_for_completion(&completion);
-    destroy_completion(&completion);
+    completion_wait_for(&completion);
+    completion_destroy(&completion);
     uv_thread_set_name_np(thread, "DAEMON_SPAWN");
 
     if (spawn_thread_error) {

@@ -2,65 +2,56 @@
 # This way we prevent modifications which will be overwriten by automation.
 
 # Global (default) code owner
-* @ktsaou @Ferroin
+* @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @knatsakis @kaskavel
-.github/ @Ferroin @knatsakis @kaskavel
+.travis/ @Ferroin
+.github/ @Ferroin
 aclk/ @stelfrag @underhood
-backends/ @thiagoftsm @vlvkobal
-backends/graphite/ @thiagoftsm @vlvkobal
-backends/json/ @thiagoftsm @vlvkobal
-backends/opentsdb/ @thiagoftsm @vlvkobal
-backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @Ferroin @knatsakis
-contrib/debian @Ferroin @knatsakis
-collectors/ @vlvkobal @mfundul
+build/ @Ferroin
+contrib/debian @Ferroin
+collectors/ @vlvkobal
+collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
-collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
 collectors/macos.plugin/ @vlvkobal @thiagoftsm
-collectors/node.d.plugin/ @jacekkolasa
-collectors/node.d.plugin/fronius/ @ccremer
-collectors/node.d.plugin/snmp/ @jacekkolasa
-collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
-daemon/ @thiagoftsm @mfundul
-database/ @mfundul @thiagoftsm
-docs/ @joelhans
-health/ @thiagoftsm @vlvkobal
+daemon/ @thiagoftsm @vkalintiris
+database/ @thiagoftsm @vkalintiris
+docs/ @DShreve2
+health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
-libnetdata/ @thiagofsm @mfundul
-packaging/ @Ferroin @knatsakis
+ml/ @andrewm4894 @vkalintiris
+libnetdata/ @thiagoftsm @vkalintiris
+packaging/ @Ferroin
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @knatsakis
-tests/ @Ferroin @knatsakis @kaskavel
-web/ @thiagoftsm @mfundul @vlvkobal
+system/ @Ferroin
+tests/ @Ferroin @vkalintiris
+web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin
-*.md @joelhans
-Dockerfile* @Ferroin @knatsakis
+*.md @DShreve2
+Dockerfile* @Ferroin
 
 # Ownership of specific files
-.gitignore @Ferroin @knatsakis
-.travis.yml @Ferroin @knatsakis @kaskavel
-.lgtm.yml @Ferroin @knatsakis
-.eslintrc @Ferroin @knatsakis
-.eslintignore @Ferroin @knatsakis
-.csslintrc @Ferroin @knatsakis
-.codeclimate.yml @Ferroin @knatsakis
-.codacy.yml @Ferroin @knatsakis
-.yamllint.yml @Ferroin @knatsakis
-netdata.spec.in @Ferroin @knatsakis
-netdata-installer.sh @Ferroin @knatsakis
-package.json @jacekkolasa @Ferroin @knatsakis
-packaging/version @netdatabot @Ferroin @knatsakis
+.gitignore @Ferroin @vkalintiris
+.travis.yml @Ferroin
+.lgtm.yml @Ferroin
+.eslintrc @Ferroin
+.eslintignore @Ferroin
+.csslintrc @Ferroin
+.codeclimate.yml @Ferroin
+.codacy.yml @Ferroin
+.yamllint.yml @Ferroin
+netdata.spec.in @Ferroin
+netdata-installer.sh @Ferroin
+packaging/version @netdatabot @Ferroin
 
-LICENSE.md @joelhans @Ferroin
+LICENSE.md @DShreve2 @Ferroin @vkalintiris
 CHANGELOG.md @netdatabot @Ferroin

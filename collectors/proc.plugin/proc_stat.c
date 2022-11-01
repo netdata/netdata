@@ -481,7 +481,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL,
            *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
-    static RRDVAR *cpus_var = NULL;
+    static const RRDVAR_ACQUIRED *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)processors;
 
@@ -713,7 +713,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                     rrddim_hide(cpu_chart->st, "idle");
 
                     if(unlikely(core == 0 && cpus_var == NULL))
-                        cpus_var = rrdvar_custom_host_variable_create(localhost, "active_processors");
+                        cpus_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "active_processors");
                 }
                 else rrdset_next(cpu_chart->st);
 
@@ -1029,7 +1029,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 , cpuidle_chart_id
                                 , NULL
                                 , "cpuidle"
-                                , "cpuidle.cpuidle"
+                                , "cpuidle.cpu_cstate_residency_time"
                                 , "C-state residency time"
                                 , "percentage"
                                 , PLUGIN_PROC_NAME
@@ -1039,11 +1039,16 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 , RRDSET_TYPE_STACKED
                         );
 
+                        char corebuf[50+1];
+                        snprintfz(corebuf, 50, "cpu%zu", core);
+                        rrdlabels_add(cpuidle_charts[core].st->rrdlabels, "cpu", corebuf, RRDLABEL_SRC_AUTO);
+
                         char cpuidle_dim_id[RRD_ID_LENGTH_MAX + 1];
-                        snprintfz(cpuidle_dim_id, RRD_ID_LENGTH_MAX, "cpu%zu_active_time", core);
-                        cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, cpuidle_dim_id, "C0 (active)", 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                        cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, "active", "C0 (active)", 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                         for(state = 0; state < cpuidle_charts[core].cpuidle_state_len; state++) {
-                            snprintfz(cpuidle_dim_id, RRD_ID_LENGTH_MAX, "cpu%zu_cpuidle_state%zu_time", core, state);
+                            strncpyz(cpuidle_dim_id, cpuidle_charts[core].cpuidle_state[state].name, RRD_ID_LENGTH_MAX);
+                            for(int i = 0; cpuidle_dim_id[i]; i++)
+                                cpuidle_dim_id[i] = tolower(cpuidle_dim_id[i]);
                             cpuidle_charts[core].cpuidle_state[state].rd = rrddim_add(cpuidle_charts[core].st, cpuidle_dim_id,
                                                                                       cpuidle_charts[core].cpuidle_state[state].name,
                                                                                       1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);

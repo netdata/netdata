@@ -1,0 +1,214 @@
+---
+# Workflow for triggering a release.
+name: Release
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Dispatch runs build and validate, then push to the appropriate storage location.
+    inputs:
+      type:
+        description: Build Type
+        default: nightly
+        required: true
+      version:
+        description: Version Tag
+        default: nightly
+        required: true
+concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
+  group: release-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  update-changelogs:
+    name: Update changelog
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.target.outputs.ref }}
+      version: ${{ steps.target.outputs.version }}
+      type: ${{ steps.target.outputs.type }}
+      run: ${{ steps.target.outputs.run }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Prepare base ref
+        id: target
+        run: >-
+          .github/scripts/prepare-release-base.sh \
+              ${{ github.repository }} \
+              ${{ github.event_name }} \
+              ${{ github.event.inputs.type }} \
+              ${{ github.event.inputs.version }} \
+              ${{ secrets.NETDATA_RELEASE_TEST }}
+      - name: Generate Nightly Changleog
+        id: nightly-changelog
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
+        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        with:
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+          maxIssues: 500
+      - name: Generate Release Changelog
+        id: release-changelog
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type != 'nightly'
+        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        with:
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          futureRelease: ${{ github.event.inputs.version }}
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+          maxIssues: 500
+      - name: Commit Changes
+        id: commit
+        if: steps.target.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+        run: |
+          git config user.name "netdatabot"
+          git config user.email "bot@netdata.cloud"
+          git add packaging/version CHANGELOG.md
+          git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
+          if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
+            git tag -a "${{ github.event.inputs.version }}" -m "${{ steps.target.outputs.message }}"
+          fi
+          if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
+            git branch "${{ steps.target.outputs.new-branch }}"
+          fi
+          git push --tags origin "${{ steps.target.outputs.branch }}"
+          if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
+            git push origin "${{ steps.target.outputs.new-branch }}"
+          fi
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to prepare changelog:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to prepare changelog.
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare base ref: ${{ steps.target.outcome }}
+              Generate nightly changelog: ${{ steps.nightly-changelog.outcome }}
+              Generate release changelog: ${{ steps.release-changelog.outcome }}
+              Commit changes: ${{ steps.commit.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()
+
+  trigger-artifacts:
+    name: Trigger artifact builds
+    runs-on: ubuntu-latest
+    needs: update-changelogs
+    if: needs.update-changelogs.outputs.run == 'true'
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ needs.update-changelogs.outputs.ref }}
+      - name: Trigger build
+        id: trigger
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          workflow: Build
+          ref: ${{ needs.update-changelogs.outputs.ref }}
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to trigger ${{ needs.update-changelogs.outputs.type }} artifact builds:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to trigger ${{ needs.update-changelogs.outputs.type }} artifact builds.
+              Checkout: ${{ steps.checkout.outcome }}
+              Trigger build: ${{ steps.trigger.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()
+
+  trigger-docker:
+    name: Trigger docker builds
+    runs-on: ubuntu-latest
+    needs: update-changelogs
+    if: needs.update-changelogs.outputs.run == 'true'
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ needs.update-changelogs.outputs.ref }}
+      - name: Trigger build
+        id: trigger
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          workflow: Docker
+          ref: ${{ needs.update-changelogs.outputs.ref }}
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}"}'
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to trigger ${{ needs.update-changelogs.outputs.type }} Docker builds:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to trigger ${{ needs.update-changelogs.outputs.type }} Docker builds.
+              Checkout: ${{ steps.checkout.outcome }}
+              Trigger build: ${{ steps.trigger.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()
+
+  trigger-packages:
+    name: Trigger package builds
+    runs-on: ubuntu-latest
+    needs: update-changelogs
+    if: needs.update-changelogs.outputs.run == 'true'
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ needs.update-changelogs.outputs.ref }}
+      - name: Trigger build
+        id: trigger
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          workflow: Packages
+          ref: ${{ needs.update-changelogs.outputs.ref }}
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to trigger ${{ needs.update-changelogs.outputs.type }} package builds:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to trigger ${{ needs.update-changelogs.outputs.type }} package builds.
+              Checkout: ${{ steps.checkout.outcome }}
+              Trigger build: ${{ steps.trigger.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()

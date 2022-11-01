@@ -38,6 +38,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_opentsdb_telnet;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = simple_connector_end_batch;
 
@@ -94,6 +95,7 @@ int init_opentsdb_http_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_opentsdb_http;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = close_batch_json_http;
 
@@ -117,20 +119,21 @@ int init_opentsdb_http_instance(struct instance *instance)
 }
 
 /**
- * Copy a label value and substitute underscores in place of charachters which can't be used in OpenTSDB output
+ * Copy a label value and substitute underscores in place of characters which can't be used in OpenTSDB output
  *
  * @param dst a destination string.
  * @param src a source string.
  * @param len the maximum number of characters copied.
  */
 
-void sanitize_opentsdb_label_value(char *dst, char *src, size_t len)
+void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
 {
     while (*src != '\0' && len) {
-        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
+        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
             *dst++ = *src;
         else
             *dst++ = '_';
+
         src++;
         len--;
     }
@@ -144,28 +147,18 @@ void sanitize_opentsdb_label_value(char *dst, char *src, size_t len)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
-int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
-{
-    if (!instance->labels)
-        instance->labels = buffer_create(1024);
+
+int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host) {
+    if(!instance->labels_buffer)
+        instance->labels_buffer = buffer_create(1024);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    rrdhost_check_rdlock(localhost);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    for (struct label *label = host->labels; label; label = label->next) {
-        if (!should_send_label(instance, label))
-            continue;
-
-        char value[CONFIG_MAX_VALUE + 1];
-        sanitize_opentsdb_label_value(value, label->value, CONFIG_MAX_VALUE);
-
-        if (*value)
-            buffer_sprintf(instance->labels, " %s=%s", label->key, value);
-    }
-    netdata_rwlock_unlock(&host->labels_rwlock);
-
+    buffer_strcat(instance->labels_buffer, " ");
+    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, "", "=", "", " ",
+                        exporting_labels_filter_callback, instance,
+                        NULL, sanitize_opentsdb_label_value);
     return 0;
 }
 
@@ -178,20 +171,19 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     buffer_sprintf(
@@ -202,10 +194,10 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
-        (instance->labels) ? buffer_tostring(instance->labels) : "");
+        (host->tags) ? rrdhost_tags(host) : "",
+        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
 }
@@ -219,46 +211,45 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
  */
 int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
 
     buffer_sprintf(
         instance->buffer,
-        "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s%s\n",
+        "put %s.%s.%s %llu " NETDATA_DOUBLE_FORMAT " host=%s%s%s%s\n",
         instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)last_t,
         value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
-        (instance->labels) ? buffer_tostring(instance->labels) : "");
+        (host->tags) ? rrdhost_tags(host) : "",
+        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
 }
 
 /**
- * Ppepare HTTP header
+ * Prepare HTTP header
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
@@ -271,11 +262,13 @@ void opentsdb_http_prepare_header(struct instance *instance)
         simple_connector_data->last_buffer->header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
+        "%s"
         "Content-Type: application/json\r\n"
         "Content-Length: %lu\r\n"
         "\r\n",
         instance->config.destination,
-        buffer_strlen(simple_connector_data->last_buffer->buffer));
+        simple_connector_data->auth_string ? simple_connector_data->auth_string : "",
+        (unsigned long int) buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;
 }
@@ -287,33 +280,17 @@ void opentsdb_http_prepare_header(struct instance *instance)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
-int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
-{
-    if (!instance->labels)
-        instance->labels = buffer_create(1024);
+
+int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
+    if (!instance->labels_buffer)
+        instance->labels_buffer = buffer_create(1024);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    for (struct label *label = host->labels; label; label = label->next) {
-        if (!should_send_label(instance, label))
-            continue;
-
-        char escaped_value[CONFIG_MAX_VALUE * 2 + 1];
-        sanitize_json_string(escaped_value, label->value, CONFIG_MAX_VALUE);
-
-        char value[CONFIG_MAX_VALUE + 1];
-        sanitize_opentsdb_label_value(value, escaped_value, CONFIG_MAX_VALUE);
-
-        if (*value) {
-            buffer_strcat(instance->labels, ",");
-            buffer_sprintf(instance->labels, "\"%s\":\"%s\"", label->key, value);
-        }
-    }
-    netdata_rwlock_unlock(&host->labels_rwlock);
-
+    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ",", ":", "\"", "",
+                        exporting_labels_filter_callback, instance,
+                        NULL, sanitize_opentsdb_label_value);
     return 0;
 }
 
@@ -326,20 +303,19 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     if (buffer_strlen((BUFFER *)instance->buffer) > 2)
@@ -360,10 +336,10 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
-        instance->labels ? buffer_tostring(instance->labels) : "");
+        (host->tags) ? rrdhost_tags(host) : "",
+        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
 }
@@ -377,24 +353,23 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
  */
 int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
         RRD_ID_LENGTH_MAX);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
         dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
     time_t last_t;
-    calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(isnan(value))
         return 0;
@@ -407,7 +382,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "{"
         "\"metric\":\"%s.%s.%s\","
         "\"timestamp\":%llu,"
-        "\"value\":"CALCULATED_NUMBER_FORMAT","
+        "\"value\":" NETDATA_DOUBLE_FORMAT ","
         "\"tags\":{"
         "\"host\":\"%s%s%s\"%s"
         "}"
@@ -417,10 +392,10 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         dimension_name,
         (unsigned long long)last_t,
         value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "",
-        instance->labels ? buffer_tostring(instance->labels) : "");
+        (host->tags) ? rrdhost_tags(host) : "",
+        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
 }

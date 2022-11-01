@@ -1,8 +1,6 @@
 <!--
----
 title: "cups.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cups.plugin/README.md
----
 -->
 
 # cups.plugin
@@ -13,9 +11,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cups.
 
 This plugin needs a running local CUPS daemon (`cupsd`). This plugin does not need any configuration. Supports cups since version 1.7.
 
+If you installed Netdata using our native packages, you will have to additionaly install `netdata-plugin-cups` to use this plugin for data collection. It is not installed by default due to the large number of dependencies it requires.
+
 ## Charts
 
-`cups.plugin` provides one common section `destinations` and one section per destination. 
+`cups.plugin` provides one common section `destinations` and one section per destination.
 
 > Destinations in CUPS represent individual printers or classes (collections or pools) of printers (<https://www.cups.org/doc/cupspm.html#working-with-destinations>)
 
@@ -60,3 +60,5 @@ For each destination the plugin provides these charts:
     -   processing
 
 At the moment only job status pending, processing, and held are reported because we do not have a method to collect stopped, canceled, aborted and completed jobs which scales.
+
+

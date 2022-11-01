@@ -1,8 +1,7 @@
 <!--
----
 title: "Web server"
+description: "The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/README.md
----
 -->
 
 # Web server
@@ -12,14 +11,14 @@ It uses non-blocking I/O and respects the `keep-alive` HTTP header to serve mult
 
 ## Configuration
 
-You can disable the web server by editing `netdata.conf` and setting:
+Disable the web server by editing `netdata.conf` and setting:
 
 ```
 [web]
     mode = none
 ```
 
-With the web server enabled, you can control the number of threads and sockets with the following settings:
+With the web server enabled, control the number of threads and sockets with the following settings:
 
 ```
 [web]
@@ -33,7 +32,7 @@ The `web server max sockets` setting is automatically adjusted to 50% of the max
 
 ### Binding Netdata to multiple ports
 
-Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (you can increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
+Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
 
 The ports to bind are controlled via `[web].bind to`, like this:
 
@@ -87,14 +86,14 @@ To enable TLS, provide the path to your certificate and private key in the `[web
 
 Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a parent-child connection, only the parent needs these settings.
 
-For test purposes, you can generate self-signed certificates with the following command:
+For test purposes, generate self-signed certificates with the following command:
 
 ```bash
 openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 ```
 
 > If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication.
-> `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. You can verify the difference
+> `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. Verify the difference
 > by running:
 >
 > ```sh
@@ -103,7 +102,7 @@ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out
 
 ### Select TLS version
 
-Beginning with version 1.21, you can also specify the TLS version and the ciphers that you want to use:
+Beginning with version 1.21, specify the TLS version and the ciphers that you want to use:
 
 ```conf
 [web]
@@ -122,7 +121,7 @@ When the certificates are defined and unless any other options are provided, a N
 -   Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, `netdata.conf` and badges.
 -   Allow incoming child connections to use both unencrypted and encrypted communications for streaming.
 
-To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
+To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
 
 | SSL setting | HTTP requests|HTTPS requests|Unencrypted Streams|Encrypted Streams|
 |:---------:|:-----------:|:------------:|:-----------------:|:----------------|
@@ -159,7 +158,7 @@ When you start using Netdata with TLS, you may find errors in the Netdata log, w
 
 Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`. 
 
-In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols, which you can find above.
+In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols listed above.
 
 ### Access lists
 
@@ -222,12 +221,10 @@ present that may match DNS FQDNs.
 |ses max window|`15`|See [single exponential smoothing](/web/api/queries/des/README.md)|
 |des max window|`15`|See [double exponential smoothing](/web/api/queries/des/README.md)|
 |listen backlog|`4096`|The port backlog. Check `man 2 listen`.|
-|web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, Netdata will only serve files owned by user given in `run as user`.|
-|web files group|`netdata`|If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.|
 |disconnect idle clients after seconds|`60`|The time in seconds to disconnect web clients after being totally idle.|
 |timeout for first request|`60`|How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.|
 |accept a streaming request every seconds|`0`|Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](/streaming/README.md)|
-|respect do not track policy|`no`|If set to `yes`, will respect the client's browser preferences on storing cookies.|
+|respect do not track policy|`no`|If set to `yes`, Netdata will respect the user's browser preferences for [Do Not Track](https://www.eff.org/issues/do-not-track) (DNT) and storing cookies. If DNT is _enabled_ in the browser, and this option is set to `yes`, users will not be able to sign in to Netdata Cloud via their local Agent dashboard, and their node will not connect to any [registry](/registry/README.md). For certain browsers, users must disable DNT and change this option to `yes` for full functionality.|
 |x-frame-options response header||[Avoid clickjacking attacks, by ensuring that the content is not embedded into other sites](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options).|
 |enable gzip compression|`yes`|When set to `yes`, Netdata web responses will be GZIP compressed, if the web client accepts such responses.|
 |gzip compression strategy|`default`|Valid strategies are `default`, `filtered`, `huffman only`, `rle` and `fixed`|
@@ -243,4 +240,4 @@ If you publish your Netdata to the internet, you may want to apply some protecti
 4.  Run the `netdata` process with a low process scheduling priority (the default is the lowest)
 5.  If possible, proxy Netdata via a full featured web server (nginx, apache, etc)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fserver%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

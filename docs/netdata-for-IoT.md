@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata for IoT"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for-IoT.md
----
 -->
 
 # Netdata for IoT
@@ -27,7 +25,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for
 
 ---
 
-Netdata is a **very efficient** server performance monitoring solution. When running in server hardware, it can collect
+Netdata is a [very efficient](/docs/guides/configure/performance.md) server performance monitoring solution. When running in server hardware, it can collect
 thousands of system and application metrics **per second** with just 1% CPU utilization of a single core. Its web server
 responds to most data requests in about **half a millisecond** making its web dashboards spontaneous, amazingly fast!
 
@@ -45,8 +43,8 @@ provider so it can directly be used by google sheets, google charts, google widg
 ![sensors](https://cloud.githubusercontent.com/assets/2662304/15339745/8be84540-1c8e-11e6-9e9a-106dea7539b6.gif)
 
 Although Netdata has been significantly optimized to lower the CPU and RAM resources it consumes, the plethora of data
-collection plugins may be inappropriate for weak IoT devices. Please follow the guide on [running Netdata in embedded
-devices](Performance.md)
+collection plugins may be inappropriate for weak IoT devices. Please follow the [Netdata Agent performance
+guide](/docs/guides/configure/performance.md)
 
 ## Monitoring RPi temperature
 
@@ -73,4 +71,4 @@ Then restart Netdata. You will get this:
 
 ![image](https://user-images.githubusercontent.com/2662304/29658868-23aa65ae-88c5-11e7-9dad-c159600db5cc.png)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fnetdata-for-IoT&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

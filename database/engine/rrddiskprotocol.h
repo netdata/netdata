@@ -35,7 +35,8 @@ struct rrdeng_df_sb {
  * Page types
  */
 #define PAGE_METRICS    (0)
-#define PAGE_LOGS       (1) /* reserved */
+#define PAGE_TIER       (1)
+#define PAGE_TYPE_MAX   1   // Maximum page type (inclusive)
 
 /*
  * Data file page descriptor
@@ -45,8 +46,8 @@ struct rrdeng_extent_page_descr {
 
     uint8_t uuid[UUID_SZ];
     uint32_t page_length;
-    uint64_t start_time;
-    uint64_t end_time;
+    uint64_t start_time_ut;
+    uint64_t end_time_ut;
 } __attribute__ ((packed));
 
 /*

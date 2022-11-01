@@ -164,7 +164,7 @@ netdata (1.6.0) - 2017-03-20
 
     1.  number of sensors by state
     2.  number of events in SEL
-    3.  Temperatures CELCIUS
+    3.  Temperatures CELSIUS
     4.  Temperatures FAHRENHEIT
     5.  Voltages
     6.  Currents
@@ -239,7 +239,7 @@ netdata (1.5.0) - 2017-01-22
     Vladimir Kobal (@vlvkobal) has done a magnificent work
     porting netdata to FreeBSD and MacOS.
 
-    Everyhing works: cpu, memory, disks performance, disks space,
+    Everything works: cpu, memory, disks performance, disks space,
     network interfaces, interrupts, IPv4 metrics, IPv6 metrics
     processes, context switches, softnet, IPC queues,
     IPC semaphores, IPC shared memory, uptime, etc. Wow!
@@ -382,7 +382,7 @@ netdata (1.4.0) - 2016-10-04
        cgroups,
        hddtemp,
        sensors,
-       phpfm,
+       phpfpm,
        tc (QoS)
 
  In detail:
@@ -483,7 +483,7 @@ netdata (1.3.0) - 2016-08-28
     -   hddtemp
     -   mysql
     -   nginx
-    -   phpfm
+    -   phpfpm
     -   postfix
     -   sensors
     -   squid
@@ -518,7 +518,7 @@ netdata (1.3.0) - 2016-08-28
 -   apps.plugin improvements:
 
     -   can now run with command line argument 'without-files'
-        to prevent it from enumating all the open files/sockets/pipes
+        to prevent it from enumerating all the open files/sockets/pipes
         of all running processes.
 
     -   apps.plugin now scales the collected values to match the
@@ -575,7 +575,7 @@ netdata (1.2.0) - 2016-05-16
         20% better performance for the core of netdata.
 
     -   More efficient threads locking in key components
-        contributed to the overal efficiency.
+        contributed to the overall efficiency.
 
 -   netdata now has a CENTRAL REGISTRY !
 
@@ -625,7 +625,7 @@ netdata (1.1.0) - 2016-04-20
 -   Data collection: apps.plugin: grouping of processes now support patterns
 -   Data collection: apps.plugin: now it is faster, after the new features added
 -   Data collection: better auto-detection of partitions for disk monitoring
--   Data collection: better fireqos intergation for QoS monitoring
+-   Data collection: better fireqos integration for QoS monitoring
 -   Data collection: squid monitoring now uses squidclient
 -   Data collection: SNMP monitoring now supports 64bit counters
 -   API: fixed issues in CSV output generation

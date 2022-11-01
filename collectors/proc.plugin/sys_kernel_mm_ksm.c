@@ -110,7 +110,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , PLUGIN_PROC_MODULE_KSM_NAME
                     , NETDATA_CHART_PRIO_MEM_KSM
                     , update_every
-                    , RRDSET_TYPE_AREA
+                    , RRDSET_TYPE_STACKED
             );
 
             rd_shared   = rrddim_add(st_mem_ksm, "shared",   NULL,      1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);

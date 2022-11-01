@@ -20,7 +20,7 @@ This is how to install the latest Netdata version on FreeBSD:
 Install required packages (**need root permission**):
 
 ```sh
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake gmake
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof liblz4 libuv json-c cmake gmake
 ```
 
 Download Netdata:
@@ -64,7 +64,7 @@ You can now access the Netdata dashboard by navigating to `http://NODE:19999`, r
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
-From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
+Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
 page](/docs/anonymous-statistics.md).
 
@@ -80,7 +80,7 @@ The `netdata-updater.sh` script will update your Agent.
 | `--dont-wait` | Run installation in non-interactive mode|
 | `--auto-update` or `-u` | Install netdata-updater in cron to update netdata automatically once per day|
 | `--stable-channel` | Use packages from GitHub release pages instead of GCS (nightly updates). This results in less frequent updates|
-| `--nightly-channel` | Use most recent nightly udpates instead of GitHub releases. This results in more frequent updates|
+| `--nightly-channel` | Use most recent nightly updates instead of GitHub releases. This results in more frequent updates|
 | `--disable-go` | Disable installation of go.d.plugin|
 | `--disable-ebpf` | Disable eBPF Kernel plugin (Default: enabled)|
 | `--disable-cloud` | Disable all Netdata Cloud functionality|
@@ -93,14 +93,15 @@ The `netdata-updater.sh` script will update your Agent.
 | `--disable-plugin-nfacct` | Disable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available|
 | `--enable-plugin-xenstat` | Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available|
 | `--disable-plugin-xenstat` | Disable the xenstat plugin|
-| `--enable-backend-kinesis` | Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|                           
-| `--disable-backend-kinesis` | Disable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
-| `--enable-backend-prometheus-remote-write` | Enable Prometheus remote write backend. Default: enable it when libprotobuf and libsnappy are available|
-| `--disable-backend-prometheus-remote-write` | Disable Prometheus remote write backend. Default: enable it when libprotobuf and libsnappy are available|
-| `--enable-backend-mongodb` | Enable MongoDB backend. Default: enable it when libmongoc is available|
-| `--disable-backend-mongodb` | Disable MongoDB backend|
+| `--disable-exporting-kinesis` | Disable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis and libraries (it depends on are available)|
+| `--enable-exporting-prometheus-remote-write` | Enable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
+| `--disable-exporting-prometheus-remote-write` | Disable Prometheus remote write exporting connector. Default: enable it when libprotobuf and libsnappy are available|
+| `--enable-exporting-mongodb` | Enable MongoDB exporting connector. Default: enable it when libmongoc is available|
+| `--disable-exporting-mongodb` | Disable MongoDB exporting connector|
 | `--enable-lto` | Enable Link-Time-Optimization. Default: enabled|
 | `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
-|`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
+|`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)|
+
+

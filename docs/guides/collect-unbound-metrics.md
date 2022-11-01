@@ -54,8 +54,9 @@ configuring the collector.
 You may not need to do any more configuration to have Netdata collect your Unbound metrics.
 
 If you followed the steps above to enable `remote-control` and make your Unbound files readable by Netdata, that should
-be enough. Restart Netdata with `service netdata restart`, or the appropriate method for your system. You should see
-Unbound metrics in your Netdata dashboard!
+be enough. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system. You should see Unbound metrics in your Netdata
+dashboard!
 
 ![Some charts showing Unbound metrics in real-time](https://user-images.githubusercontent.com/1153921/69659974-93160f00-103c-11ea-88e6-27e9efcf8c0d.png)
 
@@ -98,7 +99,8 @@ jobs:
 Netdata will attempt to read `unbound.conf` to get the appropriate `address`, `cumulative`, `use_tls`, `tls_cert`, and
 `tls_key` parameters. 
 
-Restart Netdata with `service netdata restart`, or the appropriate method for your system.
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 ### Manual setup for a remote Unbound server
 
@@ -132,7 +134,7 @@ file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.con
 
 Now that you're collecting metrics from your Unbound servers, let us know how it's working for you! There's always room
 for improvement or refinement based on real-world use cases. Feel free to [file an
-issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) with your
+issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) with your
 thoughts.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Funbound-metrics&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

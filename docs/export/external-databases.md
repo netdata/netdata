@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/export/exte
 # Export metrics to external time-series databases
 
 Netdata allows you to export metrics to external time-series databases with the [exporting
-engine](/exporting/README.md). This system uses a number of **connectors** to intiate connections to [more than
+engine](/exporting/README.md). This system uses a number of **connectors** to initiate connections to [more than
 thirty](#supported-databases) supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much
 more. 
 
@@ -51,11 +51,12 @@ documentation and the [enabling a connector](/docs/export/enable-connector.md) d
 -   **KairosDB**: [Graphite](/exporting/graphite/README.md), [OpenTSDB](/exporting/opentsdb/README.md)
 -   **M3DB**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **MetricFire**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **MongoDB**: [MongoDB](/exporting/mongodb/)
+-   **MongoDB**: [MongoDB](/exporting/mongodb/README.md)
 -   **New Relic**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **OpenTSDB**: [OpenTSDB](/exporting/opentsdb/README.md), [Prometheus remote
     write](/exporting/prometheus/remote_write/README.md)
 -   **PostgreSQL**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
+    via [PostgreSQL Prometheus Adapter](https://github.com/CrunchyData/postgresql-prometheus-adapter)
 -   **Prometheus**: [Prometheus scraper](/exporting/prometheus/README.md)
 -   **TimescaleDB**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md),
     [netdata-timescale-relay](/exporting/TIMESCALE.md)
@@ -69,7 +70,7 @@ documentation and the [enabling a connector](/docs/export/enable-connector.md) d
 
 Can't find your preferred external time-series database? Ask our [community](https://community.netdata.cloud/) for
 solutions, or file an [issue on
-GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md).
+GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
 
 ## What's next?
 
@@ -84,6 +85,5 @@ Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md).
 ### Related reference documentation
 
 -   [Exporting engine reference](/exporting/README.md)
--   [Backends reference (deprecated)](/backends/README.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fexporting%2Fexternal-databases&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

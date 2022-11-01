@@ -1,8 +1,6 @@
 <!--
----
 title: "External plugins overview"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md
----
 -->
 
 # External plugins overview
@@ -23,7 +21,6 @@ from external processes, thus allowing Netdata to use **external plugins**.
 |[nfacct.plugin](/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
 |[xenstat.plugin](/collectors/xenstat.plugin/README.md)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
 |[perf.plugin](/collectors/perf.plugin/README.md)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
-|[node.d.plugin](/collectors/node.d.plugin/README.md)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.|
 |[python.d.plugin](/collectors/python.d.plugin/README.md)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
 |[slabinfo.plugin](/collectors/slabinfo.plugin/README.md)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
 
@@ -76,12 +73,11 @@ Example:
 	# charts.d = yes
 	# fping = yes
 	# ioping = yes
-	# node.d = yes
 	# python.d = yes
 ```
 
 The setting `enable running new plugins` sets the default behavior for all external plugins. It can be 
-overriden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `no`.
+overridden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `no`.
 
 The setting `check for new plugins every` sets the interval between scans of the directory
 `/usr/libexec/netdata/plugins.d`. New plugins can be added any time, and Netdata will detect them in a timely manner.
@@ -120,15 +116,19 @@ For example, if your plugin wants to monitor `squid`, you can search for it on p
 
 Any program that can print a few values to its standard output can become a Netdata external plugin.
 
-Netdata parses 7 lines starting with:
+Netdata parses lines starting with:
 
--   `CHART` - create or update a chart
--   `DIMENSION` - add or update a dimension to the chart just created
--   `BEGIN` - initialize data collection for a chart
--   `SET` - set the value of a dimension for the initialized chart
--   `END` - complete data collection for the initialized chart
--   `FLUSH` - ignore the last collected values
--   `DISABLE` - disable this plugin
+-    `CHART` - create or update a chart
+-    `DIMENSION` - add or update a dimension to the chart just created
+-    `VARIABLE` - define a variable (to be used in health calculations)
+-    `CLABEL` - add a label to a chart
+-    `CLABEL_COMMIT` - commit added labels to the chart
+-    `FUNCTION` - define a function that can be called later to execute it
+-    `BEGIN` - initialize data collection for a chart
+-    `SET` - set the value of a dimension for the initialized chart
+-    `END` - complete data collection for the initialized chart
+-    `FLUSH` - ignore the last collected values
+-    `DISABLE` - disable this plugin
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -155,6 +155,7 @@ available for the plugin to use.
 |`NETDATA_USER_CONFIG_DIR`|The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).|
 |`NETDATA_STOCK_CONFIG_DIR`|The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).|
 |`NETDATA_PLUGINS_DIR`|The directory where all Netdata plugins are stored.|
+|`NETDATA_USER_PLUGINS_DIRS`|The list of directories where custom plugins are stored.|
 |`NETDATA_WEB_DIR`|The directory where the web files of Netdata are saved.|
 |`NETDATA_CACHE_DIR`|The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.|
 |`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.|
@@ -189,7 +190,10 @@ the template is:
 
 -   `name`
 
-    is the name that will be presented to the user instead of `id` in `type.id`. This means that only the `id` part of `type.id` is changed. When a name has been given, the chart is index (and can be referred) as both `type.id` and `type.name`. You can set name to `''`, or `null`, or `(null)` to disable it.
+    is the name that will be presented to the user instead of `id` in `type.id`. This means that only the `id` part of
+    `type.id` is changed. When a name has been given, the chart is indexed (and can be referred) as both `type.id` and
+    `type.name`. You can set name to `''`, or `null`, or `(null)` to disable it. If a chart with the same name already
+    exists, a serial number is automatically attached to the name to avoid naming collisions.
 
 -   `title`
 
@@ -233,7 +237,7 @@ the template is:
 
 -   `options`
 
-    a space separated list of options, enclosed in quotes. 4 options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to backends). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
+    a space separated list of options, enclosed in quotes. 4 options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to external databases). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
 
 -   `plugin` and `module`
 
@@ -254,7 +258,7 @@ the template is:
     the `id` of this dimension (it is a text value, not numeric),
     this will be needed later to add values to the dimension
 
-    We suggest to avoid using `.` in dimension ids. Backends expect metrics to be `.` separated and people will get confused if a dimension id contains a dot.
+    We suggest to avoid using `.` in dimension ids. External databases expect metrics to be `.` separated and people will get confused if a dimension id contains a dot.
 
 -   `name`
 
@@ -319,6 +323,120 @@ Variable names should use alphanumeric characters, the `.` and the `_`.
 The `value` is floating point (Netdata used `long double`).
 
 Variables are transferred to upstream Netdata servers (streaming and database replication).
+
+#### CLABEL
+
+> CLABEL name value source
+
+`CLABEL` defines a label used to organize and identify a chart.
+
+Name and value accept characters according to the following table:
+
+| Character           | Symbol | Label Name | Label Value |
+|---------------------|:------:|:----------:|:-----------:|
+| UTF-8 character     | UTF-8  |     _      |    keep     |
+| Lower case letter   | [a-z]  |    keep    |    keep     |
+| Upper case letter   | [A-Z]  |    keep    |    [a-z]    |
+| Digit               | [0-9]  |    keep    |    keep     |
+| Underscore          |   _    |    keep    |    keep     |
+| Minus               |   -    |    keep    |    keep     |
+| Plus                |   +    |     _      |    keep     |
+| Colon               |   :    |     _      |    keep     |
+| Semicolon           |   ;    |     _      |      :      |
+| Equal               |   =    |     _      |      :      |
+| Period              |   .    |    keep    |    keep     |
+| Comma               |   ,    |     .      |      .      |
+| Slash               |   /    |    keep    |    keep     |
+| Backslash           |   \    |     /      |      /      |
+| At                  |   @    |     _      |    keep     |
+| Space               |  ' '   |     _      |    keep     |
+| Opening parenthesis |   (    |     _      |    keep     |
+| Closing parenthesis |   )    |     _      |    keep     |
+| Anything else       |        |     _      |      _      |
+
+The `source` is an integer field that can have the following values:
+- `1`: The value was set automatically.
+- `2`: The value was set manually.
+- `4`: This is a K8 label.
+- `8`: This is a label defined using `netdata` agent cloud link.
+
+#### CLABEL_COMMIT
+
+`CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
+
+#### FUNCTION
+
+> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users"
+
+A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
+
+- per node
+- per chart
+
+Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context sensitive menu of functions related to the chart the user is using.
+
+A function is identified by a string. The allowed characters in the function definition are:
+
+| Character         | Symbol | In Functions |
+|-------------------|:------:|:------------:|
+| UTF-8 character   | UTF-8  |     keep     |
+| Lower case letter | [a-z]  |     keep     |
+| Upper case letter | [A-Z]  |     keep     |
+| Digit             | [0-9]  |     keep     |
+| Underscore        |   _    |     keep     |
+| Comma             |   ,    |     keep     |
+| Minus             |   -    |     keep     |
+| Period            |   .    |     keep     |
+| Colon             |   :    |     keep     |
+| Slash             |   /    |     keep     |
+| Space             |  ' '   |     keep     |
+| Semicolon         |   ;    |      :       |
+| Equal             |   =    |      :       |
+| Backslash         |   \    |      /       |
+| Anything else     |        |      _       |
+
+Uses can get a list of all the registered functions using the `/api/v1/functions` end point of Netdata.
+
+Users can call functions using the `/api/v1/function` end point of Netdata.
+Once a function is called, the plugin will receive at its standard input a command that looks like this:
+
+> FUNCTION transaction_id timeout "name and parameters of the function"
+
+The plugin is expected to parse and validate `name and parameters of the function`. Netdata allows users to edit this string, append more parameters or even change the ones the plugin originally exposed. To minimize the security risk, Netdata guarantees that only the characters shown above are accepted in function definitions, but still the plugin should carefully inspect the `name and parameters of the function` to ensure that it is valid and not harmful.
+
+If the plugin rejects the request, it should respond with this:
+
+```
+FUNCTION_RESULT_BEGIN transaction_id 400 application/json
+{
+   "status": 400,
+   "error_message": "description of the rejection reasons"
+}
+FUNCTION_RESULT_END
+```
+
+If the plugin prepares a response, it should send (via its standard output, together with the collected data, but not interleaved with them):
+
+> FUNCTION_RESULT_BEGIN transaction_id http_error_code content_type expiration
+
+Where:
+
+  - `transaction_id` is the transaction id that Netdata sent for this function execution
+  - `http_error` is the http error code Netdata should respond with, 200 is the "ok" response
+  - `content_type` is the content type of the response
+  - `expiration` is the absolute timestamp (number, unix epoch) this response expires
+
+Immediately after this, all text is assumed to be the response content.
+The content is text and line oriented. The maximum line length accepted is 15kb. Longer lines will be truncated.
+The type of the context itself depends on the plugin and the UI.
+
+To terminate the message, Netdata seeks a line with just this:
+
+> FUNCTION_RESULT_END
+
+This defines the end of the message. `FUNCTION_RESULT_END` should appear in a line alone, without any other text, so it is wise to add `\n` before and after it.
+
+After this line, Netdata resumes processing collected metrics from the plugin.
 
 ## Data collection
 
@@ -390,17 +508,12 @@ or do not output the line at all.
 
     python is ideal for Netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
 
-2.  **node.js**, use `node.d.plugin`, there are a few examples in the [node.d
-    directory](/collectors/node.d.plugin/README.md)
-
-    node.js is the fastest scripting language for collecting data. If your plugin needs to do a lot of work, compute values, etc, node.js is probably the best choice before moving to compiled code. Keep in mind though that node.js is not memory efficient; it will probably need more RAM compared to python.
-
-3.  **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d
+2.  **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d
     directory](/collectors/charts.d.plugin/README.md)
 
     BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
 
-4.  **C**
+3.  **C**
 
     Of course, C is the most efficient way of collecting data. This is why Netdata itself is written in C.
 
@@ -426,7 +539,7 @@ There are a few rules for writing plugins properly:
    readConfiguration();
 
    if(!verifyWeCanCollectValues()) {
-      print "DISABLE";
+      print("DISABLE");
       exit(1);
    }
 
@@ -438,7 +551,7 @@ There are a few rules for writing plugins properly:
    var dt_since_last_run = 0;
    var now = 0;
 
-   FOREVER {
+   while(true) {
        /* find the current time in milliseconds */
        now = currentTimeStampInMilliseconds();
 
@@ -483,4 +596,4 @@ There are a few rules for writing plugins properly:
 
 4.  If possible, try to autodetect if your plugin should be enabled, without any configuration.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fplugins.d%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

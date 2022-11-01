@@ -10,7 +10,7 @@ When Netdata starts, and with zero configuration, it auto-detects thousands of d
 per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you [install the Netdata Agent](/docs/get/README.md#install-the-netdata-agent).
+when you [install Netdata](/docs/get-started.mdx).
 
 Every collector has two primary jobs:
 
@@ -55,15 +55,13 @@ terms related to collecting metrics.
 
 -   **Modules** are a type of collector.
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
-    The Go orchestator is in active development.
+    The Go orchestrator is in active development.
     -   [go.d.plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/): An orchestrator for data
         collection modules written in `go`.
     -   [python.d.plugin](/collectors/python.d.plugin/README.md): An orchestrator for data collection modules written in
         `python` v2/v3.
     -   [charts.d.plugin](/collectors/charts.d.plugin/README.md): An orchestrator for data collection modules written in
         `bash` v4+.
-    -   [node.d.plugin](/collectors/node.d.plugin/README.md): An orchestrator for data collection modules written in
-        `node.js`.
 -   **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
     processes that communicate with the Netdata daemon via pipes.
 -   **Internal plugins** gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C`,
@@ -77,4 +75,4 @@ your infrastructure.
 See our [collectors reference](/collectors/REFERENCE.md) for detailed information on Netdata's collector architecture,
 troubleshooting a collector, developing a custom collector, and more.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fcollect%2Fhow-collectors-work&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

@@ -1,8 +1,7 @@
 <!--
----
 title: "Custom dashboards"
+description: "Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/custom/README.md
----
 -->
 
 # Custom dashboards
@@ -17,15 +16,14 @@ You can:
 
 You can also add Netdata charts to existing web pages.
 
-Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its
-**[html source](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/demo.html)**.
+Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard.html).
+supported charts. The code is [here](http://netdata.firehol.org/dashboard.html).
 
 If you plan to put the dashboard on TV, check out
-[tv.html](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/tv.html). Here's is a screenshot of it,
+[tv.html](http://netdata.firehol.org/tv.html). Here's is a screenshot of it,
 monitoring two servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
@@ -40,6 +38,10 @@ the HTML and JS code is `/usr/share/netdata/web`. The main dashboard is also in
 that directory and called `index.html`.\
 Note: index.html has a different syntax. Don't use it as a template for simple
 custom dashboards.
+
+> Some operating systems will use `/opt/netdata/usr/share/netdata/web` as the web directory. If you're not sure where
+> yours is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname
+> of your node, and find the `# web files directory = ` setting. The value listed is the web directory for your system.
 
 ## Example empty dashboard
 
@@ -70,68 +72,7 @@ header:
 </html>
 ```
 
-## Dash (Multi-Host Dashboard)
-
-`dash-example.html` is an all-in-one page that automatically fetches graphs from all your hosts. Just add your graphs and charts (or use the defaults) one time using the `dash-*` syntax, and your selections will be automatically replicated for all of your hosts; showing alarms and graphs for all your hosts on **one page!**
-
-__**Dash will only work if you have implemented netdata streaming using `stream.conf`**__
-
-`dash-example.html` was created as an experiment to demonstrate the capabilities of netdata in a multi-host environment. If you desire more features, submit a pull request or check out Netdata Cloud!
-
-### Configure Dash
-
-First, rename the file so it doesn't get overwritten. For instance, with a webroot at `/usr/share/netdata/web`:
-```
-cp /usr/share/netdata/web/dash-example.html /usr/share/netdata/web/dash.html
-```
-
-Find and change the following line in `dash.html` to reflect your Netdata URLs. The second URL is only used if you access your Netdata dashboard through a reverse proxy. The reverse proxy URL is optional; if it is not set then both will use the Netdata host URL.
-
-```js
-/*
-* TUTORIAL: Change this to the URL of your netdata host
-* If you use netdata behind a reverse proxy, add a second parameter for the reverse proxy url like so:
-*         new Dash('http://localhost:19999', 'https://my-domain.com/stats');
-*/
-var dash = new Dash('http://localhost:19999');
-```
-
-### The `dash-*` Syntax
-
-If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. Child divs will be generated to create your graph/chart:
-```
-<div class="dash-graph"                     <----     Use class dash-graph for line graphs, etc
-    data-dash-netdata="system.cpu"          <----     REQUIRED: Use data-dash-netdata to set the data source
-    data-dygraph-valuerange="[0, 100]">     <----     OPTIONAL: This overrides the default config. Any other data-* attributes will
-</div>                                                          be added to the generated div, so you can set any desired options here
-
-<div class="dash-chart"                     <----     Use class dash-chart for pie charts, etc. CHARTS ARE SQUARE
-    data-dash-netdata="system.io"           <----     REQUIRED: Use data-dash-netdata to set the data source
-    data-dimensions="in"                    <----     Use this to override or append default options
-    data-title="Disk Read"                  <----     Use this to override or append default options
-    data-common-units="dash.io">            <----     Use this to override or append default options
-</div>
-```
-
-To change the sizes of graphs and charts, find the `Dash.options` object in `dash.html` and set your preferences:
-```js
-/*
-* TUTORIAL: Change your graph/chart dimensions here. Host columns will automatically adjust.
-*           Charts are square! Their width is the same as their height.
-*/
-this.options = {
-    graph_width: '40em',
-    graph_height: '20em',
-    chart_width: '10em' // Charts are square
-};
-```
-
-To change the display order of your hosts, which is saved in localStorage, click the settings gear in the lower right corner
-
-We hope you like it!
-
 ---
-
 
 ## dashboard.js
 
@@ -325,7 +266,7 @@ Netdata supports a number of chart libraries. The default chart library is
 Each chart library has a number of specific settings. To learn more about them,
 you should investigate the documentation of the given chart library, or visit
 the appropriate JavaScript file that defines the library's options. These files
-are concatenated into the monolithin `dashboard.js` for deployment.
+are concatenated into the monolithic `dashboard.js` for deployment.
 
 -   [Dygraph](https://github.com/netdata/netdata/blob/5b57fc441c40959514c4e2d0863be2e6a417e352/web/gui/dashboard.js#L2034)
 -   [d3](https://github.com/netdata/netdata/blob/5b57fc441c40959514c4e2d0863be2e6a417e352/web/gui/dashboard.js#L4095)
@@ -640,7 +581,7 @@ Negative values are rendered counter-clockwise.
 This is a chart that displays the hotwater temperature in the given range of 40
 to 50.
 ```html
-<div data-netdata="stiebeleltron_system.hotwater.hotwatertemp"
+<div data-netdata="acme_system.hotwater.hotwatertemp"
  data-title="Hot Water Temperature"
  data-decimal-digits="1"
  data-chart-library="easypiechart"
@@ -661,4 +602,3 @@ to 50.
 ![hot water
 chart](https://user-images.githubusercontent.com/12159026/28666665-a7d68ad2-72c8-11e7-9a96-f6bf9691b471.png)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2Fcustom%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

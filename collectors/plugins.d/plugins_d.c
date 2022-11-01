@@ -6,119 +6,6 @@
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
 struct plugind *pluginsd_root = NULL;
 
-inline int pluginsd_space(char c) {
-    switch(c) {
-    case ' ':
-    case '\t':
-    case '\r':
-    case '\n':
-    case '=':
-        return 1;
-
-    default:
-        return 0;
-    }
-}
-
-inline int config_isspace(char c)
-{
-    switch (c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case ',':
-            return 1;
-
-        default:
-            return 0;
-    }
-}
-
-// split a text into words, respecting quotes
-static inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
-{
-    char *s = str, quote = 0;
-    int i = 0, j, rec = 0;
-    char *recover = recover_input;
-
-    // skip all white space
-    while (unlikely(custom_isspace(*s)))
-        s++;
-
-    // check for quote
-    if (unlikely(*s == '\'' || *s == '"')) {
-        quote = *s; // remember the quote
-        s++;        // skip the quote
-    }
-
-    // store the first word
-    words[i++] = s;
-
-    // while we have something
-    while (likely(*s)) {
-        // if it is escape
-        if (unlikely(*s == '\\' && s[1])) {
-            s += 2;
-            continue;
-        }
-
-        // if it is quote
-        else if (unlikely(*s == quote)) {
-            quote = 0;
-            if (recover && rec < max_recover) {
-                recover_location[rec++] = s;
-                *recover++ = *s;
-            }
-            *s = ' ';
-            continue;
-        }
-
-        // if it is a space
-        else if (unlikely(quote == 0 && custom_isspace(*s))) {
-            // terminate the word
-            if (recover && rec < max_recover) {
-                if (!rec || (rec && recover_location[rec-1] != s)) {
-                    recover_location[rec++] = s;
-                    *recover++ = *s;
-                }
-            }
-            *s++ = '\0';
-
-            // skip all white space
-            while (likely(custom_isspace(*s)))
-                s++;
-
-            // check for quote
-            if (unlikely(*s == '\'' || *s == '"')) {
-                quote = *s; // remember the quote
-                s++;        // skip the quote
-            }
-
-            // if we reached the end, stop
-            if (unlikely(!*s))
-                break;
-
-            // store the next word
-            if (likely(i < max_words))
-                words[i++] = s;
-            else
-                break;
-        }
-
-        // anything else
-        else
-            s++;
-    }
-
-    // terminate the words
-    j = i;
-    while (likely(j < max_words))
-        words[j++] = NULL;
-
-    return i;
-}
-
 inline int pluginsd_initialize_plugin_directories()
 {
     char plugins_dirs[(FILENAME_MAX * 2) + 1];
@@ -127,18 +14,12 @@ inline int pluginsd_initialize_plugin_directories()
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
         snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        plugins_dir_list = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory", plugins_dirs));
+        plugins_dir_list = strdupz(config_get(CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 
     // Parse it and store it to plugin directories
     return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace, NULL, NULL, 0);
 }
-
-inline int pluginsd_split_words(char *str, char **words, int max_words, char *recover_input, char **recover_location, int max_recover)
-{
-    return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
-}
-
 
 static void pluginsd_worker_thread_cleanup(void *arg)
 {
@@ -230,6 +111,8 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 
 void *pluginsd_worker_thread(void *arg)
 {
+    worker_register("PLUGINSD");
+
     netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
     struct plugind *cd = (struct plugind *)arg;
@@ -238,18 +121,19 @@ void *pluginsd_worker_thread(void *arg)
     size_t count = 0;
 
     while (!netdata_exit) {
-        FILE *fp = mypopen(cd->cmd, &cd->pid);
-        if (unlikely(!fp)) {
+        FILE *fp_child_input = NULL;
+        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->pid, &fp_child_input);
+        if (unlikely(!fp_child_input || !fp_child_output)) {
             error("Cannot popen(\"%s\", \"r\").", cd->cmd);
             break;
         }
 
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
-        count = pluginsd_process(localhost, cd, fp, 0);
+        count = pluginsd_process(localhost, cd, fp_child_input, fp_child_output, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid);
 
-        int worker_ret_code = mypclose(fp, cd->pid);
+        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->pid);
 
         if (likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
@@ -260,6 +144,7 @@ void *pluginsd_worker_thread(void *arg)
         if (unlikely(!cd->enabled))
             break;
     }
+    worker_unregister();
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -281,6 +166,8 @@ static void pluginsd_main_cleanup(void *data)
 
     info("cleanup completed.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    worker_unregister();
 }
 
 void *pluginsd_main(void *ptr)

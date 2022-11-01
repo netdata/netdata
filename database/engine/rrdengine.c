@@ -9,8 +9,34 @@ rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
 rrdeng_stats_t global_pg_cache_over_half_dirty_events = 0;
 rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
+unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2)
+#error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
+#endif
+
+void *dbengine_page_alloc() {
+    void *page = NULL;
+    if (unlikely(db_engine_use_malloc))
+        page = mallocz(RRDENG_BLOCK_SIZE);
+    else {
+        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
+        if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
+    }
+    return page;
+}
+
+void dbengine_page_free(void *page) {
+    if (unlikely(db_engine_use_malloc))
+        freez(page);
+    else
+        netdata_munmap(page, RRDENG_BLOCK_SIZE);
+}
+
 static void sanity_check(void)
 {
+    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2));
+
     /* Magic numbers must fit in the super-blocks */
     BUILD_BUG_ON(strlen(RRDENG_DF_MAGIC) > RRDENG_MAGIC_SZ);
     BUILD_BUG_ON(strlen(RRDENG_JF_MAGIC) > RRDENG_MAGIC_SZ);
@@ -27,8 +53,223 @@ static void sanity_check(void)
     /* page count must fit in 8 bits */
     BUILD_BUG_ON(MAX_PAGES_PER_EXTENT > 255);
 
+    /* extent cache count must fit in 32 bits */
+    BUILD_BUG_ON(MAX_CACHED_EXTENTS > 32);
+
     /* page info scratch space must be able to hold 2 32-bit integers */
     BUILD_BUG_ON(sizeof(((struct rrdeng_page_info *)0)->scratch) < 2 * sizeof(uint32_t));
+}
+
+/* always inserts into tail */
+static inline void xt_cache_replaceQ_insert(struct rrdengine_worker_config* wc,
+                                            struct extent_cache_element *xt_cache_elem)
+{
+    struct extent_cache *xt_cache = &wc->xt_cache;
+
+    xt_cache_elem->prev = NULL;
+    xt_cache_elem->next = NULL;
+
+    if (likely(NULL != xt_cache->replaceQ_tail)) {
+        xt_cache_elem->prev = xt_cache->replaceQ_tail;
+        xt_cache->replaceQ_tail->next = xt_cache_elem;
+    }
+    if (unlikely(NULL == xt_cache->replaceQ_head)) {
+        xt_cache->replaceQ_head = xt_cache_elem;
+    }
+    xt_cache->replaceQ_tail = xt_cache_elem;
+}
+
+static inline void xt_cache_replaceQ_delete(struct rrdengine_worker_config* wc,
+                                            struct extent_cache_element *xt_cache_elem)
+{
+    struct extent_cache *xt_cache = &wc->xt_cache;
+    struct extent_cache_element *prev, *next;
+
+    prev = xt_cache_elem->prev;
+    next = xt_cache_elem->next;
+
+    if (likely(NULL != prev)) {
+        prev->next = next;
+    }
+    if (likely(NULL != next)) {
+        next->prev = prev;
+    }
+    if (unlikely(xt_cache_elem == xt_cache->replaceQ_head)) {
+        xt_cache->replaceQ_head = next;
+    }
+    if (unlikely(xt_cache_elem == xt_cache->replaceQ_tail)) {
+        xt_cache->replaceQ_tail = prev;
+    }
+    xt_cache_elem->prev = xt_cache_elem->next = NULL;
+}
+
+static inline void xt_cache_replaceQ_set_hot(struct rrdengine_worker_config* wc,
+                                             struct extent_cache_element *xt_cache_elem)
+{
+    xt_cache_replaceQ_delete(wc, xt_cache_elem);
+    xt_cache_replaceQ_insert(wc, xt_cache_elem);
+}
+
+/* Returns the index of the cached extent if it was successfully inserted in the extent cache, otherwise -1 */
+static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent)
+{
+    struct extent_cache *xt_cache = &wc->xt_cache;
+    struct extent_cache_element *xt_cache_elem;
+    unsigned idx;
+    int ret;
+
+    ret = find_first_zero(xt_cache->allocation_bitmap);
+    if (-1 == ret || ret >= MAX_CACHED_EXTENTS) {
+        for (xt_cache_elem = xt_cache->replaceQ_head ; NULL != xt_cache_elem ; xt_cache_elem = xt_cache_elem->next) {
+            idx = xt_cache_elem - xt_cache->extent_array;
+            if (!check_bit(xt_cache->inflight_bitmap, idx)) {
+                xt_cache_replaceQ_delete(wc, xt_cache_elem);
+                break;
+            }
+        }
+        if (NULL == xt_cache_elem)
+            return -1;
+    } else {
+        idx = (unsigned)ret;
+        xt_cache_elem = &xt_cache->extent_array[idx];
+    }
+    xt_cache_elem->extent = extent;
+    xt_cache_elem->fileno = extent->datafile->fileno;
+    xt_cache_elem->inflight_io_descr = NULL;
+    xt_cache_replaceQ_insert(wc, xt_cache_elem);
+    modify_bit(&xt_cache->allocation_bitmap, idx, 1);
+
+    return (int)idx;
+}
+
+/**
+ * Returns 0 if the cached extent was found in the extent cache, 1 otherwise.
+ * Sets *idx to point to the position of the extent inside the cache.
+ **/
+static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent, unsigned *idx)
+{
+    struct extent_cache *xt_cache = &wc->xt_cache;
+    struct extent_cache_element *xt_cache_elem;
+    unsigned i;
+
+    for (i = 0 ; i < MAX_CACHED_EXTENTS ; ++i) {
+        xt_cache_elem = &xt_cache->extent_array[i];
+        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent &&
+            xt_cache_elem->fileno == extent->datafile->fileno) {
+            *idx = i;
+            return 0;
+        }
+    }
+    return 1;
+}
+
+#if 0 /* disabled code */
+static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned idx)
+{
+    struct extent_cache *xt_cache = &wc->xt_cache;
+    struct extent_cache_element *xt_cache_elem;
+
+    xt_cache_elem = &xt_cache->extent_array[idx];
+    xt_cache_replaceQ_delete(wc, xt_cache_elem);
+    xt_cache_elem->extent = NULL;
+    modify_bit(&wc->xt_cache.allocation_bitmap, idx, 0); /* invalidate it */
+    modify_bit(&wc->xt_cache.inflight_bitmap, idx, 0); /* not in-flight anymore */
+}
+#endif
+
+void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsigned idx,
+                                       struct extent_io_descriptor *xt_io_descr)
+{
+    struct extent_cache *xt_cache = &wc->xt_cache;
+    struct extent_cache_element *xt_cache_elem;
+    struct extent_io_descriptor *old_next;
+
+    xt_cache_elem = &xt_cache->extent_array[idx];
+    old_next = xt_cache_elem->inflight_io_descr->next;
+    xt_cache_elem->inflight_io_descr->next = xt_io_descr;
+    xt_io_descr->next = old_next;
+}
+
+void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, struct extent_io_descriptor *xt_io_descr)
+{
+    unsigned i, j, page_offset;
+    struct rrdengine_instance *ctx = wc->ctx;
+    struct rrdeng_page_descr *descr;
+    struct page_cache_descr *pg_cache_descr;
+    void *page;
+    struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
+
+    for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
+        page = dbengine_page_alloc();
+        descr = xt_io_descr->descr_array[i];
+        for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
+            /* care, we don't hold the descriptor mutex */
+            if (!uuid_compare(*extent->pages[j]->id, *descr->id) &&
+                extent->pages[j]->page_length == descr->page_length &&
+                extent->pages[j]->start_time_ut == descr->start_time_ut &&
+                extent->pages[j]->end_time_ut == descr->end_time_ut) {
+                break;
+            }
+            page_offset += extent->pages[j]->page_length;
+
+        }
+        /* care, we don't hold the descriptor mutex */
+       (void) memcpy(page, wc->xt_cache.extent_array[idx].pages + page_offset, descr->page_length);
+
+        rrdeng_page_descr_mutex_lock(ctx, descr);
+        pg_cache_descr = descr->pg_cache_descr;
+        pg_cache_descr->page = page;
+        pg_cache_descr->flags |= RRD_PAGE_POPULATED;
+        pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
+        pg_cache_replaceQ_insert(ctx, descr);
+        if (xt_io_descr->release_descr) {
+            pg_cache_put(ctx, descr);
+        } else {
+            debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
+            pg_cache_wake_up_waiters(ctx, descr);
+        }
+    }
+    if (xt_io_descr->completion)
+        completion_mark_complete(xt_io_descr->completion);
+    freez(xt_io_descr);
+}
+
+static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
+    switch(type) {
+        case PAGE_METRICS: {
+            storage_number n = pack_storage_number(NAN, SN_FLAG_NONE);
+            storage_number *array = (storage_number *)page;
+            size_t slots = page_length / sizeof(n);
+            for(size_t i = 0; i < slots ; i++)
+                array[i] = n;
+        }
+        break;
+
+        case PAGE_TIER: {
+            storage_number_tier1_t n = {
+                .min_value = NAN,
+                .max_value = NAN,
+                .sum_value = NAN,
+                .count = 1,
+                .anomaly_count = 0,
+            };
+            storage_number_tier1_t *array = (storage_number_tier1_t *)page;
+            size_t slots = page_length / sizeof(n);
+            for(size_t i = 0; i < slots ; i++)
+                array[i] = n;
+        }
+        break;
+
+        default: {
+            static bool logged = false;
+            if(!logged) {
+                error("DBENGINE: cannot fill page with nulls on unknown page type id %d", type);
+                logged = true;
+            }
+            memset(page, 0, page_length);
+        }
+    }
 }
 
 void read_extent_cb(uv_fs_t* req)
@@ -41,7 +282,7 @@ void read_extent_cb(uv_fs_t* req)
     int ret;
     unsigned i, j, count;
     void *page, *uncompressed_buf = NULL;
-    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length;
+    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length = 0;
     uint8_t have_read_error = 0;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
@@ -99,24 +340,63 @@ after_crc_check:
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
+    {
+        uint8_t xt_is_cached = 0;
+        unsigned xt_idx;
+        struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
 
-    for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        page = mallocz(RRDENG_BLOCK_SIZE);
-        descr = xt_io_descr->descr_array[i];
-        for (j = 0, page_offset = 0; j < count; ++j) {
+        xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
+        if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
+            struct extent_cache *xt_cache = &wc->xt_cache;
+            struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
+            struct extent_io_descriptor *curr, *next;
+
+            if (have_read_error) {
+                memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
+            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+                (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
+            } else {
+                (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
+            }
+            /* complete all connected in-flight read requests */
+            for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = next) {
+                next = curr->next;
+                read_cached_extent_cb(wc, xt_idx, curr);
+            }
+            xt_cache_elem->inflight_io_descr = NULL;
+            modify_bit(&xt_cache->inflight_bitmap, xt_idx, 0); /* not in-flight anymore */
+        }
+    }
+
+    for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
+        uint8_t is_prefetched_page;
+        descr = NULL;
+        for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
+            struct rrdeng_page_descr *descrj;
+
+            descrj = xt_io_descr->descr_array[j];
             /* care, we don't hold the descriptor mutex */
-            if (!uuid_compare(*(uuid_t *) header->descr[j].uuid, *descr->id) &&
-                header->descr[j].page_length == descr->page_length &&
-                header->descr[j].start_time == descr->start_time &&
-                header->descr[j].end_time == descr->end_time) {
+            if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
+                header->descr[i].page_length == descrj->page_length &&
+                header->descr[i].start_time_ut == descrj->start_time_ut &&
+                header->descr[i].end_time_ut == descrj->end_time_ut) {
+                descr = descrj;
                 break;
             }
-            page_offset += header->descr[j].page_length;
         }
+        is_prefetched_page = 0;
+        if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
+            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid,
+                                                         header->descr[i].start_time_ut);
+            if (!descr)
+                continue; /* Failed to reserve a suitable page */
+            is_prefetched_page = 1;
+        }
+        page = dbengine_page_alloc();
+
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {
-            /* Applications should make sure NULL values match 0 as does SN_EMPTY_SLOT */
-            memset(page, 0, descr->page_length);
+            fill_page_with_nulls(page, descr->page_length, descr->type);
         } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
             (void) memcpy(page, xt_io_descr->buf + payload_offset + page_offset, descr->page_length);
         } else {
@@ -129,7 +409,7 @@ after_crc_check:
         pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
         rrdeng_page_descr_mutex_unlock(ctx, descr);
         pg_cache_replaceQ_insert(ctx, descr);
-        if (xt_io_descr->release_descr) {
+        if (xt_io_descr->release_descr || is_prefetched_page) {
             pg_cache_put(ctx, descr);
         } else {
             debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
@@ -140,9 +420,9 @@ after_crc_check:
         freez(uncompressed_buf);
     }
     if (xt_io_descr->completion)
-        complete(xt_io_descr->completion);
+        completion_mark_complete(xt_io_descr->completion);
     uv_fs_req_cleanup(req);
-    free(xt_io_descr->buf);
+    posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
 }
 
@@ -159,18 +439,15 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
 //    uint32_t payload_length;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdengine_datafile *datafile;
+    struct extent_info *extent = descr[0]->extent;
+    uint8_t xt_is_cached = 0, xt_is_inflight = 0;
+    unsigned xt_idx;
 
-    datafile = descr[0]->extent->datafile;
-    pos = descr[0]->extent->offset;
-    size_bytes = descr[0]->extent->size;
+    datafile = extent->datafile;
+    pos = extent->offset;
+    size_bytes = extent->size;
 
-    xt_io_descr = mallocz(sizeof(*xt_io_descr));
-    ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
-    if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
-        /* freez(xt_io_descr);
-        return;*/
-    }
+    xt_io_descr = callocz(1, sizeof(*xt_io_descr));
     for (i = 0 ; i < count; ++i) {
         rrdeng_page_descr_mutex_lock(ctx, descr[i]);
         pg_cache_descr = descr[i]->pg_cache_descr;
@@ -188,6 +465,30 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     /* xt_io_descr->descr_commit_idx_array[0] */
     xt_io_descr->release_descr = release_descr;
 
+    xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
+    if (xt_is_cached) {
+        xt_cache_replaceQ_set_hot(wc, &wc->xt_cache.extent_array[xt_idx]);
+        xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
+        if (xt_is_inflight) {
+            enqueue_inflight_read_to_xt_cache(wc, xt_idx, xt_io_descr);
+            return;
+        }
+        return read_cached_extent_cb(wc, xt_idx, xt_io_descr);
+    } else {
+        ret = try_insert_into_xt_cache(wc, extent);
+        if (-1 != ret) {
+            xt_idx = (unsigned)ret;
+            modify_bit(&wc->xt_cache.inflight_bitmap, xt_idx, 1);
+            wc->xt_cache.extent_array[xt_idx].inflight_io_descr = xt_io_descr;
+        }
+    }
+
+    ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
+    if (unlikely(ret)) {
+        fatal("posix_memalign:%s", strerror(ret));
+        /* freez(xt_io_descr);
+    return;*/
+    }
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_read(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, pos, read_extent_cb);
@@ -393,9 +694,9 @@ void flush_pages_cb(uv_fs_t* req)
         rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     if (xt_io_descr->completion)
-        complete(xt_io_descr->completion);
+        completion_mark_complete(xt_io_descr->completion);
     uv_fs_req_cleanup(req);
-    free(xt_io_descr->buf);
+    posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
 
     uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
@@ -440,7 +741,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
          PValue = JudyLFirst(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue ;
 
-         descr != NULL && count != MAX_PAGES_PER_EXTENT ;
+         descr != NULL && count != rrdeng_pages_per_extent;
 
          PValue = JudyLNext(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
@@ -471,7 +772,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     if (!count) {
         debug(D_RRDENGINE, "%s: no pages eligible for flushing.", __func__);
         if (completion)
-            complete(completion);
+            completion_mark_complete(completion);
         return 0;
     }
     wc->inflight_dirty_pages += count;
@@ -494,6 +795,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         fatal("posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
+    memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
     (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_descr *) * count);
     xt_io_descr->descr_count = count;
 
@@ -515,11 +817,11 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
 
         descr = xt_io_descr->descr_array[i];
-        header->descr[i].type = PAGE_METRICS;
+        header->descr[i].type = descr->type;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
-        header->descr[i].start_time = descr->start_time;
-        header->descr[i].end_time = descr->end_time;
+        header->descr[i].start_time_ut = descr->start_time_ut;
+        header->descr[i].end_time_ut = descr->end_time_ut;
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {
@@ -620,6 +922,7 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     wc->now_deleting_files = NULL;
 
     wc->cleanup_thread_deleting_files = 0;
+    rrdcontext_db_rotation();
 
     /* interrupt event loop */
     uv_stop(wc->loop);
@@ -733,14 +1036,77 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
     }
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
         ctx->quiesce = QUIESCED;
-        complete(&ctx->rrdengine_completion);
+        completion_mark_complete(&ctx->rrdengine_completion);
     }
 }
 
 /* return 0 on success */
 int init_rrd_files(struct rrdengine_instance *ctx)
 {
-    return init_data_files(ctx);
+    int ret = init_data_files(ctx);
+
+    BUFFER *wb = buffer_create(1000);
+    size_t all_errors = 0;
+    usec_t now = now_realtime_usec();
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had start time > end time (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut) / USEC_PER_SEC
+                       );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had start time = end time with more than 1 entries (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter) {
+        buffer_sprintf(wb, "%s%zu pages had zero points (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter) {
+        buffer_sprintf(wb, "%s%zu pages had update every == 0 with entries > 1 (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had a different number of points compared to their timestamps (latest: %llu secs ago; these page have been loaded)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter;
+    }
+
+    if(ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter) {
+        buffer_sprintf(wb, "%s%zu extents have been dropped because they didn't have any valid pages"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter;
+    }
+
+    if(all_errors)
+        info("DBENGINE: tier %d: %s", ctx->tier, buffer_tostring(wb));
+
+    buffer_free(wb);
+    return ret;
 }
 
 void finalize_rrd_files(struct rrdengine_instance *ctx)
@@ -805,6 +1171,17 @@ struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc)
     return ret;
 }
 
+static void load_configuration_dynamic(void)
+{
+    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
+    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
+        rrdeng_pages_per_extent = read_num;
+    else {
+        error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
+        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
+    }
+}
+
 void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -817,13 +1194,17 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
+    worker_is_busy(RRDENG_MAX_OPCODE + 1);
+
     struct rrdengine_worker_config* wc = handle->data;
     struct rrdengine_instance *ctx = wc->ctx;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    if (unlikely(!ctx->metalog_ctx->initialized))
+    if (unlikely(!ctx->metalog_ctx->initialized)) {
+        worker_is_idle();
         return; /* Wait for the metadata log to initialize */
+    }
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
@@ -858,18 +1239,33 @@ void timer_cb(uv_timer_t* handle)
             }
         }
     }
+    load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS
     {
         char buf[4096];
         debug(D_RRDENGINE, "%s", get_rrdeng_statistics(wc->ctx, buf, sizeof(buf)));
     }
 #endif
+
+    worker_is_idle();
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
 
 void rrdeng_worker(void* arg)
 {
+    worker_register("DBENGINE");
+    worker_register_job_name(RRDENG_NOOP,                          "noop");
+    worker_register_job_name(RRDENG_READ_PAGE,                     "page read");
+    worker_register_job_name(RRDENG_READ_EXTENT,                   "extent read");
+    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
+    worker_register_job_name(RRDENG_FLUSH_PAGES,                   "flush");
+    worker_register_job_name(RRDENG_SHUTDOWN,                      "shutdown");
+    worker_register_job_name(RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE, "page lru");
+    worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
+    worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
+    worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
+
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
     uv_loop_t* loop;
@@ -913,12 +1309,15 @@ void rrdeng_worker(void* arg)
 
     wc->error = 0;
     /* wake up initialization thread */
-    complete(&ctx->rrdengine_completion);
+    completion_mark_complete(&ctx->rrdengine_completion);
 
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
+    int set_name = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
+        worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
+        worker_is_busy(RRDENG_MAX_OPCODE);
         rrdeng_cleanup_finished_threads(wc);
 
         /* wait for commands */
@@ -934,6 +1333,9 @@ void rrdeng_worker(void* arg)
             cmd = rrdeng_deq_cmd(wc);
             opcode = cmd.opcode;
             ++cmd_batch_size;
+
+            if(likely(opcode != RRDENG_NOOP))
+                worker_is_busy(opcode);
 
             switch (opcode) {
             case RRDENG_NOOP:
@@ -953,7 +1355,7 @@ void rrdeng_worker(void* arg)
                 wal_flush_transaction_buffer(wc);
                 if (!rrdeng_threads_alive(wc)) {
                     ctx->quiesce = QUIESCED;
-                    complete(&ctx->rrdengine_completion);
+                    completion_mark_complete(&ctx->rrdengine_completion);
                 }
                 break;
             case RRDENG_READ_PAGE:
@@ -961,6 +1363,10 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_READ_EXTENT:
                 do_read_extent(wc, cmd.read_extent.page_cache_descr, cmd.read_extent.page_count, 1);
+                if (unlikely(!set_name)) {
+                    set_name = 1;
+                    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
+                }
                 break;
             case RRDENG_COMMIT_PAGE:
                 do_commit_transaction(wc, STORE_DATA, NULL);
@@ -968,7 +1374,7 @@ void rrdeng_worker(void* arg)
             case RRDENG_FLUSH_PAGES: {
                 if (wc->now_invalidating_dirty_pages) {
                     /* Do not flush if the disk cannot keep up */
-                    complete(cmd.completion);
+                    completion_mark_complete(cmd.completion);
                 } else {
                     (void)do_flush_pages(wc, 1, cmd.completion);
                 }
@@ -985,7 +1391,7 @@ void rrdeng_worker(void* arg)
     }
 
     /* cleanup operations of the event loop */
-    info("Shutting down RRD engine event loop.");
+    info("Shutting down RRD engine event loop for tier %d", ctx->tier);
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
@@ -1000,13 +1406,14 @@ void rrdeng_worker(void* arg)
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 
-    info("Shutting down RRD engine event loop complete.");
+    info("Shutting down RRD engine event loop for tier %d complete", ctx->tier);
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */
     fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
+    worker_unregister();
     return;
 
 error_after_timer_init:
@@ -1018,7 +1425,8 @@ error_after_loop_init:
 
     wc->error = UV_EAGAIN;
     /* wake up initialization thread */
-    complete(&ctx->rrdengine_completion);
+    completion_mark_complete(&ctx->rrdengine_completion);
+    worker_unregister();
 }
 
 /* C entry point for development purposes
@@ -1030,7 +1438,7 @@ void rrdengine_main(void)
     struct rrdengine_instance *ctx;
 
     sanity_check();
-    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
+    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB, 0);
     if (ret) {
         exit(ret);
     }

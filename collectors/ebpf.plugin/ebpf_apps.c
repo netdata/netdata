@@ -116,9 +116,9 @@ int am_i_running_as_root()
 /**
  * Reset the target values
  *
- * @param root the pointer to the chain that will be reseted.
+ * @param root the pointer to the chain that will be reset.
  *
- * @return it returns the number of structures that was reseted.
+ * @return it returns the number of structures that was reset.
  */
 size_t zero_all_targets(struct target *root)
 {
@@ -134,7 +134,7 @@ size_t zero_all_targets(struct target *root)
             while (pid_on_target) {
                 struct pid_on_target *pid_on_target_to_free = pid_on_target;
                 pid_on_target = pid_on_target->next;
-                free(pid_on_target_to_free);
+                freez(pid_on_target_to_free);
             }
 
             w->root_pid = NULL;
@@ -265,7 +265,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
  * @param path the directory to search apps_%s.conf
  * @param file the word to complement the file name.
  *
- * @return It returns 0 on succcess and -1 otherwise
+ * @return It returns 0 on success and -1 otherwise
  */
 int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const char *path, const char *file)
 {
@@ -275,7 +275,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
 
     // ----------------------------------------
 
-    procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open_no_log(filename, " :\t", PROCFILE_FLAG_DEFAULT);
     if (!ff)
         return -1;
 
@@ -470,7 +470,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
 /**
  * Get PID entry
  *
- * Get or allocate the PID entry for the specifid pid.
+ * Get or allocate the PID entry for the specified pid.
  *
  * @param pid the pid to search the data.
  *
@@ -664,7 +664,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
  * @param pid the current pid that we are working
  * @param ptr a NULL value
  *
- * @return It returns 1 on succcess and 0 otherwise
+ * @return It returns 1 on success and 0 otherwise
  */
 static inline int collect_data_for_pid(pid_t pid, void *ptr)
 {
@@ -910,6 +910,83 @@ static inline void del_pid_entry(pid_t pid)
 }
 
 /**
+ * Get command string associated with a PID.
+ * This can only safely be used when holding the `collect_data_mutex` lock.
+ *
+ * @param pid the pid to search the data.
+ * @param n the maximum amount of bytes to copy into dest.
+ *          if this is greater than the size of the command, it is clipped.
+ * @param dest the target memory buffer to write the command into.
+ * @return -1 if the PID hasn't been scraped yet, 0 otherwise.
+ */
+int get_pid_comm(pid_t pid, size_t n, char *dest)
+{
+    struct pid_stat *stat;
+
+    stat = all_pids[pid];
+    if (unlikely(stat == NULL)) {
+        return -1;
+    }
+
+    if (unlikely(n > sizeof(stat->comm))) {
+        n = sizeof(stat->comm);
+    }
+
+    strncpyz(dest, stat->comm, n);
+    return 0;
+}
+
+/**
+ * Cleanup variable from other threads
+ *
+ * @param pid current pid.
+ */
+void cleanup_variables_from_other_threads(uint32_t pid)
+{
+    // Clean socket structures
+    if (socket_bandwidth_curr) {
+        freez(socket_bandwidth_curr[pid]);
+        socket_bandwidth_curr[pid] = NULL;
+    }
+
+    // Clean cachestat structure
+    if (cachestat_pid) {
+        freez(cachestat_pid[pid]);
+        cachestat_pid[pid] = NULL;
+    }
+
+    // Clean directory cache structure
+    if (dcstat_pid) {
+        freez(dcstat_pid[pid]);
+        dcstat_pid[pid] = NULL;
+    }
+
+    // Clean swap structure
+    if (swap_pid) {
+        freez(swap_pid[pid]);
+        swap_pid[pid] = NULL;
+    }
+
+    // Clean vfs structure
+    if (vfs_pid) {
+        freez(vfs_pid[pid]);
+        vfs_pid[pid] = NULL;
+    }
+
+    // Clean fd structure
+    if (fd_pid) {
+        freez(fd_pid[pid]);
+        fd_pid[pid] = NULL;
+    }
+
+    // Clean shm structure
+    if (shm_pid) {
+        freez(shm_pid[pid]);
+        shm_pid[pid] = NULL;
+    }
+}
+
+/**
  * Remove PIDs when they are not running more.
  */
 void cleanup_exited_pids()
@@ -923,7 +1000,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-            del_pid_entry(r);
 
             // Clean process structure
             freez(global_process_stats[r]);
@@ -931,14 +1007,10 @@ void cleanup_exited_pids()
 
             freez(current_apps_data[r]);
             current_apps_data[r] = NULL;
-            prev_apps_data[r] = NULL;
 
-            // Clean socket structures
-            if (socket_bandwidth_curr) {
-                freez(socket_bandwidth_curr[r]);
-                socket_bandwidth_curr[r] = NULL;
-                socket_bandwidth_prev[r] = NULL;
-            }
+            cleanup_variables_from_other_threads(r);
+
+            del_pid_entry(r);
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;
@@ -1019,6 +1091,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  */
 void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
+    if (unlikely(!all_pids))
+        return;
+
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
         if (pids->updated_twice) {
@@ -1044,7 +1119,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         key = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
-            w = mallocz(sizeof(ebpf_process_stat_t));
+            w = callocz(1, sizeof(ebpf_process_stat_t));
             global_process_stats[key] = w;
         }
 
@@ -1055,14 +1130,8 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
             freez(current_apps_data[key]);
             current_apps_data[key] = NULL;
-            prev_apps_data[key] = NULL;
 
-            // Clean socket structures
-            if (socket_bandwidth_curr) {
-                freez(socket_bandwidth_curr[key]);
-                socket_bandwidth_curr[key] = NULL;
-                socket_bandwidth_prev[key] = NULL;
-            }
+            cleanup_variables_from_other_threads(key);
 
             pids = pids->next;
             continue;

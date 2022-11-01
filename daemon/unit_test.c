@@ -4,7 +4,7 @@
 
 static int check_number_printing(void) {
     struct {
-        calculated_number n;
+        NETDATA_DOUBLE n;
         const char *correct;
     } values[] = {
             { .n = 0, .correct = "0" },
@@ -22,8 +22,8 @@ static int check_number_printing(void) {
     char netdata[50], system[50];
     int i, failed = 0;
     for(i = 0; values[i].correct ; i++) {
-        print_calculated_number(netdata, values[i].n);
-        snprintfz(system, 49, "%0.12" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)values[i].n);
+        print_netdata_double(netdata, values[i].n);
+        snprintfz(system, 49, "%0.12" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)values[i].n);
 
         int ok = 1;
         if(strcmp(netdata, values[i].correct) != 0) {
@@ -95,35 +95,36 @@ static int check_rrdcalc_comparisons(void) {
     return 0;
 }
 
-int check_storage_number(calculated_number n, int debug) {
+int check_storage_number(NETDATA_DOUBLE n, int debug) {
     char buffer[100];
-    uint32_t flags = SN_EXISTS;
+    uint32_t flags = SN_DEFAULT_FLAGS;
 
     storage_number s = pack_storage_number(n, flags);
-    calculated_number d = unpack_storage_number(s);
+    NETDATA_DOUBLE d = unpack_storage_number(s);
 
     if(!does_storage_number_exist(s)) {
-        fprintf(stderr, "Exists flags missing for number " CALCULATED_NUMBER_FORMAT "!\n", n);
+        fprintf(stderr, "Exists flags missing for number " NETDATA_DOUBLE_FORMAT "!\n", n);
         return 5;
     }
 
-    calculated_number ddiff = d - n;
-    calculated_number dcdiff = ddiff * 100.0 / n;
+    NETDATA_DOUBLE ddiff = d - n;
+    NETDATA_DOUBLE dcdiff = ddiff * 100.0 / n;
 
     if(dcdiff < 0) dcdiff = -dcdiff;
 
-    size_t len = (size_t)print_calculated_number(buffer, d);
-    calculated_number p = str2ld(buffer, NULL);
-    calculated_number pdiff = n - p;
-    calculated_number pcdiff = pdiff * 100.0 / n;
+    size_t len = (size_t)print_netdata_double(buffer, d);
+    NETDATA_DOUBLE p = str2ndd(buffer, NULL);
+    NETDATA_DOUBLE pdiff = n - p;
+    NETDATA_DOUBLE pcdiff = pdiff * 100.0 / n;
     if(pcdiff < 0) pcdiff = -pcdiff;
 
     if(debug) {
         fprintf(stderr,
-            CALCULATED_NUMBER_FORMAT " original\n"
-            CALCULATED_NUMBER_FORMAT " packed and unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
-            "%s printed after unpacked (%zu bytes)\n"
-            CALCULATED_NUMBER_FORMAT " re-parsed from printed (diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n\n",
+            NETDATA_DOUBLE_FORMAT
+            " original\n" NETDATA_DOUBLE_FORMAT " packed and unpacked, (stored as 0x%08X, diff " NETDATA_DOUBLE_FORMAT
+            ", " NETDATA_DOUBLE_FORMAT "%%)\n"
+            "%s printed after unpacked (%zu bytes)\n" NETDATA_DOUBLE_FORMAT
+            " re-parsed from printed (diff " NETDATA_DOUBLE_FORMAT ", " NETDATA_DOUBLE_FORMAT "%%)\n\n",
             n,
             d, s, ddiff, dcdiff,
             buffer, len,
@@ -132,10 +133,11 @@ int check_storage_number(calculated_number n, int debug) {
         if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
 
         if(dcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT)
-            fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, dcdiff);
+            fprintf(stderr, "WARNING: packing number " NETDATA_DOUBLE_FORMAT " has accuracy loss " NETDATA_DOUBLE_FORMAT " %%\n", n, dcdiff);
 
         if(pcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT)
-            fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, pcdiff);
+            fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " NETDATA_DOUBLE_FORMAT
+                " has accuracy loss " NETDATA_DOUBLE_FORMAT " %%\n", n, pcdiff);
     }
 
     if(len != strlen(buffer)) return 1;
@@ -144,13 +146,13 @@ int check_storage_number(calculated_number n, int debug) {
     return 0;
 }
 
-calculated_number storage_number_min(calculated_number n) {
-    calculated_number r = 1, last;
+NETDATA_DOUBLE storage_number_min(NETDATA_DOUBLE n) {
+    NETDATA_DOUBLE r = 1, last;
 
     do {
         last = n;
         n /= 2.0;
-        storage_number t = pack_storage_number(n, SN_EXISTS);
+        storage_number t = pack_storage_number(n, SN_DEFAULT_FLAGS);
         r = unpack_storage_number(t);
     } while(r != 0.0 && r != last);
 
@@ -159,12 +161,12 @@ calculated_number storage_number_min(calculated_number n) {
 
 void benchmark_storage_number(int loop, int multiplier) {
     int i, j;
-    calculated_number n, d;
+    NETDATA_DOUBLE n, d;
     storage_number s;
     unsigned long long user, system, total, mine, their;
 
-    calculated_number storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
-    calculated_number storage_number_positive_max = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW);
+    NETDATA_DOUBLE storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
+    NETDATA_DOUBLE storage_number_positive_max = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW);
 
     char buffer[100];
 
@@ -174,25 +176,25 @@ void benchmark_storage_number(int loop, int multiplier) {
 
     // ------------------------------------------------------------------------
 
-    fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %zu bytes\n", sizeof(calculated_number));
+    fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %zu bytes\n", sizeof(NETDATA_DOUBLE));
     fprintf(stderr, "NETDATA FLOATING POINT SIZE: %zu bytes\n", sizeof(storage_number));
 
-    mine = (calculated_number)sizeof(storage_number) * (calculated_number)loop;
-    their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
+    mine = (NETDATA_DOUBLE)sizeof(storage_number) * (NETDATA_DOUBLE)loop;
+    their = (NETDATA_DOUBLE)sizeof(NETDATA_DOUBLE) * (NETDATA_DOUBLE)loop;
 
     if(mine > their) {
-        fprintf(stderr, "\nNETDATA NEEDS %0.2" LONG_DOUBLE_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (LONG_DOUBLE)(mine / their));
+        fprintf(stderr, "\nNETDATA NEEDS %0.2" NETDATA_DOUBLE_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (NETDATA_DOUBLE)(mine / their));
     }
     else {
-        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" LONG_DOUBLE_MODIFIER " TIMES LESS MEMORY.\n", (LONG_DOUBLE)(their / mine));
+        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" NETDATA_DOUBLE_MODIFIER " TIMES LESS MEMORY.\n", (NETDATA_DOUBLE)(their / mine));
     }
 
     fprintf(stderr, "\nNETDATA FLOATING POINT\n");
-    fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW));
-    fprintf(stderr, "MAX POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW));
-    fprintf(stderr, "MIN NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MIN_RAW));
-    fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW));
-    fprintf(stderr, "Maximum accuracy loss accepted: " CALCULATED_NUMBER_FORMAT "%%\n\n\n", (calculated_number)ACCURACY_LOSS_ACCEPTED_PERCENT);
+    fprintf(stderr, "MIN POSITIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW));
+    fprintf(stderr, "MAX POSITIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW));
+    fprintf(stderr, "MIN NEGATIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MIN_RAW));
+    fprintf(stderr, "MAX NEGATIVE VALUE " NETDATA_DOUBLE_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW));
+    fprintf(stderr, "Maximum accuracy loss accepted: " NETDATA_DOUBLE_FORMAT "%%\n\n\n", (NETDATA_DOUBLE)ACCURACY_LOSS_ACCEPTED_PERCENT);
 
     // ------------------------------------------------------------------------
 
@@ -207,7 +209,7 @@ void benchmark_storage_number(int loop, int multiplier) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
 
-            print_calculated_number(buffer, n);
+            print_netdata_double(buffer, n);
         }
     }
 
@@ -217,7 +219,8 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" NETDATA_DOUBLE_MODIFIER ", system %0.5" NETDATA_DOUBLE_MODIFIER
+        ", total %0.5" NETDATA_DOUBLE_MODIFIER "\n", (NETDATA_DOUBLE)(user / 1000000.0), (NETDATA_DOUBLE)(system / 1000000.0), (NETDATA_DOUBLE)(total / 1000000.0));
 
     // ------------------------------------------------------------------------
 
@@ -231,7 +234,7 @@ void benchmark_storage_number(int loop, int multiplier) {
         for(i = 0; i < loop ;i++) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
-            snprintfz(buffer, 100, CALCULATED_NUMBER_FORMAT, n);
+            snprintfz(buffer, 100, NETDATA_DOUBLE_FORMAT, n);
         }
     }
 
@@ -241,13 +244,14 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     their = total;
 
-    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER ", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" NETDATA_DOUBLE_MODIFIER ", system %0.5" NETDATA_DOUBLE_MODIFIER
+        ", total %0.5" NETDATA_DOUBLE_MODIFIER "\n", (NETDATA_DOUBLE)(user / 1000000.0), (NETDATA_DOUBLE)(system / 1000000.0), (NETDATA_DOUBLE)(total / 1000000.0));
 
     if(mine > total) {
-        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -263,9 +267,9 @@ void benchmark_storage_number(int loop, int multiplier) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
 
-            s = pack_storage_number(n, SN_EXISTS);
+            s = pack_storage_number(n, SN_DEFAULT_FLAGS);
             d = unpack_storage_number(s);
-            print_calculated_number(buffer, d);
+            print_netdata_double(buffer, d);
         }
     }
 
@@ -275,13 +279,14 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER ", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" NETDATA_DOUBLE_MODIFIER ", system %0.5" NETDATA_DOUBLE_MODIFIER
+        ", total %0.5" NETDATA_DOUBLE_MODIFIER "\n", (NETDATA_DOUBLE)(user / 1000000.0), (NETDATA_DOUBLE)(system / 1000000.0), (NETDATA_DOUBLE)(total / 1000000.0));
 
     if(mine > their) {
-        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" NETDATA_DOUBLE_MODIFIER " %%\n", (NETDATA_DOUBLE)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -289,27 +294,14 @@ void benchmark_storage_number(int loop, int multiplier) {
 }
 
 static int check_storage_number_exists() {
-    uint32_t flags;
-
-
-    for(flags = 0; flags < 7 ; flags++) {
-        if(get_storage_number_flags(flags << 24) != flags << 24) {
-            fprintf(stderr, "Flag 0x%08x is not checked correctly. It became 0x%08x\n", flags << 24, get_storage_number_flags(flags << 24));
-            return 1;
-        }
-    }
-
-    flags = SN_EXISTS;
-    calculated_number n = 0.0;
+    uint32_t flags = SN_DEFAULT_FLAGS;
+    NETDATA_DOUBLE n = 0.0;
 
     storage_number s = pack_storage_number(n, flags);
-    calculated_number d = unpack_storage_number(s);
-    if(get_storage_number_flags(s) != flags) {
-        fprintf(stderr, "Wrong flags. Given %08x, Got %08x!\n", flags, get_storage_number_flags(s));
-        return 1;
-    }
+    NETDATA_DOUBLE d = unpack_storage_number(s);
+
     if(n != d) {
-        fprintf(stderr, "Wrong number returned. Expected " CALCULATED_NUMBER_FORMAT ", returned " CALCULATED_NUMBER_FORMAT "!\n", n, d);
+        fprintf(stderr, "Wrong number returned. Expected " NETDATA_DOUBLE_FORMAT ", returned " NETDATA_DOUBLE_FORMAT "!\n", n, d);
         return 1;
     }
 
@@ -319,10 +311,10 @@ static int check_storage_number_exists() {
 int unit_test_storage() {
     if(check_storage_number_exists()) return 0;
 
-    calculated_number storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
-    calculated_number storage_number_negative_max = unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW);
+    NETDATA_DOUBLE storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
+    NETDATA_DOUBLE storage_number_negative_max = unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW);
 
-    calculated_number c, a = 0;
+    NETDATA_DOUBLE c, a = 0;
     int i, j, g, r = 0;
 
     for(g = -1; g <= 1 ; g++) {
@@ -356,23 +348,26 @@ int unit_test_str2ld() {
     int i;
     for(i = 0; values[i] ; i++) {
         char *e_mine = "hello", *e_sys = "world";
-        LONG_DOUBLE mine = str2ld(values[i], &e_mine);
-        LONG_DOUBLE sys = strtold(values[i], &e_sys);
+        NETDATA_DOUBLE mine = str2ndd(values[i], &e_mine);
+        NETDATA_DOUBLE sys = strtondd(values[i], &e_sys);
 
         if(isnan(mine)) {
             if(!isnan(sys)) {
-                fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
+                fprintf(stderr, "Value '%s' is parsed as %" NETDATA_DOUBLE_MODIFIER
+                    ", but system believes it is %" NETDATA_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
                 return -1;
             }
         }
         else if(isinf(mine)) {
             if(!isinf(sys)) {
-                fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
+                fprintf(stderr, "Value '%s' is parsed as %" NETDATA_DOUBLE_MODIFIER
+                    ", but system believes it is %" NETDATA_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
                 return -1;
             }
         }
-        else if(mine != sys && abs(mine-sys) > 0.000001) {
-            fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ", delta %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
+        else if(mine != sys && ABS(mine-sys) > 0.000001) {
+            fprintf(stderr, "Value '%s' is parsed as %" NETDATA_DOUBLE_MODIFIER
+                ", but system believes it is %" NETDATA_DOUBLE_MODIFIER ", delta %" NETDATA_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
             return -1;
         }
 
@@ -381,7 +376,8 @@ int unit_test_str2ld() {
             return -1;
         }
 
-        fprintf(stderr, "str2ld() parsed value '%s' exactly the same way with strtold(), returned %" LONG_DOUBLE_MODIFIER " vs %" LONG_DOUBLE_MODIFIER "\n", values[i], mine, sys);
+        fprintf(stderr, "str2ndd() parsed value '%s' exactly the same way with strtold(), returned %" NETDATA_DOUBLE_MODIFIER
+            " vs %" NETDATA_DOUBLE_MODIFIER "\n", values[i], mine, sys);
     }
 
     return 0;
@@ -417,6 +413,44 @@ int unit_test_buffer() {
     return 0;
 }
 
+int unit_test_static_threads() {
+    struct netdata_static_thread *static_threads = static_threads_get();
+
+    /*
+     * make sure enough static threads have been registered
+     */
+    if (!static_threads) {
+        fprintf(stderr, "empty static_threads array\n");
+        return 1;
+    }
+
+    int n;
+    for (n = 0; static_threads[n].start_routine != NULL; n++) {}
+
+    if (n < 2) {
+        fprintf(stderr, "only %d static threads registered", n);
+        freez(static_threads);
+        return 1;
+    }
+
+    /*
+     * verify that each thread's start routine is unique.
+     */
+    for (int i = 0; i != n - 1; i++) {
+        for (int j = i + 1; j != n; j++) {
+            if (static_threads[i].start_routine != static_threads[j].start_routine)
+                continue;
+
+            fprintf(stderr, "Found duplicate threads with name: %s\n", static_threads[i].name);
+            freez(static_threads);
+            return 1;
+        }
+    }
+
+    freez(static_threads);
+    return 0;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 struct feed_values {
@@ -436,10 +470,10 @@ struct test {
     unsigned long feed_entries;
     unsigned long result_entries;
     struct feed_values *feed;
-    calculated_number *results;
+    NETDATA_DOUBLE *results;
 
     collected_number *feed2;
-    calculated_number *results2;
+    NETDATA_DOUBLE *results2;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -459,7 +493,7 @@ struct feed_values test1_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test1_results[] = {
+NETDATA_DOUBLE test1_results[] = {
         20, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
@@ -495,7 +529,7 @@ struct feed_values test2_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test2_results[] = {
+NETDATA_DOUBLE test2_results[] = {
         20, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
@@ -530,7 +564,7 @@ struct feed_values test3_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test3_results[] = {
+NETDATA_DOUBLE test3_results[] = {
         10, 10, 10, 10, 10, 10, 10, 10, 10
 };
 
@@ -565,7 +599,7 @@ struct feed_values test4_feed[] = {
         { 1000000, 100 },
 };
 
-calculated_number test4_results[] = {
+NETDATA_DOUBLE test4_results[] = {
         10, 10, 10, 10, 10, 10, 10, 10, 10
 };
 
@@ -600,7 +634,7 @@ struct feed_values test5_feed[] = {
         { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
 };
 
-calculated_number test5_results[] = {
+NETDATA_DOUBLE test5_results[] = {
         0x00000000FFFFFFFFULL / 15 * 7,
         0x00000000FFFFFFFFULL / 15 * 7,
         0x00000000FFFFFFFFULL / 15,
@@ -643,7 +677,7 @@ struct feed_values test5b_feed[] = {
         { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
 };
 
-calculated_number test5b_results[] = {
+NETDATA_DOUBLE test5b_results[] = {
         0xFFFFFFFFFFFFFFFFULL / 15 * 7,
         0xFFFFFFFFFFFFFFFFULL / 15 * 7,
         0xFFFFFFFFFFFFFFFFULL / 15,
@@ -692,7 +726,7 @@ struct feed_values test6_feed[] = {
         { 250000, 16000 },
 };
 
-calculated_number test6_results[] = {
+NETDATA_DOUBLE test6_results[] = {
         4000, 4000, 4000, 4000
 };
 
@@ -727,7 +761,7 @@ struct feed_values test7_feed[] = {
         { 2000000, 10000 },
 };
 
-calculated_number test7_results[] = {
+NETDATA_DOUBLE test7_results[] = {
         500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500
 };
 
@@ -758,7 +792,7 @@ struct feed_values test8_feed[] = {
         { 2000000, 6000 },
 };
 
-calculated_number test8_results[] = {
+NETDATA_DOUBLE test8_results[] = {
         1250, 2000, 2250, 3000, 3250, 4000, 4250, 5000, 5250, 6000
 };
 
@@ -799,7 +833,7 @@ struct feed_values test9_feed[] = {
         { 250000, 16000 },
 };
 
-calculated_number test9_results[] = {
+NETDATA_DOUBLE test9_results[] = {
         4000, 8000, 12000, 16000
 };
 
@@ -834,7 +868,7 @@ struct feed_values test10_feed[] = {
         { 1000000, 6900 + 1000 },
 };
 
-calculated_number test10_results[] = {
+NETDATA_DOUBLE test10_results[] = {
         1000, 1000, 1000, 1000, 1000, 1000, 1000
 };
 
@@ -873,11 +907,11 @@ collected_number test11_feed2[] = {
     10, 20, 30, 40, 50, 60, 70, 80, 90, 100
 };
 
-calculated_number test11_results[] = {
+NETDATA_DOUBLE test11_results[] = {
         50, 50, 50, 50, 50, 50, 50, 50, 50
 };
 
-calculated_number test11_results2[] = {
+NETDATA_DOUBLE test11_results2[] = {
         50, 50, 50, 50, 50, 50, 50, 50, 50
 };
 
@@ -916,11 +950,11 @@ collected_number test12_feed2[] = {
     10*3, 20*3, 30*3, 40*3, 50*3, 60*3, 70*3, 80*3, 90*3, 100*3
 };
 
-calculated_number test12_results[] = {
+NETDATA_DOUBLE test12_results[] = {
         25, 25, 25, 25, 25, 25, 25, 25, 25
 };
 
-calculated_number test12_results2[] = {
+NETDATA_DOUBLE test12_results2[] = {
         75, 75, 75, 75, 75, 75, 75, 75, 75
 };
 
@@ -955,7 +989,7 @@ struct feed_values test13_feed[] = {
         { 1000000, 6900 + 1000 },
 };
 
-calculated_number test13_results[] = {
+NETDATA_DOUBLE test13_results[] = {
         83.3333300, 100, 100, 100, 100, 100, 100
 };
 
@@ -990,7 +1024,7 @@ struct feed_values test14_feed[] = {
         { 29942000, 0x0153987f888982d0ULL },
 };
 
-calculated_number test14_results[] = {
+NETDATA_DOUBLE test14_results[] = {
         23.1383300, 21.8515600, 21.8804600, 21.7788000, 22.0112200, 22.4386100, 22.0906100, 21.9150800
 };
 
@@ -1022,7 +1056,7 @@ struct feed_values test14b_feed[] = {
         { 29942000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 + 25046000 + 29947000 + 30054000 + 29942000 },
 };
 
-calculated_number test14b_results[] = {
+NETDATA_DOUBLE test14b_results[] = {
         1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000
 };
 
@@ -1054,7 +1088,7 @@ struct feed_values test14c_feed[] = {
         { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 },
 };
 
-calculated_number test14c_results[] = {
+NETDATA_DOUBLE test14c_results[] = {
         1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000
 };
 
@@ -1093,11 +1127,11 @@ collected_number test15_feed2[] = {
     178825286, 178825286, 178825286, 178825286, 178825498, 178825498, 179165652, 179202964, 179203282, 179204130
 };
 
-calculated_number test15_results[] = {
+NETDATA_DOUBLE test15_results[] = {
         5857.4080000, 5898.4540000, 5891.6590000, 5806.3160000, 5914.2640000, 3202.2630000, 5589.6560000, 5822.5260000, 5911.7520000
 };
 
-calculated_number test15_results2[] = {
+NETDATA_DOUBLE test15_results2[] = {
         0.0000000, 0.0000000, 0.0024944, 1.6324779, 0.0212777, 2655.1890000, 290.5387000, 5.6733610, 6.5960220
 };
 
@@ -1148,12 +1182,13 @@ int run_test(struct test *test)
 
         if(c) {
             time_now += test->feed[c].microseconds;
-            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n", 
+            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " NETDATA_DOUBLE_FORMAT
+                ", rate " NETDATA_DOUBLE_FORMAT "\n",
                 test->name, c+1,
                 (float)test->feed[c].microseconds / 1000000.0,
                 (float)time_now / 1000000.0,
-                ((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor,
-                (((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor) / (calculated_number)test->feed[c].microseconds * (calculated_number)1000000);
+                ((NETDATA_DOUBLE)test->feed[c].value - (NETDATA_DOUBLE)last) * (NETDATA_DOUBLE)test->multiplier / (NETDATA_DOUBLE)test->divisor,
+                (((NETDATA_DOUBLE)test->feed[c].value - (NETDATA_DOUBLE)last) * (NETDATA_DOUBLE)test->multiplier / (NETDATA_DOUBLE)test->divisor) / (NETDATA_DOUBLE)test->feed[c].microseconds * (NETDATA_DOUBLE)1000000);
 
             // rrdset_next_usec_unfiltered(st, test->feed[c].microseconds);
             st->usec_since_last_update = test->feed[c].microseconds;
@@ -1162,12 +1197,12 @@ int run_test(struct test *test)
             fprintf(stderr, "    > %s: feeding position %lu\n", test->name, c+1);
         }
 
-        fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd->name, test->feed[c].value);
+        fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rrddim_name(rd), test->feed[c].value);
         rrddim_set(st, "dim1", test->feed[c].value);
         last = test->feed[c].value;
 
         if(rd2) {
-            fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd2->name, test->feed2[c]);
+            fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rrddim_name(rd2), test->feed2[c]);
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
@@ -1191,23 +1226,25 @@ int run_test(struct test *test)
 
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
-        calculated_number v = unpack_storage_number(rd->values[c]);
-        calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_EXISTS));
-        int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-        fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
-            test->name, rd->name, c+1,
-            (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+        NETDATA_DOUBLE v = unpack_storage_number(rd->db[c]);
+        NETDATA_DOUBLE n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
+        int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
+        fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
+            ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
+            test->name, rrddim_name(rd), c+1,
+            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
 
         if(rd2) {
-            v = unpack_storage_number(rd2->values[c]);
+            v = unpack_storage_number(rd2->db[c]);
             n = test->results2[c];
-            same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-            fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
-                test->name, rd2->name, c+1,
-                (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+            same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
+            fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
+                ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
+                test->name, rrddim_name(rd2), c+1,
+                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1217,41 +1254,43 @@ int run_test(struct test *test)
 }
 
 static int test_variable_renames(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
+
     fprintf(stderr, "Creating chart\n");
     RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
-    fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
+    fprintf(stderr, "Created chart with id '%s', name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Creating dimension DIM1\n");
     RRDDIM *rd1 = rrddim_add(st, "DIM1", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd1->id, rd1->name);
+    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Creating dimension DIM2\n");
     RRDDIM *rd2 = rrddim_add(st, "DIM2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd2->id, rd2->name);
+    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming chart to CHARTNAME1\n");
-    rrdset_set_name(st, "CHARTNAME1");
-    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, st->name);
+    rrdset_reset_name(st, "CHARTNAME1");
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming chart to CHARTNAME2\n");
-    rrdset_set_name(st, "CHARTNAME2");
-    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, st->name);
+    rrdset_reset_name(st, "CHARTNAME2");
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", rrdset_id(st), rrdset_name(st));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");
-    rrddim_set_name(st, rd1, "DIM1NAME1");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd1->id, rd1->name);
+    rrddim_reset_name(st, rd1, "DIM1NAME1");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME2\n");
-    rrddim_set_name(st, rd1, "DIM1NAME2");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd1->id, rd1->name);
+    rrddim_reset_name(st, rd1, "DIM1NAME2");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd1), rrddim_name(rd1));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME1\n");
-    rrddim_set_name(st, rd2, "DIM2NAME1");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+    rrddim_reset_name(st, rd2, "DIM2NAME1");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME2\n");
-    rrddim_set_name(st, rd2, "DIM2NAME2");
-    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+    rrddim_reset_name(st, rd2, "DIM2NAME2");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
     BUFFER *buf = buffer_create(1);
     health_api_v1_chart_variables2json(st, buf);
@@ -1301,6 +1340,7 @@ int check_strdupz_path_subpath() {
 
 int run_all_mockup_tests(void)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     if(check_strdupz_path_subpath())
         return 1;
 
@@ -1374,6 +1414,7 @@ int run_all_mockup_tests(void)
 
 int unit_test(long delay, long shift)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     static int repeat = 0;
     repeat++;
 
@@ -1406,9 +1447,8 @@ int unit_test(long delay, long shift)
     long increment = 1000;
     collected_number i = 0;
 
-    unsigned long c, dimensions = 0;
+    unsigned long c, dimensions = rrdset_number_of_dimensions(st);
     RRDDIM *rd;
-    for(rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 
     for(c = 0; c < 20 ;c++) {
         i += increment;
@@ -1429,8 +1469,10 @@ int unit_test(long delay, long shift)
         }
 
         // prevent it from deleting the dimensions
-        for(rd = st->dimensions ; rd ; rd = rd->next)
+        rrddim_foreach_read(rd, st) {
             rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
+        }
+        rrddim_foreach_done(rd);
 
         rrdset_done(st);
     }
@@ -1441,14 +1483,14 @@ int unit_test(long delay, long shift)
 
     int ret = 0;
     storage_number sn;
-    calculated_number cn, v;
+    NETDATA_DOUBLE cn, v;
     for(c = 0 ; c < st->counter ; c++) {
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
-        for(rd = st->dimensions ; rd ; rd = rd->next) {
-            sn = rd->values[c];
+        rrddim_foreach_read(rd, st) {
+            sn = rd->db[c];
             cn = unpack_storage_number(sn);
-            fprintf(stderr, "\t %s " CALCULATED_NUMBER_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
+            fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
 
             if(rd == rdabs) v =
                 (     oincrement
@@ -1463,16 +1505,198 @@ int unit_test(long delay, long shift)
 
             if(v == cn) fprintf(stderr, "passed.\n");
             else {
-                fprintf(stderr, "ERROR! (expected " CALCULATED_NUMBER_FORMAT ")\n", v);
+                fprintf(stderr, "ERROR! (expected " NETDATA_DOUBLE_FORMAT ")\n", v);
                 ret = 1;
             }
         }
+        rrddim_foreach_done(rd);
     }
 
     if(ret)
         fprintf(stderr, "\n\nUNIT TEST(%ld, %ld) FAILED\n\n", delay, shift);
 
     return ret;
+}
+
+int test_sqlite(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
+    sqlite3  *db_meta;
+    fprintf(stderr, "Testing SQLIte\n");
+
+    int rc = sqlite3_open(":memory:", &db_meta);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: DB init failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec_monitored(db_meta, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Create table failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec_monitored(db_meta, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
+        return 1;
+    }
+
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    char *uuid_str = "0000_000";
+
+    buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
+    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    if (rc != SQLITE_OK)
+        goto error;
+    buffer_flush(sql);
+
+    buffer_free(sql);
+    fprintf(stderr,"SQLite is OK\n");
+    return 0;
+error:
+    fprintf(stderr,"SQLite statement failed: %s\n", buffer_tostring(sql));
+    buffer_free(sql);
+    fprintf(stderr,"SQLite tests failed\n");
+    return 1;
+}
+
+int unit_test_bitmap256(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
+
+    BITMAP256 test_bitmap = {0};
+
+    bitmap256_set_bit(&test_bitmap, 0, 1);
+    bitmap256_set_bit(&test_bitmap, 64, 1);
+    bitmap256_set_bit(&test_bitmap, 128, 1);
+    bitmap256_set_bit(&test_bitmap, 192, 1);
+    if (test_bitmap.data[0] == 1)
+        fprintf(stderr, "%s() INDEX 1 is OK\n", __FUNCTION__ );
+    if (test_bitmap.data[1] == 1)
+        fprintf(stderr, "%s() INDEX 65 is OK\n", __FUNCTION__ );
+    if (test_bitmap.data[2] == 1)
+        fprintf(stderr, "%s() INDEX 129 is OK\n", __FUNCTION__ );
+    if (test_bitmap.data[3] == 1)
+        fprintf(stderr, "%s() INDEX 192 is OK\n", __FUNCTION__ );
+
+    uint8_t i=0;
+    int j = 0;
+    do {
+        bitmap256_set_bit(&test_bitmap, i++, 1);
+        j++;
+    } while (j < 256);
+
+    if (test_bitmap.data[0] == 0xffffffffffffffff)
+        fprintf(stderr, "%s() INDEX 0 is fully set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        return 1;
+    }
+
+    if (test_bitmap.data[1] == 0xffffffffffffffff)
+        fprintf(stderr, "%s() INDEX 1 is fully set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        return 1;
+    }
+
+    if (test_bitmap.data[2] == 0xffffffffffffffff)
+        fprintf(stderr, "%s() INDEX 2 is fully set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        return 1;
+    }
+
+    if (test_bitmap.data[3] == 0xffffffffffffffff)
+        fprintf(stderr, "%s() INDEX 3 is fully set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        return 1;
+    }
+
+    i = 0;
+    j = 0;
+    do {
+        bitmap256_set_bit(&test_bitmap, i++, 0);
+        j++;
+    } while (j < 256);
+
+    if (test_bitmap.data[0] == 0)
+        fprintf(stderr, "%s() INDEX 0 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 0 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+    if (test_bitmap.data[1] == 0)
+        fprintf(stderr, "%s() INDEX 1 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 1 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+
+    if (test_bitmap.data[2] == 0)
+        fprintf(stderr, "%s() INDEX 2 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 2 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+
+    if (test_bitmap.data[3] == 0)
+        fprintf(stderr, "%s() INDEX 3 is reset OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 3 is not reset FAILED\n", __FUNCTION__);
+        return 1;
+    }
+
+    i=0;
+    j = 0;
+    do {
+        bitmap256_set_bit(&test_bitmap, i, 1);
+        i += 4;
+        j += 4;
+    } while (j < 256);
+
+    if (test_bitmap.data[0] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 0 is 0x1111111111111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[0]);
+        return 1;
+    }
+
+    if (test_bitmap.data[1] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 1 is 0x1111111111111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[1]);
+        return 1;
+    }
+
+    if (test_bitmap.data[2] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 2 is 0x1111111111111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[2]);
+        return 1;
+    }
+
+    if (test_bitmap.data[3] == 0x1111111111111111)
+        fprintf(stderr, "%s() INDEX 3 is 0x1111111111111111 set OK\n", __FUNCTION__);
+    else {
+        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[3]);
+        return 1;
+    }
+
+    fprintf(stderr, "%s() tests passed\n", __FUNCTION__);
+    return 0;
 }
 
 #ifdef ENABLE_DBENGINE
@@ -1500,7 +1724,9 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , name
             , os_type
             , netdata_configured_timezone
-            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , netdata_configured_abbrev_timezone
+            , netdata_configured_utc_offset
+            , ""
             , program_name
             , program_version
             , default_rrd_update_every
@@ -1512,10 +1738,11 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
             , NULL
+            , 0
     );
 }
 
-// costants for test_dbengine
+// constants for test_dbengine
 static const int CHARTS = 64;
 static const int DIMS = 16; // That gives us 64 * 16 = 1024 metrics
 #define REGIONS  (3) // 3 regions of update_every
@@ -1531,6 +1758,7 @@ static const int QUERY_BATCH = 4096;
 static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],
                                         int update_every)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     int i, j;
     char name[101];
 
@@ -1569,7 +1797,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Fluh pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 }
@@ -1578,15 +1806,18 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
 static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],
                                            int current_region, time_t time_start)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     time_t time_now;
     int i, j, c, update_every;
     collected_number next;
 
     update_every = REGION_UPDATE_EVERY[current_region];
-    time_now = time_start + update_every;
+    time_now = time_start;
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
+            rd[i][j]->tiers[0]->collect_ops.change_collection_frequency(rd[i][j]->tiers[0]->db_collection_handle, update_every);
+
             rd[i][j]->last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
             rd[i][j]->last_collected_time.tv_usec =
@@ -1594,7 +1825,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
         }
     }
     for (c = 0; c < REGION_POINTS[current_region] ; ++c) {
-        time_now += update_every; // time_now = start + (c + 2) * update_every
+        time_now += update_every; // time_now = start + (c + 1) * update_every
         for (i = 0 ; i < CHARTS ; ++i) {
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
@@ -1613,48 +1844,62 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
 static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],
                                        int current_region, time_t time_start)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     uint8_t same;
-    time_t time_now, time_retrieved;
+    time_t time_now, time_retrieved, end_time;
     int i, j, k, c, errors, update_every;
     collected_number last;
-    calculated_number value, expected;
-    storage_number n;
+    NETDATA_DOUBLE value, expected;
     struct rrddim_query_handle handle;
+    size_t value_errors = 0, time_errors = 0;
 
     update_every = REGION_UPDATE_EVERY[current_region];
     errors = 0;
 
     // check the result
     for (c = 0; c < REGION_POINTS[current_region] ; c += QUERY_BATCH) {
-        time_now = time_start + (c + 2) * update_every;
+        time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every);
+                rd[i][j]->tiers[0]->query_ops.init(rd[i][j]->tiers[0]->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
-                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+                    expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    n = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved);
-                    value = unpack_storage_number(n);
+                    STORAGE_POINT sp = rd[i][j]->tiers[0]->query_ops.next_metric(&handle);
+                    value = sp.sum;
+                    time_retrieved = sp.start_time;
+                    end_time = sp.end_time;
 
-                    same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+                    same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
-                                        CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, expected, value);
+                        if(!value_errors)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                                ", found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now + k * update_every, expected, value);
+                        value_errors++;
                         errors++;
                     }
-                    if(time_retrieved != time_now + k * update_every) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k * update_every, (unsigned long)time_retrieved);
+                    if(end_time != time_now + k * update_every) {
+                        if(!time_errors)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now + k * update_every, (unsigned long)time_retrieved);
+                        time_errors++;
                         errors++;
                     }
                 }
-                rd[i][j]->state->query_ops.finalize(&handle);
+                rd[i][j]->tiers[0]->query_ops.finalize(&handle);
             }
         }
     }
+
+    if(value_errors)
+        fprintf(stderr, "%zu value errors encountered\n", value_errors);
+
+    if(time_errors)
+        fprintf(stderr, "%zu time errors encountered\n", time_errors);
+
     return errors;
 }
 
@@ -1662,60 +1907,81 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],
                                     int current_region, time_t time_start, time_t time_end)
 {
+    int update_every = REGION_UPDATE_EVERY[current_region];
+    fprintf(stderr, "%s() running on region %d, start time %ld, end time %ld, update every %d...\n", __FUNCTION__, current_region, time_start, time_end, update_every);
     uint8_t same;
     time_t time_now, time_retrieved;
-    int i, j, errors, update_every;
+    int i, j, errors, value_errors = 0, time_errors = 0;
     long c;
     collected_number last;
-    calculated_number value, expected;
+    NETDATA_DOUBLE value, expected;
 
     errors = 0;
-    update_every = REGION_UPDATE_EVERY[current_region];
-    long points = (time_end - time_start) / update_every - 1;
+    long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
-        RRDR *r = rrd2rrdr(st[i], points, time_start + update_every, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL);
+        ONEWAYALLOC *owa = onewayalloc_create(0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start, time_end,
+                           RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
+                           NULL, NULL, NULL, 0, 0);
+
         if (!r) {
-            fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
+            fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
         } else {
             assert(r->st == st[i]);
             for (c = 0; c != rrdr_rows(r) ; ++c) {
                 RRDDIM *d;
-                time_now = time_start + (c + 2) * update_every;
+                time_now = time_start + (c + 1) * update_every;
                 time_retrieved = r->t[c];
 
                 // for each dimension
-                for (j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
-                    calculated_number *cn = &r->v[ c * r->d ];
+                rrddim_foreach_read(d, r->st) {
+                    if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+
+                    j = (int)d_dfe.counter;
+
+                    NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
                     assert(rd[i][j] == d);
 
                     last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
-                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+                    expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+                    same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
-                                        CALCULATED_NUMBER_FORMAT ", RRDR found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
-                        errors++;
+                        if(value_errors < 20)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                                ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, expected, value);
+                        value_errors++;
                     }
                     if(time_retrieved != time_now) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, (unsigned long)time_retrieved);
-                        errors++;
+                        if(time_errors < 20)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, (unsigned long)time_retrieved);
+                        time_errors++;
                     }
                 }
+                rrddim_foreach_done(d);
             }
-            rrdr_free(r);
+            rrdr_free(owa, r);
         }
+        onewayalloc_destroy(owa);
     }
-    return errors;
+
+    if(value_errors)
+        fprintf(stderr, "%d value errors encountered\n", value_errors);
+
+    if(time_errors)
+        fprintf(stderr, "%d time errors encountered\n", time_errors);
+
+    return errors + value_errors + time_errors;
 }
 
 int test_dbengine(void)
 {
-    int i, j, errors, update_every, current_region;
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
+    int i, j, errors, value_errors = 0, time_errors = 0, update_every, current_region;
     RRDHOST *host = NULL;
     RRDSET *st[CHARTS];
     RRDDIM *rd[CHARTS][DIMS];
@@ -1748,7 +2014,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 
@@ -1767,7 +2033,7 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page(rd[i][j]);
+            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0]->db_collection_handle);
         }
     }
 
@@ -1789,12 +2055,15 @@ int test_dbengine(void)
     current_region = 1;
     update_every = REGION_UPDATE_EVERY[current_region]; // use the maximum update_every = 3
     errors = 0;
-    long points = (time_end[REGIONS - 1] - time_start[0]) / update_every - 1; // cover all time regions with RRDR
+    long points = (time_end[REGIONS - 1] - time_start[0]) / update_every; // cover all time regions with RRDR
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
-        RRDR *r = rrd2rrdr(st[i], points, time_start[0] + update_every, time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL);
+        ONEWAYALLOC *owa = onewayalloc_create(0);
+        RRDR *r = rrd2rrdr(owa, st[i], points, time_start[0] + update_every,
+                           time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
+                           RRDR_OPTION_NATURAL_POINTS, NULL, NULL, NULL, 0, 0);
         if (!r) {
-            fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
+            fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));
             ++errors;
         } else {
             long c;
@@ -1807,39 +2076,47 @@ int test_dbengine(void)
                 time_t time_retrieved = r->t[c];
 
                 // for each dimension
-                for(j = 0, d = r->st->dimensions ; d && j < r->d ; ++j, d = d->next) {
-                    calculated_number *cn = &r->v[ c * r->d ];
-                    calculated_number value = cn[j];
+                rrddim_foreach_read(d, r->st) {
+                    if(unlikely((int)d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+
+                    j = (int)d_dfe.counter;
+
+                    NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
+                    NETDATA_DOUBLE value = cn[j];
                     assert(rd[i][j] == d);
 
-                    collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset;
-                    calculated_number expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+                    collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset + 1;
+                    NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)last, SN_DEFAULT_FLAGS));
 
-                    uint8_t same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+                    uint8_t same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
-                                        CALCULATED_NUMBER_FORMAT ", RRDR found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, expected, value);
-                        errors++;
+                        if(!value_errors)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                                ", RRDR found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, expected, value);
+                        value_errors++;
                     }
                     if(time_retrieved != time_now) {
-                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
-                                st[i]->name, rd[i][j]->name, (unsigned long)time_now, (unsigned long)time_retrieved);
-                        errors++;
+                        if(!time_errors)
+                            fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found RRDR timestamp %lu ### E R R O R ###\n",
+                                    rrdset_name(st[i]), rrddim_name(rd[i][j]), (unsigned long)time_now, (unsigned long)time_retrieved);
+                        time_errors++;
                     }
                 }
+                rrddim_foreach_done(d);
             }
-            rrdr_free(r);
+            rrdr_free(owa, r);
         }
+        onewayalloc_destroy(owa);
     }
 error_out:
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrd_unlock();
 
-    return errors;
+    return errors + value_errors + time_errors;
 }
 
 struct dbengine_chart_thread {
@@ -1874,6 +2151,7 @@ collected_number generate_dbengine_chart_value(int chart_i, int dim_i, time_t ti
 
 static void generate_dbengine_chart(void *arg)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     struct dbengine_chart_thread *thread_info = (struct dbengine_chart_thread *)arg;
     RRDHOST *host = thread_info->host;
     char *chartname = thread_info->chartname;
@@ -1896,7 +2174,7 @@ static void generate_dbengine_chart(void *arg)
 
         thread_info->rd[j] = rd[j] = rrddim_add(st, name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    complete(&thread_info->charts_initialized);
+    completion_mark_complete(&thread_info->charts_initialized);
 
     // feed it with the test data
     time_current = time_present - history_seconds;
@@ -1920,12 +2198,13 @@ static void generate_dbengine_chart(void *arg)
         thread_info->time_max = time_current;
     }
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize(rd[j]);
+        rrdeng_store_metric_finalize((rd[j])->tiers[0]->db_collection_handle);
     }
 }
 
 void generate_dbengine_dataset(unsigned history_seconds)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     const int DSET_CHARTS = 16;
     const int DSET_DIMS = 128;
     const uint64_t EXPECTED_COMPRESSION_RATIO = 20;
@@ -1965,10 +2244,10 @@ void generate_dbengine_dataset(unsigned history_seconds)
         thread_info[i]->time_present = time_present;
         thread_info[i]->time_max = 0;
         thread_info[i]->done = 0;
-        init_completion(&thread_info[i]->charts_initialized);
+        completion_init(&thread_info[i]->charts_initialized);
         assert(0 == uv_thread_create(&thread_info[i]->thread, generate_dbengine_chart, thread_info[i]));
-        wait_for_completion(&thread_info[i]->charts_initialized);
-        destroy_completion(&thread_info[i]->charts_initialized);
+        completion_wait_for(&thread_info[i]->charts_initialized);
+        completion_destroy(&thread_info[i]->charts_initialized);
     }
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         assert(0 == uv_thread_join(&thread_info[i]->thread));
@@ -1979,7 +2258,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
     rrd_wrlock();
-    rrdhost_free(host);
+    rrdhost_free(host, 1);
     rrd_unlock();
 }
 
@@ -2000,6 +2279,7 @@ struct dbengine_query_thread {
 
 static void query_dbengine_chart(void *arg)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     struct dbengine_query_thread *thread_info = (struct dbengine_query_thread *)arg;
     const int DSET_CHARTS = thread_info->dset_charts;
     const int DSET_DIMS = thread_info->dset_dims;
@@ -2008,11 +2288,11 @@ static void query_dbengine_chart(void *arg)
     RRDSET *st;
     RRDDIM *rd;
     uint8_t same;
-    time_t time_now, time_retrieved;
+    time_t time_now, time_retrieved, end_time;
     collected_number generatedv;
-    calculated_number value, expected;
-    storage_number n;
+    NETDATA_DOUBLE value, expected;
     struct rrddim_query_handle handle;
+    size_t value_errors = 0, time_errors = 0;
 
     do {
         // pick a chart and dimension
@@ -2038,60 +2318,74 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->state->query_ops.init(rd, &handle, time_after, time_before);
+        rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, time_after, time_before);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
-            expected = unpack_storage_number(pack_storage_number((calculated_number) generatedv, SN_EXISTS));
+            expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(rd->state->query_ops.is_finished(&handle))) {
+            if (unlikely(rd->tiers[0]->query_ops.is_finished(&handle))) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected);
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                        ", found data gap, ### E R R O R ###\n",
+                            rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, expected);
                     ++thread_info->errors;
                 }
                 break;
             }
-            n = rd->state->query_ops.next_metric(&handle, &time_retrieved);
-            if (SN_EMPTY_SLOT == n) {
+
+            STORAGE_POINT sp = rd->tiers[0]->query_ops.next_metric(&handle);
+            value = sp.sum;
+            time_retrieved = sp.start_time;
+            end_time = sp.end_time;
+
+            if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected);
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                        ", found data gap, ### E R R O R ###\n",
+                            rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, expected);
                     ++thread_info->errors;
                 }
                 break;
             }
             ++thread_info->queried_metrics_nr;
-            value = unpack_storage_number(n);
 
-            same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
+            same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
             if (!same) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT
-                                    ", ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected, value);
-                    ++thread_info->errors;
+                    if(!value_errors)
+                       fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
+                            ", found " NETDATA_DOUBLE_FORMAT ", ### E R R O R ###\n",
+                                rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, expected, value);
+                    value_errors++;
+                    thread_info->errors++;
                 }
             }
-            if (time_retrieved != time_now) {
+            if (end_time != time_now) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr,
+                    if(!time_errors)
+                        fprintf(stderr,
                             "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
-                    ++thread_info->errors;
+                                rrdset_name(st), rrddim_name(rd), (unsigned long) time_now, (unsigned long) time_retrieved);
+                    time_errors++;
+                    thread_info->errors++;
                 }
             }
         }
-        rd->state->query_ops.finalize(&handle);
+        rd->tiers[0]->query_ops.finalize(&handle);
     } while(!thread_info->done);
+
+    if(value_errors)
+        fprintf(stderr, "%zu value errors encountered\n", value_errors);
+
+    if(time_errors)
+        fprintf(stderr, "%zu time errors encountered\n", time_errors);
 }
 
 void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsigned QUERY_THREADS,
                           unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB, unsigned DISK_SPACE_MB)
 {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
     const unsigned DSET_DIMS = 128;
     const uint64_t EXPECTED_COMPRESSION_RATIO = 20;
     const unsigned HISTORY_SECONDS = 3600 * 24 * 365 * 50; /* 50 year of history */
@@ -2099,7 +2393,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     struct dbengine_chart_thread **chart_threads;
     struct dbengine_query_thread **query_threads;
     unsigned i, j;
-    time_t time_start, time_end;
+    time_t time_start, test_duration;
 
     error_log_limit_unlimited();
 
@@ -2127,6 +2421,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
+    (void) sql_init_database(DB_CHECK_NONE, 1);
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host)
         return;
@@ -2156,13 +2451,13 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         chart_threads[i]->time_max = 0;
         chart_threads[i]->done = 0;
         chart_threads[i]->errors = chart_threads[i]->stored_metrics_nr = 0;
-        init_completion(&chart_threads[i]->charts_initialized);
+        completion_init(&chart_threads[i]->charts_initialized);
         assert(0 == uv_thread_create(&chart_threads[i]->thread, generate_dbengine_chart, chart_threads[i]));
     }
     /* barrier so that subsequent queries can access valid chart data */
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
-        wait_for_completion(&chart_threads[i]->charts_initialized);
-        destroy_completion(&chart_threads[i]->charts_initialized);
+        completion_wait_for(&chart_threads[i]->charts_initialized);
+        completion_destroy(&chart_threads[i]->charts_initialized);
     }
     sleep(RAMP_UP_SECONDS);
     /* at this point data have already began being written to the database */
@@ -2195,15 +2490,16 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     for (i = 0 ; i < QUERY_THREADS ; ++i) {
         assert(0 == uv_thread_join(&query_threads[i]->thread));
     }
-    time_end = now_realtime_sec();
-    fprintf(stderr, "\nDB-engine stress test finished in %ld seconds.\n", time_end - time_start);
+    test_duration = now_realtime_sec() - (time_start - HISTORY_SECONDS);
+    if (!test_duration)
+        test_duration = 1;
+    fprintf(stderr, "\nDB-engine stress test finished in %ld seconds.\n", test_duration);
     unsigned long stored_metrics_nr = 0;
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         stored_metrics_nr += chart_threads[i]->stored_metrics_nr;
     }
-    unsigned long queries_nr = 0, queried_metrics_nr = 0;
+    unsigned long queried_metrics_nr = 0;
     for (i = 0 ; i < QUERY_THREADS ; ++i) {
-        queries_nr += query_threads[i]->queries_nr;
         queried_metrics_nr += query_threads[i]->queried_metrics_nr;
     }
     fprintf(stderr, "%u metrics were stored (dataset size of %lu MiB) in %u charts by 1 writer thread per chart.\n",
@@ -2213,7 +2509,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     fprintf(stderr, "Query starting time is randomly chosen from the beginning of the time-series up to the time of\n"
                     "the latest data point, and ending time from 1 second up to 1 hour after the starting time.\n");
     fprintf(stderr, "Performance is %lu written data points/sec and %lu read data points/sec.\n",
-            stored_metrics_nr / (time_end - time_start), queried_metrics_nr / (time_end - time_start));
+            stored_metrics_nr / test_duration, queried_metrics_nr / test_duration);
 
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         freez(chart_threads[i]);
@@ -2224,9 +2520,9 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     }
     freez(query_threads);
     rrd_wrlock();
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    rrdeng_prepare_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrdhost_delete_charts(host);
-    rrdeng_exit(host->rrdeng_ctx);
+    rrdeng_exit((struct rrdengine_instance *)host->storage_instance[0]);
     rrd_unlock();
 }
 

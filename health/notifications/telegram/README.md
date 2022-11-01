@@ -1,8 +1,6 @@
 <!--
----
 title: "Telegram"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/telegram/README.md
----
 -->
 
 # Telegram
@@ -19,7 +17,7 @@ You need to:
 2.  Start a conversation with your bot or invite it into a group where you want it to send messages.
 3.  Find the chat ID for every chat you want to send messages to. Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID or invite it into a group and use the `/getgroupid` command to get the group chat ID. Group IDs start with a hyphen, supergroup IDs start with `-100`.  
     Alternatively, you can get the chat ID directly from the bot API. Send *your* bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg.  `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
-
+4.  Set the bot token and the chat ID of the recipient in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
 ```
 SEND_TELEGRAM="YES"
 TELEGRAM_BOT_TOKEN="111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5"
@@ -44,4 +42,4 @@ Telegram messages look like this:
 
 ![Netdata notifications via Telegram](https://user-images.githubusercontent.com/1153921/66612223-f07dfb80-eb75-11e9-976f-5734ffd93ecd.png)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Ftelegram%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

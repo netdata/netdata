@@ -333,9 +333,7 @@ extern int simple_pattern_is_potential_name(SIMPLE_PATTERN *p)
 }
 
 char *simple_pattern_trim_around_equal(char *src) {
-    char *store = mallocz(strlen(src) +1);
-    if(!store)
-        return NULL;
+    char *store = mallocz(strlen(src) + 1);
 
     char *dst = store;
     while (*src) {
@@ -353,4 +351,13 @@ char *simple_pattern_trim_around_equal(char *src) {
     *dst = 0x00;
 
     return store;
+}
+
+char *simple_pattern_iterate(SIMPLE_PATTERN **p)
+{
+    struct simple_pattern *root = (struct simple_pattern *) *p;
+    struct simple_pattern **Proot = (struct simple_pattern **)p;
+
+    (*Proot) = (*Proot)->next;
+    return (char *) root->match;
 }

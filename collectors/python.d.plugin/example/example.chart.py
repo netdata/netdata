@@ -29,6 +29,9 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
+        self.num_lines = self.configuration.get('num_lines', 4)
+        self.lower = self.configuration.get('lower', 0)
+        self.upper = self.configuration.get('upper', 100)
 
     @staticmethod
     def check():
@@ -37,12 +40,12 @@ class Service(SimpleService):
     def get_data(self):
         data = dict()
 
-        for i in range(1, 4):
+        for i in range(0, self.num_lines):
             dimension_id = ''.join(['random', str(i)])
 
             if dimension_id not in self.charts['random']:
                 self.charts['random'].add_dimension([dimension_id])
 
-            data[dimension_id] = self.random.randint(0, 100)
+            data[dimension_id] = self.random.randint(self.lower, self.upper)
 
         return data

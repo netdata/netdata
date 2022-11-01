@@ -249,7 +249,8 @@ cleanup:
     return len - i;
 }
 
-static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len,
+    NETDATA_DOUBLE value, const char *units, int precision) {
     if(unlikely(isnan(value) || isinf(value)))
         value = 0.0;
 
@@ -260,23 +261,23 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     if(precision < 0) {
         int len, lstop = 0, trim_zeros = 1;
 
-        calculated_number abs = value;
+        NETDATA_DOUBLE abs = value;
         if(isless(value, 0)) {
             lstop = 1;
-            abs = calculated_number_fabs(value);
+            abs = fabsndd(value);
         }
 
         if(isgreaterequal(abs, 1000)) {
-            len = snprintfz(value_string, value_string_len, "%0.0" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+            len = snprintfz(value_string, value_string_len, "%0.0" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
             trim_zeros = 0;
         }
-        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
-        else                                 len = snprintfz(value_string, value_string_len, "%0.7" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
+        else                                 len = snprintfz(value_string, value_string_len, "%0.7" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
 
         if(unlikely(trim_zeros)) {
             int l;
@@ -303,7 +304,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     }
     else {
         if(precision > 50) precision = 50;
-        snprintfz(value_string, value_string_len, "%0.*" LONG_DOUBLE_MODIFIER "%s%s", precision, (LONG_DOUBLE) value, separator, units);
+        snprintfz(value_string, value_string_len, "%0.*" NETDATA_DOUBLE_MODIFIER "%s%s", precision, (NETDATA_DOUBLE) value, separator, units);
     }
 
     return value_string;
@@ -359,7 +360,8 @@ static struct units_formatter {
         { NULL,          0, UNITS_FORMAT_NONE }
 };
 
-inline char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+inline char *format_value_and_unit(char *value_string, size_t value_string_len,
+    NETDATA_DOUBLE value, const char *units, int precision) {
     static int max = -1;
     int i;
 
@@ -555,7 +557,7 @@ typedef enum color_comparison {
     COLOR_COMPARE_GREATEREQUAL,
 } BADGE_COLOR_COMPARISON;
 
-static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value) {
+static inline void calc_colorz(const char *color, char *final, size_t len, NETDATA_DOUBLE value) {
     if(isnan(value) || isinf(value))
         value = NAN;
 
@@ -642,7 +644,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
         *dc = '\0';
         if(dv) {
             *dv = '\0';
-            calculated_number v;
+            NETDATA_DOUBLE v;
 
             if(!*value_buffer || !strcmp(value_buffer, "null")) {
                 v = NAN;
@@ -716,7 +718,7 @@ static int html_color_check(const char *str) {
 // or whatever is given as def (without checking - caller responsible to give sensible
 // safely escaped default) as default if it fails
 // in any case this function must always return something we can put directly in XML
-// so no escaping is necessary anymore (with excpetion of default where caller is responsible)
+// so no escaping is necessary anymore (with exception of default where caller is responsible)
 // to give sensible default
 #define BADGE_SVG_COLOR_ARG_MAXLEN 20
 
@@ -732,7 +734,8 @@ static const char *parse_color_argument(const char *arg, const char *def)
     return color_map(arg, def);
 }
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val, const char* text_color_lbl, const char* text_color_val) {
+void buffer_svg(BUFFER *wb, const char *label,
+    NETDATA_DOUBLE value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val, const char* text_color_lbl, const char* text_color_val) {
     char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
             , label_escaped[LABEL_STRING_SIZE + 1]
@@ -750,7 +753,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         value_color = (isnan(value) || isinf(value))?"999":"4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
-    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)? fabsndd(value):value, units, precision);
 
     if(fixed_width_lbl <= 0 || fixed_width_val <= 0) {
         label_width = verdana11_width(label, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
@@ -884,10 +887,15 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     , *fixed_width_lbl_str = NULL
     , *fixed_width_val_str = NULL
     , *text_color_lbl_str = NULL
-    , *text_color_val_str = NULL; 
+    , *text_color_val_str = NULL
+    , *group_options = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t options = 0x00000000;
+
+    const RRDCALC_ACQUIRED *rca = NULL;
+    RRDCALC *rc = NULL;
+    RRDSET *st = NULL;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -913,6 +921,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
@@ -952,7 +961,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
-    RRDSET *st = rrdset_find(host, chart);
+    st = rrdset_find(host, chart);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
@@ -962,9 +971,10 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
     st->last_accessed_time = now_realtime_sec();
 
-    RRDCALC *rc = NULL;
     if(alarm) {
-        rc = rrdcalc_find(st, alarm);
+        rca = rrdcalc_from_rrdset_get(st, alarm);
+        rc = rrdcalc_acquired_to_rrdcalc(rca);
+
         if (!rc) {
             buffer_no_cacheable(w->response.data);
             buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1, NULL, NULL);
@@ -1015,19 +1025,19 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             label = dim;
         }
         else
-            label = st->name;
+            label = rrdset_name(st);
     }
     if(!units) {
         if(alarm) {
             if(rc->units)
-                units = rc->units;
+                units = rrdcalc_units(rc);
             else
                 units = "";
         }
         else if(options & RRDR_OPTION_PERCENTAGE)
             units = "%";
         else
-            units = st->units;
+            units = rrdset_units(st);
     }
 
     debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
@@ -1096,13 +1106,17 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     else {
         time_t latest_timestamp = 0;
         int value_is_null = 1;
-        calculated_number n = NAN;
+        NETDATA_DOUBLE n = NAN;
         ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
-            ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
-                                      , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null);
+            ret = rrdset2value_api_v1(st, w->response.data, &n,
+                                      (dimensions) ? buffer_tostring(dimensions) : NULL,
+                                      points, after, before, group, group_options, 0, options,
+                                      NULL, &latest_timestamp,
+                                      NULL, NULL, NULL,
+                                      &value_is_null, NULL, 0, 0);
 
         // if the value cannot be calculated, show empty badge
         if (ret != HTTP_RESP_OK) {
@@ -1134,7 +1148,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         );
     }
 
-    cleanup:
+cleanup:
+    rrdcalc_from_rrdset_release(st, rca);
     buffer_free(dimensions);
     return ret;
 }

@@ -16,7 +16,7 @@ usage="$(basename "$0") [install] [-h] [-e]
 
 where:
     install      install ioping binary
-    -e, --env    path to environment file (defauls to '/etc/netdata/.environment'
+    -e, --env    path to environment file (defaults to '/etc/netdata/.environment'
     -h           show this help text"
 
 INSTALL=0
@@ -174,16 +174,14 @@ ioping_opts="-T 1000000"
 # -----------------------------------------------------------------------------
 # load the configuration files
 
-for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
-do
-    if [ -f "${CONFIG}" ]
-        then
-        info "Loading config file '${CONFIG}'..."
-        source "${CONFIG}"
-        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
-    else
-        warning "Cannot find file '${CONFIG}'."
-    fi
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"; do
+  if [ -f "${CONFIG}" ]; then
+    info "Loading config file '${CONFIG}'..."
+    source "${CONFIG}"
+    [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+  elif [[ $CONFIG =~ ^$NETDATA_USER_CONFIG_DIR ]]; then
+    warning "Cannot find file '${CONFIG}'."
+  fi
 done
 
 if [ -z "${destination}" ]

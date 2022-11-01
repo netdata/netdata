@@ -1432,7 +1432,7 @@ let chartState = function (element) {
             if (NETDATA.options.current.show_help) {
                 if (this.element_legend_childs.toolbox !== null) {
                     if (this.debug) {
-                        this.log('hideChart(): hidding legend popovers');
+                        this.log('hideChart(): hiding legend popovers');
                     }
 
                     $(this.element_legend_childs.toolbox_left).popover('hide');
@@ -1771,7 +1771,7 @@ let chartState = function (element) {
                 resizeChartToHeight(this.height_original.toString());
             }
 
-            // else if the current height is not the firstchild's clientheight
+            // else if the current height is not the firstChild's clientheight
             // resize to it
             else if (typeof this.element_legend_childs.perfect_scroller.firstChild !== 'undefined') {
                 let parent_rect = this.element.getBoundingClientRect();
@@ -2979,7 +2979,7 @@ let chartState = function (element) {
             }
         }
 
-        // create a hidden div to be used for hidding
+        // create a hidden div to be used for hiding
         // the original legend of the chart library
         let el = document.createElement('div');
         if (this.element_legend !== null) {

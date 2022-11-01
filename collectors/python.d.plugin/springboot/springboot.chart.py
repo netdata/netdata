@@ -92,7 +92,7 @@ class Service(UrlService):
         try:
             data = json.loads(raw_data)
         except ValueError:
-            self.debug('%s is not a vaild JSON page' % self.url)
+            self.debug('%s is not a valid JSON page' % self.url)
             return None
 
         result = {

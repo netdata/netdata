@@ -8,11 +8,19 @@ sidebar_label: "Nvidia GPUs"
 
 Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
 
+> **Warning**: this collector does not work when the Netdata Agent is [running in a container](https://learn.netdata.cloud/docs/agent/packaging/docker).
+
 
 ## Requirements and Notes
 
 -   You must have the `nvidia-smi` tool installed and your NVIDIA GPU(s) must support the tool. Mostly the newer high end models used for AI / ML and Crypto or Pro range, read more about [nvidia_smi](https://developer.nvidia.com/nvidia-system-management-interface).
--   You must enable this plugin as its disabled by default due to minor performance issues.
+-   You must enable this plugin, as its disabled by default due to minor performance issues:
+    ```bash
+    cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+    sudo ./edit-config python.d.conf
+    ```
+    Remove the '#' before nvidia_smi so it reads: `nvidia_smi: yes`.
+
 -   On some systems when the GPU is idle the `nvidia-smi` tool unloads and there is added latency again when it is next queried. If you are running GPUs under constant workload this isn't likely to be an issue.
 -   Currently the `nvidia-smi` tool is being queried via cli. Updating the plugin to use the nvidia c/c++ API directly should resolve this issue. See discussion here: <https://github.com/netdata/netdata/pull/4357>
 -   Contributions are welcome.
@@ -39,8 +47,8 @@ It produces the following charts:
 
 ## Configuration
 
-Edit the `python.d/nvidia_smi.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/nvidia_smi.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -55,4 +63,4 @@ poll_seconds : 1
 exclude_zero_memory_users : yes
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fnvidia_smi%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

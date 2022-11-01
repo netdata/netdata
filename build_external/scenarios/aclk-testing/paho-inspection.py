@@ -29,5 +29,5 @@ mqttc.connect("vernemq", 9002, 60)
 
 #mqttc.publish("/agent/mine","Test1")
 #mqttc.subscribe("$SYS/#", 0)
-print("Connected succesfully, monitoring /agent/#", flush=True)
+print("Connected successfully, monitoring /agent/#", flush=True)
 mqttc.loop_forever()

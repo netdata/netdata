@@ -1,9 +1,7 @@
 <!--
----
 title: "Health API Calls"
 date: 2020-04-27
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/health/README.md
----
 -->
 
 # Health API Calls
@@ -77,7 +75,7 @@ curl "http://NODE:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoke
 By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in `netdata.conf` within the [web] section. See [web server access lists](/web/server/README.md#access-lists) for more information.
 
 The command `RESET` just returns Netdata to the default operation, with all health checks and notifications enabled.
-If you've configured and entered your token correclty, you should see the plain text response `All health checks and notifications are enabled`.
+If you've configured and entered your token correctly, you should see the plain text response `All health checks and notifications are enabled`.
 
 ### Disable or silence all alarms
 
@@ -224,4 +222,4 @@ The file's location is configurable in `netdata.conf`. The default is shown belo
 
 The test script under [tests/health_mgmtapi](/tests/health_mgmtapi/README.md) contains a series of tests that you can either run or read through to understand the various calls and responses better.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

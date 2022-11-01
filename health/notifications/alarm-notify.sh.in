@@ -38,6 +38,7 @@
 #  - Dynatrace Event by @illumine
 #  - Stackpulse Event by @thiagoftsm
 #  - Opsgenie by @thiaoftsm #9858
+#  - Gotify by @coffeegrind123
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -165,7 +166,7 @@ pd
 fleep
 syslog
 custom
-msteam
+msteams
 kavenegar
 prowl
 irc
@@ -209,6 +210,9 @@ if [[ ${1} = "unittest" ]]; then
   cfgfile="${3}"    # the location of the config file to use for unit testing
   status="${4}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   old_status="${5}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+elif [[ ${1} = "dump_methods" ]]; then
+    dump_methods=1
+    status="WARNING"
 else
   roles="${1}"               # the roles that should be notified for this event
   args_host="${2}"           # the host generated this event
@@ -236,6 +240,11 @@ else
   calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
   total_warnings="${23}"     # Total number of alarms in WARNING state
   total_critical="${24}"     # Total number of alarms in CRITICAL state
+  total_warn_alarms="${25}"  # List of alarms in warning state
+  total_crit_alarms="${26}"  # List of alarms in critical state
+  classification="${27}"     # The class field from .conf files
+  edit_command_line="${28}"  # The command to edit the alarm, with the line number
+  child_machine_guid="${29}" # If populated, the notification is sent for a child
 fi
 
 # -----------------------------------------------------------------------------
@@ -297,8 +306,11 @@ done
 # slack configs
 SLACK_WEBHOOK_URL=
 
-# Microsoft Team configs
-MSTEAM_WEBHOOK_URL=
+# Microsoft Teams configs
+MSTEAMS_WEBHOOK_URL=
+
+# Legacy Microsoft Teams configs for backwards compatibility:
+declare -A role_recipients_msteam
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -372,6 +384,7 @@ EMAIL_PLAINTEXT_ONLY=
 IRC_NICKNAME=
 IRC_REALNAME=
 IRC_NETWORK=
+IRC_PORT=6667
 
 # hangouts configs
 declare -A HANGOUTS_WEBHOOK_URI
@@ -388,6 +401,10 @@ SEND_DYNATRACE=
 
 # stackpulse configs
 STACKPULSE_WEBHOOK=
+
+# gotify configs
+GOTIFY_APP_URL=
+GOTIFY_APP_TOKEN=
 
 # opsgenie configs
 OPSGENIE_API_KEY=
@@ -411,6 +428,12 @@ else
   done
 fi
 
+if [[ ! $curl_options =~ .*\--connect-timeout ]]; then
+  curl_options+=" --connect-timeout 5"
+fi
+
+OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
+
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
 # should be correct for almost all modern UNIX systems.
@@ -424,6 +447,38 @@ fi
 if [ "${use_fqdn}" = "YES" ] && [ "${host}" = "$(hostname -s 2>/dev/null)" ]; then
   host="$(hostname -f 2>/dev/null)"
 fi
+
+
+# -----------------------------------------------------------------------------
+# migrate old Microsoft Teams configuration keys after loading configuration
+
+msteams_migration() {
+    SEND_MSTEAMS=${SEND_MSTEAM:-$SEND_MSTEAMS}
+    unset -v SEND_MSTEAM
+    DEFAULT_RECIPIENT_MSTEAMS=${DEFAULT_RECIPIENT_MSTEAM:-$DEFAULT_RECIPIENT_MSTEAMS}
+    MSTEAMS_WEBHOOK_URL=${MSTEAM_WEBHOOK_URL:-$MSTEAMS_WEBHOOK_URL}
+    MSTEAMS_ICON_DEFAULT=${MSTEAM_ICON_DEFAULT:-$MSTEAMS_ICON_DEFAULT}
+    MSTEAMS_ICON_CLEAR=${MSTEAM_ICON_CLEAR:-$MSTEAMS_ICON_CLEAR}
+    MSTEAMS_ICON_WARNING=${MSTEAM_ICON_WARNING:-$MSTEAMS_ICON_WARNING}
+    MSTEAMS_ICON_CRITICAL=${MSTEAM_ICON_CRITICAL:-$MSTEAMS_ICON_CRITICAL}
+    MSTEAMS_COLOR_DEFAULT=${MSTEAM_COLOR_DEFAULT:-$MSTEAMS_COLOR_DEFAULT}
+    MSTEAMS_COLOR_CLEAR=${MSTEAM_COLOR_CLEAR:-$MSTEAMS_COLOR_CLEAR}
+    MSTEAMS_COLOR_WARNING=${MSTEAM_COLOR_WARNING:-$MSTEAMS_COLOR_WARNING}
+    MSTEAMS_COLOR_CRITICAL=${MSTEAM_COLOR_CRITICAL:-$MSTEAMS_COLOR_CRITICAL}
+
+    # migrate role specific recipients:
+    for key in "${!role_recipients_msteam[@]}"; do
+        # Disable check, if role_recipients_msteams is ever used:
+        # The role_recipients_$method are created and used programmatically
+        # by iterating over $methods. shellcheck therefore doesn't realize
+        # that role_recipients_msteams is actually used in the block
+        # "find the recipients' addresses per method".
+        # shellcheck disable=SC2034
+        role_recipients_msteams["$key"]="${role_recipients_msteam["$key"]}"
+    done
+}
+
+msteams_migration
 
 # -----------------------------------------------------------------------------
 # filter a recipient based on alarm event severity
@@ -544,8 +599,23 @@ filter_recipient_by_criticality() {
 # check matrix
 { [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
+# check gotify
+{ [ -z "${GOTIFY_APP_TOKEN}" ] || [ -z "${GOTIFY_APP_URL}" ]; } && SEND_GOTIFY="NO"
+
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
+
+# check msteams
+[ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
+
+# check pd
+[ -z "${DEFAULT_RECIPIENT_PD}" ] && SEND_PD="NO"
+
+# check prowl
+[ -z "${DEFAULT_RECIPIENT_PROWL}" ] && SEND_PROWL="NO"
+
+# check custom
+[ -z "${DEFAULT_RECIPIENT_CUSTOM}" ] && SEND_CUSTOM="NO"
 
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_SLACK}" = "YES" ] ||
@@ -566,10 +636,11 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_HANGOUTS}" = "YES" ] ||
   [ "${SEND_MATRIX}" = "YES" ] ||
   [ "${SEND_CUSTOM}" = "YES" ] ||
-  [ "${SEND_MSTEAM}" = "YES" ] ||
+  [ "${SEND_MSTEAMS}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
   [ "${SEND_STACKPULSE}" = "YES" ] ||
-  [ "${SEND_OPSGENIE}" = "YES" ]; then
+  [ "${SEND_OPSGENIE}" = "YES" ] ||
+  [ "${SEND_GOTIFY}" = "YES" ]; then
   # if we need curl, check for the curl command
   if [ -z "${curl}" ]; then
     curl="$(command -v curl 2>/dev/null)"
@@ -580,7 +651,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_PUSHBULLET="NO"
     SEND_TELEGRAM="NO"
     SEND_SLACK="NO"
-    SEND_MSTEAM="NO"
+    SEND_MSTEAMS="NO"
     SEND_ROCKETCHAT="NO"
     SEND_ALERTA="NO"
     SEND_PD="NO"
@@ -599,6 +670,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_DYNATRACE="NO"
     SEND_STACKPULSE="NO"
     SEND_OPSGENIE="NO"
+    SEND_GOTIFY="NO"
   fi
 fi
 
@@ -635,6 +707,15 @@ if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
     debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
     SEND_AWSSNS="NO"
   fi
+fi
+
+if [ ${dump_methods} ]; then
+    for name in "${!SEND_@}"; do
+        if [ "${!name}" = "YES" ]; then
+            echo "$name"
+        fi
+    done
+    exit
 fi
 
 # -----------------------------------------------------------------------------
@@ -726,10 +807,11 @@ for method in "${SEND_EMAIL}" \
   "${SEND_AWSSNS}" \
   "${SEND_SYSLOG}" \
   "${SEND_SMS}" \
-  "${SEND_MSTEAM}" \
+  "${SEND_MSTEAMS}" \
   "${SEND_DYNATRACE}" \
   "${SEND_STACKPULSE}" \
-  "${SEND_OPSGENIE}" ; do
+  "${SEND_OPSGENIE}" \
+  "${SEND_GOTIFY}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -747,6 +829,14 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date --date=@${when} 2>/dev/null)
 [ -z "${date}" ] && date=$(date 2>/dev/null)
+
+# -----------------------------------------------------------------------------
+# get the date in utc the alarm happened
+
+date_utc=$(date --date=@${when} "${date_format}" -u 2>/dev/null)
+[ -z "${date_utc}" ] && date_utc=$(date -u "${date_format}" 2>/dev/null)
+[ -z "${date_utc}" ] && date_utc=$(date -u --date=@${when} 2>/dev/null)
+[ -z "${date_utc}" ] && date_utc=$(date -u 2>/dev/null)
 
 # ----------------------------------------------------------------------------
 # prepare some extra headers if we've been asked to thread e-mails
@@ -853,7 +943,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && ${sendmail} -F 2>&1 | head -1 | grep -qv "sendmail: unrecognized option: F" && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
@@ -862,14 +952,15 @@ send_email() {
       echo >&2 "--- END sendmail command ---"
     fi
 
-    "${sendmail}" -t "${opts[@]}"
+    local cmd_output
+    cmd_output=$("${sendmail}" -t "${opts[@]}" 2>&1)
     ret=$?
 
     if [ ${ret} -eq 0 ]; then
       info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
       return 0
     else
-      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
+      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret} (${cmd_output})."
       return 1
     fi
   fi
@@ -925,10 +1016,21 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-  local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 user
+  local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 userOrChannelTag
   if [ "${SEND_PUSHBULLET}" = "YES" ] && [ -n "${userapikey}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
-    #https://docs.pushbullet.com/#create-push
-    for user in ${recipients}; do
+
+    # https://docs.pushbullet.com/#create-push
+    # Accept specification of user(s) (PushBullet account email address) and/or channel tag(s), separated by spaces.
+    # If recipient begins with a "#" then send to channel tag, otherwise send to email recipient.
+
+    for userOrChannelTag in ${recipients}; do
+      if [ "${userOrChannelTag::1}" = "#" ]; then
+        userOrChannelTag_type="channel_tag"
+        userOrChannelTag="${userOrChannelTag:1}" # Remove hash from start of channel tag (required by pushbullet API)
+      else
+        userOrChannelTag_type="email"
+      fi
+
       httpcode=$(docurl \
         --header 'Access-Token: '${userapikey}'' \
         --header 'Content-Type: application/json' \
@@ -936,7 +1038,7 @@ send_pushbullet() {
           cat <<EOF
                               {"title": "${title}",
                               "type": "link",
-                              "email": "${user}",
+                              "${userOrChannelTag_type}": "${userOrChannelTag}",
                               "body": "$(echo -n ${message})",
                               "url": "${url}",
                               "source_device_iden": "${source_device}"}
@@ -944,10 +1046,10 @@ EOF
         ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}'"
         sent=$((sent + 1))
       else
-        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}' with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1237,21 +1339,37 @@ send_telegram() {
 
   if [ "${SEND_TELEGRAM}" = "YES" ] && [ -n "${bottoken}" ] && [ -n "${chatids}" ] && [ -n "${message}" ]; then
     for chatid in ${chatids}; do
-      # https://core.telegram.org/bots/api#sendmessage
-      httpcode=$(docurl ${disableNotification} \
-        --data-urlencode "parse_mode=HTML" \
-        --data-urlencode "disable_web_page_preview=true" \
-        --data-urlencode "text=${emoji} ${message}" \
-        "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+      notify_telegram=1
+      notify_retries=${TELEGRAM_RETRIES_ON_LIMIT:-0}
 
-      if [ "${httpcode}" = "200" ]; then
-        info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
-        sent=$((sent + 1))
-      elif [ "${httpcode}" = "401" ]; then
-        error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
-      else
-        error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP response status code ${httpcode}."
-      fi
+      while [ ${notify_telegram} -eq 1 ]; do
+        # https://core.telegram.org/bots/api#sendmessage
+        httpcode=$(docurl ${disableNotification} \
+          --data-urlencode "parse_mode=HTML" \
+          --data-urlencode "disable_web_page_preview=true" \
+          --data-urlencode "text=${emoji} ${message}" \
+          "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+
+        notify_telegram=0
+
+        if [ "${httpcode}" = "200" ]; then
+          info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+          sent=$((sent + 1))
+        elif [ "${httpcode}" = "401" ]; then
+          error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+        elif [ "${httpcode}" = "429" ]; then
+          if [ "$notify_retries" -gt 0 ]; then
+            error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': rate limit exceeded, retrying after 1s."
+            notify_retries=$((notify_retries - 1))
+            notify_telegram=1
+            sleep 1
+          else
+            error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': rate limit exceeded."
+          fi
+        else
+          error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP response status code ${httpcode}."
+        fi
+      done
     done
 
     [ ${sent} -gt 0 ] && return 0
@@ -1263,22 +1381,22 @@ send_telegram() {
 # -----------------------------------------------------------------------------
 # Microsoft Team sender
 
-send_msteam() {
+send_msteams() {
 
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-  [ "${SEND_MSTEAM}" != "YES" ] && return 1
+  [ "${SEND_MSTEAMS}" != "YES" ] && return 1
 
   case "${status}" in
-  WARNING) icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}" ;;
-  CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}" ;;
-  CLEAR) icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}" ;;
-  *) icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}" ;;
+  WARNING) icon="${MSTEAMS_ICON_WARNING}" && color="${MSTEAMS_COLOR_WARNING}" ;;
+  CRITICAL) icon="${MSTEAMS_ICON_CRITICAL}" && color="${MSTEAMS_COLOR_CRITICAL}" ;;
+  CLEAR) icon="${MSTEAMS_ICON_CLEAR}" && color="${MSTEAMS_COLOR_CLEAR}" ;;
+  *) icon="${MSTEAMS_ICON_DEFAULT}" && color="${MSTEAMS_COLOR_DEFAULT}" ;;
   esac
 
   for channel in ${channels}; do
     ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
-    ## Online designer : https://acdesignerbeta.azurewebsites.net/
+    ## Online designer : https://adaptivecards.io/designer/
     payload="$(
       cat <<EOF
         {
@@ -1301,15 +1419,15 @@ EOF
     )"
 
     # Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
-    webhook="${webhook//CHANNEL/${channel}}"
+    cur_webhook="${webhook//CHANNEL/${channel}}"
 
-    httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
+    httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${cur_webhook}")
 
     if [ "${httpcode}" = "200" ]; then
-      info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+      info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${cur_webhook}'"
       sent=$((sent + 1))
     else
-      error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP response status code ${httpcode}."
+      error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${cur_webhook}', with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1720,9 +1838,9 @@ send_prowl() {
 # irc sender
 
 send_irc() {
-  local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" SERVERNAME="${5}" MESSAGE="${6}" sent=0 channel color send_alarm reply_codes error
+  local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" PORT="${5}" SERVERNAME="${6}" MESSAGE="${7}" sent=0 channel color send_alarm reply_codes error
 
-  if [ "${SEND_IRC}" = "YES" ] && [ -n "${NICKNAME}" ] && [ -n "${REALNAME}" ] && [ -n "${CHANNELS}" ] && [ -n "${NETWORK}" ] && [ -n "${SERVERNAME}" ]; then
+  if [ "${SEND_IRC}" = "YES" ] && [ -n "${NICKNAME}" ] && [ -n "${REALNAME}" ] && [ -n "${CHANNELS}" ] && [ -n "${NETWORK}" ] && [ -n "${SERVERNAME}" ] && [ -n "${PORT}" ]; then
     case "${status}" in
     WARNING) color="warning" ;;
     CRITICAL) color="danger" ;;
@@ -1733,7 +1851,7 @@ send_irc() {
     SNDMESSAGE="${MESSAGE//$'\n'/", "}"
     for CHANNEL in ${CHANNELS}; do
       error=0
-      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
+      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" "${PORT}")
       reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
       for code in ${reply_codes}; do
         if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then
@@ -1833,7 +1951,7 @@ EOF
 
 send_syslog() {
   local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
-  local priority='' message='' host='' port='' prefix=''
+  local priority='' message='' server='' port='' prefix=''
   local temp1='' temp2=''
 
   [ "${SEND_SYSLOG}" = "YES" ] || return 1
@@ -1847,7 +1965,7 @@ send_syslog() {
   for target in ${targets}; do
     priority="${facility}.${level}"
     message=''
-    host=''
+    server=''
     port=''
     prefix=''
     temp1=''
@@ -1859,25 +1977,25 @@ send_syslog() {
     if [ ${prefix} != ${temp1} ]; then
       if (echo ${temp1} | grep -q '@'); then
         temp2=$(echo ${temp1} | cut -d '@' -f 1)
-        host=$(echo ${temp1} | cut -d '@' -f 2)
+        server=$(echo ${temp1} | cut -d '@' -f 2)
 
-        if [ ${temp2} != ${host} ]; then
+        if [ ${temp2} != ${server} ]; then
           priority=${temp2}
         fi
 
-        port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+        port=$(echo ${server} | rev | cut -d ':' -f 1 | rev)
 
-        if (echo ${host} | grep -E -q '\[.*\]'); then
+        if (echo ${server} | grep -E -q '\[.*\]'); then
           if (echo ${port} | grep -q ']'); then
             port=''
           else
-            host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+            server=$(echo ${server} | rev | cut -d ':' -f 2- | rev)
           fi
         else
-          if [ ${port} = ${host} ]; then
+          if [ ${port} = ${server} ]; then
             port=''
           else
-            host=$(echo ${host} | cut -d ':' -f 1)
+            server=$(echo ${server} | cut -d ':' -f 1)
           fi
         fi
       else
@@ -1887,8 +2005,8 @@ send_syslog() {
 
     message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
-    if [ ${host} ]; then
-      logger_options="${logger_options} -n ${host}"
+    if [ ${server} ]; then
+      logger_options="${logger_options} -n ${server}"
       if [ ${port} ]; then
         logger_options="${logger_options} -P ${port}"
       fi
@@ -2050,12 +2168,12 @@ send_dynatrace() {
   [ "${SEND_DYNATRACE}" != "YES" ] && return 1
 
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
-  local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
+  local description="Netdata Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""
-  
+
   payload=$(cat <<EOF
 {
-  "title": "NetData Alarm from ${host}",
+  "title": "Netdata Alarm from ${host}",
   "source" : "${DYNATRACE_ANNOTATION_TYPE}",
   "description" : "${description}",
   "eventType": "${DYNATRACE_EVENT}",
@@ -2179,12 +2297,51 @@ send_opsgenie() {
 EOF
 )
 
-  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${OPSGENIE_API_URL}/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
   if [ "${httpcode}" = "200" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
     error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    return 1
+  fi
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
+# Gotify sender
+
+send_gotify() {
+  local payload httpcode priority
+  [ "${SEND_GOTIFY}" != "YES" ] && return 1
+
+  if [ -z "${GOTIFY_APP_TOKEN}" ] ; then
+    info "Can't send Gotify notification, because GOTIFY_APP_TOKEN is not defined"
+    return 1
+  fi
+
+  # priority for Gotify Android app
+  case "${status}" in
+    CRITICAL) priority=10 ;; # sound + vibration
+    WARNING) priority=4 ;; # sound
+    *) priority=1 ;; # notification only
+  esac
+
+  payload=$(cat <<EOF
+  {
+    "title" : "${status}, ${name} = ${value_string}, on ${host}",
+    "message" : "${date}: ${chart} ${value_string}",
+    "priority" : ${priority}
+  }
+EOF
+)
+
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${GOTIFY_APP_URL}/message?token=${GOTIFY_APP_TOKEN}")
+  if [ "${httpcode}" = "200" ]; then
+    info "sent gotify notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send gotify notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
     return 1
   fi
 
@@ -2203,8 +2360,10 @@ urlencode "${family}" >/dev/null
 url_family="${REPLY}"
 urlencode "${name}" >/dev/null
 url_name="${REPLY}"
+urlencode "${value_string}" >/dev/null
+url_value_string="${REPLY}"
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}"
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${chart}&alarm_value=${url_value_string}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
@@ -2221,9 +2380,13 @@ fi
 if [ ${GOTOCLOUD} -eq 0 ]; then
   goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
 else
-  # Temporarily disable alarm redirection, as the cloud endpoint no longer exists. This functionality will be restored after discussion on #9487. For now, just lead to netdata.cloud
-  #goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
-  goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}"
+    # Temporarily disable alarm redirection, as the cloud endpoint no longer exists. This functionality will be restored after discussion on #9487. For now, just lead to netdata.cloud
+    # Re-allow alarm redirection, for alarms 2.0, new template
+  if [ -z "${child_machine_guid}" ]; then
+      goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
+  else
+      goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&childId=${child_machine_guid}&${redirect_params}"
+  fi
 fi
 
 # the severity of the alarm
@@ -2248,48 +2411,79 @@ alarm="${name//_/ } = ${value_string}"
 # the image of the alarm
 image="${images_base_url}/images/banner-icon-144x144.png"
 
+# have a default email status, in case the following case does not catch it
+status_email_subject="${status}"
+
 # prepare the title based on status
 case "${status}" in
 CRITICAL)
   image="${images_base_url}/images/alert-128-red.png"
+  alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_critical.png"
   status_message="is critical"
+  status_email_subject="Critical"
   color="#ca414b"
+  rich_status_raised_for="Raised to critical, for ${non_clear_duration_txt}"
+  background_color="#FFEBEF"
+  border_color="#FF4136"
+  text_color="#FF4136"
+  action_text_color="#FFFFFF"
   ;;
 
 WARNING)
   image="${images_base_url}/images/alert-128-orange.png"
+  alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_warning.png"
   status_message="needs attention"
+  status_email_subject="Warning"
   color="#ffc107"
+  rich_status_raised_for="Raised to warning, for ${non_clear_duration_txt}"
+  background_color="#FFF8E1"
+  border_color="#FFC300"
+  text_color="#536775"
+  action_text_color="#35414A"
   ;;
 
 CLEAR)
   image="${images_base_url}/images/check-mark-2-128-green.png"
+  alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_recovered.png"
   status_message="recovered"
+  status_email_subject="Clear"
   color="#77ca6d"
+  rich_status_raised_for=
+  background_color="#E5F5E8"
+  border_color="#68C47D"
+  text_color="#00AB44"
+  action_text_color="#FFFFFF"
   ;;
 esac
+
+# the html email subject
+html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
 
 if [ "${status}" = "CLEAR" ]; then
   severity="Recovered from ${old_status}"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm was raised for ${non_clear_duration_txt})"
   fi
+  rich_status_raised_for="Recovered from ${old_status,,}, ${raised_for}"
 
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
   alarm="${name//_/ } ${raised_for}"
+  html_email_subject="${status_email_subject}, ${name} ${raised_for}, on ${host}"
 
 elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
   severity="Escalated to ${status}"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm is raised for ${non_clear_duration_txt})"
   fi
+  rich_status_raised_for="Escalated to critical, ${raised_for}"
 
 elif { [ "${old_status}" = "CRITICAL" ] && [ "${status}" = "WARNING" ]; }; then
   severity="Demoted to ${status}"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm is raised for ${non_clear_duration_txt})"
   fi
+  rich_status_raised_for="Demoted to warning, ${raised_for}"
 
 else
   raised_for=
@@ -2321,13 +2515,13 @@ send_hangouts "${to_hangouts}"
 SENT_HANGOUTS=$?
 
 # -----------------------------------------------------------------------------
-# send the Microsoft notification
+# send the Microsoft Teams notification
 
-# Microsoft team aggregates posts from the same username
+# Microsoft teams aggregates posts from the same username
 # so we use "${host} ${status}" as the bot username, to make them diff
 
-send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
-SENT_MSTEAM=$?
+send_msteams "${MSTEAMS_WEBHOOK_URL}" "${to_msteams}"
+SENT_MSTEAMS=$?
 
 # -----------------------------------------------------------------------------
 # send the rocketchat notification
@@ -2463,7 +2657,7 @@ SENT_PROWL=$?
 # -----------------------------------------------------------------------------
 # send the irc message
 
-send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
+send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${IRC_PORT}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
@@ -2565,6 +2759,13 @@ Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
 ${email_thread_headers}
+X-Netdata-Severity: ${status,,}
+X-Netdata-Alert-Name: $name
+X-Netdata-Chart: $chart
+X-Netdata-Family: $family
+X-Netdata-Classification: $classification
+X-Netdata-Host: $host
+X-Netdata-Role: $roles
 
 This is a MIME-encoded multipart message
 
@@ -2575,120 +2776,750 @@ EOF
 
 else
 
+now=$(date "+%s")
+
+if [ -n "$total_warn_alarms" ]; then
+   while read -d, -r pair; do
+       IFS='=' read -r key val <<<"$pair"
+
+       date_w=$(date --date=@${val} "${date_format}" 2>/dev/null)
+       [ -z "${date_w}" ] && date_w=$(date "${date_format}" 2>/dev/null)
+       [ -z "${date_w}" ] && date_w=$(date --date=@${val} 2>/dev/null)
+       [ -z "${date_w}" ] && date_w=$(date 2>/dev/null)
+
+       elapsed=$((now - val))
+
+       duration4human ${elapsed} >/dev/null
+       elapsed_txt="${REPLY}"
+
+       WARN_ALARMS+="
+       <div class=\"set-font\" style=\"font-family: 'IBM Plex Sans', sans-serif; background: #FFFFFF; background-color: #FFFFFF; margin: 0px auto; max-width: 600px;\">
+            <table align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#FFFFFF;background-color:#FFFFFF;width:100%;\">
+              <tbody>
+              <tr>
+                <td style=\"border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;\">
+                  <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+                  <div class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\">
+                    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\">
+                      <tbody>
+                      <tr>
+                        <td align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
+                          <div style=\"font-family:Open Sans, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#35414A;\">${key}</div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td align=\"left\" style=\"font-size:0px;padding:10px 25px;padding-top:2px;word-break:break-word;\">
+                          <div style=\"font-family:Open Sans, sans-serif;font-size:12px;line-height:1;text-align:left;color:#35414A;\">${date_w}</div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+                  <div class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\">
+                    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" width=\"100%\">
+                      <tbody>
+                      <tr>
+                        <td style=\"vertical-align:top;padding-top:13px;\">
+                          <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style width=\"100%\">
+                            <tbody>
+                            <tr>
+                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
+                                <div style=\"font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"><span style=\"background-color:#FFF8E1; border: 1px solid #FFC300; border-radius:36px; padding: 2px 12px; margin-top: 20px; white-space: nowrap\">
+              Warning for ${elapsed_txt}
+           </span></div>
+                              </td>
+                            </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+       "
+
+   done <<<"$total_warn_alarms,"
+fi
+
+if [ -n "$total_crit_alarms" ]; then
+   while read -d, -r pair; do
+       IFS='=' read -r key val <<<"$pair"
+
+       date_c=$(date --date=@${val} "${date_format}" 2>/dev/null)
+       [ -z "${date_c}" ] && date_c=$(date "${date_format}" 2>/dev/null)
+       [ -z "${date_c}" ] && date_c=$(date --date=@${val} 2>/dev/null)
+       [ -z "${date_c}" ] && date_c=$(date 2>/dev/null)
+
+       elapsed=$((now - val))
+
+       duration4human ${elapsed} >/dev/null
+       elapsed_txt="${REPLY}"
+
+       CRIT_ALARMS+="
+       <div class=\"set-font\" style=\"font-family: 'IBM Plex Sans', sans-serif; background: #FFFFFF; background-color: #FFFFFF; margin: 0px auto; max-width: 600px;\">
+            <table align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#FFFFFF;background-color:#FFFFFF;width:100%;\">
+              <tbody>
+              <tr>
+                <td style=\"border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;\">
+                  <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+                  <div class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\">
+                    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\">
+                      <tbody>
+                      <tr>
+                        <td align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
+                          <div style=\"font-family:Open Sans, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#35414A;\">${key}</div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td align=\"left\" style=\"font-size:0px;padding:10px 25px;padding-top:2px;word-break:break-word;\">
+                          <div style=\"font-family:Open Sans, sans-serif;font-size:12px;line-height:1;text-align:left;color:#35414A;\">${date_c}</div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+                  <div class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\">
+                    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" width=\"100%\">
+                      <tbody>
+                      <tr>
+                        <td style=\"vertical-align:top;padding-top:13px;\">
+                          <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style width=\"100%\">
+                            <tbody>
+                            <tr>
+                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
+                                <div style=\"font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:right;color:#35414A;\"><span style=\"background-color:#FFEBEF; border: 1px solid #FF4136; border-radius:36px; padding: 2px 12px; margin-top: 20px; white-space: nowrap\">
+              Critical for ${elapsed_txt}
+           </span></div>
+                              </td>
+                            </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+       "
+
+   done <<<"$total_crit_alarms,"
+fi
+
+if (( total_warnings + total_critical > 15 )); then
+    EXTRA_ALARMS_LIST_TEXT="(Showing latest 15 alerts)"
+fi
+
+if [ -n "$edit_command_line" ]; then
+    IFS='=' read -r edit_command line s_host <<<"$edit_command_line"
+fi
+
 IFS='' read -r -d '' email_html_part <<EOF
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px; margin: 0; padding: 0;">
-<body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; width: 100% !important; min-height: 100%; line-height: 1.6; background: #f6f6f6; margin:0; padding: 0;">
-<table>
-    <tbody>
-    <tr>
-        <td style="vertical-align: top;" valign="top"></td>
-        <td width="700" style="vertical-align: top; display: block !important; max-width: 700px !important; clear: both !important; margin: 0 auto; padding: 0;" valign="top">
-            <div style="max-width: 700px; display: block; margin: 0 auto; padding: 20px;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="background: #fff; border: 1px solid #e9e9e9;">
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <title>
+  </title>
+  <!--[if !mso]><!-->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--<![endif]-->
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style type="text/css">
+      #outlook a { padding:0; }
+      body { margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%; }
+      table, td { border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt; }
+      img { border:0;height:auto;line-height:100%; outline:none;text-decoration:none;-ms-interpolation-mode:bicubic; }
+      p { display:block;margin:13px 0; }
+  </style>
+  <!--[if mso]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
+  <!--[if lte mso 11]>
+  <style type="text/css">
+    .mj-outlook-group-fix { width:100% !important; }
+  </style>
+  <![endif]-->
+  <!--[if !mso]><!-->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700" rel="stylesheet" type="text/css">
+  <style type="text/css">
+      @import url(https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700);
+  </style>
+  <!--<![endif]-->
+  <style type="text/css">
+      @media only screen and (min-width:100px) {
+          .mj-column-px-130 { width:130px !important; max-width: 130px; }
+          .mj-column-per-50 { width:50% !important; max-width: 50%; }
+          .mj-column-per-70 { width:70% !important; max-width: 70%; }
+          .mj-column-per-30 { width:30% !important; max-width: 30%; }
+          .mj-column-per-100 { width:100% !important; max-width: 100%; }
+          .mj-column-px-66 { width:66px !important; max-width: 66px; }
+          .mj-column-px-400 { width:400px !important; max-width: 400px; }
+      }
+  </style>
+  <style type="text/css">
+      @media only screen and (max-width:100px) {
+          table.mj-full-width-mobile { width: 100% !important; }
+          td.mj-full-width-mobile { width: auto !important; }
+      }
+  </style>
+</head>
+<body style="word-spacing:normal;">
+<div class="svgbg" style="background-image: url('https://staging.netdata.cloud/static/email/img/isotype_600.png'); background-repeat: no-repeat; background-position: top center; background-size: 600px 192px;">
+  <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div style="margin:0px auto;max-width:600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:50px;padding-left:0;text-align:left;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:130px;" ><![endif]-->
+          <div class="mj-column-px-130 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:130px;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+              <tbody>
+              <tr>
+                <td align="center" style="font-size:0px;padding:10px 25px;padding-right:0;padding-left:0;word-break:break-word;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
                     <tbody>
                     <tr>
-                        <td bgcolor="#eee" style="padding: 5px 20px 5px 20px; background-color: #eee;">
-                            <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 20px; color: #777; font-weight: bold;">netdata notification</div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td bgcolor="${color}" style="font-size: 16px; vertical-align: top; font-weight: 400; text-align: center; margin: 0; padding: 10px; color: #ffffff; background: ${color} !important; border: 1px solid ${color}; border-top-color: ${color};" align="center" valign="top">
-                            <h1 style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 400; margin: 0;">${host} ${status_message}</h1>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="vertical-align: top;" valign="top">
-                            <div style="margin: 0; padding: 20px; max-width: 700px;">
-                                <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px">
-                                    <tbody>
-                                    <tr>
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding:0 0 20px;" align="left" valign="top">
-                                            <span>${chart}</span>
-                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Chart</span>
-                                        </td>
-                                    </tr>
-                                    <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            <span><b>${alarm}</b>${info_html}</span>
-                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Alarm</span>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            <span>${family}</span>
-                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Family</span>
-                                        </td>
-                                    </tr>
-                                    <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            <span>${severity}</span>
-                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Severity</span>
-                                        </td>
-                                    </tr>
-                                    <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top"><span>${date}</span>
-                                            <span>${raised_for_html}</span> <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Time</span>
-                                        </td>
-                                    </tr>
-                                    <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            <span>${calc_expression}</span>
-                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Evaluated Expression</span>
-                                        </td>
-                                    </tr>
-                                     <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            <span>${calc_param_values}</span>
-                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Expression Variables</span>
-                                        </td>
-                                    </tr>
-                                     <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised.
-                                         </td>
-                                    </tr>
-
-                                    <tr style="margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;">
-                                            <a href="${goto_url}" style="font-size: 14px; color: #ffffff; text-decoration: none; line-height: 1.5; font-weight: bold; text-align: center; display: inline-block; text-transform: capitalize; background: #35568d; border-width: 1px; border-style: solid; border-color: #2b4c86; margin: 0; padding: 10px 15px;" target="_blank">View Netdata</a>
-                                        </td>
-                                    </tr>
-                                    <tr style="text-align: center; margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; vertical-align: top; margin: 0; padding: 10px 0 0 0; color: #666666;" align="center" valign="bottom">The source of this alarm is line <code>${src}</code><br/>(alarms are configurable, edit this file to adapt the alarm to your needs)
-                                        </td>
-                                    </tr>
-                                    <tr style="text-align: center; margin: 0; padding: 0;">
-                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; margin:0; padding: 20px 0 0 0; color: #666666; border-top: 1px solid #f0f0f0;" align="center" valign="bottom">Sent by
-                                            <a href="https://mynetdata.io/" target="_blank">netdata</a>, the real-time performance and health monitoring, on <code>${host}</code>.
-                                        </td>
-                                    </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
+                      <td style="width:130px;">
+                        <img alt="Netdata Logo" height="auto" src="https://app.netdata.cloud/static/email/img/full_logo.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="130">
+                      </td>
                     </tr>
                     </tbody>
-                </table>
-            </div>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
+          <div class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding-top:4px;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:10px;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">Notification</div>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table><![endif]-->
         </td>
-    </tr>
-    </tbody>
-</table>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="no-collapse-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="no-collapse" style="border-collapse: initial; margin: 0px auto; border-radius: 4px; max-width: 600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;border-radius:4px;">
+      <tbody>
+      <tr>
+        <td style="border:1px solid ${border_color};direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+              <tbody>
+              <tr>
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:418.6px;" ><![endif]-->
+                  <div class="mj-column-per-70 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:70%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;">
+                          <div style="font-family:Open Sans, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#35414A;">${name}</div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:179.4px;" ><![endif]-->
+                  <div class="mj-column-per-30 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:30%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="right" style="font-size:0px;padding:10px 25px;padding-right:25px;word-break:break-word;">
+                          <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
+                            <tbody>
+                            <tr>
+                              <td style="width:100px;">
+                                <img height="auto" src="${alarm_badge}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="100"/>
+                              </td>
+                            </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+              <tbody>
+              <tr>
+                <td style="direction:ltr;font-size:0px;padding:0;text-align:center;">
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
+                          <div style="font-family:IBM Plex Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">on ${host}</div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+              <tbody>
+              <tr>
+                <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
+                          <div style="font-family:Open Sans, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#35414A;"><span style="color: ${text_color}; font-size:26px; background: ${background_color}; padding:4px 24px; border-radius: 36px">${value_string}
+            </span></div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+              <tbody>
+              <tr>
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
+                          <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:21px;text-align:left;color:#35414A;">Details: ${info}</div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+              <tbody>
+              <tr>
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="center" vertical-align="middle" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                          <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;width:100%;line-height:100%;">
+                            <tr>
+                              <td
+                                align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle">
+                                <p style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:600;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;">
+                                  <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">GO TO CHART</a>
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><![endif]-->
+  <div style="height:32px;line-height:32px;">&#8202;</div>
+  <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; background: ${background_color}; background-color: ${background_color}; margin: 0px auto; border-radius: 4px; max-width: 600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:${background_color};background-color:${background_color};width:100%;border-radius:4px;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
+          <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+              <tbody>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Chart:
+                    <span style="font-weight:700; font-size:20px">${chart}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Family:
+                    <span style="font-weight:700; font-size:20px">${family}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:4px;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1;text-align:left;color:#35414A;">${rich_status_raised_for}</div>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                  <p style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:100%;">
+                  </p>
+                  <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:550px;" role="presentation" width="550px" ><tr><td style="height:0;line-height:0;"> &nbsp;
+            </td></tr></table><![endif]-->
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">On
+                    <span style="font-weight:600">${date}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">By:
+                    <span style="font-weight:600">${host}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:4px;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1;text-align:left;color:#35414A;">Global time:
+                    <span style="font-weight:600">${date_utc}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                  <p style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:100%;">
+                  </p>
+                  <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:550px;" role="presentation" width="550px" ><tr><td style="height:0;line-height:0;"> &nbsp;
+            </td></tr></table><![endif]-->
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">Classification:
+                    <span style="font-weight:600">${classification}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
+                  <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">Role:
+                    <span style="font-weight:600">${roles}</span></div>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:25px;text-align:left;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:66px;" ><![endif]-->
+          <div class="mj-column-px-66 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:66px;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding:0;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-right:0;padding-left:0;word-break:break-word;">
+                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
+                          <tbody>
+                          <tr>
+                            <td style="width:48px;">
+                              <img height="auto" src="https://app.netdata.cloud/static/email/img/community_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="48">
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:400px;" ><![endif]-->
+          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:400px;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding-left:0;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#35414A;">Want to know more about this alert?</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#35414A;">Join the troubleshooting discussion for this alert on our <a href="https://community.netdata.cloud/t/${name//[._]/-}" class="link" style="color: #00AB44; text-decoration: none;">community forums</a>.</div>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:25px;text-align:left;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:66px;" ><![endif]-->
+          <div class="mj-column-px-66 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:66px;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding:0;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-right:0;padding-left:0;word-break:break-word;">
+                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
+                          <tbody>
+                          <tr>
+                            <td style="width:48px;">
+                              <img height="auto" src="https://app.netdata.cloud/static/email/img/configure_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="48">
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:400px;" ><![endif]-->
+          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:400px;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding-left:0;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#35414A;">Need to configure this alert?</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#35414A;"><span style="color: #00AB44"><a href="https://learn.netdata.cloud/docs/agent/health/notifications#:~:text=To%20edit%20it%20on%20your,have%20one%20or%20more%20destinations" class="link" style="color: #00AB44; text-decoration: none;">Edit</a></span> this alert's configuration file by logging into $s_host and running the following command:</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-top:8px;padding-left:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#35414A;">${edit_command} <br>
+                          <br>The alarm to edit is at line ${line}</div>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="history-wrapper-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="history-wrapper" style="background: #F7F8F8; background-color: #F7F8F8; margin: 0px auto; max-width: 100%;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#F7F8F8;background-color:#F7F8F8;width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:0;padding-bottom:24px;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+              <tbody>
+              <tr>
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:12px;text-align:center;">
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+                      <tbody>
+                      <tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                          <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:center;color:#35414A;">The node has
+                            <span style="font-weight:600">${total_warnings} warning</span>
+                            and
+                            <span style="font-weight:600">${total_critical} critical</span>
+                            additional active alert(s)</div>
+                        </td>
+                        </tr>
+                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                          <div style="font-family:Open Sans, sans-serif;font-size:12px;line-height:1;text-align:center;color:#35414A;">${EXTRA_ALARMS_LIST_TEXT}</div>
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          ${CRIT_ALARMS}
+          ${WARN_ALARMS}
+          <!--[if mso | IE]></td></tr></table></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
+          <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding-top:44px;padding-bottom:12px;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;padding-bottom:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata 2021 - The real-time performance and health monitoring</div>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+  </div>
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><![endif]-->
+</div>
 </body>
 </html>
 EOF
 
 send_email <<EOF
 To: ${to_email}
-Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
+Subject: ${html_email_subject}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
 ${email_thread_headers}
+X-Netdata-Severity: ${status,,}
+X-Netdata-Alert-Name: $name
+X-Netdata-Chart: $chart
+X-Netdata-Family: $family
+X-Netdata-Classification: $classification
+X-Netdata-Host: $host
+X-Netdata-Role: $roles
 
 This is a MIME-encoded multipart message
 
@@ -2719,6 +3550,11 @@ send_opsgenie
 SENT_OPSGENIE=$?
 
 # -----------------------------------------------------------------------------
+# send messages to Gotify
+send_gotify
+SENT_GOTIFY=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -2744,10 +3580,11 @@ for state in "${SENT_EMAIL}" \
   "${SENT_MATRIX}" \
   "${SENT_SYSLOG}" \
   "${SENT_SMS}" \
-  "${SENT_MSTEAM}" \
+  "${SENT_MSTEAMS}" \
   "${SENT_DYNATRACE}" \
   "${SENT_STACKPULSE}" \
-  "${SENT_OPSGENIE}"; do
+  "${SENT_OPSGENIE}" \
+  "${SENT_GOTIFY}"; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0

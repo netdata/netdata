@@ -3,9 +3,10 @@
 #ifndef NETDATA_ACLK_STATS_H
 #define NETDATA_ACLK_STATS_H
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
-#include "aclk_common.h"
+#include "aclk_query_queue.h"
+#include "mqtt_wss_client.h"
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
@@ -14,46 +15,21 @@ extern netdata_mutex_t aclk_stats_mutex;
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
 #define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
 
-extern int aclk_stats_enabled;
+// if you change update `cloud_req_http_type_names`.
+#define ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT 7
+
+int aclk_cloud_req_http_type_to_idx(const char *name);
 
 struct aclk_stats_thread {
     netdata_thread_t *thread;
     int query_thread_count;
+    mqtt_wss_client client;
 };
 
 // preserve between samples
 struct aclk_metrics {
     volatile uint8_t online;
 };
-
-//mat = max average total
-struct aclk_metric_mat_data {
-    volatile uint32_t total;
-    volatile uint32_t count;
-    volatile uint32_t max;
-};
-
-//mat = max average total
-struct aclk_metric_mat {
-    char *name;
-    char *title;
-    RRDSET *st;
-    RRDDIM *rd_avg;
-    RRDDIM *rd_max;
-    RRDDIM *rd_total;
-    long prio;
-    char *unit;
-};
-
-extern struct aclk_mat_metrics {
-#ifdef NETDATA_INTERNAL_CHECKS
-    struct aclk_metric_mat latency;
-#endif
-    struct aclk_metric_mat cloud_q_db_query_time;
-    struct aclk_metric_mat cloud_q_recvd_to_processed;
-} aclk_mat_metrics;
-
-void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement);
 
 // reset to 0 on every sample
 extern struct aclk_metrics_per_sample {
@@ -66,26 +42,38 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t queries_queued;
     volatile uint32_t queries_dispatched;
 
-    volatile uint32_t write_q_added;
-    volatile uint32_t write_q_consumed;
-
-    volatile uint32_t read_q_added;
-    volatile uint32_t read_q_consumed;
+#ifdef NETDATA_INTERNAL_CHECKS
+    volatile uint32_t latency_max;
+    volatile uint32_t latency_total;
+    volatile uint32_t latency_count;
+#endif
 
     volatile uint32_t cloud_req_recvd;
     volatile uint32_t cloud_req_err;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    struct aclk_metric_mat_data latency;
-#endif
-    struct aclk_metric_mat_data cloud_q_db_query_time;
-    struct aclk_metric_mat_data cloud_q_recvd_to_processed;
+    // query types.
+    volatile uint32_t queries_per_type[ACLK_QUERY_TYPE_COUNT];
+
+    // HTTP-specific request types.
+    volatile uint32_t cloud_req_http_by_type[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];
+
+    volatile uint32_t cloud_q_process_total;
+    volatile uint32_t cloud_q_process_count;
+    volatile uint32_t cloud_q_process_max;
 } aclk_metrics_per_sample;
+
+extern uint32_t *aclk_proto_rx_msgs_sample;
 
 extern uint32_t *aclk_queries_per_thread;
 
 void *aclk_stats_main_thread(void *ptr);
+void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt);
 void aclk_stats_thread_cleanup();
 void aclk_stats_upd_online(int online);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+void aclk_stats_msg_published(uint16_t id);
+void aclk_stats_msg_puback(uint16_t id);
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 #endif /* NETDATA_ACLK_STATS_H */

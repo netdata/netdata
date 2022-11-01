@@ -62,7 +62,8 @@ metrics your Agent collects, and more.
     dbengine disk space = 512
 ```
 
-After you've made your changes, [restart Netdata](/docs/getting-started.md#start-stop-and-restart-netdata).
+After you've made your changes, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 To confirm the database engine is working, go to your Netdata dashboard and click on the **Netdata Monitoring** menu on
 the right-hand side. You can find `dbengine` metrics after `queries`.
@@ -116,13 +117,10 @@ use netdata
 db.createCollection("netdata_metrics")
 ```
 
-Next, Netdata needs to be reinstalled in order to detect that the required libraries to make this exporting connection
-exist. Since you most likely installed Netdata using the one-line installer script, all you have to do is run that
-script again. Don't worry—any configuration changes you made along the way will be retained!
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
+Next, Netdata needs to be [reinstalled](/packaging/installer/REINSTALL.md) in order to detect that the required
+libraries to make this exporting connection exist. Since you most likely installed Netdata using the one-line installer
+script, all you have to do is run that script again. Don't worry—any configuration changes you made along the way will
+be retained!
 
 Now, from your Netdata config directory, initialize and edit a `exporting.conf` file to tell Netdata where to find the
 database you just created.
@@ -141,9 +139,10 @@ Add the following section to the file:
     collection = netdata_metrics
 ```
 
-[Restart](/docs/getting-started.md#start-stop-and-restart-netdata) Netdata to enable the MongoDB exporting connector.
-Click on the **Netdata Montioring** menu and check out the **exporting my mongo instance** sub-menu. You should start
-seeing these charts fill up with data about the exporting process!
+Restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to enable the MongoDB exporting connector. Click on the
+**Netdata Monitoring** menu and check out the **exporting my mongo instance** sub-menu. You should start seeing these
+charts fill up with data about the exporting process!
 
 ![image](https://user-images.githubusercontent.com/1153921/70443852-25171200-1a56-11ea-8be3-494544b1c295.png)
 
@@ -160,4 +159,4 @@ our Netdata dashboard.
 
 [Next: Set up a proxy &rarr;](/docs/guides/step-by-step/step-10.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-09&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

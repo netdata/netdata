@@ -12,6 +12,7 @@
 #define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_PLUGIN_KEY "plugin"
 #define HEALTH_MODULE_KEY "module"
+#define HEALTH_CHARTS_KEY "charts"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
 #define HEALTH_EVERY_KEY "every"
@@ -23,148 +24,14 @@
 #define HEALTH_RECIPIENT_KEY "to"
 #define HEALTH_UNITS_KEY "units"
 #define HEALTH_INFO_KEY "info"
+#define HEALTH_CLASS_KEY "class"
+#define HEALTH_COMPONENT_KEY "component"
+#define HEALTH_TYPE_KEY "type"
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
 #define HEALTH_REPEAT_KEY "repeat"
 #define HEALTH_HOST_LABEL_KEY "host labels"
-
-static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
-    if(!rc->chart) {
-        error("Health configuration for alarm '%s' does not have a chart", rc->name);
-        return 0;
-    }
-
-    if(!rc->update_every) {
-        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->calculation && !rc->warning && !rc->critical) {
-        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
-        return 0;
-
-    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
-
-    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
-            rc->chart?rc->chart:"NOCHART",
-            rc->name,
-            rc->id,
-            (rc->exec)?rc->exec:"DEFAULT",
-            (rc->recipient)?rc->recipient:"DEFAULT",
-            rc->green,
-            rc->red,
-            (int)rc->group,
-            rc->after,
-            rc->before,
-            rc->options,
-            (rc->dimensions)?rc->dimensions:"NONE",
-            (rc->foreachdim)?rc->foreachdim:"NONE",
-            rc->update_every,
-            (rc->calculation)?rc->calculation->parsed_as:"NONE",
-            (rc->warning)?rc->warning->parsed_as:"NONE",
-            (rc->critical)?rc->critical->parsed_as:"NONE",
-            rc->source,
-            rc->delay_up_duration,
-            rc->delay_down_duration,
-            rc->delay_max_duration,
-            rc->delay_multiplier,
-            rc->warn_repeat_every,
-            rc->crit_repeat_every
-    );
-
-    rrdcalc_add_to_host(host, rc);
-
-    return 1;
-}
-
-static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
-    if(unlikely(!rt->context)) {
-        error("Health configuration for template '%s' does not have a context", rt->name);
-        return 0;
-    }
-
-    if(unlikely(!rt->update_every)) {
-        error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rt->name);
-        return 0;
-    }
-
-    if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
-        error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
-        return 0;
-    }
-
-    RRDCALCTEMPLATE *t, *last = NULL;
-    if(!rt->foreachdim) {
-        for (t = host->templates; t ; last = t, t = t->next) {
-            if(unlikely(t->hash_name == rt->hash_name
-                        && !strcmp(t->name, rt->name)
-                        && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
-            )) {
-                error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
-                return 0;
-            }
-        }
-
-        if(likely(last)) {
-            last->next = rt;
-        }
-        else {
-            rt->next = host->templates;
-            host->templates = rt;
-        }
-    } else {
-        for (t = host->alarms_template_with_foreach; t ; last = t, t = t->next) {
-            if(unlikely(t->hash_name == rt->hash_name
-                        && !strcmp(t->name, rt->name)
-                        && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
-            )) {
-                error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
-                return 0;
-            }
-        }
-
-        if(likely(last)) {
-            last->next = rt;
-        }
-        else {
-            rt->next = host->alarms_template_with_foreach;
-            host->alarms_template_with_foreach = rt;
-        }
-    }
-
-    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
-          rt->name,
-          (rt->context)?rt->context:"NONE",
-          (rt->exec)?rt->exec:"DEFAULT",
-          (rt->recipient)?rt->recipient:"DEFAULT",
-          rt->green,
-          rt->red,
-          (int)rt->group,
-          rt->after,
-          rt->before,
-          rt->options,
-          (rt->dimensions)?rt->dimensions:"NONE",
-          (rt->foreachdim)?rt->foreachdim:"NONE",
-          rt->update_every,
-          (rt->calculation)?rt->calculation->parsed_as:"NONE",
-          (rt->warning)?rt->warning->parsed_as:"NONE",
-          (rt->critical)?rt->critical->parsed_as:"NONE",
-          rt->source,
-          rt->delay_up_duration,
-          rt->delay_down_duration,
-          rt->delay_max_duration,
-          rt->delay_multiplier,
-          rt->warn_repeat_every,
-          rt->crit_repeat_every
-    );
-
-
-    return 1;
-}
+#define HEALTH_FOREACH_KEY "foreach"
 
 static inline int health_parse_delay(
         size_t line, const char *filename, char *string,
@@ -266,7 +133,7 @@ static inline uint32_t health_parse_options(const char *s) {
             buf[count] = '\0';
 
             if(!strcasecmp(buf, "no-clear-notification") || !strcasecmp(buf, "no-clear"))
-                options |= RRDCALC_FLAG_NO_CLEAR_NOTIFICATION;
+                options |= RRDCALC_OPTION_NO_CLEAR_NOTIFICATION;
             else
                 error("Ignoring unknown alarm option '%s'", buf);
         }
@@ -325,13 +192,21 @@ static inline int health_parse_repeat(
  *
  * @param s the string that will be used to create the simple pattern.
  */
-SIMPLE_PATTERN *health_pattern_from_foreach(char *s) {
+
+static void dimension_remove_pipe_comma(char *str) {
+    while(*str) {
+        if(*str == '|' || *str == ',') *str = ' ';
+        str++;
+    }
+}
+
+static SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
     char *convert= strdupz(s);
     SIMPLE_PATTERN *val = NULL;
+
     if(convert) {
         dimension_remove_pipe_comma(convert);
         val = simple_pattern_create(convert, NULL, SIMPLE_PATTERN_EXACT);
-
         freez(convert);
     }
 
@@ -341,18 +216,18 @@ SIMPLE_PATTERN *health_pattern_from_foreach(char *s) {
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_GROUPING *group_method, int *after, int *before, int *every,
-        uint32_t *options, char **dimensions, char **foreachdim
+        RRDCALC_OPTIONS *options, STRING **dimensions, STRING **foreachdim
 ) {
     debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 
-    if(*dimensions) freez(*dimensions);
-    if(*foreachdim) freez(*foreachdim);
+    if(*dimensions) string_freez(*dimensions);
+    if(*foreachdim) string_freez(*foreachdim);
     *dimensions = NULL;
     *foreachdim = NULL;
     *after = 0;
     *before = 0;
     *every = 0;
-    *options = 0;
+    *options = (*options) & RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES; // preserve rrdcalc options
 
     char *s = string, *key;
 
@@ -384,7 +259,7 @@ static inline int health_parse_db_lookup(
     }
 
     // sane defaults
-    *every = abs(*after);
+    *every = ABS(*after);
 
     // now we may have optional parameters
     while(*s) {
@@ -428,6 +303,9 @@ static inline int health_parse_db_lookup(
         else if(!strcasecmp(key, "unaligned")) {
             *options |= RRDR_OPTION_NOT_ALIGNED;
         }
+        else if(!strcasecmp(key, "anomaly-bit")) {
+            *options |= RRDR_OPTION_ANOMALY_BIT;
+        }
         else if(!strcasecmp(key, "match-ids") || !strcasecmp(key, "match_ids")) {
             *options |= RRDR_OPTION_MATCH_IDS;
         }
@@ -441,7 +319,7 @@ static inline int health_parse_db_lookup(
                 if(find) {
                     *find = '\0';
                 }
-                *dimensions = strdupz(s);
+                *dimensions = string_strdupz(s);
             }
 
             if(!find) {
@@ -450,7 +328,7 @@ static inline int health_parse_db_lookup(
             s = ++find;
         }
         else if(!strcasecmp(key, HEALTH_FOREACH_KEY )) {
-            *foreachdim = strdupz(s);
+            *foreachdim = string_strdupz(s);
             break;
         }
         else {
@@ -462,9 +340,33 @@ static inline int health_parse_db_lookup(
     return 1;
 }
 
-static inline char *health_source_file(size_t line, const char *file) {
+static inline STRING *health_source_file(size_t line, const char *file) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%zu@%s", line, file);
+    return string_strdupz(buffer);
+}
+
+char *health_edit_command_from_source(const char *source)
+{
+    char buffer[FILENAME_MAX + 1];
+    char *temp = strdupz(source);
+    char *line_num = strchr(temp, '@');
+    char *file_no_path = strrchr(temp, '/');
+
+    if (likely(file_no_path && line_num)) {
+        *line_num = '\0';
+        snprintfz(
+            buffer,
+            FILENAME_MAX,
+            "sudo %s/edit-config health.d/%s=%s=%s",
+            netdata_configured_user_config_dir,
+            file_no_path + 1,
+            temp,
+            rrdhost_registry_hostname(localhost));
+    } else
+        buffer[0] = '\0';
+
+    freez(temp);
     return strdupz(buffer);
 }
 
@@ -475,6 +377,41 @@ static inline void strip_quotes(char *s) {
     }
 }
 
+static inline void alert_config_free(struct alert_config *cfg)
+{
+    string_freez(cfg->alarm);
+    string_freez(cfg->template_key);
+    string_freez(cfg->os);
+    string_freez(cfg->host);
+    string_freez(cfg->on);
+    string_freez(cfg->families);
+    string_freez(cfg->plugin);
+    string_freez(cfg->module);
+    string_freez(cfg->charts);
+    string_freez(cfg->lookup);
+    string_freez(cfg->calc);
+    string_freez(cfg->warn);
+    string_freez(cfg->crit);
+    string_freez(cfg->every);
+    string_freez(cfg->green);
+    string_freez(cfg->red);
+    string_freez(cfg->exec);
+    string_freez(cfg->to);
+    string_freez(cfg->units);
+    string_freez(cfg->info);
+    string_freez(cfg->classification);
+    string_freez(cfg->component);
+    string_freez(cfg->type);
+    string_freez(cfg->delay);
+    string_freez(cfg->options);
+    string_freez(cfg->repeat);
+    string_freez(cfg->host_labels);
+    string_freez(cfg->p_db_lookup_dimensions);
+    string_freez(cfg->p_db_lookup_method);
+    freez(cfg);
+}
+
+int sql_store_hashes = 1;
 static int health_readfile(const char *filename, void *data) {
     RRDHOST *host = (RRDHOST *)data;
 
@@ -489,6 +426,7 @@ static int health_readfile(const char *filename, void *data) {
             hash_families = 0,
             hash_plugin = 0,
             hash_module = 0,
+            hash_charts = 0,
             hash_calc = 0,
             hash_green = 0,
             hash_red = 0,
@@ -499,6 +437,9 @@ static int health_readfile(const char *filename, void *data) {
             hash_lookup = 0,
             hash_units = 0,
             hash_info = 0,
+            hash_class = 0,
+            hash_component = 0,
+            hash_type = 0,
             hash_recipient = 0,
             hash_delay = 0,
             hash_options = 0,
@@ -516,6 +457,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
         hash_plugin = simple_uhash(HEALTH_PLUGIN_KEY);
         hash_module = simple_uhash(HEALTH_MODULE_KEY);
+        hash_charts = simple_uhash(HEALTH_CHARTS_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
         hash_green = simple_uhash(HEALTH_GREEN_KEY);
@@ -526,6 +468,9 @@ static int health_readfile(const char *filename, void *data) {
         hash_every = simple_uhash(HEALTH_EVERY_KEY);
         hash_units = simple_hash(HEALTH_UNITS_KEY);
         hash_info = simple_hash(HEALTH_INFO_KEY);
+        hash_class = simple_uhash(HEALTH_CLASS_KEY);
+        hash_component = simple_uhash(HEALTH_COMPONENT_KEY);
+        hash_type = simple_uhash(HEALTH_TYPE_KEY);
         hash_recipient = simple_hash(HEALTH_RECIPIENT_KEY);
         hash_delay = simple_uhash(HEALTH_DELAY_KEY);
         hash_options = simple_uhash(HEALTH_OPTIONS_KEY);
@@ -541,6 +486,7 @@ static int health_readfile(const char *filename, void *data) {
 
     RRDCALC *rc = NULL;
     RRDCALCTEMPLATE *rt = NULL;
+    struct alert_config *alert_cfg = NULL;
 
     int ignore_this = 0;
     size_t line = 0, append = 0;
@@ -590,23 +536,35 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
-                    rrdcalc_free(rc);
-                }
+                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
+                    rrdcalc_free_unused_rrdcalc_loaded_from_config(rc);
+                else
+                    rrdcalc_add_from_config(host, rc);
+
                // health_add_alarms_loop(host, rc, ignore_this) ;
             }
 
             if(rt) {
-                if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
-                    rrdcalctemplate_free(rt);
+                if(!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
+                    rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(rt);
+                else
+                    rrdcalctemplate_add_from_config(host, rt);
 
                 rt = NULL;
             }
 
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
-            rc->name = strdupz(value);
-            rc->hash = simple_hash(rc->name);
+
+            {
+                char *tmp = strdupz(value);
+                if(rrdvar_fix_name(tmp))
+                    error("Health configuration renamed alarm '%s' to '%s'", value, tmp);
+
+                rc->name = string_strdupz(tmp);
+                freez(tmp);
+            }
+
             rc->source = health_source_file(line, filename);
             rc->green = NAN;
             rc->red = NAN;
@@ -616,52 +574,66 @@ static int health_readfile(const char *filename, void *data) {
             rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
             rc->warn_repeat_every = host->health_default_warn_repeat_every;
             rc->crit_repeat_every = host->health_default_crit_repeat_every;
+            if (alert_cfg)
+                alert_config_free(alert_cfg);
+            alert_cfg = callocz(1, sizeof(struct alert_config));
 
-            if(rrdvar_fix_name(rc->name))
-                error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
-
+            alert_cfg->alarm = string_dup(rc->name);
             ignore_this = 0;
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
 //                health_add_alarms_loop(host, rc, ignore_this) ;
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
-                    rrdcalc_free(rc);
-                }
+                if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
+                    rrdcalc_free_unused_rrdcalc_loaded_from_config(rc);
+                else
+                    rrdcalc_add_from_config(host, rc);
 
                 rc = NULL;
             }
 
             if(rt) {
-                if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
-                    rrdcalctemplate_free(rt);
+                if(!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
+                    rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(rt);
+                else
+                    rrdcalctemplate_add_from_config(host, rt);
             }
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
-            rt->name = strdupz(value);
-            rt->hash_name = simple_hash(rt->name);
+
+            {
+                char *tmp = strdupz(value);
+                if(rrdvar_fix_name(tmp))
+                    error("Health configuration renamed template '%s' to '%s'", value, tmp);
+
+                rt->name = string_strdupz(tmp);
+                freez(tmp);
+            }
+
             rt->source = health_source_file(line, filename);
             rt->green = NAN;
             rt->red = NAN;
-            rt->delay_multiplier = 1.0;
+            rt->delay_multiplier = (float)1.0;
             rt->warn_repeat_every = host->health_default_warn_repeat_every;
             rt->crit_repeat_every = host->health_default_crit_repeat_every;
+            if (alert_cfg)
+                alert_config_free(alert_cfg);
+            alert_cfg = callocz(1, sizeof(struct alert_config));
 
-            if(rrdvar_fix_name(rt->name))
-                error("Health configuration renamed template '%s' to '%s'", value, rt->name);
-
+            alert_cfg->template_key = string_dup(rt->name);
             ignore_this = 0;
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
             char *os_match = value;
+            if (alert_cfg) alert_cfg->os = string_strdupz(value);
             SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT);
 
-            if(!simple_pattern_matches(os_pattern, host->os)) {
+            if(!simple_pattern_matches(os_pattern, rrdhost_os(host))) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", host->hostname, rc->name, line, filename, os_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, os_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", host->hostname, rt->name, line, filename, os_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, os_match);
 
                 ignore_this = 1;
             }
@@ -670,14 +642,15 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
             char *host_match = value;
+            if (alert_cfg) alert_cfg->host = string_strdupz(value);
             SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT);
 
-            if(!simple_pattern_matches(host_pattern, host->hostname)) {
+            if(!simple_pattern_matches(host_pattern, rrdhost_hostname(host))) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", host->hostname, rc->name, line, filename, host_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, host_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", host->hostname, rt->name, line, filename, host_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, host_match);
 
                 ignore_this = 1;
             }
@@ -686,313 +659,474 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(rc) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
+                alert_cfg->on = string_strdupz(value);
                 if(rc->chart) {
-                    if(strcmp(rc->chart, value) != 0)
+                    if(strcmp(rrdcalc_chart_name(rc), value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->chart, value, value);
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_chart_name(rc), value, value);
 
-                    freez(rc->chart);
+                    string_freez(rc->chart);
                 }
-                rc->chart = strdupz(value);
-                rc->hash_chart = simple_hash(rc->chart);
+                rc->chart = string_strdupz(value);
+            }
+            else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->classification = string_strdupz(value);
+                if(rc->classification) {
+                    if(strcmp(rrdcalc_classification(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_classification(rc), value, value);
+
+                    string_freez(rc->classification);
+                }
+                rc->classification = string_strdupz(value);
+            }
+            else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->component = string_strdupz(value);
+                if(rc->component) {
+                    if(strcmp(rrdcalc_component(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_component(rc), value, value);
+
+                    string_freez(rc->component);
+                }
+                rc->component = string_strdupz(value);
+            }
+            else if(hash == hash_type && !strcasecmp(key, HEALTH_TYPE_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->type = string_strdupz(value);
+                if(rc->type) {
+                    if(strcmp(rrdcalc_type(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_type(rc), value, value);
+
+                    string_freez(rc->type);
+                }
+                rc->type = string_strdupz(value);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
+                alert_cfg->lookup = string_strdupz(value);
                 health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
-                        &rc->update_every, &rc->options, &rc->dimensions, &rc->foreachdim);
-                if(rc->foreachdim) {
-                    rc->spdim = health_pattern_from_foreach(rc->foreachdim);
+                        &rc->update_every, &rc->options, &rc->dimensions, &rc->foreach_dimension);
+
+                if(rc->foreach_dimension)
+                    rc->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalc_foreachdim(rc));
+
+                if (rc->after) {
+                    if (rc->dimensions)
+                        alert_cfg->p_db_lookup_dimensions = string_dup(rc->dimensions);
+                    if (rc->group)
+                        alert_cfg->p_db_lookup_method = string_strdupz(group_method2string(rc->group));
+                    alert_cfg->p_db_lookup_options = rc->options;
+                    alert_cfg->p_db_lookup_after = rc->after;
+                    alert_cfg->p_db_lookup_before = rc->before;
+                    alert_cfg->p_update_every = rc->update_every;
                 }
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
+                alert_cfg->every = string_strdupz(value);
                 if(!config_parse_duration(value, &rc->update_every))
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
-                            line, filename, rc->name, key, value);
+                            line, filename, rrdcalc_name(rc), key, value);
+                alert_cfg->p_update_every = rc->update_every;
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
+                alert_cfg->green = string_strdupz(value);
                 char *e;
-                rc->green = str2ld(value, &e);
+                rc->green = str2ndd(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, filename, rc->name, key, e);
+                            line, filename, rrdcalc_name(rc), key, e);
                 }
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
+                alert_cfg->red = string_strdupz(value);
                 char *e;
-                rc->red = str2ld(value, &e);
+                rc->red = str2ndd(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, filename, rc->name, key, e);
+                            line, filename, rrdcalc_name(rc), key, e);
                 }
             }
             else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
+                alert_cfg->calc = string_strdupz(value);
                 const char *failed_at = NULL;
                 int error = 0;
                 rc->calculation = expression_parse(value, &failed_at, &error);
                 if(!rc->calculation) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                            line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
+                alert_cfg->warn = string_strdupz(value);
                 const char *failed_at = NULL;
                 int error = 0;
                 rc->warning = expression_parse(value, &failed_at, &error);
                 if(!rc->warning) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                            line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
+                alert_cfg->crit = string_strdupz(value);
                 const char *failed_at = NULL;
                 int error = 0;
                 rc->critical = expression_parse(value, &failed_at, &error);
                 if(!rc->critical) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                            line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
+                alert_cfg->exec = string_strdupz(value);
                 if(rc->exec) {
-                    if(strcmp(rc->exec, value) != 0)
+                    if(strcmp(rrdcalc_exec(rc), value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->exec, value, value);
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_exec(rc), value, value);
 
-                    freez(rc->exec);
+                    string_freez(rc->exec);
                 }
-                rc->exec = strdupz(value);
+                rc->exec = string_strdupz(value);
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
+                alert_cfg->to = string_strdupz(value);
                 if(rc->recipient) {
-                    if(strcmp(rc->recipient, value) != 0)
+                    if(strcmp(rrdcalc_recipient(rc), value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->recipient, value, value);
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_recipient(rc), value, value);
 
-                    freez(rc->recipient);
+                    string_freez(rc->recipient);
                 }
-                rc->recipient = strdupz(value);
+                rc->recipient = string_strdupz(value);
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
-                if(rc->units) {
-                    if(strcmp(rc->units, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->units, value, value);
+                strip_quotes(value);
 
-                    freez(rc->units);
+                alert_cfg->units = string_strdupz(value);
+                if(rc->units) {
+                    if(strcmp(rrdcalc_units(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_units(rc), value, value);
+
+                    string_freez(rc->units);
                 }
-                rc->units = strdupz(value);
-                strip_quotes(rc->units);
+                rc->units = string_strdupz(value);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
-                if(rc->info) {
-                    if(strcmp(rc->info, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->info, value, value);
+                strip_quotes(value);
 
-                    freez(rc->info);
+                alert_cfg->info = string_strdupz(value);
+                if(rc->info) {
+                    if(strcmp(rrdcalc_info(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_info(rc), value, value);
+
+                    string_freez(rc->info);
+                    string_freez(rc->original_info);
                 }
-                rc->info = strdupz(value);
-                strip_quotes(rc->info);
+                rc->info = string_strdupz(value);
+                rc->original_info = string_dup(rc->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
+                alert_cfg->delay = string_strdupz(value);
                 health_parse_delay(line, filename, value, &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
+                alert_cfg->options = string_strdupz(value);
                 rc->options |= health_parse_options(value);
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
+                alert_cfg->repeat = string_strdupz(value);
                 health_parse_repeat(line, filename, value,
                                     &rc->warn_repeat_every,
                                     &rc->crit_repeat_every);
             }
             else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
-                if(rc->labels) {
-                    if(strcmp(rc->labels, value) != 0)
+                alert_cfg->host_labels = string_strdupz(value);
+                if(rc->host_labels) {
+                    if(strcmp(rrdcalc_host_labels(rc), value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'.",
-                              line, filename, rc->name, key, value, value);
+                              line, filename, rrdcalc_name(rc), key, value, value);
 
-                    freez(rc->labels);
-                    simple_pattern_free(rc->splabels);
+                    string_freez(rc->host_labels);
+                    simple_pattern_free(rc->host_labels_pattern);
                 }
 
-                rc->labels = simple_pattern_trim_around_equal(value);
-                rc->splabels = simple_pattern_create(rc->labels, NULL, SIMPLE_PATTERN_EXACT);
+                {
+                    char *tmp = simple_pattern_trim_around_equal(value);
+                    rc->host_labels = string_strdupz(tmp);
+                    freez(tmp);
+                }
+                rc->host_labels_pattern = simple_pattern_create(rrdcalc_host_labels(rc), NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
-                freez(rc->plugin_match);
+                alert_cfg->plugin = string_strdupz(value);
+                string_freez(rc->plugin_match);
                 simple_pattern_free(rc->plugin_pattern);
 
-                rc->plugin_match = strdupz(value);
-                rc->plugin_pattern = simple_pattern_create(rc->plugin_match, NULL, SIMPLE_PATTERN_EXACT);
+                rc->plugin_match = string_strdupz(value);
+                rc->plugin_pattern = simple_pattern_create(rrdcalc_plugin_match(rc), NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
-                freez(rc->module_match);
+                alert_cfg->module = string_strdupz(value);
+                string_freez(rc->module_match);
                 simple_pattern_free(rc->module_pattern);
 
-                rc->module_match = strdupz(value);
-                rc->module_pattern = simple_pattern_create(rc->module_match, NULL, SIMPLE_PATTERN_EXACT);
+                rc->module_match = string_strdupz(value);
+                rc->module_pattern = simple_pattern_create(rrdcalc_module_match(rc), NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
-                        line, filename, rc->name, key);
+                        line, filename, rrdcalc_name(rc), key);
             }
         }
         else if(rt) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
+                alert_cfg->on = string_strdupz(value);
                 if(rt->context) {
-                    if(strcmp(rt->context, value) != 0)
+                    if(strcmp(string2str(rt->context), value) != 0)
                         error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->context, value, value);
+                                line, filename, rrdcalctemplate_name(rt), key, string2str(rt->context), value, value);
 
-                    freez(rt->context);
+                    string_freez(rt->context);
                 }
-                rt->context = strdupz(value);
-                rt->hash_context = simple_hash(rt->context);
+                rt->context = string_strdupz(value);
+            }
+            else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->classification = string_strdupz(value);
+                if(rt->classification) {
+                    if(strcmp(rrdcalctemplate_classification(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_classification(rt), value, value);
+
+                    string_freez(rt->classification);
+                }
+                rt->classification = string_strdupz(value);
+            }
+            else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->component = string_strdupz(value);
+                if(rt->component) {
+                    if(strcmp(rrdcalctemplate_component(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_component(rt), value, value);
+
+                    string_freez(rt->component);
+                }
+                rt->component = string_strdupz(value);
+            }
+            else if(hash == hash_type && !strcasecmp(key, HEALTH_TYPE_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->type = string_strdupz(value);
+                if(rt->type) {
+                    if(strcmp(rrdcalctemplate_type(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_type(rt), value, value);
+
+                    string_freez(rt->type);
+                }
+                rt->type = string_strdupz(value);
             }
             else if(hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
-                freez(rt->family_match);
+                alert_cfg->families = string_strdupz(value);
+                string_freez(rt->family_match);
                 simple_pattern_free(rt->family_pattern);
 
-                rt->family_match = strdupz(value);
-                rt->family_pattern = simple_pattern_create(rt->family_match, NULL, SIMPLE_PATTERN_EXACT);
+                rt->family_match = string_strdupz(value);
+                rt->family_pattern = simple_pattern_create(rrdcalctemplate_family_match(rt), NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
-                freez(rt->plugin_match);
+                alert_cfg->plugin = string_strdupz(value);
+                string_freez(rt->plugin_match);
                 simple_pattern_free(rt->plugin_pattern);
 
-                rt->plugin_match = strdupz(value);
-                rt->plugin_pattern = simple_pattern_create(rt->plugin_match, NULL, SIMPLE_PATTERN_EXACT);
+                rt->plugin_match = string_strdupz(value);
+                rt->plugin_pattern = simple_pattern_create(rrdcalctemplate_plugin_match(rt), NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
-                freez(rt->module_match);
+                alert_cfg->module = string_strdupz(value);
+                string_freez(rt->module_match);
                 simple_pattern_free(rt->module_pattern);
 
-                rt->module_match = strdupz(value);
-                rt->module_pattern = simple_pattern_create(rt->module_match, NULL, SIMPLE_PATTERN_EXACT);
+                rt->module_match = string_strdupz(value);
+                rt->module_pattern = simple_pattern_create(rrdcalctemplate_module_match(rt), NULL, SIMPLE_PATTERN_EXACT);
+            }
+            else if(hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
+                alert_cfg->charts = string_strdupz(value);
+                string_freez(rt->charts_match);
+                simple_pattern_free(rt->charts_pattern);
+
+                rt->charts_match = string_strdupz(value);
+                rt->charts_pattern = simple_pattern_create(rrdcalctemplate_charts_match(rt), NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
+                alert_cfg->lookup = string_strdupz(value);
                 health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
-                        &rt->update_every, &rt->options, &rt->dimensions, &rt->foreachdim);
-                if(rt->foreachdim) {
-                    rt->spdim = health_pattern_from_foreach(rt->foreachdim);
+                        &rt->update_every, &rt->options, &rt->dimensions, &rt->foreach_dimension);
+
+                if(rt->foreach_dimension)
+                    rt->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalctemplate_foreachdim(rt));
+
+                if (rt->after) {
+                    if (rt->dimensions)
+                        alert_cfg->p_db_lookup_dimensions = string_dup(rt->dimensions);
+
+                    if (rt->group)
+                        alert_cfg->p_db_lookup_method = string_strdupz(group_method2string(rt->group));
+
+                    alert_cfg->p_db_lookup_options = rt->options;
+                    alert_cfg->p_db_lookup_after = rt->after;
+                    alert_cfg->p_db_lookup_before = rt->before;
+                    alert_cfg->p_update_every = rt->update_every;
                 }
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
+                alert_cfg->every = string_strdupz(value);
                 if(!config_parse_duration(value, &rt->update_every))
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
-                            line, filename, rt->name, key, value);
+                            line, filename, rrdcalctemplate_name(rt), key, value);
+                alert_cfg->p_update_every = rt->update_every;
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
+                alert_cfg->green = string_strdupz(value);
                 char *e;
-                rt->green = str2ld(value, &e);
+                rt->green = str2ndd(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, filename, rt->name, key, e);
+                            line, filename, rrdcalctemplate_name(rt), key, e);
                 }
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
+                alert_cfg->red = string_strdupz(value);
                 char *e;
-                rt->red = str2ld(value, &e);
+                rt->red = str2ndd(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, filename, rt->name, key, e);
+                            line, filename, rrdcalctemplate_name(rt), key, e);
                 }
             }
             else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
+                alert_cfg->calc = string_strdupz(value);
                 const char *failed_at = NULL;
                 int error = 0;
                 rt->calculation = expression_parse(value, &failed_at, &error);
                 if(!rt->calculation) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                            line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
+                alert_cfg->warn = string_strdupz(value);
                 const char *failed_at = NULL;
                 int error = 0;
                 rt->warning = expression_parse(value, &failed_at, &error);
                 if(!rt->warning) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                            line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
+                alert_cfg->crit = string_strdupz(value);
                 const char *failed_at = NULL;
                 int error = 0;
                 rt->critical = expression_parse(value, &failed_at, &error);
                 if(!rt->critical) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                            line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
+                alert_cfg->exec = string_strdupz(value);
                 if(rt->exec) {
-                    if(strcmp(rt->exec, value) != 0)
+                    if(strcmp(rrdcalctemplate_exec(rt), value) != 0)
                         error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->exec, value, value);
+                                line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_exec(rt), value, value);
 
-                    freez(rt->exec);
+                    string_freez(rt->exec);
                 }
-                rt->exec = strdupz(value);
+                rt->exec = string_strdupz(value);
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
+                alert_cfg->to = string_strdupz(value);
                 if(rt->recipient) {
-                    if(strcmp(rt->recipient, value) != 0)
+                    if(strcmp(rrdcalctemplate_recipient(rt), value) != 0)
                         error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->recipient, value, value);
+                                line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_recipient(rt), value, value);
 
-                    freez(rt->recipient);
+                    string_freez(rt->recipient);
                 }
-                rt->recipient = strdupz(value);
+                rt->recipient = string_strdupz(value);
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
-                if(rt->units) {
-                    if(strcmp(rt->units, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->units, value, value);
+                strip_quotes(value);
 
-                    freez(rt->units);
+                alert_cfg->units = string_strdupz(value);
+                if(rt->units) {
+                    if(strcmp(rrdcalctemplate_units(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_units(rt), value, value);
+
+                    string_freez(rt->units);
                 }
-                rt->units = strdupz(value);
-                strip_quotes(rt->units);
+                rt->units = string_strdupz(value);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
-                if(rt->info) {
-                    if(strcmp(rt->info, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->info, value, value);
+                strip_quotes(value);
 
-                    freez(rt->info);
+                alert_cfg->info = string_strdupz(value);
+                if(rt->info) {
+                    if(strcmp(rrdcalctemplate_info(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_info(rt), value, value);
+
+                    string_freez(rt->info);
                 }
-                rt->info = strdupz(value);
-                strip_quotes(rt->info);
+                rt->info = string_strdupz(value);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
+                alert_cfg->delay = string_strdupz(value);
                 health_parse_delay(line, filename, value, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
+                alert_cfg->options = string_strdupz(value);
                 rt->options |= health_parse_options(value);
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
+                alert_cfg->repeat = string_strdupz(value);
                 health_parse_repeat(line, filename, value,
                                     &rt->warn_repeat_every,
                                     &rt->crit_repeat_every);
             }
             else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
-                if(rt->labels) {
-                    if(strcmp(rt->labels, value) != 0)
+                alert_cfg->host_labels = string_strdupz(value);
+                if(rt->host_labels) {
+                    if(strcmp(rrdcalctemplate_host_labels(rt), value) != 0)
                         error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                              line, filename, rt->name, key, rt->labels, value, value);
+                              line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_host_labels(rt), value, value);
 
-                    freez(rt->labels);
-                    simple_pattern_free(rt->splabels);
+                    string_freez(rt->host_labels);
+                    simple_pattern_free(rt->host_labels_pattern);
                 }
 
-                rt->labels = simple_pattern_trim_around_equal(value);
-                rt->splabels = simple_pattern_create(rt->labels, NULL, SIMPLE_PATTERN_EXACT);
+                {
+                    char *tmp = simple_pattern_trim_around_equal(value);
+                    rt->host_labels = string_strdupz(tmp);
+                    freez(tmp);
+                }
+                rt->host_labels_pattern = simple_pattern_create(rrdcalctemplate_host_labels(rt), NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
-                        line, filename, rt->name, key);
+                        line, filename, rrdcalctemplate_name(rt), key);
             }
         }
         else {
@@ -1003,25 +1137,45 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
-        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
-            rrdcalc_free(rc);
-        }
+        if(!alert_hash_and_store_config(rc->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
+            rrdcalc_free_unused_rrdcalc_loaded_from_config(rc);
+        else
+            rrdcalc_add_from_config(host, rc);
     }
 
     if(rt) {
-        if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
-            rrdcalctemplate_free(rt);
+        if(!alert_hash_and_store_config(rt->config_hash_id, alert_cfg, sql_store_hashes) || ignore_this)
+            rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(rt);
+        else
+            rrdcalctemplate_add_from_config(host, rt);
     }
+
+    if (alert_cfg)
+        alert_config_free(alert_cfg);
 
     fclose(fp);
     return 1;
 }
 
+void sql_refresh_hashes(void)
+{
+    sql_store_hashes = 1;
+}
+
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
     if(unlikely(!host->health_enabled)) {
-        debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", host->hostname);
+        debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;
     }
 
+    int stock_enabled = (int)config_get_boolean(CONFIG_SECTION_HEALTH, "enable stock health configuration",
+                                                CONFIG_BOOLEAN_YES);
+
+    if (!stock_enabled) {
+        info("Netdata will not load stock alarms.");
+        stock_path = user_path;
+    }
+
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
+    sql_store_hashes = 0;
 }

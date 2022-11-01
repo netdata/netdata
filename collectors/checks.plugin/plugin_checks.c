@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "plugin_checks.h"
-
-#ifdef NETDATA_INTERNAL_CHECKS
+#include "daemon/common.h"
 
 static void checks_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -14,6 +12,9 @@ static void checks_main_cleanup(void *ptr) {
 }
 
 void *checks_main(void *ptr) {
+    if (!global_statistics_enabled)
+        return NULL;
+
     netdata_thread_cleanup_push(checks_main_cleanup, ptr);
 
     usec_t usec = 0, susec = localhost->rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
@@ -82,7 +83,7 @@ void *checks_main(void *ptr) {
         now_realtime_timeval(&now);
         loop_usec = dt_usec(&now, &last);
         usec = loop_usec - susec;
-        debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
+        debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, slept for %llu).", loop_usec, usec, susec);
 
         if(usec < (localhost->rrd_update_every * USEC_PER_SEC / 2ULL)) susec = (localhost->rrd_update_every * USEC_PER_SEC) - usec;
         else susec = localhost->rrd_update_every * USEC_PER_SEC / 2ULL;
@@ -125,5 +126,3 @@ void *checks_main(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
-
-#endif // NETDATA_INTERNAL_CHECKS

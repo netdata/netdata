@@ -7,12 +7,12 @@ exports.settings = {
   spacedTable: false,
   paddedTable: false,
   fences: true,
-  rule: '-',
+  rule: "-",
   ruleRepetition: 3,
   emphasis: "*",
   strong: "*",
   bullet: "-",
-  listItemIndent: 'tab',
+  listItemIndent: "1",
   incrementListMarker: true
 };
 

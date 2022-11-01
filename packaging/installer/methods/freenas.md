@@ -1,8 +1,6 @@
 <!--
----
 title: "Install Netdata on FreeNAS"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freenas.md
----
 -->
 
 # Install Netdata on FreeNAS
@@ -22,3 +20,5 @@ To start the Netdata service:
 ```sh
 service netdata start
 ```
+
+

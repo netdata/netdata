@@ -1,8 +1,7 @@
 <!--
----
 title: "Registry"
+description: "Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/registry/README.md
----
 -->
 
 # Registry
@@ -177,6 +176,17 @@ There can be up to 2 files:
 
 Both files are machine readable text files.
 
+### How can I disable the SameSite and Secure cookies?
+
+Beginning with `v1.30.0`, when the Netdata Agent's web server processes a request, it delivers the `SameSite=none`
+and `Secure` cookies. If you have problems accessing the local Agent dashboard or Netdata Cloud, disable these
+cookies by [editing `netdata.conf`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files):
+
+```conf
+[registry]
+    enable cookies SameSite and Secure = no
+```
+
 ## The future
 
 The registry opens a whole world of new possibilities for Netdata. Check here what we think:
@@ -201,4 +211,4 @@ ERROR 409: Cannot ACCESS netdata registry: https://registry.my-netdata.io respon
 
 This error is printed on your web browser console (press F12 on your browser to see it).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fregistry%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

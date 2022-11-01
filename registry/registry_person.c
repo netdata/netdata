@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "registry_internals.h"
 
 // ----------------------------------------------------------------------------
@@ -32,7 +32,7 @@ inline REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, c
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
     debug(D_REGISTRY, "Registry: registry_person_url_index_add('%s', '%s')", p->guid, pu->url->url);
-    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_insert(&(p->person_urls), (avl *)(pu));
+    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_insert(&(p->person_urls), (avl_t *)(pu));
     if(tpu != pu)
         error("Registry: registry_person_url_index_add('%s', '%s') already exists as '%s'", p->guid, pu->url->url, tpu->url->url);
 
@@ -41,7 +41,7 @@ inline REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, RE
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_del(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
     debug(D_REGISTRY, "Registry: registry_person_url_index_del('%s', '%s')", p->guid, pu->url->url);
-    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_remove(&(p->person_urls), (avl *)(pu));
+    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_remove(&(p->person_urls), (avl_t *)(pu));
     if(!tpu)
         error("Registry: registry_person_url_index_del('%s', '%s') deleted nothing", p->guid, pu->url->url);
     else if(tpu != pu)
@@ -197,19 +197,6 @@ REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
     if(!p) p = registry_person_allocate(NULL, when);
 
     return p;
-}
-
-void registry_person_del(REGISTRY_PERSON *p) {
-    debug(D_REGISTRY, "Registry: registry_person_del('%s'): creating dictionary of urls", p->guid);
-
-    while(p->person_urls.root)
-        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls.root);
-
-    debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
-    dictionary_del(registry.persons, p->guid);
-
-    debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
-    freez(p);
 }
 
 // ----------------------------------------------------------------------------

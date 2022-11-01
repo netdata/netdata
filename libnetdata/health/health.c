@@ -19,7 +19,7 @@ SILENCER *create_silencer(void) {
 /**
  * Health Silencers add
  *
- * Add more one silencer to the list of silenecers.
+ * Add more one silencer to the list of silencers.
  *
  * @param silencer
  */

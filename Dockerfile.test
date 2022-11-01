@@ -3,7 +3,7 @@
 #       `./packaging/docker/Dockerfile`.
 #
 # TODO: Create a netdata/package-builder:alpine9
-#FROM netdata/package-buidler:alpine AS build
+#FROM netdata/package-builder:alpine AS build
 FROM alpine:3.9 AS build
 
 # Install Dependencies
@@ -27,7 +27,7 @@ RUN ./netdata-installer.sh --dont-wait --dont-start-it --disable-go "${INSTALLER
 
 FROM alpine:3.9 AS runtime
 
-# Install runtime dependeices
+# Install runtime dependencies
 RUN apk --no-cache -U add curl bash libuv zlib util-linux libmnl python
 
 # Create netdata user/group

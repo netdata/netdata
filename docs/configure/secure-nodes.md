@@ -1,8 +1,6 @@
 <!--
 title: "Secure your nodes"
-description: "Your data and systems are safe with Netdata, but 
-
-we recommend a few easy ways to improve the security of your infrastructure."
+description: "Your data and systems are safe with Netdata, but we recommend a few easy ways to improve the security of your infrastructure."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/secure-nodes.md
 -->
 
@@ -13,7 +11,7 @@ internet at large, anyone can access the dashboard and your node's metrics at `h
 so that the local dashboard was immediately accessible to users, and so that we don't dictate how professionals set up
 and secure their infrastructures. 
 
-Despite this design decision, your [data](/docs/netdata-security.md#your-data-are-safe-with-netdata) and your
+Despite this design decision, your [data](/docs/netdata-security.md#your-data-is-safe-with-netdata) and your
 [systems](/docs/netdata-security.md#your-systems-are-safe-with-netdata) are safe with Netdata. Netdata is read-only,
 cannot do anything other than present metrics, and runs without special/`sudo` privileges. Also, the local dashboard
 only exposes chart metadata and metric values, not raw data.
@@ -36,7 +34,7 @@ that align with your goals and your organization's standards.
 
 ## Disable the local dashboard
 
-This is the _recommended method for those who have claimed their nodes to Netdata Cloud_ and prefer viewing real-time
+This is the _recommended method for those who have connected their nodes to Netdata Cloud_ and prefer viewing real-time
 metrics using the War Room Overview, Nodes view, and Cloud dashboards.
 
 You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link ([ACLK](/aclk/README.md)) that
@@ -52,8 +50,9 @@ static-threaded` setting, and change it to `none`.
     mode = none
 ```
 
-Save and close the editor, then restart your Agent using `service netdata restart`. If you try to visit the local
-dashboard to `http://NODE:19999` again, the connection will fail because that node no longer serves its local dashboard.
+Save and close the editor, then [restart your Agent](/docs/configure/start-stop-restart.md) using `sudo systemctl
+restart netdata`. If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail because
+that node no longer serves its local dashboard.
 
 > See the [configuration basics doc](/docs/configure/nodes.md) for details on how to find `netdata.conf` and use
 > `edit-config`.
@@ -114,7 +113,9 @@ We also have guides for [Apache](/docs/Running-behind-apache.md), [Lighttpd](/do
 
 ## What's next?
 
-If you haven't already, be sure to read about [Netdata's security design](/docs/netdata-security.md).
+Read about [Netdata's security design](/docs/netdata-security.md) and our [blog
+post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) about why the local Agent dashboard is both open and
+secure by design.
 
 Next up, learn about [collectors](/docs/collect/how-collectors-work.md) to ensure you're gathering every essential
 metric about your node, its applications, and your infrastructure at large.

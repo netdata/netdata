@@ -3,7 +3,7 @@
 # Artifacts creation script.
 # This script generates two things:
 #   1) The static binary that can run on all linux distros (built-in dependencies etc)
-#   2) The distribution source tarbal
+#   2) The distribution source tarball
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -52,8 +52,12 @@ make dist
 mv "${BASENAME}.tar.gz" artifacts/
 
 echo "--- Create self-extractor ---"
-command -v git > /dev/null && [ -d .git ] && git clean -d -f
-./packaging/makeself/build-x86_64-static.sh
+sxarches="x86_64 armv7l aarch64"
+for arch in ${sxarches}; do
+  git clean -d -f
+  rm -rf packating/makeself/tmp
+  ./packaging/makeself/build-static.sh ${arch}
+done
 
 # Needed for GCS
 echo "--- Copy artifacts to separate directory ---"
@@ -61,7 +65,13 @@ echo "--- Copy artifacts to separate directory ---"
 cp packaging/version artifacts/latest-version.txt
 cd artifacts
 ln -s "${BASENAME}.tar.gz" netdata-latest.tar.gz
+
+for arch in ${sxarches}; do
+  ln -s "netdata-${arch}-$(git describe).gz.run" netdata-${arch}-latest.gz.run
+done
+
 ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
+
 sha256sum -b ./* > "sha256sums.txt"
 echo "checksums:"
 cat sha256sums.txt

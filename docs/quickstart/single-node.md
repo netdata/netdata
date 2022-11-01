@@ -14,10 +14,6 @@ In this quickstart guide, you'll learn how to access your single node's metrics 
 to your liking, and make sure the Netdata Agent is collecting metrics from the applications or containers you're running
 on your node.
 
-> This quickstart assumes you have installed the Netdata Agent on your node. If you haven't yet, see the [_Get Netdata_
-> doc](/docs/get/README.md) for details on installation. In addition, this quickstart mentions features available only
-> through Netdata Cloud, which requires you to [claim your node](/docs/get/README.md#claim-your-node-on-netdata-cloud).
-
 ## See your node's metrics
 
 To see your node's real-time metrics, you need to access its dashboard. You can either view the local dashboard, which
@@ -93,4 +89,4 @@ out some of Netdata's other visualization and health monitoring features:
 -   [Export metrics](/docs/export/external-databases.md) to an external time-series database to use Netdata alongside
     other monitoring and troubleshooting tools.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fquickstart%2Fsingle-node&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

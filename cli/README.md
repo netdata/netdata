@@ -1,13 +1,12 @@
 <!--
----
-title: "Netdata cli"
+title: "Netdata CLI"
+description: "The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/cli/README.md
----
 -->
 
-# Netdata cli
+# Netdata CLI
 
-You can see the commands netdatacli supports by executing it with `netdatacli` and entering `help` in
+You can see the commands `netdatacli` supports by executing it with `netdatacli` and entering `help` in
 standard input. All commands are given as standard input to `netdatacli`.
 
 The commands that a running netdata agent can execute are the following:
@@ -18,8 +17,10 @@ help
     Show this help menu.
 reload-health
     Reload health configuration.
+reload-labels
+    Reload all labels.
 save-database
-    Save internal DB to disk for for memory mode save.
+    Save internal DB to disk for database mode save.
 reopen-logs
     Close and reopen log files.
 shutdown-agent
@@ -28,8 +29,12 @@ fatal-agent
     Log the state and halt the netdata agent.
 reload-claiming-state
     Reload agent claiming state from disk.
+ping
+    Return with 'pong' if agent is alive.
+aclk-state [json]
+    Returns current state of ACLK and Cloud connection. (optionally in json)
 ```
 
 Those commands are the same that can be sent to netdata via [signals](/daemon/README.md#command-line-options).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcli%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

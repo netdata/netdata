@@ -10,16 +10,22 @@
 # PACKAGE IS BROKEN WITHOUT THEM.
 AutoReqProv: yes
 
-%if "@HAVE_LIBBPF@" == "1"
-%global have_bpf 1
-%else
-%global have_bpf 0
-%endif
-
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.
 %global __os_install_post %{nil}
+
+# We don’t want LTO as it has a minimal performance impact at runtime
+# but a huge impact on build times (we want our CI to not take multiple
+# hours to finish).
+%global _lto_cflags %nil
+
+# Disable eBPF for architectures other than x86
+%ifarch x86_64 i386
+%global _have_ebpf 1
+%else
+%global _have_ebpf 0
+%endif
 
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
@@ -121,7 +127,9 @@ BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
+%if 0%{?rhel} <= 8
 BuildRequires: autogen
+%endif
 %endif
 BuildRequires: automake
 BuildRequires: cmake
@@ -133,15 +141,21 @@ BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
 %if 0%{?suse_version}
-BuildRequires: judy-devel
+BuildRequires: protobuf-devel
+BuildRequires: libprotobuf-c-devel
 BuildRequires: liblz4-devel
 BuildRequires: libjson-c-devel
 %else
 %if 0%{?fedora}
-BuildRequires: Judy-devel
+BuildRequires: protobuf-devel
+BuildRequires: protobuf-c-devel
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
 %else
+%if 0%{?centos_ver} >= 8
+BuildRequires: protobuf-devel
+BuildRequires: protobuf-c-devel
+%endif
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
 %endif
@@ -152,7 +166,15 @@ BuildRequires: json-c-devel
 
 # Runtime dependencies
 #
-Requires:      python
+%if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
+Requires: python
+%else
+%if 0%{?centos_ver} == 8
+Requires: python38
+%else
+Requires: python3
+%endif
+%endif
 
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
@@ -186,12 +208,6 @@ BuildRequires: cups-devel >= 1.7
 
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
-BuildRequires: protobuf-devel
-%if 0%{?suse_version}
-BuildRequires: libprotobuf-c-devel
-%else
-BuildRequires: protobuf-c-devel
-%endif
 # end - prometheus remote write dependencies
 
 # #####################################################################
@@ -209,31 +225,48 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-# Only bundle libJudy if this isn't Fedora or SUSE
-%if 0%{!?fedora:1} && 0%{!?suse_version:1}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+# Only bundle protobuf on CentOS 7 or earlier
+%if 0%{?centos_ver:1}
+%if %{centos_ver} < 8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-protobuf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
-%if 0%{?have_bpf}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%endif
+%if 0%{?_have_ebpf}
+%if 0%{?centos_ver:1}
+%if %{centos_ver} < 8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos7
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%else
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%endif
+%else
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} other
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%endif
 %endif
 
 %build
 # Conf step
 autoreconf -ivf
 %configure \
-	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
-	--with-libJudy=externaldeps/libJudy \
+	%if 0%{!?_have_ebpf}
+	--disable-ebpf
+	%endif
+	%if 0%{?centos_ver:1}
+	%if %{centos_ver} < 8
+	--with-bundled-protobuf \
+	%endif
 	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
 	--localstatedir="%{_localstatedir}" \
 	--libexecdir="%{_libexecdir}" \
-        --libdir="%{_libdir}" \
+	--libdir="%{_libdir}" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
+	--disable-dependency-tracking
 
 # Build step
 %{__make} %{?_smp_mflags}
@@ -246,6 +279,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+
+# ###########################################################
+# Install updater script
+install -m 755 -p packaging/installer/netdata-updater.sh "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/netdata-updater.sh"
 
 # ###########################################################
 # logrotate settings
@@ -266,7 +303,7 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install ebpf.plugin
-%if 0%{?have_bpf}
+%if 0%{?_have_ebpf}
 install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
 %endif
 
@@ -304,7 +341,7 @@ install -m 755 system/netdata-init-d \
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
 safe_sha256sum() {
-	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# Within the context of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
 		sha256sum $@
@@ -395,19 +432,26 @@ install_go() {
 install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
-${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-dashboard.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_datadir}/%{name}/web
-%if 0%{?have_bpf}
+%if 0%{?_have_ebpf}
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
 %endif
 
 %pre
 
-# User/Group creations, as needed
-getent group netdata >/dev/null || groupadd -r netdata
-getent group docker >/dev/null || groupadd -r docker
-getent passwd netdata >/dev/null || \
-  useradd -r -g netdata -G docker -s /sbin/nologin \
-    -d %{contentdir} -c "netdata" netdata
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+if ! getent passwd netdata > /dev/null; then
+  useradd --system -g netdata --home %{contentdir} --no-create-home -s /sbin/nologin -c "Netdata pseudo user" netdata
+fi
+
+# I am not sure that the corresponding group names are exactly the same as in Debian, but we should start somewhere, shouldn't we?
+for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+  if getent group $item > /dev/null 2>&1; then
+    usermod -a -G $item netdata
+  fi
+done
 
 %post
 %{netdata_init_post}
@@ -446,11 +490,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libexecdir}/%{name}/python.d
 %dir %{_libexecdir}/%{name}/charts.d
 %dir %{_libexecdir}/%{name}/plugins.d
-%dir %{_libexecdir}/%{name}/node.d
 
 %{_libexecdir}/%{name}/python.d
 %{_libexecdir}/%{name}/plugins.d
-%{_libexecdir}/%{name}/node.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
@@ -458,22 +500,27 @@ rm -rf "${RPM_BUILD_ROOT}"
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
 # perf plugin
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+# This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
+# %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%caps(cap_sys_admin=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # perf plugin
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # freeipmi files
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+
+# go.d.plugin (the capability required for wireguard module)
+%caps(cap_net_admin=epi) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
-%defattr(0644,root,netdata,0755)
+%defattr(0644,root,root,0755)
 %{_datadir}/%{name}/web
 
 # Enforce 0660 for files and 0770 for directories
@@ -520,6 +567,10 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+- Bundle updater script in native packages.
+* Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
+- Remove support code for legacy ACLK implementation.
 * Wed Sep 16 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-14
 - Convert to using 'AutoReq: yes' for library dependencies.
 * Thu Feb 13 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-13

@@ -11,10 +11,14 @@
 #endif /* __FreeBSD__ || __APPLE__*/
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
+
+#ifdef MADV_MERGEABLE
 int enable_ksm = 1;
+#else
+int enable_ksm = 0;
+#endif
 
 volatile sig_atomic_t netdata_exit = 0;
-const char *os_type = NETDATA_OS_TYPE;
 const char *program_version = VERSION;
 
 // ----------------------------------------------------------------------------
@@ -26,139 +30,368 @@ const char *program_version = VERSION;
 // its lifetime), these can be used to override the default system allocation
 // routines.
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-static __thread struct memory_statistics {
-    volatile ssize_t malloc_calls_made;
-    volatile ssize_t calloc_calls_made;
-    volatile ssize_t realloc_calls_made;
-    volatile ssize_t strdup_calls_made;
-    volatile ssize_t free_calls_made;
-    volatile ssize_t memory_calls_made;
-    volatile ssize_t allocated_memory;
-    volatile ssize_t mmapped_memory;
-} memory_statistics = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#ifdef NETDATA_TRACE_ALLOCATIONS
+#warning NETDATA_TRACE_ALLOCATIONS ENABLED
+#include "Judy.h"
 
-__thread size_t log_thread_memory_allocations = 0;
+#ifdef HAVE_DLSYM
+#include <dlfcn.h>
 
-static inline void print_allocations(const char *file, const char *function, const unsigned long line, const char *type, size_t size) {
-    static __thread struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
+typedef void (*libc_function_t)(void);
 
-    fprintf(stderr, "%s iteration %zu MEMORY TRACE: %lu@%s : %s : %s : %zu\n",
-            netdata_thread_tag(),
-            log_thread_memory_allocations,
-            line, file, function,
-            type, size
-    );
+static void *malloc_first_run(size_t size);
+static void *(*libc_malloc)(size_t) = malloc_first_run;
 
-    fprintf(stderr, "%s iteration %zu MEMORY ALLOCATIONS: (%04lu@%-40.40s:%-40.40s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): %s : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
-            netdata_thread_tag(),
-            log_thread_memory_allocations,
-            line, file, function,
-            (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
-            (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
-            type,
-            memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
-            memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
-            memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
-            memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
-            memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
-    );
+static void *calloc_first_run(size_t n, size_t size);
+static void *(*libc_calloc)(size_t, size_t) = calloc_first_run;
 
-    memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
-}
+static void *realloc_first_run(void *ptr, size_t size);
+static void *(*libc_realloc)(void *, size_t) = realloc_first_run;
 
-static inline void mmap_accounting(size_t size) {
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.mmapped_memory += size;
+static void free_first_run(void *ptr);
+static void (*libc_free)(void *) = free_first_run;
+
+static char *strdup_first_run(const char *s);
+static char *(*libc_strdup)(const char *) = strdup_first_run;
+
+static size_t malloc_usable_size_first_run(void *ptr);
+#ifdef HAVE_MALLOC_USABLE_SIZE
+static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size_first_run;
+#else
+static size_t (*libc_malloc_usable_size)(void *) = NULL;
+#endif
+
+static void link_system_library_function(libc_function_t *func_pptr, const char *name, bool required) {
+    *func_pptr = dlsym(RTLD_NEXT, name);
+    if(!*func_pptr && required) {
+        fprintf(stderr, "FATAL: Cannot find system's %s() function.\n", name);
+        abort();
     }
 }
 
-void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.malloc_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "malloc()", size);
-    }
-
-    size_t *n = (size_t *)malloc(sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("mallocz() cannot allocate %zu bytes of memory.", size);
-    *n = size;
-    return (void *)&n[1];
+static void *malloc_first_run(size_t size) {
+    link_system_library_function((libc_function_t *) &libc_malloc, "malloc", true);
+    return libc_malloc(size);
 }
 
-void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
-    size = nmemb * size;
-
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.calloc_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "calloc()", size);
-    }
-
-    size_t *n = (size_t *)calloc(1, sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("callocz() cannot allocate %zu bytes of memory.", size);
-    *n = size;
-    return (void *)&n[1];
+static void *calloc_first_run(size_t n, size_t size) {
+    link_system_library_function((libc_function_t *) &libc_calloc, "calloc", true);
+    return libc_calloc(n, size);
 }
 
-void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
-    if(!ptr) return mallocz_int(file, function, line, size);
-
-    size_t *n = (size_t *)ptr;
-    n--;
-    size_t old_size = *n;
-
-    n = realloc(n, sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("reallocz() cannot allocate %zu bytes of memory (from %zu bytes).", size, old_size);
-
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.realloc_calls_made++;
-        memory_statistics.allocated_memory += (size - old_size);
-        print_allocations(file, function, line, "realloc()", size - old_size);
-    }
-
-    *n = size;
-    return (void *)&n[1];
+static void *realloc_first_run(void *ptr, size_t size) {
+    link_system_library_function((libc_function_t *) &libc_realloc, "realloc", true);
+    return libc_realloc(ptr, size);
 }
 
-char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
-    size_t size = strlen(s) + 1;
+static void free_first_run(void *ptr) {
+    link_system_library_function((libc_function_t *) &libc_free, "free", true);
+    libc_free(ptr);
+}
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.strdup_calls_made++;
-        memory_statistics.allocated_memory += size;
-        print_allocations(file, function, line, "strdup()", size);
+static char *strdup_first_run(const char *s) {
+    link_system_library_function((libc_function_t *) &libc_strdup, "strdup", true);
+    return libc_strdup(s);
+}
+
+static size_t malloc_usable_size_first_run(void *ptr) {
+    link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
+
+    if(libc_malloc_usable_size)
+        return libc_malloc_usable_size(ptr);
+    else
+        return 0;
+}
+
+void *malloc(size_t size) {
+    return mallocz(size);
+}
+
+void *calloc(size_t n, size_t size) {
+    return callocz(n, size);
+}
+
+void *realloc(void *ptr, size_t size) {
+    return reallocz(ptr, size);
+}
+
+void *reallocarray(void *ptr, size_t n, size_t size) {
+    return reallocz(ptr, n * size);
+}
+
+void free(void *ptr) {
+    freez(ptr);
+}
+
+char *strdup(const char *s) {
+    return strdupz(s);
+}
+
+size_t malloc_usable_size(void *ptr) {
+    return mallocz_usable_size(ptr);
+}
+#else // !HAVE_DLSYM
+
+static void *(*libc_malloc)(size_t) = malloc;
+static void *(*libc_calloc)(size_t, size_t) = calloc;
+static void *(*libc_realloc)(void *, size_t) = realloc;
+static void (*libc_free)(void *) = free;
+static char *(*libc_strdup)(const char *) = strdup;
+
+#ifdef HAVE_MALLOC_USABLE_SIZE
+static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size;
+#else
+static size_t (*libc_malloc_usable_size)(void *) = NULL;
+#endif
+
+#endif // HAVE_DLSYM
+
+
+void posix_memfree(void *ptr) {
+    libc_free(ptr);
+}
+
+Word_t JudyMalloc(Word_t Words) {
+    Word_t Addr;
+
+    Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+    return(Addr);
+}
+void JudyFree(void * PWord, Word_t Words) {
+    (void)Words;
+    freez(PWord);
+}
+Word_t JudyMallocVirtual(Word_t Words) {
+    Word_t Addr;
+
+    Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+    return(Addr);
+}
+void JudyFreeVirtual(void * PWord, Word_t Words) {
+    (void)Words;
+    freez(PWord);
+}
+
+#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
+#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
+#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
+
+struct malloc_header_signature {
+    uint32_t magic;
+    uint32_t size;
+    struct malloc_trace *trace;
+};
+
+struct malloc_header {
+    struct malloc_header_signature signature;
+    uint8_t padding[(sizeof(struct malloc_header_signature) % MALLOC_ALIGNMENT) ? MALLOC_ALIGNMENT - (sizeof(struct malloc_header_signature) % MALLOC_ALIGNMENT) : 0];
+    uint8_t data[];
+};
+
+static size_t malloc_header_size = sizeof(struct malloc_header);
+
+int malloc_trace_compare(void *A, void *B) {
+    struct malloc_trace *a = A;
+    struct malloc_trace *b = B;
+    return strcmp(a->function, b->function);
+}
+
+static avl_tree_lock malloc_trace_index = {
+    .avl_tree = {
+        .root = NULL,
+        .compar = malloc_trace_compare},
+    .rwlock = NETDATA_RWLOCK_INITIALIZER
+};
+
+int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data) {
+    return avl_traverse_lock(&malloc_trace_index, callback, data);
+}
+
+NEVERNULL WARNUNUSED
+static struct malloc_trace *malloc_trace_find_or_create(const char *file, const char *function, size_t line) {
+    struct malloc_trace tmp = {
+        .line = line,
+        .function = function,
+        .file = file,
+    };
+
+    struct malloc_trace *t = (struct malloc_trace *)avl_search_lock(&malloc_trace_index, (avl_t *)&tmp);
+    if(!t) {
+        t = libc_calloc(1, sizeof(struct malloc_trace));
+        if(!t) fatal("No memory");
+        t->line = line;
+        t->function = function;
+        t->file = file;
+
+        struct malloc_trace *t2 = (struct malloc_trace *)avl_insert_lock(&malloc_trace_index, (avl_t *)t);
+        if(t2 != t)
+            free(t);
+
+        t = t2;
     }
 
-    size_t *n = (size_t *)malloc(sizeof(size_t) + size);
-    if (unlikely(!n)) fatal("strdupz() cannot allocate %zu bytes of memory.", size);
+    if(!t)
+        fatal("Cannot insert to AVL");
 
-    *n = size;
-    char *t = (char *)&n[1];
-    strcpy(t, s);
     return t;
 }
 
-void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
-    if(unlikely(!ptr)) return;
+void malloc_trace_mmap(size_t size) {
+    struct malloc_trace *p = malloc_trace_find_or_create("unknown", "netdata_mmap", 1);
+    size_t_atomic_count(add, p->mmap_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+}
 
-    size_t *n = (size_t *)ptr;
-    n--;
-    size_t size = *n;
+void malloc_trace_munmap(size_t size) {
+    struct malloc_trace *p = malloc_trace_find_or_create("unknown", "netdata_mmap", 1);
+    size_t_atomic_count(add, p->munmap_calls, 1);
+    size_t_atomic_count(sub, p->allocations, 1);
+    size_t_atomic_bytes(sub, p->bytes, size);
+}
 
-    if(log_thread_memory_allocations) {
-        memory_statistics.memory_calls_made++;
-        memory_statistics.free_calls_made++;
-        memory_statistics.allocated_memory -= size;
-        print_allocations(file, function, line, "free()", size);
+void *mallocz_int(size_t size, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+
+    size_t_atomic_count(add, p->malloc_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
+    if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    return (void *)&t->data;
+}
+
+void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size = nmemb * size;
+
+    size_t_atomic_count(add, p->calloc_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)libc_calloc(1, malloc_header_size + size);
+    if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    return &t->data;
+}
+
+char *strdupz_int(const char *s, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size_t size = strlen(s) + 1;
+
+    size_t_atomic_count(add, p->strdup_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
+    if (unlikely(!t)) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    strcpy((char *)&t->data, s);
+    return (char *)&t->data;
+}
+
+static struct malloc_header *malloc_get_header(void *ptr, const char *caller, const char *file, const char *function, size_t line) {
+    uint8_t *ret = (uint8_t *)ptr - malloc_header_size;
+    struct malloc_header *t = (struct malloc_header *)ret;
+
+    if(t->signature.magic != 0x0BADCAFE) {
+        error("pointer %p is not our pointer (called %s() from %zu@%s, %s()).", ptr, caller, line, file, function);
+        return NULL;
     }
 
-    free(n);
+    return t;
+}
+
+void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line) {
+    if(!ptr) return mallocz_int(size, file, function, line);
+
+    struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
+    if(!t)
+        return libc_realloc(ptr, size);
+
+    if(t->signature.size == size) return ptr;
+    size_t_atomic_count(add, t->signature.trace->free_calls, 1);
+    size_t_atomic_count(sub, t->signature.trace->allocations, 1);
+    size_t_atomic_bytes(sub, t->signature.trace->bytes, t->signature.size);
+
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size_t_atomic_count(add, p->realloc_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    t = (struct malloc_header *)libc_realloc(t, malloc_header_size + size);
+    if (unlikely(!t)) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    return (void *)&t->data;
+}
+
+size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line) {
+    if(unlikely(!ptr)) return 0;
+
+    struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
+    if(!t) {
+        if(libc_malloc_usable_size)
+            return libc_malloc_usable_size(ptr);
+        else
+            return 0;
+    }
+
+    return t->signature.size;
+}
+
+void freez_int(void *ptr, const char *file, const char *function, size_t line) {
+    if(unlikely(!ptr)) return;
+
+    struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
+    if(!t) {
+        libc_free(ptr);
+        return;
+    }
+
+    size_t_atomic_count(add, t->signature.trace->free_calls, 1);
+    size_t_atomic_count(sub, t->signature.trace->allocations, 1);
+    size_t_atomic_bytes(sub, t->signature.trace->bytes, t->signature.size);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    // it should crash if it is used after freeing it
+    memset(t, 0, malloc_header_size + t->signature.size);
+#endif
+
+    libc_free(t);
 }
 #else
 
@@ -189,6 +422,10 @@ void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
     if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
+}
+
+void posix_memfree(void *ptr) {
+    free(ptr);
 }
 
 #endif
@@ -584,7 +821,7 @@ unsigned char netdata_map_chart_ids[256] = {
         [89] = 'y', // Y
         [90] = 'z', // Z
         [91] = '_', // [
-        [92] = '/', // backslash
+        [92] = '_', // backslash
         [93] = '_', // ]
         [94] = '_', // ^
         [95] = '_', // _
@@ -940,110 +1177,137 @@ static int memory_file_open(const char *filename, size_t size) {
     return fd;
 }
 
-// mmap_shared is used for memory mode = map
-static void *memory_file_mmap(const char *filename, size_t size, int flags) {
-    // info("memory_file_mmap('%s', %zu", filename, size);
-    static int log_madvise = 1;
+static inline int madvise_sequential(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
-    int fd = -1;
-    if(filename) {
-        fd = memory_file_open(filename, size);
-        if(fd == -1) return MAP_FAILED;
-    }
-
-    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
-    if (mem != MAP_FAILED) {
-#ifdef NETDATA_LOG_ALLOCATIONS
-        mmap_accounting(size);
-#endif
-        int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
-        if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
-
-        if (madvise(mem, size, advise) != 0 && log_madvise) {
-            error("Cannot advise the kernel about shared memory usage.");
-            log_madvise--;
-        }
-    }
-
-    if(fd != -1)
-        close(fd);
-
-    return mem;
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_SEQUENTIAL) failed.");
+    return ret;
 }
 
-#ifdef MADV_MERGEABLE
-static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
-    // info("memory_file_mmap_ksm('%s', %zu", filename, size);
-    static int log_madvise_2 = 1, log_madvise_3 = 1;
+static inline int madvise_dontfork(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_DONTFORK);
 
-    int fd = -1;
-    if(filename) {
-        fd = memory_file_open(filename, size);
-        if(fd == -1) return MAP_FAILED;
-    }
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTFORK) failed.");
+    return ret;
+}
 
-    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
-    if (mem != MAP_FAILED) {
-#ifdef NETDATA_LOG_ALLOCATIONS
-        mmap_accounting(size);
-#endif
-        if(fd != -1) {
-            if (lseek(fd, 0, SEEK_SET) == 0) {
-                if (read(fd, mem, size) != (ssize_t) size)
-                    error("Cannot read from file '%s'", filename);
-            }
-            else error("Cannot seek to beginning of file '%s'.", filename);
-        }
+static inline int madvise_willneed(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_WILLNEED);
 
-        // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
-        if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
-            error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
-            log_madvise_2--;
-        }
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_WILLNEED) failed.");
+    return ret;
+}
 
-        if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
-            error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
-            log_madvise_3--;
-        }
-    }
+#if __linux__
+static inline int madvise_dontdump(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_DONTDUMP);
 
-    if(fd != -1)
-        close(fd);
-
-    return mem;
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTDUMP) failed.");
+    return ret;
 }
 #else
-static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
-    // info("memory_file_mmap_ksm FALLBACK ('%s', %zu", filename, size);
+static inline int madvise_dontdump(void *mem, size_t len) {
+    UNUSED(mem);
+    UNUSED(len);
 
-    if(filename)
-        return memory_file_mmap(filename, size, flags);
-
-    // when KSM is not available and no filename is given (memory mode = ram),
-    // we just report failure
-    return MAP_FAILED;
+    return 0;
 }
 #endif
 
-void *mymmap(const char *filename, size_t size, int flags, int ksm) {
-    void *mem = NULL;
+static inline int madvise_mergeable(void *mem, size_t len) {
+#ifdef MADV_MERGEABLE
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_MERGEABLE);
 
-    if (filename && (flags & MAP_SHARED || !enable_ksm || !ksm))
-        // memory mode = map | save
-        // when KSM is not enabled
-        // MAP_SHARED is used for memory mode = map (no KSM possible)
-        mem = memory_file_mmap(filename, size, flags);
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_MERGEABLE) failed.");
+    return ret;
+#else
+    UNUSED(mem);
+    UNUSED(len);
+    
+    return 0;
+#endif
+}
 
-    else
-        // memory mode = save | ram
-        // when KSM is enabled
-        // for memory mode = ram, the filename is NULL
-        mem = memory_file_mmap_ksm(filename, size, flags);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
+    // info("netdata_mmap('%s', %zu", filename, size);
 
+    // MAP_SHARED is used in memory mode map
+    // MAP_PRIVATE is used in memory mode ram and save
+
+    if(unlikely(!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE)))
+        fatal("Neither MAP_SHARED or MAP_PRIVATE were given to netdata_mmap()");
+
+    if(unlikely((flags & MAP_SHARED) && (flags & MAP_PRIVATE)))
+        fatal("Both MAP_SHARED and MAP_PRIVATE were given to netdata_mmap()");
+
+    if(unlikely((flags & MAP_SHARED) && (!filename || !*filename)))
+        fatal("MAP_SHARED requested, without a filename to netdata_mmap()");
+
+    // don't enable ksm is the global setting is disabled
+    if(unlikely(!enable_ksm)) ksm = 0;
+
+    // KSM only merges anonymous (private) pages, never pagecache (file) pages
+    // but MAP_PRIVATE without MAP_ANONYMOUS it fails too, so we need it always
+    if((flags & MAP_PRIVATE)) flags |= MAP_ANONYMOUS;
+
+    int fd = -1;
+    void *mem = MAP_FAILED;
+
+    if(filename && *filename) {
+        // open/create the file to be used
+        fd = memory_file_open(filename, size);
+        if(fd == -1) goto cleanup;
+    }
+
+    int fd_for_mmap = fd;
+    if(fd != -1 && (flags & MAP_PRIVATE)) {
+        // this is MAP_PRIVATE allocation
+        // no need for mmap() to use our fd
+        // we will copy the file into the memory allocated
+        fd_for_mmap = -1;
+    }
+
+    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
+    if (mem != MAP_FAILED) {
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        malloc_trace_mmap(size);
+#endif
+
+        // if we have a file open, but we didn't give it to mmap(),
+        // we have to read the file into the memory block we allocated
+        if(fd != -1 && fd_for_mmap == -1) {
+            if (lseek(fd, 0, SEEK_SET) == 0) {
+                if (read(fd, mem, size) != (ssize_t) size)
+                    info("Cannot read from file '%s'", filename);
+            }
+            else info("Cannot seek to beginning of file '%s'.", filename);
+        }
+
+        madvise_sequential(mem, size);
+        madvise_dontfork(mem, size);
+        madvise_dontdump(mem, size);
+        if(flags & MAP_SHARED) madvise_willneed(mem, size);
+        if(ksm) madvise_mergeable(mem, size);
+    }
+
+cleanup:
+    if(fd != -1) close(fd);
     if(mem == MAP_FAILED) return NULL;
-
     errno = 0;
     return mem;
+}
+
+int netdata_munmap(void *ptr, size_t size) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+    malloc_trace_munmap(size);
+#endif
+    return munmap(ptr, size);
 }
 
 int memory_file_save(const char *filename, void *mem, size_t size) {
@@ -1098,14 +1362,13 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 }
 
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
+    if(unlikely(!n)) return 0;
+
     int size = vsnprintf(dst, n, fmt, args);
+    dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) {
-        // truncated
-        size = (int)n;
-    }
+    if (unlikely((size_t) size > n)) size = (int)n;
 
-    dst[size] = '\0';
     return size;
 }
 
@@ -1407,44 +1670,45 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
         error("CONFIG cannot open stock config directory '%s'.", sdir);
     }
     else {
-        struct dirent *de = NULL;
-        while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
-                if( !de->d_name[0] ||
-                    (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
-                    (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+        if (strcmp(udir, sdir)) {
+            struct dirent *de = NULL;
+            while((de = readdir(dir))) {
+                if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
+                    if( !de->d_name[0] ||
+                        (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+                        (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
                         ) {
-                    debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
-                    continue;
+                        debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
+                        continue;
+                    }
+
+                    if(path_is_dir(sdir, de->d_name)) {
+                        // we recurse in stock subdirectory, only when there is no corresponding
+                        // user subdirectory - to avoid reading the files twice
+
+                        if(!path_is_dir(udir, de->d_name))
+                            recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data, depth + 1);
+
+                        continue;
+                    }
                 }
 
-                if(path_is_dir(sdir, de->d_name)) {
-                    // we recurse in stock subdirectory, only when there is no corresponding
-                    // user subdirectory - to avoid reading the files twice
+                if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+                    size_t len = strlen(de->d_name);
+                    if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
+                        len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+                        char *filename = strdupz_path_subpath(sdir, de->d_name);
+                        debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
+                        callback(filename, data);
+                        freez(filename);
+                        continue;
+                    }
 
-                    if(!path_is_dir(udir, de->d_name))
-                        recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data, depth + 1);
-
-                    continue;
                 }
+
+                debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
             }
-
-            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
-                size_t len = strlen(de->d_name);
-                if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
-                   len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-                    char *filename = strdupz_path_subpath(sdir, de->d_name);
-                    debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
-                    callback(filename, data);
-                    freez(filename);
-                    continue;
-                }
-
-            }
-
-            debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
         }
-
         closedir(dir);
     }
 
@@ -1490,4 +1754,183 @@ char *read_by_filename(char *filename, long *file_size)
     if (file_size)
         *file_size = size;
     return contents;
+}
+
+char *find_and_replace(const char *src, const char *find, const char *replace, const char *where)
+{
+    size_t size = strlen(src) + 1;
+    size_t find_len = strlen(find);
+    size_t repl_len = strlen(replace);
+    char *value, *dst;
+
+    if (likely(where))
+        size += (repl_len - find_len);
+
+    value = mallocz(size);
+    dst = value;
+
+    if (likely(where)) {
+        size_t count = where - src;
+
+        memmove(dst, src, count);
+        src += count;
+        dst += count;
+
+        memmove(dst, replace, repl_len);
+        src += find_len;
+        dst += repl_len;
+    }
+
+    strcpy(dst, src);
+
+    return value;
+}
+
+inline int pluginsd_space(char c) {
+    switch(c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+        case '=':
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+inline int config_isspace(char c)
+{
+    switch (c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+        case ',':
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+// split a text into words, respecting quotes
+inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
+{
+    char *s = str, quote = 0;
+    int i = 0, rec = 0;
+    char *recover = recover_input;
+
+    // skip all white space
+    while (unlikely(custom_isspace(*s)))
+        s++;
+
+    // check for quote
+    if (unlikely(*s == '\'' || *s == '"')) {
+        quote = *s; // remember the quote
+        s++;        // skip the quote
+    }
+
+    // store the first word
+    words[i++] = s;
+
+    // while we have something
+    while (likely(*s)) {
+        // if it is escape
+        if (unlikely(*s == '\\' && s[1])) {
+            s += 2;
+            continue;
+        }
+
+        // if it is quote
+        else if (unlikely(*s == quote)) {
+            quote = 0;
+            if (recover && rec < max_recover) {
+                recover_location[rec++] = s;
+                *recover++ = *s;
+            }
+            *s = ' ';
+            continue;
+        }
+
+        // if it is a space
+        else if (unlikely(quote == 0 && custom_isspace(*s))) {
+            // terminate the word
+            if (recover && rec < max_recover) {
+                if (!rec || recover_location[rec-1] != s) {
+                    recover_location[rec++] = s;
+                    *recover++ = *s;
+                }
+            }
+            *s++ = '\0';
+
+            // skip all white space
+            while (likely(custom_isspace(*s)))
+                s++;
+
+            // check for quote
+            if (unlikely(*s == '\'' || *s == '"')) {
+                quote = *s; // remember the quote
+                s++;        // skip the quote
+            }
+
+            // if we reached the end, stop
+            if (unlikely(!*s))
+                break;
+
+            // store the next word
+            if (likely(i < max_words))
+                words[i++] = s;
+            else
+                break;
+        }
+
+        // anything else
+        else
+            s++;
+    }
+
+    // terminate the words
+    memset(&words[i], 0, (max_words - i) * sizeof (char *));
+
+    return i;
+}
+
+inline int pluginsd_split_words(char *str, char **words, int max_words, char *recover_input, char **recover_location, int max_recover)
+{
+    return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
+}
+
+bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx) {
+    if (unlikely(!ptr))
+        return false;
+    return (ptr->data[idx / 64] & (1ULL << (idx % 64)));
+}
+
+void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
+    if (unlikely(!ptr))
+        return;
+    if (likely(value))
+        ptr->data[idx / 64] |= (1ULL << (idx % 64));
+    else
+        ptr->data[idx / 64] &= ~(1ULL << (idx % 64));
+}
+
+bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
+    pid_t pid;
+    FILE *fp = netdata_popen(command, &pid, NULL);
+
+    if(fp) {
+        char buffer[max_line_length + 1];
+        while (fgets(buffer, max_line_length, fp))
+            fprintf(stdout, "%s", buffer);
+    }
+    else {
+        error("Failed to execute command '%s'.", command);
+        return false;
+    }
+
+    netdata_pclose(NULL, fp, pid);
+    return true;
 }

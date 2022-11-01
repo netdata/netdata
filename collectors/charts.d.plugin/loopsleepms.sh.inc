@@ -10,7 +10,7 @@ fi
 # -----------------------------------------------------------------------------
 # use the date command as a high resolution timer
 
-# macOS 'date' doesnt support '%N' precision
+# macOS 'date' doesn't support '%N' precision
 # echo $(/bin/date +"%N") is "N"
 if [ "$($LOOPSLEEP_DATE +"%N")" = "N" ]; then
   LOOPSLEEP_DATE_FORMAT="%s * 1000"

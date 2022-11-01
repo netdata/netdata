@@ -55,7 +55,7 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
-static inline char *strip_control_characters(char *url) {
+char *strip_control_characters(char *url) {
     char *s = url;
     if(!s) return "";
 
@@ -204,68 +204,6 @@ void web_client_request_done(struct web_client *w) {
 #endif // NETDATA_WITH_ZLIB
 }
 
-uid_t web_files_uid(void) {
-    static char *web_owner = NULL;
-    static uid_t owner_uid = 0;
-
-    if(unlikely(!web_owner)) {
-        // getpwuid() is not thread safe,
-        // but we have called this function once
-        // while single threaded
-        struct passwd *pw = getpwuid(geteuid());
-        web_owner = config_get(CONFIG_SECTION_WEB, "web files owner", (pw)?(pw->pw_name?pw->pw_name:""):"");
-        if(!web_owner || !*web_owner)
-            owner_uid = geteuid();
-        else {
-            // getpwnam() is not thread safe,
-            // but we have called this function once
-            // while single threaded
-            pw = getpwnam(web_owner);
-            if(!pw) {
-                error("User '%s' is not present. Ignoring option.", web_owner);
-                owner_uid = geteuid();
-            }
-            else {
-                debug(D_WEB_CLIENT, "Web files owner set to %s.", web_owner);
-                owner_uid = pw->pw_uid;
-            }
-        }
-    }
-
-    return(owner_uid);
-}
-
-gid_t web_files_gid(void) {
-    static char *web_group = NULL;
-    static gid_t owner_gid = 0;
-
-    if(unlikely(!web_group)) {
-        // getgrgid() is not thread safe,
-        // but we have called this function once
-        // while single threaded
-        struct group *gr = getgrgid(getegid());
-        web_group = config_get(CONFIG_SECTION_WEB, "web files group", (gr)?(gr->gr_name?gr->gr_name:""):"");
-        if(!web_group || !*web_group)
-            owner_gid = getegid();
-        else {
-            // getgrnam() is not thread safe,
-            // but we have called this function once
-            // while single threaded
-            gr = getgrnam(web_group);
-            if(!gr) {
-                error("Group '%s' is not present. Ignoring option.", web_group);
-                owner_gid = getegid();
-            }
-            else {
-                debug(D_WEB_CLIENT, "Web files group set to %s.", web_group);
-                owner_gid = gr->gr_gid;
-            }
-        }
-    }
-
-    return(owner_gid);
-}
-
 static struct {
     const char *extension;
     uint32_t hash;
@@ -399,18 +337,6 @@ int mysendfile(struct web_client *w, char *filename) {
             return access_to_file_is_not_permitted(w, webfilename);
         }
 
-        // check if the file is owned by expected user
-        if (statbuf.st_uid != web_files_uid()) {
-            error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, statbuf.st_uid, web_files_uid());
-            return access_to_file_is_not_permitted(w, webfilename);
-        }
-
-        // check if the file is owned by expected group
-        if (statbuf.st_gid != web_files_gid()) {
-            error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, statbuf.st_gid, web_files_gid());
-            return access_to_file_is_not_permitted(w, webfilename);
-        }
-
         done = 1;
     }
 
@@ -439,7 +365,7 @@ int mysendfile(struct web_client *w, char *filename) {
     sock_setnonblock(w->ifd);
 
     w->response.data->contenttype = contenttype_for_filename(webfilename);
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, statbuf.st_size, w->ifd, w->ofd);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, webfilename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
@@ -570,6 +496,11 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
         if(count++) buffer_strcat(wb, " ");
         buffer_strcat(wb, "unaligned");
     }
+
+    if(options & RRDR_OPTION_ANOMALY_BIT) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "anomaly-bit");
+    }
 }
 
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
@@ -582,14 +513,14 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
     return func(host, w, url);
 }
 
-static inline int check_host_and_dashboard_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int UNUSED_FUNCTION(check_host_and_dashboard_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(!web_client_can_access_dashboard(w))
         return web_client_permission_denied(w);
 
     return check_host_and_call(host, w, url, func);
 }
 
-static inline int check_host_and_mgmt_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(!web_client_can_access_mgmt(w))
         return web_client_permission_denied(w);
 
@@ -864,7 +795,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 copyme += 9;
                 char *end = strchr(copyme,'&');
                 if(end){
-                    size_t length = end - copyme;
+                    size_t length = MIN(255, end - copyme);
                     memcpy(hostname,copyme,length);
                     hostname[length] = 0X00;
                 }
@@ -1076,15 +1007,18 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                         if (url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables)) {
                             return HTTP_VALIDATION_MALFORMED_URL;
                         }
+                    } else {
+                        //make sure there's no leftovers from previous request on the same web client
+                        w->decoded_query_string[1]='\0';
                     }
                 }
                 *ue = ' ';
 
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
-                strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+                snprintfz(w->last_url, NETDATA_WEB_REQUEST_URL_SIZE, "%s%s", w->decoded_url,  w->decoded_query_string);
 #ifdef ENABLE_HTTPS
-                if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+                if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
@@ -1120,7 +1054,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
             bytes = SSL_write(w->ssl.conn,buf, len) ;
         } else {
@@ -1177,7 +1111,7 @@ void web_client_build_http_header(struct web_client *w) {
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
                        "Connection: %s\r\n"
-                       "Server: NetData Embedded HTTP Server %s\r\n"
+                       "Server: Netdata Embedded HTTP Server %s\r\n"
                        "Access-Control-Allow-Origin: %s\r\n"
                        "Access-Control-Allow-Credentials: true\r\n"
                        "Content-Type: %s\r\n"
@@ -1277,7 +1211,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
            if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
                 while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
@@ -1371,12 +1305,10 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(url && *url) strncpyz(&w->last_url[1], url, NETDATA_WEB_REQUEST_URL_SIZE - 1);
         else w->last_url[1] = '\0';
 
-        uint32_t hash = simple_hash(tok);
-
-        host = rrdhost_find_by_hostname(tok, hash);
-        if(!host) host = rrdhost_find_by_guid(tok, hash);
-
-        if(host) return web_client_process_url(host, w, url);
+        host = rrdhost_find_by_hostname(tok);
+        if (!host)
+            host = rrdhost_find_by_guid(tok);
+        if (host) return web_client_process_url(host, w, url);
     }
 
     buffer_flush(w->response.data);
@@ -1975,7 +1907,7 @@ ssize_t web_client_receive(struct web_client *w)
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
             bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {

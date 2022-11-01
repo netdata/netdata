@@ -81,7 +81,7 @@ class Service(UrlService):
         # NOTE: there are several ways to retrieve data
         # 1. Only PE versions:
         #    https://puppet.com/docs/pe/2018.1/api_status/status_api_metrics_endpoints.html
-        # 2. Inidividual Metrics API (JMX):
+        # 2. Individual Metrics API (JMX):
         #    https://puppet.com/docs/pe/2018.1/api_status/metrics_api.html
         # 3. Extended status at debug level:
         #    https://puppet.com/docs/pe/2018.1/api_status/status_api_json_endpoints.html

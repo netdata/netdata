@@ -10,6 +10,7 @@ SUBDIRS = \
     checks.plugin \
     cups.plugin \
     diskspace.plugin \
+    timex.plugin \
     fping.plugin \
     ioping.plugin \
     freebsd.plugin \
@@ -19,7 +20,6 @@ SUBDIRS = \
     nfacct.plugin \
     xenstat.plugin \
     perf.plugin \
-    node.d.plugin \
     proc.plugin \
     python.d.plugin \
     slabinfo.plugin \

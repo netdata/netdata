@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
+#include "libnetdata/required_dummies.h"
 
 #define PLUGIN_SLABINFO_NAME "slabinfo.plugin"
 #define PLUGIN_SLABINFO_PROCFILE "/proc/slabinfo"
@@ -16,41 +16,10 @@
     fprintf(stderr, ##args); \
     fprintf(stderr, "\n"); }
 
-
-// ----------------------------------------------------------------------------
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-void send_statistics(const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
-    return;
-}
-
-// callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
-
 int running = 1;
 int debug = 0;
+size_t lines_discovered = 0;
+int redraw_chart = 0;
 
 // ----------------------------------------------------------------------------
 
@@ -126,7 +95,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
         }
     }
 
-    // Search it from the begining to the last position we used
+    // Search it from the beginning to the last position we used
     for (s = slabinfo_root; s != slabinfo_last_used; s = s->next) {
         if (hash == s->hash && !strcmp(name, s->name)) {
             slabdebug("<-- Found existing slabstruct after root %s", slabinfo_root->name);
@@ -141,7 +110,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
     s->name = strdupz(name);
     s->hash = hash;
 
-    // Add it to the current postion
+    // Add it to the current position
     if (slabinfo_root) {
         slabdebug("<-- Creating new slabstruct after %s", slabinfo_last_used->name);
         s->next = slabinfo_last_used->next;
@@ -187,6 +156,10 @@ struct slabinfo *read_file_slabinfo() {
 
     // Iterate on all lines to populate / update the slabinfo struct
     size_t lines = procfile_lines(ff), l;
+    if (unlikely(lines != lines_discovered)) {
+        lines_discovered = lines;
+        redraw_chart = 1;
+    }
 
     slabdebug("   Read %lu lines from procfile", (unsigned long)lines);
     for(l = 2; l < lines; l++) {
@@ -254,7 +227,8 @@ unsigned int do_slab_stats(int update_every) {
         sactive = read_file_slabinfo();
 
         // Init Charts
-        if (unlikely(loops == 0)) {
+        if (unlikely(redraw_chart)) {
+            redraw_chart = 0;
             // Memory Usage
             printf("CHART %s.%s '' 'Memory Usage' 'B' '%s' '' line %d %d %s\n"
                 , CHART_TYPE
@@ -362,6 +336,7 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    clocks_init();
 
     program_name = argv[0];
     program_version = "0.1";

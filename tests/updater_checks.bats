@@ -13,8 +13,7 @@ ENV="${INSTALLATION}/netdata/etc/netdata/.environment"
 # list of files which need to be checked. Path cannot start from '/'
 FILES="usr/libexec/netdata/plugins.d/go.d.plugin
        usr/libexec/netdata/plugins.d/charts.d.plugin
-       usr/libexec/netdata/plugins.d/python.d.plugin
-       usr/libexec/netdata/plugins.d/node.d.plugin"
+       usr/libexec/netdata/plugins.d/python.d.plugin"
 
 DIRS="usr/sbin/netdata
       etc/netdata
@@ -54,7 +53,7 @@ setup() {
 @test "update netdata using the new updater" {
 	export ENVIRONMENT_FILE="${ENV}"
 	# Run the updater, with the override so that it uses the local repo we have at hand
-	export NETDATA_LOCAL_TARBAL_OVERRIDE="${PWD}"
+	export NETDATA_LOCAL_TARBALL_OVERRIDE="${PWD}"
 	${INSTALLATION}/netdata/usr/libexec/netdata/netdata-updater.sh --not-running-from-cron
 	! grep "new_installation" "${ENV}"
 }

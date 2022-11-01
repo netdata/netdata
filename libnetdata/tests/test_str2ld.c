@@ -24,15 +24,15 @@ static void test_str2ld(void **state)
 
     for (int i = 0; values[i]; i++) {
         char *e_mine = "hello", *e_sys = "world";
-        LONG_DOUBLE mine = str2ld(values[i], &e_mine);
-        LONG_DOUBLE sys = strtold(values[i], &e_sys);
+        NETDATA_DOUBLE mine = str2ndd(values[i], &e_mine);
+        NETDATA_DOUBLE sys = strtondd(values[i], &e_sys);
 
         if (isnan(mine))
             assert_true(isnan(sys));
         else if (isinf(mine))
             assert_true(isinf(sys));
         else if (mine != sys)
-            assert_false(abs(mine - sys) > 0.000001);
+            assert_false(ABS(mine - sys) > 0.000001);
 
         assert_ptr_equal(e_mine, e_sys);
     }

@@ -51,7 +51,7 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
 
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+    (void) snprintfz(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
@@ -159,6 +159,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
     }
+    memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ);
     superblock->tier = 1;
@@ -173,7 +174,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
     uv_fs_req_cleanup(&req);
-    free(superblock);
+    posix_memfree(superblock);
     if (ret < 0) {
         destroy_data_file(datafile);
         return ret;
@@ -217,7 +218,7 @@ static int check_data_file_superblock(uv_file file)
         ret = 0;
     }
     error:
-    free(superblock);
+    posix_memfree(superblock);
     return ret;
 }
 
@@ -455,6 +456,5 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         close_data_file(datafile);
         freez(journalfile);
         freez(datafile);
-
     }
 }

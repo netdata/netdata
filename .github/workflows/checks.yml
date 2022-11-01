@@ -4,103 +4,58 @@ on:
   push:
     branches:
       - master
-  pull_request:
+  pull_request: null
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  checksum-checks:
-    name: Checksums
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-      - name: Run checksum checks on kickstart files
-        env:
-          LOCAL_ONLY: "true"
-        run: |
-          ./tests/installer/checksums.sh
-  dashboard-checks:
-    name: Dashboard
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-      - name: Install required packages
-        run: |
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-      - name: Backup dashboard.js
-        run: |
-          cp web/gui/dashboard.js /tmp/dashboard.js
-      - name: Regenerate dashboard.js
-        run: |
-          autoreconf -ivf
-          ./configure --enable-maintainer-mode
-          make dist
-      - name: Compare generated Dashboard vs. Backed up Dashboard
-        run: |
-          diff -sNrdu /tmp/dashboard.js web/gui/dashboard.js
   libressl-checks:
     name: LibreSSL
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Build
         run: >
-          docker run -v "$PWD":/netdata -w /netdata alpine:3.11 /bin/sh -c
+          docker run -v "$PWD":/netdata -w /netdata alpine:latest /bin/sh -c
           'apk add bash;
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
           apk del openssl openssl-dev;
           apk add libressl libressl-dev;
           autoreconf -ivf;
-          ./configure;
+          ./configure --disable-dependency-tracking;
           make;'
   clang-checks:
     name: Clang
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Build
         run: |
           docker build -f .github/dockerfiles/Dockerfile.clang .
-  dist-checks:
-    name: Dist
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Prepare environment
-        run: |
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
-                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
-                                  libnetfilter-acct-dev
-      - name: Configure
-        run: |
-          autoreconf -ivf
-          ./configure \
-            --with-zlib \
-            --with-math \
-            --with-user=netdata \
-            CFLAGS=-O2
-      - name: Make dist
-        run: |
-          make dist
-      - name: Verify & Set distfile
-        run: |
-          ls -lah netdata-*.tar.gz
-          echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
-      - name: Run run_install_with_dist_file.sh
-        run: |
-          ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
   gitignore-check:
     name: .gitignore
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install /tmp/install
+        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install /tmp/install --one-time-build
       - name: Check that repo is clean
-        run: if [ "$(git status --porcelain=v1 | wc -l)" -gt 0 ] ; then exit 1 ; fi
+        run: |
+          git status --porcelain=v1 > /tmp/porcelain
+          if [ -s /tmp/porcelain ]; then
+            cat /tmp/porcelain
+            exit 1
+          fi

@@ -65,7 +65,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff))
         return 1;
@@ -173,9 +173,9 @@ int do_proc_interrupts(int update_every, usec_t dt) {
             // some interrupt may have changed without changing the total number of lines
             // if the same number of interrupts have been added and removed between two
             // calls of this function.
-            if(unlikely(!irr->rd || strncmp(irr->rd->name, irr->name, MAX_INTERRUPT_NAME) != 0)) {
+            if(unlikely(!irr->rd || strncmp(rrddim_name(irr->rd), irr->name, MAX_INTERRUPT_NAME) != 0)) {
                 irr->rd = rrddim_add(st_system_interrupts, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_set_name(st_system_interrupts, irr->rd, irr->name);
+                rrddim_reset_name(st_system_interrupts, irr->rd, irr->name);
 
                 // also reset per cpu RRDDIMs to avoid repeating strncmp() in the per core loop
                 if(likely(do_per_core != CONFIG_BOOLEAN_NO)) {
@@ -210,7 +210,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 snprintfz(id, 50, "cpu%d_interrupts", c);
 
                 char title[100+1];
-                snprintfz(title, 100, "CPU%d Interrupts", c);
+                snprintfz(title, 100, "CPU Interrupts");
                 core_st[c] = rrdset_create_localhost(
                         "cpu"
                         , id
@@ -225,6 +225,10 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
+
+                char core[50+1];
+                snprintfz(core, 50, "cpu%d", c);
+                rrdlabels_add(core_st[c]->rrdlabels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
             else rrdset_next(core_st[c]);
 
@@ -233,7 +237,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 if(irr->used && (do_per_core == CONFIG_BOOLEAN_YES || irr->cpu[c].value)) {
                     if(unlikely(!irr->cpu[c].rd)) {
                         irr->cpu[c].rd = rrddim_add(core_st[c], irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                        rrddim_set_name(core_st[c], irr->cpu[c].rd, irr->name);
+                        rrddim_reset_name(core_st[c], irr->cpu[c].rd, irr->name);
                     }
 
                     rrddim_set_by_pointer(core_st[c], irr->cpu[c].rd, irr->cpu[c].value);

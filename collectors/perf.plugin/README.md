@@ -1,8 +1,6 @@
 <!--
----
 title: "perf.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/perf.plugin/README.md
----
 -->
 
 # perf.plugin
@@ -66,7 +64,7 @@ enable the perf plugin, edit /etc/netdata/netdata.conf and set:
 You can use the `command options` parameter to pick what data should be collected and which charts should be
 displayed. If `all` is used, all general performance monitoring counters are probed and corresponding charts
 are enabled for the available counters. You can also define a particular set of enabled charts using the
-following keywords: `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alighnment`,
+following keywords: `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`,
 `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`.
 
 ## Debugging
@@ -79,4 +77,4 @@ sudo /usr/libexec/netdata/plugins.d/perf.plugin 1 all debug
 
 You will get verbose output on what the plugin does.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fperf.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

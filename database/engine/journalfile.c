@@ -17,7 +17,7 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     }
 
     uv_fs_req_cleanup(req);
-    free(io_descr->buf);
+    posix_memfree(io_descr->buf);
     freez(io_descr);
 }
 
@@ -84,6 +84,7 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
         if (unlikely(ret)) {
             fatal("posix_memalign:%s", strerror(ret));
         }
+        memset(ctx->commit_log.buf, 0, buf_size);
         buf_pos = ctx->commit_log.buf_pos = 0;
         ctx->commit_log.buf_size =  buf_size;
     }
@@ -94,7 +95,7 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
 
 void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+    (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
@@ -210,6 +211,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
     }
+    memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ);
 
@@ -223,7 +225,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
     uv_fs_req_cleanup(&req);
-    free(superblock);
+    posix_memfree(superblock);
     if (ret < 0) {
         destroy_journal_file(journalfile, datafile);
         return ret;
@@ -266,13 +268,14 @@ static int check_journal_file_superblock(uv_file file)
         ret = 0;
     }
     error:
-    free(superblock);
+    posix_memfree(superblock);
     return ret;
 }
 
 static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                                     void *buf, unsigned max_size)
 {
+    static BITMAP256 page_error_map;
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned i, count, payload_length, descr_size, valid_pages;
     struct rrdeng_page_descr *descr;
@@ -299,11 +302,57 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         uuid_t *temp_id;
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = NULL;
+        uint8_t page_type = jf_metric_data->descr[i].type;
 
-        if (PAGE_METRICS != jf_metric_data->descr[i].type) {
-            error("Unknown page type encountered.");
+        if (page_type > PAGE_TYPE_MAX) {
+            if (!bitmap256_get_bit(&page_error_map, page_type)) {
+                error("Unknown page type %d encountered.", page_type);
+                bitmap256_set_bit(&page_error_map, page_type, 1);
+            }
             continue;
         }
+        uint64_t start_time_ut = jf_metric_data->descr[i].start_time_ut;
+        uint64_t end_time_ut = jf_metric_data->descr[i].end_time_ut;
+        size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
+        time_t update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
+
+        if (unlikely(start_time_ut > end_time_ut)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if (unlikely(start_time_ut == end_time_ut && entries != 1)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if (unlikely(!entries)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if(entries > 1 && update_every_s == 0) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter++;
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut < end_time_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut = end_time_ut;
+
+            // let this be
+            // end_time_ut = start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1);
+        }
+
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -317,7 +366,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
             PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, temp_id, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(temp_id);
+            *PValue = page_index = create_page_index(temp_id, ctx);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
@@ -325,20 +374,32 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         descr = pg_cache_create_descr();
         descr->page_length = jf_metric_data->descr[i].page_length;
-        descr->start_time = jf_metric_data->descr[i].start_time;
-        descr->end_time = jf_metric_data->descr[i].end_time;
+        descr->start_time_ut = start_time_ut;
+        descr->end_time_ut = end_time_ut;
+        descr->update_every_s = (update_every_s > 0) ? (uint32_t)update_every_s : (page_index->latest_update_every_s);
         descr->id = &page_index->id;
         descr->extent = extent;
+        descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
+
+        if(page_index->latest_time_ut == descr->end_time_ut)
+            page_index->latest_update_every_s = descr->update_every_s;
+
+        if(descr->update_every_s == 0)
+            fatal(
+                "DBENGINE: page descriptor update every is zero, end_time_ut = %llu, start_time_ut = %llu, entries = %zu",
+                (unsigned long long)end_time_ut, (unsigned long long)start_time_ut, entries);
     }
 
     extent->number_of_pages = valid_pages;
 
     if (likely(valid_pages))
         df_extent_insert(extent);
-    else
+    else {
         freez(extent);
+        ctx->load_errors[LOAD_ERRORS_DROPPED_EXTENT].counter++;
+    }
 }
 
 /*
@@ -418,26 +479,30 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     //data_file_size = journalfile->datafile->pos; TODO: utilize this?
 
     max_id = 1;
-    ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
-    if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+    bool journal_is_mmapped = (journalfile->data != NULL);
+    if (unlikely(!journal_is_mmapped)) {
+        ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
+        if (unlikely(ret))
+            fatal("posix_memalign:%s", strerror(ret));
     }
-
+    else
+        buf = journalfile->data +  sizeof(struct rrdeng_jf_sb);
     for (pos = sizeof(struct rrdeng_jf_sb) ; pos < file_size ; pos += READAHEAD_BYTES) {
         size_bytes = MIN(READAHEAD_BYTES, file_size - pos);
-        iov = uv_buf_init(buf, size_bytes);
-        ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
-        if (ret < 0) {
-            fatal("uv_fs_read: %s", uv_strerror(ret));
-            /*uv_fs_req_cleanup(&req);*/
+        if (unlikely(!journal_is_mmapped)) {
+            iov = uv_buf_init(buf, size_bytes);
+            ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
+            if (ret < 0) {
+                error("uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
+                uv_fs_req_cleanup(&req);
+                goto skip_file;
+            }
+            fatal_assert(req.result >= 0);
+            uv_fs_req_cleanup(&req);
+            ++ctx->stats.io_read_requests;
+            ctx->stats.io_read_bytes += size_bytes;
         }
-        fatal_assert(req.result >= 0);
-        uv_fs_req_cleanup(&req);
-        ctx->stats.io_read_bytes += size_bytes;
-        ++ctx->stats.io_read_requests;
 
-        //pos_i = pos;
-        //while (pos_i < pos + size_bytes) {
         for (pos_i = 0 ; pos_i < size_bytes ; ) {
             unsigned max_size;
 
@@ -450,9 +515,12 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
                 pos_i += ret;
             max_id = MAX(max_id, id);
         }
+        if (likely(journal_is_mmapped))
+            buf += size_bytes;
     }
-
-    free(buf);
+skip_file:
+    if (unlikely(!journal_is_mmapped))
+        posix_memfree(buf);
     return max_id;
 }
 
@@ -487,12 +555,16 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 
     journalfile->file = file;
     journalfile->pos = file_size;
+    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0);
+    info("Loading journal file \"%s\" using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
 
     max_id = iterate_transactions(ctx, journalfile);
 
     ctx->commit_log.transaction_id = MAX(ctx->commit_log.transaction_id, max_id + 1);
 
     info("Journal file \"%s\" loaded (size:%"PRIu64").", path, file_size);
+    if (likely(journalfile->data))
+        netdata_munmap(journalfile->data, file_size);
     return 0;
 
     error:

@@ -37,7 +37,7 @@
     GEN(port_rcv_constraint_errors,      errors,  "Pkts rcvd discarded ",          1, __VA_ARGS__)  \
     GEN(port_xmit_discards,              errors,  "Pkts sent discarded",           1, __VA_ARGS__)  \
     GEN(port_xmit_wait,                  errors,  "Tick Wait to send",             1, __VA_ARGS__)  \
-    GEN(VL15_dropped,                    errors,  "Pkts missed ressource",         1, __VA_ARGS__)  \
+    GEN(VL15_dropped,                    errors,  "Pkts missed resource",         1, __VA_ARGS__)  \
     GEN(excessive_buffer_overrun_errors, errors,  "Buffer overrun",                1, __VA_ARGS__)  \
     GEN(link_downed,                     errors,  "Link Downed",                   1, __VA_ARGS__)  \
     GEN(link_error_recovery,             errors,  "Link recovered",                1, __VA_ARGS__)  \
@@ -184,7 +184,7 @@ static struct ibport {
     RRDSET *st_hwpackets;
     RRDSET *st_hwerrors;
 
-    RRDSETVAR *stv_speed;
+    const RRDSETVAR_ACQUIRED *stv_speed;
 
     usec_t speed_last_collected_usec;
 
@@ -367,7 +367,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                 char buffer[FILENAME_MAX + 1];
 
-                // Check if counters are availablea (mandatory)
+                // Check if counters are available (mandatory)
                 // /sys/class/infiniband/<device>/ports/<port>/counters
                 char counters_dirname[FILENAME_MAX + 1];
                 snprintfz(counters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "counters");
@@ -377,7 +377,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                     continue;
                 closedir(counters_dir);
 
-                // Hardware Counters are optionnal, used later
+                // Hardware Counters are optional, used later
                 char hwcounters_dirname[FILENAME_MAX + 1];
                 snprintfz(
                     hwcounters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "hw_counters");
@@ -481,8 +481,11 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                 if (!p->discovered)
                     info(
-                        "Infiniband card %s port %s at speed %lu width %lu", dev_dent->d_name, port_dent->d_name,
-                        p->speed, p->width);
+                        "Infiniband card %s port %s at speed %" PRIu64 " width %" PRIu64 "",
+                        dev_dent->d_name,
+                        port_dent->d_name,
+                        p->speed,
+                        p->width);
 
                 p->discovered = 1;
             }
@@ -537,9 +540,10 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 rrdset_flag_set(port->st_bytes, RRDSET_FLAG_DETAIL);
                 // On this chart, we want to have a KB/s so the dashboard will autoscale it
                 // The reported values are also per-lane, so we must multiply it by the width
-                FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
+                // x4 lanes multiplier as per Documentation/ABI/stable/sysfs-class-infiniband
+                FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 4 * 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
 
-                port->stv_speed = rrdsetvar_custom_chart_variable_create(port->st_bytes, "link_speed");
+                port->stv_speed = rrdsetvar_custom_chart_variable_add_and_acquire(port->st_bytes, "link_speed");
             } else
                 rrdset_next(port->st_bytes);
 
@@ -547,7 +551,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             FOREACH_COUNTER_BYTES(GEN_RRD_DIM_SETP, port)
 
             // For link speed set only variable
-            rrdsetvar_custom_chart_variable_set(port->stv_speed, port->speed);
+            rrdsetvar_custom_chart_variable_set(port->st_bytes, port->stv_speed, port->speed);
 
             rrdset_done(port->st_bytes);
         }

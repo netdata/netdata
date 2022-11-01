@@ -11,10 +11,28 @@
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
-#define NETDATA_APPS_SYSCALL_GROUP "ebpf syscall"
-#define NETDATA_APPS_NET_GROUP "ebpf net"
+#define NETDATA_APPS_FILE_GROUP "file_access"
+#define NETDATA_APPS_FILE_CGROUP_GROUP "file_access (eBPF)"
+#define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
+#define NETDATA_APPS_NET_GROUP "net"
+#define NETDATA_APPS_IPC_SHM_GROUP "ipc shm (eBPF)"
 
 #include "ebpf_process.h"
+#include "ebpf_dcstat.h"
+#include "ebpf_disk.h"
+#include "ebpf_fd.h"
+#include "ebpf_filesystem.h"
+#include "ebpf_hardirq.h"
+#include "ebpf_cachestat.h"
+#include "ebpf_mdflush.h"
+#include "ebpf_mount.h"
+#include "ebpf_oomkill.h"
+#include "ebpf_shm.h"
+#include "ebpf_socket.h"
+#include "ebpf_softirq.h"
+#include "ebpf_sync.h"
+#include "ebpf_swap.h"
+#include "ebpf_vfs.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
@@ -102,6 +120,14 @@ struct target {
 
     uid_t uid;
     gid_t gid;
+
+    // Changes made to simplify integration between apps and eBPF.
+    netdata_publish_cachestat_t cachestat;
+    netdata_publish_dcstat_t dcstat;
+    netdata_publish_swap_t swap;
+    netdata_publish_vfs_t vfs;
+    netdata_fd_stat_t fd;
+    netdata_publish_shm_t shm;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;
@@ -330,34 +356,13 @@ typedef struct ebpf_process_stat {
     uint32_t pid;
 
     //Counter
-    uint32_t open_call;
-    uint32_t write_call;
-    uint32_t writev_call;
-    uint32_t read_call;
-    uint32_t readv_call;
-    uint32_t unlink_call;
     uint32_t exit_call;
     uint32_t release_call;
-    uint32_t fork_call;
-    uint32_t clone_call;
-    uint32_t close_call;
-
-    //Accumulator
-    uint64_t write_bytes;
-    uint64_t writev_bytes;
-    uint64_t readv_bytes;
-    uint64_t read_bytes;
+    uint32_t create_process;
+    uint32_t create_thread;
 
     //Counter
-    uint32_t open_err;
-    uint32_t write_err;
-    uint32_t writev_err;
-    uint32_t read_err;
-    uint32_t readv_err;
-    uint32_t unlink_err;
-    uint32_t fork_err;
-    uint32_t clone_err;
-    uint32_t close_err;
+    uint32_t task_err;
 
     uint8_t removeme;
 } ebpf_process_stat_t;
@@ -365,11 +370,19 @@ typedef struct ebpf_process_stat {
 typedef struct ebpf_bandwidth {
     uint32_t pid;
 
-    uint64_t first;        //First timestamp
-    uint64_t ct;           //Last timestamp
-    uint64_t sent;         //Bytes sent
-    uint64_t received;     //Bytes received
-    unsigned char removed; //Remove the PID from table
+    uint64_t first;              // First timestamp
+    uint64_t ct;                 // Last timestamp
+    uint64_t bytes_sent;         // Bytes sent
+    uint64_t bytes_received;     // Bytes received
+    uint64_t call_tcp_sent;      // Number of times tcp_sendmsg was called
+    uint64_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
+    uint64_t retransmit;         // Number of times tcp_retransmit was called
+    uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
+    uint64_t call_udp_received;  // Number of times udp_recvmsg was called
+    uint64_t close;              // Number of times tcp_close was called
+    uint64_t drop;               // THIS IS NOT USED FOR WHILE, we are in groom section
+    uint32_t tcp_v4_connection;  // Number of times tcp_v4_connection was called.
+    uint32_t tcp_v6_connection;  // Number of times tcp_v6_connection was called.
 } ebpf_bandwidth_t;
 
 /**
@@ -395,31 +408,34 @@ static inline void debug_log_int(const char *fmt, ...)
 //
 extern struct pid_stat **all_pids;
 
-extern int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
+int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
                                       struct target **apps_groups_root_target,
                                       const char *path,
                                       const char *file);
 
-extern void clean_apps_groups_target(struct target *apps_groups_root_target);
+void clean_apps_groups_target(struct target *apps_groups_root_target);
 
-extern size_t zero_all_targets(struct target *root);
+size_t zero_all_targets(struct target *root);
 
-extern int am_i_running_as_root();
+int am_i_running_as_root();
 
-extern void cleanup_exited_pids();
+void cleanup_exited_pids();
 
-extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
+int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
-extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
+int get_pid_comm(pid_t pid, size_t n, char *dest);
+
+size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
                                                            int fd,
                                                            struct pid_on_target *pids);
 
-extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids);
+size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids);
 
-extern void collect_data_for_all_processes(int tbl_pid_stats_fd);
+void collect_data_for_all_processes(int tbl_pid_stats_fd);
 
 extern ebpf_process_stat_t **global_process_stats;
 extern ebpf_process_publish_apps_t **current_apps_data;
-extern ebpf_process_publish_apps_t **prev_apps_data;
+extern netdata_publish_cachestat_t **cachestat_pid;
+extern netdata_publish_dcstat_t **dcstat_pid;
 
 #endif /* NETDATA_EBPF_APPS_H */

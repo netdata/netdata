@@ -2,7 +2,33 @@
 
 #include "plugin_macos.h"
 
-static void macos_main_cleanup(void *ptr) {
+static struct macos_module {
+    const char *name;
+    const char *dim;
+
+    int enabled;
+
+    int (*func)(int update_every, usec_t dt);
+
+    RRDDIM *rd;
+
+} macos_modules[] = {
+    {.name = "sysctl",                           .dim = "sysctl",   .enabled = 1, .func = do_macos_sysctl},
+    {.name = "mach system management interface", .dim = "mach_smi", .enabled = 1, .func = do_macos_mach_smi},
+    {.name = "iokit",                            .dim = "iokit",    .enabled = 1, .func = do_macos_iokit},
+
+    // the terminator of this array
+    {.name = NULL, .dim = NULL, .enabled = 0, .func = NULL}
+};
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 3
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
+#endif
+
+static void macos_main_cleanup(void *ptr)
+{
+    worker_unregister();
+
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -11,56 +37,42 @@ static void macos_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-void *macos_main(void *ptr) {
+void *macos_main(void *ptr)
+{
+    worker_register("MACOS");
+
     netdata_thread_cleanup_push(macos_main_cleanup, ptr);
 
-    // when ZERO, attempt to do it
-    int vdo_cpu_netdata             = !config_get_boolean("plugin:macos", "netdata server resources", 1);
-    int vdo_macos_sysctl            = !config_get_boolean("plugin:macos", "sysctl", 1);
-    int vdo_macos_mach_smi          = !config_get_boolean("plugin:macos", "mach system management interface", 1);
-    int vdo_macos_iokit             = !config_get_boolean("plugin:macos", "iokit", 1);
+    // check the enabled status for each module
+    for (int i = 0; macos_modules[i].name; i++) {
+        struct macos_module *pm = &macos_modules[i];
 
-    // keep track of the time each module was called
-    unsigned long long sutime_macos_sysctl = 0ULL;
-    unsigned long long sutime_macos_mach_smi = 0ULL;
-    unsigned long long sutime_macos_iokit = 0ULL;
+        pm->enabled = config_get_boolean("plugin:macos", pm->name, pm->enabled);
+        pm->rd = NULL;
+
+        worker_register_job_name(i, macos_modules[i].dim);
+    }
 
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while(!netdata_exit) {
+    while (!netdata_exit) {
+        worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        for (int i = 0; macos_modules[i].name; i++) {
+            struct macos_module *pm = &macos_modules[i];
+            if (unlikely(!pm->enabled))
+                continue;
 
-        // BEGIN -- the job to be done
+            debug(D_PROCNETDEV_LOOP, "macos calling %s.", pm->name);
 
-        if(!vdo_macos_sysctl) {
-            debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_sysctl().");
-            vdo_macos_sysctl = do_macos_sysctl(localhost->rrd_update_every, hb_dt);
-        }
-        if(unlikely(netdata_exit)) break;
+            worker_is_busy(i);
+            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
 
-        if(!vdo_macos_mach_smi) {
-            debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_mach_smi().");
-            vdo_macos_mach_smi = do_macos_mach_smi(localhost->rrd_update_every, hb_dt);
-        }
-        if(unlikely(netdata_exit)) break;
-
-        if(!vdo_macos_iokit) {
-            debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_iokit().");
-            vdo_macos_iokit = do_macos_iokit(localhost->rrd_update_every, hb_dt);
-        }
-        if(unlikely(netdata_exit)) break;
-
-        // END -- the job is done
-
-        // --------------------------------------------------------------------
-
-        if(!vdo_cpu_netdata) {
-            global_statistics_charts();
-            registry_statistics();
+            if (unlikely(netdata_exit))
+                break;
         }
     }
 

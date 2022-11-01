@@ -41,7 +41,7 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
     *d = '\0';
 
     debug(
-        D_BACKEND,
+        D_EXPORTING,
         "EXPORTING: received %zu bytes from %s connector instance. Ignoring them. Sample: '%s'",
         buffer_strlen(buffer),
         instance->config.name,
@@ -236,10 +236,10 @@ void simple_connector_send_buffer(
 void simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
 #ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
-    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
@@ -313,16 +313,21 @@ void simple_connector_worker(void *instance_p)
         if (unlikely(sock == -1)) {
             size_t reconnects = 0;
 
-            sock = connect_to_one_of(
-                instance->config.destination, connector_specific_config->default_port, &timeout, &reconnects, NULL, 0);
+            sock = connect_to_one_of_urls(
+                instance->config.destination,
+                connector_specific_config->default_port,
+                &timeout,
+                &reconnects,
+                connector_specific_data->connected_to,
+                CONNECTED_TO_MAX);
 #ifdef ENABLE_HTTPS
             if (exporting_tls_is_enabled(instance->config.type, options) && sock != -1) {
-                if (netdata_exporting_ctx) {
+                if (netdata_ssl_exporting_ctx) {
                     if (sock_delnonblock(sock) < 0)
                         error("Exporting cannot remove the non-blocking flag from socket %d", sock);
 
                     if (connector_specific_data->conn == NULL) {
-                        connector_specific_data->conn = SSL_new(netdata_exporting_ctx);
+                        connector_specific_data->conn = SSL_new(netdata_ssl_exporting_ctx);
                         if (connector_specific_data->conn == NULL) {
                             error("Failed to allocate SSL structure to socket %d.", sock);
                             connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;

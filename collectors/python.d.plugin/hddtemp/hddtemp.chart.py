@@ -28,7 +28,7 @@ class Disk:
     def __init__(self, id_, name, temp):
         self.id = id_.split('/')[-1]
         self.name = name.replace(' ', '_')
-        self.temp = temp if temp.isdigit() else 0
+        self.temp = temp if temp.isdigit() else None
 
     def __repr__(self):
         return self.id

@@ -3,7 +3,7 @@
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
-#include "../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration
@@ -27,6 +27,8 @@
 
 #define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
 
+#define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
+
 // ----------------------------------------------------------------------------
 // netdata include files
 
@@ -44,13 +46,14 @@
 // health monitoring and alarm notifications
 #include "health/health.h"
 
+// anomaly detection
+#include "ml/ml.h"
+
 // the netdata registry
 // the registry is actually an API feature
 #include "registry/registry.h"
 
-// backends for archiving the metrics
-#include "backends/backends.h"
-// the new exporting engine for archiving the metrics
+// exporting engine for archiving the metrics
 #include "exporting/exporting_engine.h"
 
 // the netdata API
@@ -66,22 +69,20 @@
 #include "claim/claim.h"
 
 // netdata agent cloud link
-#include "aclk/agent_cloud_link.h"
+#include "aclk/aclk.h"
 
 // global GUID map functions
 
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
-#ifdef ENABLE_DBENGINE
-#include "database/engine/global_uuid_map/global_uuid_map.h"
-#endif
-
-// the netdata deamon
+// the netdata daemon
 #include "daemon.h"
 #include "main.h"
+#include "static_threads.h"
 #include "signals.h"
 #include "commands.h"
+#include "analytics.h"
 
 // global netdata daemon variables
 extern char *netdata_configured_hostname;
@@ -96,6 +97,8 @@ extern char *netdata_configured_lock_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
+extern char *netdata_configured_abbrev_timezone;
+extern int32_t netdata_configured_utc_offset;
 extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 

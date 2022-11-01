@@ -70,11 +70,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
     }
 
-    RRDSET *st;
+    RRDSET *st = NULL;
 
-    int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
-    int i, n;
-    int common_error = 0;
+    int i;
     size_t size;
 
     // NEEDED BY: do_loadavg
@@ -96,7 +94,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // NEEDED BY: do_tcp...
     struct tcpstat tcpstat;
-    uint64_t tcps_states[TCP_NSTATES];
 
     // NEEDED BY: do_udp...
     struct udpstat udpstat;
@@ -240,7 +237,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "System Load Average"
                             , "load"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 100
                             , (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every
@@ -280,7 +277,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                         , NULL
                         , "System Swap"
                         , "MiB"
-                        , "macos"
+                        , "macos.plugin"
                         , "sysctl"
                         , 201
                         , update_every
@@ -342,7 +339,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Bandwidth"
                             , "kilobits/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 500
                             , update_every
@@ -392,7 +389,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Packets"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2600
                             , update_every
@@ -422,7 +419,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Errors"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2700
                             , update_every
@@ -455,7 +452,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Handshake Issues"
                             , "events/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2900
                             , update_every
@@ -496,7 +493,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Connection Aborts"
                             , "connections/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3010
                             , update_every
@@ -533,7 +530,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Out-Of-Order Queue"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3050
                             , update_every
@@ -567,7 +564,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "TCP SYN Cookies"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3100
                             , update_every
@@ -605,7 +602,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ECN Statistics"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 8700
                             , update_every
@@ -648,7 +645,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 UDP Packets"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2601
                             , update_every
@@ -678,7 +675,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 UDP Errors"
                             , "events/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2701
                             , update_every
@@ -739,7 +736,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Packets"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2602
                             , update_every
@@ -768,7 +765,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Errors"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2603
                             , update_every
@@ -801,7 +798,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Messages"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 2604
                             , update_every
@@ -850,7 +847,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Packets"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3000
                             , update_every
@@ -884,7 +881,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Fragments Sent"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3010
                             , update_every
@@ -917,7 +914,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Fragments Reassembly"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3011
                             , update_every
@@ -950,7 +947,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Errors"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3002
                             , update_every
@@ -1010,7 +1007,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 Packets"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3000
                             , update_every
@@ -1049,7 +1046,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 Fragments Sent"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3010
                             , update_every
@@ -1088,7 +1085,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 Fragments Reassembly"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3011
                             , update_every
@@ -1134,7 +1131,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 Errors"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 3002
                             , update_every
@@ -1196,7 +1193,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 ICMP Messages"
                             , "messages/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10000
                             , update_every
@@ -1230,7 +1227,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 ICMP Redirects"
                             , "redirects/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10050
                             , update_every
@@ -1273,7 +1270,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 ICMP Errors"
                             , "errors/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10100
                             , update_every
@@ -1326,7 +1323,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 ICMP Echo"
                             , "messages/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10200
                             , update_every
@@ -1366,7 +1363,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 Router Messages"
                             , "messages/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10400
                             , update_every
@@ -1406,7 +1403,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 Neighbor Messages"
                             , "messages/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10500
                             , update_every
@@ -1452,7 +1449,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , NULL
                             , "IPv6 ICMP Types"
                             , "messages/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "sysctl"
                             , 10700
                             , update_every
@@ -1506,7 +1503,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                         , NULL
                         , "System Uptime"
                         , "seconds"
-                        , "macos"
+                        , "macos.plugin"
                         , "sysctl"
                         , 1000
                         , update_every

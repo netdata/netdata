@@ -18,7 +18,7 @@ shift
 
 printf >&2 "Opening dist archive %s ... " "${distfile}"
 tar -xovf "${distfile}"
-distdir="$(echo "${distfile}" | cut -d. -f1,2,3)"
+distdir="$(echo "${distfile}" | rev | cut -d. -f3- | rev)"
 cp -a packaging/installer/install-required-packages.sh "${distdir}/install-required-packages.sh"
 if [ ! -d "${distdir}" ]; then
   printf >&2 "ERROR: %s is not a directory" "${distdir}"
@@ -29,10 +29,11 @@ printf >&2 "Entering %s and starting docker run ..." "${distdir}"
 
 pushd "${distdir}" || exit 1
 docker run \
+  -e DISABLE_TELEMETRY=1 \
   -v "${PWD}:/netdata" \
   -w /netdata \
   "ubuntu:latest" \
-  /bin/bash -c "./install-required-packages.sh --dont-wait --non-interactive netdata && apt install wget && ./netdata-installer.sh --dont-wait --require-cloud --disable-telemetry --install /tmp && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
+  /bin/bash -c "./install-required-packages.sh --dont-wait --non-interactive netdata && apt install wget && ./netdata-installer.sh --dont-wait --require-cloud --disable-telemetry --install /tmp --one-time-build && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
 popd || exit 1
 
 echo "All Done!"

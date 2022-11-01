@@ -7,42 +7,43 @@
 #
 # Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
 
+apk update || exit 1
+apk upgrade || exit 1
+
 # Add required APK packages
 apk add --no-cache -U \
-  bash \
-  wget \
-  curl \
-  ncurses \
-  git \
-  netcat-openbsd \
   alpine-sdk \
   autoconf \
   automake \
-  gcc \
-  make \
+  bash \
+  binutils \
   cmake \
-  libtool \
-  pkgconfig \
-  util-linux-dev \
+  curl \
+  elfutils-dev \
+  gcc \
+  git \
   gnutls-dev \
-  zlib-dev \
+  gzip \
+  jq \
+  libelf-static \
   libmnl-dev \
   libnetfilter_acct-dev \
+  libtool \
   libuv-dev \
+  libuv-static \
   lz4-dev \
-  snappy-dev \
+  lz4-static \
+  make \
+  ncurses \
+  netcat-openbsd \
+  openssh \
+  pkgconfig \
   protobuf-dev \
-  binutils \
-  gzip \
-  xz || exit 1
-
-# snappy doesnt have static version in alpine, let's compile it
-export SNAPPY_VER="1.1.7"
-wget -O /snappy.tar.gz https://github.com/google/snappy/archive/${SNAPPY_VER}.tar.gz
-tar -C / -xf /snappy.tar.gz
-rm /snappy.tar.gz
-cd /snappy-${SNAPPY_VER} || exit 1
-mkdir build
-cd build || exit 1
-cmake -DCMAKE_BUILD_SHARED_LIBS=true -DCMAKE_INSTALL_PREFIX:PATH=/usr -DCMAKE_INSTALL_LIBDIR=lib ../
-make && make install
+  snappy-dev \
+  snappy-static \
+  util-linux-dev \
+  wget \
+  xz \
+  zlib-dev \
+  zlib-static ||
+  exit 1

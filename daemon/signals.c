@@ -44,7 +44,7 @@ static void signal_handler(int signo) {
 
             if(signals_waiting[i].action == NETDATA_SIGNAL_FATAL) {
                 char buffer[200 + 1];
-                snprintfz(buffer, 200, "\nSIGNAL HANLDER: received: %s. Oops! This is bad!\n", signals_waiting[i].name);
+                snprintfz(buffer, 200, "\nSIGNAL HANDLER: received: %s. Oops! This is bad!\n", signals_waiting[i].name);
                 if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
                     // nothing to do - we cannot write but there is no way to complain about it
                     ;
@@ -82,7 +82,7 @@ void signals_init(void) {
     // This prevents zombie processes when running in a container.
     if (getpid() == 1) {
         info("SIGNAL: Enabling reaper");
-        myp_init();
+        netdata_popen_tracking_init();
         reaper_enabled = 1;
     } else {
         info("SIGNAL: Not enabling reaper");
@@ -139,7 +139,7 @@ void signals_reset(void) {
     }
 
     if (reaper_enabled == 1)
-        myp_free();
+        netdata_popen_tracking_cleanup();
 }
 
 // reap_child reaps the child identified by pid.
@@ -198,7 +198,7 @@ static void reap_children() {
         } else if (i.si_pid == 0) {
             // No child exited.
             return;
-        } else if (myp_reap(i.si_pid) == 0) {
+        } else if (netdata_popen_tracking_pid_shoud_be_reaped(i.si_pid) == 0) {
             // myp managed, sleep for a short time to avoid busy wait while
             // this is handled by myp.
             usleep(10000);

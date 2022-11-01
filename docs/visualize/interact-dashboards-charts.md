@@ -6,15 +6,15 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/i
 
 # Interact with dashboards and charts
 
+> ⚠️ There is a new version of charts that is currently **only** available on [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/visualize/interact-new-charts). We didn't
+> want to keep this valuable feature from you, so after we get this into your hands on the Cloud, we will collect and implement your feedback to make sure we are providing the best possible version of the feature on the Netdata Agent dashboard as quickly as possible.
+
 You can find Netdata's dashboards in two places: locally served at `http://NODE:19999` by the Netdata Agent, and in
 Netdata Cloud. While you access these dashboards differently, they have similar interfaces, identical charts and
 metrics, and you interact with both of them the same way.
 
 > If you're not sure which option is best for you, see our [single-node](/docs/quickstart/single-node.md) and
 > [infrastructure](/docs/quickstart/infrastructure.md) quickstart guides.
-
-![A single-node dashboard in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/93500082-b01c1700-f8c8-11ea-920a-c490f05b50f5.gif)
 
 Netdata dashboards are single, scrollable pages with many charts stacked on top of one another. As you scroll up or
 down, charts appearing in your browser's viewport automatically load and update every second.
@@ -23,6 +23,31 @@ The dashboard is broken up into multiple **sections**, such as **System Overview
 automatically generated based on which [collectors](/docs/collect/how-collectors-work.md) begin collecting metrics when
 Netdata starts up. Sections also appear in the right-hand **menu**, along with submenus based on the contexts and
 families Netdata creates for your node.
+
+## Choose timeframes to visualize
+
+Both the local Agent dashboard and Netdata Cloud feature time & date pickers to help you visualize specific points in
+time. In Netdata Cloud, the picker appears in the [Overview](/docs/visualize/overview-infrastructure.md), [Nodes
+view](https://learn.netdata.cloud/docs/cloud/visualize/nodes), [new
+dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards), and any single-node dashboards you visit.
+
+Local Agent dashboard:
+
+![Time & date picker on the local Netdata
+dashboard](https://user-images.githubusercontent.com/1153921/101512538-5875d080-3938-11eb-8daf-0fbd0948a04b.png)
+
+Netdata Cloud:
+
+![Time & date picker on Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/101512689-86f3ab80-3938-11eb-8abc-12171a9b8a5e.png)
+
+Their behavior is identical. Use the Quick Selector to visualize generic timeframes, or use the calendar or inputs to
+select days, hours, minutes or seconds. Click **Apply** to re-render all visualizations with new metrics data, or
+**Clear** to restore the default timeframe.
+
+See reference documentation for the [local Agent dashboard](/web/gui/README.md#time--date-picker) and [Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud/war-rooms#time--date-picker) for additional context about how the time &
+date picker behaves in each environment.
 
 ## Charts, dimensions, families, and contexts
 
@@ -61,8 +86,8 @@ Whenever you use a chart in this way, Netdata synchronizes all the other charts 
 | **Zoom** to a specific timeframe                  | `SHIFT` + `mouse selection`         |                                                           |                                                            |
 | **Zoom** in/out                                   | `SHIFT`/`ALT` + `mouse scrollwheel` | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) |
 
-![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
-charts](https://user-images.githubusercontent.com/1153921/93497197-071fed00-f8c5-11ea-96ff-60e77ed952bd.gif)
+![Animated GIF of interacting with Netdata
+charts](https://user-images.githubusercontent.com/1153921/102652236-051b3380-412b-11eb-8f7c-a2372ed92cd0.gif)
 
 These interactions can also be triggered using the icons on the bottom-right corner of every chart. They are,
 respectively, `Pan Left`, `Reset`, `Pan Right`, `Zoom In`, and `Zoom Out`.
@@ -75,13 +100,13 @@ You can resize any chart by clicking-and-dragging the icon on the bottom-right c
 to its original height, double-click the same icon.
 
 ![Resizing a chart and resetting it to the default
-height](https://user-images.githubusercontent.com/1153921/93497272-1acb5380-f8c5-11ea-851c-6cd5ac247e41.gif)
+height](https://user-images.githubusercontent.com/1153921/102652691-24b25c00-412b-11eb-9e2c-95325fcedc67.gif)
 
 ### Composite charts in Netdata Cloud
 
 Netdata Cloud now supports composite charts in the Overview interface. Composite charts come with a few additional UI
 elements and varied interactions, such as the location of dimensions and a utility bar for configuring the state of
-individual composite charts. All of these de4tails are covered in the [Overview
+individual composite charts. All of these details are covered in the [Overview
 reference](https://learn.netdata.cloud/docs/cloud/visualize/overview) doc.
 
 ## What's next?
@@ -97,7 +122,10 @@ to get informed when something goes wrong in your infrastructure.
 ### Related reference documentation
 
 -   [Netdata Agent · Web dashboards overview](/web/README.md)
+-   [Netdata Cloud · Interact with new charts](https://learn.netdata.cloud/docs/cloud/visualize/interact-new-charts)
 -   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
 -   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
+-   [Netdata Cloud · Nodes](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
+-   [Netdata Cloud · Build new dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fvisualize%2Finteract-dashboards-charts&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

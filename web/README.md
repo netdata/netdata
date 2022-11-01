@@ -1,12 +1,10 @@
 <!--
----
-title: "Web dashboards overview"
-date: 2020-03-11
+title: "Dashboards"
+description: "Every Netdata Agent comes bundled with hundreds of interactive, customizable charts designed by monitoring and troubleshooting experts."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/README.md
----
 -->
 
-# Web dashboards overview
+# Dashboards
 
 Because Netdata is a health monitoring and _performance troubleshooting_ system,
 we put a lot of emphasis on real-time, meaningful, and context-aware charts.
@@ -16,22 +14,20 @@ team and the community, but you can also customize them yourself.
 
 There are two primary ways to view Netdata's dashboards:
 
-1.  The [standard web dashboard](/web/gui/README.md) that comes pre-configured with every
-   Netdata installation. You can see it at `http://SERVER-IP:19999`, or
-   `http://localhost:19999` on `localhost`. You can customize the contents and
-   colors of the standard dashboard [using
-   JavaScript](/web/gui/README.md#customizing-the-standard-dashboard).
+1.  The [local Agent dashboard](/web/gui/README.md) that comes pre-configured with every Netdata installation. You can
+    see it at `http://NODE:19999`, replacing `NODE` with `localhost`, the hostname of your node, or its IP address. You
+    can customize the contents and colors of the standard dashboard [using
+    JavaScript](/web/gui/README.md#customizing-the-local-dashboard).
 
 2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
-   [customize the standard dashboards](/web/gui/README.md#customizing-the-standard-dashboard)
+   [customize the standard dashboards](/web/gui/README.md#customizing-the-local-dashboard)
    using JavaScript, or create entirely new [custom dashboards](/web/gui/custom/README.md) or
    [Atlassian Confluence dashboards](/web/gui/confluence/README.md).
 
-You can also view all the data Netdata collects through the [REST API v1](/web/api/).
+You can also view all the data Netdata collects through the [REST API v1](/web/api/README.md#netdata-rest-api).
 
-No matter where you use Netdata's charts, you'll want to know how to
-[use](#using-charts) them. You'll also want to understand how Netdata defines
-[charts](#charts), [dimensions](#dimensions), [families](#families), and
+No matter where you use Netdata's charts, you'll want to know how to [use](#using-charts) them. You'll also want to
+understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and
 [contexts](#contexts).
 
 ## Using charts
@@ -168,12 +164,12 @@ top-left corner of a chart.
 Given the four example contexts, and two families of `sdb` and `sdd`, Netdata
 will create the following charts and their names:
 
-Context | `sdb` family | `sdd` family
---- | --- | ---
-`disk.io` | `disk_io.sdb` | `disk_io.sdd`
-`disk.ops` | `disk_ops.sdb` | `disk_ops.sdd`
-`disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd`
-`disk.util` | `disk_util.sdb` | `disk_util.sdd`
+| Context        | `sdb` family       | `sdd` family       |
+|----------------|--------------------|--------------------|
+| `disk.io`      | `disk_io.sdb`      | `disk_io.sdd`      |
+| `disk.ops`     | `disk_ops.sdb`     | `disk_ops.sdd`     |
+| `disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd` |
+| `disk.util`    | `disk_util.sdb`    | `disk_util.sdd`    |
 
 And here's what two of those charts in the `disk.io` context look like under
 `sdb` and `sdd` families:
@@ -236,5 +232,3 @@ make
 If you make any changes to the `src` directory when developing Netdata, you
 should regenerate the `dashboard.js` file before you commit to the Netdata
 repository.
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

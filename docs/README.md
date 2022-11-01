@@ -1,8 +1,6 @@
 <!--
----
 title: "Read documentation on <https://learn.netdata.cloud>"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/README.md
----
 -->
 
 # Read documentation on <https://learn.netdata.cloud>
@@ -15,3 +13,5 @@ uses a few extra Markdown features that GitHub doesn't support natively. Other t
 perfect.
 
 Now get out there and build an exceptional infrastructure.
+
+

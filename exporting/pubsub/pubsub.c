@@ -23,6 +23,7 @@ int init_pubsub_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
+    instance->variables_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
@@ -141,7 +142,7 @@ void pubsub_connector_worker(void *instance_p)
         }
 
         debug(
-            D_BACKEND, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
+            D_EXPORTING, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
             connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 
         if (pubsub_publish((void *)connector_specific_data, error_message, stats->buffered_metrics, buffer_len)) {

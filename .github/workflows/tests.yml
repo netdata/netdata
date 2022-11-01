@@ -14,13 +14,20 @@ on:
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   unit-tests-legacy:
     name: Unit Tests (legacy)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: |
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
@@ -38,17 +45,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: |
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
           sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
-                                  libnetfilter-acct-dev libmongoc-dev  libcmocka-dev
+                                  libnetfilter-acct-dev libmongoc-dev  libcmocka-dev libzstd-dev
       - name: Configure
         run: |
           autoreconf -ivf
-          ./configure
+          ./configure --disable-ml --disable-dependency-tracking
       # XXX: Work-around for bug with libbson-1.0 in Ubuntu 18.04
       # See: https://bugs.launchpad.net/ubuntu/+source/libmongoc/+bug/1790771
       #      https://jira.mongodb.org/browse/CDRIVER-2818
@@ -81,7 +90,7 @@ jobs:
           find . -type f -name '*.log' -exec cp {} ../logs/ \;
           popd || exit 1
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         if: always()
         with:
           name: logs

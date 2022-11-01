@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "registry_internals.h"
 
 #define REGISTRY_STATUS_OK "ok"
@@ -23,7 +23,7 @@ static inline void registry_unlock(void) {
 // COOKIES
 
 static void registry_set_cookie(struct web_client *w, const char *guid) {
-    char edate[100];
+    char edate[100], domain[512];
     time_t et = now_realtime_sec() + registry.persons_expiration;
     struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
     strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
@@ -31,7 +31,22 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     snprintfz(w->cookie1, NETDATA_WEB_REQUEST_COOKIE_SIZE, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", guid, edate);
 
     if(registry.registry_domain && registry.registry_domain[0])
-        snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", guid, registry.registry_domain, edate);
+        snprintfz(domain, 511, "Domain=%s", registry.registry_domain);
+    else
+        domain[0]='\0';
+
+    int length = snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE,
+                           NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; %s",
+                           guid, edate, domain);
+
+    size_t remaining_length = NETDATA_WEB_REQUEST_COOKIE_SIZE - length;
+    // 25 is the necessary length to add new cookies
+    if (registry.enable_cookies_samesite_secure) {
+        if (length > 0 && remaining_length > 25)
+            snprintfz(&w->cookie2[length], remaining_length, "; SameSite=None; Secure");
+        else
+            error("Netdata does not have enough space to store cookies SameSite and Secure");
+    }
 }
 
 static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {
@@ -46,7 +61,7 @@ static inline void registry_json_header(RRDHOST *host, struct web_client *w, con
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     buffer_sprintf(w->response.data, "{\n\t\"action\": \"%s\",\n\t\"status\": \"%s\",\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
-            action, status, host->registry_hostname, host->machine_guid);
+            action, status, rrdhost_registry_hostname(host), host->machine_guid);
 }
 
 static inline void registry_json_footer(struct web_client *w) {
@@ -93,7 +108,7 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(void *entry, void *data) {
+static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
@@ -257,7 +272,7 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 
     buffer_strcat(w->response.data, ",\n\t\"urls\": [");
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
-    dictionary_get_all(m->machine_urls, registry_json_machine_url_callback, &c);
+    dictionary_walkthrough_read(m->machine_urls, registry_json_machine_url_callback, &c);
     buffer_strcat(w->response.data, "\n\t]\n");
 
     registry_json_footer(w);
@@ -351,7 +366,7 @@ void registry_statistics(void) {
                 , NULL
                 , "registry"
                 , NULL
-                , "NetData Registry Sessions"
+                , "Netdata Registry Sessions"
                 , "sessions"
                 , "registry"
                 , "stats"
@@ -376,7 +391,7 @@ void registry_statistics(void) {
                 , NULL
                 , "registry"
                 , NULL
-                , "NetData Registry Entries"
+                , "Netdata Registry Entries"
                 , "entries"
                 , "registry"
                 , "stats"
@@ -409,7 +424,7 @@ void registry_statistics(void) {
                 , NULL
                 , "registry"
                 , NULL
-                , "NetData Registry Memory"
+                , "Netdata Registry Memory"
                 , "KiB"
                 , "registry"
                 , "stats"
@@ -426,10 +441,10 @@ void registry_statistics(void) {
     }
     else rrdset_next(stm);
 
-    rrddim_set(stm, "persons",       registry.persons_memory + registry.persons_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
-    rrddim_set(stm, "machines",      registry.machines_memory + registry.machines_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
+    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_for_registry(registry.persons));
+    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_for_registry(registry.machines));
     rrddim_set(stm, "urls",          registry.urls_memory);
     rrddim_set(stm, "persons_urls",  registry.persons_urls_memory);
-    rrddim_set(stm, "machines_urls", registry.machines_urls_memory + registry.machines_count * sizeof(DICTIONARY) + registry.machines_urls_count * sizeof(NAME_VALUE));
+    rrddim_set(stm, "machines_urls", registry.machines_urls_memory);
     rrdset_done(stm);
 }

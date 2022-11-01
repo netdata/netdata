@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# next unused error code: L0003
+
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
-
 # -----------------------------------------------------------------------------
 
 setup_terminal() {
@@ -43,6 +44,7 @@ setup_terminal() {
       TPUT_RESET="$(tput sgr 0)"
       # shellcheck disable=SC2034
       TPUT_BLACK="$(tput setaf 0)"
+      # shellcheck disable=SC2034
       TPUT_RED="$(tput setaf 1)"
       TPUT_GREEN="$(tput setaf 2)"
       # shellcheck disable=SC2034
@@ -51,6 +53,7 @@ setup_terminal() {
       TPUT_BLUE="$(tput setaf 4)"
       # shellcheck disable=SC2034
       TPUT_PURPLE="$(tput setaf 5)"
+      # shellcheck disable=SC2034
       TPUT_CYAN="$(tput setaf 6)"
       TPUT_WHITE="$(tput setaf 7)"
       # shellcheck disable=SC2034
@@ -99,7 +102,7 @@ get() {
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}"
   else
-    fatal "I need curl or wget to proceed, but neither is available on this system."
+    fatal "I need curl or wget to proceed, but neither is available on this system." "L0002"
   fi
 }
 
@@ -129,11 +132,11 @@ download_file() {
 # external component handling
 
 fetch_and_verify() {
-  local component=${1}
-  local url=${2}
-  local base_name=${3}
-  local tmp=${4}
-  local override=${5}
+  component="${1}"
+  url="${2}"
+  base_name="${3}"
+  tmp="${4}"
+  override="${5}"
 
   if [ -z "${override}" ]; then
     download_file "${url}" "${tmp}/${base_name}" "${component}"
@@ -159,24 +162,20 @@ fetch_and_verify() {
 # -----------------------------------------------------------------------------
 
 netdata_banner() {
-  local l1="  ^" \
+    l1="  ^" \
     l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-" \
-    l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  " \
     l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
-    sp="                                                                              " \
-    netdata="netdata" start end msg="${*}" chartcolor="${TPUT_DIM}"
+    space="  "
+    l3f="  |   '-'   '-'   '-'   '-'   '-'"
+    l3e="               '-'   '-'   '-'   '-'   '-'   "
 
-  [ ${#msg} -lt ${#netdata} ] && msg="${msg}${sp:0:$((${#netdata} - ${#msg}))}"
-  [ ${#msg} -gt $((${#l2} - 20)) ] && msg="${msg:0:$((${#l2} - 23))}..."
-
-  start="$((${#l2} / 2 - 4))"
-  [ $((start + ${#msg} + 4)) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
-  end=$((start + ${#msg} + 4))
+    netdata="netdata"
+    chartcolor="${TPUT_DIM}"
 
   echo >&2
   echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
-  echo >&2 "${chartcolor}${l2:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}${TPUT_RESET}"
-  echo >&2 "${chartcolor}${l3:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_CYAN}${msg}${TPUT_RESET}${chartcolor}${sp:0:2}${l3:end:$((${#l2} - end))}${TPUT_RESET}"
+  echo >&2 "${chartcolor}${l2%-.   .-.   .-.   .-.   .-.   .-.   .-.   .-}${space}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${l2#  |.-.   .-.   .-.   .-.   .-.   .-.   .-. }${TPUT_RESET}"
+  echo >&2 "${chartcolor}${l3f}${l3e}${TPUT_RESET}"
   echo >&2 "${chartcolor}${l4}${TPUT_RESET}"
   echo >&2
 }
@@ -184,12 +183,13 @@ netdata_banner() {
 # -----------------------------------------------------------------------------
 # portable service command
 
-service_cmd="$(command -v service 2> /dev/null)"
-rcservice_cmd="$(command -v rc-service 2> /dev/null)"
-systemctl_cmd="$(command -v systemctl 2> /dev/null)"
+service_cmd="$(command -v service 2> /dev/null || true)"
+rcservice_cmd="$(command -v rc-service 2> /dev/null || true)"
+systemctl_cmd="$(command -v systemctl 2> /dev/null || true)"
 service() {
 
-  local cmd="${1}" action="${2}"
+  cmd="${1}"
+  action="${2}"
 
   if [ -n "${systemctl_cmd}" ]; then
     run "${systemctl_cmd}" "${action}" "${cmd}"
@@ -208,7 +208,6 @@ service() {
 # portable pidof
 
 safe_pidof() {
-  local pidof_cmd
   pidof_cmd="$(command -v pidof 2> /dev/null)"
   if [ -n "${pidof_cmd}" ]; then
     ${pidof_cmd} "${@}"
@@ -224,17 +223,21 @@ safe_pidof() {
 
 # -----------------------------------------------------------------------------
 find_processors() {
-  # Most UNIX systems have `nproc` as part of their userland (including macOS, Linux and BSD)
+  # Most UNIX systems have `nproc` as part of their userland (including Linux and BSD)
   if command -v nproc > /dev/null; then
     nproc && return
   fi
 
-  local cpus
+  # macOS has no nproc but it may have gnproc installed from Homebrew or from Macports.
+  if command -v gnproc > /dev/null; then
+    gnproc && return
+  fi
+
   if [ -f "/proc/cpuinfo" ]; then
     # linux
     cpus=$(grep -c ^processor /proc/cpuinfo)
   else
-    # freebsd
+  # freebsd
     cpus=$(sysctl hw.ncpu 2> /dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
   fi
   if [ -z "${cpus}" ] || [ $((cpus)) -lt 1 ]; then
@@ -245,26 +248,52 @@ find_processors() {
 }
 
 # -----------------------------------------------------------------------------
+exit_reason() {
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    EXIT_REASON="${1}"
+    EXIT_CODE="${2}"
+    if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
+      export EXIT_REASON
+      export EXIT_CODE
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+    fi
+  fi
+}
+
 fatal() {
-  printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+  fi
+  exit_reason "${1}" "${2}"
   exit 1
 }
 
+warning() {
+  printf >&2 "%s WARNING %s %s\n\n" "${TPUT_BGYELLOW}${TPUT_BLACK}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+  fi
+}
+
 run_ok() {
-  printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s OK %s %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
 }
 
 run_failed() {
-  printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s FAILED %s %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ] && [ -n "${1:-''}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+  fi
 }
 
 ESCAPED_PRINT_METHOD=
-if printf "%q " test > /dev/null 2>&1; then
+if printf "%s " test > /dev/null 2>&1; then
   ESCAPED_PRINT_METHOD="printfq"
 fi
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
-    printf "%q " "${@}"
+    printf "%s " "${@}"
   else
     printf "%s" "${*}"
   fi
@@ -273,14 +302,14 @@ escaped_print() {
 
 run_logfile="/dev/null"
 run() {
-  local user="${USER--}" dir="${PWD}" info info_console
-
+  local_user="${USER--}"
+  local_dir="${PWD}"
   if [ "${UID}" = "0" ]; then
-    info="[root ${dir}]# "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
+    info="[root ${local_dir}]# "
+    info_console="[${TPUT_DIM}${local_dir}${TPUT_RESET}]# "
   else
-    info="[${user} ${dir}]$ "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
+    info="[${local_user} ${local_dir}]$ "
+    info_console="[${TPUT_DIM}${local_dir}${TPUT_RESET}]$ "
   fi
 
   {
@@ -295,10 +324,13 @@ run() {
 
   "${@}"
 
-  local ret=$?
+  ret=$?
   if [ ${ret} -ne 0 ]; then
     run_failed
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
+    if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+      SAVED_WARNINGS="${SAVED_WARNINGS}\n  - Command '${*}' failed with exit code ${ret}."
+    fi
   else
     run_ok
     printf >> "${run_logfile}" "OK\n"
@@ -309,7 +341,6 @@ run() {
 
 iscontainer() {
   # man systemd-detect-virt
-  local cmd
   cmd=$(command -v systemd-detect-virt 2> /dev/null)
   if [ -n "${cmd}" ] && [ -x "${cmd}" ]; then
     "${cmd}" --container > /dev/null 2>&1 && return 0
@@ -317,7 +348,6 @@ iscontainer() {
 
   # /proc/1/sched exposes the host's pid of our init !
   # http://stackoverflow.com/a/37016302
-  local pid
   pid=$(head -n 1 /proc/1/sched 2> /dev/null | {
     # shellcheck disable=SC2034
     IFS='(),#:' read -r name pid th threads
@@ -348,18 +378,22 @@ iscontainer() {
 get_os_key() {
   if [ -f /etc/os-release ]; then
     # shellcheck disable=SC1091
-    source /etc/os-release || return 1
+    . /etc/os-release || return 1
     echo "${ID}-${VERSION_ID}"
 
   elif [ -f /etc/redhat-release ]; then
-    echo "$(< /etc/redhat-release)"
+    cat /etc/redhat-release
   else
     echo "unknown"
   fi
 }
 
 issystemd() {
-  local pids p myns ns systemctl
+  pids=''
+  p=''
+  myns=''
+  ns=''
+  systemctl=''
 
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -393,153 +427,197 @@ issystemd() {
 }
 
 get_systemd_service_dir() {
-  local SYSTEMD_DIRECTORY=""
-  local key
-  key="$(get_os_key)"
-
   if [ -w "/lib/systemd/system" ]; then
-    SYSTEMD_DIRECTORY="/lib/systemd/system"
+    echo "/lib/systemd/system"
   elif [ -w "/usr/lib/systemd/system" ]; then
-    SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+    echo "/usr/lib/systemd/system"
   elif [ -w "/etc/systemd/system" ]; then
-    SYSTEMD_DIRECTORY="/etc/systemd/system"
+    echo "/etc/systemd/system"
   fi
-
-  if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
-    SYSTEMD_DIRECTORY="/etc/systemd/system"
-  fi
-
-  echo "${SYSTEMD_DIRECTORY}"
 }
 
 install_non_systemd_init() {
   [ "${UID}" != 0 ] && return 1
-
-  local key
   key="$(get_os_key)"
 
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
-    if [[ ${key} =~ ^(gentoo|alpine).* ]]; then
+    if expr "${key}" : "^(gentoo|alpine).*"; then
       echo >&2 "Installing OpenRC init file..."
       run cp system/netdata-openrc /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run rc-update add netdata default &&
         return 0
 
-    elif [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+    elif expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
       echo >&2 "Installing LSB init file..."
       run cp system/netdata-lsb /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run update-rc.d netdata defaults &&
         run update-rc.d netdata enable &&
         return 0
-    elif [[ ${key} =~ ^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).* ]]; then
+    elif expr "${key}" : "^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).*"; then
       echo >&2 "Installing init.d file..."
       run cp system/netdata-init-d /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run chkconfig netdata on &&
         return 0
     else
-      echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
+      warning "Could not determine what type of init script to install on this system."
       return 1
     fi
   elif [ -f /etc/init.d/netdata ]; then
     echo >&2 "file '/etc/init.d/netdata' already exists."
     return 0
   else
-    echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
+    warning "Could not determine what type of init script to install on this system."
   fi
 
   return 1
 }
 
-# This is used by netdata-installer.sh
-# shellcheck disable=SC2034
-NETDATA_STOP_CMD="netdatacli shutdown-agent"
+run_install_service_script() {
+  # shellcheck disable=SC2154
+  save_path="${tmpdir}/netdata-service-cmds"
+  # shellcheck disable=SC2068
+  run "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" --save-cmds "${save_path}" ${@}
 
-NETDATA_START_CMD="netdata"
-NETDATA_INSTALLER_START_CMD=""
+  case $? in
+    0)
+      if [ -r "${save_path}" ]; then
+        # shellcheck disable=SC1090
+        . "${save_path}"
+      fi
+
+      if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
+        if [ -n "${NETDATA_START_CMD}" ]; then
+          NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+        else
+          NETDATA_INSTALLER_START_CMD="netdata"
+        fi
+      fi
+      ;;
+    1)
+      if [ -z "${NETDATA_SERVICE_WARNED_1}" ]; then
+        warning "Intenral error encountered while attempting to install or manage Netdata as a system service. This is probably a bug."
+        NETDATA_SERVICE_WARNED_1=1
+      fi
+      ;;
+    2)
+      if [ -z "${NETDATA_SERVICE_WARNED_2}" ]; then
+        warning "Failed to detect system service manager type. Cannot cleanly install or manage Netdata as a system service. If you are running this script in a container, this is expected and can safely be ignored."
+        NETDATA_SERVICE_WARNED_2=1
+      fi
+      ;;
+    3)
+      if [ -z "${NETDATA_SERVICE_WARNED_3}" ]; then
+        warning "Detected an unsupported system service manager. Manual setup will be required to manage Netdata as a system service."
+        NETDATA_SERVICE_WARNED_3=1
+      fi
+      ;;
+    4)
+      if [ -z "${NETDATA_SERVICE_WARNED_4}" ]; then
+        warning "Detected a supported system service manager, but failed to install Netdata as a system service. Usually this is a result of incorrect permissions. Manually running ${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh may provide more information about the exact issue."
+        NETDATA_SERVICE_WARNED_4=1
+      fi
+      ;;
+    5)
+      if [ -z "${NETDATA_SERVICE_WARNED_5}" ]; then
+        warning "We do not support managing Netdata as a system service on this platform. Manual setup will be required."
+        NETDATA_SERVICE_WARNED_5=1
+      fi
+      ;;
+  esac
+}
 
 install_netdata_service() {
-  local uname
-  uname="$(uname 2> /dev/null)"
-
   if [ "${UID}" -eq 0 ]; then
-    if [ "${uname}" = "Darwin" ]; then
+    if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+      run_install_service_script
+    else
+      # This is used by netdata-installer.sh
+      # shellcheck disable=SC2034
+      NETDATA_STOP_CMD="netdatacli shutdown-agent"
 
-      if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]; then
-        echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
-        return 0
-      else
-        echo >&2 "Installing MacOS X plist file..."
+      NETDATA_START_CMD="netdata"
+      NETDATA_INSTALLER_START_CMD=""
+
+      uname="$(uname 2> /dev/null)"
+
+      if [ "${uname}" = "Darwin" ]; then
+        if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]; then
+          echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
+          return 0
+        else
+          echo >&2 "Installing MacOS X plist file..."
+          # This is used by netdata-installer.sh
+          # shellcheck disable=SC2034
+          run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
+            run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
+            NETDATA_START_CMD="launchctl start com.github.netdata" &&
+            NETDATA_STOP_CMD="launchctl stop com.github.netdata"
+          return 0
+        fi
+
+      elif [ "${uname}" = "FreeBSD" ]; then
         # This is used by netdata-installer.sh
         # shellcheck disable=SC2034
-        run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
-          run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
-          NETDATA_START_CMD="launchctl start com.github.netdata" &&
-          NETDATA_STOP_CMD="launchctl stop com.github.netdata"
-        return 0
-      fi
+        run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+          NETDATA_STOP_CMD="service netdata stop" &&
+          NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
+          myret=$?
 
-    elif [ "${uname}" = "FreeBSD" ]; then
-      # This is used by netdata-installer.sh
-      # shellcheck disable=SC2034
-      run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
-        NETDATA_STOP_CMD="service netdata stop" &&
-        NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
-        myret=$?
+        echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
+        echo >&2 ""
 
-      echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
-      echo >&2 ""
+        return ${myret}
 
-      return ${myret}
-
-    elif issystemd; then
-      # systemd is running on this system
-      NETDATA_START_CMD="systemctl start netdata"
-      # This is used by netdata-installer.sh
-      # shellcheck disable=SC2034
-      NETDATA_STOP_CMD="systemctl stop netdata"
-      NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
-
-      SYSTEMD_DIRECTORY="$(get_systemd_service_dir)"
-
-      if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
-        ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
-        IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
-        if [ "${IS_NETDATA_ENABLED}" == "disabled" ]; then
-          echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
-          ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
-        fi
-
-        echo >&2 "Installing systemd service..."
-        run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
-          run systemctl daemon-reload &&
-          ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
-          return 0
-      else
-        echo >&2 "no systemd directory; cannot install netdata.service"
-      fi
-    else
-      install_non_systemd_init
-      local ret=$?
-
-      if [ ${ret} -eq 0 ]; then
-        if [ -n "${service_cmd}" ]; then
-          NETDATA_START_CMD="service netdata start"
-          # This is used by netdata-installer.sh
-          # shellcheck disable=SC2034
-          NETDATA_STOP_CMD="service netdata stop"
-        elif [ -n "${rcservice_cmd}" ]; then
-          NETDATA_START_CMD="rc-service netdata start"
-          # This is used by netdata-installer.sh
-          # shellcheck disable=SC2034
-          NETDATA_STOP_CMD="rc-service netdata stop"
-        fi
+      elif issystemd; then
+        # systemd is running on this system
+        NETDATA_START_CMD="systemctl start netdata"
+        # This is used by netdata-installer.sh
+        # shellcheck disable=SC2034
+        NETDATA_STOP_CMD="systemctl stop netdata"
         NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
-      fi
 
-      return ${ret}
+        SYSTEMD_DIRECTORY="$(get_systemd_service_dir)"
+
+        if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
+          ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
+          IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+          if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
+            echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
+            ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
+          fi
+
+          echo >&2 "Installing systemd service..."
+          run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
+            run systemctl daemon-reload &&
+            ${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
+            return 0
+        else
+          warning "Could not find a systemd service directory, unable to install Netdata systemd service."
+        fi
+      else
+        install_non_systemd_init
+        ret=$?
+
+        if [ ${ret} -eq 0 ]; then
+          if [ -n "${service_cmd}" ]; then
+            NETDATA_START_CMD="service netdata start"
+            # This is used by netdata-installer.sh
+            # shellcheck disable=SC2034
+            NETDATA_STOP_CMD="service netdata stop"
+          elif [ -n "${rcservice_cmd}" ]; then
+            NETDATA_START_CMD="rc-service netdata start"
+            # This is used by netdata-installer.sh
+            # shellcheck disable=SC2034
+            NETDATA_STOP_CMD="rc-service netdata stop"
+          fi
+          NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+        fi
+
+        return ${ret}
+      fi
     fi
   fi
 
@@ -561,14 +639,16 @@ pidisnetdata() {
 }
 
 stop_netdata_on_pid() {
-  local pid="${1}" ret=0 count=0
+  pid="${1}"
+  ret=0
+  count=0
 
   pidisnetdata "${pid}" || return 0
 
   printf >&2 "Stopping netdata on pid %s ..." "${pid}"
-  while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
+  while [ -n "${pid}" ] && [ ${ret} -eq 0 ]; do
     if [ ${count} -gt 24 ]; then
-      echo >&2 "Cannot stop the running netdata on pid ${pid}."
+      warning "Cannot stop netdata agent with PID ${pid}."
       return 1
     fi
 
@@ -593,7 +673,7 @@ stop_netdata_on_pid() {
 
   echo >&2
   if [ ${ret} -eq 0 ]; then
-    echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+    warning "Failed to stop netdata agent process with PID ${pid}."
     return 1
   fi
 
@@ -602,8 +682,6 @@ stop_netdata_on_pid() {
 }
 
 netdata_pids() {
-  local p myns ns
-
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
 
   for p in \
@@ -619,55 +697,79 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
-  local p uname
+  stop_success=0
+
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+    run_install_service_script --cmds-only
+  fi
 
   if [ "${UID}" -eq 0 ]; then
-    uname="$(uname 2> /dev/null)"
+
+    uname="$(uname 2>/dev/null)"
 
     # Any of these may fail, but we need to not bail if they do.
-    if issystemd; then
+    if [ -n "${NETDATA_STOP_CMD}" ]; then
+      if ${NETDATA_STOP_CMD}; then
+        stop_success=1
+        sleep 5
+      fi
+    elif issystemd; then
       if systemctl stop netdata; then
+        stop_success=1
         sleep 5
       fi
     elif [ "${uname}" = "Darwin" ]; then
       if launchctl stop netdata; then
+        stop_success=1
         sleep 5
       fi
     elif [ "${uname}" = "FreeBSD" ]; then
       if /etc/rc.d/netdata stop; then
+        stop_success=1
         sleep 5
       fi
     else
       if service netdata stop; then
+        stop_success=1
         sleep 5
       fi
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] && [ -n "$(builtin type -P netdatacli)" ]; then
-    netdatacli shutdown-agent
-    sleep 20
-  fi
+  if [ "$stop_success" = "0" ]; then
+    if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
+      netdatacli shutdown-agent
+      sleep 20
+    fi
 
-  for p in $(netdata_pids); do
-    # shellcheck disable=SC2086
-    stop_netdata_on_pid ${p}
-  done
+    for p in $(netdata_pids); do
+      # shellcheck disable=SC2086
+      stop_netdata_on_pid ${p}
+    done
+  fi
 }
 
 # -----------------------------------------------------------------------------
 # restart netdata
 
 restart_netdata() {
-  local netdata="${1}"
+  netdata="${1}"
   shift
 
-  local started=0
+  started=0
 
   progress "Restarting netdata instance"
 
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+    run_install_service_script --cmds-only
+  fi
+
   if [ -z "${NETDATA_INSTALLER_START_CMD}" ]; then
-    NETDATA_INSTALLER_START_CMD="${netdata}"
+    if [ -n "${NETDATA_START_CMD}" ]; then
+      NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+    else
+      NETDATA_INSTALLER_START_CMD="${netdata}"
+    fi
   fi
 
   if [ "${UID}" -eq 0 ]; then
@@ -679,7 +781,7 @@ restart_netdata() {
     # shellcheck disable=SC2086
     run ${NETDATA_INSTALLER_START_CMD} && started=1
 
-    if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
+    if [ ${started} -eq 1 ] && sleep 5 && [ -z "$(netdata_pids)" ]; then
       echo >&2 "Ooops! it seems netdata is not started."
       started=0
     fi
@@ -689,16 +791,17 @@ restart_netdata() {
       # shellcheck disable=SC2086
       run ${NETDATA_INSTALLER_START_CMD} && started=1
     fi
+
+    if [ ${started} -eq 1 ] && sleep 5 && [ -z "$(netdata_pids)" ]; then
+      echo >&2 "Hm... it seems netdata is still not started."
+      started=0
+    fi
   fi
 
-  if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
-    echo >&2 "Hm... it seems netdata is still not started."
-    started=0
-  fi
 
   if [ ${started} -eq 0 ]; then
     # still not started... another forced attempt, just run the binary
-    echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${*}'"
+    warning "Netdata service still not started, attempting another forced restart by running '${netdata} ${*}'"
     run stop_all_netdata
     run "${netdata}" "${@}"
     return $?
@@ -732,7 +835,8 @@ install_netdata_logrotate() {
 # create netdata.conf
 
 create_netdata_conf() {
-  local path="${1}" url="${2}"
+  path="${1}"
+  url="${2}"
 
   if [ -s "${path}" ]; then
     return 0
@@ -760,7 +864,7 @@ create_netdata_conf() {
       run_ok "New configuration saved for you to edit at ${path}"
     else
       [ -f "${path}.new" ] && rm "${path}.new"
-      run_failed "Cannnot download configuration from netdata daemon using url '${url}'"
+      run_failed "Cannot download configuration from netdata daemon using url '${url}'"
       url=''
     fi
   fi
@@ -773,7 +877,8 @@ create_netdata_conf() {
 }
 
 portable_add_user() {
-  local username="${1}" homedir="${2}"
+  username="${1}"
+  homedir="${2}"
 
   [ -z "${homedir}" ] && homedir="/tmp"
 
@@ -785,7 +890,6 @@ portable_add_user() {
 
   echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
-  local nologin
   nologin="$(command -v nologin || echo '/bin/false')"
 
   # Linux
@@ -808,13 +912,13 @@ portable_add_user() {
     run sysadminctl -addUser "${username}" && return 0
   fi
 
-  echo >&2 "Failed to add ${username} user account !"
+  warning "Failed to add ${username} user account!"
 
   return 1
 }
 
 portable_add_group() {
-  local groupname="${1}"
+  groupname="${1}"
 
   # Check if group exist
   if cut -d ':' -f 1 < /etc/group | grep "^${groupname}$" 1> /dev/null 2>&1; then
@@ -844,21 +948,23 @@ portable_add_group() {
     dseditgroup -o create "${groupname}" && return 0
   fi
 
-  echo >&2 "Failed to add ${groupname} user group !"
+  warning >&2 "Failed to add ${groupname} user group !"
   return 1
 }
 
 portable_add_user_to_group() {
-  local groupname="${1}" username="${2}"
+  groupname="${1}"
+  username="${2}"
 
   # Check if group exist
   if ! cut -d ':' -f 1 < /etc/group | grep "^${groupname}$" > /dev/null 2>&1; then
     echo >&2 "Group '${groupname}' does not exist."
-    return 1
+    # Don’t treat this as a failure, if the group does not exist we should not be trying to add the user to it.
+    return 0
   fi
 
   # Check if user is in group
-  if [[ ",$(grep "^${groupname}:" < /etc/group | cut -d ':' -f 4)," =~ ,${username}, ]]; then
+  if expr ",$(grep "^${groupname}:" < /etc/group | cut -d ':' -f 4)," : ",""${username}"","; then
     # username is already there
     echo >&2 "User '${username}' is already in group '${groupname}'."
     return 0
@@ -885,20 +991,21 @@ portable_add_user_to_group() {
     if command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
     fi
-    echo >&2 "Failed to add user ${username} to group ${groupname} !"
+
+    warning >&2 "Failed to add user ${username} to group ${groupname}!"
     return 1
   fi
 }
 
 safe_sha256sum() {
-  # Within the contexct of the installer, we only use -c option that is common between the two commands
+  # Within the context of the installer, we only use -c option that is common between the two commands
   # We will have to reconsider if we start non-common options
   if command -v sha256sum > /dev/null 2>&1; then
     sha256sum "$@"
   elif command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$@"
   else
-    fatal "I could not find a suitable checksum binary to use"
+    fatal "I could not find a suitable checksum binary to use" "L0001"
   fi
 }
 
@@ -945,106 +1052,6 @@ install_netdata_updater() {
   chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
   echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
   echo >&2
-
-  return 0
-}
-
-cleanup_old_netdata_updater() {
-  if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
-    echo >&2 "Removing updater from deprecated location"
-    rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
-  fi
-
-  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
-    systemctl disable netdata-updater.timer
-    rm -f "$(get_systemd_service_dir)/netdata-updater.timer"
-    rm -f "$(get_systemd_service_dir)/netdata-updater.service"
-  fi
-
-  if [ -d /etc/cron.daily ]; then
-    rm -f /etc/cron.daily/netdata-updater.sh
-    rm -f /etc/cron.daily/netdata-updater
-  fi
-
-  if [ -d /etc/periodic/daily ]; then
-    rm -f /etc/periodic/daily/netdata-updater.sh
-    rm -f /etc/periodic/daily/netdata-updater
-  fi
-
-  if [ -d /etc/cron.d ]; then
-    rm -f /etc/cron.d/netdata-updater
-  fi
-
-  return 0
-}
-
-enable_netdata_updater() {
-  local updater_type
-
-  if [ -n "${1}" ] ; then
-    updater_type="${1}"
-  else
-    updater_type="$(_get_scheduler_type)"
-  fi
-
-  case "${updater_type}" in
-    "systemd")
-      systemctl enable netdata-updater.timer
-
-      echo >&2 "Auto-updating has been enabled using a systemd timer unit."
-      echo >&2
-      echo >&2 "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
-      echo >&2 "Successful updates should produce empty logs."
-      echo >&2
-      ;;
-    "interval")
-      ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_intervaldir)/netdata-updater"
-
-      echo >&2 "Auto-updating has been enabled through cron, updater script linked to ${TPUT_RED}${TPUT_BOLD}$(_get_intervaldir)/netdata-updater${TPUT_RESET}"
-      echo >&2
-      echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
-      echo >&2 "Successful updates will not send an email."
-      echo >&2
-      ;;
-    "crontab")
-      cat "${NETDATA_SOURCE_DIR}/system/netdata.crontab" > "/etc/cron.d/netdata-updater"
-
-      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata-updater${TPUT_RESET}"
-      echo >&2
-      echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
-      echo >&2 "Successful updates will not send an email."
-      echo >&2
-      ;;
-    *)
-      echo >&2 "Unable to determine what type of auto-update scheduling to use, not enabling auto-updates."
-      echo >&2
-      return 1
-  esac
-
-  return 0
-}
-
-disable_netdata_updater() {
-  echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
-  echo >&2
-
-  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
-    systemctl disable netdata-updater.timer
-  fi
-
-  if [ -d /etc/cron.daily ]; then
-    rm -f /etc/cron.daily/netdata-updater.sh
-    rm -f /etc/cron.daily/netdata-updater
-  fi
-
-  if [ -d /etc/periodic/daily ]; then
-    rm -f /etc/periodic/daily/netdata-updater.sh
-    rm -f /etc/periodic/daily/netdata-updater
-  fi
-
-  if [ -d /etc/cron.d ]; then
-    rm -f /etc/cron.d/netdata-updater
-  fi
 
   return 0
 }

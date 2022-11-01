@@ -1,9 +1,7 @@
 <!--
----
 title: "External build-system"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/build_external/README.md
----
 -->
 
 # External build-system
@@ -14,7 +12,7 @@ decoupled. This allows:
 -   Cross-compilation (e.g. linux development from macOS)
 -   Cross-distro (e.g. using CentOS user-land while developing on Debian)
 -   Multi-host scenarios (e.g. parent-child configurations)
--   Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
+-   Bleeding-edge scenarios (e.g. using the ACLK (**currently for internal-use only**))
 
 The advantage of these scenarios is that they allow **reproducible** builds and testing
 for developers. This is the first iteration of the build-system to allow the team to use
@@ -126,4 +124,5 @@ Notes:
 * We are currently limited to arch because of restrictions on libwebsockets
 * There is not yet a good way to configure the target agent container from the docker-compose command line.
 * Several other containers should be in this compose (a paho client, tshark etc).
+
 

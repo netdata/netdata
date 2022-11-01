@@ -1,14 +1,14 @@
 <!--
 title: "Step 6. Collect metrics from more services and apps"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/docs/step-by-step/step-06.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-06.md
 -->
 
 # Step 6. Collect metrics from more services and apps
 
 When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more.
 
-To auto-detect and collect metrics from a source you just installed, you need to [restart
-Netdata](/docs/getting-started.md#start-stop-and-restart-netdata).
+To auto-detect and collect metrics from a source you just installed, you need to restart Netdata using `sudo systemctl
+restart netdata`, or the [appropriate method](/docs/configure/start-stop-restart.md) for your system.
 
 However, auto-detection only works if you installed the source using its standard installation
 procedure. If Netdata isn't collecting metrics after a restart, your source probably isn't configured
@@ -34,12 +34,12 @@ underlying architecture.
 
 By default, Netdata collects a lot of metrics every second using any number of discrete collector. Collectors, in turn,
 are organized and manged by plugins. **Internal** plugins collect system metrics, **external** plugins collect
-non-system metrics, and **orchestrator** plugins group individal collectors together based on the programming language
+non-system metrics, and **orchestrator** plugins group individual collectors together based on the programming language
 they were built in.
 
 These modules are primarily written in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/) (`go.d`) and
 [Python](/collectors/python.d.plugin/README.md), although some use [Bash](/collectors/charts.d.plugin/README.md)
-(`charts.d`) or [Node.js](/collectors/node.d.plugin/README.md) (`node.d`).
+(`charts.d`).
 
 ## Enable and disable plugins
 
@@ -58,14 +58,14 @@ Enabled:
 
 ```conf
 [plugins]
-  # node.d = yes
+  # python.d = yes
 ```
 
 Disabled:
 
 ```conf
 [plugins]
-  node.d = no
+  python.d = no
 ```
 
 When you explicitly disable a plugin this way, it won't auto-collect metrics using its collectors.
@@ -99,9 +99,9 @@ Next, edit your `/etc/nginx/sites-enabled/default` file to include a `location` 
     }
 ```
 
-Restart Netdata using `service netdata restart` or the [correct
-alternative](/docs/getting-started.md#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect
-metrics from your Nginx web server!
+Restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, and Netdata will auto-detect metrics from your Nginx web
+server!
 
 While not necessary for most auto-detection and collection purposes, you can also configure the Nginx collector itself
 by editing its configuration file:
@@ -119,4 +119,4 @@ the dashboard to learn more about some of its more advanced features.
 
 [Next: Netdata's dashboard in depth &rarr;](step-07.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-06&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

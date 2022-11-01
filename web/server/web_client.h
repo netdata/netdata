@@ -26,6 +26,8 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 // HTTP_CODES 5XX Server Errors
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
 #define HTTP_RESP_BACKEND_FETCH_FAILED 503
+#define HTTP_RESP_GATEWAY_TIMEOUT 504
+#define HTTP_RESP_BACKEND_RESPONSE_INVALID 591
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
@@ -68,15 +70,9 @@ typedef enum web_client_flags {
     WEB_CLIENT_CHUNKED_TRANSFER = 1 << 10, // chunked transfer (used with zlib compression)
 } WEB_CLIENT_FLAGS;
 
-//#ifdef HAVE_C___ATOMIC
-//#define web_client_flag_check(w, flag) (__atomic_load_n(&((w)->flags), __ATOMIC_SEQ_CST) & flag)
-//#define web_client_flag_set(w, flag)   __atomic_or_fetch(&((w)->flags), flag, __ATOMIC_SEQ_CST)
-//#define web_client_flag_clear(w, flag) __atomic_and_fetch(&((w)->flags), ~flag, __ATOMIC_SEQ_CST)
-//#else
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
 #define web_client_flag_set(w, flag) (w)->flags |= flag
 #define web_client_flag_clear(w, flag) (w)->flags &= ~flag
-//#endif
 
 #define WEB_CLIENT_IS_DEAD(w) web_client_flag_set(w, WEB_CLIENT_FLAG_DEAD)
 #define web_client_check_dead(w) web_client_flag_check(w, WEB_CLIENT_FLAG_DEAD)
@@ -194,23 +190,21 @@ struct web_client {
 #endif
 };
 
-extern uid_t web_files_uid(void);
-extern uid_t web_files_gid(void);
+int web_client_permission_denied(struct web_client *w);
 
-extern int web_client_permission_denied(struct web_client *w);
+ssize_t web_client_send(struct web_client *w);
+ssize_t web_client_receive(struct web_client *w);
+ssize_t web_client_read_file(struct web_client *w);
 
-extern ssize_t web_client_send(struct web_client *w);
-extern ssize_t web_client_receive(struct web_client *w);
-extern ssize_t web_client_read_file(struct web_client *w);
+void web_client_process_request(struct web_client *w);
+void web_client_request_done(struct web_client *w);
 
-extern void web_client_process_request(struct web_client *w);
-extern void web_client_request_done(struct web_client *w);
+void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
-extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
+int mysendfile(struct web_client *w, char *filename);
 
-extern int mysendfile(struct web_client *w, char *filename);
-
-extern void web_client_build_http_header(struct web_client *w);
+void web_client_build_http_header(struct web_client *w);
+char *strip_control_characters(char *url);
 
 #include "daemon/common.h"
 

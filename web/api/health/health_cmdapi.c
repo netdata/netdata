@@ -86,7 +86,7 @@ void health_silencers2json(BUFFER *wb) {
 /**
  * Silencer to FILE
  *
- * Write the sliencer buffer to a file.
+ * Write the silencer buffer to a file.
  * @param wb
  */
 void health_silencers2file(BUFFER *wb) {
@@ -199,6 +199,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         BUFFER *jsonb = buffer_create(200);
         health_silencers2json(jsonb);
         health_silencers2file(jsonb);
+        buffer_free(jsonb);
     }
 
     return ret;

@@ -2,167 +2,77 @@
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
+AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
     version.txt \
     $(NULL)
 
+SUBDIRS = \
+    dashboard \
+    $(NULL)
+
 DASHBOARD_JS_FILES = \
-    src/dashboard.js/prologue.js.inc \
-    src/dashboard.js/utils.js \
-    src/dashboard.js/server-detection.js \
-    src/dashboard.js/dependencies.js \
-    src/dashboard.js/error-handling.js \
-    src/dashboard.js/compatibility.js \
-    src/dashboard.js/xss.js \
-    src/dashboard.js/colors.js \
-    src/dashboard.js/units-conversion.js \
-    src/dashboard.js/options.js \
-    src/dashboard.js/localstorage.js \
-    src/dashboard.js/timeout.js \
-    src/dashboard.js/themes.js \
-    src/dashboard.js/charting/dygraph.js \
-    src/dashboard.js/charting/sparkline.js \
-    src/dashboard.js/charting/google-charts.js \
-    src/dashboard.js/charting/gauge.js \
-    src/dashboard.js/charting/easy-pie-chart.js \
-    src/dashboard.js/charting/d3pie.js \
-    src/dashboard.js/charting/d3.js \
-    src/dashboard.js/charting/peity.js \
-    src/dashboard.js/charting/textonly.js \
-    src/dashboard.js/charting.js \
-    src/dashboard.js/chart-registry.js \
-    src/dashboard.js/common.js \
-    src/dashboard.js/main.js \
-    src/dashboard.js/alarms.js \
-    src/dashboard.js/registry.js \
-    src/dashboard.js/boot.js \
-    src/dashboard.js/epilogue.js.inc \
+    $(srcdir)/src/dashboard.js/prologue.js.inc \
+    $(srcdir)/src/dashboard.js/utils.js \
+    $(srcdir)/src/dashboard.js/server-detection.js \
+    $(srcdir)/src/dashboard.js/dependencies.js \
+    $(srcdir)/src/dashboard.js/error-handling.js \
+    $(srcdir)/src/dashboard.js/compatibility.js \
+    $(srcdir)/src/dashboard.js/xss.js \
+    $(srcdir)/src/dashboard.js/colors.js \
+    $(srcdir)/src/dashboard.js/units-conversion.js \
+    $(srcdir)/src/dashboard.js/options.js \
+    $(srcdir)/src/dashboard.js/localstorage.js \
+    $(srcdir)/src/dashboard.js/timeout.js \
+    $(srcdir)/src/dashboard.js/themes.js \
+    $(srcdir)/src/dashboard.js/charting/dygraph.js \
+    $(srcdir)/src/dashboard.js/charting/sparkline.js \
+    $(srcdir)/src/dashboard.js/charting/google-charts.js \
+    $(srcdir)/src/dashboard.js/charting/gauge.js \
+    $(srcdir)/src/dashboard.js/charting/easy-pie-chart.js \
+    $(srcdir)/src/dashboard.js/charting/d3pie.js \
+    $(srcdir)/src/dashboard.js/charting/d3.js \
+    $(srcdir)/src/dashboard.js/charting/peity.js \
+    $(srcdir)/src/dashboard.js/charting/textonly.js \
+    $(srcdir)/src/dashboard.js/charting.js \
+    $(srcdir)/src/dashboard.js/chart-registry.js \
+    $(srcdir)/src/dashboard.js/common.js \
+    $(srcdir)/src/dashboard.js/main.js \
+    $(srcdir)/src/dashboard.js/alarms.js \
+    $(srcdir)/src/dashboard.js/registry.js \
+    $(srcdir)/src/dashboard.js/boot.js \
+    $(srcdir)/src/dashboard.js/epilogue.js.inc \
     $(NULL)
 
 dist_noinst_DATA = \
-    README.md \
+    $(srcdir)/README.md \
     $(DASHBOARD_JS_FILES) \
     $(NULL)
 
 dist_web_DATA = \
-    demo.html \
-    demo2.html \
-    demosites.html \
-    demosites2.html \
-    dashboard.html \
     dashboard.js \
-    dashboard_info.js \
-    dashboard_info_custom_example.js \
-    dashboard.css \
-    dashboard.slate.css \
-    favicon.ico \
-    goto-host-from-alarm.html \
-    index.html \
-    main.css \
-    main.js \
-    console.html \
-    infographic.html \
-    robots.txt \
-    refresh-badges.js \
-    sitemap.xml \
-    tv.html \
-    dash-example.html \
+    $(srcdir)/dashboard_info.js \
+    $(srcdir)/dashboard_info_custom_example.js \
+    $(srcdir)/main.css \
+    $(srcdir)/main.js \
     version.txt \
     $(NULL)
 
 webolddir=$(webdir)/old
 dist_webold_DATA = \
-    old/index.html \
+    $(srcdir)/old/index.html \
     $(NULL)
 
 webstaticdir=$(webdir)/static/img
 dist_webstatic_DATA = \
-    static/img/netdata-logomark.svg \
-    $(NULL)
-
-weblibdir=$(webdir)/lib
-dist_weblib_DATA = \
-    lib/bootstrap-3.3.7.min.js \
-    lib/bootstrap-slider-10.0.0.min.js \
-    lib/bootstrap-table-1.11.0.min.js \
-    lib/bootstrap-table-export-1.11.0.min.js \
-    lib/bootstrap-toggle-2.2.2.min.js \
-    lib/clipboard-polyfill-be05dad.js \
-    lib/d3-4.12.2.min.js \
-    lib/d3pie-0.2.1-netdata-3.js \
-    lib/dygraph-c91c859.min.js \
-    lib/dygraph-smooth-plotter-c91c859.js \
-    lib/fontawesome-all-5.0.1.min.js \
-    lib/gauge-1.3.2.min.js \
-    lib/jquery-2.2.4.min.js \
-    lib/jquery.easypiechart-97b5824.min.js \
-    lib/jquery.peity-3.2.0.min.js \
-    lib/jquery.sparkline-2.1.2.min.js \
-    lib/lz-string-1.4.4.min.js \
-    lib/pako-1.0.6.min.js \
-    lib/perfect-scrollbar-0.6.15.min.js \
-    lib/tableExport-1.6.0.min.js \
+    $(srcdir)/static/img/netdata-logomark.svg \
     $(NULL)
 
 webcssdir=$(webdir)/css
 dist_webcss_DATA = \
-    css/morris-0.5.1.css \
-    css/bootstrap-3.3.7.css \
-    css/bootstrap-theme-3.3.7.min.css \
-    css/bootstrap-slate-flat-3.3.7.css \
-    css/bootstrap-slider-10.0.0.min.css \
-    css/bootstrap-toggle-2.2.2.min.css \
-    css/c3-0.4.18.min.css \
-    $(NULL)
-
-webfontsdir=$(webdir)/fonts
-dist_webfonts_DATA = \
-    fonts/glyphicons-halflings-regular.eot \
-    fonts/glyphicons-halflings-regular.svg \
-    fonts/glyphicons-halflings-regular.ttf \
-    fonts/glyphicons-halflings-regular.woff \
-    fonts/glyphicons-halflings-regular.woff2 \
-    $(NULL)
-
-webimagesdir=$(webdir)/images
-dist_webimages_DATA = \
-    images/netdata-logomark.svg \
-    images/alert-128-orange.png \
-    images/alert-128-red.png \
-    images/alert-multi-size-orange.ico \
-    images/alert-multi-size-red.ico \
-    images/animated.gif \
-    images/check-mark-2-128-green.png \
-    images/check-mark-2-multi-size-green.ico \
-    images/netdata.svg \
-    images/post.png \
-    images/android-icon-36x36.png \
-    images/android-icon-48x48.png \
-    images/android-icon-72x72.png \
-    images/android-icon-96x96.png \
-    images/android-icon-144x144.png \
-    images/android-icon-192x192.png \
-    images/apple-icon-57x57.png \
-    images/apple-icon-60x60.png \
-    images/apple-icon-72x72.png \
-    images/apple-icon-76x76.png \
-    images/apple-icon-114x114.png \
-    images/apple-icon-120x120.png \
-    images/apple-icon-144x144.png \
-    images/apple-icon-152x152.png \
-    images/apple-icon-180x180.png \
-    images/apple-icon-precomposed.png \
-    images/apple-icon.png \
-    images/favicon-16x16.png \
-    images/favicon-32x32.png \
-    images/favicon-96x96.png \
-    images/favicon.ico \
-    images/ms-icon-70x70.png \
-    images/ms-icon-144x144.png \
-    images/ms-icon-150x150.png \
-    images/ms-icon-310x310.png \
-    images/banner-icon-144x144.png \
+    $(srcdir)/css/morris-0.5.1.css \
+    $(srcdir)/css/c3-0.4.18.min.css \
     $(NULL)
 
 dashboard.js: $(DASHBOARD_JS_FILES)
@@ -175,7 +85,7 @@ dist_webwellknown_DATA = \
 
 webdntdir=$(webdir)/.well-known/dnt
 dist_webdnt_DATA = \
-    .well-known/dnt/cookies \
+    $(srcdir)/.well-known/dnt/cookies \
     $(NULL)
 
 version.txt:

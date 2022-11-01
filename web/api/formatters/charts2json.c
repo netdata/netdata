@@ -4,34 +4,34 @@
 
 // generate JSON for the /api/v1/charts API call
 
-static inline const char* get_release_channel() {
+const char* get_release_channel() {
     static int use_stable = -1;
 
     if (use_stable == -1) {
-		char filename[FILENAME_MAX + 1];
+        char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
         procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_DEFAULT);
-        if(!ff) {
-            use_stable=1;
-        } else {
+        if (ff) {
             procfile_set_quotes(ff, "'\"");
             ff = procfile_readall(ff);
-            if(!ff) {
-                use_stable=1;
-            } else {
+            if (ff) {
                 unsigned int i;
-                for(i = 0; i < procfile_lines(ff); i++) {
-                    if (!procfile_linewords(ff, i)) continue;
-
-                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL") && !strcmp(procfile_lineword(ff, i, 1), "stable")) {
-                        use_stable = 1;
+                for (i = 0; i < procfile_lines(ff); i++) {
+                    if (!procfile_linewords(ff, i))
+                        continue;
+                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL")) {
+                        if (!strcmp(procfile_lineword(ff, i, 1), "stable"))
+                            use_stable = 1;
+                        else if (!strcmp(procfile_lineword(ff, i, 1), "nightly"))
+                            use_stable = 0;
                         break;
                     }
                 }
                 procfile_close(ff);
-                if (use_stable == -1) use_stable = 0;
             }
         }
+        if (use_stable == -1)
+            use_stable = strchr(program_version, '-') ? 0 : 1;
     }
     return (use_stable)?"stable":"nightly";
 }
@@ -57,11 +57,11 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
-                   , host->hostname
-                   , host->program_version
+                   , rrdhost_hostname(host)
+                   , rrdhost_program_version(host)
                    , get_release_channel()
-                   , host->os
-                   , host->timezone
+                   , rrdhost_os(host)
+                   , rrdhost_timezone(host)
                    , host->rrd_update_every
                    , host->rrd_history_entries
                    , rrd_memory_mode_name(host->rrd_memory_mode)
@@ -69,12 +69,11 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
     );
 
     c = 0;
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, st->id);
+            buffer_strcat(wb, rrdset_id(st));
             buffer_strcat(wb, "\": ");
             rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
@@ -82,13 +81,14 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
             st->last_accessed_time = now;
         }
     }
+    rrdset_foreach_done(st);
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(rc->rrdset)
             alarms++;
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     buffer_sprintf(wb
                    , "\n\t}"
@@ -117,7 +117,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                                  "\n\t\t\t\"hostname\": \"%s\""
                                  "\n\t\t}"
                                , (found > 0) ? "," : ""
-                               , h->hostname
+                               , rrdhost_hostname(h)
                 );
 
                 found++;
@@ -131,7 +131,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                        , "\n\t\t{"
                          "\n\t\t\t\"hostname\": \"%s\""
                          "\n\t\t}"
-                       , host->hostname
+                       , rrdhost_hostname(host)
         );
     }
 
@@ -141,8 +141,8 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 // generate collectors list for the api/v1/info call
 
 struct collector {
-    char *plugin;
-    char *module;
+    const char *plugin;
+    const char *module;
 };
 
 struct array_printer {
@@ -150,7 +150,7 @@ struct array_printer {
     BUFFER *wb;
 };
 
-int print_collector(void *entry, void *data) {
+static int print_collector_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     struct array_printer *ap = (struct array_printer *)data;
     BUFFER *wb = ap->wb;
     struct collector *col=(struct collector *) entry;
@@ -165,28 +165,27 @@ int print_collector(void *entry, void *data) {
 }
 
 void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     RRDSET *st;
     char name[500];
 
     time_t now = now_realtime_sec();
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
-                    .plugin = st->plugin_name ? st->plugin_name : "",
-                    .module = st->module_name ? st->module_name : ""
+                    .plugin = rrdset_plugin_name(st),
+                    .module = rrdset_module_name(st)
             };
             sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
             st->last_accessed_time = now;
         }
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
     struct array_printer ap = {
             .c = 0,
             .wb = wb
     };
-    dictionary_get_all(dict, print_collector, &ap);
+    dictionary_walkthrough_read(dict, print_collector_callback, &ap);
     dictionary_destroy(dict);
 }

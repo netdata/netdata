@@ -2,9 +2,12 @@
 
 #include "common.h"
 #include "buildinfo.h"
+#include "static_threads.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
+
+struct netdata_static_thread *static_threads;
 
 struct config netdata_config = {
         .first_section = NULL,
@@ -29,6 +32,12 @@ void netdata_cleanup_and_exit(int ret) {
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
 
+    char agent_crash_file[FILENAME_MAX + 1];
+    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
+    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
+    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
+    (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
+
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
@@ -38,18 +47,29 @@ void netdata_cleanup_and_exit(int ret) {
 
         // stop everything
         info("EXIT: stopping static threads...");
+#ifdef ENABLE_ACLK
+        aclk_sync_exit_all();
+#endif
         cancel_main_threads();
 
         // free the database
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
-        rrdeng_prepare_exit(&multidb_ctx);
+        if(dbengine_enabled) {
+            for (int tier = 0; tier < storage_tiers; tier++)
+                rrdeng_prepare_exit(multidb_ctx[tier]);
+        }
 #endif
         rrdhost_free_all();
 #ifdef ENABLE_DBENGINE
-        rrdeng_exit(&multidb_ctx);
+        if(dbengine_enabled) {
+            for (int tier = 0; tier < storage_tiers; tier++)
+                rrdeng_exit(multidb_ctx[tier]);
+        }
 #endif
     }
+    sql_close_context_database();
+    sql_close_database();
 
     // unlink the pid
     if(pidfile[0]) {
@@ -61,43 +81,10 @@ void netdata_cleanup_and_exit(int ret) {
 #ifdef ENABLE_HTTPS
     security_clean_openssl();
 #endif
-#ifdef ENABLE_DBENGINE
-    free_global_guid_map();
-#endif
     info("EXIT: all done - netdata is now exiting - bye bye...");
+    (void) unlink(agent_incomplete_shutdown_file);
     exit(ret);
 }
-
-struct netdata_static_thread static_threads[] = {
-
-    NETDATA_PLUGIN_HOOK_CHECKS
-    NETDATA_PLUGIN_HOOK_FREEBSD
-    NETDATA_PLUGIN_HOOK_MACOS
-
-    // linux internal plugins
-    NETDATA_PLUGIN_HOOK_LINUX_PROC
-    NETDATA_PLUGIN_HOOK_LINUX_DISKSPACE
-    NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
-    NETDATA_PLUGIN_HOOK_LINUX_TC
-
-    NETDATA_PLUGIN_HOOK_IDLEJITTER
-    NETDATA_PLUGIN_HOOK_STATSD
-
-#ifdef ENABLE_ACLK
-    NETDATA_ACLK_HOOK
-#endif
-
-        // common plugins for all systems
-    {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
-    {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
-    {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
-    {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
-
-    NETDATA_PLUGIN_HOOK_PLUGINSD
-    NETDATA_PLUGIN_HOOK_HEALTH
-
-    {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
-};
 
 void web_server_threading_selection(void) {
     web_server_mode = web_server_mode_id(config_get(CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
@@ -269,6 +256,11 @@ void cancel_main_threads() {
     }
     else
         info("All threads finished.");
+
+    for (i = 0; static_threads[i].name != NULL ; i++)
+        freez(static_threads[i].thread);
+
+    freez(static_threads);
 }
 
 struct option_def option_definitions[] = {
@@ -351,17 +343,26 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W sqlite-check          Check metadata database integrity and exit.\n\n"
+            "  -W sqlite-fix            Check metadata database integrity, fix if needed and exit.\n\n"
+            "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
-            "  -W stresstest=A,B,C,D,E,F\n"
+            "  -W stresstest=A,B,C,D,E,F,G\n"
             "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
-            "                           size of E MiB, an optional disk space limit"
-            "                           of F MiB and exit.\n\n"
+            "                           size of E MiB, an optional disk space limit\n"
+            "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
+            "  -W buildinfo             Print the version, the configure options,\n"
+            "                           a list of optional features, and whether they\n"
+            "                           are enabled or not.\n\n"
+            "  -W buildinfojson         Print the version, the configure options,\n"
+            "                           a list of optional features, and whether they\n"
+            "                           are enabled or not, in JSON format.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
             "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
@@ -379,40 +380,14 @@ int help(int exitcode) {
     return exitcode;
 }
 
-// TODO: Remove this function with the nix major release.
-void remove_option(int opt_index, int *argc, char **argv) {
-    int i;
-
-    // remove the options.
-    do {
-        *argc = *argc - 1;
-        for(i = opt_index; i < *argc; i++) {
-            argv[i] = argv[i+1];
-        }
-        i = opt_index;
-    } while(argv[i][0] != '-' && opt_index >= *argc);
-}
-
-static const char *verify_required_directory(const char *dir) {
-    if(chdir(dir) == -1)
-        fatal("Cannot cd to directory '%s'", dir);
-
-    DIR *d = opendir(dir);
-    if(!d)
-        fatal("Cannot examine the contents of directory '%s'", dir);
-    closedir(d);
-
-    return dir;
-}
-
 #ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+    netdata_ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    netdata_ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
@@ -424,24 +399,32 @@ static void security_init(){
 static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
+    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_GLOBAL, "error log",  filename);
+    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    stdaccess_filename = config_get(CONFIG_SECTION_GLOBAL, "access log", filename);
+    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+
+#ifdef ENABLE_ACLK
+    aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
+    if (aclklog_enabled) {
+        snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
+        aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+    }
+#endif
 
     char deffacility[8];
     snprintfz(deffacility,7,"%s","daemon");
-    facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
+    facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);
 
-    error_log_throttle_period = config_get_number(CONFIG_SECTION_GLOBAL, "errors flood protection period", error_log_throttle_period);
-    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
+    error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
+    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
     error_log_errors_per_period_backup = error_log_errors_per_period;
 
-    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_GLOBAL, "errors flood protection period"    , ""), 1);
-    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", ""), 1);
+    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
+    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
 }
 
 char *initialize_lock_directory_path(char *prefix)
@@ -449,7 +432,7 @@ char *initialize_lock_directory_path(char *prefix)
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
 
-    return config_get(CONFIG_SECTION_GLOBAL, "lock directory", filename);
+    return config_get(CONFIG_SECTION_DIRECTORIES, "lock", filename);
 }
 
 static void backwards_compatible_config() {
@@ -487,14 +470,132 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL, "web compression level",
                 CONFIG_SECTION_WEB,    "gzip compression level");
 
-    config_move(CONFIG_SECTION_GLOBAL, "web files owner",
-                CONFIG_SECTION_WEB,    "web files owner");
+    config_move(CONFIG_SECTION_GLOBAL,      "config directory",
+                CONFIG_SECTION_DIRECTORIES, "config");
 
-    config_move(CONFIG_SECTION_GLOBAL, "web files group",
-                CONFIG_SECTION_WEB,    "web files group");
+    config_move(CONFIG_SECTION_GLOBAL,      "stock config directory",
+                CONFIG_SECTION_DIRECTORIES, "stock config");
 
-    config_move(CONFIG_SECTION_BACKEND, "opentsdb host tags",
-                CONFIG_SECTION_BACKEND, "host tags");
+    config_move(CONFIG_SECTION_GLOBAL,      "log directory",
+                CONFIG_SECTION_DIRECTORIES, "log");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "web files directory",
+                CONFIG_SECTION_DIRECTORIES, "web");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "cache directory",
+                CONFIG_SECTION_DIRECTORIES, "cache");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "lib directory",
+                CONFIG_SECTION_DIRECTORIES, "lib");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "home directory",
+                CONFIG_SECTION_DIRECTORIES, "home");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "lock directory",
+                CONFIG_SECTION_DIRECTORIES, "lock");
+
+    config_move(CONFIG_SECTION_GLOBAL,      "plugins directory",
+                CONFIG_SECTION_DIRECTORIES, "plugins");
+
+    config_move(CONFIG_SECTION_HEALTH,      "health configuration directory",
+                CONFIG_SECTION_DIRECTORIES, "health config");
+
+    config_move(CONFIG_SECTION_HEALTH,      "stock health configuration directory",
+                CONFIG_SECTION_DIRECTORIES, "stock health config");
+
+    config_move(CONFIG_SECTION_REGISTRY,    "registry db directory",
+                CONFIG_SECTION_DIRECTORIES, "registry");
+
+    config_move(CONFIG_SECTION_GLOBAL, "debug log",
+                CONFIG_SECTION_LOGS,   "debug");
+
+    config_move(CONFIG_SECTION_GLOBAL, "error log",
+                CONFIG_SECTION_LOGS,   "error");
+
+    config_move(CONFIG_SECTION_GLOBAL, "access log",
+                CONFIG_SECTION_LOGS,   "access");
+
+    config_move(CONFIG_SECTION_GLOBAL, "facility log",
+                CONFIG_SECTION_LOGS,   "facility");
+
+    config_move(CONFIG_SECTION_GLOBAL, "errors flood protection period",
+                CONFIG_SECTION_LOGS,   "errors flood protection period");
+
+    config_move(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection",
+                CONFIG_SECTION_LOGS,   "errors to trigger flood protection");
+
+    config_move(CONFIG_SECTION_GLOBAL, "debug flags",
+                CONFIG_SECTION_LOGS,   "debug flags");
+
+    config_move(CONFIG_SECTION_GLOBAL,   "TZ environment variable",
+                CONFIG_SECTION_ENV_VARS, "TZ");
+
+    config_move(CONFIG_SECTION_PLUGINS,  "PATH environment variable",
+                CONFIG_SECTION_ENV_VARS, "PATH");
+
+    config_move(CONFIG_SECTION_PLUGINS,  "PYTHONPATH environment variable",
+                CONFIG_SECTION_ENV_VARS, "PYTHONPATH");
+
+    config_move(CONFIG_SECTION_STATSD,  "enabled",
+                CONFIG_SECTION_PLUGINS, "statsd");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "memory mode",
+                CONFIG_SECTION_DB,      "mode");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "history",
+                CONFIG_SECTION_DB,      "retention");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "update every",
+                CONFIG_SECTION_DB,      "update every");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
+                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+
+    config_move(CONFIG_SECTION_DB,      "page cache size",
+                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "page cache uses malloc",
+                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+
+    config_move(CONFIG_SECTION_DB,      "page cache with malloc",
+                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
+                CONFIG_SECTION_DB,      "dbengine disk space MB");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
+                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
+                CONFIG_SECTION_DB,      "memory deduplication (ksm)");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine page fetch timeout",
+                CONFIG_SECTION_DB,      "dbengine page fetch timeout secs");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine page fetch retries",
+                CONFIG_SECTION_DB,      "dbengine page fetch retries");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine extent pages",
+                CONFIG_SECTION_DB,      "dbengine pages per extent");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "cleanup obsolete charts after seconds",
+                CONFIG_SECTION_DB,      "cleanup obsolete charts after secs");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "gap when lost iterations above",
+                CONFIG_SECTION_DB,      "gap when lost iterations above");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "cleanup orphan hosts after seconds",
+                CONFIG_SECTION_DB,      "cleanup orphan hosts after secs");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "delete obsolete charts files",
+                CONFIG_SECTION_DB,      "delete obsolete charts files");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "delete orphan hosts files",
+                CONFIG_SECTION_DB,      "delete orphan hosts files");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
+                CONFIG_SECTION_DB,      "enable zero metrics");
+
 }
 
 static void get_netdata_configured_variables() {
@@ -512,41 +613,53 @@ static void get_netdata_configured_variables() {
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 
     // ------------------------------------------------------------------------
-    // get default database size
+    // get default database update frequency
 
-    default_rrd_history_entries = (int) config_get_number(CONFIG_SECTION_GLOBAL, "history", align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
-
-    long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
-    if(h != default_rrd_history_entries) {
-        config_set_number(CONFIG_SECTION_GLOBAL, "history", h);
-        default_rrd_history_entries = (int)h;
-    }
-
-    if(default_rrd_history_entries < 5 || default_rrd_history_entries > RRD_HISTORY_ENTRIES_MAX) {
-        error("Invalid history entries %d given. Defaulting to %d.", default_rrd_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
-        default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
+    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
+    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
+        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
+        default_rrd_update_every = UPDATE_EVERY;
+        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
 
     // ------------------------------------------------------------------------
-    // get default database update frequency
+    // get default memory mode for the database
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_GLOBAL, "update every", UPDATE_EVERY);
-    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY_MAX);
-        default_rrd_update_every = UPDATE_EVERY;
+    {
+        const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        default_rrd_memory_mode = rrd_memory_mode_id(mode);
+        if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
+            error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
+            config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // get default database size
+
+    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
+        default_rrd_history_entries = (int)config_get_number(
+            CONFIG_SECTION_DB, "retention",
+            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
+
+        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
+        if (h != default_rrd_history_entries) {
+            config_set_number(CONFIG_SECTION_DB, "retention", h);
+            default_rrd_history_entries = (int)h;
+        }
     }
 
     // ------------------------------------------------------------------------
     // get system paths
 
-    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       netdata_configured_user_config_dir);
-    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", netdata_configured_stock_config_dir);
-    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          netdata_configured_log_dir);
-    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    netdata_configured_web_dir);
-    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
-    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
+    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_DIRECTORIES, "config",       netdata_configured_user_config_dir);
+    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_DIRECTORIES, "stock config", netdata_configured_stock_config_dir);
+    netdata_configured_log_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "log",          netdata_configured_log_dir);
+    netdata_configured_web_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "web",          netdata_configured_web_dir);
+    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
+    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
     char *env_home=getenv("HOME");
-    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         env_home?env_home:netdata_configured_home_dir);
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_DIRECTORIES, "home",         env_home?env_home:netdata_configured_home_dir);
 
     netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
 
@@ -555,36 +668,39 @@ static void get_netdata_configured_variables() {
         netdata_configured_primary_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
     }
 
-    // ------------------------------------------------------------------------
-    // get default memory mode for the database
-
-    default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
-
 #ifdef ENABLE_DBENGINE
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
+    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_NO);
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
     // get default Database Engine disk space quota in MiB
 
-    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine disk space", default_rrdeng_disk_quota_mb);
+    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space", compute_multidb_diskspace());
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
     if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
         default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
+        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
     }
-
+#else
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
+       default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+    }
 #endif
     // ------------------------------------------------------------------------
 
@@ -595,8 +711,34 @@ static void get_netdata_configured_variables() {
     // get KSM settings
 
 #ifdef MADV_MERGEABLE
-    enable_ksm = config_get_boolean(CONFIG_SECTION_GLOBAL, "memory deduplication (ksm)", enable_ksm);
+    enable_ksm = config_get_boolean(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
 #endif
+
+    // --------------------------------------------------------------------
+    // metric correlations
+
+    enable_metric_correlations = config_get_boolean(CONFIG_SECTION_GLOBAL, "enable metric correlations", enable_metric_correlations);
+    default_metric_correlations_method = weights_string_to_method(config_get(
+        CONFIG_SECTION_GLOBAL, "metric correlations method",
+        weights_method_to_string(default_metric_correlations_method)));
+
+    // --------------------------------------------------------------------
+
+    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
+    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
+    if (rrdset_free_obsolete_time < 10) {
+        rrdset_free_obsolete_time = 10;
+        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    }
+
+    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    if (gap_when_lost_iterations_above < 1) {
+        gap_when_lost_iterations_above = 1;
+        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    }
 
     // --------------------------------------------------------------------
     // get various system parameters
@@ -608,148 +750,7 @@ static void get_netdata_configured_variables() {
 
 }
 
-static void get_system_timezone(void) {
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    const char *tz = getenv("TZ");
-    if(!tz || !*tz)
-        setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
-
-    char buffer[FILENAME_MAX + 1] = "";
-    const char *timezone = NULL;
-    ssize_t ret;
-
-    // use the TZ variable
-    if(tz && *tz && *tz != ':') {
-        timezone = tz;
-        // info("TIMEZONE: using TZ variable '%s'", timezone);
-    }
-
-    // use the contents of /etc/timezone
-    if(!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
-        timezone = buffer;
-        // info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
-    }
-
-    // read the link /etc/localtime
-    if(!timezone) {
-        ret = readlink("/etc/localtime", buffer, FILENAME_MAX);
-
-        if(ret > 0) {
-            buffer[ret] = '\0';
-
-            char   *cmp    = "/usr/share/zoneinfo/";
-            size_t cmp_len = strlen(cmp);
-
-            char *s = strstr(buffer, cmp);
-            if (s && s[cmp_len]) {
-                timezone = &s[cmp_len];
-                // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
-            }
-        }
-        else
-            buffer[0] = '\0';
-    }
-
-    // find the timezone from strftime()
-    if(!timezone) {
-        time_t t;
-        struct tm *tmp, tmbuf;
-
-        t = now_realtime_sec();
-        tmp = localtime_r(&t, &tmbuf);
-
-        if (tmp != NULL) {
-            if(strftime(buffer, FILENAME_MAX, "%Z", tmp) == 0)
-                buffer[0] = '\0';
-            else {
-                buffer[FILENAME_MAX] = '\0';
-                timezone = buffer;
-                // info("TIMEZONE: using strftime(): '%s'", timezone);
-            }
-        }
-    }
-
-    if(timezone && *timezone) {
-        // make sure it does not have illegal characters
-        // info("TIMEZONE: fixing '%s'", timezone);
-
-        size_t len = strlen(timezone);
-        char tmp[len + 1];
-        char *d = tmp;
-        *d = '\0';
-
-        while(*timezone) {
-            if(isalnum(*timezone) || *timezone == '_' || *timezone == '/')
-                *d++ = *timezone++;
-            else
-                timezone++;
-        }
-        *d = '\0';
-        strncpyz(buffer, tmp, len);
-        timezone = buffer;
-        // info("TIMEZONE: fixed as '%s'", timezone);
-    }
-
-    if(!timezone || !*timezone)
-        timezone = "unknown";
-
-    netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
-}
-
-void set_global_environment() {
-    {
-        char b[16];
-        snprintfz(b, 15, "%d", default_rrd_update_every);
-        setenv("NETDATA_UPDATE_EVERY", b, 1);
-    }
-
-    setenv("NETDATA_VERSION"          , program_version, 1);
-    setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
-    setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
-    setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
-    setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
-    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_primary_plugins_dir),      1);
-    setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
-    setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
-    setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
-    setenv("NETDATA_LOCK_DIR"         , netdata_configured_lock_dir, 1);
-    setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
-    setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
-    setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
-
-    char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
-    int clean = 0;
-    if (!default_port) {
-        default_port = strdupz("19999");
-        clean = 1;
-    }
-
-    setenv("NETDATA_LISTEN_PORT"      , default_port, 1);
-    if(clean)
-        freez(default_port);
-
-    get_system_timezone();
-
-    // set the path we need
-    char path[1024 + 1], *p = getenv("PATH");
-    if(!p) p = "/bin:/usr/bin";
-    snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", config_get(CONFIG_SECTION_PLUGINS, "PATH environment variable", path), 1);
-
-    // python options
-    p = getenv("PYTHONPATH");
-    if(!p) p = "";
-    setenv("PYTHONPATH", config_get(CONFIG_SECTION_PLUGINS, "PYTHONPATH environment variable", p), 1);
-
-    // disable buffering for python plugins
-    setenv("PYTHONUNBUFFERED", "1", 1);
-
-    // switch to standard locale for plugins
-    setenv("LC_ALL", "C", 1);
-}
-
-static int load_netdata_conf(char *filename, char overwrite_used) {
+int load_netdata_conf(char *filename, char overwrite_used) {
     errno = 0;
 
     int ret = 0;
@@ -799,12 +800,13 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     info("Executing %s", script);
 
-    FILE *fp = mypopen(script, &command_pid);
-    if(fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if(fp_child_output) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -825,51 +827,10 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        mypclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
     return 0;
-}
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    static char *as_script;
-
-    if (netdata_anonymous_statistics_enabled == -1) {
-        char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
-        sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
-        if (likely(access(optout_file, R_OK) != 0)) {
-            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
-            sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
-            if (unlikely(access(as_script, R_OK) != 0)) {
-               netdata_anonymous_statistics_enabled=0;
-               info("Anonymous statistics script %s not found.",as_script);
-               freez(as_script);
-            } else {
-               netdata_anonymous_statistics_enabled=1;
-            }
-        } else {
-            netdata_anonymous_statistics_enabled = 0;
-            as_script = NULL;
-        }
-        freez(optout_file);
-    }
-    if(!netdata_anonymous_statistics_enabled) return;
-    if (!action) return;
-    if (!action_result) action_result="";
-    if (!action_data) action_data="";
-    char *command_to_run=mallocz(sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) + 10));
-    pid_t command_pid;
-
-    sprintf(command_to_run,"%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
-    info("%s", command_to_run);
-
-    FILE *fp = mypopen(command_to_run, &command_pid);
-    if(fp) {
-        char buffer[100 + 1];
-        while (fgets(buffer, 100, fp) != NULL);
-        mypclose(fp, command_pid);
-    }
-    freez(command_to_run);
 }
 
 void set_silencers_filename() {
@@ -910,42 +871,16 @@ int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
+    bool close_open_fds = true;
     size_t default_stacksize;
     char *user = NULL;
 
+    static_threads = static_threads_get();
 
     netdata_ready=0;
     // set the name for logging
     program_name = "netdata";
 
-    // parse depercated options
-    // TODO: Remove this block with the next major release.
-    {
-        i = 1;
-        while(i < argc) {
-            if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
-                strncpyz(pidfile, argv[i+1], FILENAME_MAX);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
-                dont_fork = 1;
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "host access prefix", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -s instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "history", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- This option will be removed with V2.*.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else i++;
-        }
-    }
     if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
         // don't run netdata, this is the spawn server
         spawn_server();
@@ -1025,16 +960,37 @@ int main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 #endif
+                        if(strcmp(optarg, "sqlite-check") == 0) {
+                            sql_init_database(DB_CHECK_INTEGRITY, 0);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-fix") == 0) {
+                            sql_init_database(DB_CHECK_FIX_DB, 0);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-compact") == 0) {
+                            sql_init_database(DB_CHECK_RECLAIM_SPACE, 0);
+                            return 0;
+                        }
 
                         if(strcmp(optarg, "unittest") == 0) {
-                            if(unit_test_buffer()) return 1;
-                            if(unit_test_str2ld()) return 1;
+                            if (unit_test_static_threads())
+                                return 1;
+                            if (unit_test_buffer())
+                                return 1;
+                            if (unit_test_str2ld())
+                                return 1;
+                            if (unit_test_bitmap256())
+                                return 1;
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
+                            storage_tiers = 1;
                             registry_init();
                             if(rrd_init("unittest", NULL)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -1046,10 +1002,43 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                             if(test_dbengine()) return 1;
 #endif
+                            if(test_sqlite()) return 1;
+                            if(string_unittest(10000)) return 1;
+                            if (dictionary_unittest(10000))
+                                return 1;
+                            if(aral_unittest(10000))
+                                return 1;
+                            if (rrdlabels_unittest())
+                                return 1;
+                            if (ctx_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
+#ifdef ENABLE_ML_TESTS
+                        else if(strcmp(optarg, "mltest") == 0) {
+                            return test_ml(argc, argv);
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
+                        else if(strcmp(optarg, "mctest") == 0) {
+                            return mc_unittest();
+                        }
+                        else if(strcmp(optarg, "ctxtest") == 0) {
+                            return ctx_unittest();
+                        }
+                        else if(strcmp(optarg, "dicttest") == 0) {
+                            return dictionary_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "araltest") == 0) {
+                            return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "stringtest") == 0) {
+                            return string_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "rrdlabelstest") == 0) {
+                            return rrdlabels_unittest();
+                        }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
@@ -1059,7 +1048,7 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
                             unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
-                            page_cache_mb = 0, disk_space_mb = 0;
+                            page_cache_mb = 0, disk_space_mb = 0, workers = 16;
 
                             optarg += strlen(stresstest_string);
                             test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
@@ -1073,7 +1062,15 @@ int main(int argc, char **argv) {
                                 page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
                                 disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                workers = (unsigned)strtoul(endptr + 1, &endptr, 0);
 
+                            if (workers > 1024)
+                                workers = 1024;
+
+                            char workers_str[16];
+                            snprintf(workers_str, 15, "%u", workers);
+                            setenv("UV_THREADPOOL_SIZE", workers_str, 1);
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
                                                  page_cache_mb, disk_space_mb);
                             return 0;
@@ -1104,21 +1101,21 @@ int main(int argc, char **argv) {
                                 return 1;
                             }
 
-                            const char *heystack = argv[optind];
+                            const char *haystack = argv[optind];
                             const char *needle = argv[optind + 1];
                             size_t len = strlen(needle) + 1;
                             char wildcarded[len];
 
-                            SIMPLE_PATTERN *p = simple_pattern_create(heystack, NULL, SIMPLE_PATTERN_EXACT);
+                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT);
                             int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
                             if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 0;
                             }
                             else {
-                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 1;
                             }
                         }
@@ -1128,7 +1125,7 @@ int main(int argc, char **argv) {
                         }
                         else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
                             optarg += strlen(debug_flags_string);
-                            config_set(CONFIG_SECTION_GLOBAL, "debug flags",  optarg);
+                            config_set(CONFIG_SECTION_LOGS, "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
@@ -1261,7 +1258,17 @@ int main(int argc, char **argv) {
                             print_build_info();
                             return 0;
                         }
-                        else {
+                        else if(strcmp(optarg, "buildinfojson") == 0) {
+                            print_build_info_json();
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "keepopenfds") == 0) {
+                            // Internal dev option to skip closing inherited
+                            // open FDs. Useful, when we want to run the agent
+                            // under profiling tools that open/maintain their
+                            // own FDs.
+                            close_open_fds = false;
+                        } else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             return help(1);
                         }
@@ -1276,20 +1283,26 @@ int main(int argc, char **argv) {
     }
 
 #ifdef _SC_OPEN_MAX
-    // close all open file descriptors, except the standard ones
-    // the caller may have left open files (lxc-attach has this issue)
-    {
-        int fd;
-        for(fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
-            if(fd_is_valid(fd)) close(fd);
+    if (close_open_fds == true) {
+        // close all open file descriptors, except the standard ones
+        // the caller may have left open files (lxc-attach has this issue)
+        for(int fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
+            if(fd_is_valid(fd))
+                close(fd);
     }
 #endif
+
 
     if(!config_loaded)
     {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
         load_cloud_conf(0);
+    }
+
+    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
+    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
     }
 
 
@@ -1304,12 +1317,20 @@ int main(int argc, char **argv) {
         i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
+
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        mallopt(M_PERTURB, 0x5A);
+        // mallopt(M_MXFAST, 0);
 #endif
-        test_clock_boottime();
-        test_clock_monotonic_coarse();
+#endif
+
+        // initialize the system clocks
+        clocks_init();
 
         // prepare configuration environment variables for the plugins
 
+        setenv("UV_THREADPOOL_SIZE", config_get(CONFIG_SECTION_GLOBAL, "libuv worker threads", "16"), 1);
         get_netdata_configured_variables();
         set_global_environment();
 
@@ -1327,7 +1348,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the debugging flags from the configuration file
 
-        char *flags = config_get(CONFIG_SECTION_GLOBAL, "debug flags",  "0x0000000000000000");
+        char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
         setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
@@ -1346,28 +1367,43 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // get log filenames and settings
+
         log_init();
         error_log_limit_unlimited();
 
+        // initialize the log files
+        open_all_log_files();
+
+        get_system_timezone();
+
         // --------------------------------------------------------------------
         // get the certificate and start security
+
 #ifdef ENABLE_HTTPS
         security_init();
 #endif
 
         // --------------------------------------------------------------------
         // This is the safest place to start the SILENCERS structure
+
         set_silencers_filename();
         health_initialize_global_silencers();
+
+        // --------------------------------------------------------------------
+        // Initialize ML configuration
+
+        ml_init();
 
         // --------------------------------------------------------------------
         // setup process signals
 
         // block signals while initializing threads.
         // this causes the threads to block signals.
+
         signals_block();
 
         // setup the signals we want to use
+
         signals_init();
 
         // setup threads configs
@@ -1385,8 +1421,13 @@ int main(int argc, char **argv) {
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
-        }
 
+            if(st->env_name)
+                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+
+            if(st->global_variable)
+                *st->global_variable = (st->enabled) ? true : false;
+        }
 
         // --------------------------------------------------------------------
         // create the listening sockets
@@ -1396,10 +1437,8 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
-    }
 
-    // initialize the log files
-    open_all_log_files();
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1424,14 +1463,9 @@ int main(int argc, char **argv) {
 
     info("netdata started on pid %d.", getpid());
 
-    // IMPORTANT: these have to run once, while single threaded
-    // but after we have switched user
-    web_files_uid();
-    web_files_gid();
-
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
-    // initialyze internal registry
+    // initialize internal registry
     registry_init();
     // fork the spawn server
     spawn_init();
@@ -1448,14 +1482,24 @@ int main(int argc, char **argv) {
     // initialize rrd, registry, health, rrdpush, etc.
 
     netdata_anonymous_statistics_enabled=-1;
-    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
+    system_info->hops = 0;
+    get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
-#ifdef ENABLE_DBENGINE
-    init_global_guid_map();
-#endif
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+
+    char agent_crash_file[FILENAME_MAX + 1];
+    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
+    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
+    int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
+    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
+    int crash_detected = (unlink(agent_crash_file) == 0);
+    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
+    if (fd >= 0)
+        close(fd);
+
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
@@ -1471,17 +1515,15 @@ int main(int argc, char **argv) {
 
     // Load host labels
     reload_host_labels();
-#ifdef ENABLE_DBENGINE
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        metalog_commit_update_host(localhost);
-#endif
 
     // ------------------------------------------------------------------------
     // spawn the threads
 
     web_server_config_options();
 
-    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_GLOBAL, "enable zero metrics", CONFIG_BOOLEAN_NO);
+    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
+
+    set_late_global_environment();
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
@@ -1503,6 +1545,23 @@ int main(int argc, char **argv) {
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
+    if (crash_detected)
+        send_statistics("CRASH", "-", "-");
+    if (incomplete_shutdown_detected)
+        send_statistics("INCOMPLETE_SHUTDOWN", "-", "-");
+
+    //check if ANALYTICS needs to start
+    if (netdata_anonymous_statistics_enabled == 1) {
+        for (i = 0; static_threads[i].name != NULL; i++) {
+            if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
+                struct netdata_static_thread *st = &static_threads[i];
+                st->thread = mallocz(sizeof(netdata_thread_t));
+                st->enabled = 1;
+                debug(D_SYSTEM, "Starting thread %s.", st->name);
+                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+            }
+        }
+    }
 
     // ------------------------------------------------------------------------
     // Report ACLK build failure
@@ -1512,12 +1571,6 @@ int main(int argc, char **argv) {
     snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
     if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
         send_statistics("ACLK_DISABLED", "-", "-");
-#ifdef ACLK_NO_LWS
-        send_statistics("BUILD_FAIL_LWS", "-", "-");
-#endif
-#ifdef ACLK_NO_LIBMOSQ
-        send_statistics("BUILD_FAIL_MOSQ", "-", "-");
-#endif
         int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
         if (fd == -1)
             error("Cannot create file '%s'. Please fix this.", filename);

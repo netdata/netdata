@@ -2,7 +2,7 @@
 
 #include "test_exporting_engine.h"
 
-// Use memomy allocation functions guarded by CMocka in strdupz
+// Use memory allocation functions guarded by CMocka in strdupz
 const char *__wrap_strdupz(const char *s)
 {
     char *duplicate = malloc(sizeof(char) * (strlen(s) + 1));
@@ -100,9 +100,7 @@ RRDSET *rrdset_create_custom(
     int update_every,
     RRDSET_TYPE chart_type,
     RRD_MEMORY_MODE memory_mode,
-    long history_entries,
-    int is_archived,
-    uuid_t *chart_uuid)
+    long history_entries)
 {
     check_expected_ptr(host);
     check_expected_ptr(type);
@@ -119,8 +117,6 @@ RRDSET *rrdset_create_custom(
     check_expected(chart_type);
     UNUSED(memory_mode);
     UNUSED(history_entries);
-    UNUSED(is_archived);
-    UNUSED(chart_uuid);
 
     function_called();
 
@@ -149,9 +145,7 @@ RRDDIM *rrddim_add_custom(
     collected_number multiplier,
     collected_number divisor,
     RRD_ALGORITHM algorithm,
-    RRD_MEMORY_MODE memory_mode,
-    int is_archived,
-    uuid_t *dim_uuid)
+    RRD_MEMORY_MODE memory_mode)
 {
     check_expected_ptr(st);
     UNUSED(id);
@@ -160,8 +154,6 @@ RRDDIM *rrddim_add_custom(
     check_expected(divisor);
     check_expected(algorithm);
     UNUSED(memory_mode);
-    UNUSED(is_archived);
-    UNUSED(dim_uuid);
 
     function_called();
 
@@ -185,45 +177,32 @@ const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
     return RRD_MEMORY_MODE_NONE_NAME;
 }
 
-calculated_number rrdvar2number(RRDVAR *rv)
-{
-    (void)rv;
-    return 0;
-}
-
-int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data)
-{
-    (void)host;
-    (void)callback;
-    (void)data;
-    return 0;
-}
-
 void rrdset_update_heterogeneous_flag(RRDSET *st)
 {
     (void)st;
 }
 
-time_t __mock_rrddim_query_oldest_time(RRDDIM *rd)
+time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
 {
-    (void)rd;
+    (void)db_metric_handle;
 
     function_called();
     return mock_type(time_t);
 }
 
-time_t __mock_rrddim_query_latest_time(RRDDIM *rd)
+time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
 {
-    (void)rd;
+    (void)db_metric_handle;
 
     function_called();
     return mock_type(time_t);
 }
 
-void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type)
 {
-    (void)rd;
+    (void)db_metric_handle;
     (void)handle;
+    (void)tier_query_fetch_type;
 
     function_called();
     check_expected(start_time);
@@ -238,13 +217,14 @@ int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
     return mock_type(int);
 }
 
-storage_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time)
+STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle)
 {
     (void)handle;
-    (void)current_time;
 
     function_called();
-    return mock_type(storage_number);
+
+    STORAGE_POINT sp = {};
+    return sp;    
 }
 
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
@@ -252,4 +232,25 @@ void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
     (void)handle;
 
     function_called();
+}
+
+void rrdcalc_update_rrdlabels(RRDSET *st)
+{
+    (void)st;
+}
+
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva)
+{
+    (void)host;
+    (void)rva;
+}
+
+void db_execute(const char *cmd)
+{
+    (void)cmd;
+}
+
+DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rfa) {
+    (void)rfa;
+    return NULL;
 }

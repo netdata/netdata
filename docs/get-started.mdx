@@ -1,0 +1,107 @@
+---
+title: "Get started with Netdata"
+description: "Download and install the open-source Netdata monitoring agent on physical/virtual servers, Linux (Ubuntu/Debian/CentOS/etc), Docker, Kubernetes, and many others, often with one command."
+type: how-to
+sidebar_label: "Get started"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/get-started.mdx
+---
+
+import { OneLineInstallWget } from '../src/components/OneLineInstall/'
+import { Install, InstallBox } from '../src/components/Install/'
+
+# Get started with Netdata
+
+Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
+any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
+
+Together with [Netdata Cloud](https://learn.netdata.cloud/docs/cloud), you can monitor your entire infrastructure in
+real time and troubleshoot problems that threaten the health of your nodes.
+
+Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices. It
+runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters,
+Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
+
+## Install on Linux with one-line installer 
+
+The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
+[kickstart script](/packaging/installer/methods/kickstart.md). This script automatically installs dependencies and
+builds Netdata from its source code.
+
+Copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
+
+<OneLineInstallWget />
+
+Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
+troubleshooting with Netdata.
+
+## Other installation options
+
+<Install>
+  <InstallBox
+    to="/docs/agent/packaging/docker"
+    os="Run with Docker" 
+    svg="docker" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kubernetes"
+    os="Deploy on Kubernetes" 
+    svg="kubernetes" />
+   <InstallBox
+    to="/docs/agent/packaging/installer/methods/macos"
+    os="Install on macOS" 
+    svg="macos" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/manual"
+    os="Linux from Git" 
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/source"
+    os="Linux from source"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/offline" 
+    os="Linux for offline nodes"
+    svg="linux" />
+</Install>
+
+
+## What's next?
+
+To start using Netdata, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
+the hostname/IP address of a remote node.
+
+Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting.
+
+### Dashboard
+
+Learn more about [how the dashboard works](/docs/dashboard/how-dashboard-works.mdx), or dive directly into the many ways
+to [interact with charts](/docs/dashboard/interact-charts.mdx).
+
+### Configuration
+
+Discover the recommended way to [configure Netdata's settings or behavior](/docs/configure/nodes.md) using our built-in
+`edit-config` script, then apply that knowledge to mission-critical tweaks, such as [changing how long Netdata stores
+metrics](/docs/store/change-metrics-storage.md).
+
+### Data collection
+
+If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should
+learn more about [how data collectors work](/docs/collect/how-collectors-work.md). If there's a [supported
+collector](/collectors/COLLECTORS.md) for metrics you need, [configure the collector](/docs/collect/enable-configure.md)
+or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
+
+### Alarms & notifications
+
+Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
+community, but you may want to [edit alarms](/docs/monitor/configure-alarms.md) or [enable
+notifications](/docs/monitor/enable-notifications.md) to customize your Netdata experience.
+
+### Need to monitor multiple nodes in one place?
+
+For robust multi-node monitoring from a single interface, consider [Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud), which streams, aggregates, and visualizes metrics from any number of
+nodes. It's all the same out-of-the-box, zero-configuration functionality of the open-source monitoring agent, but for
+any number of distributed nodes, _entirely for free_.
+
+There is an alternative for those who aren't interested in using Netdata Cloud, albeit with some required configuration.
+Each node can [stream](/streaming/README.md) its metrics to any other node, and the default
+[registry](/registry/README.md) is configurable to create a private "network" of Netdata dashboards.

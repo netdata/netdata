@@ -23,11 +23,21 @@ dist_config_SCRIPTS = \
     edit-config \
     $(NULL)
 
+dist_config_DATA = \
+    .install-type \
+    $(NULL)
+
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(configdir)
+	$(INSTALL) -d $(DESTDIR)$(libsysdir)
 
-nodist_noinst_DATA = \
+libexecnetdatadir=$(libexecdir)/netdata
+nodist_libexecnetdata_SCRIPTS = \
+    install-service.sh \
+    $(NULL)
+
+nodist_libsys_DATA = \
     netdata-openrc \
     netdata.logrotate \
     netdata.service \
@@ -40,8 +50,13 @@ nodist_noinst_DATA = \
     netdata-updater.service \
     $(NULL)
 
+dist_libsys_DATA = \
+    netdata-updater.timer \
+    $(NULL)
+
 dist_noinst_DATA = \
     edit-config.in \
+    install-service.sh.in \
     netdata-openrc.in \
     netdata.logrotate.in \
     netdata.service.in \
@@ -53,5 +68,4 @@ dist_noinst_DATA = \
     netdata.conf \
     netdata.crontab.in \
     netdata-updater.service.in \
-    netdata-updater.timer \
     $(NULL)

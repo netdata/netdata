@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../../libnetdata/libnetdata.h"
-#include "../../../libnetdata/required_dummies.h"
-#include "../../../database/rrd.h"
-#include "../../../web/server/web_client.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
+#include "database/rrd.h"
+#include "web/server/web_client.h"
 #include <setjmp.h>
 #include <cmocka.h>
 #include <stdbool.h>
+
+void free_temporary_host(RRDHOST *host)
+{
+    (void) host;
+}
+
+void *__wrap_free_temporary_host(RRDHOST *host)
+{
+    (void) host;
+    return NULL;
+}
 
 void repr(char *result, int result_size, char const *buf, int size)
 {
@@ -63,9 +74,9 @@ void __wrap_finished_web_request_statistics(
 
 char *__wrap_config_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    if (!strcmp(section, CONFIG_SECTION_WEB) && !strcmp(name, "web files owner"))
-        return "netdata";
     (void)root;
+    (void)section;
+    (void)name;
     (void)default_value;
     return "UNKNOWN FIX ME";
 }
@@ -251,7 +262,7 @@ static void destroy_web_client(struct web_client *w)
 // ---------------------------------- Parameterized test-families -----------------------------------------------------
 // There is no way to pass a parameter block into the setup fixture, we would have to patch CMocka and maintain it
 // locally. (The void **current_state in _run_group_tests would be set from a parameter). This is unfortunate as a
-// parameteric unit-tester needs to be to pass parameters to the fixtures. We are faking this by calculating the
+// parametric unit-tester needs to be to pass parameters to the fixtures. We are faking this by calculating the
 // space of tests in the launcher, passing an array of identical unit-tests to CMocka and then counting through the
 // parameters in the shared state passed between tests. To initialise this counter structure we use this global to
 // pass from the launcher (test-builder) to the setup-fixture.

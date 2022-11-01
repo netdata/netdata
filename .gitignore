@@ -7,6 +7,9 @@ gcs-credentials.json
 .project
 .pydevproject
 
+# local dev outputs
+dist/
+
 *.o
 *.a
 config.h.in
@@ -69,6 +72,7 @@ cgroup-network
 ebpf.plugin
 collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
+collectors/ebpf.plugin/includes/
 
 # protoc generated files
 *.pb.cc
@@ -81,6 +85,9 @@ packaging/installer/.environment.sh
 
 # netdata makeself downloads
 packaging/makeself/tmp/
+
+# Libbpf is always overwritten depending of kernel version
+packaging/libbpf.*
 
 # coverity
 cov-int/
@@ -98,6 +105,7 @@ TODO.txt
 
 web/gui/chart-info/
 web/gui/control.html
+web/gui/dashboard.js
 web/gui/datasource.css
 web/gui/gadget.xml
 web/gui/index_new.html
@@ -120,16 +128,15 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 system/netdata.crontab
+system/install-service.sh
 
 daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh
 
 health/notifications/alarm-notify.sh
 claim/netdata-claim.sh
-collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin
-collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
 collectors/ioping.plugin/ioping.plugin
@@ -164,6 +171,7 @@ diagrams/plantuml.jar
 # cppcheck
 cppcheck-build/
 
+# python virtual environment
 venv/
 
 # debugging / profiling
@@ -186,7 +194,7 @@ tests/acls/acl.sh
 tests/urls/request.sh
 tests/alarm_repetition/alarm.sh
 tests/template_dimension/template_dim.sh
-aclk/tests/install-fake-charts.d.sh
+aclk/legacy/tests/install-fake-charts.d.sh
 
 # tests and temp files
 test-driver
@@ -208,3 +216,20 @@ netdata.cbp
 
 # External dependencies
 externaldeps/
+
+# vim sessions
+Session.vim
+Session.*.vim
+
+# clangd cache
+.cache/
+
+# Special exceptions
+!packaging/repoconfig/Makefile
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints
+
+# Judy stuff
+JudyLTables.c
+judyltablesgen

@@ -14,6 +14,8 @@ char *netdata_configured_lock_dir            = NULL;
 char *netdata_configured_home_dir            = VARLIB_DIR;
 char *netdata_configured_host_prefix         = NULL;
 char *netdata_configured_timezone            = NULL;
+char *netdata_configured_abbrev_timezone     = NULL;
+int32_t netdata_configured_utc_offset        = 0;
 int netdata_ready;
 int netdata_cloud_setting;
 

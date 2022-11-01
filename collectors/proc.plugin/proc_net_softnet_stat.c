@@ -117,7 +117,7 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
             st = rrdset_find_active_bytype_localhost("cpu", id);
             if(unlikely(!st)) {
                 char title[100+1];
-                snprintfz(title, 100, "CPU%zu softnet_stat", l);
+                snprintfz(title, 100, "CPU softnet_stat");
 
                 st = rrdset_create_localhost(
                         "cpu"

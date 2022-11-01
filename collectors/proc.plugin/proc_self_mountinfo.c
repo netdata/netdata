@@ -47,11 +47,17 @@
 
 // find the mount info with the given major:minor
 // in the supplied linked list of mountinfo structures
-struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor) {
+struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor, char *device) {
     struct mountinfo *mi;
 
+    uint32_t hash = simple_hash(device);
+
     for(mi = root; mi ; mi = mi->next)
-        if(unlikely(mi->major == major && mi->minor == minor))
+        if (unlikely(
+                mi->major == major &&
+                mi->minor == minor &&
+                mi->mount_source_name_hash == hash &&
+                !strcmp(mi->mount_source_name, device)))
             return mi;
 
     return NULL;
@@ -120,6 +126,7 @@ static void mountinfo_free(struct mountinfo *mi) {
 */
     freez(mi->filesystem);
     freez(mi->mount_source);
+    freez(mi->mount_source_name);
     freez(mi->super_options);
     freez(mi);
 }
@@ -175,6 +182,33 @@ static inline int is_read_only(const char *s) {
     return 0;
 }
 
+// for the full list of protected mount points look at
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L142-L149
+// https://github.com/systemd/systemd/blob/1eb3ef78b4df28a9e9f464714208f2682f957e36/src/core/namespace.c#L180-L194
+static const char *systemd_protected_mount_points[] = {
+    "/home",
+    "/root",
+    "/usr",
+    "/boot",
+    "/efi",
+    "/etc",
+    "/run/user",
+    "/lib",
+    "/lib64",
+    "/bin",
+    "/sbin",
+    NULL
+};
+
+static inline int mount_point_is_protected(char *mount_point)
+{
+    for (size_t i = 0; systemd_protected_mount_points[i] != NULL; i++)
+        if (!strcmp(mount_point, systemd_protected_mount_points[i]))
+            return 1;
+
+    return 0;
+}
+
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
@@ -192,10 +226,21 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
     struct mountinfo *root = NULL, *last = NULL, *mi = NULL;
 
+    // create a dictionary to track uniqueness
+    DICTIONARY *dict = dictionary_create(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_NAME_LINK_DONT_CLONE);
+
     unsigned long l, lines = procfile_lines(ff);
     for(l = 0; l < lines ;l++) {
         if(unlikely(procfile_linewords(ff, l) < 5))
             continue;
+
+        // make sure we don't add the same item twice
+        char *v = (char *)dictionary_set(dict, procfile_lineword(ff, l, 4), "N", 2);
+        if(v) {
+            if(*v == 'O') continue;
+            *v = 'O';
+        }
 
         mi = mallocz(sizeof(struct mountinfo));
 
@@ -235,6 +280,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         if(unlikely(is_read_only(mi->mount_options)))
             mi->flags |= MOUNTINFO_READONLY;
 
+        if(unlikely(mount_point_is_protected(mi->mount_point)))
+           mi->flags |= MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST;
+
         // count the optional fields
 /*
         unsigned long wo = w;
@@ -272,6 +320,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
             mi->mount_source = strdupz_decoding_octal(procfile_lineword(ff, l, w)); w++;
             mi->mount_source_hash = simple_hash(mi->mount_source);
+
+            mi->mount_source_name = strdupz(basename(mi->mount_source));
+            mi->mount_source_name_hash = simple_hash(mi->mount_source_name);
 
             mi->super_options = strdupz(procfile_lineword(ff, l, w)); w++;
 
@@ -315,6 +366,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
             mi->mount_source = NULL;
             mi->mount_source_hash = 0;
+
+            mi->mount_source_name = NULL;
+            mi->mount_source_name_hash = 0;
 
             mi->super_options = NULL;
 
@@ -398,6 +452,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
     }
 */
 
+    dictionary_destroy(dict);
     procfile_close(ff);
     return root;
 }

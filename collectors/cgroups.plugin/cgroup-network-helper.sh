@@ -76,7 +76,7 @@ debug() {
 
 pid=
 cgroup=
-while [ ! -z "${1}" ]
+while [ -n "${1}" ]
 do
     case "${1}" in
         --cgroup) cgroup="${2}"; shift 1;;
@@ -123,7 +123,7 @@ proc_pid_fdinfo_iff() {
 find_tun_tap_interfaces_for_cgroup() {
     local c="${1}" # the cgroup path
     [ -d "${c}/emulator" ] && c="${c}/emulator" # check for 'emulator' subdirectory
-    c="${c}/cgroup.procs" # make full path 
+    c="${c}/cgroup.procs" # make full path
 
     # for each pid of the cgroup
     # find any tun/tap devices linked to the pid
@@ -164,22 +164,30 @@ virsh_find_all_interfaces_for_cgroup() {
     # shellcheck disable=SC2230
     virsh="$(which virsh 2>/dev/null || command -v virsh 2>/dev/null)"
 
-    if [ ! -z "${virsh}" ]
+    if [ -n "${virsh}" ]
     then
         local d
         d="$(virsh_cgroup_to_domain_name "${c}")"
+        # convert hex to character
+        # e.g.: vm01\x2dweb => vm01-web (https://github.com/netdata/netdata/issues/11088#issuecomment-832618149)
+        d="$(printf '%b' "${d}")"
 
-        if [ ! -z "${d}" ]
+        if [ -n "${d}" ]
         then
             debug "running: virsh domiflist ${d}; to find the network interfaces"
 
-            # match only 'network' interfaces from virsh output
+            # 'virsh -r domiflist <domain>' example output
+            # Interface  Type       Source     Model       MAC
+            #--------------------------------------------------------------
+            # vnet3       bridge    br0        virtio   52:54:00:xx:xx:xx
+            # vnet4       network   default    virtio   52:54:00:yy:yy:yy
 
+            # match only 'network' interfaces from virsh output
             set_source "virsh"
             "${virsh}" -r domiflist "${d}" |\
                 sed -n \
-                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p" \
-                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p"
+                    -e "s|^[[:space:]]\?\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p" \
+                    -e "s|^[[:space:]]\?\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p"
         else
             debug "no virsh domain extracted from cgroup ${c}"
         fi
@@ -195,8 +203,11 @@ netnsid_find_all_interfaces_for_pid() {
     local pid="${1}"
     [ -z "${pid}" ] && return 1
 
-    local nsid=$(lsns -t net -p ${pid} -o NETNSID -nr)
-    [ -z "${nsid}" -o "${nsid}" = "unassigned" ] && return 1
+    local nsid
+    nsid=$(lsns -t net -p "${pid}" -o NETNSID -nr 2>/dev/null)
+    if [ -z "${nsid}" ] || [ "${nsid}" = "unassigned" ]; then
+      return 1
+    fi
 
     set_source "netnsid"
     ip link show |\
@@ -207,15 +218,8 @@ netnsid_find_all_interfaces_for_pid() {
 netnsid_find_all_interfaces_for_cgroup() {
     local c="${1}" # the cgroup path
 
-    # for each pid of the cgroup
-    # find any tun/tap devices linked to the pid
-    if [ -f "${c}/cgroup.procs" ]
-    then
-        local p
-        for p in $(< "${c}/cgroup.procs" )
-        do
-            netnsid_find_all_interfaces_for_pid "${p}"
-        done
+    if [ -f "${c}/cgroup.procs" ]; then
+        netnsid_find_all_interfaces_for_pid "$(head -n 1 "${c}/cgroup.procs" 2>/dev/null)"
     else
         debug "Cannot find file '${c}/cgroup.procs', not searching for netnsid interfaces."
     fi
@@ -226,14 +230,14 @@ netnsid_find_all_interfaces_for_cgroup() {
 find_all_interfaces_of_pid_or_cgroup() {
     local p="${1}" c="${2}" # the pid and the cgroup path
 
-    if [ ! -z "${pid}" ]
+    if [ -n "${pid}" ]
     then
         # we have been called with a pid
 
         proc_pid_fdinfo_iff "${p}"
         netnsid_find_all_interfaces_for_pid "${p}"
 
-    elif [ ! -z "${c}" ]
+    elif [ -n "${c}" ]
     then
         # we have been called with a cgroup
 

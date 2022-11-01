@@ -4,18 +4,65 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
-// Vector indexes
-#define NETDATA_MAX_SOCKET_VECTOR 6
-#define NETDATA_UDP_START 3
-#define NETDATA_RETRANSMIT_START 5
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
 
-#define NETDATA_SOCKET_APPS_HASH_TABLE 0
-#define NETDATA_SOCKET_IPV4_HASH_TABLE 1
-#define NETDATA_SOCKET_IPV6_HASH_TABLE 2
-#define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
-#define NETDATA_SOCKET_LISTEN_TABLE 5
+// Vector indexes
+#define NETDATA_UDP_START 3
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
+
+// config file
+#define NETDATA_NETWORK_CONFIG_FILE "network.conf"
+#define EBPF_NETWORK_VIEWER_SECTION "network connections"
+#define EBPF_SERVICE_NAME_SECTION "service name"
+#define EBPF_CONFIG_RESOLVE_HOSTNAME "resolve hostnames"
+#define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
+#define EBPF_CONFIG_PORTS "ports"
+#define EBPF_CONFIG_HOSTNAMES "hostnames"
+#define EBPF_CONFIG_BANDWIDTH_SIZE "bandwidth table size"
+#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection table size"
+#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection table size"
+#define EBPF_CONFIG_UDP_SIZE "udp connection table size"
+#define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
+
+enum ebpf_socket_table_list {
+    NETDATA_SOCKET_TABLE_BANDWIDTH,
+    NETDATA_SOCKET_GLOBAL,
+    NETDATA_SOCKET_LPORTS,
+    NETDATA_SOCKET_TABLE_IPV4,
+    NETDATA_SOCKET_TABLE_IPV6,
+    NETDATA_SOCKET_TABLE_UDP,
+    NETDATA_SOCKET_TABLE_CTRL
+};
+
+enum ebpf_socket_publish_index {
+    NETDATA_IDX_TCP_SENDMSG,
+    NETDATA_IDX_TCP_CLEANUP_RBUF,
+    NETDATA_IDX_TCP_CLOSE,
+    NETDATA_IDX_UDP_RECVBUF,
+    NETDATA_IDX_UDP_SENDMSG,
+    NETDATA_IDX_TCP_RETRANSMIT,
+    NETDATA_IDX_TCP_CONNECTION_V4,
+    NETDATA_IDX_TCP_CONNECTION_V6,
+    NETDATA_IDX_INCOMING_CONNECTION_TCP,
+    NETDATA_IDX_INCOMING_CONNECTION_UDP,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_MAX_SOCKET_VECTOR
+};
+
+enum socket_functions {
+    NETDATA_FCNT_INET_CSK_ACCEPT,
+    NETDATA_FCNT_TCP_RETRANSMIT,
+    NETDATA_FCNT_CLEANUP_RBUF,
+    NETDATA_FCNT_TCP_CLOSE,
+    NETDATA_FCNT_UDP_RECEVMSG,
+    NETDATA_FCNT_TCP_SENDMSG,
+    NETDATA_FCNT_UDP_SENDMSG,
+    NETDATA_FCNT_TCP_V4_CONNECT,
+    NETDATA_FCNT_TCP_V6_CONNECT
+};
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -38,24 +85,41 @@ typedef enum ebpf_socket_idx {
 
     NETDATA_KEY_TCP_RETRANSMIT,
 
+    NETDATA_KEY_CALLS_TCP_CONNECT_IPV4,
+    NETDATA_KEY_ERROR_TCP_CONNECT_IPV4,
+
+    NETDATA_KEY_CALLS_TCP_CONNECT_IPV6,
+    NETDATA_KEY_ERROR_TCP_CONNECT_IPV6,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
-#define NETDATA_SOCKET_GROUP "Socket"
-#define NETDATA_NETWORK_CONNECTIONS_GROUP "Network connections"
+#define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
+#define NETDATA_NETWORK_CONNECTIONS_GROUP "network connections"
+#define NETDATA_CGROUP_NET_GROUP "network (eBPF)"
 
 // Global chart name
+#define NETDATA_TCP_OUTBOUND_CONNECTIONS "tcp_outbound_conn"
+#define NETDATA_INBOUND_CONNECTIONS "inbound_conn"
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
-#define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
+#define NETDATA_TCP_FUNCTION_BITS "total_tcp_bandwidth"
 #define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
 #define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
 #define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
-#define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
+#define NETDATA_UDP_FUNCTION_BITS "total_udp_bandwidth"
 #define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
 // Charts created on Apps submenu
-#define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
-#define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+#define NETDATA_NET_APPS_CONNECTION_TCP_V4 "outbound_conn_v4"
+#define NETDATA_NET_APPS_CONNECTION_TCP_V6 "outbound_conn_v6"
+#define NETDATA_NET_APPS_BANDWIDTH_SENT "total_bandwidth_sent"
+#define NETDATA_NET_APPS_BANDWIDTH_RECV "total_bandwidth_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS "bandwidth_tcp_send"
+#define NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS "bandwidth_tcp_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT "bandwidth_tcp_retransmit"
+#define NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS "bandwidth_udp_send"
+#define NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS "bandwidth_udp_recv"
 
 // Network viewer charts
 #define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
@@ -67,18 +131,47 @@ typedef enum ebpf_socket_idx {
 // Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
+#define NETDATA_COMPILED_CONNECTIONS_ALLOWED 65535U
+#define NETDATA_MAXIMUM_CONNECTIONS_ALLOWED 16384U
+#define NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED 8192U
+#define NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED 4096U
 
 #define NETDATA_MINIMUM_IPV4_CIDR 0
 #define NETDATA_MAXIMUM_IPV4_CIDR 32
 
+// Contexts
+#define NETDATA_CGROUP_TCP_V4_CONN_CONTEXT "cgroup.net_conn_ipv4"
+#define NETDATA_CGROUP_TCP_V6_CONN_CONTEXT "cgroup.net_conn_ipv6"
+#define NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT "cgroup.net_bytes_recv"
+#define NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT "cgroup.net_bytes_send"
+#define NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT "cgroup.net_tcp_recv"
+#define NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT "cgroup.net_tcp_send"
+#define NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT "cgroup.net_retransmit"
+#define NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT "cgroup.net_udp_recv"
+#define NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT "cgroup.net_udp_send"
+
+#define NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT "services.net_conn_ipv4"
+#define NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT "services.net_conn_ipv6"
+#define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "services.net_bytes_recv"
+#define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "services.net_bytes_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "services.net_tcp_recv"
+#define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "services.net_tcp_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "services.net_retransmit"
+#define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "services.net_udp_recv"
+#define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
+
 typedef struct ebpf_socket_publish_apps {
     // Data read
-    uint64_t sent;
-    uint64_t received;
-
-    // Publish information.
-    uint64_t publish_sent;
-    uint64_t publish_recv;
+    uint64_t bytes_sent;            // Bytes sent
+    uint64_t bytes_received;        // Bytes received
+    uint64_t call_tcp_sent;         // Number of times tcp_sendmsg was called
+    uint64_t call_tcp_received;     // Number of times tcp_cleanup_rbuf was called
+    uint64_t retransmit;            // Number of times tcp_retransmit was called
+    uint64_t call_udp_sent;         // Number of times udp_sendmsg was called
+    uint64_t call_udp_received;     // Number of times udp_recvmsg was called
+    uint64_t call_close;            // Number of times tcp_close was called
+    uint64_t call_tcp_v4_connection;// Number of times tcp_v4_connect was called
+    uint64_t call_tcp_v6_connection;// Number of times tcp_v6_connect was called
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {
@@ -100,9 +193,23 @@ typedef struct ebpf_network_viewer_port_list {
     uint16_t cmp_first;
     uint16_t cmp_last;
 
-    uint8_t protocol;
+    uint16_t protocol;
+    uint32_t pid;
+    uint32_t tgid;
+    uint64_t connections;
     struct ebpf_network_viewer_port_list *next;
 } ebpf_network_viewer_port_list_t;
+
+typedef struct netdata_passive_connection {
+    uint32_t tgid;
+    uint32_t pid;
+    uint64_t counter;
+} netdata_passive_connection_t;
+
+typedef struct netdata_passive_connection_idx {
+    uint16_t protocol;
+    uint16_t port;
+} netdata_passive_connection_idx_t;
 
 /**
  * Union used to store ip addresses
@@ -169,12 +276,10 @@ typedef struct netdata_socket {
     uint64_t sent_bytes;
     uint64_t first; // First timestamp
     uint64_t ct;   // Current timestamp
-    uint16_t retransmit; // It is never used with UDP
-    uint8_t protocol;
-    uint8_t removeme;
-    uint32_t reserved;
-} netdata_socket_t __attribute__((__aligned__(8)));
-
+    uint32_t retransmit; // It is never used with UDP
+    uint16_t protocol;
+    uint16_t reserved;
+} netdata_socket_t;
 
 typedef struct netdata_plot_values {
     // Values used in the previous iteration
@@ -182,7 +287,7 @@ typedef struct netdata_plot_values {
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
-    uint16_t retransmit;
+    uint32_t retransmit;
 
     uint64_t last_time;
 
@@ -202,7 +307,7 @@ typedef struct netdata_socket_idx {
     uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
-} netdata_socket_idx_t __attribute__((__aligned__(8)));
+} netdata_socket_idx_t;
 
 // Next values were defined according getnameinfo(3)
 #define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
@@ -217,7 +322,7 @@ typedef struct netdata_socket_idx {
  */
 typedef struct netdata_socket_plot {
     // Search
-    avl avl;
+    avl_t avl;
     netdata_socket_idx_t index;
 
     // Current data
@@ -251,11 +356,15 @@ typedef struct netdata_vector_plot {
 
 } netdata_vector_plot_t;
 
-extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
+void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
-extern void update_listen_table(uint16_t value, uint8_t proto);
+void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
+void parse_network_viewer_section(struct config *cfg);
+void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
+void parse_service_name_section(struct config *cfg);
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
-extern ebpf_socket_publish_apps_t **socket_bandwidth_prev;
+extern struct config socket_config;
+extern netdata_ebpf_targets_t socket_targets[];
 
 #endif

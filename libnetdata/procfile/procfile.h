@@ -50,7 +50,7 @@ typedef struct {
     char filename[FILENAME_MAX + 1]; // not populated until profile_filename() is called
 
     uint32_t flags;
-    int fd;               // the file desriptor
+    int fd;               // the file descriptor
     size_t len;           // the bytes we have placed into data
     size_t size;          // the bytes we have allocated for data
     pflines *lines;
@@ -60,25 +60,25 @@ typedef struct {
 } procfile;
 
 // close the proc file and free all related memory
-extern void procfile_close(procfile *ff);
+void procfile_close(procfile *ff);
 
 // (re)read and parse the proc file
-extern procfile *procfile_readall(procfile *ff);
+procfile *procfile_readall(procfile *ff);
 
 // open a /proc or /sys file
-extern procfile *procfile_open(const char *filename, const char *separators, uint32_t flags);
+procfile *procfile_open(const char *filename, const char *separators, uint32_t flags);
 
 // re-open a file
 // if separators == NULL, the last separators are used
-extern procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags);
+procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags);
 
 // example walk-through a procfile parsed file
-extern void procfile_print(procfile *ff);
+void procfile_print(procfile *ff);
 
-extern void procfile_set_quotes(procfile *ff, const char *quotes);
-extern void procfile_set_open_close(procfile *ff, const char *open, const char *close);
+void procfile_set_quotes(procfile *ff, const char *quotes);
+void procfile_set_open_close(procfile *ff, const char *open, const char *close);
 
-extern char *procfile_filename(procfile *ff);
+char *procfile_filename(procfile *ff);
 
 // ----------------------------------------------------------------------------
 
@@ -102,5 +102,8 @@ extern int procfile_adaptive_initial_allocation;
 
 // return the Nth word of the current line
 #define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords((ff), (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + (word)) : "")
+
+// Open file without logging file IO error if any
+#define procfile_open_no_log(filename, separators, flags) procfile_open(filename, separators, flags | PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)
 
 #endif /* NETDATA_PROCFILE_H */

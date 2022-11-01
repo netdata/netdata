@@ -1,8 +1,7 @@
 <!--
----
 title: "Install Netdata on cloud providers"
+description: "The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/cloud-providers.md
----
 -->
 
 # Install Netdata on cloud providers
@@ -16,7 +15,7 @@ aims to document some of those steps for popular cloud providers.
 
 > This document is a work-in-progress! If you find new issues specific to a cloud provider, or would like to help
 > clarify the correct workaround, please [create an
-> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request%2C+needs+triage&template=feature_request.md)
+> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request,+needs+triage&template=feature_request.md)
 > with your process and instructions on using the provider's interface to complete the workaround.
 
 -   [Recommended installation methods for cloud providers](#recommended-installation-methods-for-cloud-providers)
@@ -26,11 +25,7 @@ aims to document some of those steps for popular cloud providers.
 ## Recommended installation methods for cloud providers
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,
-we recommend either the [`kickstart.sh` automatic installation script](kickstart.md) or [.deb/.rpm
-packages](packages.md).
-
-To see the full list of approved methods for each operating system/version we support, see our [distribution
-matrix](../../DISTRIBUTIONS.md). That table will guide you to the various supported methods for your cloud instance.
+we recommend the [`kickstart.sh` automatic installation script](kickstart.md).
 
 If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing,
 followed by the solution for your provider.
@@ -90,7 +85,7 @@ to create a new firewall rule.
 #### Amazon Web Services (AWS) / EC2
 
 Sign in to the [AWS console](https://console.aws.amazon.com/) and navigate to the EC2 dashboard. Click on the **Security
-Groups** link in the naviagtion, beneath the **Network & Security** heading. Find the Security Group your instance
+Groups** link in the navigation, beneath the **Network & Security** heading. Find the Security Group your instance
 belongs to, and either right-click on it or click the **Actions** button above to see a dropdown menu with **Edit
 inbound rules**.
 
@@ -119,7 +114,7 @@ Add a new rule with the following options:
 Source: Any
 Source port ranges: 19999
 Destination: Any
-Destination port randes: 19999
+Destination port ranges: 19999
 Protocol: TCP
 Action: Allow
 Priority: 310
@@ -127,3 +122,5 @@ Name: Netdata
 ```
 
 Click **Add** to apply your new inbound security rule.
+
+

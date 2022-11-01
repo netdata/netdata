@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "../database/engine/rrdenginelib.h"
 
 static uv_thread_t thread;
 static uv_loop_t* loop;
@@ -46,6 +45,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
 static cmd_status_t cmd_read_config_execute(char *args, char **message);
 static cmd_status_t cmd_write_config_execute(char *args, char **message);
 static cmd_status_t cmd_ping_execute(char *args, char **message);
+static cmd_status_t cmd_aclk_state(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -58,7 +58,8 @@ static command_info_t command_info_array[] = {
         {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
         {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
         {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
-        {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL}
+        {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
+        {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -121,7 +122,9 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "reload-claiming-state\n"
              "    Reload agent claiming state from disk.\n"
              "ping\n"
-             "    Return with 'pong' if agent is alive.\n",
+             "    Return with 'pong' if agent is alive.\n"
+             "aclk-state [json]\n"
+             "    Returns current state of ACLK and Cloud connection. (optionally in json)\n",
              MAX_COMMAND_LENGTH - 1);
     return CMD_STATUS_SUCCESS;
 }
@@ -214,17 +217,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     reload_host_labels();
 
     BUFFER *wb = buffer_create(10);
-
-    rrdhost_rdlock(localhost);
-    netdata_rwlock_rdlock(&localhost->labels_rwlock);
-    struct label *l=localhost->labels;
-    while (l != NULL) {
-        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
-        l = l->next;
-    }
-    netdata_rwlock_unlock(&localhost->labels_rwlock);
-    rrdhost_unlock(localhost);
-
+    rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
 
@@ -310,6 +303,17 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
+static cmd_status_t cmd_aclk_state(char *args, char **message)
+{
+    info("COMMAND: Reopening aclk/cloud state.");
+    if (strstr(args, "json"))
+        *message = aclk_state_json();
+    else
+        *message = aclk_state();
+
+    return CMD_STATUS_SUCCESS;
+}
+
 static void cmd_lock_exclusive(unsigned index)
 {
     (void)index;
@@ -373,6 +377,7 @@ static void pipe_write_cb(uv_write_t* req, int status)
 
     uv_close((uv_handle_t *)client, pipe_close_cb);
     --clients;
+    freez(client->data);
     info("Command Clients = %u\n", clients);
 }
 
@@ -386,6 +391,10 @@ static inline void add_string_to_command_reply(char *reply_string, unsigned *rep
     unsigned len;
 
     len = strlen(str);
+
+    if (MAX_COMMAND_LENGTH - 1 < len + *reply_string_size)
+        len = MAX_COMMAND_LENGTH - *reply_string_size - 1;
+
     strncpyz(reply_string + *reply_string_size, str, len);
     *reply_string_size += len;
 }
@@ -393,7 +402,7 @@ static inline void add_string_to_command_reply(char *reply_string, unsigned *rep
 static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t status, char *message)
 {
     int ret;
-    char reply_string[MAX_COMMAND_LENGTH] = {'\0', };
+    char *reply_string = mallocz(MAX_COMMAND_LENGTH);
     char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
@@ -410,6 +419,7 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     }
 
     cmd_ctx->write_req.data = client;
+    client->data = reply_string;
     write_buf.base = reply_string;
     write_buf.len = reply_string_size;
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
@@ -505,7 +515,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - cmd_ctx->command_string_size);
+        to_copy = MIN((size_t) nread, MAX_COMMAND_LENGTH - 1 - cmd_ctx->command_string_size);
         memcpy(cmd_ctx->command_string + cmd_ctx->command_string_size, buf->base, to_copy);
         cmd_ctx->command_string_size += to_copy;
         cmd_ctx->command_string[cmd_ctx->command_string_size] = '\0';
@@ -625,7 +635,7 @@ static void command_thread(void *arg)
     command_thread_error = 0;
     command_thread_shutdown = 0;
     /* wake up initialization thread */
-    complete(&completion);
+    completion_mark_complete(&completion);
 
     while (command_thread_shutdown == 0) {
         uv_run(loop, UV_RUN_DEFAULT);
@@ -654,7 +664,7 @@ error_after_loop_init:
     freez(loop);
 
     /* wake up initialization thread */
-    complete(&completion);
+    completion_mark_complete(&completion);
 }
 
 static void sanity_check(void)
@@ -678,15 +688,15 @@ void commands_init(void)
     }
     fatal_assert(0 == uv_rwlock_init(&exclusive_rwlock));
 
-    init_completion(&completion);
+    completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
     if (error) {
         error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for worker thread to initialize */
-    wait_for_completion(&completion);
-    destroy_completion(&completion);
+    completion_wait_for(&completion);
+    completion_destroy(&completion);
     uv_thread_set_name_np(thread, "DAEMON_COMMAND");
 
     if (command_thread_error) {

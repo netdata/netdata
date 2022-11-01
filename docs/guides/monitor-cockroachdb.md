@@ -13,7 +13,7 @@ maximum granularity using Netdata. Collect more than 50 unique metrics and put t
 designed for better visual anomaly detection.
 
 Netdata itself uses CockroachDB as part of its Netdata Cloud infrastructure, so we're happy to introduce this new
-collector and help others get started with it straightaway.
+collector and help others get started with it straight away.
 
 Let's dive in and walk through the process of monitoring CockroachDB metrics with Netdata.
 
@@ -30,9 +30,9 @@ configuring CockroachDB. Netdata only needs to regularly query the database's `_
 display them on the dashboard.
 
 If your CockroachDB instance is accessible through `http://localhost:8080/` or `http://127.0.0.1:8080`, your setup is
-complete. Restart Netdata with `service netdata restart`, or use the [appropriate
-method](../getting-started.md#start-stop-and-restart-netdata) for your system, and refresh your browser. You should see
-CockroachDB metrics in your Netdata dashboard!
+complete. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, and refresh your browser. You should see CockroachDB
+metrics in your Netdata dashboard!
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockroachDB database monitored by Netdata" />
@@ -115,7 +115,7 @@ guide](/health/QUICKSTART.md).
 
 Now that you're collecting metrics from your CockroachDB databases, let us know how it's working for you! There's always
 room for improvement or refinement based on real-world use cases. Feel free to [file an
-issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) with your
+issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) with your
 thoughts.
 
 Also, be sure to check out these useful resources:
@@ -133,4 +133,4 @@ Also, be sure to check out these useful resources:
 -   [Monitor CockroachDB with
     Prometheus](https://www.cockroachlabs.com/docs/stable/monitor-cockroachdb-with-prometheus.html)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor-cockroachdb&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

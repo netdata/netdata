@@ -11,7 +11,7 @@ To accurately monitor the health of your systems and applications, you need to k
 strange going on. Netdata's alarm and notification systems are essential to keeping you informed. 
 
 Netdata comes with hundreds of pre-configured alarms that don't require configuration. They were designed by our
-community of system adminstrators to cover the most important parts of production systems, so, in many cases, you won't
+community of system administrators to cover the most important parts of production systems, so, in many cases, you won't
 need to edit them.
 
 Luckily, Netdata's alarm and notification system are incredibly adaptable to your infrastructure's unique needs.
@@ -69,8 +69,8 @@ the `warn` and `crit` lines to the values of your choosing. For example:
     crit: $this > (($status == $CRITICAL) ? (75) : (85))
 ```
 
-You _can_ [restart Netdata](/docs/getting-started.md#start-stop-and-restart-netdata) to enable your tune, but you can
-also reload _only_ the health monitoring component using one of the available [methods](/health/QUICKSTART.md#reload-health-configuration).
+You _can_ restart Netdata with `sudo systemctl restart netdata`, to enable your tune, but you can also reload _only_ the
+health monitoring component using one of the available [methods](/health/QUICKSTART.md#reload-health-configuration).
 
 You can also tune any other aspect of the default alarms. To better understand how each line in a health entity works,
 read our [health documentation](/health/README.md).
@@ -109,6 +109,13 @@ bother you with notifications.
 
 The best way to understand how health entities work is building your own and experimenting with the options. To start,
 let's build a health entity that triggers an alarm when system RAM usage goes above 80%.
+
+We will first create a new file inside of the `health.d/` directory. We'll name our file
+`example.conf` for now.
+
+```bash
+./edit-config health.d/example.conf
+```
 
 The first line in a health entity will be `alarm:`. This is how you name your entity. You can give it any name you
 choose, but the only symbols allowed are `.` and `_`. Let's call the alarm `ram_usage`.
@@ -217,7 +224,7 @@ Health alarms, while great on their own, are pretty useless without some way of 
 That's why Netdata comes with a notification system that supports more than a dozen services, such as email, Slack,
 Discord, PagerDuty, Twilio, Amazon SNS, and much more.
 
-To see all the supported systems, visit our [notifications documentation](/health/notifications/).
+To see all the supported systems, visit our [notifications documentation](/health/notifications/README.md).
 
 We'll cover email and Slack notifications here, but with this knowledge you should be able to enable any other type of
 notifications instead of or in addition to these.
@@ -340,4 +347,4 @@ from hundreds of services with almost no configuration on your part. Onward!
 
 [Next: Collect metrics from more services and apps &rarr;](step-06.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-05&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+

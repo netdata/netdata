@@ -15,7 +15,10 @@ static void clean_instance_config(struct instance_config *config)
     freez((void *)config->type_name);
     freez((void *)config->name);
     freez((void *)config->destination);
+    freez((void *)config->username);
+    freez((void *)config->password);
     freez((void *)config->prefix);
+    freez((void *)config->hostname);
 
     simple_pattern_free(config->charts_pattern);
 
@@ -30,7 +33,7 @@ static void clean_instance_config(struct instance_config *config)
 void clean_instance(struct instance *instance)
 {
     clean_instance_config(&instance->config);
-    buffer_free(instance->labels);
+    buffer_free(instance->labels_buffer);
 
     uv_cond_destroy(&instance->cond_var);
     // uv_mutex_destroy(&instance->mutex);
@@ -47,6 +50,8 @@ void simple_connector_cleanup(struct instance *instance)
 
     struct simple_connector_data *simple_connector_data =
         (struct simple_connector_data *)instance->connector_specific_data;
+
+    freez(simple_connector_data->auth_string);
 
     buffer_free(instance->buffer);
     buffer_free(simple_connector_data->buffer);

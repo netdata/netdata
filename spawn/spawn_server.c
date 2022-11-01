@@ -16,7 +16,7 @@ static char prot_buffer[MAX_COMMAND_LENGTH];
 static unsigned prot_buffer_len = 0;
 
 struct spawn_execution_info {
-    avl avl;
+    avl_t avl;
 
     void *handle;
     int exit_status;
@@ -71,12 +71,15 @@ static void after_pipe_write(uv_write_t *req, int status)
 #ifdef SPAWN_DEBUG
     fprintf(stderr, "SERVER %s called status=%d\n", __func__, status);
 #endif
-    freez(req->data);
+    void **data = req->data;
+    freez(data[0]);
+    freez(data[1]);
+    freez(data);
 }
 
 static void child_waited_async_cb(uv_async_t *async_handle)
 {
-    uv_buf_t writebuf[2];
+    uv_buf_t *writebuf;
     int ret;
     struct spawn_execution_info *exec_info;
     struct write_context *write_ctx;
@@ -84,8 +87,13 @@ static void child_waited_async_cb(uv_async_t *async_handle)
     (void)async_handle;
     while (NULL != (exec_info = dequeue_child_waited_list())) {
         write_ctx = mallocz(sizeof(*write_ctx));
-        write_ctx->write_req.data = write_ctx;
 
+        void **data = callocz(2, sizeof(void *));
+        writebuf = callocz(2, sizeof(uv_buf_t));
+
+        data[0] = write_ctx;
+        data[1] = writebuf;
+        write_ctx->write_req.data = data;
 
         write_ctx->header.opcode = SPAWN_PROT_CMD_EXIT_STATUS;
         write_ctx->header.handle = exec_info->handle;
@@ -106,7 +114,7 @@ static void wait_children(void *arg)
 {
     siginfo_t i;
     struct spawn_execution_info tmp, *exec_info;
-    avl *ret_avl;
+    avl_t *ret_avl;
 
     (void)arg;
     while (!server_shutdown) {
@@ -133,7 +141,7 @@ static void wait_children(void *arg)
 #endif
             fatal_assert(CLD_EXITED == i.si_code);
             tmp.pid = (pid_t)i.si_pid;
-            while (NULL == (ret_avl = avl_remove_lock(&spawn_outstanding_exec_tree, (avl *)&tmp))) {
+            while (NULL == (ret_avl = avl_remove_lock(&spawn_outstanding_exec_tree, (avl_t *)&tmp))) {
                 fprintf(stderr,
                         "SPAWN: race condition detected, waiting for child process %d to be indexed.\n",
                         (int)tmp.pid);
@@ -151,14 +159,18 @@ static void wait_children(void *arg)
 
 void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t command_length)
 {
-    uv_buf_t writebuf[2];
+    uv_buf_t *writebuf;
     int ret;
-    avl *avl_ret;
+    avl_t *avl_ret;
     struct spawn_execution_info *exec_info;
     struct write_context *write_ctx;
 
     write_ctx = mallocz(sizeof(*write_ctx));
-    write_ctx->write_req.data = write_ctx;
+    void **data = callocz(2, sizeof(void *));
+    writebuf = callocz(2, sizeof(uv_buf_t));
+    data[0] = write_ctx;
+    data[1] = writebuf;
+    write_ctx->write_req.data = data;
 
     command_to_run[command_length] = '\0';
 #ifdef SPAWN_DEBUG
@@ -174,8 +186,8 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
         exec_info = mallocz(sizeof(*exec_info));
         exec_info->handle = handle;
         exec_info->pid = write_ctx->spawn_result.exec_pid;
-        avl_ret = avl_insert_lock(&spawn_outstanding_exec_tree, (avl *)exec_info);
-        fatal_assert(avl_ret == (avl *)exec_info);
+        avl_ret = avl_insert_lock(&spawn_outstanding_exec_tree, (avl_t *)exec_info);
+        fatal_assert(avl_ret == (avl_t *)exec_info);
 
         /* wake up the thread that blocks waiting for processes to exit */
         uv_mutex_lock(&wait_children_mutex);
@@ -300,8 +312,8 @@ void spawn_server(void)
 {
     int error;
 
-    test_clock_boottime();
-    test_clock_monotonic_coarse();
+    // initialize the system clocks
+    clocks_init();
 
     // close all open file descriptors, except the standard ones
     // the caller may have left open files (lxc-attach has this issue)

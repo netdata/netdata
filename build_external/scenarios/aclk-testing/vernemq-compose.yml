@@ -4,4 +4,3 @@ services:
     build:
       dockerfile: configureVerneMQ.Dockerfile
       context: .
-

@@ -49,6 +49,8 @@ ATTR198 = '198'
 ATTR199 = '199'
 ATTR202 = '202'
 ATTR206 = '206'
+ATTR233 = '233'
+ATTR249 = '249'
 ATTR_READ_ERR_COR = 'read-total-err-corrected'
 ATTR_READ_ERR_UNC = 'read-total-unc-errors'
 ATTR_WRITE_ERR_COR = 'write-total-err-corrected'
@@ -111,6 +113,7 @@ ORDER = [
     'current_pending_sector_count',
     'offline_uncorrectable_sector_count',
     'percent_lifetime_used',
+    'media_wearout_indicator',
 ]
 
 CHARTS = {
@@ -151,7 +154,7 @@ CHARTS = {
         'algo': INCREMENTAL,
     },
     'write_total_err_corrected': {
-        'options': [None, 'Write Error Corrected', 'errors', 'errors', 'smartd_log.read_total_err_corrected', 'line'],
+        'options': [None, 'Write Error Corrected', 'errors', 'errors', 'smartd_log.write_total_err_corrected', 'line'],
         'lines': [],
         'attrs': [ATTR_WRITE_ERR_COR],
         'algo': INCREMENTAL,
@@ -322,7 +325,19 @@ CHARTS = {
         'lines': [],
         'attrs': [ATTR202],
         'algo': ABSOLUTE,
-    }
+    },
+    'media_wearout_indicator': {
+        'options': [None, 'Media Wearout Indicator', 'percentage', 'wear', 'smartd_log.media_wearout_indicator', 'line'],
+        'lines': [],
+        'attrs': [ATTR233],
+        'algo': ABSOLUTE,
+    },
+    'nand_writes_1gib': {
+        'options': [None, 'NAND Writes', 'GiB', 'wear', 'smartd_log.nand_writes_1gib', 'line'],
+        'lines': [],
+        'attrs': [ATTR249],
+        'algo': ABSOLUTE,
+    },
 }
 
 # NOTE: 'parse_temp' decodes ATA 194 raw value. Not heavily tested. Written by @Ferroin
@@ -506,6 +521,7 @@ def ata_attribute_factory(value):
         ATTR7,
         ATTR202,
         ATTR206,
+        ATTR233,
     ]:
         return AtaNormalized(*value)
 
@@ -614,6 +630,7 @@ class Service(SimpleService):
         self.exclude = configuration.get('exclude_disks', str()).split()
         self.disks = list()
         self.runs = 0
+        self.do_force_rescan = False
 
     def check(self):
         return self.scan() > 0
@@ -621,9 +638,10 @@ class Service(SimpleService):
     def get_data(self):
         self.runs += 1
 
-        if self.runs % DEF_RESCAN_INTERVAL == 0:
+        if self.do_force_rescan or self.runs % DEF_RESCAN_INTERVAL == 0:
             self.cleanup()
             self.scan()
+            self.do_force_rescan = False
 
         data = dict()
 
@@ -638,10 +656,12 @@ class Service(SimpleService):
 
             if changed is None:
                 disk.alive = False
+                self.do_force_rescan = True
                 continue
 
             if changed and disk.populate_attrs() is None:
                 disk.alive = False
+                self.do_force_rescan = True
                 continue
 
             data.update(disk.data())

@@ -1,13 +1,17 @@
+
+
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_ACLK_RX_MSGS_H
-#define NETDATA_ACLK_RX_MSGS_H
+#ifndef ACLK_RX_MSGS_H
+#define ACLK_RX_MSGS_H
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 
-int aclk_handle_cloud_message(char *payload);
-void aclk_set_rx_handlers(int version);
+int aclk_handle_cloud_cmd_message(char *payload);
 
+const char *rx_handler_get_name(size_t i);
+unsigned int aclk_init_rx_msg_handlers(void);
+void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic);
 
-#endif /* NETDATA_ACLK_RX_MSGS_H */
+#endif /* ACLK_RX_MSGS_H */
