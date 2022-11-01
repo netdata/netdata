@@ -945,8 +945,6 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
         ((PARSER_USER_OBJECT *) user)->replay.end_time_ut = 0;
     }
 
-    st->last_accessed_time = now_realtime_sec();
-
     if(start_time_str && end_time_str) {
         time_t start_time = strtol(start_time_str, NULL, 0);
         time_t end_time = strtol(end_time_str, NULL, 0);

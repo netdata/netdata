@@ -422,6 +422,10 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
+
+    if(st)
+        st->last_accessed_time = now_realtime_sec();
+    
     return(st);
 }
 
