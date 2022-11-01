@@ -135,7 +135,8 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 
         if(pa) {
             if(page_index->alignment && page_index->alignment != pa)
-                fatal("DBENGINE: page_index has a different alignment.");
+                fatal("DBENGINE: page_index has a different alignment (page_index refcount is %u, writers is %u).",
+                      page_index->refcount, page_index->writers);
 
             if(!page_index->alignment) {
                 page_index->alignment = pa;
