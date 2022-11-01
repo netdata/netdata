@@ -38,7 +38,7 @@ Netdata is also capable of monitoring Windows systems. The [WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi) integrates with
 [windows_exporter](https://github.com/prometheus-community/windows_exporter), a small Go-based binary that you can run
 on Windows systems. The WMI collector then gathers metrics from an endpoint created by windows_exporter, for more
-details see [the requirements](https://github.com/netdata/go.d.plugin/tree/master/modules/wmi#requirements).
+details see [the requirements](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#requirements).
 
 Next, [configure the WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#configuration) to point to the URL
