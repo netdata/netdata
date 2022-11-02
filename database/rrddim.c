@@ -705,7 +705,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
 
     if(!reset) {
         rd->last_collected_value = rd_on_file->last_collected_value;
-        
+
         if(rd_on_file->algorithm != rd->algorithm)
             info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
                  fullfilename, rd->algorithm, rrd_algorithm_name(rd->algorithm), rd_on_file->algorithm, rrd_algorithm_name(rd_on_file->algorithm));

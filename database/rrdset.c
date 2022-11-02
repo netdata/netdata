@@ -1510,6 +1510,8 @@ after_first_database_work:
     if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         rrdset_done_push(st);
 
+    uint32_t has_reset_value = 0;
+
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
     struct rda_item *rda_base = rrdset_thread_rda(&rda_slots);
 
@@ -1536,6 +1538,22 @@ after_first_database_work:
 
         // calculate totals
         if(likely(rd->updated)) {
+            // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
+            // to reset the calculation (it will give zero as the calculation for this second)
+            if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rd->last_collected_value > rd->collected_value)) {
+                debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+                , rrdset_id(st)
+                , rrddim_name(rd)
+                , rd->last_collected_value
+                , rd->collected_value
+                );
+
+                if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                    has_reset_value = 1;
+
+                rd->last_collected_value = rd->collected_value;
+            }
+
             st->last_collected_total += rd->last_collected_value;
             st->collected_total += rd->collected_value;
 
@@ -1555,8 +1573,6 @@ after_first_database_work:
     rrdset_debug(st, "now_collect_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (current collection time)", (NETDATA_DOUBLE)now_collect_ut/USEC_PER_SEC);
     rrdset_debug(st, "last_stored_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
     rrdset_debug(st, "next_store_ut   = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
-
-    uint32_t has_reset_value = 0;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
@@ -1694,22 +1710,6 @@ after_first_database_work:
                 if(unlikely(rd->collections_counter <= 1)) {
                     rd->calculated_value = 0;
                     continue;
-                }
-
-                // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
-                // to reset the calculation (it will give zero as the calculation for this second)
-                if(unlikely(rd->last_collected_value > rd->collected_value)) {
-                    debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                          , rrdset_id(st)
-                          , rrddim_name(rd)
-                          , rd->last_collected_value
-                          , rd->collected_value
-                    );
-
-                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        has_reset_value = 1;
-
-                    rd->last_collected_value = rd->collected_value;
                 }
 
                 // the percentage of the current increment
