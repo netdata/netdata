@@ -976,7 +976,7 @@ void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
     while (extent) {
         for (uint8_t index = 0; index < extent->number_of_pages; index++) {
             struct rrdeng_page_descr *descr = extent->pages[index];
-            pg_cache_punch_hole(journalfile->datafile->ctx, descr, 0, 0, NULL, false, true);
+            pg_cache_punch_hole(journalfile->datafile->ctx, descr, 0, 0, NULL, false);
             count++;
         }
         extent = extent->next;

@@ -424,12 +424,9 @@ after_crc_check:
     }
     for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
         struct rrdeng_page_descr *descr =  xt_io_descr->descr_array[j];
-//        if (!(descr->pg_cache_descr->flags & RRD_PAGE_READ_PENDING))
-//            continue;
 
         if (unlikely(bitmap256_get_bit(&xt_io_descr->descr_array_wakeup, j))) {
             if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
-                info("DEBUG: Setting page to invalid");
                 descr->pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
                 descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
             }
@@ -683,7 +680,7 @@ static void invalidate_oldest_committed(void *arg)
 
             goto out;
         }
-        pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true, true);
+        pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true);
 
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
@@ -742,8 +739,6 @@ void after_delete_descriptors(uv_work_t *req, int status __maybe_unused)
     wc->delete_descriptors = 0;
     freez(work_request);
 }
-#define UT_TO_SEC(ut_time)     (ut_time) / USEC_PER_SEC
-
 
 void delete_descriptors(uv_work_t *req)
 {
@@ -755,59 +750,78 @@ void delete_descriptors(uv_work_t *req)
         return;
 
     struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
+    struct descriptor_info *descr_info;
     Pvoid_t *PValue;
     Word_t Index;
 
     unsigned deleted = 0;
+    unsigned process = 0;
+    time_t now = now_realtime_sec();
     uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
-    for (Index = 0,
+    bool delete_entry;
+    for (Index = 0, process = 0,
         PValue = JudyLFirst(pg_cache->dirty_descr_index.JudyL_array, &Index, PJE0),
-        descr = unlikely(NULL == PValue) ? NULL : *PValue;
+        descr_info = unlikely(NULL == PValue) ? NULL : *PValue;
 
-         descr != NULL;
+         descr_info != NULL;
 
          PValue = JudyLNext(pg_cache->dirty_descr_index.JudyL_array, &Index, PJE0),
-        descr = unlikely(NULL == PValue) ? NULL : *PValue) {
+        descr_info = unlikely(NULL == PValue) ? NULL : *PValue, process++) {
 
-        // Look it up in our list
-        PValue = JudyHSGet(pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr));
-        if (!PValue) {
-            // Its not there ... delete it
-            uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
-            uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
-
-            (void) JudyLDel(&pg_cache->dirty_descr_index.JudyL_array, Index, PJE0);
-
-            uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
-            uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
+        if (unlikely(descr_info->expiration > now))
             continue;
+
+        struct pg_cache_page_index *page_index = NULL;
+        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &descr_info->uuid, sizeof(uuid_t));
+        if (likely(NULL != PValue)) {
+            page_index = *PValue;
+        }
+        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+        if (!PValue) {
+            delete_entry = true;
+            goto remove_item;
         }
 
-        rrdeng_page_descr_mutex_lock(ctx, descr);
-        pg_cache_descr = descr->pg_cache_descr;
+        uv_rwlock_rdlock(&page_index->lock);
+        PValue = JudyLGet(page_index->JudyL_array, descr_info->start_time, PJE0);
+        descr = unlikely(NULL == PValue) ? NULL : *PValue;
+        uv_rwlock_rdunlock(&page_index->lock);
 
-        if (!(pg_cache_descr->flags) && pg_cache_try_get_unsafe(descr, 1)) {
+        bool delete_item = false;
+
+        if (likely(descr)) {
+            rrdeng_page_descr_mutex_lock(ctx, descr);
+
+            unsigned long flags = descr->pg_cache_descr->flags;
+            if (((flags & RRD_PAGE_POPULATED) || !flags) && pg_cache_try_get_unsafe(descr, 1))
+                delete_item = true;
+
             rrdeng_page_descr_mutex_unlock(ctx, descr);
 
-            pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false, false);
+            if (delete_item) {
+                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+                delete_entry = true;
+            }
+       }
 
+remove_item:
+        if (delete_entry) {
             uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
             uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
 
             (void) JudyLDel(&pg_cache->dirty_descr_index.JudyL_array, Index, PJE0);
-            (void) JudyHSDel(&pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr), PJE0);
+            freez(descr_info);
 
             uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
             uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
             deleted++;
-        } else
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
+        }
     }
 
     uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
-    if (deleted)
-        info("Removed %u descriptors from the page cache", deleted);
+    info("Processed %u items, removed %u descriptors from the page cache", process, deleted);
+
 }
 
 void flush_pages_cb(uv_fs_t* req)
@@ -1100,7 +1114,7 @@ static void delete_old_data(void *arg)
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id, true, true);
+            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id, true);
             if (unlikely(can_delete_metric)) {
                 /*
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
