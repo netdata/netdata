@@ -15,7 +15,7 @@ struct rrdengine_journalfile;
 #define WALFILE_EXTENSION ".njf"
 #define WALFILE_EXTENSION_V2 ".njfv2"
 
-#define is_descr_journal_v2(descr) ((descr)->extent == NULL)
+#define is_descr_journal_v2(descr) ((descr)->extent == NULL && (descr)->extent_entry != NULL)
 
 /* only one event loop is supported for now */
 struct rrdengine_journalfile {
