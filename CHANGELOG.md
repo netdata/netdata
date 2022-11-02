@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Rrddim acquire on replay set [\#13932](https://github.com/netdata/netdata/pull/13932) ([ktsaou](https://github.com/ktsaou))
+- fix compiling without dbengine [\#13931](https://github.com/netdata/netdata/pull/13931) ([ilyam8](https://github.com/ilyam8))
+- bump go.d.plugin to v0.42.1 [\#13930](https://github.com/netdata/netdata/pull/13930) ([ilyam8](https://github.com/ilyam8))
+- Remove pluginsd action param & dead code. [\#13928](https://github.com/netdata/netdata/pull/13928) ([vkalintiris](https://github.com/vkalintiris))
+- Return accidentaly removed 32bit RPi keep alive fix [\#13925](https://github.com/netdata/netdata/pull/13925) ([underhood](https://github.com/underhood))
+- error\_limit\(\) function to limit number of error lines per instance [\#13924](https://github.com/netdata/netdata/pull/13924) ([ktsaou](https://github.com/ktsaou))
 - fix crash on query plan switch [\#13920](https://github.com/netdata/netdata/pull/13920) ([ktsaou](https://github.com/ktsaou))
 - add ping dashboard info and alarms [\#13916](https://github.com/netdata/netdata/pull/13916) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
@@ -23,6 +29,7 @@
 - Prompt users about updates/claiming on unknown install types. [\#13890](https://github.com/netdata/netdata/pull/13890) ([Ferroin](https://github.com/Ferroin))
 - tune rrdcontext timings [\#13889](https://github.com/netdata/netdata/pull/13889) ([ktsaou](https://github.com/ktsaou))
 - filtering out charts in context queries, includes them in full\_xxx variables [\#13886](https://github.com/netdata/netdata/pull/13886) ([ktsaou](https://github.com/ktsaou))
+- Fix systemd chart update \(eBPF\) [\#13884](https://github.com/netdata/netdata/pull/13884) ([thiagoftsm](https://github.com/thiagoftsm))
 - apps.plugin function processes cosmetic changes [\#13880](https://github.com/netdata/netdata/pull/13880) ([ktsaou](https://github.com/ktsaou))
 - allow single chart to be filtered in context queries [\#13879](https://github.com/netdata/netdata/pull/13879) ([ktsaou](https://github.com/ktsaou))
 - Add description for TCP WMI [\#13878](https://github.com/netdata/netdata/pull/13878) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -220,6 +227,7 @@
 - Add Fedora 37 to CI and package builds. [\#13489](https://github.com/netdata/netdata/pull/13489) ([Ferroin](https://github.com/Ferroin))
 - Overhaul handling of installation of Netdata as a system service. [\#13451](https://github.com/netdata/netdata/pull/13451) ([Ferroin](https://github.com/Ferroin))
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
+- Remove Alpine 3.13 from CI and official support. [\#13415](https://github.com/netdata/netdata/pull/13415) ([Ferroin](https://github.com/Ferroin))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
 - Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
 
@@ -332,15 +340,6 @@
 - bump go.d.plugin version to v0.33.0 [\#13280](https://github.com/netdata/netdata/pull/13280) ([ilyam8](https://github.com/ilyam8))
 - Fixes vbi parser in mqtt5 implementation [\#13277](https://github.com/netdata/netdata/pull/13277) ([underhood](https://github.com/underhood))
 - Fix alignment in charts endpoint [\#13275](https://github.com/netdata/netdata/pull/13275) ([thiagoftsm](https://github.com/thiagoftsm))
-- Dont print io errors for cgroups [\#13274](https://github.com/netdata/netdata/pull/13274) ([vlvkobal](https://github.com/vlvkobal))
-- Pluginsd doc [\#13273](https://github.com/netdata/netdata/pull/13273) ([thiagoftsm](https://github.com/thiagoftsm))
-- Remove obsolete --use-system-lws option from netdata-installer.sh help [\#13272](https://github.com/netdata/netdata/pull/13272) ([Dim-P](https://github.com/Dim-P))
-- Rename the chart of real memory usage in FreeBSD [\#13271](https://github.com/netdata/netdata/pull/13271) ([vlvkobal](https://github.com/vlvkobal))
-- Update documentation about our REST API documentation. [\#13269](https://github.com/netdata/netdata/pull/13269) ([Ferroin](https://github.com/Ferroin))
-- Fix package build filtering on PRs. [\#13267](https://github.com/netdata/netdata/pull/13267) ([Ferroin](https://github.com/Ferroin))
-- Add document explaining how to proxy Netdata via H2O [\#13266](https://github.com/netdata/netdata/pull/13266) ([Ferroin](https://github.com/Ferroin))
-- chore\(python.d\): remove deprecated modules from python.d.conf [\#13264](https://github.com/netdata/netdata/pull/13264) ([ilyam8](https://github.com/ilyam8))
-- Multi-Tier database backend for long term metrics storage [\#13263](https://github.com/netdata/netdata/pull/13263) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
