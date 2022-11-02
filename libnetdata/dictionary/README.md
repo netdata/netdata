@@ -229,12 +229,3 @@ There are 2 versions of `dfe_start`:
 While in the loop, depending on the read or write versions of `dfe_start`, the caller may lookup or manipulate the dictionary. The rules are the same with the unsorted walkthrough callback functions.
 
 PS: DFE is Dictionary For Each.
-
-## special multi-threaded lockless case
-
-Since the dictionary uses a hash table and a double linked list, if the contract between 2 threads is for one to use the hash table functions only (`set`, `get` - but no `del`) and the other to use the traversal ones only, the dictionary allows concurrent use without locks.
-
-This is currently used in statsd:
-
-- the data collection thread uses only `get` and `set`. It never uses `del`. New items are added at the front of the linked list (`DICT_OPTION_ADD_IN_FRONT`).
-- the flushing thread is only traversing the dictionary up to the point it last traversed it (it uses a flag for that to know where it stopped last time). It never uses `get`, `set` or `del`.
