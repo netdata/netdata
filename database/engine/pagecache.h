@@ -22,6 +22,12 @@ struct rrdeng_page_descr;
 #define RRD_PAGE_POPULATED      (1LU << 4)
 #define RRD_PAGE_INVALID        (1LU << 5)
 
+struct descriptor_info {
+    uuid_t uuid;
+    Word_t start_time;
+    time_t expiration;
+};
+
 struct page_cache_descr {
     struct rrdeng_page_descr *descr; /* parent descriptor */
     void *page;
@@ -209,8 +215,7 @@ uint8_t pg_cache_punch_hole(
     uint8_t remove_dirty,
     uint8_t is_exclusive_holder,
     uuid_t(*metric_id),
-    bool update_page_duration,
-    bool spin);
+    bool update_page_duration);
 usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
                                             usec_t start_time_ut, usec_t end_time_ut);
 void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
