@@ -360,14 +360,10 @@ int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     struct stat statbuf;
     if (stat(file, &statbuf)) {
         info("Netdata does not have the parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
-        return 0;
-    }
-
-    ERR_clear_error();
-    u_long err;
-    char buf[256];
-    if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
-        goto slfc;
+    } else {
+        if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
+            goto slfc;
+        }
     }
 
     if(!SSL_CTX_set_default_verify_paths(ctx)) {
@@ -377,6 +373,9 @@ int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     return 0;
 
 slfc:
+    ERR_clear_error();
+    u_long err;
+    char buf[256];
     while ((err = ERR_get_error()) != 0) {
         ERR_error_string_n(err, buf, sizeof(buf));
         error("Cannot set the directory for the certificates and the parent SSL certificate: %s",buf);
