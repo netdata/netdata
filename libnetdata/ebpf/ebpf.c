@@ -1057,8 +1057,10 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netd
  * @param modules   structure that will be updated
  * @oaram origin    specify the configuration file loaded
  * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
  */
-void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file)
+void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file,
+                                     int kver, int is_rh)
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
@@ -1102,7 +1104,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
  *
  * @param em       the module structure
  * @param btf_file a pointer to the loaded btf file.
- * @param is_rhf is Red Hat fammily?
+ * @param is_rhf is Red Hat family?
  * @param kver   the kernel version
  */
 void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int is_rh)
@@ -1123,7 +1125,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int i
     } else
         origin = EBPF_LOADED_FROM_USER;
 
-    ebpf_update_module_using_config(em, origin, btf_file);
+    ebpf_update_module_using_config(em, origin, btf_file, kver, is_rh);
 }
 
 /**
