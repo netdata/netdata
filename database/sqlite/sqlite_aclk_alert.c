@@ -43,7 +43,7 @@ void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 }
 
-#define MAX_REMOVED_PERIOD 900
+#define MAX_REMOVED_PERIOD 86400
 //decide if some events should be sent or not
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
