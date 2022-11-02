@@ -301,6 +301,8 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
     if (is_rhf > 0) { // Is Red Hat family
         if (kver >= NETDATA_EBPF_KERNEL_5_14)
             return NETDATA_IDX_V5_14;
+        else if (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5) // For Oracle Linux
+            return NETDATA_IDX_V5_4;
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
