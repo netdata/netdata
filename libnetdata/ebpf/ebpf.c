@@ -1033,14 +1033,19 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
  *
  * @param btf_file a pointer to the loaded btf file.
  * @parma load     current value.
+ * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
  *
  * @return it returns the new load mode.
  */
-static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load)
+static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load,
+                                                      int kver, int is_rh)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {
-        load = (!btf_file) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
+        // Quick fix for Oracle linux 8.x
+        load = (!btf_file || (is_rh && (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5))) ?
+               EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
     }
 #else
     load = EBPF_LOAD_LEGACY;
@@ -1082,7 +1087,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
     value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(value);
-    load = ebpf_select_load_mode(btf_file, load);
+    load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
