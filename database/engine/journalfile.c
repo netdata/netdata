@@ -1153,7 +1153,7 @@ void migrate_journal_file_v2(
 
     // descr @ time will start here
     uint32_t pages_offset = total_file_size;
-    total_file_size  += (number_of_pages * (sizeof(struct journal_page_list) + sizeof(struct journal_page_header)));
+    total_file_size  += (number_of_pages * (sizeof(struct journal_page_list) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer)));
 
     uint32_t trailer_offset = total_file_size;
     total_file_size  += sizeof(struct journal_v2_block_trailer);
