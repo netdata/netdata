@@ -261,8 +261,16 @@ PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user)
 
 PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *user)
 {
-    long first_entry_child = str2l(get_word(words, num_words, 1));
-    long last_entry_child = str2l(get_word(words, num_words, 2));
+    const char *first_entry_txt = get_word(words, num_words, 1);
+    const char *last_entry_txt = get_word(words, num_words, 2);
+
+    if(unlikely(!first_entry_txt || !last_entry_txt)) {
+        error("REPLAY: received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " command without first or last entry. Disabling it.");
+        return PARSER_RC_ERROR;
+    }
+
+    long first_entry_child = str2l(first_entry_txt);
+    long last_entry_child = str2l(last_entry_txt);
 
     PARSER_USER_OBJECT *user_object = (PARSER_USER_OBJECT *) user;
 
