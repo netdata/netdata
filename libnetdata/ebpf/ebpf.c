@@ -1102,8 +1102,10 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
  *
  * @param em       the module structure
  * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat fammily?
+ * @param kver   the kernel version
  */
-void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
+void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int is_rh)
 {
     char filename[FILENAME_MAX+1];
     netdata_ebpf_load_mode_t origin;
