@@ -1206,7 +1206,9 @@ int run_test(struct test *test)
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
-        rrdset_done(st);
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st, now, false);
 
         // align the first entry to second boundary
         if(!c) {
