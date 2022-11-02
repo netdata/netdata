@@ -1517,6 +1517,7 @@ after_first_database_work:
     size_t dimensions = 0;
     struct rda_item *rda = rda_base;
     st->collected_total = 0;
+    st->last_collected_total = 0;
     rrddim_foreach_read(rd, st) {
         if(rd_dfe.counter >= rda_slots)
             break;
@@ -1535,6 +1536,7 @@ after_first_database_work:
 
         // calculate totals
         if(likely(rd->updated)) {
+            st->last_collected_total += rd->last_collected_value;
             st->collected_total += rd->collected_value;
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
