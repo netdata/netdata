@@ -772,7 +772,7 @@ void delete_descriptors(uv_work_t *req)
 
         // Look it up in our list
         PValue = JudyHSGet(pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr));
-        if (!PValue && !*PValue) {
+        if (!PValue) {
             // Its not there ... delete it
             uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
             uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
