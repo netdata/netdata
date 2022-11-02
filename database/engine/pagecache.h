@@ -177,6 +177,7 @@ struct page_cache { /* TODO: add statistics */
     struct pg_cache_replaceQ replaceQ;
 
     unsigned page_descriptors;
+    unsigned active_descriptors;
     unsigned populated_pages;
 };
 
