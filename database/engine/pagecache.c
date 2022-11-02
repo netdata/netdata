@@ -560,7 +560,10 @@ uint8_t pg_cache_punch_hole(
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     ++ctx->stats.pg_cache_deletions;
-    --pg_cache->page_descriptors;
+    if (update_page_duration)
+        --pg_cache->page_descriptors;
+    else
+        --pg_cache->active_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
     rrdeng_page_descr_mutex_lock(ctx, descr);
@@ -919,6 +922,8 @@ struct rrdeng_page_descr *pg_cache_insert(struct rrdengine_instance *ctx, struct
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     ++ctx->stats.pg_cache_insertions;
     ++pg_cache->page_descriptors;
+    if (descr->extent_entry)
+        ++pg_cache->active_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     return descr;
 }
@@ -1347,6 +1352,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->page_descriptors = 0;
+    pg_cache->active_descriptors = 0;
     pg_cache->populated_pages = 0;
     fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
