@@ -87,7 +87,7 @@ struct rrdeng_page_info {
 /* returns 1 for success, 0 for failure */
 typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
-#define PAGE_CACHE_MAX_PRELOAD_PAGES    (8)
+#define PAGE_CACHE_MAX_PRELOAD_PAGES    (16)
 
 struct pg_alignment {
     uint32_t page_length;
@@ -150,6 +150,13 @@ struct pg_cache_committed_page_index {
     unsigned nr_committed_pages;
 };
 
+struct pg_cache_dirty_descr_index {
+    uv_rwlock_t lock;
+    Pvoid_t JudyL_array;
+    Pvoid_t JudyHS_array;
+    unsigned count;
+};
+
 /*
  * Gathers populated pages to be evicted.
  * Relies on page cache descriptors being there as it uses their memory.
@@ -166,6 +173,7 @@ struct page_cache { /* TODO: add statistics */
 
     struct pg_cache_metrics_index metrics_index;
     struct pg_cache_committed_page_index committed_page_index;
+    struct pg_cache_dirty_descr_index dirty_descr_index;
     struct pg_cache_replaceQ replaceQ;
 
     unsigned page_descriptors;

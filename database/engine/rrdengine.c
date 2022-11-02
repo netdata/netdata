@@ -734,6 +734,82 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
     }
 }
 
+void after_delete_descriptors(uv_work_t *req, int status __maybe_unused)
+{
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = req->loop->data;
+
+    wc->delete_descriptors = 0;
+    freez(work_request);
+}
+#define UT_TO_SEC(ut_time)     (ut_time) / USEC_PER_SEC
+
+
+void delete_descriptors(uv_work_t *req)
+{
+    struct rrdengine_worker_config *wc = req->loop->data;
+    struct rrdengine_instance *ctx = wc->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    if (unlikely(ctx->quiesce != NO_QUIESCE)) /* Shutting down */
+        return;
+
+    struct rrdeng_page_descr *descr;
+    struct page_cache_descr *pg_cache_descr;
+    Pvoid_t *PValue;
+    Word_t Index;
+
+    unsigned deleted = 0;
+    uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
+    for (Index = 0,
+        PValue = JudyLFirst(pg_cache->dirty_descr_index.JudyL_array, &Index, PJE0),
+        descr = unlikely(NULL == PValue) ? NULL : *PValue;
+
+         descr != NULL;
+
+         PValue = JudyLNext(pg_cache->dirty_descr_index.JudyL_array, &Index, PJE0),
+        descr = unlikely(NULL == PValue) ? NULL : *PValue) {
+
+        // Look it up in our list
+        PValue = JudyHSGet(pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr));
+        if (!PValue && !*PValue) {
+            // Its not there ... delete it
+            uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
+            uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
+
+            (void) JudyLDel(&pg_cache->dirty_descr_index.JudyL_array, Index, PJE0);
+
+            uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
+            uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
+            continue;
+        }
+
+        rrdeng_page_descr_mutex_lock(ctx, descr);
+        pg_cache_descr = descr->pg_cache_descr;
+
+        if (!(pg_cache_descr->flags) && pg_cache_try_get_unsafe(descr, 1)) {
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+            pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false, false);
+
+            uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
+            uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
+
+            (void) JudyLDel(&pg_cache->dirty_descr_index.JudyL_array, Index, PJE0);
+            (void) JudyHSDel(&pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr), PJE0);
+
+            uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
+            uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
+            deleted++;
+        } else
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
+    }
+
+    uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
+    if (deleted)
+        info("Removed %u descriptors from the page cache", deleted);
+}
+
 void flush_pages_cb(uv_fs_t* req)
 {
     struct rrdengine_worker_config* wc = req->loop->data;
@@ -1272,7 +1348,8 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
-    static time_t next_journal_indexing_check =0;
+//    static time_t next_journal_indexing_check =0;
+    static time_t next_descriptor_cleanup =0;
 
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
@@ -1343,6 +1420,14 @@ void timer_cb(uv_timer_t* handle)
 //            }
 //        }
 //    }
+
+    if (next_descriptor_cleanup < now_realtime_sec()) {
+        next_descriptor_cleanup = now_realtime_sec() + 30;
+
+        struct rrdeng_cmd cmd;
+        cmd.opcode = RRDENG_DELETE_DESCRIPTORS;
+        rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+    }
     worker_is_idle();
 }
 
@@ -1479,6 +1564,23 @@ void rrdeng_worker(void* arg)
                 rrdeng_invalidate_oldest_committed(wc);
                 break;
             }
+            case RRDENG_DELETE_DESCRIPTORS:
+                ;
+
+                if (wc->delete_descriptors == 0) {
+                    wc->delete_descriptors = 1;
+                    struct rrdeng_work  *work_request;
+                    work_request = mallocz(sizeof(*work_request));
+                    work_request->req.data = work_request;
+                    if (unlikely(
+                            uv_queue_work(loop, &work_request->req,
+                                          delete_descriptors, after_delete_descriptors))) {
+                        freez(work_request);
+                        wc->delete_descriptors = 0;
+                    }
+                }
+
+                break;
             default:
                 debug(D_RRDENGINE, "%s: default.", __func__);
                 break;

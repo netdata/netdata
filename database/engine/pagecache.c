@@ -50,6 +50,7 @@ bool rrdeng_page_descr_is_mmap(void) {
 /* Forward declarations */
 static struct rrdeng_page_descr *pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
+//static void queue_descriptor_for_deletion(struct page_cache *pg_cache, struct rrdeng_page_descr *descr);
 /* always inserts into tail */
 static inline void pg_cache_replaceQ_insert_unsafe(struct rrdengine_instance *ctx,
                                                    struct rrdeng_page_descr *descr)
@@ -308,6 +309,33 @@ unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx)
     return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
+static void queue_descriptor_for_deletion(struct page_cache *pg_cache, struct rrdeng_page_descr *descr)
+{
+    Pvoid_t *PValue;
+    bool exists;
+
+    uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
+    PValue = JudyHSGet(pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr));
+    exists = (PValue && *PValue);
+    uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
+
+    if (exists)
+        return;
+
+    // Get write lock to add it
+    uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
+    PValue = JudyHSIns(&pg_cache->dirty_descr_index.JudyHS_array, descr, sizeof(descr), PJE0);
+    if (PValue && *PValue) {
+        // someone added it .. its ok
+        uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
+        return;
+    }
+    *PValue = (void *) 0x01;
+    PValue = JudyLIns(&pg_cache->dirty_descr_index.JudyL_array, pg_cache->dirty_descr_index.count++, PJE0);
+    *PValue = descr;
+    uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
+}
+
 /*
  * This function will block until it reserves #number populated pages.
  * It will trigger evictions or dirty page flushing if the pg_cache_hard_limit() limit is hit.
@@ -372,7 +400,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     for (unsigned i=0; i < deleted; i++) {
         descr = list_to_destroy[i];
         if (is_descr_journal_v2(descr))
-            pg_cache_punch_hole(ctx, descr, 0, 0, NULL, false, true);
+            queue_descriptor_for_deletion(pg_cache, descr);
     }
 }
 
@@ -417,7 +445,7 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     for (unsigned i=0; i < deleted; i++) {
         descr = list_to_destroy[i];
         if (is_descr_journal_v2(descr))
-            pg_cache_punch_hole(ctx, descr, 0, 0, NULL, false, false);
+            queue_descriptor_for_deletion(pg_cache, descr);
     }
     return ret;
 }
@@ -1240,7 +1268,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         if (old_flags & RRD_PAGE_INVALID) {
             info("DEBUG: Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u", descr->pg_cache_descr_state,
                  descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
-            pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true, true);
+            pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true, false);
         }
 
         /* reset scan to find again */
@@ -1318,6 +1346,11 @@ void init_page_cache(struct rrdengine_instance *ctx)
     init_metrics_index(ctx);
     init_replaceQ(ctx);
     init_committed_page_index(ctx);
+
+    pg_cache->dirty_descr_index.JudyL_array = (Pvoid_t) NULL;
+    pg_cache->dirty_descr_index.JudyHS_array = (Pvoid_t) NULL;
+    pg_cache->dirty_descr_index.count = 0;
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->dirty_descr_index.lock));
 }
 
 void free_page_cache(struct rrdengine_instance *ctx)
