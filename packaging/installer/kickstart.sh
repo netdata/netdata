@@ -248,10 +248,16 @@ telemetry_event() {
     TOTAL_RAM="$((TOTAL_RAM * 1024))"
   fi
 
-  if [ -f /etc/machine-id ]; then
-    DISTINCT_ID="$(cat /etc/machine-id)"
+  if [ "${KERNEL_NAME}" = Darwin ] && command -v ioreg >/dev/null 2>&1; then
+    DISTINCT_ID="macos-$(ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/ { split($0, line, "\""); printf("%s\n", line[4]); }')"
+  elif [ -f /etc/machine-id ]; then
+    DISTINCT_ID="machine-$(cat /etc/machine-id)"
+  elif [ -f /var/db/dbus/machine-id ]; then
+    DISTINCT_ID="dbus-$(cat /var/db/dbus/machine-id)"
+  elif [ -f /var/lib/dbus/machine-id ]; then
+    DISTINCT_ID="dbus-$(cat /var/lib/dbus/machine-id)"
   elif command -v uuidgen > /dev/null 2>&1; then
-    DISTINCT_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    DISTINCT_ID="uuid-$(uuidgen | tr '[:upper:]' '[:lower:]')"
   else
     DISTINCT_ID="null"
   fi
