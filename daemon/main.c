@@ -310,7 +310,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
@@ -321,7 +321,8 @@ int help(int exitcode) {
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
             " Twitter    : https://twitter.com/linuxnetdata\n"
-            " Facebook   : https://www.facebook.com/linuxnetdata/\n"
+            " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
+            " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
             "\n"
     );
