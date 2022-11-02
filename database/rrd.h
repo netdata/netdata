@@ -607,9 +607,6 @@ struct rrdset {
     struct timeval last_updated;                    // when this data set was last updated (updated every time the rrd_stats_done() function)
     struct timeval last_collected_time;             // when did this data set last collected values
 
-    total_number collected_total;                   // used internally to calculate percentages
-    total_number last_collected_total;              // used internally to calculate percentages
-
     size_t rrdlabels_last_saved_version;
 
     DICTIONARY *functions_view;                     // collector functions this rrdset supports, can be NULL

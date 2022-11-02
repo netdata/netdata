@@ -1518,8 +1518,8 @@ after_first_database_work:
     size_t dim_id;
     size_t dimensions = 0;
     struct rda_item *rda = rda_base;
-    st->collected_total = 0;
-    st->last_collected_total = 0;
+    total_number collected_total = 0;
+    total_number last_collected_total = 0;
     rrddim_foreach_read(rd, st) {
         if(rd_dfe.counter >= rda_slots)
             break;
@@ -1554,8 +1554,8 @@ after_first_database_work:
                 rd->last_collected_value = rd->collected_value;
             }
 
-            st->last_collected_total += rd->last_collected_value;
-            st->collected_total += rd->collected_value;
+            last_collected_total += rd->last_collected_value;
+            collected_total += rd->collected_value;
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
                 error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
@@ -1617,7 +1617,7 @@ after_first_database_work:
                 break;
 
             case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
-                if(unlikely(!st->collected_total))
+                if(unlikely(!collected_total))
                     rd->calculated_value = 0;
                 else
                     // the percentage of the current value
@@ -1625,7 +1625,7 @@ after_first_database_work:
                     rd->calculated_value =
                             (NETDATA_DOUBLE)100
                             * (NETDATA_DOUBLE)rd->collected_value
-                            / (NETDATA_DOUBLE)st->collected_total;
+                            / (NETDATA_DOUBLE)collected_total;
 
                 rrdset_debug(st, "%s: CALC PCENT-ROW " NETDATA_DOUBLE_FORMAT " = 100"
                             " * " COLLECTED_NUMBER_FORMAT
@@ -1633,7 +1633,7 @@ after_first_database_work:
                           , rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value
-                          , st->collected_total
+                          , collected_total
                 );
                 break;
 
@@ -1714,13 +1714,13 @@ after_first_database_work:
 
                 // the percentage of the current increment
                 // over the increment of all dimensions together
-                if(unlikely(st->collected_total == st->last_collected_total))
+                if(unlikely(collected_total == last_collected_total))
                     rd->calculated_value = 0;
                 else
                     rd->calculated_value =
                             (NETDATA_DOUBLE)100
                             * (NETDATA_DOUBLE)(rd->collected_value - rd->last_collected_value)
-                            / (NETDATA_DOUBLE)(st->collected_total - st->last_collected_total);
+                            / (NETDATA_DOUBLE)(collected_total - last_collected_total);
 
                 rrdset_debug(st, "%s: CALC PCENT-DIFF " NETDATA_DOUBLE_FORMAT " = 100"
                             " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
@@ -1728,7 +1728,7 @@ after_first_database_work:
                           , rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value, rd->last_collected_value
-                          , st->collected_total, st->last_collected_total
+                          , collected_total, last_collected_total
                 );
                 break;
 
@@ -1782,8 +1782,6 @@ after_first_database_work:
     );
 
 after_second_database_work:
-    st->last_collected_total  = st->collected_total;
-
     for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
         rd = rda->rd;
         if(unlikely(!rd)) continue;
@@ -1955,8 +1953,8 @@ struct rrdset_map_save_v019 {
     usec_t usec_since_last_update;                  // NEEDS TO BE UPDATED - maintained on load
     struct timeval last_updated;                    // NEEDS TO BE UPDATED - check to reset all - fixed on load
     struct timeval last_collected_time;             // ignored
-    long long collected_total;                      // NEEDS TO BE UPDATED - maintained on load
-    long long last_collected_total;                 // NEEDS TO BE UPDATED - maintained on load
+    long long collected_total;                      // ignored
+    long long last_collected_total;                 // ignored
     void *rrdfamily;                                // ignored
     void *rrdhost;                                  // ignored
     void *next;                                     // ignored
@@ -1980,8 +1978,6 @@ void rrdset_memory_file_update(RRDSET *st) {
     st_on_file->usec_since_last_update = st->usec_since_last_update;
     st_on_file->last_updated.tv_sec = st->last_updated.tv_sec;
     st_on_file->last_updated.tv_usec = st->last_updated.tv_usec;
-    st_on_file->collected_total = st->collected_total;
-    st_on_file->last_collected_total = st->last_collected_total;
 }
 
 const char *rrdset_cache_filename(RRDSET *st) {
@@ -2073,8 +2069,6 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     st->usec_since_last_update = st_on_file->usec_since_last_update;
     st->last_updated.tv_sec = st_on_file->last_updated.tv_sec;
     st->last_updated.tv_usec = st_on_file->last_updated.tv_usec;
-    st->collected_total = st_on_file->collected_total;
-    st->last_collected_total = st_on_file->last_collected_total;
 
     // link it to st
     st->st_on_file = st_on_file;
