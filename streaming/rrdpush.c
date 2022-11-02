@@ -310,7 +310,24 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
         time_t first_entry_local = rrdset_first_entry_t(st);
         time_t last_entry_local = st->last_updated.tv_sec;
-        buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
+
+        if(!last_entry_local) {
+            internal_error(true,
+                           "RRDSET: '%s' last updated time zero. Querying db for last updated time.",
+                           rrdset_id(st));
+
+            last_entry_local = rrdset_last_entry_t(st);
+            time_t now = now_realtime_sec();
+            if(last_entry_local > now) {
+                internal_error(true,
+                               "RRDSET: '%s' last updated time %llu is in the future (now is %llu)",
+                               rrdset_id(st), (unsigned long long)last_entry_local, (unsigned long long)now);
+                last_entry_local = now;
+            }
+        }
+
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_CHART_DEFINITION_END " %llu %llu\n",
+                       (unsigned long long)first_entry_local, (unsigned long long)last_entry_local);
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);

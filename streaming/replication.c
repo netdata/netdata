@@ -170,6 +170,13 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
 
     // find the latest entry we have
     time_t last_entry_local = st->last_updated.tv_sec;
+    if(!last_entry_local) {
+        internal_error(true,
+                       "RRDSET: '%s' last updated time zero. Querying db for last updated time.",
+                       rrdset_id(st));
+        last_entry_local = rrdset_last_entry_t(st);
+    }
+
     if(last_entry_local > now) {
         internal_error(true,
                        "RRDSET: '%s' last updated time %llu is in the future (now is %llu)",

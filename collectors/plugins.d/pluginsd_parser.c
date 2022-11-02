@@ -273,6 +273,12 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
         return PARSER_RC_ERROR;
     }
 
+    internal_error(
+               (first_entry_child != 0 || last_entry_child != 0)
+            && (first_entry_child == 0 || last_entry_child == 0),
+            "REPLAY: received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %llu, last time %llu).",
+            (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
+
     rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
 
     bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child, 0, 0);
