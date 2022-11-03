@@ -81,6 +81,16 @@ override_dh_install:
 	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/charts.d \
 	$(TOP)-plugin-chartsd/usr/lib/netdata/conf.d/charts.d
 
+	# Add ebpf plugin install rules
+	[ $(HAVE_EBPF) -eq 1 ] && mkdir -p $(TOP)-plugin-ebpf/usr/libexec/netdata/plugins.d/
+	[ $(HAVE_EBPF) -eq 1 ] && mkdir -p $(TOP)-plugin-ebpf/usr/lib/netdata/conf.d/
+	[ $(HAVE_EBPF) -eq 1 ] && mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/ebpf.plugin \
+	$(TOP)-plugin-ebpf/usr/libexec/netdata/plugins.d/ebpf.plugin
+	[ $(HAVE_EBPF) -eq 1 ] && mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/ebpf.d.conf \
+	$(TOP)-plugin-ebpf/usr/lib/netdata/conf.d/ebpf.d.conf
+	[ $(HAVE_EBPF) -eq 1 ] && mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/ebpf.d \
+	$(TOP)-plugin-ebpf/usr/lib/netdata/conf.d/ebpf.d
+
 	# Set the rest of the software in the main package
 	#
 	cp -rp $(TEMPTOP)/usr $(TOP)
@@ -103,9 +113,10 @@ override_dh_install:
 		ln -s "/usr/share/netdata/www/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
-	if [ $(HAVE_EBPF) -eq 1 ]; then \
-		packaging/bundle-ebpf.sh . ${TOP}/usr/libexec/netdata/plugins.d; \
-	fi
+	# Handle eBPF code
+	#
+	[ $(HAVE_EBPF) -eq 1 ] && mkdir -p $(TOP)-plugin-ebpf-code/usr/libexec/netdata/plugins.d/
+	[ $(HAVE_EBPF) -eq 1 ] && packaging/bundle-ebpf.sh . ${TOP}-plugin-ebpf-code/usr/libexec/netdata/plugins.d/
 
 	# Install go
 	#

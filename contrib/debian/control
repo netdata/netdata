@@ -42,6 +42,7 @@ Conflicts: netdata-core,
            netdata-plugins-bash,
            netdata-plugins-python,
            netdata-web
+Recommends: netdata-plugin-ebpf
 Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
@@ -80,3 +81,16 @@ Suggests: apcupsd, nut, iw, sudo
 Description: The charts.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent. It includes
  collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
+
+Package: netdata-plugin-ebpf
+Architecture: i386 amd64
+Depends: ${shlibs:Depends},
+         netdata-plugin-ebpf-code (>= ${source:Version}),
+         netdata (>= ${source:Version})
+Description: The eBPF metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
+
+Package: netdata-plugin-ebpf-code
+Architecture: i386 amd64
+Description: Compiled eBPF code for the Netdata eBPF plugin
+ This package provides the pre-compiled eBPF code for use by the Netdata eBPF plugin.

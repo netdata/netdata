@@ -150,6 +150,19 @@ Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
 # #####################################################################
+# External plugin package dependencies
+# #####################################################################
+# CentOS prior to CentOS 8 does not have a new enough version of RPM
+# to support weak dependencies. Explicitly requiring our default plugins
+# makes it impossible to properly test the packages prior to updload,
+# so we just skip depending on them on CentOS 7.
+%if 0%{?centos_ver} != 7
+%if 0%{?_have_ebpf}
+Recommends: netdata-plugin-ebpf
+%endif
+%endif
+
+# #####################################################################
 # Functionality-dependent package dependencies
 # #####################################################################
 # Note: Some or all of the Packages may be found in the EPEL repo,
@@ -543,6 +556,14 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libdir}/%{name}/conf.d/charts.d.conf
 %exclude %{_libdir}/%{name}/conf.d/charts.d/
 
+# eBPF belongs to a different sub-package
+%if 0%{?_have_ebpf}
+%exclude %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%exclude %{_libdir}/%{name}/conf.d/ebpf.d.conf
+%exclude %{_libdir}/%{name}/conf.d/ebpf.d
+%exclude %{_libexecdir}/%{name}/plugins.d/ebpf.d
+%endif
+
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -604,7 +625,7 @@ Suggests: sudo
 %endif
 
 %description plugin-chartsd
-  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
+ This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
 It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
 
 %files plugin-chartsd
@@ -615,6 +636,36 @@ It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless acces
 %defattr(0644,root,netdata,0644)
 %{_libdir}/%{name}/conf.d/charts.d.conf
 %{_libdir}/%{name}/conf.d/charts.d/
+
+%if 0%{?_have_ebpf}
+%package plugin-ebpf
+Summary: The eBPF metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Requires: netdata-plugin-ebpf-code >= %{version}
+
+%description plugin-ebpf
+ This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
+
+%files plugin-ebpf
+%defattr(4750,root,netdata,4750)
+%{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%defattr(0644,root,netdata,0644)
+%{_libdir}/%{name}/conf.d/ebpf.d.conf
+%{_libdir}/%{name}/conf.d/ebpf.d
+
+%package plugin-ebpf-code
+Summary: Compiled eBPF code for the Netdata eBPF plugin
+Group: Applications/System
+
+%description plugin-ebpf-code
+ This package provides the pre-compiled eBPF code for use by the Netdata eBPF plugin.
+
+%files plugin-ebpf-code
+%defattr(0640,root,netdata,0640)
+%{_libexecdir}/%{name}/plugins.d/ebpf.d
+
+%endif
 
 %changelog
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
