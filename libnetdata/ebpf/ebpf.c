@@ -301,6 +301,8 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
     if (is_rhf > 0) { // Is Red Hat family
         if (kver >= NETDATA_EBPF_KERNEL_5_14)
             return NETDATA_IDX_V5_14;
+        else if (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5) // For Oracle Linux
+            return NETDATA_IDX_V5_4;
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
@@ -1031,14 +1033,19 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
  *
  * @param btf_file a pointer to the loaded btf file.
  * @parma load     current value.
+ * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
  *
  * @return it returns the new load mode.
  */
-static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load)
+static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load,
+                                                      int kver, int is_rh)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {
-        load = (!btf_file) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
+        // Quick fix for Oracle linux 8.x
+        load = (!btf_file || (is_rh && (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5))) ?
+               EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
     }
 #else
     load = EBPF_LOAD_LEGACY;
@@ -1055,8 +1062,10 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netd
  * @param modules   structure that will be updated
  * @oaram origin    specify the configuration file loaded
  * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
  */
-void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file)
+void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file,
+                                     int kver, int is_rh)
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
@@ -1078,7 +1087,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
     value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(value);
-    load = ebpf_select_load_mode(btf_file, load);
+    load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
@@ -1100,8 +1109,10 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
  *
  * @param em       the module structure
  * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
+ * @param kver   the kernel version
  */
-void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
+void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int is_rh)
 {
     char filename[FILENAME_MAX+1];
     netdata_ebpf_load_mode_t origin;
@@ -1119,7 +1130,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
     } else
         origin = EBPF_LOADED_FROM_USER;
 
-    ebpf_update_module_using_config(em, origin, btf_file);
+    ebpf_update_module_using_config(em, origin, btf_file, kver, is_rh);
 }
 
 /**
