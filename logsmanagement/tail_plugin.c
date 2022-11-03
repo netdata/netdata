@@ -199,7 +199,7 @@ static int enable_file_changed_events(struct File_info *p_file_info, uint8_t for
     // TODO: Change the timer implementation to start once, there is no reason to start-stop.
     rc = uv_timer_start(p_file_info->enable_file_changed_events_timer,
                         (uv_timer_cb)enable_file_changed_events_timer_cb, 
-                        p_file_info->update_every * MS_IN_SEC, 0);
+                        p_file_info->update_every * MSEC_PER_SEC, 0);
     if (unlikely(rc)) {
         error("uv_timer_start() error: (%d) %s\n", rc, uv_strerror(rc));
         m_assert(!rc, "uv_timer_start() error");

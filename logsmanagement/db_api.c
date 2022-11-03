@@ -293,7 +293,7 @@ static void db_writer(void *arg){
 
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
         uv_mutex_unlock(p_file_info->db_mut);
-        uv_sleep(p_file_info->buff_flush_to_db_interval * MS_IN_SEC);
+        uv_sleep(p_file_info->buff_flush_to_db_interval * MSEC_PER_SEC);
     }
 }
 

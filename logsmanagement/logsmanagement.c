@@ -119,7 +119,7 @@ static struct File_info *monitor_log_file_init(const char *filename,
             if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))) fatal("uv_mutex_init() failed");
             uv_timer_init(main_loop, &p_file_info->flb_tmp_buff_cpy_timer);
             uv_timer_start(&p_file_info->flb_tmp_buff_cpy_timer,
-                        (uv_timer_cb)flb_tmp_buff_cpy_timer_cb, 0, p_file_info->update_every * MS_IN_SEC);            
+                        (uv_timer_cb)flb_tmp_buff_cpy_timer_cb, 0, p_file_info->update_every * MSEC_PER_SEC);            
             break;
         }
 
