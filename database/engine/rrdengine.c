@@ -392,6 +392,10 @@ after_crc_check:
         }
         is_prefetched_page = 0;
         if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
+            struct page_cache *pg_cache = &ctx->pg_cache;
+            if (pg_cache->populated_pages >= ctx->cache_pages_low_watermark)
+                continue;
+
             descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid,
                                                          header->descr[i].start_time_ut);
             if (!descr)
