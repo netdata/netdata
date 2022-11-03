@@ -1228,6 +1228,10 @@ if test "${enable_logsmanagement}" = "yes" -a "${have_logsmanagement_submodules}
     AC_MSG_ERROR([You have explicitly requested --enable-logsmanagement functionality but it cannot be built because the required git submodules are missing.])
 fi
 
+if test "${enable_logsmanagement}" = "yes" -a "x$CAN_USE_DLSYM" = xno; then
+    AC_MSG_ERROR([You have explicitly requested --enable-logsmanagement functionality but it cannot be built because dlsym cannot be used.])
+fi
+
 # Decide if we should build Logs Management
 if test "${enable_logsmanagement}" != "no" -a "${have_logsmanagement_submodules}" = "yes" -a "x$CAN_USE_DLSYM" = xyes; then
     build_logsmanagement="yes"
