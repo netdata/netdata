@@ -1254,11 +1254,8 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
 
-            // TO PUSH METRICS WITH DEFINITIONS:
-            //if(unlikely(s->rrdpush_sender_socket != -1 && __atomic_load_n(&s->host->rrdpush_sender_connected, __ATOMIC_SEQ_CST))) {
-            //    thread_data->sending_definitions_status = SENDING_DEFINITIONS_DONE;
-            //    rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_COLLECTED_METRICS);
-            //}
+            rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+            info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
 
             continue;
         }
@@ -1280,14 +1277,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
         if(outstanding)
             s->send_attempts++;
-        else {
-            if(unlikely(rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
-                        !rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
-                // let the data collection threads know we are ready to push metrics
-                rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-                info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
-            }
-        }
 
         if(unlikely(s->rrdpush_sender_pipe[PIPE_READ] == -1)) {
             if(!rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true)) {

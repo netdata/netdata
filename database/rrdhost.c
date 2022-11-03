@@ -1044,6 +1044,7 @@ void stop_streaming_sender(RRDHOST *host)
     dictionary_destroy(host->sender->replication_requests);
     freez(host->sender);
     host->sender = NULL;
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 }
 
 void stop_streaming_receiver(RRDHOST *host)

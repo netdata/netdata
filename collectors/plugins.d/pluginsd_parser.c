@@ -287,6 +287,12 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
             "REPLAY: received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %llu, last time %llu).",
             (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
 
+//    internal_error(
+//            true,
+//            "REPLAY host '%s', chart '%s': received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " first time %llu, last time %llu.",
+//            rrdhost_hostname(host), rrdset_id(st),
+//            (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
+
     rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
 
     bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child, 0, 0);
@@ -1098,12 +1104,12 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
     }
 
     time_t update_every_child = str2l(get_word(words, num_words, 1));
-    time_t first_entry_child = str2l(get_word(words, num_words, 2));
-    time_t last_entry_child = str2l(get_word(words, num_words, 3));
+    time_t first_entry_child = (time_t)str2ull(get_word(words, num_words, 2));
+    time_t last_entry_child = (time_t)str2ull(get_word(words, num_words, 3));
 
     bool start_streaming = (strcmp(get_word(words, num_words, 4), "true") == 0);
-    time_t first_entry_requested = str2l(get_word(words, num_words, 5));
-    time_t last_entry_requested = str2l(get_word(words, num_words, 6));
+    time_t first_entry_requested = (time_t)str2ull(get_word(words, num_words, 5));
+    time_t last_entry_requested = (time_t)str2ull(get_word(words, num_words, 6));
 
     PARSER_USER_OBJECT *user_object = user;
 
@@ -1115,6 +1121,13 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
               rrdhost_hostname(host));
         return PARSER_RC_ERROR;
     }
+
+//    internal_error(true,
+//                   "REPLAY: host '%s', chart '%s': received " PLUGINSD_KEYWORD_REPLAY_END " child first_t = %llu, last_t = %llu, start_streaming = %s, requested first_t = %llu, last_t = %llu",
+//                   rrdhost_hostname(host), rrdset_id(st),
+//                   (unsigned long long)first_entry_child, (unsigned long long)last_entry_child,
+//                   start_streaming?"true":"false",
+//                   (unsigned long long)first_entry_requested, (unsigned long long)last_entry_requested);
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
