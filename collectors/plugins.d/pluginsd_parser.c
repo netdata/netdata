@@ -1056,8 +1056,6 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
 {
     char *last_collected_ut_str = get_word(words, num_words, 1);
     char *last_updated_ut_str = get_word(words, num_words, 2);
-    char *last_collected_total_str = get_word(words, num_words, 3);
-    char *collected_total_str = get_word(words, num_words, 4);
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -1081,9 +1079,6 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
         st->last_updated.tv_sec = last_updated_ut / USEC_PER_SEC;
         st->last_updated.tv_usec = last_updated_ut % USEC_PER_SEC;
     }
-
-    st->last_collected_total = last_collected_total_str ? strtoll(last_collected_total_str, NULL, 0) : 0;
-    st->collected_total = collected_total_str ? strtoll(collected_total_str, NULL, 0) : 0;
 
     st->counter++;
     st->counter_done++;

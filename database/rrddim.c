@@ -601,7 +601,7 @@ struct rrddim_map_save_v019 {
     long double last_calculated_value;              // ignored
     long double last_stored_value;                  // ignored
     long long collected_value;                      // ignored
-    long long last_collected_value;                 // ignored
+    long long last_collected_value;                 // load and save
     long double collected_volume;                   // ignored
     long double stored_volume;                      // ignored
     void *next;                                     // ignored
@@ -624,6 +624,7 @@ void rrddim_memory_file_update(RRDDIM *rd) {
 
     rd_on_file->last_collected_time.tv_sec = rd->last_collected_time.tv_sec;
     rd_on_file->last_collected_time.tv_usec = rd->last_collected_time.tv_usec;
+    rd_on_file->last_collected_value = rd->last_collected_value;
 }
 
 void rrddim_memory_file_free(RRDDIM *rd) {
@@ -703,6 +704,8 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     }
 
     if(!reset) {
+        rd->last_collected_value = rd_on_file->last_collected_value;
+
         if(rd_on_file->algorithm != rd->algorithm)
             info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
                  fullfilename, rd->algorithm, rrd_algorithm_name(rd->algorithm), rd_on_file->algorithm, rrd_algorithm_name(rd_on_file->algorithm));
