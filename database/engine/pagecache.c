@@ -48,7 +48,7 @@ bool rrdeng_page_descr_is_mmap(void) {
 }
 
 /* Forward declarations */
-static struct rrdeng_page_descr *pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
+static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
 /* always inserts into tail */
 static inline void pg_cache_replaceQ_insert_unsafe(struct rrdengine_instance *ctx,
@@ -308,23 +308,6 @@ unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx)
     return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
-static void queue_descriptor_for_deletion(struct page_cache *pg_cache, struct rrdeng_page_descr *descr, void *mark)
-{
-    if (unlikely(!descr || !descr->id))
-        return;
-
-    struct descriptor_info *descr_info = mallocz(sizeof(struct descriptor_info));
-    uuid_copy(descr_info->uuid, *descr->id);
-    descr_info->start_time = descr->start_time_ut / USEC_PER_SEC;
-    descr_info->expiration = (mark == (void *) 1) ? now_realtime_sec() + 60 : 0;
-
-    uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
-    Pvoid_t *PValue = JudyLIns(&pg_cache->dirty_descr_index.JudyL_array, pg_cache->dirty_descr_index.count++, PJE0);
-    fatal_assert(NULL == *PValue);
-    *PValue = descr_info;
-    uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
-}
-
 /*
  * This function will block until it reserves #number populated pages.
  * It will trigger evictions or dirty page flushing if the pg_cache_hard_limit() limit is hit.
@@ -343,13 +326,9 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
         debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
 
-    struct rrdeng_page_descr *list_to_destroy[number];
-    struct rrdeng_page_descr *descr;
-    unsigned deleted=0;
     while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
 
-        // TODO: If it succeeds, return the descr and then we can punch hole to it
-        if (!(descr = pg_cache_try_evict_one_page_unsafe(ctx))) {
+        if (!(pg_cache_try_evict_one_page_unsafe(ctx))) {
             /* failed to evict */
             struct completion compl;
             struct rrdeng_cmd cmd;
@@ -379,18 +358,9 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             }
             uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
         }
-        else {
-            if (deleted < number)
-                list_to_destroy[deleted++] = descr;
-        }
     }
     pg_cache->populated_pages += number;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-    for (unsigned i=0; i < deleted; i++) {
-        descr = list_to_destroy[i];
-        if (is_descr_journal_v2(descr))
-            queue_descriptor_for_deletion(pg_cache, descr, (void *)1);
-    }
 }
 
 /*
@@ -406,20 +376,14 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
 
     assert(number < ctx->max_cache_pages);
 
-    struct rrdeng_page_descr *list_to_destroy[number];
-    struct rrdeng_page_descr *descr;
-    unsigned deleted=0;
-
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
         debug(D_RRDENGINE,
               "==Page cache full. Trying to reserve %u pages.==",
               number);
         do {
-            if (!(descr = pg_cache_try_evict_one_page_unsafe(ctx)))
+            if (!pg_cache_try_evict_one_page_unsafe(ctx))
                 break;
-            if (deleted < number)
-                list_to_destroy[deleted++] = descr;
             ++count;
         } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
         debug(D_RRDENGINE, "Evicted %u pages.", count);
@@ -430,12 +394,6 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
         ret = 1; /* success */
     }
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-
-    for (unsigned i=0; i < deleted; i++) {
-        descr = list_to_destroy[i];
-        if (is_descr_journal_v2(descr))
-            queue_descriptor_for_deletion(pg_cache, descr, (void *)1);
-    }
     return ret;
 }
 
@@ -458,9 +416,9 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
  * If it fails it sets in_flight_descr to the oldest descriptor that has write-back in progress,
  * or it sets it to NULL if no write-back is in progress.
  *
- * Returns the evicted descr on success and NULL on failure.
- */
-static struct rrdeng_page_descr *pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
+* Returns 1 on success and 0 on failure.
+*/
+static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned long old_flags;
@@ -484,14 +442,14 @@ static struct rrdeng_page_descr *pg_cache_try_evict_one_page_unsafe(struct rrden
 
             rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
 
-            return descr;
+            return 1;
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     uv_rwlock_wrunlock(&pg_cache->replaceQ.lock);
 
     /* failed to evict */
-    return NULL;
+    return 0;
 }
 
 /**
@@ -536,7 +494,8 @@ uint8_t pg_cache_punch_hole(
         }
         goto destroy;
     }
-    --page_index->page_count;
+    if (update_page_duration)
+        --page_index->page_count;
     if (!page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;
         if (metric_id) {
@@ -642,6 +601,10 @@ static uint32_t find_matching_page(struct journal_page_header *page_list_header,
     return right;
 }
 
+bool descr_exists_unsafe( struct pg_cache_page_index *page_index, time_t start_time_s)
+{
+    return (NULL != JudyLGet(page_index->JudyL_array, start_time_s, PJE0));
+}
 
 // Note we have read lock on page index
 // We release and escalate to write lock
@@ -657,12 +620,14 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
 {
     time_t journal_start_time_s = (time_t)(journal_start_time_ut / USEC_PER_SEC);
     struct rrdengine_instance *ctx = page_index->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
 
     uint32_t entries = page_list_header->entries;
     uint32_t pos = find_matching_page(page_list_header, delta_start_time_s);
 
-    struct journal_page_list *page_list = (struct journal_page_list *) ((void *) page_list_header + sizeof(*page_list_header));
+    struct journal_page_list *page_list =
+        (struct journal_page_list *)((void *)page_list_header + sizeof(*page_list_header));
 
     struct journal_page_list *page_entry = &page_list[pos];
     time_t page_entry_start_time_s = journal_start_time_s + page_entry->delta_start_s;
@@ -673,30 +638,46 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
     if (unlikely(match_descr && (time_t)(match_descr->start_time_ut / USEC_PER_SEC) == page_entry_start_time_s))
         return match_descr;
 
+    // This is the page offset that we will store to check for v2 descriptors later on
+    uint32_t page_offset = (void *)page_list_header - (void *)datafile->journalfile->journal_data;
+
     uv_rwlock_rdunlock(&page_index->lock);
     uv_rwlock_wrlock(&page_index->lock);
 
+    match_descr = NULL;
     uint32_t pages_to_cache = MIN(pos + cache_pages, entries);
-    for (uint32_t x=pos; x < pages_to_cache; x++) {
+    for (uint32_t x = pos; x < pages_to_cache; x++) {
+        struct rrdeng_page_descr *added_descr;
+
         page_entry = &page_list[x];
-        struct rrdeng_page_descr *descr = pg_cache_create_descr();
-        descr->page_length = page_entry->page_length;
-        descr->start_time_ut = (journal_start_time_s + page_entry->delta_start_s) * USEC_PER_SEC;
-        descr->end_time_ut = (journal_start_time_s + page_entry->delta_end_s) * USEC_PER_SEC;
-        descr->id = &page_index->id;
-        descr->extent = NULL;
-        // FIXME: Check valid offset within file
-        descr->extent_entry = &extent_list[page_entry->extent_index];
-        descr->type = page_entry->type;
-        descr->update_every_s = page_entry->update_every_s;
-        descr->datafile_fd = datafile->file;
 
-        struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, descr, false);
-        if (unlikely(added_descr != descr))
-            rrdeng_page_descr_freez(descr);
+        if (!descr_exists_unsafe(page_index, (journal_start_time_s + page_entry->delta_start_s))) {
+            struct rrdeng_page_descr *descr = pg_cache_create_descr();
+            descr->page_length = page_entry->page_length;
+            descr->start_time_ut = (journal_start_time_s + page_entry->delta_start_s) * USEC_PER_SEC;
+            descr->end_time_ut = (journal_start_time_s + page_entry->delta_end_s) * USEC_PER_SEC;
+            descr->id = &page_index->id;
+            descr->extent = NULL;
+            // FIXME: Check valid offset within file
+            descr->extent_entry = &extent_list[page_entry->extent_index];
+            descr->type = page_entry->type;
+            descr->update_every_s = page_entry->update_every_s;
+            descr->datafile_fd = datafile->file;
 
-        if (!match_descr)
-            match_descr = added_descr;
+            added_descr = pg_cache_insert(ctx, page_index, descr, false);
+            if (unlikely(added_descr != descr))
+                rrdeng_page_descr_freez(descr);
+
+            if (!match_descr) {
+                match_descr = added_descr;
+
+                // Mark the area to check
+                uv_rwlock_wrlock(&pg_cache->v2_lock);
+                PValue = JudyLIns(&datafile->journalfile->JudyL_array, (Word_t)page_offset, PJE0);
+                *(uint32_t *)PValue = (x + 1);
+                uv_rwlock_wrunlock(&pg_cache->v2_lock);
+            }
+        }
     }
 
     uv_rwlock_wrunlock(&page_index->lock);
@@ -787,11 +768,8 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     }
 
     struct rrdeng_page_descr *descr = populate_page_index(page_index, start_time, cache_pages);
-    if (descr) {
-        //queue_descriptor_for_deletion(&page_index->ctx->pg_cache, descr, (void *) 0);
-        //queue_descriptor_for_deletion(&page_index->ctx->pg_cache, descr, (void *) 0);
+    if (descr)
         return descr;
-    }
 
     Index = (Word_t) (start_time / USEC_PER_SEC);
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
@@ -1056,7 +1034,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     }
 
     uv_rwlock_rdlock(&page_index->lock);
-    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, 1);
+    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, PAGE_CACHE_MAX_PRELOAD_PAGES);
     if (NULL == descr) {
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
@@ -1263,7 +1241,6 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         if (old_flags & RRD_PAGE_INVALID) {
             info("Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u", descr->pg_cache_descr_state,
                  descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
-            queue_descriptor_for_deletion(pg_cache, descr, (void *) 0);
         }
 
         /* reset scan to find again */
@@ -1343,10 +1320,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
     init_replaceQ(ctx);
     init_committed_page_index(ctx);
 
-    pg_cache->dirty_descr_index.JudyL_array = (Pvoid_t) NULL;
-    pg_cache->dirty_descr_index.JudyHS_array = (Pvoid_t) NULL;
-    pg_cache->dirty_descr_index.count = 0;
-    fatal_assert(0 == uv_rwlock_init(&pg_cache->dirty_descr_index.lock));
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->v2_lock));
 }
 
 void free_page_cache(struct rrdengine_instance *ctx)
@@ -1410,3 +1384,53 @@ void free_page_cache(struct rrdengine_instance *ctx)
     fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
     info("Freed %lu bytes of memory from page cache.", pages_dirty_index_bytes + pages_index_bytes + metrics_index_bytes);
 }
+
+//void delete_unused_descriptors(struct rrdengine_instance *ctx)
+//{
+//    struct page_cache *pg_cache = &ctx->pg_cache;
+//    Pvoid_t *PValue;
+//    struct pg_cache_page_index *page_index, *prev_page_index;
+//    Word_t Index;
+//    struct rrdeng_page_descr *descr;
+//    struct page_cache_descr *pg_cache_descr;
+//
+//    // Need to scan for descriptors to release
+//    for (page_index = pg_cache->metrics_index.last_page_index ;
+//         page_index != NULL ;
+//         page_index = prev_page_index) {
+//
+//        prev_page_index = page_index->prev;
+//
+//        /* Find first page in range */
+//        Index = (Word_t) 0;
+//        PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
+//        descr = unlikely(NULL == PValue) ? NULL : *PValue;
+//
+//        while (descr != NULL) {
+//            /* Iterate all page descriptors of this metric */
+//
+//            if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
+//                /* Check rrdenglocking.c */
+//                pg_cache_descr = descr->pg_cache_descr;
+//                if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
+//                    dbengine_page_free(pg_cache_descr->page);
+//                }
+//                rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
+//            }
+//            rrdeng_page_descr_freez(descr);
+//
+//            PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
+//            descr = unlikely(NULL == PValue) ? NULL : *PValue;
+//        }
+//
+//        /* Free page index */
+//        pages_index_bytes += JudyLFreeArray(&page_index->JudyL_array, PJE0);
+//        fatal_assert(NULL == page_index->JudyL_array);
+//        freez(page_index);
+//    }
+//    /* Free metrics index */
+//    metrics_index_bytes = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
+//    fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
+//    info("Freed %lu bytes of memory from page cache.", pages_dirty_index_bytes + pages_index_bytes + metrics_index_bytes);
+//}
+

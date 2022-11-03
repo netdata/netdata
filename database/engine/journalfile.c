@@ -113,6 +113,7 @@ void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengin
     journalfile->datafile = datafile;
     journalfile->journal_data = NULL;
     journalfile->journal_data_size = 0;
+    journalfile->JudyL_array = (Pvoid_t) NULL;
 }
 
 int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
@@ -1375,8 +1376,11 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
         netdata_munmap(journalfile->data, file_size);
 
     // Don't Index the last file
-    if (ctx->last_fileno == journalfile->datafile->fileno)
+    if (ctx->last_fileno == journalfile->datafile->fileno) {
+        // Consider allowing migration -- the index will be rebuilt every time on restart
+        //migrate_journal_file_v2(ctx, journalfile, datafile, true, false);
         return 0;
+    }
 
     int migrate_on_startup = 1;
 

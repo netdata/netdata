@@ -22,12 +22,6 @@ struct rrdeng_page_descr;
 #define RRD_PAGE_POPULATED      (1LU << 4)
 #define RRD_PAGE_INVALID        (1LU << 5)
 
-struct descriptor_info {
-    uuid_t uuid;
-    Word_t start_time;
-    time_t expiration;
-};
-
 struct page_cache_descr {
     struct rrdeng_page_descr *descr; /* parent descriptor */
     void *page;
@@ -93,7 +87,7 @@ struct rrdeng_page_info {
 /* returns 1 for success, 0 for failure */
 typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
-#define PAGE_CACHE_MAX_PRELOAD_PAGES    (16)
+#define PAGE_CACHE_MAX_PRELOAD_PAGES    (4)
 
 struct pg_alignment {
     uint32_t page_length;
@@ -136,7 +130,6 @@ struct pg_cache_page_index {
 struct pg_cache_metrics_index {
     uv_rwlock_t lock;
     Pvoid_t JudyHS_array;
-    Pvoid_t migration_JudyHS_array;
     struct pg_cache_page_index *last_page_index;
 };
 
@@ -156,13 +149,6 @@ struct pg_cache_committed_page_index {
     unsigned nr_committed_pages;
 };
 
-struct pg_cache_dirty_descr_index {
-    uv_rwlock_t lock;
-    Pvoid_t JudyL_array;
-    Pvoid_t JudyHS_array;
-    unsigned count;
-};
-
 /*
  * Gathers populated pages to be evicted.
  * Relies on page cache descriptors being there as it uses their memory.
@@ -176,10 +162,10 @@ struct pg_cache_replaceQ {
 
 struct page_cache { /* TODO: add statistics */
     uv_rwlock_t pg_cache_rwlock; /* page cache lock */
+    uv_rwlock_t v2_lock;
 
     struct pg_cache_metrics_index metrics_index;
     struct pg_cache_committed_page_index committed_page_index;
-    struct pg_cache_dirty_descr_index dirty_descr_index;
     struct pg_cache_replaceQ replaceQ;
 
     unsigned page_descriptors;
