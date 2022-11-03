@@ -527,15 +527,16 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         return;
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if (!strncmp(message_type, "cmd", strlen("cmd"))) {
-        log_aclk_message_bin(msg, msg_len, 0, topic, msg_descriptor->name);
-    } else {
-        char *json = protomsg_to_json(msg, msg_len, msg_descriptor->name);
-        log_aclk_message_bin(json, strlen(json), 0, topic, msg_descriptor->name);
-        freez(json);
+
+    if (aclklog_enabled) {
+        if (!strncmp(message_type, "cmd", strlen("cmd"))) {
+            log_aclk_message_bin(msg, msg_len, 0, topic, msg_descriptor->name);
+        } else {
+            char *json = protomsg_to_json(msg, msg_len, msg_descriptor->name);
+            log_aclk_message_bin(json, strlen(json), 0, topic, msg_descriptor->name);
+            freez(json);
+        }
     }
-#endif
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
