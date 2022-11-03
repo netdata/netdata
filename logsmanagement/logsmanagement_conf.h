@@ -17,6 +17,8 @@
 
 #define MAX_LOG_MSG_SIZE 50 MiB                     /**< Maximum allowable log message size (in Bytes) to be stored in message queue and DB. **/
 
+#define MAX_CUS_CHARTS_PER_SOURCE 100               /**< Hard limit of maximum custom charts per log source **/
+
 /* -------------------------------------------------------------------------- */
 /*                                  Database                                  */
 /* -------------------------------------------------------------------------- */

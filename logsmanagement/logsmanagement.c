@@ -336,26 +336,29 @@ static void logs_manag_config_init(){
         /* Configure (optional) custom charts */
         p_file_info->parser_cus_config = callocz(1, sizeof(Log_parser_cus_config_t *));
         p_file_info->parser_metrics->parser_cus = callocz(1, sizeof(Log_parser_cus_metrics_t *));
-        for(int cus_off = 1;; cus_off++){
+        for(int cus_off = 1; cus_off <= MAX_CUS_CHARTS_PER_SOURCE; cus_off++){
 
             /* Read chart name config */
-            char cus_chart_k[19];
-            sprintf(cus_chart_k, "custom %d chart", cus_off % 1000);
+            char *cus_chart_k = mallocz(snprintf(NULL, 0, "custom %d chart", MAX_CUS_CHARTS_PER_SOURCE) + 1);
+            sprintf(cus_chart_k, "custom %d chart", cus_off);
             char *cus_chart_v = appconfig_get(&log_management_config, config_section->name, cus_chart_k, NULL);
             debug(D_LOGS_MANAG, "cus chart: (%s:%s)", cus_chart_k, cus_chart_v ? cus_chart_v : "NULL");
-            if(!cus_chart_v) break;
+            freez(cus_chart_k);
+            if(unlikely(!cus_chart_v)) break; // or could we continue instead of breaking ?
 
             /* Read regex name config - OK if NULL */
-            char cus_regex_name_k[24];
-            sprintf(cus_regex_name_k, "custom %d regex name", cus_off % 1000);
+            char *cus_regex_name_k = mallocz(snprintf(NULL, 0, "custom %d regex name", MAX_CUS_CHARTS_PER_SOURCE) + 1);
+            sprintf(cus_regex_name_k, "custom %d regex name", cus_off);
             char *cus_regex_name_v = appconfig_get(&log_management_config, config_section->name, cus_regex_name_k, NULL);
             debug(D_LOGS_MANAG, "cus regex name: (%s:%s)", cus_regex_name_k, cus_regex_name_v ? cus_regex_name_v : "NULL");
+            freez(cus_regex_name_k);
 
             /* Read regex config */
-            char cus_regex_k[19];
-            sprintf(cus_regex_k, "custom %d regex", cus_off % 1000);
+            char *cus_regex_k = mallocz(snprintf(NULL, 0, "custom %d regex", MAX_CUS_CHARTS_PER_SOURCE) + 1);
+            sprintf(cus_regex_k, "custom %d regex", cus_off);
             char *cus_regex_v = appconfig_get(&log_management_config, config_section->name, cus_regex_k, NULL);
             debug(D_LOGS_MANAG, "cus regex:(%s:%s)", cus_regex_k, cus_regex_v ? cus_regex_v : "NULL");
+            freez(cus_regex_k);
             if(unlikely(!cus_regex_v)) {
                 freez(cus_chart_v);
                 freez(cus_regex_name_v); // Might be NULL but free(NULL) is OK
@@ -363,11 +366,12 @@ static void logs_manag_config_init(){
             }
 
             /* Read ignore case config */
-            char cus_ignore_case_k[25];
-            sprintf(cus_ignore_case_k, "custom %d ignore case", cus_off % 1000);
+            char *cus_ignore_case_k = mallocz(snprintf(NULL, 0, "custom %d ignore case", MAX_CUS_CHARTS_PER_SOURCE) + 1);
+            sprintf(cus_ignore_case_k, "custom %d ignore case", cus_off);
             int cus_ignore_case_v = appconfig_get_boolean(  &log_management_config, 
                                                             config_section->name, cus_ignore_case_k, 1);
             debug(D_LOGS_MANAG, "cus case: (%s:%s)", cus_ignore_case_k, cus_ignore_case_v ? "yes" : "no");
+            freez(cus_ignore_case_k);
 
             /* Allocate memory and copy config to p_file_info->parser_cus_config struct */
             p_file_info->parser_cus_config = reallocz(  p_file_info->parser_cus_config, 
