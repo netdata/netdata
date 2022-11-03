@@ -389,7 +389,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     for (unsigned i=0; i < deleted; i++) {
         descr = list_to_destroy[i];
         if (is_descr_journal_v2(descr))
-            queue_descriptor_for_deletion(pg_cache, descr, (void *) 1);
+            queue_descriptor_for_deletion(pg_cache, descr, (void *)1);
     }
 }
 
@@ -657,8 +657,6 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
 {
     time_t journal_start_time_s = (time_t)(journal_start_time_ut / USEC_PER_SEC);
     struct rrdengine_instance *ctx = page_index->ctx;
-    struct page_cache *pg_cache = &ctx->pg_cache;
-
     Pvoid_t *PValue;
 
     uint32_t entries = page_list_header->entries;
@@ -699,10 +697,8 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
 
         if (!match_descr)
             match_descr = added_descr;
-
-        queue_descriptor_for_deletion(pg_cache, added_descr, (void *) 1);
-
     }
+
     uv_rwlock_wrunlock(&page_index->lock);
     uv_rwlock_rdlock(&page_index->lock);
     return match_descr;
