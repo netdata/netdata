@@ -268,14 +268,14 @@ void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *r
         NETDATA_DOUBLE *v = rs->value;
         if(*v != value) {
             *v = value;
-
-            // mark the chart to be sent upstream
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND_VARIABLES);
         }
     }
 }
 
 void rrdsetvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb) {
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND_VARIABLES);
+
     // send the chart local custom variables
     RRDSETVAR *rs;
     dfe_start_read(st->rrdsetvar_root_index, rs) {

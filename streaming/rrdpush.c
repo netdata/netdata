@@ -161,16 +161,7 @@ int rrdpush_init() {
 // this is for the first iterations of each chart
 unsigned int remote_clock_resync_iterations = 60;
 
-static inline bool should_send_chart_matching(RRDSET *st) {
-    // get all the flags we need to check, with one atomic operation
-    RRDSET_FLAGS flags = rrdset_flag_check(st,
-              RRDSET_FLAG_UPSTREAM_SEND
-            | RRDSET_FLAG_UPSTREAM_IGNORE
-            | RRDSET_FLAG_ANOMALY_RATE_CHART
-            | RRDSET_FLAG_ANOMALY_DETECTION
-            | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
-            );
-
+static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
     if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
         return false;
 
@@ -219,8 +210,6 @@ int configured_as_parent() {
 
     return is_parent;
 }
-
-#define need_to_send_chart_definition(st) (!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))
 
 // chart labels
 static int send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
@@ -334,7 +323,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 }
 
 // sends the current chart dimensions
-void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) {
+static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s, RRDSET_FLAGS flags) {
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
@@ -365,6 +354,10 @@ void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) 
         }
     }
     rrddim_foreach_done(rd);
+
+    if(unlikely(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
+        rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
+
     buffer_fast_strcat(wb, "END\n", 4);
 }
 
@@ -374,7 +367,8 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host);
 bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host) || !should_send_chart_matching(st)))
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
+        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST))))
         return false;
 
     BUFFER *wb = sender_start(host->sender);
@@ -412,16 +406,18 @@ void rrdset_done_push(RRDSET *st) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
 
-    if(unlikely(!should_send_chart_matching(st)))
+    RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
+
+    if(unlikely(!should_send_chart_matching(st, rrdset_flags)))
         return;
 
     BUFFER *wb = sender_start(host->sender);
 
-    if(unlikely(need_to_send_chart_definition(st)))
+    if(unlikely(!(rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED)))
         rrdpush_send_chart_definition(wb, st);
 
-    if (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
-        rrdpush_send_chart_metrics(wb, st, host->sender);
+    if (likely(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+        rrdpush_send_chart_metrics(wb, st, host->sender, rrdset_flags);
 
     sender_commit(host->sender, wb);
 }
