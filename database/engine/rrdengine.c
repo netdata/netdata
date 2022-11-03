@@ -744,6 +744,98 @@ void after_delete_descriptors(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
+static struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid)
+{
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
+    struct pg_cache_page_index *page_index = (NULL == PValue) ? NULL : *PValue;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    return page_index;
+}
+
+static struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
+{
+    uv_rwlock_rdlock(&page_index->lock);
+    Pvoid_t *PValue = JudyLGet(page_index->JudyL_array, start_time_s, PJE0);
+    struct rrdeng_page_descr *descr = unlikely(NULL == PValue) ? NULL : *PValue;
+    uv_rwlock_rdunlock(&page_index->lock);
+    return descr;
+};
+
+static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, time_t start_time_s)
+{
+    struct rrdeng_page_descr *descr = get_descriptor(page_index, start_time_s);
+    if (unlikely(!descr))
+        return true;
+
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
+        pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+        return true;
+    }
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+    return false;
+}
+
+void check_journal_file(struct rrdengine_journalfile *journalfile)
+{
+    struct rrdengine_instance *ctx = journalfile->datafile->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    Pvoid_t *PValue;
+    Word_t page_address;
+    uint32_t Index;
+
+    struct journal_v2_header *journal_header = (struct journal_v2_header *) journalfile->journal_data;
+    time_t journal_start_time_s = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+
+    uv_rwlock_rdlock(&pg_cache->v2_lock);
+
+    for (page_address = 0,
+        PValue = JudyLFirst(journalfile->JudyL_array, &page_address, PJE0),
+        Index = unlikely(NULL == PValue) ? 0 : *(uint32_t *) PValue;
+        Index ;
+        PValue = JudyLNext(journalfile->JudyL_array, &page_address, PJE0),
+        Index = unlikely(NULL == PValue) ? 0 : *(uint32_t *) PValue) {
+
+        uv_rwlock_rdunlock(&pg_cache->v2_lock);
+
+        // Assume we will evict everything
+        bool all_evicted = true;
+        // Get the page index will be working on
+        struct journal_page_header *page_list_header = journalfile->journal_data + page_address;
+        struct pg_cache_page_index *page_index = get_page_index(pg_cache, &page_list_header->uuid);
+
+        if (likely(page_index)) {
+            struct journal_page_list *page_list = (struct journal_page_list *) ((void *) page_list_header + sizeof(*page_list_header));
+            uint32_t entries = page_list_header->entries;
+
+            // First try to target the marked entry; Note marked entry is recorded +1
+            struct journal_page_list *page_entry = &page_list[Index - 1];
+            time_t index_time_s = journal_start_time_s + page_entry->delta_start_s;
+            all_evicted = try_to_remove_v2_descriptor(ctx, page_index, index_time_s);
+
+            // Try to scan range ; all need to return evicted
+            for (uint32_t x = 0; all_evicted && x < entries; x++) {
+                index_time_s = journal_start_time_s + (&page_list[x])->delta_start_s;
+                all_evicted = all_evicted && try_to_remove_v2_descriptor(ctx, page_index, index_time_s);
+            }
+        }
+
+        if (all_evicted) {
+            uv_rwlock_wrlock(&pg_cache->v2_lock);
+            (void) JudyLDel(&journalfile->JudyL_array, page_address, PJE0);
+            uv_rwlock_wrunlock(&pg_cache->v2_lock);
+        }
+
+        uv_rwlock_rdlock(&pg_cache->v2_lock);
+    }
+
+    uv_rwlock_rdunlock(&pg_cache->v2_lock);
+}
+
 void delete_descriptors(uv_work_t *req)
 {
     struct rrdengine_worker_config *wc = req->loop->data;
@@ -753,79 +845,28 @@ void delete_descriptors(uv_work_t *req)
     if (unlikely(ctx->quiesce != NO_QUIESCE)) /* Shutting down */
         return;
 
-    struct rrdeng_page_descr *descr;
-    struct descriptor_info *descr_info;
-    Pvoid_t *PValue;
-    Word_t Index;
-
-    unsigned deleted = 0;
-    unsigned process = 0;
-    time_t now = now_realtime_sec();
-    uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
-    bool delete_entry;
-    for (Index = 0, process = 0,
-        PValue = JudyLFirst(pg_cache->dirty_descr_index.JudyL_array, &Index, PJE0),
-        descr_info = unlikely(NULL == PValue) ? NULL : *PValue;
-
-         descr_info != NULL;
-
-         PValue = JudyLNext(pg_cache->dirty_descr_index.JudyL_array, &Index, PJE0),
-        descr_info = unlikely(NULL == PValue) ? NULL : *PValue, process++) {
-
-        if (unlikely(descr_info->expiration > now))
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    struct rrdengine_journalfile *journalfile;
+    while (datafile) {
+        journalfile = datafile->journalfile;
+        if (!journalfile->journal_data) {
+            datafile = datafile->next;
             continue;
-
-        struct pg_cache_page_index *page_index = NULL;
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &descr_info->uuid, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-        if (!PValue) {
-            delete_entry = true;
-            goto remove_item;
         }
 
-        uv_rwlock_rdlock(&page_index->lock);
-        PValue = JudyLGet(page_index->JudyL_array, descr_info->start_time, PJE0);
-        descr = unlikely(NULL == PValue) ? NULL : *PValue;
-        uv_rwlock_rdunlock(&page_index->lock);
+        uv_rwlock_rdlock(&pg_cache->v2_lock);
+        Word_t count = JudyLCount(journalfile->JudyL_array, 0, -1, PJE0);
+        uv_rwlock_rdunlock(&pg_cache->v2_lock);
 
-        bool delete_item = false;
-
-        if (likely(descr)) {
-            rrdeng_page_descr_mutex_lock(ctx, descr);
-
-            unsigned long flags = descr->pg_cache_descr->flags;
-            if (((flags & RRD_PAGE_POPULATED) || !flags) && pg_cache_try_get_unsafe(descr, 1))
-                delete_item = true;
-
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-
-            if (delete_item) {
-                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
-                delete_entry = true;
-            }
-       }
-
-remove_item:
-        if (delete_entry) {
-            uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
-            uv_rwlock_wrlock(&pg_cache->dirty_descr_index.lock);
-
-            (void) JudyLDel(&pg_cache->dirty_descr_index.JudyL_array, Index, PJE0);
-            freez(descr_info);
-
-            uv_rwlock_wrunlock(&pg_cache->dirty_descr_index.lock);
-            uv_rwlock_rdlock(&pg_cache->dirty_descr_index.lock);
-            deleted++;
+        if (unlikely(count)) {
+            info("Checking journal file %u, areas to search %lu", datafile->fileno, count);
+            check_journal_file(journalfile);
         }
+        datafile = datafile->next;
     }
 
-    uv_rwlock_rdunlock(&pg_cache->dirty_descr_index.lock);
-    info("Processed %u items, removed %u descriptors from the page cache", process, deleted);
-
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 }
 
 void flush_pages_cb(uv_fs_t* req)
