@@ -69,7 +69,8 @@ then
 	sudo git clean -dfxf && git submodule update --init --recursive --force
 
 	# Build Fluent Bit
-	sudo apt install libsystemd-dev
+
+	# May require to install libsystemd-dev on some systems - is it a Fluent-Bit dependency for systemd logs?
 	mkdir -p fluent-bit/build
 	cd fluent-bit/build
 
@@ -84,12 +85,7 @@ then
 		c_flags="-O1 -ggdb -Wall -Wextra -fsanitize=address -static-libasan "
 		c_flags+="-fno-omit-frame-pointer -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 "
 		c_flags+="-DNETDATA_INTERNAL_CHECKS=1 -DLOGS_MANAG_DEBUG_LEV=1 -DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
-		c_flags+="-Ifluent-bit/build/lib/c-ares-809d5e84/ -Ifluent-bit/lib/c-ares-809d5e84/include/ "
-		c_flags+="-Ifluent-bit/lib/mbedtls-2.28.0/include/ -Ifluent-bit/lib/cmetrics/include/ "
-		c_flags+="-Ifluent-bit/lib/mpack-amalgamation-1.0/src/ -Ifluent-bit/build/lib/monkey/include/monkey/ "
-		c_flags+="-Ifluent-bit/build/lib/monkey/include/monkey/mk_core/ -Ifluent-bit/lib/monkey/include/ "
-        c_flags+="-Ifluent-bit/lib/msgpack-c/include/msgpack/ -Ifluent-bit/lib/msgpack-c/include/ "
-		c_flags+="-Wl,--no-as-needed -ldl "
+		# c_flags+="-Wl,--no-as-needed -ldl "
 		sudo CFLAGS="$c_flags" ./netdata-installer.sh \
 					--dont-start-it \
 					--dont-wait \
@@ -105,12 +101,7 @@ then
 					--install $INSTALL_PATH
 	else
 		c_flags="-DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
-		c_flags+="-Ifluent-bit/build/lib/c-ares-809d5e84/ -Ifluent-bit/lib/c-ares-809d5e84/include/ "
-		c_flags+="-Ifluent-bit/lib/mbedtls-2.28.0/include/ -Ifluent-bit/lib/cmetrics/include/ "
-		c_flags+="-Ifluent-bit/lib/mpack-amalgamation-1.0/src/ -Ifluent-bit/build/lib/monkey/include/monkey/ "
-		c_flags+="-Ifluent-bit/build/lib/monkey/include/monkey/mk_core/ -Ifluent-bit/lib/monkey/include/ "
-        c_flags+="-Ifluent-bit/lib/msgpack-c/include/msgpack/ -Ifluent-bit/lib/msgpack-c/include/ "
-		c_flags+="-Wl,--no-as-needed -ldl "
+		# c_flags+="-Wl,--no-as-needed -ldl "
 		sudo CFLAGS="$c_flags" ./netdata-installer.sh \
 					--dont-start-it \
 					--dont-wait \

@@ -218,30 +218,15 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--enable-logsmanagement],
                     [Enable logsmanagement @<:@default disabled@:>@])],
     ,
-    [enable_logsmanagement="detect"]
+    [enable_logsmanagement="no"]
 )
-
-if test "${enable_logsmanagement}" = "yes"; then
-    AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
-fi
-
-AC_MSG_RESULT([${enable_logsmanagement}])
-AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${enable_logsmanagement}" = "yes"])
-
 AC_ARG_ENABLE(
     [logsmanagement_tests],
     [AS_HELP_STRING([--enable-logsmanagement-tests],
                     [Enable logsmanagement tests @<:@default disabled@:>@])],
     ,
-    [enable_logsmanagement_tests="detect"]
+    [enable_logsmanagement_tests="no"]
 )
-
-if test "${enable_logsmanagement_tests}" = "yes"; then
-    AC_DEFINE([ENABLE_LOGSMANAGEMENT_TESTS], [1], [enable logs management tests functionality])
-fi
-
-AC_MSG_RESULT([${enable_logsmanagement_tests}])
-AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT_TESTS], [test "${enable_logsmanagement_tests}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -673,6 +658,27 @@ if test "${enable_pedantic}" = "yes"; then
     CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"
 fi
 
+# -----------------------------------------------------------------------------
+# dlsym check
+
+AC_MSG_CHECKING(whether we can use dlsym)
+OLD_LIBS="${LIBS}"
+LIBS="-ldl"
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+  #include <dlfcn.h>
+  static void *(*libc_malloc)(size_t);
+  int main() {
+    libc_malloc = dlsym(RTLD_NEXT, "malloc");
+  }
+]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
+LIBS="${OLD_LIBS}"
+AC_MSG_RESULT($CAN_USE_DLSYM)
+
+if test "x$CAN_USE_DLSYM" = xyes; then
+    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
+    OPTIONAL_DL_LIBS="-ldl"
+fi
+AC_SUBST([OPTIONAL_DL_LIBS])
 
 # -----------------------------------------------------------------------------
 # memory allocation library
@@ -1205,6 +1211,54 @@ fi
 
 
 # -----------------------------------------------------------------------------
+# logsmanagement
+
+# Check if submodules have not been fetched. Fail if Logs Management was explicitly requested.
+
+AC_MSG_CHECKING([if git submodules are present for logs management functionality])
+if test -f "fluent-bit/CMakeLists.txt"; then
+    AC_MSG_RESULT([yes])
+    have_logsmanagement_submodules="yes"
+else
+    AC_MSG_RESULT([no])
+    have_logsmanagement_submodules="no"
+fi
+
+if test "${enable_logsmanagement}" = "yes" -a "${have_logsmanagement_submodules}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-logsmanagement functionality but it cannot be built because the required git submodules are missing.])
+fi
+
+# Decide if we should build Logs Management
+if test "${enable_logsmanagement}" != "no" -a "${have_logsmanagement_submodules}" = "yes" -a "x$CAN_USE_DLSYM" = xyes; then
+    build_logsmanagement="yes"
+else
+    build_logsmanagement="no"
+fi
+
+AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${build_logsmanagement}" = "yes"])
+if test "${build_logsmanagement}" = "yes"; then
+    AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
+    OPTIONAL_LOGSMANAGEMENT_CFLAGS=" \
+    -I \$(abs_top_srcdir)/fluent-bit/build/lib/c-ares-809d5e84/ -I \$(abs_top_srcdir)/fluent-bit/lib/c-ares-809d5e84/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/mbedtls-2.28.0/include/ -I \$(abs_top_srcdir)/fluent-bit/lib/cmetrics/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/mpack-amalgamation-1.0/src/ -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/ \
+    -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/mk_core/ -I \$(abs_top_srcdir)/fluent-bit/lib/monkey/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/msgpack/ -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/ "
+fi
+
+# Decide if we should build Logs Management tests.
+if test "${build_logsmanagement}" = "yes" -a "${enable_logsmanagement_tests}" = "yes"; then
+    build_logsmanagement_tests="yes"
+else
+    build_logsmanagement_tests="no"
+fi
+
+AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT_TESTS], [test "${build_logsmanagement_tests}" = "yes"])
+if test "${build_logsmanagement_tests}" = "yes"; then
+    AC_DEFINE([ENABLE_LOGSMANAGEMENT_TESTS], [1], [logs management tests])
+fi
+
+# -----------------------------------------------------------------------------
 # ebpf.plugin
 
 if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
@@ -1568,27 +1622,6 @@ AC_LANG_POP([C++])
 
 # -----------------------------------------------------------------------------
 
-AC_MSG_CHECKING(whether we can use dlsym)
-OLD_LIBS="${LIBS}"
-LIBS="-ldl"
-AC_LINK_IFELSE([AC_LANG_SOURCE([[
-  #include <dlfcn.h>
-  static void *(*libc_malloc)(size_t);
-  int main() {
-    libc_malloc = dlsym(RTLD_NEXT, "malloc");
-  }
-]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
-LIBS="${OLD_LIBS}"
-AC_MSG_RESULT($CAN_USE_DLSYM)
-
-if test "x$CAN_USE_DLSYM" = xyes; then
-    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
-    OPTIONAL_DL_LIBS="-ldl"
-fi
-AC_SUBST([OPTIONAL_DL_LIBS])
-
-# -----------------------------------------------------------------------------
-
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -1622,7 +1655,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_LOGSMANAGEMENT_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1676,6 +1709,7 @@ AC_SUBST([OPTIONAL_GTEST_CFLAGS])
 AC_SUBST([OPTIONAL_GTEST_LIBS])
 AC_SUBST([OPTIONAL_ML_CFLAGS])
 AC_SUBST([OPTIONAL_ML_LIBS])
+AC_SUBST([OPTIONAL_LOGSMANAGEMENT_CFLAGS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
