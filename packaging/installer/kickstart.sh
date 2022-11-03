@@ -632,7 +632,7 @@ get_system_info() {
         SYSCODENAME="${VERSION_CODENAME}"
         SYSARCH="$(uname -m)"
 
-        supported_compat_names="debian ubuntu centos fedora opensuse ol"
+        supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
 
         if str_in_list "${DISTRO}" "${supported_compat_names}"; then
             DISTRO_COMPAT_NAME="${DISTRO}"
