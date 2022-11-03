@@ -42,7 +42,8 @@ Conflicts: netdata-core,
            netdata-plugins-bash,
            netdata-plugins-python,
            netdata-web
-Recommends: netdata-plugin-ebpf
+Recommends: netdata-plugin-ebpf,
+            netdata-plugin-pythond
 Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
@@ -94,3 +95,12 @@ Package: netdata-plugin-ebpf-code
 Architecture: i386 amd64
 Description: Compiled eBPF code for the Netdata eBPF plugin
  This package provides the pre-compiled eBPF code for use by the Netdata eBPF plugin.
+
+Package: netdata-plugin-pythond
+Architecture: all
+Depends: ${shlibs:Depends},
+         netdata (>= ${source:Version})
+Description: The python.d metrics collection plugin for the Netdata Agent
+ Many of the collectors provided by this package are also available
+ in netdata-plugin-god. In msot cases, you probably want to use those
+ versions instead of the Python versions.

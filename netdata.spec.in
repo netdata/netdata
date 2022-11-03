@@ -160,6 +160,7 @@ Requires(pre): /usr/sbin/useradd
 %if 0%{?_have_ebpf}
 Recommends: netdata-plugin-ebpf
 %endif
+Recommends: netdata-plugin-pythond
 %endif
 
 # #####################################################################
@@ -491,10 +492,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %defattr(0750,root,netdata,0750)
 
-%dir %{_libexecdir}/%{name}/python.d
 %dir %{_libexecdir}/%{name}/plugins.d
 
-%{_libexecdir}/%{name}/python.d
 %{_libexecdir}/%{name}/plugins.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
@@ -563,6 +562,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libdir}/%{name}/conf.d/ebpf.d
 %exclude %{_libexecdir}/%{name}/plugins.d/ebpf.d
 %endif
+
+# Python.d belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/python.d.plugin
+%exclude %{_libexecdir}/%{name}/python.d
+%exclude %{_libdir}/%{name}/conf.d/python.d.conf
+%exclude %{_libdir}/%{name}/conf.d/python.d
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -666,6 +671,33 @@ Group: Applications/System
 %{_libexecdir}/%{name}/plugins.d/ebpf.d
 
 %endif
+
+%package plugin-pythond
+Summary: The python.d metrics collection plugin for the Netdata Agent
+Group: Applications/System
+%if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
+Requires: python
+%else
+%if 0%{?centos_ver} == 8
+Requires: python38
+%else
+Requires: python3
+%endif
+%endif
+Requires: netdata = %{version}
+
+%description plugin-pythond
+ This plugin adds a selection of additional collectors written in Python to the Netdata Agent.
+Many of the collectors provided by this package are also available in netdata-plugin-god. In msot cases, you probably
+want to use those versions instead of the Python versions.
+
+%files plugin-pythond
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/python.d.plugin
+%{_libexecdir}/%{name}/python.d
+%defattr(0640,root,netdata,0640)
+%{_libdir}/%{name}/conf.d/python.d.conf
+%{_libdir}/%{name}/conf.d/python.d
 
 %changelog
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
