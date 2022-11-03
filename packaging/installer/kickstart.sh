@@ -644,6 +644,9 @@ get_system_info() {
             cloudlinux|almalinux|rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
                 ;;
+            artix|manjaro|obarun)
+                DISTRO_COMPAT_NAME="arch"
+                ;;
             *)
                 DISTRO_COMPAT_NAME="unknown"
                 ;;
