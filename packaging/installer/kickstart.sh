@@ -1213,19 +1213,48 @@ set_auto_updates() {
 
 # Check for an already installed package with a given name.
 pkg_installed() {
-  case "${DISTRO_COMPAT_NAME}" in
-    debian|ubuntu)
-      # shellcheck disable=SC2016
-      dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
-      return $?
+  case "${SYSTYPE}" in
+    Linux)
+      case "${DISTRO_COMPAT_NAME}" in
+        debian|ubuntu)
+          # shellcheck disable=SC2016
+          dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
+          return $?
+          ;;
+        centos|fedora|opensuse|ol)
+          rpm -q "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        alpine)
+          apk -e info "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        arch)
+          pacman -Qi "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        *)
+          return 1
+          ;;
+      esac
       ;;
-    centos|fedora|opensuse|ol)
-      rpm -q "${1}" > /dev/null 2>&1
-      return $?
+    Darwin)
+      if command -v brew > /dev/null 2>&1; then
+        brew list "${1}" > /dev/null 2>&1
+        return $?
+      else
+        return 1
+      fi
       ;;
-    *)
-      return 1
+    FreeBSD)
+      if pkg -N > /dev/null 2>&1; then
+        pkg info "${1}" > /dev/null 2>&1
+        return $?
+      else
+        return 1
+      fi
       ;;
+    *) return 1 ;;
   esac
 }
 
