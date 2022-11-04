@@ -59,7 +59,8 @@ Depends: cups,
          ${shlibs:Depends},
          netdata (>= ${source:Version})
 Description: The CUPS metrics collection plugin for the Netdata Agent
- This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
+ This plugin allows the Netdata Agent to collect metrics from the Common
+ UNIX Printing System.
 
 Package: netdata-plugin-freeipmi
 Architecture: any
@@ -67,14 +68,16 @@ Depends: freeipmi,
          ${shlibs:Depends},
          netdata (= ${source:Version})
 Description: The FreeIPMI metrics collection plugin for the Netdata Agent
- This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
+ This plugin allows the Netdata Agent to collect metrics from hardware
+ using FreeIPMI.
 
 Package: netdata-plugin-nfacct
 Architecture: any
 Depends: ${shlibs:Depends},
          netdata (>= ${source:Version})
 Description: The NFACCT metrics collection plugin for the Netdata Agent
- This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
+ This plugin allows the Netdata Agent to collect metrics from the firewall
+ using NFACCT objects.
 
 Package: netdata-plugin-chartsd
 Architecture: all
@@ -82,8 +85,9 @@ Depends: bash,
          netdata (>= ${source:Version})
 Suggests: apcupsd, nut, iw, sudo
 Description: The charts.d metrics collection plugin for the Netdata Agent
- This plugin adds a selection of additional collectors written in shell script to the Netdata Agent. It includes
- collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
+ This plugin adds a selection of additional collectors written in shell
+ script to the Netdata Agent. It includes collectors for NUT, APCUPSD,
+ LibreSWAN, OpenSIPS, and Wireless access point statistics.
 
 Package: netdata-plugin-ebpf
 Architecture: i386 amd64
@@ -92,12 +96,14 @@ Depends: ${shlibs:Depends},
          netdata-plugin-ebpf-code (>= ${source:Version}),
          netdata (>= ${source:Version})
 Description: The eBPF metrics collection plugin for the Netdata Agent
- This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
+ This plugin allows the Netdata Agent to use eBPF code to collect more
+ detailed kernel-level metrics for the system.
 
 Package: netdata-plugin-ebpf-code
 Architecture: i386 amd64
 Description: Compiled eBPF code for the Netdata eBPF plugin
- This package provides the pre-compiled eBPF code for use by the Netdata eBPF plugin.
+ This package provides the pre-compiled eBPF code for use by the Netdata
+ eBPF plugin.
 
 Package: netdata-plugin-pythond
 Architecture: all
