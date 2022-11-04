@@ -705,6 +705,7 @@ want to use those versions instead of the Python versions.
 %package plugin-go
 Summary: The go.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
+Requires: netdata = %{version}
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
@@ -723,6 +724,7 @@ so most users will want it installed.
 %package plugin-apps
 Summary: The per-application metrics collection plugin for the Netdata Agent
 Group: Applications/System
+Requires: netdata = %{version}
 
 %description plugin-apps
  This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
