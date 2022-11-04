@@ -603,7 +603,7 @@ static int check_journal_v2_extent_list (void *data_start, size_t file_size)
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
 
-    journal_v2_trailer = data_start + j2_header->extent_trailer_offset;
+    journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->extent_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->extent_offset, j2_header->extent_count * sizeof(struct journal_extent_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
@@ -622,7 +622,7 @@ static int check_journal_v2_metric_list(void *data_start, size_t file_size)
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
 
-    journal_v2_trailer = data_start + j2_header->metric_trailer_offset;
+    journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->metric_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->metric_offset, j2_header->metric_count * sizeof(struct journal_metric_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
@@ -648,7 +648,7 @@ static int check_journal_v2_file (void *data_start, size_t file_size)
         return 1;
 
 
-    journal_v2_trailer = data_start + file_size - sizeof(*journal_v2_trailer);
+    journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + file_size - sizeof(*journal_v2_trailer));
 
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (void *) j2_header, sizeof(*j2_header));
@@ -705,7 +705,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     }
 
     usec_t start_loading = now_realtime_usec();
-    void *data_start = mmap(NULL, file_size, PROT_READ, MAP_SHARED, fd, 0);
+    uint8_t *data_start = mmap(NULL, file_size, PROT_READ, MAP_SHARED, fd, 0);
     if (data_start == MAP_FAILED) {
         close(fd);
         return 1;
@@ -730,7 +730,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         return 1;
     }
 
-    struct journal_metric_list *metric = data_start + j2_header->metric_offset;
+    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
 
     uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
 
@@ -1184,8 +1184,8 @@ void migrate_journal_file_v2(
     uint32_t trailer_offset = total_file_size;
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
-    void *data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false);
-    void *data = data_start;
+    uint8_t *data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false);
+    uint8_t *data = data_start;
 
     // Write header
     struct journal_v2_header j2_header;
@@ -1214,7 +1214,7 @@ void migrate_journal_file_v2(
     fatal_assert(data == data_start + extent_offset_trailer);
 
     // Calculate CRC for extents
-    journal_v2_trailer = data_start + extent_offset_trailer;
+    journal_v2_trailer = (struct journal_v2_block_trailer *) (data_start + extent_offset_trailer);
     uLong crc;
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
@@ -1295,7 +1295,7 @@ void migrate_journal_file_v2(
             break;
 
         // Trailer
-        void *next_page_address = journal_v2_write_data_page_trailer(&j2_header, page_trailer, data_start + pages_offset);
+        uint8_t *next_page_address = journal_v2_write_data_page_trailer(&j2_header, page_trailer, data_start + pages_offset);
 
         // Calculate start of the pages start for next descriptor
         pages_offset += (metric_info->entries * (sizeof(struct journal_page_list)) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer));
@@ -1308,7 +1308,7 @@ void migrate_journal_file_v2(
     internal_error(true, "WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
     // Calculate CRC for metrics
-    journal_v2_trailer = data_start + metric_offset_trailer;
+    journal_v2_trailer = (struct journal_v2_block_trailer *) (data_start + metric_offset_trailer);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
     crc32set(journal_v2_trailer->checksum, crc);
@@ -1316,7 +1316,7 @@ void migrate_journal_file_v2(
 
     // Prepare to write CRC for the file
     j2_header.data = NULL;
-    journal_v2_trailer = data_start + trailer_offset;
+    journal_v2_trailer = (struct journal_v2_block_trailer *) (data_start + trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (void *) &j2_header, sizeof(j2_header));
     crc32set(journal_v2_trailer->checksum, crc);
