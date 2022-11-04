@@ -111,6 +111,7 @@ Description: The python.d metrics collection plugin for the Netdata Agent
 Package: netdata-plugin-go
 Architecture: any
 Depends: ${shlibs:Depends},
+         libcap2-bin,
          netdata (>= ${source:Version})
 Description: The go.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in Go to
@@ -121,6 +122,7 @@ Description: The go.d metrics collection plugin for the Netdata Agent
 Package: netdata-plugin-apps
 Architecture: any
 Depends: ${shlibs:Depends},
+         libcap2-bin,
          netdata (>= ${source:Version})
 Description: The per-application metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect per-application and
