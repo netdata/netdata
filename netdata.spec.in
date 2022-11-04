@@ -480,10 +480,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
-%dir %{_libdir}/%{name}
-%dir %{_datadir}/%{name}
 %{_libdir}/%{name}
-%{_libdir}/%{name}/conf.d/
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
@@ -493,8 +490,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_presetdir}/50-netdata.preset
 
 %defattr(0750,root,netdata,0750)
-
-%dir %{_libexecdir}/%{name}/plugins.d
 
 %{_libexecdir}/%{name}/plugins.d
 
