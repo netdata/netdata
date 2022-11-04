@@ -160,6 +160,7 @@ Requires(pre): /usr/sbin/useradd
 %if 0%{?_have_ebpf}
 Recommends: netdata-plugin-ebpf
 %endif
+Recommends: netdata-plugin-apps
 Recommends: netdata-plugin-pythond
 Recommends: netdata-plugin-go
 %endif
@@ -497,7 +498,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %{_libexecdir}/%{name}/plugins.d
 
-%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
@@ -571,6 +571,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libexecdir}/%{name}/plugins.d/go.d.plugin
 %exclude %{_libdir}/%{name}/conf.d/go.d.conf
 %exclude %{_libdir}/%{name}/conf.d/go.d
+
+# apps belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%exclude %{_libdir}/%{name}/conf.d/apps_groups.conf
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -650,6 +654,7 @@ It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless acces
 Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
+Requires: netdata-plugin-apps = %{version}
 Requires: netdata-plugin-ebpf-code >= %{version}
 
 %description plugin-ebpf
@@ -719,6 +724,20 @@ so most users will want it installed.
 %defattr(0644,root,netdata,0644)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d
+
+%package plugin-apps
+Summary: The per-application metrics collection plugin for the Netdata Agent
+Group: Applications/System
+
+%description plugin-apps
+ This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
+
+%files plugin-apps
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH and CAP_SYS_PTRACE needed for data collection by the plugin.
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%defattr(0644,root,netdata,0644)
+%{_libdir}/%{name}/conf.d/apps_groups.conf
 
 %changelog
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19

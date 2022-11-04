@@ -43,6 +43,7 @@ Conflicts: netdata-core,
            netdata-plugins-python,
            netdata-web
 Recommends: netdata-plugin-ebpf,
+            netdata-plugin-apps,
             netdata-plugin-pythond,
             netdata-plugin-go
 Pre-Depends: dpkg (>= 1.17.14)
@@ -87,6 +88,7 @@ Description: The charts.d metrics collection plugin for the Netdata Agent
 Package: netdata-plugin-ebpf
 Architecture: i386 amd64
 Depends: ${shlibs:Depends},
+         netdata-plugin-apps (>= ${source:Version}),
          netdata-plugin-ebpf-code (>= ${source:Version}),
          netdata (>= ${source:Version})
 Description: The eBPF metrics collection plugin for the Netdata Agent
@@ -115,3 +117,11 @@ Description: The go.d metrics collection plugin for the Netdata Agent
  the Netdata Agent A significant percentage of the application specific
  collectors provided by Netdata are part of this plugin, so most users
  will want it installed.
+
+Package: netdata-plugin-apps
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (>= ${source:Version})
+Description: The per-application metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect per-application and
+ per-user metrics without using cgroups.
