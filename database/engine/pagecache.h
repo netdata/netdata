@@ -51,10 +51,6 @@ struct page_cache_descr {
  * number of descriptor users   |    DESTROY |     LOCKED | ALLOCATED |
  */
 
-//FIXME: To check if v2 add macros
-// Is v2
-// is v1
-// is collected
 struct rrdeng_page_descr {
     uuid_t *id; /* never changes */
     struct extent_info *extent;
@@ -87,7 +83,7 @@ struct rrdeng_page_info {
 /* returns 1 for success, 0 for failure */
 typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
-#define PAGE_CACHE_MAX_PRELOAD_PAGES    (4)
+#define PAGE_CACHE_MAX_PRELOAD_PAGES    (64)
 
 struct pg_alignment {
     uint32_t page_length;

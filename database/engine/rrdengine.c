@@ -762,14 +762,15 @@ static struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page
     return descr;
 };
 
-static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, time_t start_time_s)
+static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, time_t start_time_s, bool expired)
 {
     struct rrdeng_page_descr *descr = get_descriptor(page_index, start_time_s);
     if (unlikely(!descr))
         return true;
 
     rrdeng_page_descr_mutex_lock(ctx, descr);
-    if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
+    unsigned flags = descr->pg_cache_descr->flags & RRD_PAGE_POPULATED;
+    if ((!flags || expired) && pg_cache_try_get_unsafe(descr, 1)) {
         rrdeng_page_descr_mutex_unlock(ctx, descr);
         pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
         return true;
@@ -778,6 +779,7 @@ static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct 
 
     return false;
 }
+#define JOURVAL_V2_DESCRIPTOR_EXPIRATION_TIME (600)
 
 void check_journal_file(struct rrdengine_journalfile *journalfile)
 {
@@ -792,6 +794,8 @@ void check_journal_file(struct rrdengine_journalfile *journalfile)
     time_t journal_start_time_s = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
 
     uv_rwlock_rdlock(&pg_cache->v2_lock);
+
+    bool expired = ((now_realtime_sec() - journalfile->last_access) > JOURVAL_V2_DESCRIPTOR_EXPIRATION_TIME);
 
     for (page_address = 0,
         PValue = JudyLFirst(journalfile->JudyL_array, &page_address, PJE0),
@@ -815,12 +819,12 @@ void check_journal_file(struct rrdengine_journalfile *journalfile)
             // First try to target the marked entry; Note marked entry is recorded +1
             struct journal_page_list *page_entry = &page_list[Index - 1];
             time_t index_time_s = journal_start_time_s + page_entry->delta_start_s;
-            all_evicted = try_to_remove_v2_descriptor(ctx, page_index, index_time_s);
+            all_evicted = try_to_remove_v2_descriptor(ctx, page_index, index_time_s, expired);
 
             // Try to scan range ; all need to return evicted
             for (uint32_t x = 0; all_evicted && x < entries; x++) {
                 index_time_s = journal_start_time_s + (&page_list[x])->delta_start_s;
-                all_evicted = all_evicted && try_to_remove_v2_descriptor(ctx, page_index, index_time_s);
+                all_evicted = all_evicted && try_to_remove_v2_descriptor(ctx, page_index, index_time_s, expired);
             }
         }
 
@@ -859,10 +863,9 @@ void delete_descriptors(uv_work_t *req)
         Word_t count = JudyLCount(journalfile->JudyL_array, 0, -1, PJE0);
         uv_rwlock_rdunlock(&pg_cache->v2_lock);
 
-        if (unlikely(count)) {
-            info("Checking journal file %u, areas to search %lu", datafile->fileno, count);
+        if (unlikely(count))
             check_journal_file(journalfile);
-        }
+
         datafile = datafile->next;
     }
 
