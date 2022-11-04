@@ -161,6 +161,7 @@ Requires(pre): /usr/sbin/useradd
 Recommends: netdata-plugin-ebpf
 %endif
 Recommends: netdata-plugin-pythond
+Recommends: netdata-plugin-go
 %endif
 
 # #####################################################################
@@ -522,9 +523,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 # slabinfo plugin
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
-# go.d.plugin (the capability required for wireguard module)
-%caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
-
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
 %defattr(0644,root,root,0755)
@@ -568,6 +566,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libexecdir}/%{name}/python.d
 %exclude %{_libdir}/%{name}/conf.d/python.d.conf
 %exclude %{_libdir}/%{name}/conf.d/python.d
+
+# Go.d belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%exclude %{_libdir}/%{name}/conf.d/go.d.conf
+%exclude %{_libdir}/%{name}/conf.d/go.d
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -698,6 +701,24 @@ want to use those versions instead of the Python versions.
 %defattr(0640,root,netdata,0640)
 %{_libdir}/%{name}/conf.d/python.d.conf
 %{_libdir}/%{name}/conf.d/python.d
+
+%package plugin-go
+Summary: The go.d metrics collection plugin for the Netdata Agent
+Group: Applications/System
+
+%description plugin-go
+ This plugin adds a selection of additional collectors written in Go to the Netdata Agent
+A significant percentage of the application specific collectors provided by Netdata are part of this plugin,
+so most users will want it installed.
+
+%files plugin-go
+%defattr(0750,root,netdata,0750)
+# CAP_NET_ADMIN needed for WireGuard collector
+# CAP_NET_RAW needed for ping collector
+%caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%defattr(0644,root,netdata,0644)
+%{_libdir}/%{name}/conf.d/go.d.conf
+%{_libdir}/%{name}/conf.d/go.d
 
 %changelog
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
