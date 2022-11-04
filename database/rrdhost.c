@@ -1112,7 +1112,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     freez(host->exporting_flags);
 
-    health_thread_stop(host);
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE

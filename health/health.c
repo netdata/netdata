@@ -606,15 +606,6 @@ static void health_thread_cleanup(void *ptr) {
     debug(D_HEALTH, "HEALTH %s: Health thread ended.", rrdhost_hostname(h->host));
 }
 
-void health_thread_stop(RRDHOST *host) {
-    if(host->health_spawn) {
-        log_health("[%s]: Signaling health thread to stop...", rrdhost_hostname(host));
-
-        // signal it to cancel
-        netdata_thread_cancel(host->health_thread);
-    }
-}
-
 static void initialize_health(RRDHOST *host, int is_localhost) {
     if(!host->health_enabled || rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) return;
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
@@ -889,7 +880,7 @@ void *health_main(void *ptr) {
 #ifdef ENABLE_ACLK
     unsigned int marked_aclk_reload_loop = 0;
 #endif
-    while(!netdata_exit) {
+    while(!netdata_exit && host->health_enabled) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
@@ -943,10 +934,6 @@ void *health_main(void *ptr) {
 
             log_health("[%s]: Resuming health checks after delay.", rrdhost_hostname(host));
             host->health_delay_up_to = 0;
-        }
-
-        if (unlikely(!host->health_enabled)) {
-            health_thread_stop(host);
         }
 
         // wait until cleanup of obsolete charts on children is complete
