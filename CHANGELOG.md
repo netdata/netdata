@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- do not resend charts upstream when chart variables are being updated [\#13946](https://github.com/netdata/netdata/pull/13946) ([ktsaou](https://github.com/ktsaou))
+- recalculate last\_collected\_total [\#13945](https://github.com/netdata/netdata/pull/13945) ([ktsaou](https://github.com/ktsaou))
 - fix chart definition end time\_t printing and parsing [\#13942](https://github.com/netdata/netdata/pull/13942) ([ktsaou](https://github.com/ktsaou))
+- Setup default certificates path [\#13941](https://github.com/netdata/netdata/pull/13941) ([MrZammler](https://github.com/MrZammler))
 - update link to point at demo spaces [\#13939](https://github.com/netdata/netdata/pull/13939) ([andrewm4894](https://github.com/andrewm4894))
 - Statsd dictionaries should be multi-threaded [\#13938](https://github.com/netdata/netdata/pull/13938) ([ktsaou](https://github.com/ktsaou))
+- Fix oracle linux \(eBPF plugin\) [\#13935](https://github.com/netdata/netdata/pull/13935) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update print message on startup [\#13934](https://github.com/netdata/netdata/pull/13934) ([andrewm4894](https://github.com/andrewm4894))
 - Rrddim acquire on replay set [\#13932](https://github.com/netdata/netdata/pull/13932) ([ktsaou](https://github.com/ktsaou))
 - fix compiling without dbengine [\#13931](https://github.com/netdata/netdata/pull/13931) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +21,7 @@
 - Return accidentaly removed 32bit RPi keep alive fix [\#13925](https://github.com/netdata/netdata/pull/13925) ([underhood](https://github.com/underhood))
 - error\_limit\(\) function to limit number of error lines per instance [\#13924](https://github.com/netdata/netdata/pull/13924) ([ktsaou](https://github.com/ktsaou))
 - fix crash on query plan switch [\#13920](https://github.com/netdata/netdata/pull/13920) ([ktsaou](https://github.com/ktsaou))
+- Enable aclk conversation log even without NETDATA\_INTERNAL CHECKS [\#13917](https://github.com/netdata/netdata/pull/13917) ([MrZammler](https://github.com/MrZammler))
 - add ping dashboard info and alarms [\#13916](https://github.com/netdata/netdata/pull/13916) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
 - do not free hosts if a change on db mode is not needed [\#13912](https://github.com/netdata/netdata/pull/13912) ([ktsaou](https://github.com/ktsaou))
@@ -337,10 +342,6 @@
 - fix\(cgroups.plugin\): adjust kubepods regex to fix name resolution in a kind cluster [\#13302](https://github.com/netdata/netdata/pull/13302) ([ilyam8](https://github.com/ilyam8))
 - Null terminate string if file read was not successful [\#13299](https://github.com/netdata/netdata/pull/13299) ([stelfrag](https://github.com/stelfrag))
 - fix\(health\): fix incorrect Redis dimension names [\#13296](https://github.com/netdata/netdata/pull/13296) ([ilyam8](https://github.com/ilyam8))
-- chore: remove python-mysql from install-required-packages.sh [\#13288](https://github.com/netdata/netdata/pull/13288) ([ilyam8](https://github.com/ilyam8))
-- Use new MQTT as default \(revert \#13258\)" [\#13287](https://github.com/netdata/netdata/pull/13287) ([underhood](https://github.com/underhood))
-- query engine fixes for alarms and dashboards [\#13282](https://github.com/netdata/netdata/pull/13282) ([ktsaou](https://github.com/ktsaou))
-- Better ACLK debug communication log [\#13281](https://github.com/netdata/netdata/pull/13281) ([underhood](https://github.com/underhood))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
