@@ -211,40 +211,82 @@ backlink to the task to run this module in debug mode
 
 The template that is used for Task files is:
 
-```
-  <!--
-  title: "Task title"
-  description: "Task description"
-  custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Tasks/sampletask.md
-  learn_topic_type: "Tasks"
-  learn_rel_path: "/sample_category"
-  learn_status: "published"
-  -->
-```
+<!--
+title: "Configure exporting engine "
+sidebar_label: "Configure exporting engine "
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-exporting-engine-.md"
+learn_status: "Published"
+sidebar_position: 10
+learn_topic_type: "Tasks"
+learn_rel_path: "manage-retained-metrics"
+learn_docs_purpose: "Instructions on how to configure the exporting engine to export metrics to an external target"
+-->
 
-## Description
+In this task, you will learn how to enable the exporting engine, and the exporting connector, followed by two examples
+using the OpenTSDB and Graphite connectors.
 
-A small description of the Task.
+:::note
+When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
+restart its process_, not the entire database of long-term metrics.
+:::
+
+Once you understand the process of enabling a connector, you can translate that knowledge to any other connector.
 
 ## Prerequisites
 
-Describe all the information that the user needs to know before proceeding with the task.
+You need to find the right connector for your external time-series
+database, and then you can proceed on with the task.
 
-## Context
+## Enable the exporting engine
 
-Describe the background information of the Task, the purpose of the Task, and what will the user achieve by completing it.
+1. Edit the `exporting.conf` configuration file,
+   by [editing the Netdata configuration](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md)
+   .
+2. Enable the exporting engine itself by setting `enabled` to `yes`:
 
-## Steps
+    ```conf
+    [exporting:global]
+        enabled = yes
+    ```
 
-A task consists of steps, here provide the actions needed from the user, so he can complete the task correctly.
+3. Save the file but keep it open, as you will edit it again to enable specific connectors.
 
-## Result
+### Example: Enable the OpenTSDB connector
 
-Describe the expected output/ outcome of the result.
+Use the following configuration as a starting point. Copy and paste it into `exporting.conf`.
 
-## Example
+```conf
+[opentsdb:http:my_opentsdb_http_instance]
+    enabled = yes
+    destination = localhost:4242
+```
 
-Provide any examples needed for the Task
+1. Replace `my_opentsdb_http_instance` with an instance name of your choice, and change the `destination` setting to the
+   IP
+   address or hostname of your OpenTSDB database.
+
+2. [Restart your Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md#restarting-the-agent)
+   to begin exporting to your OpenTSDB database. The
+   Netdata Agent exports metrics _beginning from the time the process starts_, and because it exports as metrics are
+   collected, you should start seeing data in your external database after only a few seconds.
+
+### Example: Enable the Graphite connector
+
+Use the following configuration as a starting point. Copy and paste it into `exporting.conf`.
+
+```conf
+[graphite:my_graphite_instance]
+    enabled = yes
+    destination = 203.0.113.0:2003
+```
+
+1. Replace `my_graphite_instance` with an instance name of your choice, and change the `destination` setting to the IP
+   address or hostname of your Graphite-supported database.
+
+2. [Restart your Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md#restarting-the-agent)
+   to begin exporting to your Graphite-supported database.
+   Because the Agent exports metrics as they're collected, you should start seeing data in your external database after
+   only a few seconds.
 
 </details>
 
@@ -675,11 +717,11 @@ Additionally, you should use a **Caution** admonition to provide necessary infor
 
 Documentation should link to relevant pages whenever it's relevant and provides valuable context to the reader.
 
-Links should always reference the full path to the document, beginning at the root of the Netdata Agent repository
-(`/`), and ending with the `.md` file extension. Avoid relative links or traversing up directories using `../`.
-
-For example, if you want to link to our node configuration document, link to `/docs/configure/nodes.md`. To reference
-the guide for deploying the Netdata Agent with Ansible, link to `/docs/guides/deploy/ansible.md`.
+Links should always reference the full path to the document as if you were going to click the link from a browser, and from there the ingest script will take care to do the rest.
+  
+If you are introducing a new file on the branch you are editing, and you want to link to that, lets say "https://github.com/netdata/netdata/blob/yourbranch/.../doc.md", to get it working when it is merged, change the "yourbranch" branch entry to "master",
+like: https://github.com/netdata/netdata/blob/master/.../doc.md to account for the file getting merged.
+  
 
 ### References to UI elements
 
