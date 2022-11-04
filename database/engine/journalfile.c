@@ -182,21 +182,23 @@ int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrden
     generate_journalfilepath(datafile, path, sizeof(path));
     generate_journalfilepath_v2(datafile, path_v2, sizeof(path));
 
-    ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
-    if (ret < 0) {
-        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
-    }
-    uv_fs_req_cleanup(&req);
+    if (unlikely(journalfile->file != -1)) {
+        ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
+        if (ret < 0) {
+            error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+            ++ctx->stats.fs_errors;
+            rrd_stat_atomic_add(&global_fs_errors, 1);
+        }
+        uv_fs_req_cleanup(&req);
 
-    ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
-    if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
+        if (ret < 0) {
+            error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+            ++ctx->stats.fs_errors;
+            rrd_stat_atomic_add(&global_fs_errors, 1);
+        }
+        uv_fs_req_cleanup(&req);
     }
-    uv_fs_req_cleanup(&req);
 
     // This is the new journal v2 index file
     ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
@@ -1299,16 +1301,19 @@ void migrate_journal_file_v2(
             internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
         }
 
-        // Close old journalfile -- not needed anymore
-        uv_fs_t req;
-        int ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
-        if (ret < 0) {
-            error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-            ++ctx->stats.fs_errors;
-            rrd_stat_atomic_add(&global_fs_errors, 1);
+        // Close file descriptor for all files except the last one
+        if (journalfile->datafile->fileno != ctx->last_fileno) {
+            // Close old journalfile -- not needed anymore
+            uv_fs_t req;
+            int ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
+            if (ret < 0) {
+                error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+                ++ctx->stats.fs_errors;
+                rrd_stat_atomic_add(&global_fs_errors, 1);
+            }
+            journalfile->file = -1;
+            uv_fs_req_cleanup(&req);
         }
-        journalfile->file = -1;
-        uv_fs_req_cleanup(&req);
     }
     else {
         // If we failed and didnt process the entire list, free the rest
