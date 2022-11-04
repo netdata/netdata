@@ -23,9 +23,10 @@ struct rrdengine_journalfile {
     uint64_t pos;
     void *data;
     uint16_t file_index;                        // File index
-    void *journal_data;                      // MMAPed file of journal v2
+    void *journal_data;                         // MMAPed file of journal v2
     uint32_t journal_data_size;                 // Total file size mapped
-    Pvoid_t JudyL_array;
+    Pvoid_t JudyL_array;                        // Used track active v2 descriptors
+    time_t last_access;                         // Last access for v2 descriptors to decide cleanup
     struct rrdengine_datafile *datafile;
 };
 
@@ -94,6 +95,7 @@ struct journal_v2_header {
     uint32_t page_offset;
     uint32_t extent_trailer_offset;     // CRC for entent list
     uint32_t metric_trailer_offset;     // CRC for metric list
+    uint32_t original_file_size;        // This is the original journal file
     uint32_t total_file_size;           // This is the total file size
     void *data;                         // Used when building the index
 };
