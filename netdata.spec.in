@@ -330,6 +330,11 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/log/%{name}"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 
 # ###########################################################
+# Install uninstaller script
+install -m 750 -p packaging/installer/netdata-uninstaller.sh \
+        "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/netdata-uninstaller.sh"
+
+# ###########################################################
 # Install netdata service
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
 install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
@@ -477,11 +482,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
-%{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
+%attr(0755,root,netdata) %{_sysconfdir}/%{name}/edit-config
+%attr(0644,root,netdata) %{_sysconfdir}/%{name}/.install-type
+%dir %{_sysconfdir}/%{name}/health.d
+%dir %{_sysconfdir}/%{name}/statsd.d
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %{_libdir}/%{name}
-%{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
@@ -489,10 +496,24 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_unitdir}/netdata.service
 %{_presetdir}/50-netdata.preset
 
+%dir %{_libexecdir}/%{name}
+%dir %{_libexecdir}/%{name}/plugins.d
 %defattr(0750,root,netdata,0750)
-
-%{_libexecdir}/%{name}/plugins.d
-
+%{_libexecdir}/%{name}/install-service.sh
+%{_libexecdir}/%{name}/netdata-updater.sh
+%{_libexecdir}/%{name}/netdata-uninstaller.sh
+%{_libexecdir}/%{name}/plugins.d/acl.sh
+%{_libexecdir}/%{name}/plugins.d/alarm-email.sh
+%{_libexecdir}/%{name}/plugins.d/alarm-notify.sh
+%{_libexecdir}/%{name}/plugins.d/alarm-test.sh
+%{_libexecdir}/%{name}/plugins.d/anonymous-statistics.sh
+%{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
+%{_libexecdir}/%{name}/plugins.d/health-cmdapi-test.sh
+%{_libexecdir}/%{name}/plugins.d/ioping.plugin
+%{_libexecdir}/%{name}/plugins.d/request.sh
+%{_libexecdir}/%{name}/plugins.d/system-info.sh
+%{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
+%{_libexecdir}/%{name}/plugins.d/template_dim.sh
 
 %if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
