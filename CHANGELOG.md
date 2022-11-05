@@ -31,6 +31,7 @@
 - Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin v0.41.2 [\#13903](https://github.com/netdata/netdata/pull/13903) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin function add max value on all value columns [\#13899](https://github.com/netdata/netdata/pull/13899) ([ktsaou](https://github.com/ktsaou))
+- Reduce unnecessary alert events to the cloud [\#13897](https://github.com/netdata/netdata/pull/13897) ([MrZammler](https://github.com/MrZammler))
 - add pandas collector to collectors.md [\#13895](https://github.com/netdata/netdata/pull/13895) ([andrewm4894](https://github.com/andrewm4894))
 - Fix reading health "enable" from the configuration [\#13894](https://github.com/netdata/netdata/pull/13894) ([stelfrag](https://github.com/stelfrag))
 - fix\(proc.plugin\): fix read retry logic when reading interface speed [\#13893](https://github.com/netdata/netdata/pull/13893) ([ilyam8](https://github.com/ilyam8))
@@ -238,7 +239,6 @@
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 - Remove Alpine 3.13 from CI and official support. [\#13415](https://github.com/netdata/netdata/pull/13415) ([Ferroin](https://github.com/Ferroin))
 - Modify PID monitoring \(ebpf.plugin\) [\#13397](https://github.com/netdata/netdata/pull/13397) ([thiagoftsm](https://github.com/thiagoftsm))
-- Support chart labels in alerts [\#13290](https://github.com/netdata/netdata/pull/13290) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
