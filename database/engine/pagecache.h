@@ -67,7 +67,7 @@ struct rrdeng_page_descr {
     uint32_t update_every_s:24;
     uint8_t type;
     uint32_t page_length;
-    uv_file datafile_fd;
+    uv_file file;               // This is the datafile this descriptor belongs
     void *extent_entry;
 };
 
@@ -227,6 +227,7 @@ void rrdeng_page_descr_use_mmap(void);
 bool rrdeng_page_descr_is_mmap(void);
 struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void);
 void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr);
+void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index);
 
 static inline void
     pg_cache_atomic_get_pg_info(struct rrdeng_page_descr *descr, usec_t *end_time_ut_p, uint32_t *page_lengthp)

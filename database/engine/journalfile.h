@@ -25,7 +25,7 @@ struct rrdengine_journalfile {
     uint16_t file_index;                        // File index
     void *journal_data;                         // MMAPed file of journal v2
     uint32_t journal_data_size;                 // Total file size mapped
-    Pvoid_t JudyL_array;                        // Used track active v2 descriptors
+    Pvoid_t JudyL_array;                        // Used to track active v2 descriptors
     time_t last_access;                         // Last access for v2 descriptors to decide cleanup
     struct rrdengine_datafile *datafile;
 };
@@ -58,7 +58,7 @@ struct journal_page_header {
 struct journal_page_list {
     uint32_t delta_start_s;    // relative to the start time of journal
     uint32_t delta_end_s;      // relative to delta_start
-    uint32_t extent_index;   // Index to the extent (extent list) (bytes from BASE)
+    uint32_t extent_index;     // Index to the extent (extent list) (bytes from BASE)
     uint16_t update_every_s;
     uint16_t page_length;
     uint8_t type;
@@ -115,12 +115,13 @@ struct transaction_commit_log {
 };
 
 void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
+void generate_journalfilepath_v2(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 void *wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned size);
 void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc);
 int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int unlink_journal_file(struct rrdengine_journalfile *journalfile);
-int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
+int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                              struct rrdengine_datafile *datafile);

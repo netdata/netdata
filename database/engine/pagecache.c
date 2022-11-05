@@ -136,7 +136,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     descr->update_every_s = 0;
     descr->extent_entry = NULL;
     descr->type = 0;
-    descr->datafile_fd = -1;
+    descr->file = -1;
 
     return descr;
 }
@@ -607,7 +607,7 @@ bool descr_exists_unsafe( struct pg_cache_page_index *page_index, time_t start_t
     return (NULL != JudyLGet(page_index->JudyL_array, start_time_s, PJE0));
 }
 
-static void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index)
+void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index)
 {
     Pvoid_t *PValue;
 
@@ -618,6 +618,34 @@ static void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrd
     uv_rwlock_wrunlock(&pg_cache->v2_lock);
 }
 
+static void update_journal_access_time(struct rrdengine_journalfile *journalfile, struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
+{
+    if (journalfile) {
+        journalfile->last_access = now_realtime_sec();
+        return;
+    }
+
+    if (unlikely(!page_index || !descr))
+        return;
+
+    struct rrdengine_instance *ctx = page_index->ctx;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile) {
+        journalfile = datafile->journalfile;
+        if (!journalfile->journal_data) {
+            datafile = datafile->next;
+            continue;
+        }
+        if (datafile->file == descr->file) {
+            journalfile->last_access = now_realtime_sec();
+            break;
+        }
+        datafile = datafile->next;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+}
 
 // Note: We have read lock on page index
 // We release and escalate to write lock
@@ -647,8 +675,9 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
 
     struct rrdeng_page_descr *descr = NULL;
 
-    uv_rwlock_rdunlock(&page_index->lock);
-    uv_rwlock_wrlock(&page_index->lock);
+    bool journal_updated = false;
+    bool rw_lock_acquired = false;
+
     // We will cache pages_to_cache pages or until our end time is out of range
     for (uint32_t x = pos; x < pages_to_cache; x++) {
 
@@ -667,7 +696,13 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
             new_descr->extent_entry = &extent_list[page_entry->extent_index];
             new_descr->type = page_entry->type;
             new_descr->update_every_s = page_entry->update_every_s;
-            new_descr->datafile_fd = datafile->file;
+            new_descr->file = datafile->file;
+
+            if (false == rw_lock_acquired) {
+                uv_rwlock_rdunlock(&page_index->lock);
+                uv_rwlock_wrlock(&page_index->lock);
+                rw_lock_acquired = true;
+            }
 
             struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
             if (unlikely(added_descr != new_descr))
@@ -677,12 +712,19 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
                 descr = added_descr;
                 // Mark the area to check
                 mark_journalfile_descriptor(pg_cache, datafile->journalfile, page_offset, x);
+                journal_updated = true;
             }
         }
     }
 
-    uv_rwlock_wrunlock(&page_index->lock);
-    uv_rwlock_rdlock(&page_index->lock);
+    if (!journal_updated)
+        update_journal_access_time(datafile->journalfile, NULL, NULL);
+
+    // Check if we have switched to rw lock for the page index and switch back
+    if (rw_lock_acquired) {
+        uv_rwlock_wrunlock(&page_index->lock);
+        uv_rwlock_rdlock(&page_index->lock);
+    }
     return descr;
 };
 
@@ -693,10 +735,13 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 
 //
 // Steps
-// 1. Find which journal has the start time / end time range
+// 1. Find which journal has the start time within its range
 // 2. Find the UUID in that journal
 // 3. Find the array of times for that UUID (convert from the journal header to the offset needed)
 // Note: We have page_index lock
+// cache pages is the maximum pages to fetch (create metadata for)
+// This will be limited by the end_time or if we run out of pages in the matching journal
+// pages that could be precached but exist in another journal will not be precached
 static struct rrdeng_page_descr *populate_page_index(
     struct pg_cache_page_index *page_index,
     usec_t start_time_ut,
@@ -770,6 +815,7 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     if (likely(NULL != PValue)) {
         descr = *PValue;
         if (is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
+            update_journal_access_time(NULL, page_index, descr);
             return descr;
         }
     }
@@ -783,6 +829,7 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     if (likely(NULL != PValue)) {
         descr = *PValue;
         if (is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
+            update_journal_access_time(NULL, page_index, descr);
             return descr;
         }
     }
@@ -1125,7 +1172,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
             if (NULL == next) {
                 continue;
             }
-            if (descr->extent && descr->extent == next->extent) {
+            if (!descr->extent_entry && (descr->extent && descr->extent == next->extent)) {
                 /* same extent, consolidate */
                 if (!pg_cache_try_reserve_pages(ctx, 1)) {
                     failed_to_reserve = 1;
