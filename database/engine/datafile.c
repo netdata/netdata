@@ -1,9 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+
+void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
+{
+    struct extent_info *extent = datafile->extents.first, *next_extent;
+    while (extent) {
+        next_extent = extent->next;
+        freez(extent);
+        extent = next_extent;
+    }
+    datafile->extents.first = NULL;
+}
+
 void df_extent_insert(struct extent_info *extent)
 {
     struct rrdengine_datafile *datafile = extent->datafile;
+    uv_rwlock_wrlock(&datafile->ctx->datafiles.rwlock);
 
     if (likely(NULL != datafile->extents.last)) {
         datafile->extents.last->next = extent;
@@ -12,6 +25,8 @@ void df_extent_insert(struct extent_info *extent)
         datafile->extents.first = extent;
     }
     datafile->extents.last = extent;
+
+    uv_rwlock_wrunlock(&datafile->ctx->datafiles.rwlock);
 }
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
@@ -29,16 +44,12 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
-void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_datafile *next;
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
     next = datafile->next;
     fatal_assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
     ctx->datafiles.first = next;
-
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 
@@ -104,7 +115,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
     return ret;
 }
 
-int destroy_data_file(struct rrdengine_datafile *datafile)
+int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
@@ -183,7 +194,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     uv_fs_req_cleanup(&req);
     posix_memfree(superblock);
     if (ret < 0) {
-        destroy_data_file(datafile);
+        destroy_data_file_unsafe(datafile);
         return ret;
     }
 
@@ -414,7 +425,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsi
     return 0;
 
 error_after_journalfile:
-    destroy_data_file(datafile);
+    destroy_data_file_unsafe(datafile);
     freez(journalfile);
 error_after_datafile:
     freez(datafile);
