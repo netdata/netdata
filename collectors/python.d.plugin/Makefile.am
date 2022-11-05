@@ -91,6 +91,7 @@ include tor/Makefile.inc
 include traefik/Makefile.inc
 include uwsgi/Makefile.inc
 include varnish/Makefile.inc
+include vnstat/Makefile.inc
 include w1sensor/Makefile.inc
 include zscores/Makefile.inc
 
