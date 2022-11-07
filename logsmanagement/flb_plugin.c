@@ -205,11 +205,8 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
     buff->in->data[buff->in->text_size - 1] = '\0'; 
 
     /* Store status (timestamp and text_size must have already been 
-     * stored during flb_write_to_buff_cb() ). 
-     * IMPORTANT! Systemd logs and docker events logs have already been parsed, 
-     * so in that case set status to DONE. */
-    buff->in->status = (p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_DOCKER_EV) ? 
-                        CIRC_BUFF_ITEM_STATUS_DONE : CIRC_BUFF_ITEM_STATUS_UNPROCESSED;
+     * stored during flb_write_to_buff_cb() ). */
+    buff->in->status = CIRC_BUFF_ITEM_STATUS_UNPROCESSED;
 
     /* Load max size of compressed buffer, as calculated previously */
     size_t text_compressed_buff_max_size = buff->in->text_compressed_size;
