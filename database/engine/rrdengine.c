@@ -301,13 +301,19 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     trailer = xt_io_descr->buf + xt_io_descr->bytes - sizeof(*trailer);
 
     if (unlikely(read_failed)) {
-        struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
+        struct rrdengine_datafile *datafile = NULL;
+        if (xt_io_descr->descr_array[0]->extent)
+            datafile = xt_io_descr->descr_array[0]->extent->datafile;
 
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u-%u.", __func__, xt_io_descr->pos,
-              xt_io_descr->bytes, datafile->tier, datafile->fileno);
+        if (datafile)
+            error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u-%u.", __func__, xt_io_descr->pos,
+                  xt_io_descr->bytes, datafile->tier, datafile->fileno);
+        else
+            error("%s: uv_fs_read - extent at offset %"PRIu64"(%u)", __func__, xt_io_descr->pos,
+                  xt_io_descr->bytes);
         goto after_crc_check;
     }
     crc = crc32(0L, Z_NULL, 0);

@@ -1415,16 +1415,11 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     if (ctx->last_fileno == journalfile->datafile->fileno)
         return 0;
 
-    int migrate_on_startup = 1;
-
-    if (migrate_on_startup) {
-        if (should_try_migration == 1)
-            migrate_journal_file_v2(datafile, true, true);
-        else
-            error_report("File %s cannot be migrated to the new journal format. Index will be allocated in memory", path);
-    }
+    if (should_try_migration == 1)
+        migrate_journal_file_v2(datafile, true, true);
     else
-        info("Migration will happen as the agent is running");
+        error_report("File %s cannot be migrated to the new journal format. Index will be allocated in memory", path);
+
     return 0;
 
     error:
