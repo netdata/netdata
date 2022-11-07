@@ -298,6 +298,11 @@ unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
     return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
+unsigned long pg_cache_warn_limit(struct rrdengine_instance *ctx)
+{
+    return ctx->cache_pages_warn_watermark + (unsigned long)ctx->metric_API_max_producers;
+}
+
 /*
  * This function returns the maximum number of dirty pages that are committed to be written to disk allowed in the page
  * cache.
@@ -1011,8 +1016,11 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
-    if (page_index && page_index->alignment && alignment && page_index->alignment != alignment)
-        return NULL;
+    if (page_index && page_index->alignment && alignment && page_index->alignment != alignment) {
+        struct page_cache *pg_cache = &ctx->pg_cache;
+        if (pg_cache->populated_pages >=  pg_cache_warn_limit(ctx))
+            return NULL;
+    }
 
     if ((NULL == PValue) || !pg_cache_try_reserve_pages(ctx, 1)) {
         /* Failed to find page or failed to reserve a spot in the cache */

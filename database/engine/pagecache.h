@@ -217,6 +217,7 @@ void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct
 void pg_cache_update_metric_times(struct pg_cache_page_index *page_index);
 unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx);
 unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx);
+unsigned long pg_cache_warn_limit(struct rrdengine_instance *ctx);
 unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx);
 
 void rrdeng_page_descr_aral_go_singlethreaded(void);

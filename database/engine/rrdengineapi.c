@@ -1030,6 +1030,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->max_cache_pages = page_cache_mb * (1048576LU / RRDENG_BLOCK_SIZE);
     /* try to keep 5% of the page cache free */
     ctx->cache_pages_low_watermark = (ctx->max_cache_pages * 95LLU) / 100;
+    ctx->cache_pages_warn_watermark = (ctx->max_cache_pages * 90LLU) / 100;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->max_disk_space = disk_space_mb * 1048576LLU;

@@ -270,6 +270,7 @@ struct rrdengine_instance {
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
+    unsigned long cache_pages_warn_watermark;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
