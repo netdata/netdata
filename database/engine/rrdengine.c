@@ -382,7 +382,7 @@ after_crc_check:
     }
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0], sizeof(uuid_t));
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0]->id, sizeof(uuid_t));
     struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
