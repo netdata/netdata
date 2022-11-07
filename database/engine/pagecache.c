@@ -1017,7 +1017,6 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
     if (page_index && page_index->alignment && alignment && page_index->alignment != alignment) {
-        struct page_cache *pg_cache = &ctx->pg_cache;
         if (pg_cache->populated_pages >=  pg_cache_warn_limit(ctx))
             return NULL;
     }
