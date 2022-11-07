@@ -54,15 +54,6 @@ AutoReqProv: yes
 # Redefine centos_ver to standardize on a single macro
 %{?rhel:%global centos_ver %rhel}
 
-#
-# Conditional build:
-%bcond_without  netns    # build with netns support (cgroup-network)
-
-%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
-%else
-%undefine	with_netns
-%endif
-
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	%{version}
@@ -503,10 +494,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/netdata-updater.sh
 %{_libexecdir}/%{name}/netdata-uninstaller.sh
 %{_libexecdir}/%{name}/plugins.d/acl.sh
+%{_libexecdir}/%{name}/plugins.d/alarm.sh
 %{_libexecdir}/%{name}/plugins.d/alarm-email.sh
 %{_libexecdir}/%{name}/plugins.d/alarm-notify.sh
 %{_libexecdir}/%{name}/plugins.d/alarm-test.sh
 %{_libexecdir}/%{name}/plugins.d/anonymous-statistics.sh
+%{_libexecdir}/%{name}/plugins.d/cgroup-name.sh
 %{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
 %{_libexecdir}/%{name}/plugins.d/health-cmdapi-test.sh
 %{_libexecdir}/%{name}/plugins.d/ioping.plugin
@@ -515,13 +508,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
 %{_libexecdir}/%{name}/plugins.d/template_dim.sh
 
-%if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
-%endif
 
 # ebpf plugin
 %if 0%{?_have_ebpf}
