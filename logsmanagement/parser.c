@@ -16,7 +16,6 @@
 #include <math.h>
 
 static regex_t vhost_regex, req_client_regex, cipher_suite_regex;
-// static int regexs_initialised = 0;
 
 const char* const csv_auto_format_guess_matrix[] = {
     "$host:$server_port $remote_addr - - [$time_local] \"$request\" $status $body_bytes_sent - - $request_length $request_time $upstream_response_time", // csvVhostCustom4
@@ -242,22 +241,19 @@ static inline char **parse_csv( const char *line, const char delimiter, int num_
 }
 
 /**
- * @brief Search a buffer for a keyword
- * @details Search the source buffer for a keyword and copy matches to the 
- * destination buffer
+ * @brief Search a buffer for a keyword (or regular expression)
+ * @details Search the source buffer for a keyword (or regular expression) and 
+ * copy matches to the destination buffer.
  * @param[in] src The source buffer to be searched
  * @param[in] src_sz Size of \p src
  * @param[in, out] dest The destination buffer where the results will be 
- * written out to. If NULL, 
+ * written out to. If NULL, the results will just be discarded.
  * @param[out] dest_sz Size of \p dest
  * @param[in] keyword The keyword or pattern to be searched in the src buffer
  * @param[in] regex The precompiled regular expression to be search in the 
- * src buffer. If NULL, the /p keyword will be used instead.
- * @param[in] ignore_case Case insensitive search if 1, it does not matter if 
- * keyword characters.
- * are upper or lower case. 
+ * src buffer. If NULL, \p keyword will be used instead.
+ * @param[in] ignore_case Perform case insensitive search if 1.
  * @return Number of matches, or -1 in case of error
- * @todo Sanitise keyword (escape regex special characters)
  */
 int search_keyword( char *src, size_t src_sz, 
                     char *dest, size_t *dest_sz, 
@@ -307,7 +303,6 @@ int search_keyword( char *src, size_t src_sz,
 }
 
 /**
- * 
  * @brief Extract web log parser configuration from string
  * @param[in] log_format String that describes the log format
  * @param[in] delimiter Delimiter to be used when parsing a CSV log format
@@ -455,13 +450,19 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
     return wblp_config;
 }
 
+/**
+ * @brief Parse a web log line to extract individual fields.
+ * @param[in] wblp_config Configuration that specifies how to parse the line.
+ * @param[in] line Web log record to be parsed. '\n' or '\0' terminated.
+ * @param[out] log_line_parsed Struct that stores the results of parsing.
+ */
 static void parse_web_log_line( const Web_log_parser_config_t *wblp_config, 
                                 char *line, Log_line_parsed_t *log_line_parsed){
 
     /* Read parsing configuration */
     web_log_line_field_t *fields_format = wblp_config->fields;
     const int num_fields_config = wblp_config->num_fields;
-    const char delimiter = ' ';
+    const char delimiter = wblp_config->delimiter;
     const int verify = wblp_config->verify_parsed_logs;
 
     char *field = line;
@@ -1274,6 +1275,14 @@ next_item:
     }
 }
 
+/**
+ * @brief Extract web log metrics from a group of web log fields.
+ * @param[in] parser_config Configuration specifying how and what web log 
+ * metrics to extract.
+ * @param[in] line_parsed Web logs fields extracted from a web log line.
+ * @param[out] metrics Web logs metrics exctracted from the \p line_parsed 
+ * web log fields, using the \p parser_config configuration.
+ */
 static inline void extract_web_log_metrics( Log_parser_config_t *parser_config, 
                                             Log_line_parsed_t *line_parsed, 
                                             Log_parser_metrics_t *metrics){
@@ -1546,6 +1555,15 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
     }
 }
 
+/**
+ * @brief Extract web log metrics from web log records stored in a buffer.
+ * @param[in] text Buffer containing web logs
+ * @param[in] text_size Size of \p text
+ * @param[in] parser_config Configuration specifying how and what web log 
+ * metrics to extract.
+ * @param[out] parser_metrics Extracted metrics.
+ * @returns -1 in case of error or 0 in case of success.
+ */
 int parse_web_log_buf( char *text, size_t text_size, 
                        Log_parser_config_t *parser_config, 
                        Log_parser_metrics_t *parser_metrics){
@@ -1603,6 +1621,16 @@ int parse_web_log_buf( char *text, size_t text_size,
     return 0;
 }
 
+/**
+ * @brief Try to automatically detect the configuration for a web log parser.
+ * @details It tries to automatically detect the configuration to be used for
+ * a web log parser, by parsing a single web log line record and trying to pick 
+ * a matching configuration (from a static list of predefined ones.)
+ * @param[in] line Web log line to use in guessing the configuration.
+ * @param[in] delimiter Delimiter used to break down \p line in separate fields.
+ * @returns Pointer to the web log parser configuration if automatic detection
+ * was sucessful, otherwise NULL.
+ */
 Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter){
     for(int i = 0; csv_auto_format_guess_matrix[i] != NULL; i++){
         Web_log_parser_config_t *wblp_config = read_web_log_parser_config(csv_auto_format_guess_matrix[i], delimiter);
