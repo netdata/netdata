@@ -782,7 +782,10 @@ static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct 
 
     return false;
 }
-#define JOURVAL_V2_DESCRIPTOR_EXPIRATION_TIME (60)
+
+#ifndef DESCRIPTOR_EXPIRATION_TIME
+#define DESCRIPTOR_EXPIRATION_TIME (600)
+#endif
 
 void check_journal_file(struct rrdengine_journalfile *journalfile)
 {
@@ -798,7 +801,7 @@ void check_journal_file(struct rrdengine_journalfile *journalfile)
 
     uv_rwlock_rdlock(&pg_cache->v2_lock);
 
-    bool expired = ((now_realtime_sec() - journalfile->last_access) > JOURVAL_V2_DESCRIPTOR_EXPIRATION_TIME);
+    bool expired = ((now_realtime_sec() - journalfile->last_access) > DESCRIPTOR_EXPIRATION_TIME);
 
     for (page_address = 0,
         PValue = JudyLFirst(journalfile->JudyL_array, &page_address, PJE0),
@@ -1208,7 +1211,9 @@ static void delete_old_data(void *arg)
 }
 
 #define DESCRIPTOR_INITIAL_CLEANUP    (60)
-#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
+#ifndef DESCRIPTOR_INTERVAL_CLEANUP
+#define DESCRIPTOR_INTERVAL_CLEANUP    (60)
+#endif
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
