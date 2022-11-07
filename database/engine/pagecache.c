@@ -691,10 +691,12 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
         if (delta_end_time_s < page_entry->delta_start_s)
             break;
 
-        if (!descr_exists_unsafe(page_index, (journal_start_time_s + page_entry->delta_start_s))) {
+        time_t index_time_s = (time_t) (journal_start_time_s + page_entry->delta_start_s);
+
+        if (!descr_exists_unsafe(page_index, index_time_s)) {
             struct rrdeng_page_descr *new_descr = pg_cache_create_descr();
             new_descr->page_length = page_entry->page_length;
-            new_descr->start_time_ut = (journal_start_time_s + page_entry->delta_start_s) * USEC_PER_SEC;
+            new_descr->start_time_ut = index_time_s * USEC_PER_SEC;
             new_descr->end_time_ut = (journal_start_time_s + page_entry->delta_end_s) * USEC_PER_SEC;
             new_descr->id = &page_index->id;
             new_descr->extent = NULL;
