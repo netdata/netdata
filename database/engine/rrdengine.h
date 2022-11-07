@@ -74,7 +74,6 @@ enum rrdeng_opcode {
     RRDENG_SHUTDOWN,
     RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
     RRDENG_QUIESCE,
-    RRDENG_DELETE_DESCRIPTORS,
 
     RRDENG_MAX_OPCODE
 };
@@ -171,7 +170,9 @@ struct rrdengine_worker_config {
 
     /* file deletion thread */
     uv_thread_t *now_deleting_files;
+    uv_thread_t *now_deleting_descriptors;
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
+    unsigned long cleanup_deleting_descriptors;  /* set to 0 when now_deleting_descriptors is still running */
 
     uint8_t running_journal_migration;
     uint8_t delete_descriptors;

@@ -738,15 +738,6 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
     }
 }
 
-void after_delete_descriptors(uv_work_t *req, int status __maybe_unused)
-{
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_worker_config *wc = req->loop->data;
-
-    wc->delete_descriptors = 0;
-    freez(work_request);
-}
-
 static struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid)
 {
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -927,14 +918,23 @@ static bool migrate_journalfile_descriptors(struct rrdengine_instance *ctx, stru
     return true;
 }
 
-void delete_descriptors(uv_work_t *req)
+void after_delete_descriptors(struct rrdengine_worker_config* wc)
 {
-    struct rrdengine_worker_config *wc = req->loop->data;
-    struct rrdengine_instance *ctx = wc->ctx;
-    struct page_cache *pg_cache = &ctx->pg_cache;
+    int error = uv_thread_join(wc->now_deleting_descriptors);
+    if (error)
+        error("uv_thread_join(): %s", uv_strerror(error));
+    freez(wc->now_deleting_descriptors);
+    wc->now_deleting_descriptors = NULL;
+    wc->cleanup_deleting_descriptors = 0;
+    /* interrupt event loop */
+    uv_stop(wc->loop);
+}
 
-    if (unlikely(ctx->quiesce != NO_QUIESCE)) /* Shutting down */
-        return;
+void delete_descriptors(void *arg)
+{
+    struct rrdengine_instance *ctx = arg;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct rrdengine_worker_config *wc = &ctx->worker_config;
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
@@ -945,7 +945,6 @@ void delete_descriptors(uv_work_t *req)
             datafile = datafile->next;
             continue;
         }
-
 
         // migrate journalfile descriptors
 #if 0
@@ -963,6 +962,8 @@ void delete_descriptors(uv_work_t *req)
     }
 
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    wc->cleanup_deleting_descriptors = 1;
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 void flush_pages_cb(uv_fs_t* req)
@@ -1286,13 +1287,21 @@ static void delete_old_data(void *arg)
     fatal_assert(0 == uv_async_send(&wc->async));
 }
 
+#define DESCRIPTOR_INITIAL_CLEANUP    (60)
+#define DESCRIPTOR_INTERVAL_CLEANUP    (60)
+
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
+    static time_t next_descriptor_cleanup = 0;
     struct rrdengine_instance *ctx = wc->ctx;
     struct rrdengine_datafile *datafile;
     unsigned current_size, target_size;
     uint8_t out_of_space, only_one_datafile;
     int ret, error;
+
+    if (0 == next_descriptor_cleanup) {
+        next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INITIAL_CLEANUP;
+    }
 
     out_of_space = 0;
     /* Do not allow the pinned pages to exceed the disk space quota to avoid deadlocks */
@@ -1305,6 +1314,20 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     only_one_datafile = (datafile == ctx->datafiles.first) ? 1 : 0;
+
+    if (!wc->now_deleting_files && !wc->now_deleting_descriptors && !out_of_space && NO_QUIESCE == ctx->quiesce && next_descriptor_cleanup < now_realtime_sec()) {
+        next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INTERVAL_CLEANUP;
+
+        wc->now_deleting_descriptors = mallocz(sizeof(*wc->now_deleting_descriptors));
+        wc->cleanup_deleting_descriptors = 0;
+        error = uv_thread_create(wc->now_deleting_descriptors, delete_descriptors, ctx);
+        if (error) {
+            error("uv_thread_create(): %s", uv_strerror(error));
+            freez(wc->now_deleting_descriptors);
+            wc->now_deleting_descriptors = NULL;
+        }
+    }
+
     if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
         /* Finalize data and journal file and create a new pair */
         wal_flush_transaction_buffer(wc);
@@ -1341,7 +1364,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 {
-    if (wc->now_invalidating_dirty_pages || wc->now_deleting_files) {
+    if (wc->now_invalidating_dirty_pages || wc->now_deleting_files || wc->now_deleting_descriptors) {
         return 1;
     }
     return 0;
@@ -1357,6 +1380,10 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
     if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
     }
+
+    if (unlikely(wc->cleanup_deleting_descriptors))
+        after_delete_descriptors(wc);
+
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
         ctx->quiesce = QUIESCED;
         completion_mark_complete(&ctx->rrdengine_completion);
@@ -1517,9 +1544,6 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
-//    static time_t next_journal_indexing_check =0;
-    static time_t next_descriptor_cleanup =0;
-
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
     struct rrdengine_worker_config* wc = handle->data;
@@ -1568,35 +1592,6 @@ void timer_cb(uv_timer_t* handle)
         debug(D_RRDENGINE, "%s", get_rrdeng_statistics(wc->ctx, buf, sizeof(buf)));
     }
 #endif
-
-//    if (unlikely(!next_journal_indexing_check))
-//        next_journal_indexing_check = now_realtime_sec() + 60;
-//
-//    if (next_journal_indexing_check < now_realtime_sec()) {
-//        next_journal_indexing_check = now_realtime_sec() + 60;
-//        if (!wc->running_journal_migration && ctx->quiesce == NO_QUIESCE) {
-//            internal_error(true, "Checking for journal files that need indexing");
-//
-//            struct rrdeng_work *work_request;
-//            work_request = mallocz(sizeof(*work_request));
-//            work_request->req.data = work_request;
-//            work_request->wc = wc;
-//            wc->running_journal_migration = 1;
-//            if (unlikely(
-//                    uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
-//                freez(work_request);
-//                wc->running_journal_migration = 0;
-//            }
-//        }
-//    }
-
-//    if (next_descriptor_cleanup < now_realtime_sec()) {
-//        next_descriptor_cleanup = now_realtime_sec() + 30;
-//
-//        struct rrdeng_cmd cmd;
-//        cmd.opcode = RRDENG_DELETE_DESCRIPTORS;
-//        rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-//    }
     worker_is_idle();
 }
 
@@ -1733,23 +1728,6 @@ void rrdeng_worker(void* arg)
                 rrdeng_invalidate_oldest_committed(wc);
                 break;
             }
-            case RRDENG_DELETE_DESCRIPTORS:
-                ;
-
-                if (wc->delete_descriptors == 0) {
-                    wc->delete_descriptors = 1;
-                    struct rrdeng_work  *work_request;
-                    work_request = mallocz(sizeof(*work_request));
-                    work_request->req.data = work_request;
-                    if (unlikely(
-                            uv_queue_work(loop, &work_request->req,
-                                          delete_descriptors, after_delete_descriptors))) {
-                        freez(work_request);
-                        wc->delete_descriptors = 0;
-                    }
-                }
-
-                break;
             default:
                 debug(D_RRDENGINE, "%s: default.", __func__);
                 break;
