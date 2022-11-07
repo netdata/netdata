@@ -547,9 +547,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %endif
 
 # NFACCT belongs to a different sub-package
-%if 0%{!?ol8} && 0%{!?ol9} && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
-%endif
 
 # Charts.d belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/charts.d.plugin
@@ -615,7 +613,6 @@ Requires: netdata = %{version}
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
-%if 0%{!?ol8} && 0%{!?ol9} && 0%{?centos_ver} != 7
 %package plugin-nfacct
 Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
@@ -630,7 +627,6 @@ Requires: netdata = %{version}
 
 %files plugin-nfacct
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
-%endif
 
 %package plugin-chartsd
 Summary: The charts.d metrics collection plugin for the Netdata Agent
