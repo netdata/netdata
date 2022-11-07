@@ -1166,7 +1166,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 // activate : make the new file active immediately
 //            journafile data will be set and descriptors (if deleted) will be repopulated as needed
 // startup  : if the migration is done during agent startup
-//            this will allow us to optomize certain things
+//            this will allow us to optimize certain things
 void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate, bool startup)
 {
     char path[RRDENG_PATH_MAX];
