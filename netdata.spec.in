@@ -503,6 +503,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
 %{_libexecdir}/%{name}/plugins.d/health-cmdapi-test.sh
 %{_libexecdir}/%{name}/plugins.d/ioping.plugin
+%{_libexecdir}/%{name}/plugins.d/loopsleepms.sh.inc
 %{_libexecdir}/%{name}/plugins.d/request.sh
 %{_libexecdir}/%{name}/plugins.d/system-info.sh
 %{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
