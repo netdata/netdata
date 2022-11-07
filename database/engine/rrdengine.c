@@ -407,10 +407,6 @@ after_crc_check:
         }
         is_prefetched_page = 0;
         if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
-            struct page_cache *pg_cache = &ctx->pg_cache;
-            if (pg_cache->populated_pages >= ctx->cache_pages_low_watermark)
-                continue;
-
             descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid, header->descr[i].start_time_ut, alignment);
             if (!descr)
                 continue; /* Failed to reserve a suitable page */
@@ -786,7 +782,7 @@ static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct 
 
     return false;
 }
-#define JOURVAL_V2_DESCRIPTOR_EXPIRATION_TIME (600)
+#define JOURVAL_V2_DESCRIPTOR_EXPIRATION_TIME (60)
 
 void check_journal_file(struct rrdengine_journalfile *journalfile)
 {
@@ -1212,7 +1208,7 @@ static void delete_old_data(void *arg)
 }
 
 #define DESCRIPTOR_INITIAL_CLEANUP    (60)
-#define DESCRIPTOR_INTERVAL_CLEANUP    (60)
+#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
