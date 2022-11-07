@@ -7618,7 +7618,7 @@ netdataDashboard.context = {
         info: '<p>Critical warnings for the status of the controller. Status active if set to 1.</p><p><b>AvailableSpare</b> - the available spare capacity is below the threshold. <b>TempThreshold</b> - the composite temperature is greater than or equal to an over temperature threshold or less than or equal to an under temperature threshold. <b>NvmSubsystemReliability</b> - the NVM subsystem reliability is degraded due to excessive media or internal errors. <b>ReadOnly</b> - media is placed in read-only mode. <b>VolatileMemBackupFailed</b> - the volatile memory backup device has failed. <b>PersistentMemoryReadOnly</b> - the Persistent Memory Region has become read-only or unreliable.</p>'
     },
     'nvme.device_media_errors_rate': {
-        info: 'The number of occurrences where the controller detected an unrecovered data integrity error. Errors such as uncorrectable ECC, CRC checksum failure, or LBA tag mismatch are included in this field.'
+        info: 'The number of occurrences where the controller detected an unrecovered data integrity error. Errors such as uncorrectable ECC, CRC checksum failure, or LBA tag mismatch are included in this counter.'
     },
     'nvme.device_error_log_entries_rate': {
         info: 'The number of entries in the Error Information Log. By itself, an increase in the number of records is not an indicator of any failure condition.'
