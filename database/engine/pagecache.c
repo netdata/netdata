@@ -991,8 +991,11 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
  *         2. It did not succeed to get a reference.
  *         3. It did not succeed to reserve a spot in the page cache.
  */
-struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t *id,
-                                                               usec_t start_time_ut)
+struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(
+    struct rrdengine_instance *ctx,
+    uuid_t(*id),
+    usec_t start_time_ut,
+    struct pg_alignment *alignment)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
@@ -1008,6 +1011,9 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_
         page_index = *PValue;
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if (page_index->alignment && alignment && page_index->alignment != alignment)
+        return NULL;
 
     if ((NULL == PValue) || !pg_cache_try_reserve_pages(ctx, 1)) {
         /* Failed to find page or failed to reserve a spot in the cache */

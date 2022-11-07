@@ -283,6 +283,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     struct rrdengine_instance *ctx = wc->ctx;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     int ret;
     unsigned i, j, count;
     void *page, *uncompressed_buf = NULL;
@@ -374,6 +375,13 @@ after_crc_check:
         }
     }
 
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0], sizeof(uuid_t));
+    struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    struct pg_alignment *alignment = likely(NULL != page_index) ? page_index->alignment : NULL;
+
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
         uint8_t is_prefetched_page;
         descr = NULL;
@@ -397,8 +405,7 @@ after_crc_check:
 //            if (pg_cache->populated_pages >= ctx->cache_pages_low_watermark)
 //                continue;
 
-            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid,
-                                                         header->descr[i].start_time_ut);
+            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid, header->descr[i].start_time_ut, alignment);
             if (!descr)
                 continue; /* Failed to reserve a suitable page */
             is_prefetched_page = 1;
