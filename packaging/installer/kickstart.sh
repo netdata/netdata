@@ -27,7 +27,7 @@ KICKSTART_SOURCE="$(
 )"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-PUBLIC_CLOUD_URL="https://api.netdata.cloud"
+PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-2"
 START_TIME="$(date +%s)"
@@ -43,7 +43,7 @@ INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_ONLY=0
-NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
+NETDATA_CLAIM_URL="api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_BUILD=0
