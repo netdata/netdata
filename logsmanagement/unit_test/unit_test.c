@@ -147,6 +147,112 @@ static int test_sanitise_string(){
     return errors;
 }
 
+char * const regex_src[] = { 
+"2022-11-07T11:28:27.427519600Z container create e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.932624500Z container start e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.971060500Z container die e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (exitCode=0, image=hello-world, name=xenodochial_lumiere)",
+    
+"2022-11-07T11:28:27.427519600Z container create e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.932624500Z container start e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.971060500Z container die e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (exitCode=0, image=hello-world, name=xenodochial_lumiere)",
+
+"2022-11-07T11:28:27.427519600Z container create e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.932624500Z container start e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.971060500Z container die e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (exitCode=0, image=hello-world, name=xenodochial_lumiere)",
+
+"2022-11-07T20:06:36.919980700Z container create bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:36.927728700Z container attach bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:36.958906200Z network connect 178a1988c4173559c721d5e24970eef32aaca41e0e363ff9792c731f917683ed (container=bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234, name=bridge, type=bridge)\n\
+2022-11-07T20:06:37.564947300Z container start bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:37.596428500Z container die bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (exitCode=0, image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:38.134325100Z network disconnect 178a1988c4173559c721d5e24970eef32aaca41e0e363ff9792c731f917683ed (container=bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234, name=bridge, type=bridge)",
+
+"Nov  7 21:54:24 X-PC sudo: john : TTY=pts/7 ; PWD=/home/john ; USER=root ; COMMAND=/usr/bin/docker run hello-world\n\
+Nov  7 21:54:24 X-PC sudo: pam_unix(sudo:session): session opened for user root by john(uid=0)\n\
+Nov  7 21:54:25 X-PC sudo: pam_unix(sudo:session): session closed for user root\n\
+Nov  7 21:54:24 X-PC sudo: john : TTY=pts/7 ; PWD=/home/john ; USER=root ; COMMAND=/usr/bin/docker run hello-world\n"
+};
+const char * const regex_keyword[] = {
+    "start",
+    "CONTAINER",
+    "CONTAINER",
+    NULL,
+    NULL
+};
+const char * const regex_pat_str[] = {
+    NULL,
+    NULL,
+    NULL,
+    ".*\\bcontainer\\b.*\\bhello-world\\b.*",
+    ".*\\bsudo\\b.*\\bCOMMAND=/usr/bin/docker run\\b.*"
+
+};
+const int regex_ignore_case[] = {
+    1,
+    1,
+    0,
+    1,
+    1
+};
+const int regex_exp_matches[] = {
+    1,
+    3,
+    0,
+    4,
+    2
+};
+const char * const regex_exp_dst[] = { 
+"2022-11-07T11:28:27.932624500Z container start e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n",
+
+"2022-11-07T11:28:27.427519600Z container create e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.932624500Z container start e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (image=hello-world, name=xenodochial_lumiere)\n\
+2022-11-07T11:28:27.971060500Z container die e0c3c6120c29beb393e4b92773c9aa60006747bddabd352b77bf0b4ad23747a7 (exitCode=0, image=hello-world, name=xenodochial_lumiere)",
+
+"",
+
+"2022-11-07T20:06:36.919980700Z container create bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:36.927728700Z container attach bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:37.564947300Z container start bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (image=hello-world, name=distracted_sinoussi)\n\
+2022-11-07T20:06:37.596428500Z container die bd8d4a3338c3e9ab4ca555c6d869dc980f04f10ebdcd9284321c0afecbec1234 (exitCode=0, image=hello-world, name=distracted_sinoussi)",
+
+"Nov  7 21:54:24 X-PC sudo: john : TTY=pts/7 ; PWD=/home/john ; USER=root ; COMMAND=/usr/bin/docker run hello-world\n\
+Nov  7 21:54:24 X-PC sudo: john : TTY=pts/7 ; PWD=/home/john ; USER=root ; COMMAND=/usr/bin/docker run hello-world\n"
+};
+static int test_search_keyword(){
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    for(int i = 0; i < (int) (sizeof(regex_src) / sizeof(regex_src[0])); i++){
+        regex_t *regex_c = regex_pat_str[i] ? mallocz(sizeof(regex_t)) : NULL;
+        if(regex_c && regcomp(  regex_c, regex_pat_str[i], 
+                                regex_ignore_case[i] ? REG_EXTENDED | REG_NEWLINE | REG_ICASE : REG_EXTENDED | REG_NEWLINE))
+                    fatal("Could not compile regular expression:%s", regex_pat_str[i]);
+
+        size_t regex_src_sz = strlen(regex_src[i]) + 1;
+        char *res = callocz(1 , regex_src_sz);
+        size_t res_sz;
+        int matches = search_keyword( regex_src[i], regex_src_sz, 
+                                      res, &res_sz, 
+                                      regex_keyword[i], regex_c, 
+                                      regex_ignore_case[i]);
+        // fprintf(stderr, "\nMatches:%d\nResults:\n%.*s\n", matches, (int) res_sz, res);
+        if(regex_exp_matches[i] != matches){
+            fprintf(stderr, "- Error in matches returned from search_keyword() for: regex_src[%d]\n", i);
+            ++errors;
+        };
+        if(strncmp(regex_exp_dst[i], res, res_sz - 1)){
+            fprintf(stderr, "- Error in strncmp() of results from search_keyword() for: regex_src[%d]\n", i);
+            ++errors;
+        }
+        
+        if(regex_c) freez(regex_c);
+        freez(res);
+    }
+
+    fprintf(stderr, "%s", errors ? "" : "OK\n");
+    return errors;
+}
+
 int test_logs_management(int argc, char *argv[]){
     (void) argc;
     (void) argv;
@@ -162,10 +268,13 @@ int test_logs_management(int argc, char *argv[]){
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_sanitise_string();
     fprintf(stderr, "------------------------------------------------------\n");
-    fprintf(stderr, "Total errors: %d\n", errors);
+    errors += test_search_keyword();
+    fprintf(stderr, "------------------------------------------------------\n");
+    fprintf(stderr, "[%s] Total errors: %d\n", errors ? "FAILED" : "SUCCEEDED", errors);
     fprintf(stderr, "======================================================\n");
     fprintf(stderr, "         ** Finished logs management tests **\n");
     fprintf(stderr, "======================================================\n");
+    fflush(stderr);
 
     return errors;
 }
