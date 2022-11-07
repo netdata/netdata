@@ -133,3 +133,12 @@ Depends: ${shlibs:Depends},
 Description: The per-application metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect per-application and
  per-user metrics without using cgroups.
+
+Package: netdata-plugin-slabinfo
+Architecture: any
+Depends: ${shlibs:Depends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Description: The slabinfo metrics collector for the Netdata Agent
+ This plugin allows the Netdata Agent to collect perfromance and
+ utilization metrics for the Linux kernel’s SLAB allocator.
