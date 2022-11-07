@@ -164,10 +164,12 @@ void registry_update_cloud_base_url()
 int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
+    const char *cloud_ui_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud ui url", DEFAULT_CLOUD_UI_URL);
+
     buffer_sprintf(w->response.data,
             ",\n\t\"registry\": \"%s\",\n\t\"cloud_base_url\": \"%s\",\n\t\"anonymous_statistics\": %s",
             registry.registry_to_announce,
-            registry.cloud_base_url, netdata_anonymous_statistics_enabled?"true":"false");
+            cloud_ui_url, netdata_anonymous_statistics_enabled?"true":"false");
 
     registry_json_footer(w);
     return 200;
