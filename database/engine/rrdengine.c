@@ -841,90 +841,6 @@ void check_journal_file(struct rrdengine_journalfile *journalfile)
     uv_rwlock_rdunlock(&pg_cache->v2_lock);
 }
 
-// true: all extent descriptors migrated
-static bool migrate_extent_descriptors(struct rrdengine_instance *ctx, struct extent_info *extent)
-{
-    struct page_cache *pg_cache = &ctx->pg_cache;
-    Pvoid_t *PValue;
-
-    bool all_migrated = true;
-    uint8_t number_of_pages = extent->number_of_pages;
-    for (uint8_t i = 0; i < number_of_pages; i++) {
-        struct rrdeng_page_descr *descr = extent->pages[i];
-        if (!descr || !descr->extent)
-            continue;
-
-        // Find page index
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
-        struct pg_cache_page_index *page_index = unlikely(NULL == PValue) ? NULL : *PValue;
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-
-        if (unlikely(!page_index))
-            continue;
-
-        uv_rwlock_rdlock(&page_index->lock);
-
-        rrdeng_page_descr_mutex_lock(ctx, descr);
-
-        unsigned flags = descr->pg_cache_descr->flags & RRD_PAGE_POPULATED;
-        if (!flags && pg_cache_try_get_unsafe(descr, 1)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
-#endif
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-#ifdef NETDATA_INTERNAL_CHECKS
-            char uuid_str[UUID_STR_LEN];
-            uuid_unparse_lower(*descr->id, uuid_str);
-            info("DEBUG: %s @ %ld migrating", uuid_str, start_time_s);
-#endif
-            pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
-            extent->pages[i] = NULL;
-            uv_rwlock_rdunlock(&page_index->lock);
-            continue;
-        }
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
-
-        uv_rwlock_rdunlock(&page_index->lock);
-        all_migrated = false;
-    }
-    return all_migrated;
-}
-
-// We have datafiles read lock
-static bool migrate_journalfile_descriptors(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile)
-{
-    bool all_migrated = true;
-
-    struct extent_info *extent = journalfile->datafile->extents.first;
-
-    if (likely(NULL == extent))
-        return true;
-
-    info("DEBUG: Journalfile %u checking extents", journalfile->datafile->fileno);
-
-    for (; extent; extent = extent->next)
-        all_migrated = all_migrated && migrate_extent_descriptors(ctx, extent);
-
-    info("DEBUG: Journalfile %u descriptors migrated = %d", journalfile->datafile->fileno, all_migrated);
-    if (false == all_migrated)
-        return false;
-
-    // All extents migrated, remove them
-    // Switch to write lock
-
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
-    df_extent_delete_all_unsafe(journalfile->datafile);
-
-    // Switch to read lock again
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-
-    return true;
-}
-
 void after_delete_descriptors(struct rrdengine_worker_config* wc)
 {
     int error = uv_thread_join(wc->now_deleting_descriptors);
@@ -952,11 +868,6 @@ void delete_descriptors(void *arg)
             datafile = datafile->next;
             continue;
         }
-
-        // migrate journalfile descriptors
-#if 0
-        migrate_journalfile_descriptors(ctx, journalfile);
-#endif
 
         uv_rwlock_rdlock(&pg_cache->v2_lock);
         Word_t count = JudyLCount(journalfile->JudyL_array, 0, -1, PJE0);

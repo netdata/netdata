@@ -901,7 +901,6 @@ int page_header_is_corrupted(struct journal_v2_header *j2_header, void *page_hea
     uint32_t bytes = data_page_header->entries * sizeof(struct journal_page_list) + sizeof(struct journal_page_header);
     // Check if trailer overshoots the file
 
-    // TODO: Improve this
     struct journal_v2_header j2_header_local = { .data = j2_header};
 
     if (verify_journal_space(&j2_header_local, page_header, bytes))
@@ -987,102 +986,6 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
             break;
     }
     return data_page;
-}
-
-
-void after_page_deactivation(uv_work_t *req, int status)
-{
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_journalfile *journalfile = work_request->journalfile;
-    char path[RRDENG_PATH_MAX];
-
-    if (unlikely(!journalfile))
-        return;
-
-    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
-
-    if (likely(status != UV_ECANCELED)) {
-        info("Old pages for journal file %s were deactivated", path);
-    }
-    freez(work_request);
-}
-
-// Tries to delete all pages for this extent
-static unsigned pg_extent_punch_hole(struct extent_info *extent)
-{
-    if (unlikely(!extent || !extent->datafile))
-        return 0;
-
-    struct rrdengine_instance *ctx = extent->datafile->ctx;
-
-    unsigned count = 0;
-    uint8_t number_of_pages = extent->number_of_pages;
-    for (uint8_t index = 0; index < number_of_pages; index++) {
-        struct rrdeng_page_descr *descr = extent->pages[index];
-        if (unlikely(!descr))
-            continue;
-
-        pg_cache_punch_hole(ctx, descr, 0, 0, NULL, false);
-        extent->pages[index] = NULL;
-        count++;
-    }
-    return count;
-}
-
-// FIXME: locking
-void deactivate_one_journalfile(struct rrdengine_journalfile *journalfile)
-{
-    char path[RRDENG_PATH_MAX];
-
-    if (unlikely(!journalfile || !journalfile->journal_data))
-        return;
-
-    generate_journalfilepath(journalfile->datafile, path, sizeof(path));
-
-    info("Removing page descriptors for extents used by %s", path);
-    unsigned count = 0;
-
-    for (struct extent_info *extent = journalfile->datafile->extents.first; extent; extent = extent->next)
-        count += pg_extent_punch_hole(extent);
-
-    uv_rwlock_wrlock(&journalfile->datafile->ctx->datafiles.rwlock);
-    df_extent_delete_all_unsafe(journalfile->datafile);
-    uv_rwlock_wrunlock(&journalfile->datafile->ctx->datafiles.rwlock);
-
-    info("Removed %u page descriptors from memory", count);
-}
-
-// Caller needs to check journalfile->journal_data
-bool journalfile_ready_to_migrate(struct rrdengine_journalfile *journalfile)
-{
-    struct extent_info *extent = journalfile->datafile->extents.first;
-    while (extent) {
-        uint8_t number_of_pages = extent->number_of_pages;
-        for (uint8_t index = 0; index < number_of_pages; index++) {
-            struct rrdeng_page_descr *descr = extent->pages[index];
-            if (descr->extent == NULL)
-                return false;
-        }
-        extent = extent->next;
-    }
-
-    return true;
-}
-
-void start_page_deactivation(uv_work_t *req)
-{
-    //    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_worker_config *wc = req->loop->data;
-    struct rrdengine_instance *ctx = wc->ctx;
-
-    info("Checking all journal files for page descriptors deactivation");
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    while (datafile && datafile->fileno != ctx->last_fileno) {
-        struct rrdengine_journalfile *journalfile = datafile->journalfile;
-        deactivate_one_journalfile(journalfile);
-        datafile = datafile->next;
-    }
-    info("Done checking all journal files for page descriptors deactivation");
 }
 
 static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *journalfile, struct metric_info_s *metric_info, bool startup)

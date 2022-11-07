@@ -776,7 +776,6 @@ static struct rrdeng_page_descr *populate_page_index(
             if (uuid_entry && ((delta_start_time >= uuid_entry->delta_start && delta_start_time <= uuid_entry->delta_end))) {
 
                 struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) journal_header + uuid_entry->page_offset);
-                //info("JOURVALV2: Validating UUID PAGE LIST is %d", page_header_is_corrupted(journal_header, page_list_header));
                 struct rrdeng_page_descr *descr = add_pages_from_timerange(
                     page_list_header,
                     delta_start_time,
