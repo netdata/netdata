@@ -345,6 +345,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
     },
 
+    'nvme': {
+        title: 'NVMe',
+        icon: '<i class="fas fa-hdd"></i>',
+        info: 'NVMe devices SMART and health metrics. Additional information on metrics can be found in the <a href="https://nvmexpress.org/developers/nvme-specification/" target="_blank">NVM Express Base Specification</a>.'
+    },
+
     'postgres': {
         title: 'PostgreSQL',
         icon: '<i class="fas fa-database"></i>',
@@ -7585,6 +7591,56 @@ netdataDashboard.context = {
         info: 'Number of ICMP messages sent and received. These counters should be equal if there is no packet loss.'
     },
 
+    // NVMe
+
+    'nvme.device_estimated_endurance_perc': {
+        info: 'NVM subsystem lifetime used based on the actual usage and the manufacturer\'s prediction of NVM life. A value of 100 indicates that the estimated endurance of the device has been consumed, but may not indicate a device failure. The value can be greater than 100 if you use the storage beyond its planned lifetime.'
+    },
+    'nvme.device_available_spare_perc': {
+        info: 'Remaining spare capacity that is available. SSDs provide a set of internal spare capacity, called spare blocks, that can be used to replace blocks that have reached their write operation limit. After all of the spare blocks have been used, the next block that reaches its limit causes the disk to fail.'
+    },
+    'nvme.device_composite_temperature': {
+        info: 'The current composite temperature of the controller and namespace(s) associated with that controller. The manner in which this value is computed is implementation specific and may not represent the actual temperature of any physical point in the NVM subsystem.'
+    },
+    'nvme.device_io_transferred_count': {
+        info: 'The total amount of data read and written by the host.'
+    },
+    'nvme.device_power_cycles_count': {
+        info: 'Power cycles reflect the number of times this host has been rebooted or the device has been woken up after sleep. A high number of power cycles does not affect the device\'s life expectancy.'
+    },
+    'nvme.device_power_on_time': {
+        info: '<a href="https://en.wikipedia.org/wiki/Power-on_hours" target="_blank">Power-on time</a> is the length of time the device is supplied with power.'
+    },
+    'nvme.device_unsafe_shutdowns_count': {
+        info: 'The number of times a power outage occurred without a shutdown notification being sent. Depending on the NVMe device you are using, an unsafe shutdown can corrupt user data.'
+    },
+    'nvme.device_critical_warnings_state': {
+        info: '<p>Critical warnings for the status of the controller. Status active if set to 1.</p><p><b>AvailableSpare</b> - the available spare capacity is below the threshold. <b>TempThreshold</b> - the composite temperature is greater than or equal to an over temperature threshold or less than or equal to an under temperature threshold. <b>NvmSubsystemReliability</b> - the NVM subsystem reliability is degraded due to excessive media or internal errors. <b>ReadOnly</b> - media is placed in read-only mode. <b>VolatileMemBackupFailed</b> - the volatile memory backup device has failed. <b>PersistentMemoryReadOnly</b> - the Persistent Memory Region has become read-only or unreliable.</p>'
+    },
+    'nvme.device_media_errors_rate': {
+        info: 'The number of occurrences where the controller detected an unrecovered data integrity error. Errors such as uncorrectable ECC, CRC checksum failure, or LBA tag mismatch are included in this counter.'
+    },
+    'nvme.device_error_log_entries_rate': {
+        info: 'The number of entries in the Error Information Log. By itself, an increase in the number of records is not an indicator of any failure condition.'
+    },
+    'nvme.device_warning_composite_temperature_time': {
+        info: 'The time the device has been operating above the Warning Composite Temperature Threshold (WCTEMP) and below Critical Composite Temperature Threshold (CCTEMP).'
+    },
+    'nvme.device_critical_composite_temperature_time': {
+        info: 'The time the device has been operating above the Critical Composite Temperature Threshold (CCTEMP).'
+    },
+    'nvme.device_thermal_mgmt_temp1_transitions_rate': {
+        info: 'The number of times the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>minimizing performance impact</b>, to attempt to lower the Composite Temperature due to the host-managed thermal management feature.'
+    },
+    'nvme.device_thermal_mgmt_temp2_transitions_rate': {
+        info: 'The number of times the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>regardless of the impact on performance (e.g., heavy throttling)</b>, to attempt to lower the Combined Temperature due to the host-managed thermal management feature.'
+    },
+    'nvme.device_thermal_mgmt_temp1_time': {
+        info: 'The amount of time the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>minimizing performance impact</b>, to attempt to lower the Composite Temperature due to the host-managed thermal management feature.'
+    },
+    'nvme.device_thermal_mgmt_temp2_time': {
+        info: 'The amount of time the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>regardless of the impact on performance (e.g., heavy throttling)</b>, to attempt to lower the Combined Temperature due to the host-managed thermal management feature.'
+    },
     // ------------------------------------------------------------------------
 
 };
