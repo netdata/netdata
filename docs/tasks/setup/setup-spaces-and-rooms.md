@@ -16,7 +16,7 @@ named for your login email is automatically created. Every Space has a static Wa
 
 ## Steps
 
-Follow on-boarding guides to walk through the app.
+Follow our on-boarding guides to walk through the app.
 
 ## How to organize your Netdata Cloud
 
