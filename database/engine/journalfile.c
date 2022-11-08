@@ -946,7 +946,7 @@ void *journal_v2_write_data_page(struct journal_v2_header *j2_header, void *data
 
     data_page->delta_start_s = (descr->start_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
     data_page->delta_end_s = (descr->end_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
-    data_page->extent_index = descr->extent->index;
+    data_page->extent_index = unlikely(NULL == descr->extent) ? UINT32_MAX : descr->extent->index;
     data_page->update_every_s = descr->update_every_s;
     data_page->page_length = descr->page_length;
     data_page->type = descr->type;
@@ -1054,11 +1054,12 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
             struct journal_page_list *page_entry = &page_list[index++];
 
-            descr->extent_entry = &extent_list[page_entry->extent_index];
-            descr->file = file;
-
-            fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
-            fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
+            if (likely(page_entry->extent_index != UINT32_MAX)) {
+                descr->extent_entry = &extent_list[page_entry->extent_index];
+                descr->file = file;
+                fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
+                fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
+            }
         }
         uint32_t page_offset = (uint8_t *) page_list_header - (uint8_t *) journalfile->journal_data;
         mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
