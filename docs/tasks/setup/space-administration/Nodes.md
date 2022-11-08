@@ -30,6 +30,8 @@ In this Task you will learn how to:
 
 ## Prerequisites
 
+To perform administration on a node, you need the following:
+
 - A Netdata Cloud account with at least one space where it has admin access
 - (optional) A node claimed to that space
 
@@ -44,38 +46,38 @@ all the users or only the admin.
 
 ## Create a new War Room
 
-From the **War Rooms** tab, you can create a new War Room.  
-To do so:
+To create a new war room:
 
-1. Click the green **+** icon **Create War Room**
-2. Proceed into giving a name to the War Room
-3. (Optional) Give a description to the War Room
-4. Click **Add** to create the new War Room
+1. Navigate to the **War Rooms** tab.
+2. Click the green **+** icon **Create War Room**
+3. Proceed into giving a name to the War Room
+4. (Optional) Give a description to the War Room
+5. Click **Add** to create the new War Room
 
 ## Delete a War Room
 
 While in the **War Rooms** tab, you can see all the War Rooms of the Space you are in, and their number of nodes and
 users. To delete a War Room:
 
-- Click the **trashcan** icon
-- In the confirmation message click **Yes**
-
-Now the War Room is successfully deleted from your Space.
+1. Go to the **War Rooms* tab.
+2. Click the **trashcan** icon
+3. In the confirmation message click **Yes**
+4. The War Room is successfully deleted from your Space.
 
 ## Check the state of the Space's nodes
 
 From the **Nodes** tab, you have access to all the Nodes claimed on this Space, for each of them you can see:
 
-- The Node's Name
-- The Node's Version
-- The node's Status
-- The Connection to Cloud
+- The Node's name
+- The Node's version
+- The node's status
+- The connection to cloud
 
-So, you can see if a node is outdated, if it is offline, or if it needs further steps to connect to the cloud.
+So, you can see if a node is outdated, offline, or needs further steps to connect to the cloud.
 
 ## Claim a node to the Space
 
-From the **Nodes** tab you can click the green **+** icon to begin the claiming process.  
+From the **Nodes** tab, you can click the green **+** icon to begin the claiming process.  
 For a detailed guide in claiming Agent nodes, refer to
 our [Claim an Agent to the Cloud Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
 .
@@ -97,29 +99,31 @@ To do so:
 
 ## Remove a user from the Space
 
-You can remove a User by going to the **Users** tab and clicking the trash can icon in the **Actions** column, next to
+You can remove a User by going to the **Users** tab by clicking the trash can icon in the **Actions** column within the row that contains
 their name.
 
 ## Change a user's role within the Space
 
-While in the **Users** tab, you can change a user's role by clicking the user icon in the **Actions** column, and then
+While in the **Users** tab, you can change a user's role by clicking the user icon in the **Actions** column and 
 selecting the role for that user.
 
 ## Enable/Disable Space-wide notifications
 
-From the **Notifications** tab, you can enable or disable Space-wide E-mail notifications, by clicking the respective
+From the **Notifications** tab, you can enable or disable Space-wide E-mail notifications by clicking the respective
 toggle button.
 
 ## Create/Delete Space-wide Bookmarks
 
-In the **Bookmarks** tab, you can create and delete Bookmarks, that will appear in the left bar of the Space at any
+In the **Bookmarks** tab, you can create and delete Bookmarks that will appear in the left bar of the Space at any
 given time.
 
 ## Delete or Leave the Space
 
-In the event that you want to delete or leave your space, you can do so by clicking either **Leave Space** or **Delete
+You can delete or leave your space by clicking either **Leave Space** or **Delete
 Space** in the bottom of the **Info** tab.
 
 ## Related topics
 
-1. [Spaces Concept Documentation](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
+### Related Concepts
+
+- [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
