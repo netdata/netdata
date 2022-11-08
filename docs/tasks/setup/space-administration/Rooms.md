@@ -30,11 +30,13 @@ Task.
 
 ## Prerequisites
 
+To perform administrative actions on Rooms, you will need the following:
+
 - A Netdata Cloud account with at least one node claimed to one of its Spaces.
 
 ## Node management
 
-You can perform the actions below from either of:
+You can perform the following actions from either :
 
 - The **War Room settings** interface, reachable from the top of the Cloud
   interface, by clicking the **cogwheel** icon next to the War Room's name
@@ -49,11 +51,11 @@ You can perform the actions below from either of:
 1. Click on the **Nodes** tab
 2. Click the green **+** icon
 3. Then you can:
-    - Either proceed on claiming a new Agent to this Space, and adding it to the War Room that you are in, see details
+    - Either proceed on claiming a new Agent to this Space, and adding it to the War Room that you are in. See details
       at
       our [claim an Agent to the Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
       Task
-    - Or, from the bottom tab, you can select to add nodes that are already claimed on your Space
+    - Or, from the bottom tab, you can select to add nodes that are already claimed on your Space.
 
 </TabItem>
 
@@ -61,11 +63,11 @@ You can perform the actions below from either of:
 
 1. Click the **+ Add Nodes** button
 2. Then you can:
-    - Either proceed on claiming a new Agent to this Space, and adding it to the War Room that you are in, see details
+    - Either proceed on claiming a new Agent to this Space, and adding it to the War Room that you are in. See details
       at
       our [claim an Agent to the Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
       Task
-    - Or, from the bottom tab, you can select to add nodes that are already claimed on your Space
+    - Or, from the bottom tab, you can select to add nodes that are already claimed on your Space.
 
 </TabItem>
 </Tabs>
@@ -129,5 +131,7 @@ To delete a Custom Dashboard, select it from the tick box column, and then click
 
 ## Related topics
 
-1. [War Rooms Concept Documentation](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md)
-2. [Views Concept Documentation](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
+### Related Concepts
+
+1. [War Rooms](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md)
+2. [Views Concept](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
