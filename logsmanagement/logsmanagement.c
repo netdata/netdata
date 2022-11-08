@@ -381,6 +381,7 @@ static void logs_manag_config_init(){
             p_file_info->parser_cus_config[cus_off - 1]->chart_name = cus_chart_v;
             p_file_info->parser_cus_config[cus_off - 1]->regex_name = cus_regex_name_v ? 
                                                                         cus_regex_name_v : strdupz(cus_regex_v);
+            p_file_info->parser_cus_config[cus_off - 1]->regex_str = cus_regex_v;         
             
             /* Escape any backslashes in the regex name, to ensure dimension is displayed correctly in charts */
             int regex_name_bslashes = 0;
@@ -396,10 +397,7 @@ static void logs_manag_config_init(){
                 }
             } 
 
-            p_file_info->parser_cus_config[cus_off - 1]->regex_str = callocz(1, snprintf(NULL, 0, ".*(%s).*", cus_regex_v) + 1);
-            sprintf(p_file_info->parser_cus_config[cus_off - 1]->regex_str, ".*(%s).*", cus_regex_v);
             debug(D_LOGS_MANAG, "cus regex_str: %s", p_file_info->parser_cus_config[cus_off - 1]->regex_str);
-            freez(cus_regex_v);
 
             int regex_flags = cus_ignore_case_v ?   REG_EXTENDED | REG_NEWLINE | REG_ICASE : 
                                                     REG_EXTENDED | REG_NEWLINE;
