@@ -37,6 +37,7 @@ jobs:
         shell: python3 {0}
         run: |
           from ruamel.yaml import YAML
+          import os
           import json
           yaml = YAML(typ='safe')
           entries = list()
@@ -58,7 +59,8 @@ jobs:
           entries.sort(key=lambda k: (k['distro'], k['version']))
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
-          print('::set-output name=matrix::' + matrix)
+          with open(os.env['GITHUB_ENV'], 'a') as f:
+              f.write('matrix=' + matrix)
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

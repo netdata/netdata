@@ -97,7 +97,7 @@ git config user.email "bot@netdata.cloud"
 
 if [ "${REPO}" != "netdata/netdata" ] && [ -z "${RELEASE_TEST}" ]; then
     echo "::notice::Not running in the netdata/netdata repository, not queueing a release build."
-    echo "::set-output name=run::false"
+    echo "run=false" >> "${GITHUB_OUTPUT}"
 elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     echo "::notice::Preparing a nightly release build."
     LAST_TAG=$(git describe --abbrev=0 --tags)
@@ -107,15 +107,16 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     HEAD_COMMIT="$(git rev-parse HEAD)"
     if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then
         echo "::notice::No commits since last nightly build, not publishing a new nightly build."
-        echo "::set-output name=run::false"
+        echo "run=false" >> "${GITHUB_OUTPUT}"
     else
         echo "${NEW_VERSION}" > packaging/version || exit 1
-        echo "::set-output name=run::true"
-        echo "::set-output name=message::Update changelog and version for nightly build: ${NEW_VERSION}."
-        echo "::set-output name=ref::master"
-        echo "::set-output name=type::nightly"
-        echo "::set-output name=branch::master"
-        echo "::set-output name=version::nightly"
+        # shellcheck disable=SC2129
+        echo "run=true" >> "${GITHUB_OUTPUT}"
+        echo "message=Update changelog and version for nightly build: ${NEW_VERSION}." >> "${GITHUB_OUTPUT}"
+        echo "ref=master" >> "${GITHUB_OUTPUT}"
+        echo "type=nightly" >> "${GITHUB_OUTPUT}"
+        echo "branch=master" >> "${GITHUB_OUTPUT}"
+        echo "version=nightly" >> "${GITHUB_OUTPUT}"
     fi
 elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a patch release build."
@@ -130,12 +131,13 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     major_matches || exit 1
     check_newer_patch_version || exit 1
     echo "${EVENT_VERSION}" > packaging/version || exit 1
-    echo "::set-output name=run::true"
-    echo "::set-output name=message::Patch release ${EVENT_VERSION}."
-    echo "::set-output name=ref::${EVENT_VERSION}"
-    echo "::set-output name=type::release"
-    echo "::set-output name=branch::${branch_name}"
-    echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
+    # shellcheck disable=SC2129
+    echo "run=true" >> "${GITHUB_OUTPUT}"
+    echo "message=Patch release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
+    echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
+    echo "type=release" >> "${GITHUB_OUTPUT}"
+    echo "branch=${branch_name}" >> "${GITHUB_OUTPUT}"
+    echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
 elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a minor release build."
     check_version_format || exit 1
@@ -149,13 +151,14 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
         exit 1
     fi
     echo "${EVENT_VERSION}" > packaging/version || exit 1
-    echo "::set-output name=run::true"
-    echo "::set-output name=message::Minor release ${EVENT_VERSION}."
-    echo "::set-output name=ref::${EVENT_VERSION}"
-    echo "::set-output name=type::release"
-    echo "::set-output name=branch::master"
-    echo "::set-output name=new-branch::${branch_name}"
-    echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
+    # shellcheck disable=SC2129
+    echo "run=true" >> "${GITHUB_OUTPUT}"
+    echo "message=Minor release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
+    echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
+    echo "type=release" >> "${GITHUB_OUTPUT}"
+    echo "branch=master" >> "${GITHUB_OUTPUT}"
+    echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
+    echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
 elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "::notice::Preparing a major release build."
     check_version_format || exit 1
@@ -164,12 +167,13 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     check_newer_major_version || exit 1
     check_for_existing_tag || exit 1
     echo "${EVENT_VERSION}" > packaging/version || exit 1
-    echo "::set-output name=run::true"
-    echo "::set-output name=message::Major release ${EVENT_VERSION}"
-    echo "::set-output name=ref::${EVENT_VERSION}"
-    echo "::set-output name=type::release"
-    echo "::set-output name=branch::master"
-    echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
+    # shellcheck disable=SC2129
+    echo "run=true" >> "${GITHUB_OUTPUT}"
+    echo "message=Major release ${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
+    echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
+    echo "type=release" >> "${GITHUB_OUTPUT}"
+    echo "branch=master" >> "${GITHUB_OUTPUT}"
+    echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
 else
     echo '::error::Unrecognized release type or invalid version.'
     exit 1

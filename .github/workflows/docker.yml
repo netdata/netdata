@@ -129,9 +129,9 @@ jobs:
         id: tag
         run: |
           if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
-            echo "::set-output name=tag::v${{ github.event.inputs.version }}"
+            echo "tag=v${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
           else
-            echo "::set-output name=tag::${{ github.event.inputs.version }}"
+            echo "tag=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
           fi
 
   docker-publish:

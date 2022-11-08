@@ -32,39 +32,39 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/codeql') }}" = "true" ]; then
-              echo '::set-output name=run::true'
+              echo "run=true" >> "${GITHUB_OUTPUT}"
               echo '::notice::Found ci/codeql label, unconditionally running all CodeQL checks.'
             else
-              echo '::set-output name=run::false'
+              echo "run=false" >> "${GITHUB_OUTPUT}"
             fi
           else
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check for C/C++ changes
         id: cpp
         run: |
           if [ "${{ steps.always.outputs.run }}" = "false" ]; then
             if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.[ch](xx|\+\+)?' ; then
-              echo '::set-output name=run::true'
+              echo "run=true" >> "${GITHUB_OUTPUT}"
               echo '::notice::C/C++ code has changed, need to run CodeQL.'
             else
-              echo '::set-output name=run::false'
+              echo "run=false" >> "${GITHUB_OUTPUT}"
             fi
           else
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check for python changes
         id: python
         run: |
           if [ "${{ steps.always.outputs.run }}" = "false" ]; then
             if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'collectors/python.d.plugin/.*\.py' ; then
-              echo '::set-output name=run::true'
+              echo "run=true" >> "${GITHUB_OUTPUT}"
               echo '::notice::Python code has changed, need to run CodeQL.'
             else
-              echo '::set-output name=run::false'
+              echo "run=false" >> "${GITHUB_OUTPUT}"
             fi
           else
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           fi
 
   analyze-cpp:
