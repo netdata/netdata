@@ -13,6 +13,7 @@ void *service_main(void *ptr);
 void *statsd_main(void *ptr);
 void *timex_main(void *ptr);
 void *replication_thread_main(void *ptr __maybe_unused);
+void *profile_main(void *ptr);
 
 extern bool global_statistics_enabled;
 
@@ -119,6 +120,15 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = socket_listen_main_static_threaded
+    },
+    {
+        .name = "PROFILE",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = profile_main
     },
 
 #ifdef ENABLE_ACLK
