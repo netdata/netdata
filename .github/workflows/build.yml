@@ -216,7 +216,7 @@ jobs:
           entries.sort(key=lambda k: k['distro'])
           matrix = json.dumps({'include': entries}, sort_keys=True)
           print('Generated Matrix: ' + matrix)
-          with open(os.env['GITHUB_ENV'], 'a') as f:
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write('matrix=' + matrix)
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
