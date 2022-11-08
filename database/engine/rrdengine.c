@@ -747,7 +747,7 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
     }
 }
 
-static struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid)
+struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid)
 {
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
@@ -756,7 +756,7 @@ static struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, u
     return page_index;
 }
 
-static struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
+struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
 {
     uv_rwlock_rdlock(&page_index->lock);
     Pvoid_t *PValue = JudyLGet(page_index->JudyL_array, start_time_s, PJE0);
@@ -1279,14 +1279,15 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    int force_journal = unlink("/tmp/journal");
-
-    if (unlikely(current_size >= target_size || !force_journal || (out_of_space && only_one_datafile))) {
+    if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
         /* Finalize data and journal file and create a new pair */
+        struct rrdengine_journalfile *journalfile = unlikely(NULL == ctx->datafiles.last) ? NULL : ctx->datafiles.last->journalfile;
         wal_flush_transaction_buffer(wc);
         ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
         if (likely(!ret)) {
             ++ctx->last_fileno;
+            if (likely(journalfile))
+                queue_journalfile_v2_migration(wc, journalfile);
         }
     }
     if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {

@@ -1,6 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+void queue_journalfile_v2_migration(struct rrdengine_worker_config* wc, struct rrdengine_journalfile *journalfile)
+{
+    if (unlikely(!journalfile))
+        return;
+
+    info("Journal file %u is ready to be indexed", journalfile->datafile->fileno);
+
+    struct rrdeng_work *work_request;
+    work_request = mallocz(sizeof(*work_request));
+    work_request->req.data = work_request;
+    work_request->journalfile = journalfile;
+    work_request->wc = wc;
+    wc->running_journal_migration = 1;
+    if (unlikely(uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
+        freez(work_request);
+        wc->running_journal_migration = 0;
+    }
+}
+
 static void flush_transaction_buffer_cb(uv_fs_t* req)
 {
     struct generic_io_descriptor *io_descr = req->data;
@@ -18,28 +37,6 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
 
     uv_fs_req_cleanup(req);
     posix_memfree(io_descr->buf);
-
-    // This is the journalfile we are processing
-    struct rrdengine_journalfile *journalfile = io_descr->data;
-
-    // Determine if we have created a new datafile / journal pair
-    if (journalfile->datafile->fileno < journalfile->datafile->ctx->last_fileno) {
-        if ((NULL == ctx->commit_log.buf || 0 == ctx->commit_log.buf_pos)) {
-            // We can index the journal file
-            info("Journal file %u is ready to be indexed", journalfile->datafile->fileno);
-
-            struct rrdeng_work *work_request;
-            work_request = mallocz(sizeof(*work_request));
-            work_request->req.data = work_request;
-            work_request->journalfile = journalfile;
-            work_request->wc = wc;
-            wc->running_journal_migration = 1;
-            if (unlikely(uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
-                freez(work_request);
-                wc->running_journal_migration = 0;
-            }
-        }
-    }
     freez(io_descr);
 }
 
@@ -1070,6 +1067,28 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
     }
 }
 
+bool descriptor_is_corrupted(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct pg_cache_page_index *page_index = get_page_index(pg_cache, descr->id);
+
+    if (unlikely(!page_index))
+        return true;
+
+    time_t index_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
+    struct rrdeng_page_descr *idx_descr = get_descriptor(page_index, index_time_s);
+
+    bool is_corrupted = (idx_descr != descr);
+
+#ifdef  NETDATA_INTERNAL_CHECKS
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(page_index->id, uuid_str);
+    internal_error(is_corrupted, "Descriptor corrupted (Extent %p  Judy %p) @ %ld", descr, idx_descr, index_time_s);
+#endif
+
+    return is_corrupted;
+}
+
 // Migrate the journalfile pointed by datafile
 // activate : make the new file active immediately
 //            journafile data will be set and descriptors (if deleted) will be repopulated as needed
@@ -1113,6 +1132,13 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
 
             if (unlikely(!descr))
                 continue;
+
+            if (false == startup) {
+                if (unlikely(descriptor_is_corrupted(ctx, descr))) {
+                    extent->pages[index] = NULL;
+                    continue;
+                }
+            }
 
             PValue = JudyHSGet(metrics_JudyHS_array, descr->id, sizeof(uuid_t));
             if (likely(NULL != PValue)) {
