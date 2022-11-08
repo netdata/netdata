@@ -141,7 +141,12 @@ void TrainableHost::train() {
 
         worker_is_idle();
         SleepFor = std::min(AllottedDuration - RealDuration, MaxSleepFor);
-        std::this_thread::sleep_for(SleepFor);
+        TimePoint Now = SteadyClock::now();
+        auto Until = Now + SleepFor;
+        while (Now < Until && !netdata_exit) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            Now = SteadyClock::now();
+        }
         worker_is_busy(0);
     }
 }
