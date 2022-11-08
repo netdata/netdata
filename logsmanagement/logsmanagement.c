@@ -25,7 +25,7 @@
 #include "file_info.h"
 #include "helper.h"
 #include "query.h"
-#if LOGS_MANAGEMENT_STRESS_TEST
+#if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
 #include "query_test.h"
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
 #include "parser.h"
@@ -618,7 +618,7 @@ void *logsmanagement_main(void *ptr) {
     debug(D_LOGS_MANAG, "SQLITE version: %s\n", sqlite_version);
     freez(sqlite_version);
 
-#if LOGS_MANAGEMENT_STRESS_TEST
+#if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
     debug(D_LOGS_MANAG, "Running Netdata with logs_management stress test enabled!");
     static uv_thread_t run_stress_test_queries_thread_id;
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);

@@ -68,18 +68,6 @@ then
 	sudo rm -rf $INSTALL_PATH/netdata/etc/netdata # Remove /etc/netdata if it persists for some reason
 	sudo git clean -dfxf && git submodule update --init --recursive --force
 
-	# Build Fluent Bit
-
-	# May require to install libsystemd-dev on some systems - is it a Fluent-Bit dependency for systemd logs?
-	mkdir -p fluent-bit/build
-	cd fluent-bit/build
-
-	cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_POSITION_INDEPENDENT_CODE=ON -C ../../logsmanagement/stress_test/config.cmake -B./ -S../
-
-	make -j"$CPU_CORES" || exit 1
-
-	cd ../..
-
 	if [ "$build_for_release" -eq 0 ]
 	then
 		c_flags="-O1 -ggdb -Wall -Wextra -fsanitize=address -static-libasan "
@@ -110,8 +98,6 @@ then
 					--install $INSTALL_PATH
 	fi
 
-	# Install Fluent-Bit library
-	sudo cp fluent-bit/build/lib/libfluent-bit.so "$INSTALL_PATH/netdata/usr/lib/netdata"
 else
 	cd ../.. && sudo make -j"$CPU_CORES" || exit 1 && sudo make install 
 	sudo chown -R netdata:netdata "$INSTALL_PATH/netdata/usr/share/netdata/web"

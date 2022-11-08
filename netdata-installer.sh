@@ -335,6 +335,7 @@ while [ -n "${1}" ]; do
       NETDATA_ENABLE_ML=0
       ;;
     "--enable-logsmanagement")
+      NETDATA_ENABLE_LOGS_MANAGEMENT=1
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
       ;;
     "--enable-logsmanagement-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement-tests)}" | sed 's/$/ --enable-logsmanagement-tests/g')" ;;
@@ -714,6 +715,53 @@ bundle_jsonc() {
 }
 
 bundle_jsonc
+
+# -----------------------------------------------------------------------------
+build_fluentbit() {
+  env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
+  fi
+  
+  mkdir -p fluent-bit/build || return 1
+  cd fluent-bit/build > /dev/null || exit 1
+  
+  run eval "${env_cmd} cmake -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/stress_test/config.cmake -B./ -S../"
+  run eval "${env_cmd} ${make} ${MAKEOPTS}" || return 1
+  cd - > /dev/null || return 1
+}
+
+bundle_fluentbit() {
+  if [ -z "${NETDATA_ENABLE_LOGS_MANAGEMENT}" ]; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ]; then
+    run_failed "Could not find cmake, which is required to build Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
+  if [ ! -d "fluent-bit" ]; then
+    run_failed "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
+
+  progress "Prepare Fluent-Bit"
+
+  if build_fluentbit; then
+    FLUENT_BIT_BUILD_SUCCESS=1
+    run_ok "Fluent-Bit built successfully."
+  else
+    run_failed "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_fluentbit
 
 # -----------------------------------------------------------------------------
 
@@ -1573,6 +1621,39 @@ install_ebpf() {
 
 progress "eBPF Kernel Collector"
 install_ebpf
+
+should_install_fluentbit() {
+  if [ -z "${NETDATA_ENABLE_LOGS_MANAGEMENT}" ]; then
+    run_failed "netdata-installer.sh run without --enable-logsmanagement, Netdata Logs Management support will be disabled in this build."
+    return 1
+  elif [ "${FLUENT_BIT_BUILD_SUCCESS:=0}" -eq 0 ]; then
+    run_failed "--enable-logsmanagement was requested but Fluent-Bit was not built successfully, Netdata Logs Management support will be disabled in this build."
+    return 1
+  elif [ ! -f fluent-bit/build/lib/libfluent-bit.so ]; then
+    run_failed "--enable-logsmanagement was requested but libfluent-bit.so is missing, Netdata Logs Management support will be disabled in this build."
+    return 1
+  fi
+  
+  return 0
+}
+
+install_fluentbit() {
+  if ! should_install_fluentbit; then
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Fluent-Bit."
+
+  run chown "root:${NETDATA_GROUP}" fluent-bit/build/lib
+  run chmod 0644 fluent-bit/build/lib/libfluent-bit.so
+
+  run cp -a -v fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+progress "Installing Fluent-Bit plugin"
+install_fluentbit
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
