@@ -127,6 +127,8 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
 
+- [**Netdata Logs**](https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md): The three log files - `error.log`, `access.log` and `debug.log` - used by Netdata
+
 - [**Notifications**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md): Netdata can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team.
 
 ## O
@@ -156,6 +158,8 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 ## S
 
 - [**Single Node Dashboard**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md#jump-to-single-node-dashboards-1): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
+
+- [**Snapshots**](https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md): An image of your dashboard at any given time, whicn can be imiported into any other node running Netdata or used to genereated a PDF file for your records.
 
 - [**Space**](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
