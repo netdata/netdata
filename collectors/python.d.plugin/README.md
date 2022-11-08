@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "python.d.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Collectors References/Uncategorized"
+learn_rel_path: "References/Collectors references/Uncategorized"
 -->
 
 # python.d.plugin

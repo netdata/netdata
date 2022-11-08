@@ -3,7 +3,7 @@ title: "Claim existing Agent to the Cloud"
 sidebar_label: "Claim existing Agent to the Cloud"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md"
 learn_status: "Published"
-sidebar_position: 30
+sidebar_position: "30"
 learn_topic_type: "Tasks"
 learn_rel_path: "Setup"
 learn_docs_purpose: "Instructions on how to claim a node on a Space in the Cloud."

@@ -6,7 +6,7 @@ sidebar_url: "Anomalies"
 sidebar_label: "anomalies"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Collectors References/Misc"
+learn_rel_path: "References/Collectors references/Misc"
 -->
 
 # Anomaly detection with Netdata

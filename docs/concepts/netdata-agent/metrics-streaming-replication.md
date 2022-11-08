@@ -2,10 +2,10 @@
 title: "Metrics streaming/replication"
 sidebar_label: "Metrics streaming/replication"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md"
-sidebar_position: 1300
+sidebar_position: "1300"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-agent"
+learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain the streaming and replication concepts"
 -->
 

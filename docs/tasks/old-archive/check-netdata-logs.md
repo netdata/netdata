@@ -4,7 +4,7 @@ sidebar_label: "Check netdata logs"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md"
 learn_status: "Unpublished"
 learn_topic_type: "Tasks"
-learn_rel_path: "operations"
+learn_rel_path: "Operations"
 learn_docs_purpose: "Instructions on how to inspect the logs"
 -->
 

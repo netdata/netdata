@@ -3,7 +3,7 @@ title: "Install Agent and add it to your space"
 sidebar_label: "Install Agent and add it to your space"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-agent-and-claim.md"
 learn_status: "Published"
-sidebar_position: 20
+sidebar_position: "20"
 learn_topic_type: "Tasks"
 learn_rel_path: "Setup"
 learn_docs_purpose: "Step by step instruction to deploy an Agent"

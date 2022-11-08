@@ -2,10 +2,10 @@
 title: "Overview"
 sidebar_label: "Overview"
 custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/health-monitoring/overview.md"
-sidebar_position: 1900
+sidebar_position: "1900"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "health-monitoring"
+learn_rel_path: "Concepts/Health monitoring"
 learn_docs_purpose: "Explain the alerts and notifications that make up Netdata's health monitoring techniques."
 learn_repo_doc: "True"
 -->

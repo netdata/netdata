@@ -2,10 +2,10 @@
 title: "Linux/Unix based deployments-(manual)"
 sidebar_label: "Linux/unix based deployments-(manual)"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/single-node-deployment-(manual).md"
-sidebar_position: 4
+sidebar_position: "4"
 learn_status: "Published"
 learn_topic_type: "Getting started"
-learn_rel_path: "Installation"
+learn_rel_path: "Getting started/Installation"
 learn_docs_purpose: "Instructions on deploying Netdata in core supported platforms+static builds."
 -->
 

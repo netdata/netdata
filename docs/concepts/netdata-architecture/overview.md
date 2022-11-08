@@ -4,8 +4,8 @@ sidebar_label: "Overview"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/overview.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-architecture"
-sidebar_position: 000
+learn_rel_path: "Concepts/Netdata architecture"
+sidebar_position: "000"
 learn_docs_purpose: "Give an overview of what Netdata Agent is about and present the capabilities of the Agent (Metric collection/storage/exporting/streaming-replication & ACLK for interconnecting with Netdata Hub). Give a small overview on how  Netdata Agent runs a daemon and how you manage it via CLI"
 -->
 

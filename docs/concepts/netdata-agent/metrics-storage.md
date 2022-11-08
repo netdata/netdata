@@ -2,10 +2,10 @@
 title: "Metrics storage"
 sidebar_label: "Metrics storage"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md"
-sidebar_position: 1100
+sidebar_position: "1100"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-agent"
+learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain how the Agent can manage/retain the metrics it collects, where it stores them, how it stores them and deletion policies (innovations like the tiering mechanism)"
 -->
 

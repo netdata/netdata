@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/idle
 sidebar_label: "idlejitter.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Collectors References/Disks and filesystems"
+learn_rel_path: "References/Collectors references/Disks and filesystems"
 -->
 
 # idlejitter.plugin

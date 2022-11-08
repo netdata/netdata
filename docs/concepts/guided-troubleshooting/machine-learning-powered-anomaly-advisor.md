@@ -3,9 +3,9 @@ title: "Anomaly Advisor"
 sidebar_label: "Anomaly Advisor"
 custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/machine-learning/anomaly-advisor.md"
 learn_status: "Published"
-sidebar_position: 2000
+sidebar_position: "2000"
 learn_topic_type: "Concepts"
-learn_rel_path: "Guided troubleshooting"
+learn_rel_path: "Concepts/Guided troubleshooting"
 learn_docs_purpose: "Present the concept of Netdata's Anomaly Advisor feature, it's purpose and use cases"
 learn_repo_doc: "True"
 -->

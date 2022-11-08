@@ -2,10 +2,10 @@
 title: "Registry"
 sidebar_label: "Registry"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md"
-sidebar_position: 19
+sidebar_position: "19"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-agent"
+learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain what a registry does, it's purpose and some examples"
 -->
 

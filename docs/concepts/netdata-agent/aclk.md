@@ -2,10 +2,10 @@
 title: "ACLK"
 sidebar_label: "ACLK"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md"
-sidebar_position: 1400
+sidebar_position: "1400"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-agent"
+learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain that the ACLK is // a mechanism for secure connection between the Agent and the Hub/Cloud."
 -->
 

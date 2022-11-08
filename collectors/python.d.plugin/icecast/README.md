@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Icecast"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Collectors References/Networking"
+learn_rel_path: "References/Collectors references/Networking"
 -->
 
 # Icecast monitoring with Netdata

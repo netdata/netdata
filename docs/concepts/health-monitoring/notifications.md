@@ -2,10 +2,10 @@
 title: "notifications"
 sidebar_label: "Notifications"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/notifications.md"
-sidebar_position: 2100
+sidebar_position: "2100"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "health-monitoring"
+learn_rel_path: "Concepts/Health monitoring"
 learn_docs_purpose: "Define notifications, correlate how they can assist with health monitoring. Give an explanation of notification methods."
 -->
 

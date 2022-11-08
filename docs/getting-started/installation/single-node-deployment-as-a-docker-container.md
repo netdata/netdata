@@ -1,11 +1,11 @@
 <!--
-title: Deploy netdata in a host as a Docker container
-sidebar_label: Deploy netdata as a Docker container
+title: "Deploy netdata in a host as a Docker container"
+sidebar_label: "Deploy netdata as a Docker container"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/deploy-netdata-as-a-docker-container.md"
-sidebar_position: 7
+sidebar_position: "7"
 learn_status: "Published"
 learn_topic_type: "Getting started"
-learn_rel_path: "Installation"
+learn_rel_path: "Getting started/Installation"
 learn_docs_purpose: "Instruction to deploy Netdata as a Docker container"
 -->
 

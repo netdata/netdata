@@ -2,10 +2,10 @@
 title: "Glossary"
 sidebar_label: "Glossary"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/glossary.md"
-sidebar_position: 30000
+sidebar_position: "30000"
 learn_status: "Published"
 learn_topic_type: "Glossary"
-learn_rel_path: "glossary"
+learn_rel_path: "Glossary/Glossary"
 learn_docs_purpose: "A list of single terms related to Netdata, paired with clear definitions and linked to documentation starting points related to the topic."
 -->
 

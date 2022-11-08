@@ -2,7 +2,7 @@
 title: "Secure Agent Netdata deployments"
 sidebar_label: "Secure Netdata deployments"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/secure-netdata-deployments.md"
-sidebar_position : 50
+sidebar_position : "50"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Setup"

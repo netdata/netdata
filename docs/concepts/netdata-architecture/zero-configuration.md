@@ -2,10 +2,10 @@
 title: "Zero configuration"
 sidebar_label: "Zero configuration"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/zero-configuration.md"
-sidebar_position: 500
+sidebar_position: "500"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-architecture"
+learn_rel_path: "Concepts/Netdata architecture"
 learn_docs_purpose: "Explain what Netdata can do out of the box"
 -->
 

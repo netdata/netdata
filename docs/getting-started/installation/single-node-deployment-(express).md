@@ -2,10 +2,10 @@
 title: "Linux/Unix based deployments-(express/recommended)"
 sidebar_label: "Linux/unix based deployments-(express/recommended)"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/single-node-deployment-(express).md"
-sidebar_position: 1
+sidebar_position: "1"
 learn_status: "Published"
 learn_topic_type: "Getting started"
-learn_rel_path: "Installation"
+learn_rel_path: "Getting started/Installation"
 learn_docs_purpose: "Instructions on running the kickstart script on Linux/Unix systems."
 -->
 

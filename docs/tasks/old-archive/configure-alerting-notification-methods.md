@@ -3,9 +3,9 @@ title: "Configure alerting notification methods"
 sidebar_label: "Configure alerting notification methods"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/alerting/configure-alerting-notification-methods.md"
 learn_status: "Unpublished"
-sidebar_position: 4
+sidebar_position: "4"
 learn_topic_type: "Tasks"
-learn_rel_path: "alerting"
+learn_rel_path: "Alerting"
 learn_docs_purpose: "Instructions on how to configure alerting notification methods"
 -->
 

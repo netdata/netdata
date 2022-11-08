@@ -2,10 +2,10 @@
 title: "Metrics exporting"
 sidebar_label: "Metrics exporting"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md"
-sidebar_position: 1200
+sidebar_position: "1200"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-agent"
+learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain what exporting means and the purpose to export metrics"
 -->
 

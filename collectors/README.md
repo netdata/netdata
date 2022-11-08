@@ -5,7 +5,7 @@ id: "collectors-ref"
 sidebar_label: "Plugins Reference"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "General References/Collectors References"
+learn_rel_path: "References/General references/Collectors references"
 -->
 
 # Collecting metrics

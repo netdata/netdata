@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/char
 sidebar_label: "OpenSIPS"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Collectors References/Networking"
+learn_rel_path: "References/Collectors references/Networking"
 -->
 
 # OpenSIPS monitoring with Netdata

@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/cli/README.md"
 sidebar_label: "Agent CLI"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "General References"
+learn_rel_path: "References/General references"
 -->
 
 # Netdata CLI

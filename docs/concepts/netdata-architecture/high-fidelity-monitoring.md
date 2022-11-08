@@ -2,11 +2,11 @@
 title: "High fidelity monitoring"
 sidebar_label: "High fidelity monitoring"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/high-fidelity-monitoring.md"
-sidebar_position: 300
+sidebar_position: "300"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "netdata-architecture"
-learn_docs_purpose: "Present what high fidelity monitoring is: (real time, high resolution, unlimited, fixed step metric databases)"
+learn_rel_path: "Concepts/Netdata architecture"
+learn_docs_purpose: "Present what high fidelity monitoring is"
 -->
 
 Netdata is not just another monitoring solution, it's _the_ high fidelity monitoring solution.

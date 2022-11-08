@@ -2,10 +2,10 @@
 title: "Build from source"
 sidebar_label: "Build from source"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/single-node-build-from-source.md"
-sidebar_position: 10
+sidebar_position: "10"
 learn_status: "Published"
 learn_topic_type: "Getting Started"
-learn_rel_path: "Installation"
+learn_rel_path: "Getting started/Installation"
 learn_docs_purpose: "Build Netdata from source"
 -->
 

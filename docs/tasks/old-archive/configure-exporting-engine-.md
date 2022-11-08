@@ -3,9 +3,9 @@ title: "Configure exporting engine "
 sidebar_label: "Configure exporting engine "
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/manage-retained-metrics/configure-exporting-engine-.md"
 learn_status: "Unpublished"
-sidebar_position: 10
+sidebar_position: "10"
 learn_topic_type: "Tasks"
-learn_rel_path: "manage-retained-metrics"
+learn_rel_path: "Manage retained metrics"
 learn_docs_purpose: "Instructions on how to configure the exporting engine to export metrics to an external target"
 -->
 
