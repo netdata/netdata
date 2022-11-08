@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/gene
 sidebar_position: 13
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "administration"
+learn_rel_path: "Operations"
 learn_docs_purpose: "Instructions on how to remove a node from a Space in the cloud"
 -->
 

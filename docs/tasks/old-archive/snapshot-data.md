@@ -2,7 +2,7 @@
 title: "Snapshot data"
 sidebar_label: "Snapshot data"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "Tasks"
 learn_rel_path: "operations"
 learn_docs_purpose: "Instructions on how to take snapshots of data"

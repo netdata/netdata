@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/secu
 sidebar_position : 50
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "security"
+learn_rel_path: "Setup"
 learn_docs_purpose: "Present all the Agent interconnection ports and Cloud IPs for the user to whitelist them and hardening it"
 -->
 
