@@ -18,6 +18,8 @@ snapshot, and send it to a colleague for further analysis.
 
 ## Prerequisites
 
+To import/export snapshots, you need:
+
 - A node with the Agent installed, and access to that node's local dashboard
 
 ## Export a snapshot
