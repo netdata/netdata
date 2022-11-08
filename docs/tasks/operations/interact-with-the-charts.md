@@ -10,24 +10,26 @@ learn_docs_purpose: "Instructions on how to interact with the charts (buttons, e
 learn_repo_doc: "True"
 -->
 
-In this task you are going to learn how to interact with Netdata's charts.
+In this task, you will learn how to interact with Netdata's many charts.
 
 Before we begin, let's explain some of the terminology we are going to use:
 
-- "tooltip" is the small text that appears upon hovering over a button. They help in giving more info about a button's
+- "Tooltip" is the small text that appears upon hovering over a button. They help in giving more info about a button's
   function
 - "Toolbox" is the box that appears in every chart's top right corner, and it contains tools used in manipulating the
   chart
-- The button names used in this task will resemble the tooltips shown while hovering above them
+- The button names used in this task will resemble the tooltips shown while hovering above the individual button
 
 We will begin analyzing all the buttons and the actions from the top of the chart to the bottom, in a left-to-right
 fashion.
 
 ## Prerequisites
 
+To interact with charts, you will need the following:
+
 - A Netdata Cloud Space with at least one live node claimed to it
 
-## Stop a chart from updating
+## Stopping a chart from updating (and restarting)
 
 You can stop a chart from updating by clicking on it. This will pause all the charts in order to take a better look!
 
@@ -53,7 +55,7 @@ the **See anomalies based on chart data** button.
 
 You can see a chart's information by clicking the **Information** button.
 
-Then you will be presented with:
+After clicking this button, you will be presented with:
 
 - the chart's name
 - the plugin name
@@ -62,26 +64,26 @@ Then you will be presented with:
 
 ### Change a chart's line style
 
-By clicking the **Line** button you can select between "Line", "Stacked" and "Area" styles, which resemble different ways
+Clicking the **Line** button allows you to select between **Line**, **Stacked** and **Area** styles, which resemble different ways
 of rendering the metrics on the chart.
 
 ### Toggle Fullscreen
 
-You can set a chart to fullscreen, to have better visibility or to focus on one chart for example, by clicking
+You can set a chart to fullscreen to have better visibility or focus on one specific charts by clicking
 the **Maximize** button.
 
 To bring the chart back to normal size, you can click the same button, now with the tooltip **Minimize**.
 
 ### Add a chart to a custom dashboard
 
-You can add a chart to one of your custom dashboards, by clicking the **add to dashboard** button.
+You can add a chart to one of your custom dashboards by clicking the **add to dashboard** button.
 
 To read more about custom dashboards, check our Task
 on [how to create custom Dashboards](https://github.com/netdata/learn/blob/master/docs/tasks/setup/space-administration/room-management.md#createdelete-custom-dashboards).
 
 ## Metrics management bar
 
-This is the bar responsible to allow you to customise what metrics are presented on the chart.
+This bar allows you to customise what metrics are presented on the chart.
 
 In detail, you can:
 
@@ -90,7 +92,7 @@ In detail, you can:
 
 ### Group Metrics
 
-You can group metrics:
+To group metrics:
 
 1. Press the **Group by** tab
 2. Select any of the available options
@@ -100,7 +102,7 @@ You can group metrics:
 You can change how the grouped metrics are presented, by altering the fields in the sentence that follows the **Group by**
 tab.
 
-Depending on what you grouped the metrics by, you are going to have different options, correlated to the current
+Depending on how metrics are currently grouped, you are going to have different options, correlated to the current
 grouping.
 
 You can always reset the options by pressing the **Reset** button.
@@ -188,11 +190,13 @@ The colors used represent the colors of the currently shown metrics on the chart
 
 In this bar you can:
 
-- short dimensions/metrics by name or value
+- shorten dimensions/metrics by name or value
 - click on any given field to show only that on the chart
 - use `ctrl` and click to select more than one dimension/metric
 - Expand or contract the chart for better visibility.
 
 ## Related topics
+
+### Related Concepts
 
 1. [From raw metrics to visualization](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
