@@ -1001,15 +1001,15 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
             {
                 char uuid_str[UUID_STR_LEN];
                 uuid_unparse_lower(*descr->id, uuid_str);
-                internal_error(true, "SKIPPING page marked as invalid for %s with %llu, %llu length=%u",
-                               uuid_str, descr->start_time_ut, descr->end_time_ut, descr->page_length);
+                internal_error(true, "SKIPPING page %p marked as invalid for %s with %llu, %llu length=%u",
+                               descr, uuid_str, descr->start_time_ut, descr->end_time_ut, descr->page_length);
 
                 struct pg_cache_page_index *page_index = get_page_index(pg_cache, descr->id);
                 struct rrdeng_page_descr *in_cache_descr = get_descriptor(page_index,(time_t) (descr->start_time_ut / USEC_PER_SEC ));
 
                 if (likely(in_cache_descr))
-                    internal_error(true, "MEMORY page found %s with %llu, %llu length=%u",
-                               uuid_str, in_cache_descr->start_time_ut / USEC_PER_SEC, in_cache_descr->end_time_ut / USEC_PER_SEC, in_cache_descr->page_length);
+                    internal_error(true, "MEMORY page %p found %s with %llu, %llu length=%u",
+                                   in_cache_descr, uuid_str, in_cache_descr->start_time_ut / USEC_PER_SEC, in_cache_descr->end_time_ut / USEC_PER_SEC, in_cache_descr->page_length);
                 else
                     internal_error(true, "MEMORY page not found for %s", uuid_str);
             }
