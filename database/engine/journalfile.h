@@ -127,6 +127,6 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
                              struct rrdengine_datafile *datafile);
 void init_commit_log(struct rrdengine_instance *ctx);
 bool unlink_descriptor_extent_unsafe(struct rrdeng_page_descr *descr);
-
+void queue_journalfile_v2_migration(struct rrdengine_worker_config* wc, struct rrdengine_journalfile *journalfile);
 
 #endif /* NETDATA_JOURNALFILE_H */

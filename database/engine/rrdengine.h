@@ -296,4 +296,6 @@ struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
 int page_header_is_corrupted(struct journal_v2_header *j2_header, void *page_header);
 void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
+struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
+struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
 #endif /* NETDATA_RRDENGINE_H */
