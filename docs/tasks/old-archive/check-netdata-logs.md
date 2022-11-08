@@ -8,14 +8,17 @@ learn_rel_path: "Operations"
 learn_docs_purpose: "Instructions on how to inspect the logs"
 -->
 
-Netdata uses 3 log files, `error.log`, `access.log` and `debug.log`, you can read more at
+Netdata uses 3 log files, `error.log`, `access.log` and `debug.log`; you can read more at
 the [Daemon Reference](https://github.com/netdata/netdata/blob/master/daemon/README.md) documentation.
 
 Log files are stored in `/var/log/netdata/` by default.
 
 ## Prerequisites
 
-- A node with the Agent installed, and terminal access to that node
+To check Netdata logs, you will need the following:
+
+- A node with the Agent installed 
+- Terminal access to that node
 
 ## Steps
 
@@ -33,5 +36,7 @@ To access the logs of your Agent you can:
 
 ## Related topics
 
-1. [Daemon Reference](https://github.com/netdata/netdata/blob/master/daemon/README.md) 
+### Related refernces
+
+- [Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) 
 
