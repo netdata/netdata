@@ -763,7 +763,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create nightly release or attach artifacts.
               Checkout netdata/netdata: ${{ steps.checkout-main.outcome }}
-              Checkout netdata/netdata-nightlies: ${{ steps.checkout-nightlies.outcome }}
+              Checkout netdata/netdata-nightlies: ${{ steps.checkout-nightly.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Prepare version info: ${{ steps.version.outcome }}
               Create release: ${{ steps.create-release.outcome }}
