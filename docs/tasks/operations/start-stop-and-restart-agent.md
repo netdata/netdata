@@ -26,6 +26,8 @@ the database engine.
 
 ## Prerequisites
 
+To start/stop the agent, you will need the following:
+
 - A node with the Agent installed
 
 ## Steps
@@ -297,4 +299,6 @@ with `service netdata start`, or the appropriate method for your system.
 
 ## Related topics
 
-1. [Netdata Daemon Reference](https://github.com/netdata/netdata/blob/master/daemon/README.md)
+### Related References
+
+- [Netdata Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
