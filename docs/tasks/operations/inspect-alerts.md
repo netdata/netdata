@@ -42,7 +42,7 @@ To inspect your alerts, you will need the following:
 
 ### Related Concepts
 
-1. [Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
+- [Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
 
 ### Related References
-3. [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
+- [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
