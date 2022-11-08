@@ -688,6 +688,9 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
 
         struct journal_page_list *page_entry = &page_list[x];
 
+        if (page_entry->extent_index == UINT32_MAX)
+            continue;
+
         if (delta_end_time_s < page_entry->delta_start_s)
             break;
 
