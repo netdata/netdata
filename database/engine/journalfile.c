@@ -459,14 +459,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                            extent->offset, extent->size);
 #endif
             // Remove entry from previous extent
-            struct extent_info *old_extent = descr->extent;
-            for (uint8_t index = 0; index < old_extent->number_of_pages; index++) {
-                if (old_extent->pages[index] == descr) {
-                    old_extent->pages[index] = NULL;
-                    internal_error(true, "REMOVING UUID %s with %lu OK", uuid_str, start_time_ut);
-                    break;
-                }
-            }
+            unlink_descriptor_extent_unsafe(descr);
+            internal_error(true, "REMOVING UUID %s with %lu OK", uuid_str, start_time_ut);
         }
         else {
             descr = pg_cache_create_descr();
@@ -482,7 +476,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         if (likely(!descr_found))
-            (void) pg_cache_insert(ctx, page_index, descr, true);
+            (void)pg_cache_insert(ctx, page_index, descr, true, false);
 
         if (page_index->latest_time_ut == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
@@ -623,6 +617,21 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     if (unlikely(!journal_is_mmapped))
         posix_memfree(buf);
     return max_id;
+}
+
+bool unlink_descriptor_extent_unsafe(struct rrdeng_page_descr *descr)
+{
+    if (unlikely(!descr || !descr->extent))
+        return true;
+
+    struct extent_info *extent = descr->extent;
+    for (uint8_t index = 0; index < extent->number_of_pages; index++) {
+        if (extent->pages[index] == descr) {
+            extent->pages[index] = NULL;
+            return true;
+        }
+    }
+    return false;
 }
 
 // Checks that the extent list checksum is valid
@@ -1010,15 +1019,11 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         (void)JudyLFreeArray(&page_index->JudyL_array, PJE0);
     }
     else {
-        // This is during startup, so we are the only ones accessing the structures
-        // thats why we can safely remote the entire page_index->JudyL_array
+        // This is during runtime
         struct rrdeng_page_descr *descr;
         Pvoid_t *PValue;
-        struct pg_cache_page_index *page_index;
-        page_index = metric_info->page_index;
-
-        struct rrdengine_instance *ctx = page_index->ctx;
-        struct page_cache *pg_cache = &ctx->pg_cache;
+        struct pg_cache_page_index *page_index = metric_info->page_index;
+        struct page_cache *pg_cache = &page_index->ctx->pg_cache;
 
         Word_t  index_time = metric_info->min_index_time_s;
         uint32_t metric_info_offset = metric_info->page_list_header;
@@ -1097,6 +1102,9 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
     usec_t start_loading = now_realtime_usec();
 #endif
 
+    if (false == startup)
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+
     struct extent_info *extent = datafile->extents.first;
     while (extent) {
         uint8_t extent_pages = extent->number_of_pages;
@@ -1153,6 +1161,9 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
         extent->index = number_of_extents++;
         extent = extent->next;
     }
+
+    if (false == startup)
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     internal_error(true, "Scan and extbuild metric %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
@@ -1440,6 +1451,7 @@ void after_journal_indexing(uv_work_t *req, int status)
     struct rrdengine_worker_config *wc = work_request->wc;
 
     if (likely(status != UV_ECANCELED)) {
+        errno = 0;
         internal_error(true, "Journal indexing done");
     }
     wc->running_journal_migration = 0;
