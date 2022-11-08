@@ -15,17 +15,23 @@ highlight window of interest.
 
 ## Prerequisites
 
+The following is required to detect anomalies with Anomaly Advisor.
+
 - A Netdata Cloud account with at least one node claimed to one of its Spaces.
 
 ## Using Anomaly Advisor
 
 To use the Anomaly Advisor:
 
-1. Go to the "Anomalies" tab
+1. Go to the **Anomalies** tab
 2. Highlight a particular timeframe of interest.
-3. You should see an ordered list of anomaly rate sparklines in the "Anomalous metrics" section
+3. An ordered list of anomaly rate sparklines in the "Anomalous metrics" section.
 
 ## Related topics
 
-1. [Anomaly Advisor Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
-2. [Netdata Configuration Reference](https://github.com/netdata/netdata/blob/master/daemon/config/README.md).
+### Related Concepts
+
+- [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
+
+### Related References
+- [Netdata Configuration Reference](https://github.com/netdata/netdata/blob/master/daemon/config/README.md).
