@@ -22,8 +22,8 @@ Once you understand the process of enabling a connector, you can translate that 
 
 ## Prerequisites
 
-You need to find the right connector for your [external time-series
-database](MISSING LINK FOR METRIC EXPORTING REFERENCES), and then you can proceed on with the task.
+To configure the exporting engine, you will need to find the right connector for your [external time-series
+database](MISSING LINK FOR METRIC EXPORTING REFERENCES), and then you can proceed on with the task steps as follows.
 
 ## Enable the exporting engine
 
