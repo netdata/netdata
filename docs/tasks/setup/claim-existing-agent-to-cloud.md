@@ -612,5 +612,7 @@ with details about your system and relevant output from `error.log`.
 
 ## Related topics
 
-1. [Kickstart script reference](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
-2. [ACLK reference](https://github.com/netdata/netdata/blob/master/aclk/README.md)
+### Related References
+
+- [Kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
+- [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
