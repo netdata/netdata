@@ -33,11 +33,13 @@ Each role may have one or more destinations.
 
 ## Prerequisites
 
+To configure Alert notifications, you will need the following:
+
 - A node with the Agent installed, and terminal access to that node
 
 ## Steps
 
-So, to configure an alerting notification method:
+To configure an alerting notification method:
 
 1. Edit `/etc/netdata/health_alarm_notify.conf`, if you don't know how to edit configuration files, refer to
    the [Configuring the Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md)
@@ -63,7 +65,7 @@ So, to configure an alerting notification method:
 
 ## Testing Notifications
 
-You can run the following command by hand, to test alerts configuration:
+You can manually run the following command to test alerts configuration:
 
 1. Become the netdata user
     ```bash
