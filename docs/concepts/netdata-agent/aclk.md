@@ -1,6 +1,6 @@
 <!--
-title: "ACLK"
-sidebar_label: "ACLK"
+title: "Agent-cloud link (ACLK)"
+sidebar_label: "Agent-cloud link (ACLK)"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md"
 sidebar_position: "1400"
 learn_status: "Published"
@@ -9,41 +9,40 @@ learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain that the ACLK is // a mechanism for secure connection between the Agent and the Hub/Cloud."
 -->
 
-**********************************************************************
-
-# Agent-cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
 through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port
 `443`. The ACLK is encrypted, safe, and _is only established if you connect your node_.
 
-The Cloud App lives at app.netdata.cloud which currently resolves to the following list of IPs: 
+The Cloud App lives at app.netdata.cloud which currently resolves to the following list of IPs:
 
 - 54.198.178.11
 - 44.207.131.212
-- 44.196.50.41 
- 
+- 44.196.50.41
+
 :::caution
 
-This list of IPs can change without notice; we strongly advise you to whitelist the domain `app.netdata.cloud`, if
-this is not an option in your case, always verify the current domain resolution (e.g via the `host` command).
+This list of IPs can change without notice; we strongly advise you to whitelist the domain `app.netdata.cloud`, if this
+is not an option in your case, always verify the current domain resolution (e.g via the `host` command).
 
 :::
 
-For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our full [connect to Cloud
-documentation](/claim/README.md).
+For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our
+full [connect to Cloud documentation](/claim/README.md).
 
 ## Data privacy
-[Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to
-you. This is why **we don't store any metric data in Netdata Cloud**.
 
-All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. 
-The data passes through our systems, but it isn't stored.
+[Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to you.
+This is why **we don't store any metric data in Netdata Cloud**.
 
-However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
+All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata
+Agent to the Netdata Cloud dashboard. The data passes through our systems, but it isn't stored.
 
-Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the documentation.
+However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a
+limited number of _metadata_.
 
+Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the
+documentation.
 
 ## Enable and configure the ACLK
 
@@ -57,10 +56,11 @@ configuration uses two settings:
   cloud base url = https://app.netdata.cloud
 ```
 
-If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-connecting to cloud](/claim/README.md#connect-through-a-proxy).
+If your Agent needs to use a proxy to access the internet, you
+must [set up a proxy for connecting to cloud](/claim/README.md#connect-through-a-proxy).
 
 You can configure following keys in the `netdata.conf` section `[cloud]`:
+
 ```
 [cloud]
   statistics = yes
@@ -68,23 +68,27 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
   mqtt5 = yes
 ```
 
-- `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
-- `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
-- `mqtt5` allows disabling the new MQTT5 implementation which is used now by default in case of issues. This option will be removed in future stable release.
+- `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the
+  database and slightly reduce memory usage of Netdata Agent.
+- `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for
+  nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
+- `mqtt5` allows disabling the new MQTT5 implementation which is used now by default in case of issues. This option will
+  be removed in future stable release.
 
 ## Disable the ACLK
 
-You have two options if you prefer to disable the ACLK and not use Netdata Cloud. The following subsections provide expalantion and instruction for these options.
+You have two options if you prefer to disable the ACLK and not use Netdata Cloud. The following subsections provide
+expalantion and instruction for these options.
 
 ### Disable at installation
 
 You can pass the `--disable-cloud` parameter to the Agent installation when using a kickstart script
-([kickstart.sh](/packaging/installer/methods/kickstart.md), or a [manual installation from
-Git](/packaging/installer/methods/manual.md).
+([kickstart.sh](/packaging/installer/methods/kickstart.md), or
+a [manual installation from Git](/packaging/installer/methods/manual.md).
 
 When you pass this parameter, the installer does not download or compile any extra libraries. Once running, the Agent
-kills the thread responsible for the ACLK and connecting behavior, and behaves as though the ACLK, and thus Netdata Cloud,
-does not exist.
+kills the thread responsible for the ACLK and connecting behavior, and behaves as though the ACLK, and thus Netdata
+Cloud, does not exist.
 
 ### Disable at runtime
 
@@ -100,7 +104,7 @@ installation. To disable the ACLK, open that file and change the `enabled` setti
     enabled = no
 ```
 
-If the file at `/var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it. 
+If the file at `/var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it.
 
 Copy and paste the first two lines from below, which will change your prompt to `cat`.
 
@@ -109,10 +113,10 @@ cd /var/lib/netdata/cloud.d
 cat > cloud.conf << EOF
 ```
 
-Copy and paste in lines 3-6, and after the final `EOF`, hit **Enter**. The final line must contain only `EOF`. Hit **Enter** again to return to your normal prompt with the newly-created file.
+Copy and paste in lines 3-6, and after the final `EOF`, hit **Enter**. The final line must contain only `EOF`. Hit **
+Enter** again to return to your normal prompt with the newly-created file.
 
-To get your normal prompt back, the final line
-must contain only `EOF`.
+To get your normal prompt back, the final line must contain only `EOF`.
 
 ```bash
 [global]
@@ -163,6 +167,5 @@ Restart your Agent and [connect your node](/claim/README.md#how-to-connect-a-nod
 ### Related References
 
 - [ACLK](/aclk/README.md)
-
 
 *******************************************************************************

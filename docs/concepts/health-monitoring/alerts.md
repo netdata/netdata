@@ -9,22 +9,23 @@ learn_rel_path: "Concepts/Health monitoring"
 learn_docs_purpose: "Define alerts, correlate the meaning health monitoring with alert and present how they work. Give an explanation with an alert configuration"
 -->
 
-**********************************************************************
-With the information that appears on Netdata Cloud and the local dashboard about active alarms, you can configure alarms to match your infrastructure's needs or your team's goals.
+With the information that appears on Netdata Cloud and the local dashboard about active alarms, you can configure alarms
+to match your infrastructure's needs or your team's goals.
 
 ## Netdata Cloud alerts
 
 A War Room's [alarms indicator](https://learn.netdata.cloud/docs/cloud/war-rooms#indicators) displays the number of
 active `critical` (red) and `warning` (yellow) alerts for the nodes in this War Room. Click on either the critical or
-warning badges to open a pre-filtered modal displaying only those types of [active
-alarms](https://learn.netdata.cloud/docs/cloud/alerts-notifications/view-active-alerts).
+warning badges to open a pre-filtered modal displaying only those types
+of [active alarms](https://learn.netdata.cloud/docs/cloud/alerts-notifications/view-active-alerts).
 
-The **Alerts** view lists all active alarms for nodes within that War Room, and tells you which chart triggered the alarm,
-what that chart's current value is, the alarm that triggered it, and when the alarm status first began.
+The **Alerts** view lists all active alarms for nodes within that War Room, and tells you which chart triggered the
+alarm, what that chart's current value is, the alarm that triggered it, and when the alarm status first began.
 
-Use the input field in the **Alarms** view to filter active alarms. You can sort by the node's name, alarm, status, chart
-that triggered the alarm, or the operating system. Read more about the [filtering
-syntax](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) to build valuable filters for your infrastructure.
+Use the input field in the **Alarms** view to filter active alarms. You can sort by the node's name, alarm, status,
+chart that triggered the alarm, or the operating system. Read more about
+the [filtering syntax](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) to build valuable filters for your
+infrastructure.
 
 Click on the 3-dot icon (`⋮`) to view active alarm information or navigate directly to the offending chart in that
 node's Cloud dashboard with the **Go to chart** button.
@@ -33,33 +34,29 @@ The active alert information gives you details about the alert that's been trigg
 configuration, how it calculates warning or critical alarms, and which configuration file you could edit on that node if
 you want to tweak or disable the alarm to better suit your needs.
 
-![Active alarm details in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/108564813-f08d2000-72c0-11eb-80c8-b2af22a751fd.png)
-
+![Active alarm details in Netdata Cloud](https://user-images.githubusercontent.com/1153921/108564813-f08d2000-72c0-11eb-80c8-b2af22a751fd.png)
 
 ## Local Netdata Agent dashboard
 
-Find the alerts icon ![Alerts
-icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/alarm.svg)
+Find the alerts
+icon ![Alerts icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/alarm.svg)
 in the top navigation to bring up a modal that shows currently raised alarms, all running alarms, and the alarms log.
 Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
 
-![Animated GIF of looking at raised alarms and the alarm
-log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
+![Animated GIF of looking at raised alarms and the alarm log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
 
-And a static screenshot of the raised CPU alert: 
+And a static screenshot of the raised CPU alert:
 
-![Screenshot of a raised system CPU
-alarm](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
+![Screenshot of a raised system CPU alarm](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
 
 The alert itself is named **system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
 shows the latest value of the chart that triggered the alarm.
 
 With the three icons beneath that and the **role** designation, you can:
 
-1.  Scroll to the chart associated with this raised alarm.
-2.  Copy a link to the badge to your clipboard.
-3.  Copy the code to embed the badge onto another web page using an `<embed>` element.
+1. Scroll to the chart associated with this raised alarm.
+2. Copy a link to the badge to your clipboard.
+3. Copy the code to embed the badge onto another web page using an `<embed>` element.
 
 The table on the right-hand side displays information about the health entity that triggered the alarm, which you can
 use as a reference to [configure alarms](/docs/monitor/configure-alarms.md).
@@ -69,20 +66,20 @@ Welcome to the health configuration reference.
 This guide contains information about editing health configuration files to tweak existing alarms or create new health
 entities that are customized to the needs of your infrastructure.
 
-To learn the basics of locating and editing health configuration files, see the [health
-quickstart](/health/QUICKSTART.md).
+To learn the basics of locating and editing health configuration files, see
+the [health quickstart](/health/QUICKSTART.md).
 
 ## Health configuration files
 
 You can configure the Agent's health watchdog service by editing files in two locations:
 
--   The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
-    altogether, run health checks more or less often, and more. See [daemon
-    configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
-    default values, and what they control.
--   The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
-    performing calculations on or their associated collector. You should edit these files using the `edit-config`
-    script. For example: `sudo ./edit-config health.d/cpu.conf`.
+- The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
+  altogether, run health checks more or less often, and more.
+  See [daemon configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings,
+  their default values, and what they control.
+- The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
+  performing calculations on or their associated collector. You should edit these files using the `edit-config`
+  script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
 ## Health entity reference
 
@@ -106,16 +103,16 @@ to the same chart, Netdata will use the alarm.
 
 Netdata parses the following lines. Beneath the table is an in-depth explanation of each line's purpose and syntax.
 
--   The `alarm` or `template` line must be the first line of any entity.
--   The `on` line is **always required**.
--   The `every` line is **required** if not using `lookup`.
--   Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
--   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
-    `!` for a negative match. Order is important, too! See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
-    more examples.
--   Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
-    joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
-    This comes in handy if your `info` line consists of several sentences.  
+- The `alarm` or `template` line must be the first line of any entity.
+- The `on` line is **always required**.
+- The `every` line is **required** if not using `lookup`.
+- Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
+- A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
+  `!` for a negative match. Order is important, too! See
+  our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more examples.
+- Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
+  joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
+  This comes in handy if your `info` line consists of several sentences.
 
 | line                                                | required        | functionality                                                                         |
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
@@ -161,7 +158,7 @@ alarm: NAME
 template: NAME
 ```
 
-`NAME` can be any alpha character, with `.` (period) and `_` (underscore) as the only allowed symbols, but the names 
+`NAME` can be any alpha character, with `.` (period) and `_` (underscore) as the only allowed symbols, but the names
 cannot be `chart name`, `dimension name`, `family name`, or `chart variables names`.
 
 #### Alarm line `on`
@@ -177,8 +174,7 @@ on: CHART
 The value `CHART` should be the unique ID or name of the chart you're interested in, as shown on the dashboard. In the
 image below, the unique ID is `system.cpu`.
 
-![Finding the unique ID of a
-chart](https://user-images.githubusercontent.com/1153921/67443082-43b16e80-f5b8-11e9-8d33-d6ee052c6678.png)
+![Finding the unique ID of a chart](https://user-images.githubusercontent.com/1153921/67443082-43b16e80-f5b8-11e9-8d33-d6ee052c6678.png)
 
 **Template:**
 
@@ -193,13 +189,14 @@ shows a disk I/O chart, the tooltip reads: `proc:/proc/diskstats, disk.io`.
 
 ![Finding the context of a chart via the tooltip](https://user-images.githubusercontent.com/1153921/68882856-2b230880-06cd-11ea-923b-b28c4632d479.png)
 
-You're interested in what comes after the comma: `disk.io`. That's the name of the chart's context. 
+You're interested in what comes after the comma: `disk.io`. That's the name of the chart's context.
 
 If you create a template using the `disk.io` context, it will apply an alarm to every disk available on your system.
 
 #### Alarm line `class`
 
-This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues on network interfaces, web servers, or database systems. Example:
+This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency`
+can be used for alarms that trigger on latency issues on network interfaces, web servers, or database systems. Example:
 
 ```yaml
 class: Latency
@@ -215,18 +212,20 @@ class: Latency
 | Utilization     |
 | Workload        |
 
-
 </details>
 
 `class` will default to `Unknown` if the line is missing from the alarm configuration.
 
 #### Alarm line `type`
 
-Type can be used to indicate the broader area of the system that the alarm applies to. For example, under the general `Database` type, you can group together alarms that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc. Example:
+Type can be used to indicate the broader area of the system that the alarm applies to. For example, under the
+general `Database` type, you can group together alarms that operate on various database systems, like `MySQL`
+, `CockroachDB`, `CouchDB` etc. Example:
 
 ```yaml
 type: Database
 ```
+
 <details>
 <summary>Netdata's stock alarms use the following `type` attributes by default, but feel free to adjust for your own requirements.</summary>
 
@@ -262,12 +261,16 @@ If an alarm configuration is missing the `type` line, its value will default to 
 
 #### Alarm line `component`
 
-Component can be used to narrow down what the previous `type` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` type. Example:
+Component can be used to narrow down what the previous `type` value specifies for each alarm or template. Continuing
+from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database`
+type. Example:
 
 ```yaml
 component: MySQL
 ```
-As with the `class` and `type` line, if `component` is missing from the configuration, its value will default to `Unknown`.
+
+As with the `class` and `type` line, if `component` is missing from the configuration, its value will default
+to `Unknown`.
 
 #### Alarm line `os`
 
@@ -295,8 +298,8 @@ hosts: server1 server2 database* !redis3 redis*
 #### Alarm line `plugin`
 
 The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
-list of [simple patterns](/libnetdata/simple_pattern/README.md). For example,
-you can create a filter for an alarm that applies specifically to `python.d.plugin`:
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For example, you can create a filter for an alarm that
+applies specifically to `python.d.plugin`:
 
 ```yaml
 plugin: python.d.plugin
@@ -309,8 +312,8 @@ comprehensive example using both.
 #### Alarm line `module`
 
 The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
-list of [simple patterns](/libnetdata/simple_pattern/README.md). For
-example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For example, you can create an alarm that applies only
+on the `isc_dhcpd` module started by `python.d.plugin`:
 
 ```yaml
 plugin: python.d.plugin
@@ -319,14 +322,14 @@ module: isc_dhcpd
 
 #### Alarm line `charts`
 
-The `charts` line filters which chart this alarm should apply to. It is only available on entities using the 
-[`template`](#alarm-line-alarm-or-template) line.
-The value is a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). For
-example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alarms:
+The `charts` line filters which chart this alarm should apply to. It is only available on entities using the
+[`template`](#alarm-line-alarm-or-template) line. The value is a space-separated list
+of [simple patterns](/libnetdata/simple_pattern/README.md). For example, a template that applies to `disk.svctm` (
+Average Service Time) context, but excludes the disk `sdb` from alarms:
 
 ```yaml
 template: disk_svctm_alarm
-      on: disk.svctm
+  on: disk.svctm
   charts: !*sdb* *
 ```
 
@@ -335,8 +338,8 @@ template: disk_svctm_alarm
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
 to. The value is a space-separated list.
 
-The value is a space-separate list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
-some examples.
+The value is a space-separate list of simple patterns. See
+our [simple patterns docs](/libnetdata/simple_pattern/README.md) for some examples.
 
 For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
 
@@ -356,36 +359,32 @@ lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [for
 
 Everything is the same with [badges](/web/api/badges/README.md). In short:
 
--   `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
-     This is required.
+- `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`. This is required.
 
--   `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
-     the units, like `-1s` = 1 second in the past, `-1m` = 1 minute in the past, `-1h` = 1 hour
-     in the past, `-1d` = 1 day in the past. You need a negative number (i.e. how far in the past
-     to look for the value). **This is required**.
+- `AFTER` is a relative number of seconds, but it also accepts a single letter for changing the units, like `-1s` = 1
+  second in the past, `-1m` = 1 minute in the past, `-1h` = 1 hour in the past, `-1d` = 1 day in the past. You need a
+  negative number (i.e. how far in the past to look for the value). **This is required**.
 
--   `at BEFORE` is by default 0 and is not required. Using this you can define the end of the
-     lookup. So data will be evaluated between `AFTER` and `BEFORE`.
+- `at BEFORE` is by default 0 and is not required. Using this you can define the end of the lookup. So data will be
+  evaluated between `AFTER` and `BEFORE`.
 
--   `every DURATION` sets the updated frequency of the lookup (supports single letter units as
-     above too).
+- `every DURATION` sets the updated frequency of the lookup (supports single letter units as above too).
 
--   `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
-     `match-ids`, `match-names`. Check the [badges](/web/api/badges/README.md) documentation for more info.
+- `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
+  `match-ids`, `match-names`. Check the [badges](/web/api/badges/README.md) documentation for more info.
 
--   `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
-     by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
-     have spaces in their names). This accepts Netdata simple patterns _(with `words` separated by
-     `,` or `|` instead of spaces)_ and the `match-ids` and `match-names` options affect the searches
-     for dimensions.
+- `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated by `,` or `|`. The space
+  characters found in dimensions will be kept as-is (a few dimensions have spaces in their names). This accepts Netdata
+  simple patterns _(with `words` separated by
+  `,` or `|` instead of spaces)_ and the `match-ids` and `match-names` options affect the searches for dimensions.
 
--   `foreach DIMENSIONS` is optional, will always be the last parameter, and uses the same `,`/`|`
-     rules as the `of` parameter. Each dimension you specify in `foreach` will use the same rule
-     to trigger an alarm. If you set both `of` and `foreach`, Netdata will ignore the `of` parameter
-     and replace it with one of the dimensions you gave to `foreach`.
+- `foreach DIMENSIONS` is optional, will always be the last parameter, and uses the same `,`/`|`
+  rules as the `of` parameter. Each dimension you specify in `foreach` will use the same rule to trigger an alarm. If
+  you set both `of` and `foreach`, Netdata will ignore the `of` parameter and replace it with one of the dimensions you
+  gave to `foreach`.
 
-The result of the lookup will be available as `$this` and `$NAME` in expressions.
-The timestamps of the timeframe evaluated by the database lookup is available as variables
+The result of the lookup will be available as `$this` and `$NAME` in expressions. The timestamps of the timeframe
+evaluated by the database lookup is available as variables
 `$after` and `$before` (both are unix timestamps).
 
 #### Alarm line `calc`
@@ -407,8 +406,7 @@ calc: EXPRESSION
 
 #### Alarm line `every`
 
-Sets the update frequency of this alarm.  This is the same to the `every DURATION` given
-in the `lookup` lines.
+Sets the update frequency of this alarm. This is the same to the `every DURATION` given in the `lookup` lines.
 
 Format:
 
@@ -479,44 +477,44 @@ settings do not affect the actual alarm - only the time the `exec` script is exe
 Format:
 
 ```yaml
-delay: [[[up U] [down D] multiplier M] max X]
+delay: [ [ [ up U ] [ down D ] multiplier M ] max X ]
 ```
 
--   `up U` defines the delay to be applied to a notification for an alarm that raised its status
-     (i.e. CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the
-     notification for this event will be sent 10 seconds after the actual event. This is used in
-     hope the alarm will get back to its previous state within the duration given. The default `U`
-     is zero.
+- `up U` defines the delay to be applied to a notification for an alarm that raised its status
+  (i.e. CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the notification for this
+  event will be sent 10 seconds after the actual event. This is used in hope the alarm will get back to its previous
+  state within the duration given. The default `U`
+  is zero.
 
--   `down D` defines the delay to be applied to a notification for an alarm that moves to lower
-     state (i.e. CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
-     will delay the notification by 1 minute. This is used to prevent notifications for flapping
-     alarms. The default `D` is zero.
+- `down D` defines the delay to be applied to a notification for an alarm that moves to lower state (i.e. CRITICAL to
+  WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
+  will delay the notification by 1 minute. This is used to prevent notifications for flapping alarms. The default `D` is
+  zero.
 
--   `multiplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
-     delayed. The default multiplier is `1.0`.
+- `multiplier M` multiplies `U` and `D` when an alarm changes state, while a notification is delayed. The default
+  multiplier is `1.0`.
 
--   `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
-     is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
+- `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
+  is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
 
-    Example:
+  Example:
 
-    `delay: up 10s down 15m multiplier 2 max 1h`
+  `delay: up 10s down 15m multiplier 2 max 1h`
 
-    The time is `00:00:00` and the status of the alarm is CLEAR.
+  The time is `00:00:00` and the status of the alarm is CLEAR.
 
-    | time of event | new status | delay               | notification will be sent | why                                                                           |
-    | ------------- | ---------- | ---                 | ------------------------- | ---                                                                           |
-    | 00:00:01      | WARNING    | `up 10s`            | 00:00:11                  | first state switch                                                            |
-    | 00:00:05      | CLEAR      | `down 15m x2`       | 00:30:05                  | the alarm changes state while a notification is delayed, so it was multiplied |
-    | 00:00:06      | WARNING    | `up 10s x2 x2`      | 00:00:26                  | multiplied twice                                                              |
-    | 00:00:07      | CLEAR      | `down 15m x2 x2 x2` | 00:45:07                  | multiplied 3 times.                                                           |
+  | time of event | new status | delay               | notification will be sent | why                                                                           |
+      | ------------- | ---------- | ---                 | ------------------------- | ---                                                                           |
+  | 00:00:01      | WARNING    | `up 10s`            | 00:00:11                  | first state switch                                                            |
+  | 00:00:05      | CLEAR      | `down 15m x2`       | 00:30:05                  | the alarm changes state while a notification is delayed, so it was multiplied |
+  | 00:00:06      | WARNING    | `up 10s x2 x2`      | 00:00:26                  | multiplied twice                                                              |
+  | 00:00:07      | CLEAR      | `down 15m x2 x2 x2` | 00:45:07                  | multiplied 3 times.                                                           |
 
-    So:
+  So:
 
-    -   `U` and `D` are multiplied by `M` every time the alarm changes state (any state, not just
-        their matching one) and a delay is in place.
-    -   All are reset to their defaults when the alarm switches state without a delay in place.
+    - `U` and `D` are multiplied by `M` every time the alarm changes state (any state, not just their matching one) and
+      a delay is in place.
+    - All are reset to their defaults when the alarm switches state without a delay in place.
 
 #### Alarm line `repeat`
 
@@ -529,15 +527,15 @@ for `CRITICAL`, `CLEAR` and `WARNING` messages.
 Format:
 
 ```yaml
-repeat: [off] [warning DURATION] [critical DURATION]
+repeat: [ off ] [ warning DURATION ] [ critical DURATION ]
 ```
 
--   `off`: Turns off the repeating feature for the current alarm. This is effective when the default repeat settings has
-    been enabled in health configuration.
--   `warning DURATION`: Defines the interval when the alarm is in WARNING state. Use `0s` to turn off the repeating
-    notification for WARNING mode.
--   `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating
-    notification for CRITICAL mode.
+- `off`: Turns off the repeating feature for the current alarm. This is effective when the default repeat settings has
+  been enabled in health configuration.
+- `warning DURATION`: Defines the interval when the alarm is in WARNING state. Use `0s` to turn off the repeating
+  notification for WARNING mode.
+- `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating
+  notification for CRITICAL mode.
 
 #### Alarm line `options`
 
@@ -558,23 +556,23 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `host labels`
 
-Defines the list of labels present on a host. See our [host labels guide](/docs/guides/using-host-labels.md) for
-an explanation of host labels and how to implement them.
+Defines the list of labels present on a host. See our [host labels guide](/docs/guides/using-host-labels.md) for an
+explanation of host labels and how to implement them.
 
 For example, let's suppose that `netdata.conf` is configured with the following labels:
 
 ```yaml
-[host labels]
-    installed = 20191211
-    room = server
+[ host labels ]
+  installed = 20191211
+  room = server
 ```
 
 And more labels in `netdata.conf` for workstations:
 
 ```yaml
-[host labels]
-    installed = 201705
-    room = workstation
+[ host labels ]
+  installed = 201705
+  room = workstation
 ```
 
 By defining labels inside of `netdata.conf`, you can now apply labels to alarms. For example, you can add the following
@@ -584,8 +582,8 @@ line to any alarms you'd like to apply to hosts that have the label `room = serv
 host labels: room = server
 ```
 
-The `host labels` is a space-separated list that accepts simple patterns. For example, you can create an alarm 
-that will be applied to all hosts installed in the last decade with the following line:
+The `host labels` is a space-separated list that accepts simple patterns. For example, you can create an alarm that will
+be applied to all hosts installed in the last decade with the following line:
 
 ```yaml
 host labels: installed = 201*
@@ -622,8 +620,8 @@ Will be rendered on the alert acting on interface `eth0` as:
 info: average inbound utilization for the network interface eth0 over the last minute
 ```
 
-An alert acting on a chart that has a chart label named e.g. `target`, with a value of `https://netdata.cloud/`,
-can be enriched as follows:
+An alert acting on a chart that has a chart label named e.g. `target`, with a value of `https://netdata.cloud/`, can be
+enriched as follows:
 
 ```yaml
 info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site $label:target
@@ -642,8 +640,8 @@ info: average ratio of HTTP responses with unexpected status over the last 5 min
 Netdata has an internal [infix expression parser](/libnetdata/eval). This parses expressions and creates an internal
 structure that allows fast execution of them.
 
-These operators are supported `+`, `-`, `*`, `/`, `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
-Boolean operators result in either `1` (true) or `0` (false).
+These operators are supported `+`, `-`, `*`, `/`, `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`
+, `NOT`. Boolean operators result in either `1` (true) or `0` (false).
 
 The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE conditional statements can be
 specified. The format is: `(condition) ? (true expression) : (false expression)`. So, Netdata will first evaluate the
@@ -660,51 +658,54 @@ Expressions can have variables. Variables start with `$`. Check below for more i
 
 There are two special values you can use:
 
--   `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the
-    database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
+- `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the
+  database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
 
--   `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be set to infinite
-    if divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
+- `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be set to infinite if
+  divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
 
 ### Special use of the conditional operator
 
 A common (but not necessarily obvious) use of the conditional evaluation operator is to provide
-[hysteresis](https://en.wikipedia.org/wiki/Hysteresis) around the critical or warning thresholds.  This usage helps to
+[hysteresis](https://en.wikipedia.org/wiki/Hysteresis) around the critical or warning thresholds. This usage helps to
 avoid bogus messages resulting from small variations in the value when it is varying regularly but staying close to the
 threshold value, without needing to delay sending messages at all.
 
 An example of such usage from the default CPU usage alarms bundled with Netdata is:
 
 ```yaml
-warn: $this > (($status >= $WARNING)  ? (75) : (85))
-crit: $this > (($status == $CRITICAL) ? (85) : (95))
+warn:
+  $this > (($status >= $WARNING)  ? (75): (85))
+crit:
+  $this > (($status == $CRITICAL) ? (85): (95))
 ```
 
 The above say:
 
--   If the alarm is currently a warning, then the threshold for being considered a warning is 75, otherwise it's 85.
+- If the alarm is currently a warning, then the threshold for being considered a warning is 75, otherwise it's 85.
 
--   If the alarm is currently critical, then the threshold for being considered critical is 85, otherwise it's 95.
+- If the alarm is currently critical, then the threshold for being considered critical is 85, otherwise it's 95.
 
 Which in turn, results in the following behavior:
 
--   While the value is rising, it will trigger a warning when it exceeds 85, and a critical alert when it exceeds 95.
+- While the value is rising, it will trigger a warning when it exceeds 85, and a critical alert when it exceeds 95.
 
--   While the value is falling, it will return to a warning state when it goes below 85, and a normal state when it goes
-    below 75.
+- While the value is falling, it will return to a warning state when it goes below 85, and a normal state when it goes
+  below 75.
 
--   If the value is constantly varying between 80 and 90, then it will trigger a warning the first time it goes above
-    85, but will remain a warning until it goes below 75 (or goes above 85).
+- If the value is constantly varying between 80 and 90, then it will trigger a warning the first time it goes above 85,
+  but will remain a warning until it goes below 75 (or goes above 85).
 
--   If the value is constantly varying between 90 and 100, then it will trigger a critical alert the first time it goes
-    above 95, but will remain a critical alert goes below 85 (at which point it will return to being a warning).
+- If the value is constantly varying between 90 and 100, then it will trigger a critical alert the first time it goes
+  above 95, but will remain a critical alert goes below 85 (at which point it will return to being a warning).
 
 ## Variables
 
 You can find all the variables that can be used for a given chart, using
 `http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME`, replacing `NODE` with the IP address or hostname for your
-Agent dashboard. For example, [variables for the `system.cpu` chart of the
-registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
+Agent dashboard. For
+example, [variables for the `system.cpu` chart of the registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu)
+.
 
 > If you don't know how to find the CHART_NAME, you can read about it [here](/web/README.md#charts).
 
@@ -714,66 +715,62 @@ Netdata supports 3 internal indexes for variables that will be used in health mo
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
 templates for charts belonging to a given [context](/web/README.md#contexts). The reason is that all charts of a given
-context are essentially identical, with the only difference being the [family](/web/README.md#families) that
-identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
-unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
+context are essentially identical, with the only difference being the [family](/web/README.md#families) that identifies
+a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you
+explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 
 </details>
 
--   **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of `$this` for
-    the other configured alarms of the chart also appears, under the name of each configured alarm.
+- **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of `$this` for
+  the other configured alarms of the chart also appears, under the name of each configured alarm.
 
-     Charts also define a few special variables:
+  Charts also define a few special variables:
 
-    -   `$last_collected_t` is the unix timestamp of the last data collection
-    -   `$collected_total_raw` is the sum of all the dimensions (their last collected values)
-    -   `$update_every` is the update frequency of the chart
-    -   `$green` and `$red` the threshold defined in alarms (these are per chart - the charts
-            inherits them from the the first alarm that defined them)
+    - `$last_collected_t` is the unix timestamp of the last data collection
+    - `$collected_total_raw` is the sum of all the dimensions (their last collected values)
+    - `$update_every` is the update frequency of the chart
+    - `$green` and `$red` the threshold defined in alarms (these are per chart - the charts inherits them from the the
+      first alarm that defined them)
 
-        Chart dimensions define their last calculated (i.e. interpolated) value, exactly as
-        shown on the charts, but also a variable with their name and suffix `_raw` that resolves
-        to the last collected value - as collected and another with suffix `_last_collected_t`
-        that resolves to unix timestamp the dimension was last collected (there may be dimensions
-        that fail to be collected while others continue normally).
+      Chart dimensions define their last calculated (i.e. interpolated) value, exactly as shown on the charts, but also
+      a variable with their name and suffix `_raw` that resolves to the last collected value - as collected and another
+      with suffix `_last_collected_t`
+      that resolves to unix timestamp the dimension was last collected (there may be dimensions that fail to be
+      collected while others continue normally).
 
--   **family variables**. Families are used to group charts together. For example all `eth0`
-     charts, have `family = eth0`. This index includes all local variables, but if there are
-     overlapping variables, only the first are exposed.
+- **family variables**. Families are used to group charts together. For example all `eth0`
+  charts, have `family = eth0`. This index includes all local variables, but if there are overlapping variables, only
+  the first are exposed.
 
--   **host variables**. All the dimensions of all charts, including all alarms, in fullname.
-     Fullname is `CHART.VARIABLE`, where `CHART` is either the chart id or the chart name (both
-     are supported).
+- **host variables**. All the dimensions of all charts, including all alarms, in fullname. Fullname is `CHART.VARIABLE`,
+  where `CHART` is either the chart id or the chart name (both are supported).
 
--   **special variables\*** are:
+- **special variables\*** are:
 
-    -   `$this`, which is resolved to the value of the current alarm.
+    - `$this`, which is resolved to the value of the current alarm.
 
-    -   `$status`, which is resolved to the current status of the alarm (the current = the last
-         status, i.e. before the current database lookup and the evaluation of the `calc` line).
-         This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
-         `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as
-         expected.
+    - `$status`, which is resolved to the current status of the alarm (the current = the last status, i.e. before the
+      current database lookup and the evaluation of the `calc` line). This values can be compared with `$REMOVED`
+      , `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
+      `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as expected.
 
-    -   `$now`, which is resolved to current unix timestamp.
+    - `$now`, which is resolved to current unix timestamp.
 
 ## Alarm statuses
 
 Alarms can have the following statuses:
 
--   `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata
-     to reload health configuration)
+- `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata to reload health configuration)
 
--   `UNINITIALIZED` - the alarm is not initialized yet
+- `UNINITIALIZED` - the alarm is not initialized yet
 
--   `UNDEFINED` - the alarm failed to be calculated (i.e. the database lookup failed,
-     a division by zero occurred, etc)
+- `UNDEFINED` - the alarm failed to be calculated (i.e. the database lookup failed, a division by zero occurred, etc)
 
--   `CLEAR` - the alarm is not armed / raised (i.e. is OK)
+- `CLEAR` - the alarm is not armed / raised (i.e. is OK)
 
--   `WARNING` - the warning expression resulted in true or non-zero
+- `WARNING` - the warning expression resulted in true or non-zero
 
--   `CRITICAL` - the critical expression resulted in true or non-zero
+- `CRITICAL` - the critical expression resulted in true or non-zero
 
 The external script will be called for all status changes.
 
@@ -789,9 +786,9 @@ A simple check if an apache server is alive:
 
 ```yaml
 template: apache_last_collected_secs
-      on: apache.requests
-    calc: $now - $last_collected_t
-   every: 10s
+  on: apache.requests
+  calc: $now - $last_collected_t
+  every: 10s
     warn: $this > ( 5 * $update_every)
     crit: $this > (10 * $update_every)
 ```
@@ -802,9 +799,8 @@ The above checks that Netdata is able to collect data from apache. In detail:
 template: apache_last_collected_secs
 ```
 
-The above defines a **template** named `apache_last_collected_secs`.
-The name is important since `$apache_last_collected_secs` resolves to the `calc` line.
-So, try to give something descriptive.
+The above defines a **template** named `apache_last_collected_secs`. The name is important
+since `$apache_last_collected_secs` resolves to the `calc` line. So, try to give something descriptive.
 
 ```yaml
       on: apache.requests
@@ -817,10 +813,10 @@ The above applies the **template** to all charts that have `context = apache.req
     calc: $now - $last_collected_t
 ```
 
--   `$now` is a standard variable that resolves to the current timestamp.
+- `$now` is a standard variable that resolves to the current timestamp.
 
--   `$last_collected_t` is the last data collection timestamp of the chart.
-     So this calculation gives the number of seconds passed since the last data collection.
+- `$last_collected_t` is the last data collection timestamp of the chart. So this calculation gives the number of
+  seconds passed since the last data collection.
 
 ```yaml
    every: 10s
@@ -835,13 +831,13 @@ The alarm will be evaluated every 10 seconds.
 
 If these result in non-zero or true, they trigger the alarm.
 
--   `$this` refers to the value of this alarm (i.e. the result of the `calc` line.
-     We could also use `$apache_last_collected_secs`.
+- `$this` refers to the value of this alarm (i.e. the result of the `calc` line. We could also
+  use `$apache_last_collected_secs`.
 
 `$update_every` is the update frequency of the chart, in seconds.
 
-So, the warning condition checks if we have not collected data from apache for 5
-iterations and the critical condition checks for 10 iterations.
+So, the warning condition checks if we have not collected data from apache for 5 iterations and the critical condition
+checks for 10 iterations.
 
 ### Example 2 - disk space
 
@@ -849,9 +845,9 @@ Check if any of the disks is critically low on disk space:
 
 ```yaml
 template: disk_full_percent
-      on: disk.space
-    calc: $used * 100 / ($avail + $used)
-   every: 1m
+  on: disk.space
+  calc: $used * 100 / ($avail + $used)
+  every: 1m
     warn: $this > 80
     crit: $this > 95
   repeat: warning 120s critical 10s
@@ -874,34 +870,32 @@ Calculate the disk fill rate:
 
 ```yaml
     template: disk_fill_rate
-          on: disk.space
+      on: disk.space
       lookup: max -1s at -30m unaligned of avail
         calc: ($this - $avail) / (30 * 60)
-       every: 15s
+        every: 15s
 ```
 
-In the `calc` line: `$this` is the result of the `lookup` line (i.e. the free space 30 minutes
-ago) and `$avail` is the current disk free space. So the `calc` line will either have a positive
-number of GB/second if the disk if filling up, or a negative number of GB/second if the disk is
-freeing up space.
+In the `calc` line: `$this` is the result of the `lookup` line (i.e. the free space 30 minutes ago) and `$avail` is the
+current disk free space. So the `calc` line will either have a positive number of GB/second if the disk if filling up,
+or a negative number of GB/second if the disk is freeing up space.
 
-There is no `warn` or `crit` lines here. So, this template will just do the calculation and
-nothing more.
+There is no `warn` or `crit` lines here. So, this template will just do the calculation and nothing more.
 
 Predict the hours after which the disk will run out of space:
 
 ```yaml
     template: disk_full_after_hours
-          on: disk.space
-        calc: $avail / $disk_fill_rate / 3600
-       every: 10s
+      on: disk.space
+      calc: $avail / $disk_fill_rate / 3600
+      every: 10s
         warn: $this > 0 and $this < 48
         crit: $this > 0 and $this < 24
 ```
 
-The `calc` line estimates the time in hours, we will run out of disk space. Of course, only
-positive values are interesting for this check, so the warning and critical conditions check
-for positive values and that we have enough free space for 48 and 24 hours respectively.
+The `calc` line estimates the time in hours, we will run out of disk space. Of course, only positive values are
+interesting for this check, so the warning and critical conditions check for positive values and that we have enough
+free space for 48 and 24 hours respectively.
 
 Once this alarm triggers we will receive an email like this:
 
@@ -913,19 +907,18 @@ Check if any network interface is dropping packets:
 
 ```yaml
 template: 30min_packet_drops
-      on: net.drops
+  on: net.drops
   lookup: sum -30m unaligned absolute
-   every: 10s
-    crit: $this > 0
+    every: 10s
+      crit: $this > 0
 ```
 
 The `lookup` line will calculate the sum of the all dropped packets in the last 30 minutes.
 
 The `crit` line will issue a critical alarm if even a single packet has been dropped.
 
-Note that the drops chart does not exist if a network interface has never dropped a single packet.
-When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
-alarm to it.
+Note that the drops chart does not exist if a network interface has never dropped a single packet. When Netdata detects
+a dropped packet, it will add the chart and it will automatically attach this alarm to it.
 
 ### Example 5 - CPU usage
 
@@ -933,17 +926,17 @@ Check if user or system dimension is using more than 50% of cpu:
 
 ```yaml
  alarm: dim_template
-    on: system.cpu
-    os: linux
-lookup: average -3s percentage foreach system,user
- units: %
- every: 10s
-  warn: $this > 50
-  crit: $this > 80
+   on: system.cpu
+   os: linux
+ lookup: average -3s percentage foreach system,user
+   units: %
+   every: 10s
+     warn: $this > 50
+     crit: $this > 80
 ```
 
-The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds. Because we have
-the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
+The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds. Because we have the
+foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
 ### Example 6 - CPU usage
@@ -952,13 +945,13 @@ Check if all dimensions are using more than 50% of cpu:
 
 ```yaml
  alarm: dim_template
-    on: system.cpu
-    os: linux
-lookup: average -3s percentage foreach *
- units: %
- every: 10s
-  warn: $this > 50
-  crit: $this > 80
+   on: system.cpu
+   os: linux
+ lookup: average -3s percentage foreach *
+   units: %
+   every: 10s
+     warn: $this > 50
+     crit: $this > 80
 ```
 
 The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
@@ -966,99 +959,112 @@ Netdata will create alarms for all dimensions of the chart.
 
 ### Example 7 - Z-Score based alarm
 
-Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alarm on `user` dimension of the `system.cpu` chart:
+Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alarm on `user` dimension of the `system.cpu`
+chart:
 
 ```yaml
  alarm: cpu_user_mean
-    on: system.cpu
-lookup: mean -60s of user
- every: 10s
+   on: system.cpu
+ lookup: mean -60s of user
+   every: 10s
 
- alarm: cpu_user_stddev
-    on: system.cpu
-lookup: stddev -60s of user
- every: 10s
+   alarm: cpu_user_stddev
+     on: system.cpu
+ lookup: stddev -60s of user
+   every: 10s
 
- alarm: cpu_user_zscore
-    on: system.cpu
-lookup: mean -10s of user
-  calc: ($this - $cpu_user_mean) / $cpu_user_stddev
- every: 10s
-  warn: $this < -2 or $this > 2
-  crit: $this < -3 or $this > 3
+   alarm: cpu_user_zscore
+     on: system.cpu
+ lookup: mean -10s of user
+   calc: ($this - $cpu_user_mean) / $cpu_user_stddev
+   every: 10s
+     warn: $this < -2 or $this > 2
+     crit: $this < -3 or $this > 3
 ```
 
-Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
+Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one
+for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
 
 ### Example 8 - [Anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) based CPU dimensions alarm
 
-Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) for any CPU dimension is above 5%, critical if it goes above 20%:
+Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) for any CPU dimension
+is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_cpu_dims
-      on: system.cpu
-      os: linux
-   hosts: *
+  on: system.cpu
+  os: linux
+  hosts: *
   lookup: average -5m anomaly-bit foreach *
     calc: $this
-   units: %
-   every: 30s
-    warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
-    info: rolling 5min anomaly rate for each system.cpu dimension
+    units: %
+    every: 30s
+      warn:
+        $this > (($status >= $WARNING)  ? (5): (20))
+      crit:
+        $this > (($status == $CRITICAL) ? (20): (100))
+      info: rolling 5min anomaly rate for each system.cpu dimension
 ```
 
-The `lookup` line will calculate the average anomaly rate of each `system.cpu` dimension over the last 5 minues. In this case
-Netdata will create alarms for all dimensions of the chart.
+The `lookup` line will calculate the average anomaly rate of each `system.cpu` dimension over the last 5 minues. In this
+case Netdata will create alarms for all dimensions of the chart.
 
 ### Example 9 - [Anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) based CPU chart alarm
 
-Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
+Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) averaged across all
+CPU dimensions is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_cpu_chart
-      on: system.cpu
-      os: linux
-   hosts: *
+  on: system.cpu
+  os: linux
+  hosts: *
   lookup: average -5m anomaly-bit of *
     calc: $this
-   units: %
-   every: 30s
-    warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
-    info: rolling 5min anomaly rate for system.cpu chart
+    units: %
+    every: 30s
+      warn:
+        $this > (($status >= $WARNING)  ? (5): (20))
+      crit:
+        $this > (($status == $CRITICAL) ? (20): (100))
+      info: rolling 5min anomaly rate for system.cpu chart
 ```
 
-The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In this case
-Netdata will create one alarm for the chart.
+The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In
+this case Netdata will create one alarm for the chart.
 
 ### Example 10 - [Anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) based node level alarm
 
-Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
+Warning if 5 minute rolling [anomaly rate](https://learn.netdata.cloud/docs/agent/ml#anomaly-rate) averaged across all
+ML enabled dimensions is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_node
-      on: anomaly_detection.anomaly_rate
-      os: linux
-   hosts: *
+  on: anomaly_detection.anomaly_rate
+  os: linux
+  hosts: *
   lookup: average -5m of anomaly_rate
     calc: $this
-   units: %
-   every: 30s
-    warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
-    info: rolling 5min anomaly rate for all ML enabled dims
+    units: %
+    every: 30s
+      warn:
+        $this > (($status >= $WARNING)  ? (5): (20))
+      crit:
+        $this > (($status == $CRITICAL) ? (20): (100))
+      info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
-The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://learn.netdata.cloud/docs/agent/ml#node-anomaly-rate) over the last 5 minues.
+The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate
+the average [node level anomaly rate](https://learn.netdata.cloud/docs/agent/ml#node-anomaly-rate) over the last 5
+minues.
 
 ## Troubleshooting
 
 You can compile Netdata with [debugging](/daemon/README.md#debugging) and then set in `netdata.conf`:
 
 ```yaml
-[global]
-   debug flags = 0x0000000000800000
+[ global ]
+  debug flags = 0x0000000000800000
 ```
 
 Then check your `/var/log/netdata/debug.log`. It will show you how it works. Important: this will generate a lot of
@@ -1068,16 +1074,15 @@ You can find the context of charts by looking up the chart in either `http://NOD
 `http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
 You can find how Netdata interpreted the expressions by examining the alarm at
-`http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
-config file, and the same expression with additional parentheses added to indicate the evaluation flow of the
-expression.
+`http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its config
+file, and the same expression with additional parentheses added to indicate the evaluation flow of the expression.
 
 ## Disabling health checks or silencing notifications at runtime
 
 It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need
 to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence
-notifications are runtime. The health checks can be controlled at runtime via the [health management
-api](/web/api/health/README.md).
+notifications are runtime. The health checks can be controlled at runtime via
+the [health management api](/web/api/health/README.md).
 
 
 *******************************************************************************

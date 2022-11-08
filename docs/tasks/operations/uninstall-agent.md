@@ -6,9 +6,7 @@ learn_status: "Published"
 learn_topic_type: "Tasks"
 sidebar_position: "7"
 learn_rel_path: "Operations"
-learn_docs_purpose: "Instructions on how to uninstall demonstration"-->**********************************************************************Template:Small intro, give some context to the user## PrerequisiteUnordered list of what you will need. ## StepsExact list of steps the user must follow## Expected resultWhat you expect to see when you complete the steps above## ExampleExample configuration/actions of the task## Related topicsList of reference docs user needs to be aware of.*****************Suggested document to be transformed**************************"
-From netdata repo's commit : "3a672f5b4ba23d455b507c8276b36403e10f953d<!--"
-description: "If you are no longer interested in using the Netdata Agent, use the self-contained uninstaller to remove all traces of binaries and configuration files."
+learn_docs_purpose: "Instructions on how to uninstall demonstration"
 -->
 
 # Uninstall Netdata

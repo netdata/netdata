@@ -9,8 +9,6 @@ learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain the streaming and replication concepts"
 -->
 
-**********************************************************************
-
 Each node running Netdata can stream the metrics it collects, in real time, to another node. Streaming allows you to
 replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database
 (TSDB).

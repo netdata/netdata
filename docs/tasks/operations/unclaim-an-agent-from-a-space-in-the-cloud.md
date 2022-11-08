@@ -9,7 +9,6 @@ learn_rel_path: "Operations"
 learn_docs_purpose: "Instructions on how to remove a node from a Space in the cloud"
 -->
 
-**********************************************************************
 Template:
 
 Small intro, give some context to the user

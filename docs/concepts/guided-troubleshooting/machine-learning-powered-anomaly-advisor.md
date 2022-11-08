@@ -10,7 +10,6 @@ learn_docs_purpose: "Present the concept of Netdata's Anomaly Advisor feature, i
 learn_repo_doc: "True"
 -->
 
-**********************************************************************
 
 Netdata's Anomaly Advisor feature lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of interest. 
 If you are running a Netdata version higher than v1.35.0-29-nightly, you will be able to use the Anomaly Advisor out of the box with zero configuration. If you 

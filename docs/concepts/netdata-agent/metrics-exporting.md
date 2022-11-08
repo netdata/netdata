@@ -9,8 +9,6 @@ learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain what exporting means and the purpose to export metrics"
 -->
 
-**********************************************************************
-
 Netdata allows you to export metrics to external time-series databases with the [exporting
 engine](/exporting/README.md). This system uses a number of **connectors** to initiate connections to [more than
 thirty](#supported-databases) supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much
