@@ -14,34 +14,35 @@ Room's Alerts, and how to further filter the results to your liking.
 
 ## Prerequisites
 
+To inspect your alerts, you will need the following:
+
 - A Cloud account with at least one node connected to one of its Spaces.
 
 ## Steps
 
 1. Click on the **Alerts** view
 2. Click on the **Active** tab
-
-You will then be presented with a table of the active alerts (if any), containing info about the:
-
-- Alert Status
-- Alert name
-- Latest Value
-- Latest Updated timestamp
-- Triggered Value
-- Triggered Node
-- Chart Id
-
-You can sort the results by these columns, and you can also filter the Alerts, from the right tab in the interface.  
-You can filter by:
-
-- Status (Critical/Warning)
-- Class (Errors, Latency, Utilization, Workload)
-- Type & Component
-- Role
-- OS
-- Node (Select any node from the War Room)
+3. You will be presented with a table of the active alerts (if any), containing info about the:
+    - Alert Status
+    - Alert name
+    - Latest Value
+    - Latest Updated timestamp
+    - Triggered Value
+    - Triggered Node
+    - Chart Id
+4. Inspect the alerts by sorting the results by these columns, or filtering from the right tab in the interface, using the following filters.
+    - Status (Critical/Warning)
+    - Class (Errors, Latency, Utilization, Workload)
+    - Type & Component
+    - Role
+    - OS
+    - Node (Select any node from the War Room)
 
 ## Related topics
 
-1. [Alerts Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
-2. [Alerts Configuration Reference](https://github.com/netdata/netdata/blob/master/health/README.md)
+### Related Concepts
+
+1. [Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
+
+### Related References
+3. [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
