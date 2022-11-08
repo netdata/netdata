@@ -632,7 +632,7 @@ get_system_info() {
         SYSCODENAME="${VERSION_CODENAME}"
         SYSARCH="$(uname -m)"
 
-        supported_compat_names="debian ubuntu centos fedora opensuse ol"
+        supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
 
         if str_in_list "${DISTRO}" "${supported_compat_names}"; then
             DISTRO_COMPAT_NAME="${DISTRO}"
@@ -643,6 +643,9 @@ get_system_info() {
                 ;;
             cloudlinux|almalinux|rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
+                ;;
+            artix|manjaro|obarun)
+                DISTRO_COMPAT_NAME="arch"
                 ;;
             *)
                 DISTRO_COMPAT_NAME="unknown"
@@ -814,7 +817,9 @@ detect_existing_install() {
 
   if pkg_installed netdata; then
     ndprefix="/"
+    EXISTING_INSTALL_IS_NATIVE="1"
   else
+    EXISTING_INSTALL_IS_NATIVE="0"
     if [ -n "${INSTALL_PREFIX}" ]; then
       searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
       searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
@@ -879,7 +884,11 @@ handle_existing_install() {
   case "${INSTALL_TYPE}" in
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
-        warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type. Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
+        if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+          warning "Found an existing netdata install managed by the system package manager, but could not determine the install type. Usually this means you installed an unsupported third-party netdata package."
+        else
+          warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type. Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
+        fi
       else
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
@@ -897,7 +906,13 @@ handle_existing_install() {
             elif [ "${INTERACTIVE}" -eq 0 ]; then
               fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
             else
-              if confirm "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"; then
+              if [ "${EXISTING_INSTALL_IS_NATIVE}" ]; then
+                reinstall_prompt="Reinstalling over top of an existing install managed by the system package manager is known to cause things to break, are you sure you want to continue?"
+              else
+                reinstall_prompt="Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"
+              fi
+
+              if confirm "${reinstall_prompt}"; then
                 progress "OK, continuing."
               else
                 fatal "Cancelling reinstallation at user request." F0105
@@ -908,10 +923,18 @@ handle_existing_install() {
 
         return 0
       elif [ "${INSTALL_TYPE}" = "unknown" ]; then
+        claimonly_notice="If you just want to claim this install, you should re-run this command with the --claim-only option instead."
+        if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+          failmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}"
+          promptmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice} Are you sure you want to continue?"
+        else
+          failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
+          promptmsg="Attempting to update an existing install is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
+        fi
         if [ "${INTERACTIVE}" -eq 0 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
-          fatal "We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. If you just want to claim this install, you can re-run this command with the --claim-only option." F0106
+          fatal "${failmsg}" F0106
         elif [ "${INTERACTIVE}" -eq 1 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
-          if confirm "Attempting to update an existing install is not officially supported. It may work, but it also might break your system. If you just want to claim this install, you should re-run this command with the --claim-only option instead. Are you sure you want to continue?"; then
+          if confirm "${promptmsg}"; then
             progress "OK, continuing"
           else
             fatal "Cancelling update of unknown installation type at user request." F050C
@@ -1210,19 +1233,48 @@ set_auto_updates() {
 
 # Check for an already installed package with a given name.
 pkg_installed() {
-  case "${DISTRO_COMPAT_NAME}" in
-    debian|ubuntu)
-      # shellcheck disable=SC2016
-      dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
-      return $?
+  case "${SYSTYPE}" in
+    Linux)
+      case "${DISTRO_COMPAT_NAME}" in
+        debian|ubuntu)
+          # shellcheck disable=SC2016
+          dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
+          return $?
+          ;;
+        centos|fedora|opensuse|ol)
+          rpm -q "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        alpine)
+          apk -e info "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        arch)
+          pacman -Qi "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        *)
+          return 1
+          ;;
+      esac
       ;;
-    centos|fedora|opensuse|ol)
-      rpm -q "${1}" > /dev/null 2>&1
-      return $?
+    Darwin)
+      if command -v brew > /dev/null 2>&1; then
+        brew list "${1}" > /dev/null 2>&1
+        return $?
+      else
+        return 1
+      fi
       ;;
-    *)
-      return 1
+    FreeBSD)
+      if pkg -N > /dev/null 2>&1; then
+        pkg info "${1}" > /dev/null 2>&1
+        return $?
+      else
+        return 1
+      fi
       ;;
+    *) return 1 ;;
   esac
 }
 
