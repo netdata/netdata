@@ -985,15 +985,41 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
-        if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
+        bool invalid_page = ((pg_cache_descr->flags & RRD_PAGE_INVALID) == RRD_PAGE_INVALID);
+        if (likely(false == invalid_page)) {
+            if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
+                page_write_pending = 1;
+                /* care, no reference being held */
+                pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
+                uncompressed_payload_length += descr->page_length;
+                descr_commit_idx_array[count] = Index;
+                eligible_pages[count++] = descr;
+            }
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
+        } else {
+#ifdef NETDATA_INTERNAL_CHECKS
+            {
+                char uuid_str[UUID_STR_LEN];
+                uuid_unparse_lower(*descr->id, uuid_str);
+                internal_error(true, "SKIPPING page marked as invalid for %s with %llu, %llu length=%u",
+                               uuid_str, descr->start_time_ut, descr->end_time_ut, descr->page_length);
+
+                struct pg_cache_page_index *page_index = get_page_index(pg_cache, descr->id);
+                struct rrdeng_page_descr *in_cache_descr = get_descriptor(page_index,(time_t) (descr->start_time_ut / USEC_PER_SEC ));
+
+                if (likely(in_cache_descr))
+                    internal_error(true, "MEMORY page found %s with %llu, %llu length=%u",
+                               uuid_str, in_cache_descr->start_time_ut / USEC_PER_SEC, in_cache_descr->end_time_ut / USEC_PER_SEC, in_cache_descr->page_length);
+                else
+                    internal_error(true, "MEMORY page not found for %s", uuid_str);
+            }
+#endif
+            if (pg_cache_try_get_unsafe(descr, 1)) {
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+            }
             page_write_pending = 1;
-            /* care, no reference being held */
-            pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
-            uncompressed_payload_length += descr->page_length;
-            descr_commit_idx_array[count] = Index;
-            eligible_pages[count++] = descr;
         }
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
 
         if (page_write_pending) {
             ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
@@ -1212,7 +1238,7 @@ static void delete_old_data(void *arg)
 
 #define DESCRIPTOR_INITIAL_CLEANUP    (60)
 #ifndef DESCRIPTOR_INTERVAL_CLEANUP
-#define DESCRIPTOR_INTERVAL_CLEANUP    (60)
+#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
 #endif
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
@@ -1253,7 +1279,9 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
+    int force_journal = unlink("/tmp/journal");
+
+    if (unlikely(current_size >= target_size || !force_journal || (out_of_space && only_one_datafile))) {
         /* Finalize data and journal file and create a new pair */
         wal_flush_transaction_buffer(wc);
         ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
@@ -1478,7 +1506,7 @@ void timer_cb(uv_timer_t* handle)
     uv_update_time(handle->loop);
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
-    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
+    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages && !wc->now_deleting_descriptors && !wc->running_journal_migration)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
         struct page_cache *pg_cache = &ctx->pg_cache;
         unsigned long total_bytes, bytes_written, nr_committed_pages, bytes_to_write = 0, producers, low_watermark,

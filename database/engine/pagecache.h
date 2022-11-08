@@ -187,9 +187,8 @@ struct rrdeng_page_descr *pg_cache_insert(
     struct rrdengine_instance *ctx,
     struct pg_cache_page_index *index,
     struct rrdeng_page_descr *descr,
-    bool lock_page_index);
-bool pg_cache_insert_unsafe(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
-                     struct rrdeng_page_descr *descr);
+    bool new_page,
+    bool remove_old);
 
 uint8_t pg_cache_punch_hole(
     struct rrdengine_instance *ctx,
@@ -198,8 +197,7 @@ uint8_t pg_cache_punch_hole(
     uint8_t is_exclusive_holder,
     uuid_t(*metric_id),
     bool update_page_duration);
-usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
-                                            usec_t start_time_ut, usec_t end_time_ut);
+
 void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
                                             usec_t point_in_time_ut, pg_cache_page_info_filter_t *filter,
                                             struct rrdeng_page_info *page_info);

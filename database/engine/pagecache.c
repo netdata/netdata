@@ -711,7 +711,7 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
                 rw_lock_acquired = true;
             }
 
-            struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
+            struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false, false);
             if (unlikely(added_descr != new_descr))
                 rrdeng_page_descr_freez(new_descr);
 
@@ -893,7 +893,12 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
 
 
 /* If index is NULL lookup by UUID (descr->id) */
-struct rrdeng_page_descr *pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr, bool lock_page_index)
+struct rrdeng_page_descr *pg_cache_insert(
+    struct rrdengine_instance *ctx,
+    struct pg_cache_page_index *index,
+    struct rrdeng_page_descr *descr,
+    bool new_page,
+    bool remove_old)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
@@ -922,29 +927,45 @@ struct rrdeng_page_descr *pg_cache_insert(struct rrdengine_instance *ctx, struct
         page_index = index;
     }
 
-    if (lock_page_index)
+    if (new_page)
         uv_rwlock_wrlock(&page_index->lock);
 
+    struct rrdeng_page_descr *old_descr = NULL;
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
     if (unlikely(*PValue)) {
-        descr = *PValue;
-        if (lock_page_index)
-            uv_rwlock_wrunlock(&page_index->lock);
-        return descr;
+        if (false == remove_old) {
+            descr = *PValue;
+            if (new_page)
+                uv_rwlock_wrunlock(&page_index->lock);
+            return descr;
+        }
+        old_descr = *PValue;
+        uv_rwlock_wrlock(&page_index->ctx->datafiles.rwlock);
+        if (false == unlink_descriptor_extent_unsafe(old_descr)) {
+            rrdeng_page_descr_mutex_lock(ctx, old_descr);
+            old_descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
+            rrdeng_page_descr_mutex_unlock(ctx, old_descr);
+        }
+        uv_rwlock_wrlock(&page_index->ctx->datafiles.rwlock);
     }
-    ++page_index->page_count;
-    *PValue = descr;
-    pg_cache_add_new_metric_time(page_index, descr);
 
-    if (lock_page_index)
+    *PValue = descr;
+    if (new_page) {
+        if (!old_descr)
+            ++page_index->page_count;
+        pg_cache_add_new_metric_time(page_index, descr);
         uv_rwlock_wrunlock(&page_index->lock);
+    }
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    ++ctx->stats.pg_cache_insertions;
-    ++pg_cache->page_descriptors;
+    if (new_page && !old_descr) {
+        ++ctx->stats.pg_cache_insertions;
+        ++pg_cache->page_descriptors;
+    }
     if (is_descr_journal_v2(descr))
         ++pg_cache->active_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+
     return descr;
 }
 
