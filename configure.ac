@@ -47,8 +47,8 @@ AC_LANG_PUSH([C])
 AX_COMPILER_VENDOR
 AC_LANG_POP([C])
 if test "$ax_cv_c_compiler_vendor" = "clang"; then
-  AC_CHECK_TOOL([AR], [llvm-ar])
-  AC_CHECK_TOOL([RANLIB], [llvm-ranlib])
+  AC_CHECK_PROG([AR], [llvm-ar], [llvm-ar], [ar])
+  AC_CHECK_PROG([RANLIB], [llvm-ranlib], [llvm-ranlib], [ranlib])
 else
   AC_CHECK_TOOL([RANLIB], [ranlib])
   AC_CHECK_TOOL([AR], [ar])
