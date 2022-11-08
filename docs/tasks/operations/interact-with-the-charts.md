@@ -199,4 +199,4 @@ In this bar you can:
 
 ### Related Concepts
 
-1. [From raw metrics to visualization](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
+- [From raw metrics to visualization](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
