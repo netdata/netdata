@@ -17,6 +17,8 @@ documentation.
 
 ## Prerequisites
 
+To change the database mode, you will need the following.
+
 - The Agent installed on a Node
 - Terminal access to that node
 
@@ -42,5 +44,9 @@ The available database modes, are:
 
 ## Related topics
 
-1. [Metrics Storage Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
-2. [Database Reference](https://github.com/netdata/netdata/blob/master/database/README.md)
+### Related Concepts
+
+- [Metrics Storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
+
+### Related Reference
+- [Database](https://github.com/netdata/netdata/blob/master/database/README.md)
