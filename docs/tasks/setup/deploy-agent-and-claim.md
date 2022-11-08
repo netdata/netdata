@@ -22,6 +22,8 @@ alerts, you can silence individual alerts by changing one line in a given health
 
 ## Prerequisites
 
+To deploy and claim an agent, you will need the following:
+
 - A node with the Agent installed, and terminal access to that node
 
 ## Steps
