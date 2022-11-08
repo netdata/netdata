@@ -222,16 +222,8 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
 
     circ_buff_insert(buff);
 
-    /* Instruct log parsing and metrics extraction, asynchronously for web logs
-     * but synchronously for systemd logs (also because the later must happen
-     * while p_file_info->flb_tmp_buff_mut is still acquired - not the case for
-     * the web logs) */
-    if(p_file_info->log_type == FLB_GENERIC || p_file_info->log_type == FLB_WEB_LOG){
-        uv_mutex_lock(&p_file_info->notify_parser_thread_mut);
-        p_file_info->log_batches_to_be_parsed++;
-        uv_cond_signal(&p_file_info->notify_parser_thread_cond);
-        uv_mutex_unlock(&p_file_info->notify_parser_thread_mut);
-    } else if(p_file_info->log_type == FLB_SYSTEMD) {
+    /* Extract systemd and docker events metrics */
+    if(p_file_info->log_type == FLB_SYSTEMD) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
         p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_systemd_metrics.num_lines;
         p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_systemd_metrics.num_lines;
@@ -259,13 +251,20 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
             p_file_info->flb_tmp_docker_ev_metrics.ev_type[i] = 0;
         }
         uv_mutex_unlock(p_file_info->parser_metrics_mut);
-    } else m_assert(0, "invalid p_file_info->log_type at this point");
+    } 
 
     buff->in->timestamp = 0;
     buff->in->text_size = 0;
     // *buff->in->data = 0;
 
     uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
+
+    /* Instruct log parsing and metrics extraction (asynchronously) for web logs
+     * and any custom charts */
+    uv_mutex_lock(&p_file_info->notify_parser_thread_mut);
+    p_file_info->log_batches_to_be_parsed++;
+    uv_cond_signal(&p_file_info->notify_parser_thread_cond);
+    uv_mutex_unlock(&p_file_info->notify_parser_thread_mut);
 }
 
 static int flb_write_to_buff_cb(void *record, size_t size, void *data){
