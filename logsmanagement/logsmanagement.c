@@ -10,7 +10,6 @@
  */
 
 #include "../daemon/common.h"
-#include "../libnetdata/libnetdata.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <lz4.h>
@@ -599,7 +598,7 @@ void *logsmanagement_main(void *ptr) {
 
     tail_plugin_init(p_file_infos_arr);
 
-    flb_init();
+    if(flb_init()) return NULL;
 
     logs_manag_config_init();
 

@@ -8,7 +8,7 @@
 #include <lz4.h>
 #include "helper.h"
 #include "circular_buffer.h"
-#include "../libnetdata/libnetdata.h"
+#include "../daemon/common.h"
 #include "../fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include "../fluent-bit/include/fluent-bit/flb_macros.h"
@@ -98,7 +98,9 @@ int flb_init(void){
     void *handle;
     char *dl_error;
 
-    handle = dlopen("/tmp/netdata/usr/lib/netdata/libfluent-bit.so", RTLD_LAZY);
+    char *flb_lib_path = strdupz_path_subpath(netdata_configured_stock_config_dir, "/../libfluent-bit.so");
+    handle = dlopen(flb_lib_path, RTLD_LAZY);
+    freez(flb_lib_path);
     if (unlikely(!handle)){
         if (likely((dl_error = dlerror()) != NULL)) error("dlopen() libfluent-bit.so error: %s", dl_error);
         m_assert(handle, "dlopen() libfluent-bit.so error");
