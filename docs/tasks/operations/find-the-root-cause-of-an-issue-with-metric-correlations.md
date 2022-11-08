@@ -37,11 +37,11 @@ From within a War Room:
 7. Click the **Find Correlations** button in the top right corner
 8. You will be presented with the charts who metric behavior is most correlated with the behavior that you highlighted.
 9. Use the top bar to investigate the correlations with the following button functions:
-- **show less**: Use this button to show less metric data.   
-- **show more**: Use this button to show more metric data.
-- **correlation method**: Use this to select a correlation method.
-- **aggregation method**: Use this to select an aggregation method.
-- **data to correlate**: Use this to select which data to correlate.
+    -  **show less**: Use this button to show less metric data.   
+    -  **show more**: Use this button to show more metric data.
+    -  **correlation method**: Use this to select a correlation method.
+    -  **aggregation method**: Use this to select an aggregation method.
+    -  **data to correlate**: Use this to select which data to correlate.
 
 ## Related topics
 
