@@ -41,10 +41,12 @@ priority     : 60000
 local_tcp:
  name: 'local'
  control_port: 9051
+ password: <password> # if required
 
 local_socket:
  name: 'local'
  control_port: '/var/run/tor/control'
+ password: <password> # if required
 ```
 
 ### prerequisite
