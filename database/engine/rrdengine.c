@@ -1018,6 +1018,8 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
                 rrdeng_page_descr_mutex_unlock(ctx, descr);
                 pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
             }
+            else
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
             page_write_pending = 1;
         }
 
