@@ -1240,7 +1240,7 @@ static void delete_old_data(void *arg)
 
 #define DESCRIPTOR_INITIAL_CLEANUP    (60)
 #ifndef DESCRIPTOR_INTERVAL_CLEANUP
-#define DESCRIPTOR_INTERVAL_CLEANUP    (60)
+#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
 #endif
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
