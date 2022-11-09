@@ -165,13 +165,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
 
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
-
     if(host->sender->rrdpush_sender_socket != -1) {
         close(host->sender->rrdpush_sender_socket);
         host->sender->rrdpush_sender_socket = -1;
     }
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
