@@ -174,8 +174,7 @@ struct rrdengine_worker_config {
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
     unsigned long cleanup_deleting_descriptors;  /* set to 0 when now_deleting_descriptors is still running */
 
-    uint8_t running_journal_migration;
-    uint8_t delete_descriptors;
+    unsigned long running_journal_migration;
 
     /* dirty page deletion thread */
     uv_thread_t *now_invalidating_dirty_pages;

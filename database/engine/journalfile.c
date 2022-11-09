@@ -678,6 +678,9 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
 
+    if (j2_header->magic == JOURVAL_V2_REBUILD_MAGIC)
+        return 2;
+
     // Magic failure
     if (j2_header->magic != JOURVAL_V2_MAGIC)
         return 1;
@@ -760,10 +763,13 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     int rc = check_journal_v2_file(data_start, file_size, original_file_size);
     if (rc) {
-        error_report("File %s is invalid", path);
+        if (rc == 2)
+            error_report("File %s needs to be rebuilt", path);
+        else
+            error_report("File %s is invalid", path);
         if (unlikely(munmap(data_start, file_size)))
             error("Failed to unmap %s", path);
-        return rc;
+        return 1;
     }
 
     struct journal_v2_header *j2_header = (void *) data_start;
@@ -944,12 +950,18 @@ void *journal_v2_write_data_page(struct journal_v2_header *j2_header, void *data
     if (verify_journal_space(j2_header, data, sizeof(*data_page)))
         return NULL;
 
+    uint32_t extent_index =  unlikely(NULL == descr->extent) ? UINT32_MAX : descr->extent->index;
+
     data_page->delta_start_s = (descr->start_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
     data_page->delta_end_s = (descr->end_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
-    data_page->extent_index = unlikely(NULL == descr->extent) ? UINT32_MAX : descr->extent->index;
+    data_page->extent_index = extent_index;
     data_page->update_every_s = descr->update_every_s;
     data_page->page_length = descr->page_length;
     data_page->type = descr->type;
+
+    // Rebuild on start to resolve unknown entry
+    if (unlikely(UINT32_MAX == extent_index))
+        j2_header->magic = JOURVAL_V2_REBUILD_MAGIC;
 
     return ++data_page;
 }

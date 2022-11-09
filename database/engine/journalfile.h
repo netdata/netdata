@@ -33,7 +33,8 @@ struct rrdengine_journalfile {
 
 // Journal v2 structures
 
-#define JOURVAL_V2_MAGIC   (0x01221019)
+#define JOURVAL_V2_MAGIC           (0x01221019)
+#define JOURVAL_V2_REBUILD_MAGIC   (0x00221019)
 
 struct journal_v2_block_trailer {
     union {
