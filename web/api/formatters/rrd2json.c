@@ -153,9 +153,6 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
-    if (qt->request.st && rrdset_is_ar_chart(qt->request.st))
-        ml_process_rrdr(r, qt->request.max_anomaly_rates);
-
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
         buffer_no_cacheable(wb);
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)

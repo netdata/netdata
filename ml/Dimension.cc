@@ -167,16 +167,6 @@ bool Dimension::predict(CalculatedNumber Value, bool Exists) {
     return true;
 }
 
-void Dimension::updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous) {
-    AnomalyBitCounter += IsAnomalous;
-
-    if (Elapsed == Cfg.DBEngineAnomalyRateEvery) {
-        double AR = static_cast<double>(AnomalyBitCounter) / Cfg.DBEngineAnomalyRateEvery;
-        rrddim_set_by_pointer(RS, getAnomalyRateRD(), AR * 1000);
-        AnomalyBitCounter = 0;
-    }
-}
-
 std::array<KMeans, 1> Dimension::getModels() {
     std::unique_lock<std::mutex> Lock(Mutex);
     return Models;

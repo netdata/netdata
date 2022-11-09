@@ -164,7 +164,6 @@ typedef struct query_target_request {
     time_t before;                      // the requested timeframe
     size_t points;                      // the requested number of points
     time_t timeout;                     // the timeout of the query in seconds
-    int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it
     uint32_t format;                    // DATASOURCE_FORMAT
     RRDR_OPTIONS options;
     RRDR_GROUPING group_method;

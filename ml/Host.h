@@ -13,25 +13,7 @@ namespace ml {
 
 class RrdHost {
 public:
-    RrdHost(RRDHOST *RH) : RH(RH) {
-        AnomalyRateRS = rrdset_create(
-            RH,
-            "anomaly_detection",
-            "anomaly_rates",
-            NULL, // name
-            "anomaly_rates",
-            NULL, // ctx
-            "Average anomaly rate",
-            "anomaly rate",
-            "netdata",
-            "ml",
-            39189,
-            Cfg.DBEngineAnomalyRateEvery,
-            RRDSET_TYPE_LINE
-        );
-
-        rrdset_flag_set(AnomalyRateRS, RRDSET_FLAG_HIDDEN);
-    }
+    RrdHost(RRDHOST *RH) : RH(RH) {};
 
     RRDHOST *getRH() { return RH; }
 
@@ -43,10 +25,6 @@ public:
         return S;
     }
 
-    RRDSET *getAnomalyRateRS() const {
-        return AnomalyRateRS;
-    }
-
     void addDimension(Dimension *D);
     void removeDimension(Dimension *D);
 
@@ -56,7 +34,6 @@ public:
 
 protected:
     RRDHOST *RH;
-    RRDSET *AnomalyRateRS;
 
     // Protect dimension and lock maps
     std::mutex Mutex;
@@ -114,8 +91,6 @@ private:
     size_t NumNormalDimensions{0};
     size_t NumTrainedDimensions{0};
     size_t NumActiveDimensions{0};
-
-    unsigned AnomalyRateTimer{0};
 };
 
 using Host = DetectableHost;

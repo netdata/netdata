@@ -147,11 +147,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    if(!rrdset_is_ar_chart(st)) {
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    }
+    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -251,11 +249,10 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-        if(!rrdset_is_ar_chart(st)) {
-            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-            rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-            rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-        }
+
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     if(unlikely(rc))
@@ -357,13 +354,10 @@ inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
     rd->name = rrd_string_strdupz(name);
     string_freez(old);
 
-    if (!rrdset_is_ar_chart(st))
-        rrddimvar_rename_all(rd);
+    rrddimvar_rename_all(rd);
 
     rd->exposed = 0;
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-
-    ml_dimension_update_name(st, rd, name);
 
     return 1;
 }

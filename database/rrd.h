@@ -529,20 +529,17 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
     RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
 
-    RRDSET_FLAG_ANOMALY_RATE_CHART      = (1 << 21), // the rrdset is for storing anomaly rates for all dimensions
-    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 22),
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 21),
 
-    RRDSET_FLAG_SENDER_REPLICATION_FINISHED   = (1 << 23), // the sending side has completed replication
-    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 24), // the receiving side has completed replication
+    RRDSET_FLAG_SENDER_REPLICATION_FINISHED   = (1 << 22), // the sending side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 23), // the receiving side has completed replication
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES = (1 << 25), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES = (1 << 24), // a custom variable has been updated and needs to be exposed to parent
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
-
-#define rrdset_is_ar_chart(st) rrdset_flag_check(st, RRDSET_FLAG_ANOMALY_RATE_CHART)
 
 struct rrdset {
     uuid_t chart_uuid;                             // the global UUID for this chart

@@ -795,9 +795,6 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
         if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
-        if(unlikely(rrdset_is_ar_chart(st)))
-            continue;
-
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
         if(!st->rrdfamily)
