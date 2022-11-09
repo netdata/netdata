@@ -1240,7 +1240,7 @@ static void delete_old_data(void *arg)
 
 #define DESCRIPTOR_INITIAL_CLEANUP    (60)
 #ifndef DESCRIPTOR_INTERVAL_CLEANUP
-#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
+#define DESCRIPTOR_INTERVAL_CLEANUP    (60)
 #endif
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
@@ -1268,7 +1268,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     only_one_datafile = (datafile == ctx->datafiles.first) ? 1 : 0;
 
-    if (!wc->now_deleting_files && !wc->now_deleting_descriptors && !out_of_space && NO_QUIESCE == ctx->quiesce && next_descriptor_cleanup < now_realtime_sec()) {
+    if (!wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration && !out_of_space &&
+        NO_QUIESCE == ctx->quiesce && next_descriptor_cleanup < now_realtime_sec()) {
         next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INTERVAL_CLEANUP;
 
         wc->now_deleting_descriptors = mallocz(sizeof(*wc->now_deleting_descriptors));
