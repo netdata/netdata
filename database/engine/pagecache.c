@@ -949,7 +949,7 @@ struct rrdeng_page_descr *pg_cache_insert(
             old_descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
             rrdeng_page_descr_mutex_unlock(ctx, old_descr);
         }
-        uv_rwlock_wrlock(&page_index->ctx->datafiles.rwlock);
+        uv_rwlock_wrunlock(&page_index->ctx->datafiles.rwlock);
     }
 
     *PValue = descr;
