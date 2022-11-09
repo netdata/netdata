@@ -6,9 +6,11 @@
 
 **Merged pull requests:**
 
+- require -DENABLE\_DLSYM=1 to use dlsym\(\) [\#13958](https://github.com/netdata/netdata/pull/13958) ([ktsaou](https://github.com/ktsaou))
 - health/ping: use 'host' label in alerts info [\#13955](https://github.com/netdata/netdata/pull/13955) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.43.0 [\#13954](https://github.com/netdata/netdata/pull/13954) ([ilyam8](https://github.com/ilyam8))
 - Fix local dashboard cloud links [\#13953](https://github.com/netdata/netdata/pull/13953) ([underhood](https://github.com/underhood))
+- Provide improved messaging in the kickstart script for existing installs managed by the system package manager. [\#13947](https://github.com/netdata/netdata/pull/13947) ([Ferroin](https://github.com/Ferroin))
 - do not resend charts upstream when chart variables are being updated [\#13946](https://github.com/netdata/netdata/pull/13946) ([ktsaou](https://github.com/ktsaou))
 - recalculate last\_collected\_total [\#13945](https://github.com/netdata/netdata/pull/13945) ([ktsaou](https://github.com/ktsaou))
 - fix chart definition end time\_t printing and parsing [\#13942](https://github.com/netdata/netdata/pull/13942) ([ktsaou](https://github.com/ktsaou))
@@ -343,7 +345,6 @@
 - Protect shared variables with log lock. [\#13306](https://github.com/netdata/netdata/pull/13306) ([vkalintiris](https://github.com/vkalintiris))
 - Keep rc before freeing it during labels unlink alarms [\#13305](https://github.com/netdata/netdata/pull/13305) ([MrZammler](https://github.com/MrZammler))
 - fix\(cgroups.plugin\): adjust kubepods regex to fix name resolution in a kind cluster [\#13302](https://github.com/netdata/netdata/pull/13302) ([ilyam8](https://github.com/ilyam8))
-- Null terminate string if file read was not successful [\#13299](https://github.com/netdata/netdata/pull/13299) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
