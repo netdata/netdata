@@ -731,6 +731,8 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
     // Metadata
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
+
+    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED = ( 1 << 26), // set when the receiver part is disconnected
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

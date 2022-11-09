@@ -378,16 +378,12 @@ void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation
-    RRDHOST_FLAGS host_flags = rrdhost_flag_check(host,
-              RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
-            | RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS
-            | RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN
-        );
+    RRDHOST_FLAGS host_flags = __atomic_load_n(&host->flags, __ATOMIC_SEQ_CST);
 
     // check if we are not connected
     if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
 
-        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
+        if(unlikely(!(host_flags & (RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))))
             rrdpush_sender_thread_spawn(host);
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {

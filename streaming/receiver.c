@@ -726,6 +726,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdcontext_host_child_connected(rpt->host);
 
+
+    rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
     size_t count = streaming_parser(rpt, &cd, fp_in, fp_out,
 #ifdef ENABLE_HTTPS
                                     (rpt->ssl.conn) ? &rpt->ssl : NULL
@@ -733,6 +736,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
                                     NULL
 #endif
                                     );
+
+    rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
     log_stream_connection(rpt->client_ip, rpt->client_port,
                           rpt->key, rpt->host->machine_guid, rpt->hostname,
