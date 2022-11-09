@@ -187,7 +187,7 @@ struct rrdeng_page_descr *pg_cache_insert(
     struct rrdengine_instance *ctx,
     struct pg_cache_page_index *index,
     struct rrdeng_page_descr *descr,
-    bool new_page,
+    bool lock_and_count,
     bool remove_old);
 
 uint8_t pg_cache_punch_hole(

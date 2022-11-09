@@ -900,7 +900,7 @@ struct rrdeng_page_descr *pg_cache_insert(
     struct rrdengine_instance *ctx,
     struct pg_cache_page_index *index,
     struct rrdeng_page_descr *descr,
-    bool new_page,
+    bool lock_and_count,
     bool remove_old)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
@@ -930,15 +930,16 @@ struct rrdeng_page_descr *pg_cache_insert(
         page_index = index;
     }
 
-    if (new_page)
+    if (lock_and_count)
         uv_rwlock_wrlock(&page_index->lock);
 
     struct rrdeng_page_descr *old_descr = NULL;
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
-    if (unlikely(*PValue)) {
+    bool page_inserted = (NULL == *PValue);
+    if (unlikely(!page_inserted)) {
         if (false == remove_old) {
             descr = *PValue;
-            if (new_page)
+            if (lock_and_count)
                 uv_rwlock_wrunlock(&page_index->lock);
             return descr;
         }
@@ -949,19 +950,19 @@ struct rrdeng_page_descr *pg_cache_insert(
             old_descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
             rrdeng_page_descr_mutex_unlock(ctx, old_descr);
         }
+        page_inserted = false;
         uv_rwlock_wrunlock(&page_index->ctx->datafiles.rwlock);
     }
-
     *PValue = descr;
-    if (new_page) {
-        if (!old_descr)
-            ++page_index->page_count;
+
+    if (page_inserted && lock_and_count) {
+        ++page_index->page_count;
         pg_cache_add_new_metric_time(page_index, descr);
         uv_rwlock_wrunlock(&page_index->lock);
     }
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (new_page && !old_descr) {
+    if (page_inserted && lock_and_count) {
         ++ctx->stats.pg_cache_insertions;
         ++pg_cache->page_descriptors;
     }

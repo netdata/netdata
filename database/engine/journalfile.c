@@ -802,6 +802,8 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
             *PValue = page_index = create_page_index(&metric->uuid, ctx);
             page_index->oldest_time_ut = LLONG_MAX;
             page_index->latest_time_ut = 0;
+            page_index->prev = pg_cache->metrics_index.last_page_index;
+            pg_cache->metrics_index.last_page_index = page_index;
         }
 
         usec_t metric_delta_start = header_start_time + (usec_t ) metric->delta_start;
@@ -813,8 +815,8 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         if (page_index->latest_time_ut < metric_delta_end)
             page_index->latest_time_ut = metric_delta_end;
 
-        page_index->prev = pg_cache->metrics_index.last_page_index;
-        pg_cache->metrics_index.last_page_index = page_index;
+        ++page_index->page_count;
+        ++pg_cache->page_descriptors;
         metric++;
     }
 
