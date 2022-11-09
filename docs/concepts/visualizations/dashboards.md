@@ -1,7 +1,7 @@
 <!--
 title: "Dashboards"
 sidebar_label: "Dashboards"
-custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md"
 sidebar_position: "2400"
 learn_status: "Published"
 learn_topic_type: "Concepts"

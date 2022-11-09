@@ -1,7 +1,7 @@
 <!--
 title: "Sign in to Netdata"
 sidebar_label: "Sign in to Netdata"
-custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/tasks/setup/sign-in-to-netdata.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/sign-in-to-netdata.md"
 sidebar_position : "1 "
 learn_status: "Published"
 learn_topic_type: "Tasks"

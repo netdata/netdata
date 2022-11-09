@@ -1,7 +1,7 @@
 <!--
 title: "Rooms"
 sidebar_label: "Rooms"
-custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md"
 sidebar_position: "1700"
 learn_status: "Published"
 learn_topic_type: "Concepts"

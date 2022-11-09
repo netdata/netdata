@@ -1,7 +1,7 @@
 <!--
 title: "Remove an Agent from a Space in the Cloud"
 sidebar_label: "Remove an Agent from a Space in the Cloud"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/unclaim-an-agent-from-a-space-in-the-cloud.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/operations/unclaim-an-agent-from-a-space-in-the-cloud.md"
 sidebar_position: "13"
 learn_status: "Published"
 learn_topic_type: "Tasks"

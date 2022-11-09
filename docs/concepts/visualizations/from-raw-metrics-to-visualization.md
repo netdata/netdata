@@ -1,7 +1,7 @@
 <!--
 title: "From raw Metrics to visualization"
 sidebar_label: "From raw Metrics to visualization"
-custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md"
 sidebar_position: "2300"
 learn_status: "Published"
 learn_topic_type: "Concepts"
