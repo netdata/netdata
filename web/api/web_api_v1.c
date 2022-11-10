@@ -1651,13 +1651,13 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         if(!value || !*value) continue;
 
         if(!strcmp(name, "from")) {
-            query_params.start_timestamp = strtol(value, NULL, 10);
+            query_params.start_timestamp = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, "until")) {
-            query_params.end_timestamp = strtol(value, NULL, 10);
+            query_params.end_timestamp = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, "quota")) {
-            query_params.quota = strtol(value, NULL, 10);
+            query_params.quota = (size_t) strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, "filename")) {
             query_params.filename[fn_off++] = value;
