@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-void queue_journalfile_v2_migration(struct rrdengine_worker_config* wc, struct rrdengine_journalfile *journalfile)
+void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
 {
-    if (unlikely(!journalfile))
-        return;
-
-    info("Journal file %u is ready to be indexed", journalfile->datafile->fileno);
-
     struct rrdeng_work *work_request;
     work_request = mallocz(sizeof(*work_request));
     work_request->req.data = work_request;
-    work_request->journalfile = journalfile;
     work_request->wc = wc;
     wc->running_journal_migration = 1;
     if (unlikely(uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
@@ -1499,11 +1493,29 @@ void after_journal_indexing(uv_work_t *req, int status)
     freez(work_request);
 }
 
+#define MAX_RETRIES_TO_START_INDEX (100)
 void start_journal_indexing(uv_work_t *req)
 {
     struct rrdeng_work *work_request = req->data;
-    struct rrdengine_journalfile *journalfile = work_request->journalfile;
-    migrate_journal_file_v2(journalfile->datafile, true, false);
+    struct rrdengine_worker_config *wc = work_request->wc;
+    struct rrdengine_instance *ctx = wc->ctx;
+
+    unsigned count = 0;
+    while ((wc->now_deleting_files || wc->now_deleting_descriptors) && count++ < MAX_RETRIES_TO_START_INDEX)
+        sleep_usec(100 * USEC_PER_MS);
+
+    if (count == MAX_RETRIES_TO_START_INDEX)
+        return;
+
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+
+    while (datafile && datafile->fileno != ctx->last_fileno) {
+        if (unlikely(!datafile->journalfile->journal_data)) {
+            info("Journal file %u is ready to be indexed", datafile->fileno);
+            migrate_journal_file_v2(datafile, true, false);
+        }
+        datafile = datafile->next;
+    }
 }
 
 void init_commit_log(struct rrdengine_instance *ctx)

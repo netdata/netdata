@@ -102,7 +102,7 @@ struct rrdeng_cmd {
 struct rrdeng_work {
     uv_work_t req;
     struct rrdengine_worker_config *wc;
-    struct rrdengine_journalfile *journalfile;
+    void *data;
     struct completion *completion;
 };
 

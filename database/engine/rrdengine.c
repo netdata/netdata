@@ -437,13 +437,14 @@ after_crc_check:
         }
     }
     for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
-        struct rrdeng_page_descr *descr =  xt_io_descr->descr_array[j];
-
+        descr =  xt_io_descr->descr_array[j];
         if (unlikely(bitmap256_get_bit(&xt_io_descr->descr_array_wakeup, j))) {
+            rrdeng_page_descr_mutex_lock(ctx, descr);
             if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
                 descr->pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
                 descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
             }
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
             pg_cache_wake_up_waiters(ctx, descr);
         }
     }
@@ -1290,7 +1291,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         if (likely(!ret)) {
             ++ctx->last_fileno;
             if (likely(journalfile))
-                queue_journalfile_v2_migration(wc, journalfile);
+                queue_journalfile_v2_migration(wc);
         }
     }
     if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {
