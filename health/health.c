@@ -601,18 +601,9 @@ static void health_thread_cleanup(void *ptr) {
     struct health_state *h = ptr;
     h->host->health_spawn = 0;
 
-    netdata_thread_detach(netdata_thread_self());
+    netdata_thread_cancel(netdata_thread_self());
     log_health("[%s]: Health thread ended.", rrdhost_hostname(h->host));
     debug(D_HEALTH, "HEALTH %s: Health thread ended.", rrdhost_hostname(h->host));
-}
-
-void health_thread_stop(RRDHOST *host) {
-    if(host->health_spawn) {
-        log_health("[%s]: Signaling health thread to stop...", rrdhost_hostname(host));
-
-        // signal it to cancel
-        netdata_thread_cancel(host->health_thread);
-    }
 }
 
 static void initialize_health(RRDHOST *host, int is_localhost) {
@@ -701,13 +692,15 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     health_silencers_init();
 }
 
-static void health_sleep(time_t next_run, unsigned int loop) {
+static void health_sleep(time_t next_run, unsigned int loop, RRDHOST *host) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();
         debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
-        sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
-        now = now_realtime_sec();
+        while (now < next_run && host->health_enabled && !netdata_exit) {
+            sleep_usec(USEC_PER_SEC);
+            now = now_realtime_sec();
+        }
     }
     else {
         debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
@@ -886,7 +879,7 @@ void *health_main(void *ptr) {
 #ifdef ENABLE_ACLK
     unsigned int marked_aclk_reload_loop = 0;
 #endif
-    while(!netdata_exit) {
+    while(!netdata_exit && host->health_enabled) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
@@ -928,13 +921,13 @@ void *health_main(void *ptr) {
 
             host->health_delay_up_to = now + hibernation_delay;
             next_run = now + hibernation_delay;
-            health_sleep(next_run, loop);
+            health_sleep(next_run, loop, host);
         }
 
         if (unlikely(host->health_delay_up_to)) {
             if (unlikely(now < host->health_delay_up_to)) {
                 next_run = host->health_delay_up_to;
-                health_sleep(next_run, loop);
+                health_sleep(next_run, loop, host);
                 continue;
             }
 
@@ -942,15 +935,11 @@ void *health_main(void *ptr) {
             host->health_delay_up_to = 0;
         }
 
-        if (unlikely(!host->health_enabled)) {
-            health_thread_stop(host);
-        }
-
         // wait until cleanup of obsolete charts on children is complete
         if (host != localhost) {
             if (unlikely(host->trigger_chart_obsoletion_check == 1)) {
                 log_health("[%s]: Waiting for chart obsoletion check.", rrdhost_hostname(host));
-                health_sleep(next_run, loop);
+                health_sleep(next_run, loop, host);
                 continue;
             }
         }
@@ -1413,7 +1402,7 @@ void *health_main(void *ptr) {
         if(unlikely(netdata_exit))
             break;
 
-        health_sleep(next_run, loop);
+        health_sleep(next_run, loop, host);
 
     } // forever
 
