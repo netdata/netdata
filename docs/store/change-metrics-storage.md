@@ -51,9 +51,7 @@ the accuracy of the values you enter below, changes in the compression ratio, an
 
 :::
 
-Visit our [Google Sheet calculator](https://docs.google.com/spreadsheets/d/1aRLZJGJk6fvQDktkCB44l-EFROJcUrwOLe8rBQcfpPE/edit?usp=sharing)
-to tune the data retention on your preferences, you need to make a copy of this Google Sheet to use it. Experiment with the variables
-which are padded with yellow to come up with the best settings for your use case.
+Visit the [Google Sheet Calculator](https://docs.google.com/spreadsheets/d/1aRLZJGJk6fvQDktkCB44l-EFROJcUrwOLe8rBQcfpPE/edit?usp=sharing) to customize data retention according to your preferences. To use it, you need to make a copy of this Google Sheet. Experiment with the variables highlighted in yellow to find the best settings for your use case.
 
 ## Edit `netdata.conf` with recommended database engine settings
 
