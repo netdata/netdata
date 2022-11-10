@@ -210,7 +210,8 @@ void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, str
         descr = xt_io_descr->descr_array[i];
         for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
             /* care, we don't hold the descriptor mutex */
-            if (!uuid_compare(*extent->pages[j]->id, *descr->id) &&
+            if (extent->pages[j] &&
+                !uuid_compare(*extent->pages[j]->id, *descr->id) &&
                 extent->pages[j]->page_length == descr->page_length &&
                 extent->pages[j]->start_time_ut == descr->start_time_ut &&
                 extent->pages[j]->end_time_ut == descr->end_time_ut) {
@@ -350,36 +351,36 @@ after_crc_check:
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
-    {
-        uint8_t xt_is_cached = 0;
-        unsigned xt_idx;
-        struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
-
-        bool use_extent_caching = (xt_io_descr->descr_array[0]->extent_entry == NULL);
-        if (use_extent_caching) {
-            xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-            if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
-                struct extent_cache *xt_cache = &wc->xt_cache;
-                struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
-                struct extent_io_descriptor *curr, *next;
-
-                if (have_read_error) {
-                    memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
-                } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                    (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
-                } else {
-                    (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
-                }
-                /* complete all connected in-flight read requests */
-                for (curr = xt_cache_elem->inflight_io_descr->next; curr; curr = next) {
-                    next = curr->next;
-                    read_cached_extent_cb(wc, xt_idx, curr);
-                }
-                xt_cache_elem->inflight_io_descr = NULL;
-                modify_bit(&xt_cache->inflight_bitmap, xt_idx, 0); /* not in-flight anymore */
-            }
-        }
-    }
+//    {
+//        uint8_t xt_is_cached = 0;
+//        unsigned xt_idx;
+//        struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
+//
+//        bool use_extent_caching = (xt_io_descr->descr_array[0]->extent_entry == NULL);
+//        if (use_extent_caching) {
+//            xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
+//            if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
+//                struct extent_cache *xt_cache = &wc->xt_cache;
+//                struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
+//                struct extent_io_descriptor *curr, *next;
+//
+//                if (have_read_error) {
+//                    memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
+//                } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+//                    (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
+//                } else {
+//                    (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
+//                }
+//                /* complete all connected in-flight read requests */
+//                for (curr = xt_cache_elem->inflight_io_descr->next; curr; curr = next) {
+//                    next = curr->next;
+//                    read_cached_extent_cb(wc, xt_idx, curr);
+//                }
+//                xt_cache_elem->inflight_io_descr = NULL;
+//                modify_bit(&xt_cache->inflight_bitmap, xt_idx, 0); /* not in-flight anymore */
+//            }
+//        }
+//    }
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0]->id, sizeof(uuid_t));
@@ -564,25 +565,25 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     xt_io_descr->release_descr = release_descr;
     xt_io_descr->buf = NULL;
 
-    if (use_extent_caching) {
-        xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-        if (xt_is_cached) {
-            xt_cache_replaceQ_set_hot(wc, &wc->xt_cache.extent_array[xt_idx]);
-            xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
-            if (xt_is_inflight) {
-                enqueue_inflight_read_to_xt_cache(wc, xt_idx, xt_io_descr);
-                return;
-            }
-            return read_cached_extent_cb(wc, xt_idx, xt_io_descr);
-        } else {
-            ret = try_insert_into_xt_cache(wc, extent);
-            if (-1 != ret) {
-                xt_idx = (unsigned)ret;
-                modify_bit(&wc->xt_cache.inflight_bitmap, xt_idx, 1);
-                wc->xt_cache.extent_array[xt_idx].inflight_io_descr = xt_io_descr;
-            }
-        }
-    }
+//    if (use_extent_caching) {
+//        xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
+//        if (xt_is_cached) {
+//            xt_cache_replaceQ_set_hot(wc, &wc->xt_cache.extent_array[xt_idx]);
+//            xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
+//            if (xt_is_inflight) {
+//                enqueue_inflight_read_to_xt_cache(wc, xt_idx, xt_io_descr);
+//                return;
+//            }
+//            return read_cached_extent_cb(wc, xt_idx, xt_io_descr);
+//        } else {
+//            ret = try_insert_into_xt_cache(wc, extent);
+//            if (-1 != ret) {
+//                xt_idx = (unsigned)ret;
+//                modify_bit(&wc->xt_cache.inflight_bitmap, xt_idx, 1);
+//                wc->xt_cache.extent_array[xt_idx].inflight_io_descr = xt_io_descr;
+//            }
+//        }
+//    }
 
     ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_read_extent, read_mmap_extent_cb);
     fatal_assert(-1 != ret);
@@ -1597,6 +1598,10 @@ void rrdeng_worker(void* arg)
 
     wc->now_deleting_files = NULL;
     wc->cleanup_thread_deleting_files = 0;
+
+    wc->now_deleting_descriptors = NULL;
+    wc->cleanup_deleting_descriptors = 0;
+    wc->running_journal_migration = 0;
 
     wc->now_invalidating_dirty_pages = NULL;
     wc->cleanup_thread_invalidating_dirty_pages = 0;
