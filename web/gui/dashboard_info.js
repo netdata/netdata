@@ -727,6 +727,12 @@ netdataDashboard.menu = {
     'pandas': {
         icon: '<i class="fas fa-teddy-bear"></i>'
     },
+
+    'cassandra': {
+        title: 'Cassandra',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance metrics for Cassandra, the open source distributed NoSQL database management system'
+    }
 };
 
 
