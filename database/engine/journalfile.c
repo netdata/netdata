@@ -831,7 +831,7 @@ struct metric_info_s {
     time_t max_index_time_s;
     usec_t min_time_ut;
     usec_t max_time_ut;
-    uint32_t extent_index;
+    uint32_t mark;
     uint32_t page_list_header;
 };
 
@@ -946,6 +946,8 @@ void *journal_v2_write_data_page(struct journal_v2_header *j2_header, void *data
     if (verify_journal_space(j2_header, data, sizeof(*data_page)))
         return NULL;
 
+    fatal_assert(descr->extent != NULL);
+
     uint32_t extent_index =  unlikely(NULL == descr->extent) ? UINT32_MAX : descr->extent->index;
 
     data_page->delta_start_s = (descr->start_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
@@ -982,23 +984,35 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
         return data_page;
 
     // We need to write all descriptors with index metric_info->min_index_time_s, metric_info->max_index_time_s
+    // that belong to this journal file
 
     Word_t index_time = metric_info->min_index_time_s;
+    unsigned entries = 0;
+
+    uv_rwlock_rdlock(&page_index->lock);
+
+    // Need page_index lock if running live
     for (PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
         descr = unlikely(NULL == PValue) ? NULL : *PValue;
          descr != NULL;
          PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
 
-        if (unlikely((time_t) index_time > metric_info->max_index_time_s))
+        if (unlikely((time_t) index_time > metric_info->max_index_time_s) || entries == metric_info->entries)
             break;
+
+        if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
+            continue;
 
         // Write one descriptor and return the next data page location
         data_page = journal_v2_write_data_page(j2_header, (void *)data_page, descr);
 
+        entries++;
         if (unlikely(!data_page))
             break;
     }
+
+    uv_rwlock_rdunlock(&page_index->lock);
     return data_page;
 }
 
@@ -1029,6 +1043,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = metric_info->page_index;
         struct page_cache *pg_cache = &page_index->ctx->pg_cache;
+        struct rrdengine_instance *ctx = page_index->ctx;
 
         Word_t  index_time = metric_info->min_index_time_s;
         uint32_t metric_info_offset = metric_info->page_list_header;
@@ -1044,8 +1059,6 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         uint32_t index = 0;
         uint32_t entries = page_list_header->entries;
 
-        uv_file file = journalfile->datafile->file;
-
         uv_rwlock_rdlock(&page_index->lock);
 
         for (PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
@@ -1054,21 +1067,30 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
              PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue) {
 
-            if (unlikely((time_t) index_time > metric_info->max_index_time_s))
+            if (unlikely((time_t) index_time > metric_info->max_index_time_s) || index == entries)
                 break;
 
-            if (index == entries)
-                break;
+            if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
+                continue;
 
             struct journal_page_list *page_entry = &page_list[index++];
 
             if (likely(page_entry->extent_index != UINT32_MAX)) {
-                descr->extent_entry = &extent_list[page_entry->extent_index];
-                descr->file = file;
+
                 fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
                 fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
+
+                rrdeng_page_descr_mutex_lock(ctx, descr);
+                while (!pg_cache_try_get_unsafe(descr, 1)) {
+                    pg_cache_wait_event_unsafe(descr);
+                }
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                uv_rwlock_rdunlock(&page_index->lock);
+                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+                uv_rwlock_rdlock(&page_index->lock);
             }
         }
+
         uint32_t page_offset = (uint8_t *) page_list_header - (uint8_t *) journalfile->journal_data;
         mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
 
@@ -1125,7 +1147,6 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
     generate_journalfilepath_v2(datafile, path, sizeof(path));
     info("Indexing file %s", path);
 
-
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t start_loading = now_realtime_usec();
 #endif
@@ -1163,14 +1184,14 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
                 metric_info->min_index_time_s = LLONG_MAX;
                 metric_info->max_index_time_s = 0;
                 metric_info->id = descr->id;
-                metric_info->extent_index = number_of_extents;
+                metric_info->entries = 0;
+                metric_info->page_index = NULL;
+                metric_info->page_list_header = 0;
 
                 PValue = JudyLIns(&metrics_JudyL_array,number_of_metrics, PJE0);
-
                 *PValue = metric_info;
                 number_of_metrics++;
             }
-
             time_t current_index_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
 
             if (metric_info->min_time_ut > descr->start_time_ut) {
@@ -1178,24 +1199,20 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
                 metric_info->min_index_time_s = current_index_time_s;
             }
 
-            if (metric_info->max_index_time_s < current_index_time_s)
-                    metric_info->max_index_time_s =current_index_time_s;
+            metric_info->max_index_time_s= MAX(metric_info->max_index_time_s, current_index_time_s);
+            metric_info->max_time_ut = MAX(metric_info->max_time_ut , descr->end_time_ut);
 
-            if (metric_info->max_time_ut < descr->end_time_ut)
-                metric_info->max_time_ut = descr->end_time_ut;
-
+            metric_info->entries++;
             number_of_pages++;
 
             // Maintain the min max times to add to the journal header
-            if (min_time_ut > descr->start_time_ut)
-                min_time_ut = descr->start_time_ut;
-
-            if (max_time_ut < descr->end_time_ut)
-                max_time_ut = descr->end_time_ut;
+            min_time_ut = MIN(min_time_ut, descr->start_time_ut);
+            max_time_ut = MAX(max_time_ut, descr->end_time_ut);
         }
         extent->index = number_of_extents++;
         extent = extent->next;
     }
+    info("File %s has %lu extents", path, number_of_extents);
 
     if (false == startup)
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -1236,6 +1253,7 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
 
     // Write header
     struct journal_v2_header j2_header;
+    memset(&j2_header, 0, sizeof(j2_header));
 
     j2_header.magic = JOURVAL_V2_MAGIC;
     j2_header.start_time_ut = min_time_ut;
@@ -1289,16 +1307,19 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
         fatal_assert(Index < number_of_metrics);
         uuid_list[Index].metric_info = metric_info;
 
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+        if (false == startup)
+            uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+
         PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric_info->id, sizeof(uuid_t));
         page_index = (NULL == PValue) ? NULL : *PValue;
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+        if (false == startup)
+            uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
         fatal_assert(NULL != page_index);
 
         metric_info->page_index = page_index;
 
-        // Count all entries that exist within a timerange
-         metric_info->entries = JudyLCount(page_index->JudyL_array, metric_info->min_index_time_s, metric_info->max_index_time_s, PJE0);
     }
     // Cleanup judy arrays we no longer need
     JudyLFreeArray(&metrics_JudyL_array, PJE0);

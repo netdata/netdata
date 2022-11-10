@@ -1,16 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-
 void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
 {
+    struct rrdeng_page_descr *descr;
     struct extent_info *extent = datafile->extents.first, *next_extent;
+
+    char path[RRDENG_PATH_MAX];
+
+    generate_journalfilepath_v2(datafile, path, sizeof(path));
+    internal_error(true, "Deleting extents of file %s", path);
+    unsigned count = 0;
     while (extent) {
         next_extent = extent->next;
         freez(extent);
+        count++;
         extent = next_extent;
     }
     datafile->extents.first = NULL;
+    internal_error(true, "Deleted %lu extents of file %s", count, path);
 }
 
 void df_extent_insert(struct extent_info *extent)
