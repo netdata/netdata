@@ -1304,9 +1304,17 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         flags = pg_cache_descr->flags;
 
         if ((flags & RRD_PAGE_INVALID)) {
+            bool can_drop_page = pg_cache_try_get_unsafe(descr, 1);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
+
             uv_rwlock_rdunlock(&page_index->lock);
             pg_cache_release_pages(ctx, 1);
+
+            if (likely(can_drop_page)) {
+                info("Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u", descr->pg_cache_descr_state,
+                      descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
+                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+            }
             return NULL;
         }
 
@@ -1347,13 +1355,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             page_not_in_cache = 1;
 
         pg_cache_wait_event_unsafe(descr);
-        unsigned old_flags = pg_cache_descr->flags;
         rrdeng_page_descr_mutex_unlock(ctx, descr);
-        if (old_flags & RRD_PAGE_INVALID) {
-            info("Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u", descr->pg_cache_descr_state,
-                 descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
-        }
-
         /* reset scan to find again */
         uv_rwlock_rdlock(&page_index->lock);
     }
