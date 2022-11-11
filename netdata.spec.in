@@ -481,16 +481,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 
-# ebpf plugin
-%if 0%{?_have_ebpf}
-%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
-%endif
-
-# perf plugin
-# This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
-# %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
-%caps(cap_sys_admin=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
-
 # debugfs plugin
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
@@ -547,6 +537,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # slabinfo belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+
+# perf belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -723,6 +716,24 @@ Requires: netdata = %{version}
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH needed to access the files the plugin reads to collect data.
 %caps(cap_dac_read_search=ep) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+
+%package plugin-perf
+Summary: The perf metrics collector for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+
+%description plugin-perf
+ This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
+
+%files plugin-perf
+%defattr(0750,root,netdata,0750)
+# Either CAP_SYS_ADMIN or CAP_PERFMON needed for data collection
+# PERFMON is newer, so only try to use it on platforms which support it.
+%if 0%{?centos_ver} >= 9 || 0%{?fedora} >= 36
+%caps(cap_perfmon=ep) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%else
+%caps(cap_sys_admin=ep) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%endif
 
 %changelog
 * Tue Nov 01 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-17

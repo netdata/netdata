@@ -142,3 +142,12 @@ Depends: ${shlibs:Depends},
 Description: The slabinfo metrics collector for the Netdata Agent
  This plugin allows the Netdata Agent to collect perfromance and
  utilization metrics for the Linux kernel’s SLAB allocator.
+
+Package: netdata-plugin-perf
+Architecture: any
+Depends: ${shlibs:Depends},
+         libcap2-bin,
+         netdata (>= ${source:Version})
+Description: The perf metrics collector for the Netdata Agent
+ This plugin allows the Netdata to collect metrics from the Linux perf
+ subsystem.
