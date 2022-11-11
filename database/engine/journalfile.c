@@ -776,6 +776,14 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         return 1;
     }
 
+    rc = madvise(data_start, file_size, MADV_DONTFORK);
+    if (rc)
+        error("MADV_DONTFORK: setting failed");
+
+    rc = madvise(data_start, file_size, MADV_DONTDUMP);
+    if (rc)
+        error("MADV_DONTDUMP: setting failed");
+
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
 
     uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
