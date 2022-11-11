@@ -257,6 +257,11 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 return 0;
             }
 
+            if (rd->algorithm == RRD_ALGORITHM_INCREMENTAL || rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
+                if (strcmp(rrdset_module_name(rd->rrdset), "prometheus"))
+                    suffix = "_total";
+            }
+
             if (homogeneous) {
                 // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                 // we add all dimensions as labels
