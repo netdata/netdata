@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- add Cassandra icon to dashboard info [\#13975](https://github.com/netdata/netdata/pull/13975) ([ilyam8](https://github.com/ilyam8))
+- enable collecting ECC memory errors by default [\#13970](https://github.com/netdata/netdata/pull/13970) ([ilyam8](https://github.com/ilyam8))
 - break active-active loop from replicating non-existing child to each other [\#13968](https://github.com/netdata/netdata/pull/13968) ([ktsaou](https://github.com/ktsaou))
 - document password param for tor collector [\#13966](https://github.com/netdata/netdata/pull/13966) ([andrewm4894](https://github.com/andrewm4894))
+- Fallback to ar and ranlib if llvm-ar and llvm-ranlib are not there [\#13959](https://github.com/netdata/netdata/pull/13959) ([MrZammler](https://github.com/MrZammler))
 - require -DENABLE\_DLSYM=1 to use dlsym\(\) [\#13958](https://github.com/netdata/netdata/pull/13958) ([ktsaou](https://github.com/ktsaou))
 - health/ping: use 'host' label in alerts info [\#13955](https://github.com/netdata/netdata/pull/13955) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.43.0 [\#13954](https://github.com/netdata/netdata/pull/13954) ([ilyam8](https://github.com/ilyam8))
 - Fix local dashboard cloud links [\#13953](https://github.com/netdata/netdata/pull/13953) ([underhood](https://github.com/underhood))
+- Remove health\_thread\_stop [\#13948](https://github.com/netdata/netdata/pull/13948) ([MrZammler](https://github.com/MrZammler))
 - Provide improved messaging in the kickstart script for existing installs managed by the system package manager. [\#13947](https://github.com/netdata/netdata/pull/13947) ([Ferroin](https://github.com/Ferroin))
 - do not resend charts upstream when chart variables are being updated [\#13946](https://github.com/netdata/netdata/pull/13946) ([ktsaou](https://github.com/ktsaou))
 - recalculate last\_collected\_total [\#13945](https://github.com/netdata/netdata/pull/13945) ([ktsaou](https://github.com/ktsaou))
@@ -342,9 +346,6 @@
 - Add link to docker config section [\#13323](https://github.com/netdata/netdata/pull/13323) ([cakrit](https://github.com/cakrit))
 - Guide for troubleshooting Agent with Cloud connection for new nodes [\#13322](https://github.com/netdata/netdata/pull/13322) ([Ancairon](https://github.com/Ancairon))
 - fix\(apps.plugin\): adjust `zmstat*` pattern to exclude zoneminder scripts [\#13314](https://github.com/netdata/netdata/pull/13314) ([ilyam8](https://github.com/ilyam8))
-- array allocator for dbengine page descriptors [\#13312](https://github.com/netdata/netdata/pull/13312) ([ktsaou](https://github.com/ktsaou))
-- fix\(health\): disable go.d last collected alarm for prometheus module [\#13309](https://github.com/netdata/netdata/pull/13309) ([ilyam8](https://github.com/ilyam8))
-- Explicitly skip uploads and notifications in third-party repositories. [\#13308](https://github.com/netdata/netdata/pull/13308) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
