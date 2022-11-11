@@ -736,6 +736,7 @@ jobs:
       - name: Prepare version info
         id: version
         run: |
+          # shellcheck disable=SC2129
           echo "version=$(cat main/packaging/version)" >> "${GITHUB_OUTPUT}"
           echo "commit=$(cd nightlies && git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
           echo "date=$(date +%F)" >> "${GITHUB_OUTPUT}"
