@@ -1151,7 +1151,9 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
     if (force)
         wc->flushing_under_pressure = 0;
-    rrdeng_test_quota(wc);
+//    else {
+//        bool should_schedule_indexing = rrdeng_test_quota(wc);
+//    }
 
     return ALIGN_BYTES_CEILING(size_bytes);
 }
@@ -1260,7 +1262,7 @@ static void delete_old_data(void *arg)
 #define DESCRIPTOR_INTERVAL_CLEANUP    (1)
 #endif
 
-void rrdeng_test_quota(struct rrdengine_worker_config* wc)
+bool rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
     static time_t next_descriptor_cleanup = 0;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1273,6 +1275,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INITIAL_CLEANUP;
     }
 
+    bool should_do_indexing = false;
+
     out_of_space = 0;
     /* Do not allow the pinned pages to exceed the disk space quota to avoid deadlocks */
     if (unlikely(ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE))) {
@@ -1284,6 +1288,18 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     only_one_datafile = (datafile == ctx->datafiles.first) ? 1 : 0;
+
+    if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile)) && !wc->now_deleting_descriptors) {
+        /* Finalize data and journal file and create a new pair */
+        struct rrdengine_journalfile *journalfile = unlikely(NULL == ctx->datafiles.last) ? NULL : ctx->datafiles.last->journalfile;
+        wal_flush_transaction_buffer(wc);
+        ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
+        if (likely(!ret)) {
+            ++ctx->last_fileno;
+            if (likely(journalfile))
+                should_do_indexing = true;
+        }
+    }
 
     if (!wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration && !out_of_space &&
         NO_QUIESCE == ctx->quiesce && next_descriptor_cleanup < now_realtime_sec()) {
@@ -1299,28 +1315,17 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
-        /* Finalize data and journal file and create a new pair */
-        struct rrdengine_journalfile *journalfile = unlikely(NULL == ctx->datafiles.last) ? NULL : ctx->datafiles.last->journalfile;
-        wal_flush_transaction_buffer(wc);
-        ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
-        if (likely(!ret)) {
-            ++ctx->last_fileno;
-            if (likely(journalfile))
-                queue_journalfile_v2_migration(wc);
-        }
-    }
     if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {
         /* delete old data */
         if (wc->now_deleting_files) {
             /* already deleting data */
-            return;
+            return false;
         }
         if (NULL == ctx->datafiles.first->next) {
             error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
                  " to reclaim space, there are no other file pairs left.",
                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-            return;
+            return false;
         }
         info("Deleting data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
@@ -1334,6 +1339,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             wc->now_deleting_files = NULL;
         }
     }
+
+    return should_do_indexing;
 }
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
@@ -1518,6 +1525,7 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
+    static bool do_indexing = false;
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
     struct rrdengine_worker_config* wc = handle->data;
@@ -1525,7 +1533,10 @@ void timer_cb(uv_timer_t* handle)
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    rrdeng_test_quota(wc);
+    bool should_schedule_indexing = rrdeng_test_quota(wc);
+
+    if (should_schedule_indexing)
+        do_indexing = true;
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages && !wc->now_deleting_descriptors && !wc->running_journal_migration)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
@@ -1556,6 +1567,11 @@ void timer_cb(uv_timer_t* handle)
                  bytes_written && (total_bytes < bytes_to_write);
                  total_bytes += bytes_written) {
                 bytes_written = do_flush_pages(wc, 0, NULL);
+            }
+
+            if (total_bytes == 0 && do_indexing) {
+                do_indexing = false;
+                queue_journalfile_v2_migration(wc);
             }
         }
     }

@@ -633,6 +633,9 @@ static void update_journal_access_time(struct rrdengine_journalfile *journalfile
     if (unlikely(!page_index || !descr))
         return;
 
+    if (!is_descr_journal_v2(descr))
+        return;
+
     struct rrdengine_instance *ctx = page_index->ctx;
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);

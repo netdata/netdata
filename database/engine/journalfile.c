@@ -4,6 +4,9 @@
 void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
 {
     struct rrdeng_work *work_request;
+
+    fatal_assert(0 == wc->running_journal_migration);
+
     work_request = mallocz(sizeof(*work_request));
     work_request->req.data = work_request;
     work_request->wc = wc;
@@ -839,8 +842,8 @@ struct metric_info_s {
     time_t max_index_time_s;
     usec_t min_time_ut;
     usec_t max_time_ut;
-    uint32_t mark;
     uint32_t page_list_header;
+    Pvoid_t JudyL_array;
 };
 
 struct journal_metric_list_to_sort {
@@ -1000,17 +1003,17 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
     uv_rwlock_rdlock(&page_index->lock);
 
     // Need page_index lock if running live
-    for (PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
+    for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
         descr = unlikely(NULL == PValue) ? NULL : *PValue;
          descr != NULL;
-         PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
+         PValue = JudyLNext(metric_info->JudyL_array, &index_time, PJE0),
         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
 
         if (unlikely((time_t) index_time > metric_info->max_index_time_s) || entries == metric_info->entries)
             break;
 
-        if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
-            continue;
+//        if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
+//            continue;
 
         // Write one descriptor and return the next data page location
         data_page = journal_v2_write_data_page(j2_header, (void *)data_page, descr);
@@ -1069,10 +1072,10 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
         uv_rwlock_rdlock(&page_index->lock);
 
-        for (PValue = JudyLFirst(page_index->JudyL_array, &index_time, PJE0),
+        for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
              descr != NULL;
-             PValue = JudyLNext(page_index->JudyL_array, &index_time, PJE0),
+             PValue = JudyLNext(metric_info->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue) {
 
             if (unlikely((time_t) index_time > metric_info->max_index_time_s) || index == entries)
@@ -1192,9 +1195,9 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
                 metric_info->min_index_time_s = LLONG_MAX;
                 metric_info->max_index_time_s = 0;
                 metric_info->id = descr->id;
-                metric_info->entries = 0;
                 metric_info->page_index = NULL;
                 metric_info->page_list_header = 0;
+                metric_info->JudyL_array = (Pvoid_t) NULL;
 
                 PValue = JudyLIns(&metrics_JudyL_array,number_of_metrics, PJE0);
                 *PValue = metric_info;
@@ -1209,6 +1212,10 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
 
             metric_info->max_index_time_s= MAX(metric_info->max_index_time_s, current_index_time_s);
             metric_info->max_time_ut = MAX(metric_info->max_time_ut , descr->end_time_ut);
+
+            PValue = JudyLIns(&metric_info->JudyL_array, current_index_time_s, PJE0);
+            fatal_assert(NULL != PValue && NULL == *PValue);
+            *PValue = descr;
 
             metric_info->entries++;
             number_of_pages++;
@@ -1408,12 +1415,14 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
         {
             for (Index = 0; Index < number_of_metrics; Index++) {
                 journal_v2_remove_active_descriptors(journalfile, uuid_list[Index].metric_info, startup);
+
+                JudyLFreeArray(&uuid_list[Index].metric_info->JudyL_array, PJE0);
+
                 freez(uuid_list[Index].metric_info);
             }
             internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
             if (false == startup) {
-                struct rrdengine_worker_config *wc = &ctx->worker_config;
                 uv_rwlock_wrlock(&journalfile->datafile->extent_rwlock);
                 df_extent_delete_all_unsafe(journalfile->datafile);
                 uv_rwlock_wrunlock(&journalfile->datafile->extent_rwlock);
