@@ -182,6 +182,7 @@ struct rrdengine_worker_config {
     /* set to 0 when now_invalidating_dirty_pages is still running */
     unsigned long cleanup_thread_invalidating_dirty_pages;
     unsigned inflight_dirty_pages;
+    unsigned flushing_under_pressure;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
