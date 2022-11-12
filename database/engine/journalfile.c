@@ -1091,6 +1091,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                 fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
                 fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
 
+                // FIXME:
                 rrdeng_page_descr_mutex_lock(ctx, descr);
                 while (!pg_cache_try_get_unsafe(descr, 1)) {
                     pg_cache_wait_event_unsafe(descr);
