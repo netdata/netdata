@@ -31,6 +31,7 @@ struct page_cache_descr {
 
     unsigned refcnt;
     uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
+    const char *function;
     uv_cond_t cond;
     unsigned waiters;
 };
