@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- apps.plugin function processes: keys should not have spaces [\#13980](https://github.com/netdata/netdata/pull/13980) ([ktsaou](https://github.com/ktsaou))
+- dont crash when netdata cannot execute its external plugins [\#13978](https://github.com/netdata/netdata/pull/13978) ([ktsaou](https://github.com/ktsaou))
+- Add \_total suffix to raw increment metrics for remote write [\#13977](https://github.com/netdata/netdata/pull/13977) ([vlvkobal](https://github.com/vlvkobal))
 - add Cassandra icon to dashboard info [\#13975](https://github.com/netdata/netdata/pull/13975) ([ilyam8](https://github.com/ilyam8))
+- Change the db-engine calculator to a read only gsheet [\#13974](https://github.com/netdata/netdata/pull/13974) ([tkatsoulas](https://github.com/tkatsoulas))
 - enable collecting ECC memory errors by default [\#13970](https://github.com/netdata/netdata/pull/13970) ([ilyam8](https://github.com/ilyam8))
 - break active-active loop from replicating non-existing child to each other [\#13968](https://github.com/netdata/netdata/pull/13968) ([ktsaou](https://github.com/ktsaou))
 - document password param for tor collector [\#13966](https://github.com/netdata/netdata/pull/13966) ([andrewm4894](https://github.com/andrewm4894))
@@ -37,6 +41,7 @@
 - bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
 - do not free hosts if a change on db mode is not needed [\#13912](https://github.com/netdata/netdata/pull/13912) ([ktsaou](https://github.com/ktsaou))
 - timeframe matching should take into account the update frequency of the chart [\#13911](https://github.com/netdata/netdata/pull/13911) ([ktsaou](https://github.com/ktsaou))
+- WMI Process \(Dashboard, Documentation\) [\#13910](https://github.com/netdata/netdata/pull/13910) ([thiagoftsm](https://github.com/thiagoftsm))
 - feat\(packaging\): add CAP\_NET\_RAW to go.d.plugin [\#13909](https://github.com/netdata/netdata/pull/13909) ([ilyam8](https://github.com/ilyam8))
 - Reference the bash collector for RPi [\#13907](https://github.com/netdata/netdata/pull/13907) ([cakrit](https://github.com/cakrit))
 - Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
@@ -342,10 +347,6 @@
 - Cid 379238 379238 [\#13328](https://github.com/netdata/netdata/pull/13328) ([stelfrag](https://github.com/stelfrag))
 - Docs fix metric storage [\#13327](https://github.com/netdata/netdata/pull/13327) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix two helgrind reports [\#13325](https://github.com/netdata/netdata/pull/13325) ([vkalintiris](https://github.com/vkalintiris))
-- fix\(cgroups.plugin\): adjust kubepods patterns to filter pods when using Kind cluster [\#13324](https://github.com/netdata/netdata/pull/13324) ([ilyam8](https://github.com/ilyam8))
-- Add link to docker config section [\#13323](https://github.com/netdata/netdata/pull/13323) ([cakrit](https://github.com/cakrit))
-- Guide for troubleshooting Agent with Cloud connection for new nodes [\#13322](https://github.com/netdata/netdata/pull/13322) ([Ancairon](https://github.com/Ancairon))
-- fix\(apps.plugin\): adjust `zmstat*` pattern to exclude zoneminder scripts [\#13314](https://github.com/netdata/netdata/pull/13314) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
