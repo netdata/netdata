@@ -111,63 +111,63 @@ static inline void xt_cache_replaceQ_set_hot(struct rrdengine_worker_config* wc,
 }
 
 /* Returns the index of the cached extent if it was successfully inserted in the extent cache, otherwise -1 */
-static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-    unsigned idx;
-    int ret;
-
-    if (unlikely(!extent))
-        return -1;
-
-    ret = find_first_zero(xt_cache->allocation_bitmap);
-    if (-1 == ret || ret >= MAX_CACHED_EXTENTS) {
-        for (xt_cache_elem = xt_cache->replaceQ_head ; NULL != xt_cache_elem ; xt_cache_elem = xt_cache_elem->next) {
-            idx = xt_cache_elem - xt_cache->extent_array;
-            if (!check_bit(xt_cache->inflight_bitmap, idx)) {
-                xt_cache_replaceQ_delete(wc, xt_cache_elem);
-                break;
-            }
-        }
-        if (NULL == xt_cache_elem)
-            return -1;
-    } else {
-        idx = (unsigned)ret;
-        xt_cache_elem = &xt_cache->extent_array[idx];
-    }
-    xt_cache_elem->extent = extent;
-    xt_cache_elem->fileno = extent->datafile->fileno;
-    xt_cache_elem->inflight_io_descr = NULL;
-    xt_cache_replaceQ_insert(wc, xt_cache_elem);
-    modify_bit(&xt_cache->allocation_bitmap, idx, 1);
-
-    return (int)idx;
-}
+//static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent)
+//{
+//    struct extent_cache *xt_cache = &wc->xt_cache;
+//    struct extent_cache_element *xt_cache_elem;
+//    unsigned idx;
+//    int ret;
+//
+//    if (unlikely(!extent))
+//        return -1;
+//
+//    ret = find_first_zero(xt_cache->allocation_bitmap);
+//    if (-1 == ret || ret >= MAX_CACHED_EXTENTS) {
+//        for (xt_cache_elem = xt_cache->replaceQ_head ; NULL != xt_cache_elem ; xt_cache_elem = xt_cache_elem->next) {
+//            idx = xt_cache_elem - xt_cache->extent_array;
+//            if (!check_bit(xt_cache->inflight_bitmap, idx)) {
+//                xt_cache_replaceQ_delete(wc, xt_cache_elem);
+//                break;
+//            }
+//        }
+//        if (NULL == xt_cache_elem)
+//            return -1;
+//    } else {
+//        idx = (unsigned)ret;
+//        xt_cache_elem = &xt_cache->extent_array[idx];
+//    }
+//    xt_cache_elem->extent = extent;
+//    xt_cache_elem->fileno = extent->datafile->fileno;
+//    xt_cache_elem->inflight_io_descr = NULL;
+//    xt_cache_replaceQ_insert(wc, xt_cache_elem);
+//    modify_bit(&xt_cache->allocation_bitmap, idx, 1);
+//
+//    return (int)idx;
+//}
 
 /**
  * Returns 0 if the cached extent was found in the extent cache, 1 otherwise.
  * Sets *idx to point to the position of the extent inside the cache.
  **/
-static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent, unsigned *idx)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-    unsigned i;
-
-    if (unlikely(!extent))
-        return 1;
-
-    for (i = 0 ; i < MAX_CACHED_EXTENTS ; ++i) {
-        xt_cache_elem = &xt_cache->extent_array[i];
-        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent &&
-            xt_cache_elem->fileno == extent->datafile->fileno) {
-            *idx = i;
-            return 0;
-        }
-    }
-    return 1;
-}
+//static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent, unsigned *idx)
+//{
+//    struct extent_cache *xt_cache = &wc->xt_cache;
+//    struct extent_cache_element *xt_cache_elem;
+//    unsigned i;
+//
+//    if (unlikely(!extent))
+//        return 1;
+//
+//    for (i = 0 ; i < MAX_CACHED_EXTENTS ; ++i) {
+//        xt_cache_elem = &xt_cache->extent_array[i];
+//        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent &&
+//            xt_cache_elem->fileno == extent->datafile->fileno) {
+//            *idx = i;
+//            return 0;
+//        }
+//    }
+//    return 1;
+//}
 
 #if 0 /* disabled code */
 static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned idx)
@@ -196,51 +196,51 @@ void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsig
     xt_io_descr->next = old_next;
 }
 
-void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, struct extent_io_descriptor *xt_io_descr)
-{
-    unsigned i, j, page_offset;
-    struct rrdengine_instance *ctx = wc->ctx;
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-    void *page;
-    struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
-
-    for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        page = dbengine_page_alloc();
-        descr = xt_io_descr->descr_array[i];
-        for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
-            /* care, we don't hold the descriptor mutex */
-            if (extent->pages[j] &&
-                !uuid_compare(*extent->pages[j]->id, *descr->id) &&
-                extent->pages[j]->page_length == descr->page_length &&
-                extent->pages[j]->start_time_ut == descr->start_time_ut &&
-                extent->pages[j]->end_time_ut == descr->end_time_ut) {
-                break;
-            }
-            page_offset += extent->pages[j]->page_length;
-
-        }
-        /* care, we don't hold the descriptor mutex */
-       (void) memcpy(page, wc->xt_cache.extent_array[idx].pages + page_offset, descr->page_length);
-
-        rrdeng_page_descr_mutex_lock(ctx, descr);
-        pg_cache_descr = descr->pg_cache_descr;
-        pg_cache_descr->page = page;
-        pg_cache_descr->flags |= RRD_PAGE_POPULATED;
-        pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
-        pg_cache_replaceQ_insert(ctx, descr);
-        if (xt_io_descr->release_descr) {
-            pg_cache_put(ctx, descr);
-        } else {
-            debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
-            pg_cache_wake_up_waiters(ctx, descr);
-        }
-    }
-    if (xt_io_descr->completion)
-        completion_mark_complete(xt_io_descr->completion);
-    freez(xt_io_descr);
-}
+//void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, struct extent_io_descriptor *xt_io_descr)
+//{
+//    unsigned i, j, page_offset;
+//    struct rrdengine_instance *ctx = wc->ctx;
+//    struct rrdeng_page_descr *descr;
+//    struct page_cache_descr *pg_cache_descr;
+//    void *page;
+//    struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
+//
+//    for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
+//        page = dbengine_page_alloc();
+//        descr = xt_io_descr->descr_array[i];
+//        for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
+//            /* care, we don't hold the descriptor mutex */
+//            if (extent->pages[j] &&
+//                !uuid_compare(*extent->pages[j]->id, *descr->id) &&
+//                extent->pages[j]->page_length == descr->page_length &&
+//                extent->pages[j]->start_time_ut == descr->start_time_ut &&
+//                extent->pages[j]->end_time_ut == descr->end_time_ut) {
+//                break;
+//            }
+//            page_offset += extent->pages[j]->page_length;
+//
+//        }
+//        /* care, we don't hold the descriptor mutex */
+//       (void) memcpy(page, wc->xt_cache.extent_array[idx].pages + page_offset, descr->page_length);
+//
+//        rrdeng_page_descr_mutex_lock(ctx, descr);
+//        pg_cache_descr = descr->pg_cache_descr;
+//        pg_cache_descr->page = page;
+//        pg_cache_descr->flags |= RRD_PAGE_POPULATED;
+//        pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
+//        rrdeng_page_descr_mutex_unlock(ctx, descr);
+//        pg_cache_replaceQ_insert(ctx, descr);
+//        if (xt_io_descr->release_descr) {
+//            pg_cache_put(ctx, descr);
+//        } else {
+//            debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
+//            pg_cache_wake_up_waiters(ctx, descr);
+//        }
+//    }
+//    if (xt_io_descr->completion)
+//        completion_mark_complete(xt_io_descr->completion);
+//    freez(xt_io_descr);
+//}
 
 static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
     switch(type) {
@@ -528,13 +528,13 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     struct extent_io_descriptor *xt_io_descr;
     struct rrdengine_datafile *datafile;
     struct extent_info *extent = descr[0]->extent;
-    uint8_t xt_is_cached = 0, xt_is_inflight = 0;
-    unsigned xt_idx;
+//    uint8_t xt_is_cached = 0, xt_is_inflight = 0;
+//    unsigned xt_idx;
     uv_file file_to_use;
 
     struct journal_extent_list *extent_entry = (struct journal_extent_list *) descr[0]->extent_entry;
 
-    bool use_extent_caching = (extent_entry == NULL);
+//    bool use_extent_caching = (extent_entry == NULL);
     if (likely(extent_entry)) {
         file_to_use = descr[0]->file;
         pos = extent_entry->datafile_offset;
@@ -866,10 +866,21 @@ void delete_descriptors(void *arg)
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdengine_worker_config *wc = &ctx->worker_config;
 
+    if (unlikely(wc->flushing_under_pressure)) {
+        wc->cleanup_deleting_descriptors = 1;
+        fatal_assert(0 == uv_async_send(&wc->async));
+    }
+
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     struct rrdengine_journalfile *journalfile;
     while (datafile) {
+
+        if (unlikely(wc->flushing_under_pressure)) {
+            info("DEBUG: Aborting deleting descriptors; page cache under pressure");
+            break;
+        }
+
         journalfile = datafile->journalfile;
         if (!journalfile->journal_data) {
             datafile = datafile->next;
@@ -969,6 +980,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     uLong crc;
 
     if (force) {
+        wc->flushing_under_pressure = 1;
         debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
     }
     uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
@@ -1136,6 +1148,9 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
+
+    if (force)
+        wc->flushing_under_pressure = 0;
     rrdeng_test_quota(wc);
 
     return ALIGN_BYTES_CEILING(size_bytes);
@@ -1211,9 +1226,9 @@ static void delete_old_data(void *arg)
 
     /* Safe to use since it will be deleted after we are done */
 
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
     datafile = ctx->datafiles.first;
 
+    uv_rwlock_wrlock(&datafile->extent_rwlock);
     for (extent = datafile->extents.first ; extent != NULL ; extent = next) {
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
@@ -1233,7 +1248,7 @@ static void delete_old_data(void *arg)
         next = extent->next;
         freez(extent);
     }
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+    uv_rwlock_wrunlock(&datafile->extent_rwlock);
 
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
@@ -1606,6 +1621,7 @@ void rrdeng_worker(void* arg)
     wc->now_invalidating_dirty_pages = NULL;
     wc->cleanup_thread_invalidating_dirty_pages = 0;
     wc->inflight_dirty_pages = 0;
+    wc->flushing_under_pressure = 0;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);

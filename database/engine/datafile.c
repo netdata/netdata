@@ -24,7 +24,7 @@ void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
 void df_extent_insert(struct extent_info *extent)
 {
     struct rrdengine_datafile *datafile = extent->datafile;
-    uv_rwlock_wrlock(&datafile->ctx->datafiles.rwlock);
+    uv_rwlock_wrlock(&datafile->extent_rwlock);
 
     if (likely(NULL != datafile->extents.last)) {
         datafile->extents.last->next = extent;
@@ -34,7 +34,7 @@ void df_extent_insert(struct extent_info *extent)
     }
     datafile->extents.last = extent;
 
-    uv_rwlock_wrunlock(&datafile->ctx->datafiles.rwlock);
+    uv_rwlock_wrunlock(&datafile->extent_rwlock);
 }
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
@@ -70,6 +70,7 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->file = (uv_file)0;
     datafile->pos = 0;
     datafile->extents.first = datafile->extents.last = NULL; /* will be populated by journalfile */
+    fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->journalfile = NULL;
     datafile->next = NULL;
     datafile->ctx = ctx;

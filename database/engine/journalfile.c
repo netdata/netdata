@@ -1412,13 +1412,14 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
             }
             internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
-            if (false == startup)
-                uv_rwlock_wrlock(&journalfile->datafile->ctx->datafiles.rwlock);
-
-            df_extent_delete_all_unsafe(journalfile->datafile);
-
-            if (false == startup)
-                uv_rwlock_wrunlock(&journalfile->datafile->ctx->datafiles.rwlock);
+            if (false == startup) {
+                struct rrdengine_worker_config *wc = &ctx->worker_config;
+                uv_rwlock_wrlock(&journalfile->datafile->extent_rwlock);
+                df_extent_delete_all_unsafe(journalfile->datafile);
+                uv_rwlock_wrunlock(&journalfile->datafile->extent_rwlock);
+            }
+            else
+                df_extent_delete_all_unsafe(journalfile->datafile);
         }
 
         ctx->disk_space += total_file_size;
