@@ -165,12 +165,25 @@ void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const 
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
+    struct pg_cache_waiter w = {
+            .line = line,
+            .function = function,
+            .tid = gettid(),
+            .next = NULL,
+            .prev = NULL,
+    };
+
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
+
     ++pg_cache_descr->waiters;
     uv_cond_wait(&pg_cache_descr->cond, &pg_cache_descr->mutex);
-    pg_cache_descr->function = function;
-    pg_cache_descr->line = line;
-    pg_cache_descr->tid = gettid();
     --pg_cache_descr->waiters;
+
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
+
+    pg_cache_descr->owner.function = function;
+    pg_cache_descr->owner.line = line;
+    pg_cache_descr->owner.tid = gettid();
 }
 
 /*
@@ -184,12 +197,25 @@ int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, ui
     int ret;
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
+    struct pg_cache_waiter w = {
+            .line = line,
+            .function = function,
+            .tid = gettid(),
+            .next = NULL,
+            .prev = NULL,
+    };
+
+    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
+
     ++pg_cache_descr->waiters;
     ret = uv_cond_timedwait(&pg_cache_descr->cond, &pg_cache_descr->mutex, timeout_sec * NSEC_PER_SEC);
     --pg_cache_descr->waiters;
-    pg_cache_descr->function = function;
-    pg_cache_descr->line = line;
-    pg_cache_descr->tid = gettid();
+
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
+
+    pg_cache_descr->owner.function = function;
+    pg_cache_descr->owner.line = line;
+    pg_cache_descr->owner.tid = gettid();
 
     return ret;
 }

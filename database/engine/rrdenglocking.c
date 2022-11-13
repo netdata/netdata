@@ -90,9 +90,9 @@ void rrdeng_page_descr_mutex_lock_internal(struct rrdengine_instance *ctx, struc
     }
     pg_cache_descr = descr->pg_cache_descr;
     uv_mutex_lock(&pg_cache_descr->mutex);
-    pg_cache_descr->function = function;
-    pg_cache_descr->line = line;
-    pg_cache_descr->tid = gettid();
+    pg_cache_descr->owner.function = function;
+    pg_cache_descr->owner.line = line;
+    pg_cache_descr->owner.tid = gettid();
 }
 
 void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
@@ -101,9 +101,9 @@ void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrden
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr, *delete_pg_cache_descr = NULL;
     uint8_t we_locked;
 
-    pg_cache_descr->function = "UNLOCKED";
-    pg_cache_descr->line = 0;
-    pg_cache_descr->tid = 0;
+    pg_cache_descr->owner.function = "UNLOCKED";
+    pg_cache_descr->owner.line = 0;
+    pg_cache_descr->owner.tid = 0;
     uv_mutex_unlock(&pg_cache_descr->mutex);
 
     we_locked = 0;
