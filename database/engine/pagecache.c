@@ -161,12 +161,13 @@ void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page
  * The lock will be released and re-acquired. The descriptor is not guaranteed
  * to exist after this function returns.
  */
-void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr)
+void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const char *function)
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
     ++pg_cache_descr->waiters;
     uv_cond_wait(&pg_cache_descr->cond, &pg_cache_descr->mutex);
+    pg_cache_descr->function = function;
     --pg_cache_descr->waiters;
 }
 
@@ -176,7 +177,7 @@ void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr)
  * to exist after this function returns.
  * Returns UV_ETIMEDOUT if timeout_sec seconds pass.
  */
-int pg_cache_timedwait_event_unsafe(struct rrdeng_page_descr *descr, uint64_t timeout_sec)
+int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function)
 {
     int ret;
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
@@ -184,6 +185,7 @@ int pg_cache_timedwait_event_unsafe(struct rrdeng_page_descr *descr, uint64_t ti
     ++pg_cache_descr->waiters;
     ret = uv_cond_timedwait(&pg_cache_descr->cond, &pg_cache_descr->mutex, timeout_sec * NSEC_PER_SEC);
     --pg_cache_descr->waiters;
+    pg_cache_descr->function = function;
 
     return ret;
 }
