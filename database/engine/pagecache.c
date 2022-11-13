@@ -1341,10 +1341,13 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
 
     page_not_in_cache = 0;
     uv_rwlock_rdlock(&page_index->lock);
+    int retry_count = 0;
     while (1) {
         descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, PAGE_CACHE_MAX_PRELOAD_PAGES);
-        if (NULL == descr || 0 == descr->page_length) {
+        if (NULL == descr || 0 == descr->page_length || retry_count == default_rrdeng_page_fetch_retries) {
             /* non-empty page not found */
+            if (retry_count == default_rrdeng_page_fetch_retries)
+                error_report("Page cache timeout while waiting for page %p : returning FAIL", descr);
             uv_rwlock_rdunlock(&page_index->lock);
 
             pg_cache_release_pages(ctx, 1);
@@ -1405,7 +1408,10 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         if (!(flags & RRD_PAGE_POPULATED))
             page_not_in_cache = 1;
 
-        pg_cache_wait_event_unsafe(descr);
+        if (pg_cache_timedwait_event_unsafe(descr, default_rrdeng_page_fetch_timeout) == UV_ETIMEDOUT) {
+            error_report("Page cache timeout while waiting for page %p : retry count = %d", descr, retry_count);
+            ++retry_count;
+        }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
         /* reset scan to find again */
         uv_rwlock_rdlock(&page_index->lock);
