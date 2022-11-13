@@ -22,6 +22,7 @@ struct rrdeng_page_descr;
 #define RRD_PAGE_POPULATED      (1LU << 4)
 #define RRD_PAGE_INVALID        (1LU << 5)
 
+#ifdef NETDATA_INTERNAL_CHECKS
 struct pg_cache_waiter {
     const char *function;
     size_t line;
@@ -30,6 +31,7 @@ struct pg_cache_waiter {
     struct pg_cache_waiter *next;
     struct pg_cache_waiter *prev;
 };
+#endif
 
 struct page_cache_descr {
     struct rrdeng_page_descr *descr; /* parent descriptor */
@@ -40,8 +42,10 @@ struct page_cache_descr {
 
     unsigned refcnt;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     struct pg_cache_waiter *wait_list;
     struct pg_cache_waiter owner;
+#endif
 
     uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
     uv_cond_t cond;
@@ -184,10 +188,17 @@ struct page_cache { /* TODO: add statistics */
 
 void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr);
 void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-#define pg_cache_wait_event_unsafe(descr) pg_cache_wait_event_unsafe_internal(descr, __FUNCTION__, __LINE__)
-void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const char *function, size_t line);
-#define pg_cache_timedwait_event_unsafe(descr, timeout_sec) pg_cache_timedwait_event_unsafe_internal(descr, timeout_sec, __FUNCTION__, __LINE__)
-int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function, size_t line);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+#define pg_cache_wait_event_unsafe(descr) pg_cache_wait_event_unsafe_with_trace(descr, __FUNCTION__, __LINE__)
+void pg_cache_wait_event_unsafe_with_trace(struct rrdeng_page_descr *descr, const char *function, size_t line);
+#define pg_cache_timedwait_event_unsafe(descr, timeout_sec) pg_cache_timedwait_event_unsafe_with_trace(descr, timeout_sec, __FUNCTION__, __LINE__)
+int pg_cache_timedwait_event_unsafe_with_trace(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function, size_t line);
+#else
+void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr);
+int pg_cache_timedwait_event_unsafe(struct rrdeng_page_descr *descr, uint64_t timeout_sec);
+#endif
+
 unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx,
                                      struct rrdeng_page_descr *descr);
