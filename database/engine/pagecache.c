@@ -165,6 +165,9 @@ void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const 
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
+    if(pg_cache_descr->owner.tid != gettid())
+        fatal("DBENGINE pg_cache_desc is not locked by me");
+
     struct pg_cache_waiter w = {
             .line = line,
             .function = function,
