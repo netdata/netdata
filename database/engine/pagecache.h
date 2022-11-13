@@ -33,6 +33,7 @@ struct page_cache_descr {
 
     const char *function;
     size_t line;
+    pid_t tid;
 
     uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
     uv_cond_t cond;
