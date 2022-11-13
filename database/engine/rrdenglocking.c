@@ -96,10 +96,11 @@ void rrdeng_page_descr_mutex_lock_internal(struct rrdengine_instance *ctx, struc
 void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
 {
     unsigned long old_state, new_state, ret_state, old_users;
-    struct page_cache_descr *pg_cache_descr, *delete_pg_cache_descr = NULL;
+    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr, *delete_pg_cache_descr = NULL;
     uint8_t we_locked;
 
-    uv_mutex_unlock(&descr->pg_cache_descr->mutex);
+    pg_cache_descr->function = "UNLOCKED";
+    uv_mutex_unlock(&pg_cache_descr->mutex);
 
     we_locked = 0;
     while (1) { /* spin */

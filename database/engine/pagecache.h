@@ -171,7 +171,10 @@ struct page_cache { /* TODO: add statistics */
 
 void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr);
 void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr);
+#define pg_cache_wait_event_unsafe(descr) pg_cache_wait_event_unsafe_internal(descr, __FUNCTION__)
+void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const char *function);
+#define pg_cache_timedwait_event_unsafe(descr, timeout_sec) pg_cache_timedwait_event_unsafe_internal(descr, timeout_sec, __FUNCTION__)
+int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function);
 unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx,
                                      struct rrdeng_page_descr *descr);
