@@ -161,12 +161,18 @@ void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page
  * The lock will be released and re-acquired. The descriptor is not guaranteed
  * to exist after this function returns.
  */
-void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const char *function, size_t line)
+#ifdef NETDATA_INTERNAL_CHECKS
+void pg_cache_wait_event_unsafe_with_trace(struct rrdeng_page_descr *descr, const char *function, size_t line)
+#else
+void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr)
+#endif
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     if(pg_cache_descr->owner.tid != gettid())
-        fatal("DBENGINE pg_cache_desc is not locked by me");
+        fatal("DBENGINE: pg_cache_descr is not locked by me in %s(). It is locked by thread %u, I am %u",
+              __FUNCTION__, (unsigned)pg_cache_descr->owner.tid, (unsigned)gettid());
 
     struct pg_cache_waiter w = {
             .line = line,
@@ -177,16 +183,19 @@ void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const 
     };
 
     DOUBLE_LINKED_LIST_PREPEND_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
+#endif
 
     ++pg_cache_descr->waiters;
     uv_cond_wait(&pg_cache_descr->cond, &pg_cache_descr->mutex);
     --pg_cache_descr->waiters;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
 
     pg_cache_descr->owner.function = function;
     pg_cache_descr->owner.line = line;
     pg_cache_descr->owner.tid = gettid();
+#endif
 }
 
 /*
@@ -195,10 +204,19 @@ void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const 
  * to exist after this function returns.
  * Returns UV_ETIMEDOUT if timeout_sec seconds pass.
  */
-int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function, size_t line)
+#ifdef NETDATA_INTERNAL_CHECKS
+int pg_cache_timedwait_event_unsafe_with_trace(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function, size_t line)
+#else
+int pg_cache_timedwait_event_unsafe(struct rrdeng_page_descr *descr, uint64_t timeout_sec)
+#endif
 {
     int ret;
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(pg_cache_descr->owner.tid != gettid())
+        fatal("DBENGINE: pg_cache_descr is not locked by me in %s(). It is locked by thread %u, I am %u",
+              __FUNCTION__, (unsigned)pg_cache_descr->owner.tid, (unsigned)gettid());
 
     struct pg_cache_waiter w = {
             .line = line,
@@ -209,16 +227,19 @@ int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, ui
     };
 
     DOUBLE_LINKED_LIST_PREPEND_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
+#endif
 
     ++pg_cache_descr->waiters;
     ret = uv_cond_timedwait(&pg_cache_descr->cond, &pg_cache_descr->mutex, timeout_sec * NSEC_PER_SEC);
     --pg_cache_descr->waiters;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pg_cache_descr->wait_list, &w, prev, next);
 
     pg_cache_descr->owner.function = function;
     pg_cache_descr->owner.line = line;
     pg_cache_descr->owner.tid = gettid();
+#endif
 
     return ret;
 }
