@@ -1569,7 +1569,7 @@ void timer_cb(uv_timer_t* handle)
                 bytes_written = do_flush_pages(wc, 0, NULL);
             }
 
-            if (total_bytes == 0 && do_indexing) {
+            if (do_indexing) {
                 do_indexing = false;
                 queue_journalfile_v2_migration(wc);
             }
