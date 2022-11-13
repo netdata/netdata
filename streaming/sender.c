@@ -1132,9 +1132,13 @@ static void process_replication_requests(struct sender_state *s) {
             continue;
         }
 
+        netdata_thread_disable_cancelability();
+
         // send the replication data
         bool start_streaming = replicate_chart_response(st->rrdhost, st,
                 rr->start_streaming, rr->after, rr->before);
+
+        netdata_thread_enable_cancelability();
 
         // enable normal streaming if we have to
         if (start_streaming) {

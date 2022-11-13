@@ -1144,6 +1144,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         return PARSER_RC_OK;
     }
 
+    rrdcontext_updated_retention_rrdset(st);
+
     bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child,
                                       first_entry_requested, last_entry_requested);
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;

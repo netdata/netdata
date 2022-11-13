@@ -153,10 +153,13 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
     time_t query_after = after;
     time_t query_before = before;
     time_t now = now_realtime_sec();
+    time_t tolerance = 2;   // sometimes from the time we get this value, to the time we check,
+                            // a data collection has been made
+                            // so, we give this tolerance to detect invalid timestamps
 
     // find the first entry we have
     time_t first_entry_local = rrdset_first_entry_t(st);
-    if(first_entry_local > now) {
+    if(first_entry_local > now + tolerance) {
         internal_error(true,
                        "RRDSET: '%s' first time %llu is in the future (now is %llu)",
                        rrdset_id(st), (unsigned long long)first_entry_local, (unsigned long long)now);
@@ -175,7 +178,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
         last_entry_local = rrdset_last_entry_t(st);
     }
 
-    if(last_entry_local > now) {
+    if(last_entry_local > now + tolerance) {
         internal_error(true,
                        "RRDSET: '%s' last updated time %llu is in the future (now is %llu)",
                        rrdset_id(st), (unsigned long long)last_entry_local, (unsigned long long)now);
