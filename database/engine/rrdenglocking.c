@@ -92,6 +92,7 @@ void rrdeng_page_descr_mutex_lock_internal(struct rrdengine_instance *ctx, struc
     uv_mutex_lock(&pg_cache_descr->mutex);
     pg_cache_descr->function = function;
     pg_cache_descr->line = line;
+    pg_cache_descr->tid = gettid();
 }
 
 void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
@@ -102,6 +103,7 @@ void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrden
 
     pg_cache_descr->function = "UNLOCKED";
     pg_cache_descr->line = 0;
+    pg_cache_descr->tid = 0;
     uv_mutex_unlock(&pg_cache_descr->mutex);
 
     we_locked = 0;

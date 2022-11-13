@@ -169,6 +169,7 @@ void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const 
     uv_cond_wait(&pg_cache_descr->cond, &pg_cache_descr->mutex);
     pg_cache_descr->function = function;
     pg_cache_descr->line = line;
+    pg_cache_descr->tid = gettid();
     --pg_cache_descr->waiters;
 }
 
@@ -188,6 +189,7 @@ int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, ui
     --pg_cache_descr->waiters;
     pg_cache_descr->function = function;
     pg_cache_descr->line = line;
+    pg_cache_descr->tid = gettid();
 
     return ret;
 }
