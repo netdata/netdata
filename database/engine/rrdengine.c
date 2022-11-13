@@ -1526,6 +1526,7 @@ void async_cb(uv_async_t *handle)
 void timer_cb(uv_timer_t* handle)
 {
     static bool do_indexing = false;
+    static time_t do_indexing_after = 0;
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
     struct rrdengine_worker_config* wc = handle->data;
@@ -1535,8 +1536,10 @@ void timer_cb(uv_timer_t* handle)
     uv_update_time(handle->loop);
     bool should_schedule_indexing = rrdeng_test_quota(wc);
 
-    if (should_schedule_indexing)
+    if (should_schedule_indexing && false == do_indexing) {
         do_indexing = true;
+        do_indexing_after = now_realtime_sec() + 10;
+    }
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages && !wc->now_deleting_descriptors && !wc->running_journal_migration)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
@@ -1568,13 +1571,14 @@ void timer_cb(uv_timer_t* handle)
                  total_bytes += bytes_written) {
                 bytes_written = do_flush_pages(wc, 0, NULL);
             }
-
-            if (do_indexing) {
-                do_indexing = false;
-                queue_journalfile_v2_migration(wc);
-            }
         }
     }
+
+    if (do_indexing && do_indexing_after < now_realtime_sec()) {
+        do_indexing = false;
+        queue_journalfile_v2_migration(wc);
+    }
+
     load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS
     {
