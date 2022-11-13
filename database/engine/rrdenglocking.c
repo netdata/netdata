@@ -12,6 +12,8 @@ struct page_cache_descr *rrdeng_create_pg_cache_descr(struct rrdengine_instance 
     pg_cache_descr->prev = pg_cache_descr->next = NULL;
     pg_cache_descr->refcnt = 0;
     pg_cache_descr->waiters = 0;
+    pg_cache_descr->wait_list = NULL;
+    pg_cache_descr->owner.function = NULL;
     fatal_assert(0 == uv_cond_init(&pg_cache_descr->cond));
     fatal_assert(0 == uv_mutex_init(&pg_cache_descr->mutex));
 
