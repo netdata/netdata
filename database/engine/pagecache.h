@@ -30,8 +30,11 @@ struct page_cache_descr {
     struct page_cache_descr *next; /* LRU */
 
     unsigned refcnt;
-    uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
+
     const char *function;
+    size_t line;
+
+    uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
     uv_cond_t cond;
     unsigned waiters;
 };
@@ -171,10 +174,10 @@ struct page_cache { /* TODO: add statistics */
 
 void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr);
 void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-#define pg_cache_wait_event_unsafe(descr) pg_cache_wait_event_unsafe_internal(descr, __FUNCTION__)
-void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const char *function);
-#define pg_cache_timedwait_event_unsafe(descr, timeout_sec) pg_cache_timedwait_event_unsafe_internal(descr, timeout_sec, __FUNCTION__)
-int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function);
+#define pg_cache_wait_event_unsafe(descr) pg_cache_wait_event_unsafe_internal(descr, __FUNCTION__, __LINE__)
+void pg_cache_wait_event_unsafe_internal(struct rrdeng_page_descr *descr, const char *function, size_t line);
+#define pg_cache_timedwait_event_unsafe(descr, timeout_sec) pg_cache_timedwait_event_unsafe_internal(descr, timeout_sec, __FUNCTION__, __LINE__)
+int pg_cache_timedwait_event_unsafe_internal(struct rrdeng_page_descr *descr, uint64_t timeout_sec, const char *function, size_t line);
 unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx,
                                      struct rrdeng_page_descr *descr);
