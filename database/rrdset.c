@@ -1097,8 +1097,6 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 
         store_metric_at_tier(rd, t, sp, point_end_time_ut);
     }
-
-    rrdcontext_collected_rrddim(rd);
 }
 
 // caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through
@@ -1257,6 +1255,7 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, 0, false);
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
+                rrdcontext_collected_rrddim(rd);
                 continue;
             }
 
@@ -1269,6 +1268,7 @@ static inline size_t rrdset_done_interpolate(
                 }
 
                 rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
+                rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1277,6 +1277,7 @@ static inline size_t rrdset_done_interpolate(
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
+                rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = NAN;
             }
 
