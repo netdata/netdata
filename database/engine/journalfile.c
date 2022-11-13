@@ -1091,15 +1091,12 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                 fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
                 fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
 
-                // FIXME:
                 rrdeng_page_descr_mutex_lock(ctx, descr);
                 while (!pg_cache_try_get_unsafe(descr, 1)) {
                     pg_cache_wait_event_unsafe(descr);
                 }
+                descr->extent_entry = &extent_list[page_entry->extent_index];
                 rrdeng_page_descr_mutex_unlock(ctx, descr);
-                uv_rwlock_rdunlock(&page_index->lock);
-                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
-                uv_rwlock_rdlock(&page_index->lock);
             }
         }
 
