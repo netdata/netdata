@@ -22,6 +22,15 @@ struct rrdeng_page_descr;
 #define RRD_PAGE_POPULATED      (1LU << 4)
 #define RRD_PAGE_INVALID        (1LU << 5)
 
+struct pg_cache_waiter {
+    const char *function;
+    size_t line;
+    pid_t tid;
+
+    struct pg_cache_waiter *next;
+    struct pg_cache_waiter *prev;
+};
+
 struct page_cache_descr {
     struct rrdeng_page_descr *descr; /* parent descriptor */
     void *page;
@@ -31,9 +40,8 @@ struct page_cache_descr {
 
     unsigned refcnt;
 
-    const char *function;
-    size_t line;
-    pid_t tid;
+    struct pg_cache_waiter *wait_list;
+    struct pg_cache_waiter owner;
 
     uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
     uv_cond_t cond;
