@@ -595,8 +595,6 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
 }
 
 static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
-    netdata_thread_disable_cancelability();
-
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     struct rrdengine_instance *ctx = handle->ctx;
@@ -617,20 +615,16 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
         handle->descr = NULL;
         handle->wanted_start_time_s = (time_t)((handle->page_end_time_ut / USEC_PER_SEC) + handle->dt_s);
 
-        if (unlikely(handle->wanted_start_time_s > rrdimm_handle->end_time_s)) {
-            netdata_thread_enable_cancelability();
+        if (unlikely(handle->wanted_start_time_s > rrdimm_handle->end_time_s))
             return 1;
-        }
     }
 
     usec_t wanted_start_time_ut = handle->wanted_start_time_s * USEC_PER_SEC;
     descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
         wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
 
-    if (NULL == descr) {
-        netdata_thread_enable_cancelability();
+    if (NULL == descr)
         return 1;
-    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, 1);
@@ -641,7 +635,6 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
     if (unlikely(INVALID_TIME == descr->start_time_ut || INVALID_TIME == page_end_time_ut || 0 == descr->update_every_s)) {
         error("DBENGINE: discarding invalid page descriptor (start_time = %llu, end_time = %llu, update_every_s = %d)",
               descr->start_time_ut, page_end_time_ut, descr->update_every_s);
-        netdata_thread_enable_cancelability();
         return 1;
     }
 
@@ -675,7 +668,6 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
 //            wanted_start_time_ut, in_out?"true":"false"
 //             );
 
-    netdata_thread_enable_cancelability();
     return 0;
 }
 
