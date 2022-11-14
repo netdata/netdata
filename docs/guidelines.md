@@ -2,6 +2,8 @@ Welcome to our docs developer guidelines!
 
 We store documentation related to Netdata inside of the [`netdata/netdata` repository](https://github.com/netdata/netdata) on GitHub.
 
+If you want to contribute to our Blog, check the [README](https://github.com/netdata/blog/blob/master/README.md) in our blog repo!
+
 The Netdata team aggregates and publishes all documentation at [learn.netdata.cloud](/) using
 [Docusaurus](https://v2.docusaurus.io/) over at the [`netdata/learn` repository](https://github.com/netdata/learn).
 
