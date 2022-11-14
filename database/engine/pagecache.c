@@ -1024,8 +1024,9 @@ struct rrdeng_page_descr *pg_cache_insert(
 
     if (page_inserted && lock_and_count) {
         ++page_index->page_count;
-        pg_cache_add_new_metric_time(page_index, descr);
     }
+
+    pg_cache_add_new_metric_time(page_index, descr);
 
     if (lock_and_count)
         uv_rwlock_wrunlock(&page_index->lock);
