@@ -1011,6 +1011,14 @@ struct rrdeng_page_descr *pg_cache_insert(
             return descr;
         }
         old_descr = *PValue;
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(page_index->id, uuid_str);
+        internal_error(true, "ATTEMPT TO INSERT %s @ %llu BUT IT EXISTS: old entry (%llu, %llu, %llu)  new entry (%llu, %llu, %llu)",
+                       uuid_str, (descr->start_time_ut / USEC_PER_SEC),
+                       old_descr->start_time_ut, old_descr->end_time_ut, old_descr->page_length,
+                       descr->start_time_ut, descr->end_time_ut, descr->page_length);
+        fatal_assert(old_descr == descr);
+
         uv_rwlock_wrlock(&page_index->ctx->datafiles.rwlock);
         if (false == unlink_descriptor_extent_unsafe(old_descr)) {
             rrdeng_page_descr_mutex_lock(ctx, old_descr);
