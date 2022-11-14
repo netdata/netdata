@@ -1098,22 +1098,22 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                     pg_cache_wait_event_unsafe(descr);
                 }
 
-                bool can_punch_hole = !(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED);
-                if (likely(false == can_punch_hole)) {
-                    descr->extent_entry = &extent_list[page_entry->extent_index];
-                    descr->extent = NULL;
-                    descr->file = journalfile->datafile->file;
-                    ++pg_cache->active_descriptors;
-                    pg_cache_put_unsafe(descr);
-                    rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
-                    rrdeng_page_descr_mutex_unlock(ctx, descr);
-                    mark_journalfile_for_expiration_check = true;
-                } else {
-                    rrdeng_page_descr_mutex_unlock(ctx, descr);
-                    uv_rwlock_rdunlock(&page_index->lock);
-                    pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
-                    uv_rwlock_rdlock(&page_index->lock);
-                }
+                //bool can_punch_hole = !(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED);
+                //if (likely(false == can_punch_hole)) {
+                descr->extent_entry = &extent_list[page_entry->extent_index];
+                descr->extent = NULL;
+                descr->file = journalfile->datafile->file;
+                ++pg_cache->active_descriptors;
+                pg_cache_put_unsafe(descr);
+                rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                mark_journalfile_for_expiration_check = true;
+                //} else {
+                //    rrdeng_page_descr_mutex_unlock(ctx, descr);
+                //    uv_rwlock_rdunlock(&page_index->lock);
+                //    pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+                //    uv_rwlock_rdlock(&page_index->lock);
+                //}
             }
         }
 
