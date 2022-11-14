@@ -51,7 +51,7 @@ the accuracy of the values you enter below, changes in the compression ratio, an
 
 :::
 
-Visit the [Netdata Storage Calculator]([https://docs.google.com/spreadsheets/d/1aRLZJGJk6fvQDktkCB44l-EFROJcUrwOLe8rBQcfpPE/edit?usp=sharing](https://netdata-storage-calculator.streamlit.app/)) app to customize data retention according to your preferences. There is also a [python notebook](https://github.com/netdata/netdata-storage-calculator/blob/main/calculator.ipynb) version you can also use.
+Visit the [Netdata Storage Calculator](https://netdata-storage-calculator.herokuapp.com/) app to customize data retention according to your preferences. There is also a [python notebook](https://github.com/netdata/netdata-storage-calculator/blob/main/calculator.ipynb) version you can also use.
 
 ## Edit `netdata.conf` with recommended database engine settings
 
