@@ -717,54 +717,6 @@ bundle_jsonc() {
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
-build_fluentbit() {
-  env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
-  fi
-  
-  mkdir -p fluent-bit/build || return 1
-  cd fluent-bit/build > /dev/null || return 1
-  
-  rm CMakeCache.txt
-  run eval "${env_cmd} cmake -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../" || return 1
-  run eval "${env_cmd} ${make} ${MAKEOPTS}" || return 1
-  cd - > /dev/null || return 1
-}
-
-bundle_fluentbit() {
-  if [ -z "${NETDATA_ENABLE_LOGS_MANAGEMENT}" ]; then
-    return 0
-  fi
-
-  if [ -z "$(command -v cmake)" ]; then
-    run_failed "Could not find cmake, which is required to build Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
-    return 0
-  fi
-
-  if [ ! -d "fluent-bit" ]; then
-    run_failed "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
-
-  progress "Prepare Fluent-Bit"
-
-  if build_fluentbit; then
-    FLUENT_BIT_BUILD_SUCCESS=1
-    run_ok "Fluent-Bit built successfully."
-  else
-    run_failed "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_fluentbit
-
-# -----------------------------------------------------------------------------
 
 get_kernel_version() {
   r="$(uname -r | cut -f 1 -d '-')"
@@ -946,6 +898,64 @@ bundle_ebpf_co_re() {
 }
 
 bundle_ebpf_co_re
+
+# -----------------------------------------------------------------------------
+build_fluentbit() {
+  env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
+  fi
+  
+  mkdir -p fluent-bit/build || return 1
+  cd fluent-bit/build > /dev/null || return 1
+  
+  rm CMakeCache.txt
+  run eval "${env_cmd} cmake -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../" || return 1
+  run eval "${env_cmd} ${make} ${MAKEOPTS}" || return 1
+  cd - > /dev/null || return 1
+}
+
+bundle_fluentbit() {
+  if [ -z "${NETDATA_ENABLE_LOGS_MANAGEMENT}" ]; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ]; then
+    run_failed "Could not find cmake, which is required to build Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
+  if [ ! -d "fluent-bit" ]; then
+    run_failed "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
+  # If musl is used, we need to patch chunkio, providing fts has been previously installed.
+  libc=$(detect_libc)
+  if [ -z "$libc" ]; then
+    run_failed "Cannot detect a supported libc on your system, Logs Management support will be disabled."
+    return 0
+  elif [ "${libc}" = "musl" ]; then
+    patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
+  fi
+  
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
+
+  progress "Prepare Fluent-Bit"
+
+  if build_fluentbit; then
+    FLUENT_BIT_BUILD_SUCCESS=1
+    run_ok "Fluent-Bit built successfully."
+  else
+    run_failed "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_fluentbit
 
 # -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
