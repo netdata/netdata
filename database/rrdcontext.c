@@ -2276,6 +2276,7 @@ typedef struct query_target_locals {
 static __thread QUERY_TARGET thread_query_target = {};
 void query_target_release(QUERY_TARGET *qt) {
     if(unlikely(!qt)) return;
+    if(unlikely(!qt->used)) return;
 
     simple_pattern_free(qt->hosts.pattern);
     qt->hosts.pattern = NULL;
