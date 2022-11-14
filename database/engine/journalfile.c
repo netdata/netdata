@@ -1004,18 +1004,17 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
 
     uv_rwlock_rdlock(&page_index->lock);
 
+    Pvoid_t JudyL_array = metric_info->JudyL_array ? metric_info->JudyL_array : page_index->JudyL_array;
+
     // Need page_index lock if running live
-    for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
+    for (PValue = JudyLFirst(JudyL_array, &index_time, PJE0),
         descr = unlikely(NULL == PValue) ? NULL : *PValue;
          descr != NULL;
-         PValue = JudyLNext(metric_info->JudyL_array, &index_time, PJE0),
+         PValue = JudyLNext(JudyL_array, &index_time, PJE0),
         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
 
         if (unlikely((time_t) index_time > metric_info->max_index_time_s) || entries == metric_info->entries)
             break;
-
-//        if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
-//            continue;
 
         // Write one descriptor and return the next data page location
         data_page = journal_v2_write_data_page(j2_header, (void *)data_page, descr);
@@ -1074,6 +1073,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
         uv_rwlock_rdlock(&page_index->lock);
 
+        bool mark_journalfile_for_expiration_check = false;
         for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
              descr != NULL;
@@ -1099,16 +1099,17 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                 }
 
                 bool can_punch_hole = !(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED);
-                if (false == can_punch_hole) {
+                if (likely(false == can_punch_hole)) {
                     descr->extent_entry = &extent_list[page_entry->extent_index];
                     descr->extent = NULL;
                     descr->file = journalfile->datafile->file;
                     ++pg_cache->active_descriptors;
                     pg_cache_put_unsafe(descr);
                     rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
-                }
-                rrdeng_page_descr_mutex_unlock(ctx, descr);
-                if (can_punch_hole) {
+                    rrdeng_page_descr_mutex_unlock(ctx, descr);
+                    mark_journalfile_for_expiration_check = true;
+                } else {
+                    rrdeng_page_descr_mutex_unlock(ctx, descr);
                     uv_rwlock_rdunlock(&page_index->lock);
                     pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
                     uv_rwlock_rdlock(&page_index->lock);
@@ -1116,8 +1117,10 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             }
         }
 
-        uint32_t page_offset = (uint8_t *) page_list_header - (uint8_t *) journalfile->journal_data;
-        mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
+        if (mark_journalfile_for_expiration_check) {
+            uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
+            mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
+        }
 
         uv_rwlock_rdunlock(&page_index->lock);
     }
@@ -1156,7 +1159,6 @@ static bool journalfile_ready_to_index(struct rrdengine_datafile *datafile)
                 continue;
             if (unlikely(!descr->extent))
                 return false;
-
         }
         extent = extent->next;
     }

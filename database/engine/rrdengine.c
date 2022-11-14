@@ -61,54 +61,54 @@ static void sanity_check(void)
 }
 
 /* always inserts into tail */
-static inline void xt_cache_replaceQ_insert(struct rrdengine_worker_config* wc,
-                                            struct extent_cache_element *xt_cache_elem)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
+//static inline void xt_cache_replaceQ_insert(struct rrdengine_worker_config* wc,
+//                                            struct extent_cache_element *xt_cache_elem)
+//{
+//    struct extent_cache *xt_cache = &wc->xt_cache;
+//
+//    xt_cache_elem->prev = NULL;
+//    xt_cache_elem->next = NULL;
+//
+//    if (likely(NULL != xt_cache->replaceQ_tail)) {
+//        xt_cache_elem->prev = xt_cache->replaceQ_tail;
+//        xt_cache->replaceQ_tail->next = xt_cache_elem;
+//    }
+//    if (unlikely(NULL == xt_cache->replaceQ_head)) {
+//        xt_cache->replaceQ_head = xt_cache_elem;
+//    }
+//    xt_cache->replaceQ_tail = xt_cache_elem;
+//}
 
-    xt_cache_elem->prev = NULL;
-    xt_cache_elem->next = NULL;
+//static inline void xt_cache_replaceQ_delete(struct rrdengine_worker_config* wc,
+//                                            struct extent_cache_element *xt_cache_elem)
+//{
+//    struct extent_cache *xt_cache = &wc->xt_cache;
+//    struct extent_cache_element *prev, *next;
+//
+//    prev = xt_cache_elem->prev;
+//    next = xt_cache_elem->next;
+//
+//    if (likely(NULL != prev)) {
+//        prev->next = next;
+//    }
+//    if (likely(NULL != next)) {
+//        next->prev = prev;
+//    }
+//    if (unlikely(xt_cache_elem == xt_cache->replaceQ_head)) {
+//        xt_cache->replaceQ_head = next;
+//    }
+//    if (unlikely(xt_cache_elem == xt_cache->replaceQ_tail)) {
+//        xt_cache->replaceQ_tail = prev;
+//    }
+//    xt_cache_elem->prev = xt_cache_elem->next = NULL;
+//}
 
-    if (likely(NULL != xt_cache->replaceQ_tail)) {
-        xt_cache_elem->prev = xt_cache->replaceQ_tail;
-        xt_cache->replaceQ_tail->next = xt_cache_elem;
-    }
-    if (unlikely(NULL == xt_cache->replaceQ_head)) {
-        xt_cache->replaceQ_head = xt_cache_elem;
-    }
-    xt_cache->replaceQ_tail = xt_cache_elem;
-}
-
-static inline void xt_cache_replaceQ_delete(struct rrdengine_worker_config* wc,
-                                            struct extent_cache_element *xt_cache_elem)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *prev, *next;
-
-    prev = xt_cache_elem->prev;
-    next = xt_cache_elem->next;
-
-    if (likely(NULL != prev)) {
-        prev->next = next;
-    }
-    if (likely(NULL != next)) {
-        next->prev = prev;
-    }
-    if (unlikely(xt_cache_elem == xt_cache->replaceQ_head)) {
-        xt_cache->replaceQ_head = next;
-    }
-    if (unlikely(xt_cache_elem == xt_cache->replaceQ_tail)) {
-        xt_cache->replaceQ_tail = prev;
-    }
-    xt_cache_elem->prev = xt_cache_elem->next = NULL;
-}
-
-static inline void xt_cache_replaceQ_set_hot(struct rrdengine_worker_config* wc,
-                                             struct extent_cache_element *xt_cache_elem)
-{
-    xt_cache_replaceQ_delete(wc, xt_cache_elem);
-    xt_cache_replaceQ_insert(wc, xt_cache_elem);
-}
+//static inline void xt_cache_replaceQ_set_hot(struct rrdengine_worker_config* wc,
+//                                             struct extent_cache_element *xt_cache_elem)
+//{
+//    xt_cache_replaceQ_delete(wc, xt_cache_elem);
+//    xt_cache_replaceQ_insert(wc, xt_cache_elem);
+//}
 
 /* Returns the index of the cached extent if it was successfully inserted in the extent cache, otherwise -1 */
 //static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent)
@@ -169,32 +169,32 @@ static inline void xt_cache_replaceQ_set_hot(struct rrdengine_worker_config* wc,
 //    return 1;
 //}
 
-#if 0 /* disabled code */
-static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned idx)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
+//#if 0 /* disabled code */
+//static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned idx)
+//{
+//    struct extent_cache *xt_cache = &wc->xt_cache;
+//    struct extent_cache_element *xt_cache_elem;
+//
+//    xt_cache_elem = &xt_cache->extent_array[idx];
+//    xt_cache_replaceQ_delete(wc, xt_cache_elem);
+//    xt_cache_elem->extent = NULL;
+//    modify_bit(&wc->xt_cache.allocation_bitmap, idx, 0); /* invalidate it */
+//    modify_bit(&wc->xt_cache.inflight_bitmap, idx, 0); /* not in-flight anymore */
+//}
+//#endif
 
-    xt_cache_elem = &xt_cache->extent_array[idx];
-    xt_cache_replaceQ_delete(wc, xt_cache_elem);
-    xt_cache_elem->extent = NULL;
-    modify_bit(&wc->xt_cache.allocation_bitmap, idx, 0); /* invalidate it */
-    modify_bit(&wc->xt_cache.inflight_bitmap, idx, 0); /* not in-flight anymore */
-}
-#endif
-
-void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsigned idx,
-                                       struct extent_io_descriptor *xt_io_descr)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-    struct extent_io_descriptor *old_next;
-
-    xt_cache_elem = &xt_cache->extent_array[idx];
-    old_next = xt_cache_elem->inflight_io_descr->next;
-    xt_cache_elem->inflight_io_descr->next = xt_io_descr;
-    xt_io_descr->next = old_next;
-}
+//void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsigned idx,
+//                                       struct extent_io_descriptor *xt_io_descr)
+//{
+//    struct extent_cache *xt_cache = &wc->xt_cache;
+//    struct extent_cache_element *xt_cache_elem;
+//    struct extent_io_descriptor *old_next;
+//
+//    xt_cache_elem = &xt_cache->extent_array[idx];
+//    old_next = xt_cache_elem->inflight_io_descr->next;
+//    xt_cache_elem->inflight_io_descr->next = xt_io_descr;
+//    xt_io_descr->next = old_next;
+//}
 
 //void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, struct extent_io_descriptor *xt_io_descr)
 //{
@@ -279,10 +279,28 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
+unsigned int getdatafile_fileno(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    if (descr->extent)
+        return descr->extent->datafile->fileno;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+        if (journalfile->journal_data && datafile->file == descr->file)
+                break;
+        datafile = datafile->next;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    return datafile ? datafile->fileno : 0;
+}
+
 static void do_extent_processing (struct rrdengine_worker_config *wc, struct extent_io_descriptor *xt_io_descr, bool read_failed)
 {
     struct rrdengine_instance *ctx = wc->ctx;
-    struct rrdeng_page_descr *descr;
+    struct rrdeng_page_descr *descr = NULL;
     struct page_cache_descr *pg_cache_descr;
     struct page_cache *pg_cache = &ctx->pg_cache;
     int ret;
@@ -302,19 +320,11 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     trailer = xt_io_descr->buf + xt_io_descr->bytes - sizeof(*trailer);
 
     if (unlikely(read_failed)) {
-        struct rrdengine_datafile *datafile = NULL;
-        if (xt_io_descr->descr_array[0]->extent)
-            datafile = xt_io_descr->descr_array[0]->extent->datafile;
-
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        if (datafile)
-            error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u-%u.", __func__, xt_io_descr->pos,
-                  xt_io_descr->bytes, datafile->tier, datafile->fileno);
-        else
-            error("%s: uv_fs_read - extent at offset %"PRIu64"(%u)", __func__, xt_io_descr->pos,
-                  xt_io_descr->bytes);
+        error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u.", __func__, xt_io_descr->pos,
+                  xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
         goto after_crc_check;
     }
     crc = crc32(0L, Z_NULL, 0);
@@ -328,13 +338,11 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     }
 #endif
     if (unlikely(ret)) {
-        struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
-
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        error("%s: Extent at offset %"PRIu64"(%u) was read from datafile %u-%u. CRC32 check: FAILED", __func__,
-              xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno);
+        error("%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. CRC32 check: FAILED", __func__,
+               xt_io_descr->pos, xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
     }
 
 after_crc_check:
