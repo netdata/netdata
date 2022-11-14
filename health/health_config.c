@@ -7,6 +7,7 @@
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"
 #define HEALTH_ON_KEY "on"
+#define HEALTH_TITLE_KEY "title"
 #define HEALTH_HOST_KEY "hosts"
 #define HEALTH_OS_KEY "os"
 #define HEALTH_FAMILIES_KEY "families"
@@ -384,6 +385,7 @@ static inline void alert_config_free(struct alert_config *cfg)
     string_freez(cfg->os);
     string_freez(cfg->host);
     string_freez(cfg->on);
+    string_freez(cfg->title);
     string_freez(cfg->families);
     string_freez(cfg->plugin);
     string_freez(cfg->module);
@@ -422,6 +424,7 @@ static int health_readfile(const char *filename, void *data) {
             hash_template = 0,
             hash_os = 0,
             hash_on = 0,
+            hash_title = 0,
             hash_host = 0,
             hash_families = 0,
             hash_plugin = 0,
@@ -452,6 +455,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
         hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
         hash_on = simple_uhash(HEALTH_ON_KEY);
+        hash_title = simple_uhash(HEALTH_TITLE_KEY);
         hash_os = simple_uhash(HEALTH_OS_KEY);
         hash_host = simple_uhash(HEALTH_HOST_KEY);
         hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
@@ -676,6 +680,21 @@ static int health_readfile(const char *filename, void *data) {
                     string_freez(rc->chart);
                 }
                 rc->chart = string_strdupz(value);
+            }
+            else if(hash == hash_title && !strcasecmp(key, HEALTH_TITLE_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->title = string_strdupz(value);
+                if(rc->title) {
+                    if(strcmp(rrdcalc_title(rc), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rrdcalc_name(rc), key, rrdcalc_title(rc), value, value);
+
+                    string_freez(rc->title);
+                    string_freez(rc->original_title);
+                }
+                rc->title = string_strdupz(value);
+                rc->original_title = string_strdupz(value);
             }
             else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
                 strip_quotes(value);
@@ -904,6 +923,19 @@ static int health_readfile(const char *filename, void *data) {
                     string_freez(rt->context);
                 }
                 rt->context = string_strdupz(value);
+            }
+            else if(hash == hash_title && !strcasecmp(key, HEALTH_TITLE_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->title = string_strdupz(value);
+                if(rt->title) {
+                    if(strcmp(rrdcalctemplate_title(rt), value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_title(rt), value, value);
+
+                    string_freez(rt->title);
+                }
+                rt->title = string_strdupz(value);
             }
             else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
                 strip_quotes(value);

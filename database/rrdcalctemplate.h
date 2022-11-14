@@ -16,6 +16,8 @@ struct rrdcalctemplate {
     STRING *exec;
     STRING *recipient;
 
+    STRING *title;
+
     STRING *classification;
     STRING *component;
     STRING *type;
@@ -93,6 +95,7 @@ struct rrdcalctemplate {
 
 #define rrdcalctemplate_name(rt) string2str((rt)->name)
 #define rrdcalctemplate_exec(rt) string2str((rt)->exec)
+#define rrdcalctemplate_title(rt) string2str((rt)->title)
 #define rrdcalctemplate_recipient(rt) string2str((rt)->recipient)
 #define rrdcalctemplate_classification(rt) string2str((rt)->classification)
 #define rrdcalctemplate_component(rt) string2str((rt)->component)

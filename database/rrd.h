@@ -817,6 +817,7 @@ struct alarm_entry {
     time_t non_clear_duration;
 
     STRING *name;
+    STRING *title;
     STRING *chart;
     STRING *chart_context;
     STRING *family;
@@ -860,6 +861,7 @@ struct alarm_entry {
 };
 
 #define ae_name(ae) string2str((ae)->name)
+#define ae_title(ae) string2str((ae)->title)    
 #define ae_chart_name(ae) string2str((ae)->chart)
 #define ae_chart_context(ae) string2str((ae)->chart_context)
 #define ae_family(ae) string2str((ae)->family)

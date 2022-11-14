@@ -63,9 +63,9 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
 }
 
 // ----------------------------------------------------------------------------
-// RRDCALC replacing info text variables with RRDSET labels
+// RRDCALC replacing info/title text variables
 
-static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RRDCALC *rc) {
+static STRING *rrdcalc_replace_variables(const char *line, RRDCALC *rc) {
     if (!line || !*line)
         return NULL;
 
@@ -117,15 +117,23 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
     return ret;
 }
 
-void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
-    if(!rc->rrdset || !rc->original_info || !rc->rrdset->rrdlabels) return;
+void rrdcalc_update_info_and_title_variables(RRDCALC *rc) {
+    if(!rc->rrdset || !rc->rrdset->rrdlabels) return;
 
     size_t labels_version = dictionary_version(rc->rrdset->rrdlabels);
     if(rc->labels_version != labels_version) {
 
-        STRING *old = rc->info;
-        rc->info = rrdcalc_replace_variables_with_rrdset_labels(rrdcalc_original_info(rc), rc);
-        string_freez(old);
+        if (rc->original_info) {
+            STRING *old = rc->info;
+            rc->info = rrdcalc_replace_variables(rrdcalc_original_info(rc), rc);
+            string_freez(old);
+        }
+
+        if (rc->original_title) {
+            STRING *old = rc->title;
+            rc->title = rrdcalc_replace_variables(rrdcalc_original_title(rc), rc);
+            string_freez(old);
+        }
 
         rc->labels_version = labels_version;
     }
@@ -245,7 +253,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     if(!rc->units)
         rc->units = string_dup(st->units);
 
-    rrdcalc_update_info_using_rrdset_labels(rc);
+    rrdcalc_update_info_and_title_variables(rc);
 
     time_t now = now_realtime_sec();
 
@@ -255,6 +263,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         rc->next_event_id++,
         rc->config_hash_id,
         now,
+        rc->title,
         rc->name,
         rc->rrdset->id,
         rc->rrdset->context,
@@ -299,6 +308,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
             rc->config_hash_id,
             now,
             rc->name,
+            rc->title,
             rc->rrdset->id,
             rc->rrdset->context,
             rc->rrdset->family,

@@ -47,6 +47,9 @@ struct rrdcalc {
     STRING *name;                   // the name of this alarm
     STRING *chart;                  // the chart id this should be linked to
 
+    STRING *title;                  // a short descriptive alert title
+    STRING *original_title;         // the original title field before any variable replacement
+
     STRING *exec;                   // the command to execute when this alarm switches state
     STRING *recipient;              // the recipient of the alarm (the first parameter to exec)
 
@@ -157,6 +160,8 @@ struct rrdcalc {
 #define rrdcalc_exec(rc) string2str((rc)->exec)
 #define rrdcalc_recipient(rc) string2str((rc)->recipient)
 #define rrdcalc_classification(rc) string2str((rc)->classification)
+#define rrdcalc_title(rc) string2str((rc)->title)
+#define rrdcalc_original_title(rc) string2str((rc)->original_title)
 #define rrdcalc_component(rc) string2str((rc)->component)
 #define rrdcalc_type(rc) string2str((rc)->type)
 #define rrdcalc_plugin_match(rc) string2str((rc)->plugin_match)
@@ -184,6 +189,7 @@ struct alert_config {
     STRING *os;
     STRING *host;
     STRING *on;
+    STRING *title;
     STRING *families;
     STRING *plugin;
     STRING *module;
@@ -218,7 +224,7 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
+void rrdcalc_update_info_and_title_variables(RRDCALC *rc);
 
 void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
 

@@ -449,6 +449,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     const uuid_t config_hash_id,
     time_t when,
     STRING *name,
+    STRING *title,
     STRING *chart,
     STRING *chart_context,
     STRING *family,
@@ -472,6 +473,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
     ae->name = string_dup(name);
+    ae->title = string_dup(title);
     ae->chart = string_dup(chart);
     ae->chart_context = string_dup(chart_context);
 

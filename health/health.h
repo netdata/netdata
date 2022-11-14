@@ -59,6 +59,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     const uuid_t config_hash_id,
     time_t when,
     STRING *name,
+    STRING *title,
     STRING *chart,
     STRING *chart_context,
     STRING *family,

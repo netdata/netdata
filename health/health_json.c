@@ -28,6 +28,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"alarm_event_id\": %u,\n"
                     "\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\"name\": \"%s\",\n"
+                    "\t\t\"title\": \"%s\",\n"
                     "\t\t\"chart\": \"%s\",\n"
                     "\t\t\"context\": \"%s\",\n"
                     "\t\t\"family\": \"%s\",\n"
@@ -65,6 +66,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->alarm_event_id
                    , config_hash_id
                    , ae_name(ae)
+                   , ae_title(ae)
                    , ae_chart_name(ae)
                    , ae_chart_context(ae)
                    , ae_family(ae)
@@ -178,6 +180,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"id\": %lu,\n"
                     "\t\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\t\"name\": \"%s\",\n"
+                    "\t\t\t\"title\": \"%s\",\n"
                     "\t\t\t\"chart\": \"%s\",\n"
                     "\t\t\t\"family\": \"%s\",\n"
                     "\t\t\t\"class\": \"%s\",\n"
@@ -211,6 +214,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , (unsigned long)rc->id
                    , hash_id
                    , rrdcalc_name(rc)
+                   , (rc->title)?rrdcalc_title(rc):""
                    , rrdcalc_chart_name(rc)
                    , (rc->rrdset)?rrdset_family(rc->rrdset):""
                    , rc->classification?rrdcalc_classification(rc):"Unknown"
