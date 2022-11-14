@@ -447,6 +447,15 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     struct pg_cache_page_index *page_index = handle->page_index;
     struct rrdeng_page_descr *descr = handle->descr;
 
+    if(point_in_time_ut < handle->last_collected_point_in_time_ut) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, latest was %llu",
+                    point_in_time_ut, handle->last_collected_point_in_time_ut);
+        return;
+    }
+
+    handle->last_collected_point_in_time_ut = point_in_time_ut;
+
     if(likely(descr)) {
         usec_t last_point_in_time_ut = descr->end_time_ut;
         usec_t update_every_ut = page_index->latest_update_every_s * USEC_PER_SEC;
