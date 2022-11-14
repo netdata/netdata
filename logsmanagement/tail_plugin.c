@@ -335,7 +335,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
         statbuf = uv_fs_get_statbuf(&stat_req);
 
     } else if(unlikely(p_file_info->inode != statbuf->st_ino)) {
-        char *new_filename = malloc(strlen(p_file_info->filename)+ 3);
+        char *new_filename = mallocz(strlen(p_file_info->filename)+ 3);
         new_filename[0] = '\0';
         strcat(new_filename, p_file_info->filename);
         strcat(new_filename, ".1");
