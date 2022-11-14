@@ -103,6 +103,8 @@ struct rrdeng_work {
     uv_work_t req;
     struct rrdengine_worker_config *wc;
     void *data;
+    uint32_t count;
+    bool rerun;
     struct completion *completion;
 };
 
@@ -181,7 +183,7 @@ struct rrdengine_worker_config {
     /* set to 0 when now_invalidating_dirty_pages is still running */
     unsigned long cleanup_thread_invalidating_dirty_pages;
     unsigned inflight_dirty_pages;
-    unsigned flushing_under_pressure;
+    bool run_indexing;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -289,7 +291,7 @@ void dbengine_page_free(void *page);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
-bool rrdeng_test_quota(struct rrdengine_worker_config *wc);
+void rrdeng_test_quota(struct rrdengine_worker_config *wc);
 void rrdeng_worker(void *arg);
 void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);

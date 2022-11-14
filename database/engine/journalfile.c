@@ -10,6 +10,8 @@ void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
     work_request = mallocz(sizeof(*work_request));
     work_request->req.data = work_request;
     work_request->wc = wc;
+    work_request->count = 0;
+    work_request->rerun = false;
     wc->running_journal_migration = 1;
     if (unlikely(uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
         freez(work_request);
@@ -1095,8 +1097,22 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                 while (!pg_cache_try_get_unsafe(descr, 1)) {
                     pg_cache_wait_event_unsafe(descr);
                 }
-                descr->extent_entry = &extent_list[page_entry->extent_index];
+
+                bool can_punch_hole = !(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED);
+                if (false == can_punch_hole) {
+                    descr->extent_entry = &extent_list[page_entry->extent_index];
+                    descr->extent = NULL;
+                    descr->file = journalfile->datafile->file;
+                    ++pg_cache->active_descriptors;
+                    pg_cache_put_unsafe(descr);
+                    rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+                }
                 rrdeng_page_descr_mutex_unlock(ctx, descr);
+                if (can_punch_hole) {
+                    uv_rwlock_rdunlock(&page_index->lock);
+                    pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+                    uv_rwlock_rdlock(&page_index->lock);
+                }
             }
         }
 
@@ -1127,6 +1143,24 @@ bool descriptor_is_corrupted(struct rrdengine_instance *ctx, struct rrdeng_page_
 #endif
 
     return is_corrupted;
+}
+
+static bool journalfile_ready_to_index(struct rrdengine_datafile *datafile)
+{
+    struct extent_info *extent = datafile->extents.first;
+    while (extent) {
+        uint8_t extent_pages = extent->number_of_pages;
+        for (uint8_t index = 0; index < extent_pages; index++) {
+            struct rrdeng_page_descr *descr = extent->pages[index];
+            if (unlikely(!descr))
+                continue;
+            if (unlikely(!descr->extent))
+                return false;
+
+        }
+        extent = extent->next;
+    }
+    return true;
 }
 
 // Migrate the journalfile pointed by datafile
@@ -1211,9 +1245,11 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
             metric_info->max_index_time_s= MAX(metric_info->max_index_time_s, current_index_time_s);
             metric_info->max_time_ut = MAX(metric_info->max_time_ut , descr->end_time_ut);
 
-            PValue = JudyLIns(&metric_info->JudyL_array, current_index_time_s, PJE0);
-            fatal_assert(NULL != PValue && NULL == *PValue);
-            *PValue = descr;
+            if (false == startup) {
+                PValue = JudyLIns(&metric_info->JudyL_array, current_index_time_s, PJE0);
+                fatal_assert(NULL != PValue && NULL == *PValue);
+                *PValue = descr;
+            }
 
             metric_info->entries++;
             number_of_pages++;
@@ -1414,7 +1450,8 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
             for (Index = 0; Index < number_of_metrics; Index++) {
                 journal_v2_remove_active_descriptors(journalfile, uuid_list[Index].metric_info, startup);
 
-                JudyLFreeArray(&uuid_list[Index].metric_info->JudyL_array, PJE0);
+                if (false == startup)
+                    JudyLFreeArray(&uuid_list[Index].metric_info->JudyL_array, PJE0);
 
                 freez(uuid_list[Index].metric_info);
             }
@@ -1524,9 +1561,11 @@ void after_journal_indexing(uv_work_t *req, int status)
 
     if (likely(status != UV_ECANCELED)) {
         errno = 0;
-        internal_error(true, "Journal indexing done");
+        if (likely(work_request->count))
+            internal_error(true, "Journal indexing done; %u files processed", work_request->count);
     }
     wc->running_journal_migration = 0;
+    wc->run_indexing= work_request->rerun;
     freez(work_request);
 }
 
@@ -1548,10 +1587,21 @@ void start_journal_indexing(uv_work_t *req)
 
     while (datafile && datafile->fileno != ctx->last_fileno) {
         if (unlikely(!datafile->journalfile->journal_data)) {
-            info("Journal file %u is ready to be indexed", datafile->fileno);
-            migrate_journal_file_v2(datafile, true, false);
+            bool ready_to_index = journalfile_ready_to_index(datafile);
+            if (ready_to_index) {
+                info("Journal file %u is ready to be indexed", datafile->fileno);
+                migrate_journal_file_v2(datafile, true, false);
+               ++work_request->count;
+            }
+            else {
+                info("Journal file %u is not ready to be indexed", datafile->fileno);
+                work_request->rerun = true;
+                sleep_usec(100 * USEC_PER_MS);
+            }
         }
         datafile = datafile->next;
+        if (unlikely(NO_QUIESCE != ctx->quiesce))
+            break;
     }
 }
 
