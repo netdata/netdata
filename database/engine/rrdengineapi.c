@@ -31,6 +31,8 @@ int db_engine_use_malloc = 0;
 int default_rrdeng_page_fetch_timeout = 3;
 int default_rrdeng_page_fetch_retries = 3;
 int default_rrdeng_page_cache_mb = 32;
+int db_engine_journal_indexing = 1;
+int db_engine_journal_check = 0;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
@@ -415,7 +417,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
             }
         }
 
-        (void )pg_cache_insert(ctx, page_index, descr, true, true);
+        (void )pg_cache_insert(ctx, page_index, descr, true);
     } else {
         pg_cache_add_new_metric_time(page_index, descr);
     }

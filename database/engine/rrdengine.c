@@ -1289,12 +1289,12 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
         if (likely(!ret)) {
             ++ctx->last_fileno;
-            if (likely(journalfile))
+            if (likely(journalfile && db_engine_journal_indexing))
                 wc->run_indexing = true;
         }
     }
 
-    if (!wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration && !out_of_space &&
+    if (db_engine_journal_indexing && !wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration && !out_of_space &&
         NO_QUIESCE == ctx->quiesce && next_descriptor_cleanup < now_realtime_sec()) {
         next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INTERVAL_CLEANUP;
 
