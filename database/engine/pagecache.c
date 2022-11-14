@@ -1254,7 +1254,6 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
             }
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
-
     }
     uv_rwlock_rdunlock(&page_index->lock);
 
@@ -1280,7 +1279,8 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
             if (NULL == next) {
                 continue;
             }
-            if (!descr->extent_entry && (descr->extent && descr->extent == next->extent)) {
+            if ((descr->extent && descr->extent == next->extent) ||
+                ((descr->extent_entry && descr->extent_entry == next->extent_entry))) {
                 /* same extent, consolidate */
                 if (!pg_cache_try_reserve_pages(ctx, 1)) {
                     failed_to_reserve = 1;

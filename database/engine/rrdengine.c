@@ -789,7 +789,7 @@ static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct 
 #define DESCRIPTOR_EXPIRATION_TIME (600)
 #endif
 
-void check_journal_file(struct rrdengine_journalfile *journalfile)
+static void check_journal_file(struct rrdengine_journalfile *journalfile, size_t count)
 {
     struct rrdengine_instance *ctx = journalfile->datafile->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
@@ -805,6 +805,7 @@ void check_journal_file(struct rrdengine_journalfile *journalfile)
 
     bool expired = ((now_realtime_sec() - journalfile->last_access) > DESCRIPTOR_EXPIRATION_TIME);
 
+    unsigned count_evicted = 0;
     for (page_address = 0,
         PValue = JudyLFirst(journalfile->JudyL_array, &page_address, PJE0),
         Index = unlikely(NULL == PValue) ? 0 : *(uint32_t *) PValue;
@@ -840,9 +841,12 @@ void check_journal_file(struct rrdengine_journalfile *journalfile)
             uv_rwlock_wrlock(&pg_cache->v2_lock);
             (void) JudyLDel(&journalfile->JudyL_array, page_address, PJE0);
             uv_rwlock_wrunlock(&pg_cache->v2_lock);
+            ++count_evicted;
         }
 
         uv_rwlock_rdlock(&pg_cache->v2_lock);
+        if (count_evicted > count / 10)
+            break;
     }
 
     uv_rwlock_rdunlock(&pg_cache->v2_lock);
@@ -866,21 +870,10 @@ void delete_descriptors(void *arg)
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdengine_worker_config *wc = &ctx->worker_config;
 
-    if (unlikely(wc->flushing_under_pressure)) {
-        wc->cleanup_deleting_descriptors = 1;
-        fatal_assert(0 == uv_async_send(&wc->async));
-    }
-
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     struct rrdengine_journalfile *journalfile;
     while (datafile) {
-
-        if (unlikely(wc->flushing_under_pressure)) {
-            info("DEBUG: Aborting deleting descriptors; page cache under pressure");
-            break;
-        }
-
         journalfile = datafile->journalfile;
         if (!journalfile->journal_data) {
             datafile = datafile->next;
@@ -892,7 +885,7 @@ void delete_descriptors(void *arg)
         uv_rwlock_rdunlock(&pg_cache->v2_lock);
 
         if (unlikely(count))
-            check_journal_file(journalfile);
+            check_journal_file(journalfile, count);
 
         datafile = datafile->next;
     }
@@ -980,7 +973,6 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     uLong crc;
 
     if (force) {
-        wc->flushing_under_pressure = 1;
         debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
     }
     uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
@@ -1148,12 +1140,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
-
-    if (force)
-        wc->flushing_under_pressure = 0;
-//    else {
-//        bool should_schedule_indexing = rrdeng_test_quota(wc);
-//    }
+    rrdeng_test_quota(wc);
 
     return ALIGN_BYTES_CEILING(size_bytes);
 }
@@ -1262,7 +1249,7 @@ static void delete_old_data(void *arg)
 #define DESCRIPTOR_INTERVAL_CLEANUP    (1)
 #endif
 
-bool rrdeng_test_quota(struct rrdengine_worker_config* wc)
+void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
     static time_t next_descriptor_cleanup = 0;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1274,8 +1261,6 @@ bool rrdeng_test_quota(struct rrdengine_worker_config* wc)
     if (0 == next_descriptor_cleanup) {
         next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INITIAL_CLEANUP;
     }
-
-    bool should_do_indexing = false;
 
     out_of_space = 0;
     /* Do not allow the pinned pages to exceed the disk space quota to avoid deadlocks */
@@ -1297,7 +1282,7 @@ bool rrdeng_test_quota(struct rrdengine_worker_config* wc)
         if (likely(!ret)) {
             ++ctx->last_fileno;
             if (likely(journalfile))
-                should_do_indexing = true;
+                wc->run_indexing = true;
         }
     }
 
@@ -1319,13 +1304,13 @@ bool rrdeng_test_quota(struct rrdengine_worker_config* wc)
         /* delete old data */
         if (wc->now_deleting_files) {
             /* already deleting data */
-            return false;
+            return;
         }
         if (NULL == ctx->datafiles.first->next) {
             error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
                  " to reclaim space, there are no other file pairs left.",
                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-            return false;
+            return;
         }
         info("Deleting data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
@@ -1339,8 +1324,6 @@ bool rrdeng_test_quota(struct rrdengine_worker_config* wc)
             wc->now_deleting_files = NULL;
         }
     }
-
-    return should_do_indexing;
 }
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
@@ -1525,8 +1508,6 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
-    static bool do_indexing = false;
-    static time_t do_indexing_after = 0;
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
     struct rrdengine_worker_config* wc = handle->data;
@@ -1534,12 +1515,8 @@ void timer_cb(uv_timer_t* handle)
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    bool should_schedule_indexing = rrdeng_test_quota(wc);
+    rrdeng_test_quota(wc);
 
-    if (should_schedule_indexing && false == do_indexing) {
-        do_indexing = true;
-        do_indexing_after = now_realtime_sec() + 10;
-    }
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages && !wc->now_deleting_descriptors && !wc->running_journal_migration)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
@@ -1574,8 +1551,8 @@ void timer_cb(uv_timer_t* handle)
         }
     }
 
-    if (do_indexing && do_indexing_after < now_realtime_sec()) {
-        do_indexing = false;
+    if (true == wc->run_indexing) {
+        wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
     }
 
@@ -1641,7 +1618,7 @@ void rrdeng_worker(void* arg)
     wc->now_invalidating_dirty_pages = NULL;
     wc->cleanup_thread_invalidating_dirty_pages = 0;
     wc->inflight_dirty_pages = 0;
-    wc->flushing_under_pressure = 0;
+    wc->run_indexing = false;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);

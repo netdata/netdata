@@ -3,7 +3,6 @@
 
 void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
 {
-    struct rrdeng_page_descr *descr;
     struct extent_info *extent = datafile->extents.first, *next_extent;
 
     char path[RRDENG_PATH_MAX];
