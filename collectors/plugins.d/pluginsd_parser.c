@@ -293,9 +293,19 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 //            rrdhost_hostname(host), rrdset_id(st),
 //            (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
 
-    rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+    bool ok = true;
+    if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
 
-    bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child, 0, 0);
+        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+
+        ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child,
+                                          last_entry_child, 0, 0);
+    }
+    else {
+        internal_error(true, "RRDSET: not sending duplicate replication request for chart '%s'", rrdset_id(st));
+    }
+
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
 
@@ -1140,6 +1150,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
             rrdset_set_update_every(st, update_every_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
         rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
         return PARSER_RC_OK;
     }

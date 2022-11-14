@@ -1114,45 +1114,69 @@ static size_t sender_buffer_used_percent(struct sender_state *s) {
     return (s->host->sender->buffer->max_size - available) * 100 / s->host->sender->buffer->max_size;
 }
 
+int replication_request_compar(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
+    struct replication_request *rr1 = dictionary_acquired_item_value(*item1);
+    struct replication_request *rr2 = dictionary_acquired_item_value(*item2);
+
+    time_t after1 = rr1->after;
+    time_t after2 = rr2->after;
+
+    if(after1 < after2)
+        return -1;
+    if(after1 > after2)
+        return 1;
+
+    return 0;
+}
+
+int process_one_replication_request(const DICTIONARY_ITEM *item, void *value, void *data) {
+    struct sender_state *s = data;
+
+    size_t used_percent = sender_buffer_used_percent(s);
+    if(used_percent >= 50) return -1; // signal the traversal to stop
+
+    struct replication_request *rr = value;
+    const char *name = dictionary_acquired_item_name(item);
+
+    // delete it from the dictionary
+    // the current item is referenced - it will not go away until the next iteration of the dfe loop
+    dictionary_del(s->replication_requests, name);
+
+    // find the chart
+    RRDSET *st = rrdset_find(s->host, name);
+    if(unlikely(!st)) {
+        internal_error(true,
+                       "STREAM %s [send to %s]: cannot find chart '%s' to satisfy pending replication command."
+                       , rrdhost_hostname(s->host), s->connected_to, name);
+        return 0;
+    }
+
+    netdata_thread_disable_cancelability();
+
+    // send the replication data
+    bool start_streaming = replicate_chart_response(st->rrdhost, st,
+                                                    rr->start_streaming, rr->after, rr->before);
+
+    netdata_thread_enable_cancelability();
+
+    // enable normal streaming if we have to
+    if (start_streaming) {
+        debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
+              rrdhost_hostname(s->host), rrdset_id(st));
+
+        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+    }
+
+    return 1;
+}
+
 static void process_replication_requests(struct sender_state *s) {
     if(dictionary_entries(s->replication_requests) == 0)
         return;
 
-    struct replication_request *rr;
-    dfe_start_write(s->replication_requests, rr) {
-        size_t used_percent = sender_buffer_used_percent(s);
-        if(used_percent > 50) break;
-
-        // delete it from the dictionary
-        // the current item is referenced - it will not go away until the next iteration of the dfe loop
-        dictionary_del(s->replication_requests, rr_dfe.name);
-
-        // find the chart
-        RRDSET *st = rrdset_find(s->host, rr_dfe.name);
-        if(unlikely(!st)) {
-            internal_error(true,
-                           "STREAM %s [send to %s]: cannot find chart '%s' to satisfy pending replication command."
-                           , rrdhost_hostname(s->host), s->connected_to, rr_dfe.name);
-            continue;
-        }
-
-        netdata_thread_disable_cancelability();
-
-        // send the replication data
-        bool start_streaming = replicate_chart_response(st->rrdhost, st,
-                rr->start_streaming, rr->after, rr->before);
-
-        netdata_thread_enable_cancelability();
-
-        // enable normal streaming if we have to
-        if (start_streaming) {
-            debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
-                  rrdhost_hostname(s->host), rrdset_id(st));
-
-            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-        }
-    }
-    dfe_done(rr);
+    dictionary_sorted_walkthrough_rw(s->replication_requests, DICTIONARY_LOCK_WRITE,
+                                     process_one_replication_request, s,
+                                     replication_request_compar);
 }
 
 void *rrdpush_sender_thread(void *ptr) {

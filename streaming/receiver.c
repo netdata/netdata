@@ -724,8 +724,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_set_is_parent_label(++localhost->senders_count);
 
-    rrdcontext_host_child_connected(rpt->host);
+    if(stream_has_capability(rpt->host->receiver, STREAM_CAP_REPLICATION)) {
+        RRDSET *st;
+        rrdset_foreach_read(st, rpt->host) {
+            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        }
+        rrdset_foreach_done(st);
+    }
 
+    rrdcontext_host_child_connected(rpt->host);
 
     rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
@@ -745,6 +752,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).",
           rpt->hostname, rpt->client_ip, rpt->client_port, count);
+
+    if(stream_has_capability(rpt->host->receiver, STREAM_CAP_REPLICATION)) {
+        RRDSET *st;
+        rrdset_foreach_read(st, rpt->host) {
+            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        }
+        rrdset_foreach_done(st);
+    }
 
     rrdcontext_host_child_disconnected(rpt->host);
 
