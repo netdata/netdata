@@ -1,0 +1,12 @@
+diff --git a/lib/chunkio/src/CMakeLists.txt b/lib/chunkio/src/CMakeLists.txt
+index a4fc2d37..4244eb85 100644
+--- a/lib/chunkio/src/CMakeLists.txt
++++ b/lib/chunkio/src/CMakeLists.txt
+@@ -13,6 +13,7 @@ set(src
+   )
+ 
+ set(libs cio-crc32)
++set(libs ${libs} fts)
+ 
+ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+   set(src
