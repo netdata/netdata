@@ -473,7 +473,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         if (likely(!descr_found))
-            (void)pg_cache_insert(ctx, page_index, descr, true, false);
+            (void)pg_cache_insert(ctx, page_index, descr, true);
 
         if (page_index->latest_time_ut == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
@@ -708,6 +708,63 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
     rc = check_journal_v2_metric_list(data_start, file_size);
     if (rc) return 1;
 
+    if (!db_engine_journal_check)
+        return 0;
+
+    // Verify complete UUID chain
+
+    struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
+
+    unsigned verified = 0;
+    unsigned entries;
+    unsigned total_pages = 0;
+
+    info("Checking %u metrics that exist in the journal", j2_header->metric_count);
+    for (entries = 0; entries < j2_header->metric_count; entries++) {
+
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(metric->uuid, uuid_str);
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        struct journal_page_header local_metric_list_header = *metric_list_header;
+
+        local_metric_list_header.crc = JOURVAL_V2_MAGIC;
+
+        crc = crc32(0L, Z_NULL, 0);
+        crc = crc32(crc, (void *) &local_metric_list_header, sizeof(local_metric_list_header));
+        rc = crc32cmp(metric_list_header->checksum, crc);
+
+        internal_error(rc, "Index %lu : %s entries %d at offset %u (%llu -- %llu) verified, HEADER CRC computed %u, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
+                j2_header->start_time_ut + (usec_t) metric->delta_start * USEC_PER_SEC, j2_header->start_time_ut + (usec_t) metric->delta_end * USEC_PER_SEC,
+                         crc, metric_list_header->crc);
+        if (!rc) {
+            struct journal_v2_block_trailer *journal_trailer =
+                (void *) data_start + metric->page_offset + sizeof(struct journal_page_header) + (metric_list_header->entries * sizeof(struct journal_page_list));
+
+            crc = crc32(0L, Z_NULL, 0);
+            crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));
+            rc = crc32cmp(journal_trailer->checksum, crc);
+            internal_error(rc, "Index %lu : %s entries %d at offset %u (%llu -- %llu) verified, HEADER CRC computed %u, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
+                           j2_header->start_time_ut + (usec_t) metric->delta_start * USEC_PER_SEC, j2_header->start_time_ut + (usec_t) metric->delta_end * USEC_PER_SEC,
+                           crc, metric_list_header->crc);
+            if (!rc) {
+                total_pages += metric_list_header->entries;
+                verified++;
+            }
+        }
+
+        metric++;
+        if (((uint8_t *) metric - (uint8_t *) data_start) > (uint32_t) file_size) {
+            info("Verification failed EOF reached -- total entries %u, verified %u", entries, verified);
+            return 1;
+        }
+    }
+
+    if (entries != verified) {
+        info("Verification failed -- total entries %u, verified %u", entries, verified);
+        return 1;
+    }
+    info("Verification succeeded -- total entries %u, verified %u (%u total pages)", entries, verified, total_pages);
+
     return 0;
 }
 
@@ -761,6 +818,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     }
     close(fd);
 
+    info("Checking integrity of %s", path);
     int rc = check_journal_v2_file(data_start, file_size, original_file_size);
     if (rc) {
         if (rc == 2)
@@ -910,31 +968,11 @@ void *journal_v2_write_data_page_header(struct journal_v2_header *j2_header __ma
     uuid_copy(data_page_header->uuid, *metric_info->id);
     data_page_header->entries = metric_info->entries;
     data_page_header->uuid_offset = uuid_offset;        // data header OFFSET poings to METRIC in the directory
+    data_page_header->crc = JOURVAL_V2_MAGIC;
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (void *) data_page_header, sizeof(*data_page_header));
     crc32set(data_page_header->checksum, crc);
     return ++data_page_header;
-}
-
-int page_header_is_corrupted(struct journal_v2_header *j2_header, void *page_header)
-{
-    struct journal_page_header *data_page_header = page_header;
-
-    uint32_t bytes = data_page_header->entries * sizeof(struct journal_page_list) + sizeof(struct journal_page_header);
-    // Check if trailer overshoots the file
-
-    struct journal_v2_header j2_header_local = { .data = j2_header};
-
-    if (verify_journal_space(&j2_header_local, page_header, bytes))
-        return 1;
-
-    struct journal_v2_block_trailer *journal_trailer = ( struct journal_v2_block_trailer *) ((uint8_t *) page_header + bytes);
-
-    uLong crc;
-    crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, (uint8_t *) page_header + sizeof(struct journal_page_header), data_page_header->entries * sizeof(struct journal_page_list));
-
-    return crc32cmp(journal_trailer->checksum, crc);
 }
 
 void *journal_v2_write_data_page_trailer(struct journal_v2_header *j2_header __maybe_unused, void *data, void *page_header)
@@ -1491,7 +1529,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     int should_try_migration = 0;
 
     // Do not try to load the latest file (always rebuild and live migrate)
-    if (datafile->fileno != ctx->last_fileno) {
+    if (datafile->fileno != ctx->last_fileno && db_engine_journal_indexing) {
         if (!(should_try_migration = load_journal_file_v2(ctx, journalfile, datafile))) {
             return 0;
         }
@@ -1535,7 +1573,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
         netdata_munmap(journalfile->data, file_size);
 
     // Don't Index the last file
-    if (ctx->last_fileno == journalfile->datafile->fileno)
+    if (ctx->last_fileno == journalfile->datafile->fileno || !db_engine_journal_indexing)
         return 0;
 
     if (should_try_migration == 1)

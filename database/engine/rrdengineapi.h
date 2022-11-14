@@ -16,6 +16,8 @@ extern int db_engine_use_malloc;
 extern int default_rrdeng_page_fetch_timeout;
 extern int default_rrdeng_page_fetch_retries;
 extern int default_rrdeng_page_cache_mb;
+extern int db_engine_journal_indexing;
+extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
 extern uint8_t rrdeng_drop_metrics_under_page_cache_pressure;

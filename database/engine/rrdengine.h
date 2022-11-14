@@ -295,7 +295,6 @@ void rrdeng_test_quota(struct rrdengine_worker_config *wc);
 void rrdeng_worker(void *arg);
 void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
-int page_header_is_corrupted(struct journal_v2_header *j2_header, void *page_header);
 void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
 struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
