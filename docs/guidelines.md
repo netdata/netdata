@@ -2,8 +2,6 @@ Welcome to our docs developer guidelines!
 
 We store documentation related to Netdata inside of the [`netdata/netdata` repository](https://github.com/netdata/netdata) on GitHub.
 
-If you want to contribute to our Blog, check the [README](https://github.com/netdata/blog/blob/master/README.md) in our blog repo!
-
 The Netdata team aggregates and publishes all documentation at [learn.netdata.cloud](/) using
 [Docusaurus](https://v2.docusaurus.io/) over at the [`netdata/learn` repository](https://github.com/netdata/learn).
 
@@ -46,6 +44,8 @@ Under the **Commit changes**  header, write descriptive title for your requested
 button to initiate your pull request (PR).
 
 Jump down to our instructions on [PRs](#making-a-pull-request) for your next steps.
+
+**Note**: If you wish to contribute documentation that is more tailored from your specific infrastructure monitoring/troubleshooting experience, please consider submitting a blog post about your experience. Check the [README](https://github.com/netdata/blog/blob/master/README.md) in our blog repo! Any blog submissions that have widespread or universal application will be integrated into our permanent documentation.
 
 ### Edit locally
 
