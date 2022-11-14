@@ -297,7 +297,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
     rrdhost_aclk_state_unlock(localhost);
 
-    freez(node_state_update.capabilities);
+    freez((void *)node_state_update.capabilities);
 
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;

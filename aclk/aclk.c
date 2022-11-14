@@ -829,7 +829,7 @@ void aclk_send_node_instances()
                  list->live,
                  list->hops);
 
-            freez(node_state_update.capabilities);
+            freez((void*)node_state_update.capabilities);
             freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;

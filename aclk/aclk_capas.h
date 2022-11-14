@@ -8,7 +8,7 @@
 
 #include "schema-wrappers/capability.h"
 
-struct capability *aclk_get_agent_capas();
+const struct capability *aclk_get_agent_capas();
 struct capability *aclk_get_node_instance_capas(RRDHOST *host);
 
 #endif /* ACLK_CAPAS_H */

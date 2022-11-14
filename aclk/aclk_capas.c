@@ -4,7 +4,7 @@
 
 #include "ml/ml.h"
 
-struct capability *aclk_get_agent_capas()
+const struct capability *aclk_get_agent_capas()
 {
     static struct capability agent_capabilities[] = {
         { .name = "json",  .version = 2, .enabled = 0 },
