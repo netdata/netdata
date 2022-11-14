@@ -336,12 +336,12 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     time_t first_entry_wanted;
     if (prev_first_entry_wanted && prev_last_entry_wanted) {
-        first_entry_wanted = prev_last_entry_wanted;
+        first_entry_wanted = prev_last_entry_wanted + 1;
         if ((now - first_entry_wanted) > host->rrdpush_seconds_to_replicate)
             first_entry_wanted = now - host->rrdpush_seconds_to_replicate;
     }
     else
-        first_entry_wanted = MAX(last_entry_local, first_entry_child);
+        first_entry_wanted = MAX(last_entry_local + 1, first_entry_child);
 
     time_t last_entry_wanted = first_entry_wanted + host->rrdpush_replication_step;
     last_entry_wanted = MIN(last_entry_wanted, last_entry_child);
