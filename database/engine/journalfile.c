@@ -5,7 +5,8 @@ void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
 {
     struct rrdeng_work *work_request;
 
-    fatal_assert(0 == wc->running_journal_migration);
+    if (unlikely(wc->running_journal_migration))
+        return;
 
     work_request = mallocz(sizeof(*work_request));
     work_request->req.data = work_request;

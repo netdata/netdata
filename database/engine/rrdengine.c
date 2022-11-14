@@ -794,7 +794,7 @@ static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct 
 }
 
 #ifndef DESCRIPTOR_EXPIRATION_TIME
-#define DESCRIPTOR_EXPIRATION_TIME (600)
+#define DESCRIPTOR_EXPIRATION_TIME (365 * 86400)
 #endif
 
 static void check_journal_file(struct rrdengine_journalfile *journalfile, size_t count)
