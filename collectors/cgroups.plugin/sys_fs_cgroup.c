@@ -2846,7 +2846,7 @@ void update_systemd_services_charts(
 
     // create the charts
 
-    if (do_cpu && !st_cpu) {
+    if (unlikely(do_cpu && !st_cpu)) {
         char title[CHART_TITLE_MAX + 1];
         snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (100%% = 1 core)");
 
@@ -2866,7 +2866,7 @@ void update_systemd_services_charts(
         );
     }
 
-    if (do_mem_usage && !st_mem_usage) {
+    if (unlikely(do_mem_usage && !st_mem_usage)) {
         st_mem_usage = rrdset_create_localhost(
                 "services"
                 , "mem_usage"
@@ -3023,7 +3023,7 @@ void update_systemd_services_charts(
         }
     }
 
-    if(do_mem_failcnt && !st_mem_failcnt) {
+    if(unlikely(do_mem_failcnt && !st_mem_failcnt)) {
         st_mem_failcnt = rrdset_create_localhost(
                 "services"
                 , "mem_failcnt"
