@@ -1343,7 +1343,7 @@ void rrdset_done(RRDSET *st) {
     struct timeval now;
 
     now_realtime_timeval(&now);
-    rrdset_timed_done(st, now, /* pending_rrdset_next = */ true);
+    rrdset_timed_done(st, now, /* pending_rrdset_next = */ st->counter_done != 0);
 }
 
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
