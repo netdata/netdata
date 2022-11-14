@@ -1963,7 +1963,13 @@ RRDR *rrd2rrdr_legacy(
 }
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
-    if(!qt || !owa) return NULL;
+    if(!qt)
+        return NULL;
+
+    if(!owa) {
+        query_target_release(qt);
+        return NULL;
+    }
 
     time_t timeout = qt->request.timeout;
     time_t resampling_time_requested = qt->request.resampling_time;

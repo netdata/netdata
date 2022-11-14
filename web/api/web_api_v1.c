@@ -713,6 +713,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     RRDSET *st = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
+    QUERY_TARGET *qt = NULL;
 
     if(!is_valid_sp(chart) && !is_valid_sp(context)) {
         buffer_sprintf(w->response.data, "No chart or context is given.");
@@ -751,7 +752,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .chart_label_key = chart_label_key,
             .charts_labels_filter = chart_labels_filter,
     };
-    QUERY_TARGET *qt = query_target_create(&qtr);
+    qt = query_target_create(&qtr);
 
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
@@ -822,6 +823,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
 cleanup:
+    if(qt && qt->used) {
+        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
+        query_target_release(qt);
+    }
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
