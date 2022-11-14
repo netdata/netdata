@@ -223,6 +223,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle->unaligned_page = 0;
     page_index->latest_update_every_s = update_every;
 
+    handle->last_collected_point_in_time_ut = page_index->latest_time_ut;
+
     uv_rwlock_wrlock(&page_index->lock);
     ++page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);
@@ -452,7 +454,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     struct pg_cache_page_index *page_index = handle->page_index;
     struct rrdeng_page_descr *descr = handle->descr;
 
-    if(point_in_time_ut < handle->last_collected_point_in_time_ut) {
+    if(point_in_time_ut <= handle->last_collected_point_in_time_ut) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, latest was %llu",
                     point_in_time_ut, handle->last_collected_point_in_time_ut);
