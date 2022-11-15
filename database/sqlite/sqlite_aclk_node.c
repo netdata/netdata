@@ -120,6 +120,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 
     rrd_unlock();
     freez(node_info.claim_id);
+    freez(node_info.node_instance_capabilities);
     freez(host_version);
 
     wc->node_collectors_send = now_realtime_sec();
