@@ -12,10 +12,6 @@ struct page_cache_descr *rrdeng_create_pg_cache_descr(struct rrdengine_instance 
     pg_cache_descr->prev = pg_cache_descr->next = NULL;
     pg_cache_descr->refcnt = 0;
     pg_cache_descr->waiters = 0;
-#ifdef NETDATA_INTERNAL_CHECKS
-    pg_cache_descr->wait_list = NULL;
-    pg_cache_descr->owner.function = NULL;
-#endif
     fatal_assert(0 == uv_cond_init(&pg_cache_descr->cond));
     fatal_assert(0 == uv_mutex_init(&pg_cache_descr->mutex));
 
@@ -31,11 +27,7 @@ void rrdeng_destroy_pg_cache_descr(struct rrdengine_instance *ctx, struct page_c
 }
 
 /* also allocates page cache descriptor if missing */
-#ifdef NETDATA_INTERNAL_CHECKS
-void rrdeng_page_descr_mutex_lock_with_trace(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, const char *function, size_t line)
-#else
 void rrdeng_page_descr_mutex_lock(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
-#endif
 {
     unsigned long old_state, old_users, new_state, ret_state;
     struct page_cache_descr *pg_cache_descr = NULL;
@@ -98,27 +90,15 @@ void rrdeng_page_descr_mutex_lock(struct rrdengine_instance *ctx, struct rrdeng_
     }
     pg_cache_descr = descr->pg_cache_descr;
     uv_mutex_lock(&pg_cache_descr->mutex);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    pg_cache_descr->owner.function = function;
-    pg_cache_descr->owner.line = line;
-    pg_cache_descr->owner.tid = gettid();
-#endif
 }
 
 void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
 {
     unsigned long old_state, new_state, ret_state, old_users;
-    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr, *delete_pg_cache_descr = NULL;
+    struct page_cache_descr *pg_cache_descr, *delete_pg_cache_descr = NULL;
     uint8_t we_locked;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    pg_cache_descr->owner.function = "UNLOCKED";
-    pg_cache_descr->owner.line = 0;
-    pg_cache_descr->owner.tid = 0;
-#endif
-
-    uv_mutex_unlock(&pg_cache_descr->mutex);
+    uv_mutex_unlock(&descr->pg_cache_descr->mutex);
 
     we_locked = 0;
     while (1) { /* spin */
