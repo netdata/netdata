@@ -1690,7 +1690,7 @@ static inline void ebpf_load_thread_config()
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_update_module(&ebpf_modules[i], default_btf);
+        ebpf_update_module(&ebpf_modules[i], default_btf, running_on_kernel, isrh);
     }
 }
 

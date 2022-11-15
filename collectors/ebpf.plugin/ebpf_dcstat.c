@@ -893,21 +893,16 @@ static void ebpf_create_systemd_dc_charts(int update_every)
  * Send Directory Cache charts
  *
  * Send collected data to Netdata.
- *
- * @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
- *         otherwise function returns 1 to avoid chart recreation
  */
-static int ebpf_send_systemd_dc_charts()
+static void ebpf_send_systemd_dc_charts()
 {
-    int ret = 1;
     collected_number value;
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_HIT_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_dc.ratio);
-        } else if (unlikely(ect->systemd))
-            ret = 0;
+        }
     }
     write_end_chart();
 
@@ -943,8 +938,6 @@ static int ebpf_send_systemd_dc_charts()
         }
     }
     write_end_chart();
-
-    return ret;
 }
 
 /**
@@ -999,13 +992,11 @@ void ebpf_dc_send_cgroup_data(int update_every)
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
     if (has_systemd) {
-        static int systemd_charts = 0;
-        if (!systemd_charts) {
+        if (send_cgroup_chart) {
             ebpf_create_systemd_dc_charts(update_every);
-            systemd_charts = 1;
         }
 
-        systemd_charts = ebpf_send_systemd_dc_charts();
+        ebpf_send_systemd_dc_charts();
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {

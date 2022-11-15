@@ -81,6 +81,8 @@ enum netdata_ebpf_kernel_versions {
     NETDATA_EBPF_KERNEL_4_15 = 265984,  //  265984 = 4 * 65536 + 15 * 256
     NETDATA_EBPF_KERNEL_4_17 = 266496,  //  266496 = 4 * 65536 + 17 * 256
     NETDATA_EBPF_KERNEL_5_0  = 327680,  //  327680 = 5 * 65536 +  0 * 256
+    NETDATA_EBPF_KERNEL_5_4  = 328704,  //  327680 = 5 * 65536 +  4 * 256
+    NETDATA_EBPF_KERNEL_5_5  = 328960,  //  327680 = 5 * 65536 +  5 * 256
     NETDATA_EBPF_KERNEL_5_10 = 330240,  //  330240 = 5 * 65536 + 10 * 256
     NETDATA_EBPF_KERNEL_5_11 = 330496,  //  330240 = 5 * 65536 + 11 * 256
     NETDATA_EBPF_KERNEL_5_14 = 331264,  //  331264 = 5 * 65536 + 14 * 256
@@ -279,7 +281,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
 void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 int ebpf_load_config(struct config *config, char *filename);
-void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file);
+void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int is_rh);
 void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
 void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode);
 char *ebpf_find_symbol(char *search);

@@ -29,7 +29,7 @@ static int send_to_plugin(const char *txt, void *data) {
     return ret;
 }
 
-PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
 {
     char *dimension = get_word(words, num_words, 1);
     char *value = get_word(words, num_words, 2);
@@ -56,14 +56,15 @@ PARSER_RC pluginsd_set(char **words, size_t num_words, void *user, PLUGINSD_ACTI
         debug(D_PLUGINSD, "is setting dimension '%s'/'%s' to '%s'", rrdset_id(st), dimension, value ? value : "<nothing>");
 
     if (value) {
-        RRDDIM *rd = rrddim_find(st, dimension);
+        RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
         if (unlikely(!rd)) {
-            error(
-                "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
-                dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+            error( "requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.",
+                    dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
             goto disable;
-        } else
-            rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+        }
+        rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+        rrddim_acquired_release(rda);
     }
     return PARSER_RC_OK;
 
@@ -72,7 +73,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user)
 {
     char *id = get_word(words, num_words, 1);
     char *microseconds_txt = get_word(words, num_words, 2);
@@ -111,7 +112,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
 {
     UNUSED(words);
     UNUSED(num_words);
@@ -134,7 +135,7 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user, PLUGINSD_ACTI
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user)
 {
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
@@ -258,12 +259,18 @@ PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user, PLUGINSD_AC
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *user)
 {
-    UNUSED(plugins_action);
+    const char *first_entry_txt = get_word(words, num_words, 1);
+    const char *last_entry_txt = get_word(words, num_words, 2);
 
-    long first_entry_child = str2l(get_word(words, num_words, 1));
-    long last_entry_child = str2l(get_word(words, num_words, 2));
+    if(unlikely(!first_entry_txt || !last_entry_txt)) {
+        error("REPLAY: received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " command without first or last entry. Disabling it.");
+        return PARSER_RC_ERROR;
+    }
+
+    long first_entry_child = str2l(first_entry_txt);
+    long last_entry_child = str2l(last_entry_txt);
 
     PARSER_USER_OBJECT *user_object = (PARSER_USER_OBJECT *) user;
 
@@ -274,13 +281,41 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
         return PARSER_RC_ERROR;
     }
 
-    rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+    internal_error(
+               (first_entry_child != 0 || last_entry_child != 0)
+            && (first_entry_child == 0 || last_entry_child == 0),
+            "REPLAY: received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %llu, last time %llu).",
+            (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
 
-    bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child, 0, 0);
+//    internal_error(
+//            true,
+//            "REPLAY host '%s', chart '%s': received " PLUGINSD_KEYWORD_CHART_DEFINITION_END " first time %llu, last time %llu.",
+//            rrdhost_hostname(host), rrdset_id(st),
+//            (unsigned long long)first_entry_child, (unsigned long long)last_entry_child);
+
+    bool ok = true;
+    if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        st->replay.start_streaming = false;
+        st->replay.after = 0;
+        st->replay.before = 0;
+#endif
+
+        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+
+        ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child,
+                                          last_entry_child, 0, 0);
+    }
+    else {
+        internal_error(true, "RRDSET: not sending duplicate replication request for chart '%s'", rrdset_id(st));
+    }
+
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user)
 {
     char *id = get_word(words, num_words, 1);
     char *name = get_word(words, num_words, 2);
@@ -510,7 +545,7 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
     return HTTP_RESP_OK;
 }
 
-PARSER_RC pluginsd_function(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_function(char **words, size_t num_words, void *user)
 {
     bool global = false;
     size_t i = 1;
@@ -557,7 +592,7 @@ static void pluginsd_function_result_end(struct parser *parser, void *action_dat
     string_freez(key);
 }
 
-PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *user)
 {
     char *key = get_word(words, num_words, 1);
     char *status = get_word(words, num_words, 2);
@@ -613,7 +648,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *u
 
 // ----------------------------------------------------------------------------
 
-PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user)
 {
     char *name = get_word(words, num_words, 1);
     char *value = get_word(words, num_words, 2);
@@ -690,7 +725,7 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user, PLUGINSD
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, void *user)
 {
     debug(D_PLUGINSD, "requested a FLUSH");
     ((PARSER_USER_OBJECT *) user)->st = NULL;
@@ -701,14 +736,14 @@ PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_u
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_disable(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_disable(char **words __maybe_unused, size_t num_words __maybe_unused, void *user __maybe_unused)
 {
     info("called DISABLE. Disabling it.");
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_label(char **words, size_t num_words, void *user)
 {
     const char *name = get_word(words, num_words, 1);
     const char *label_source = get_word(words, num_words, 2);
@@ -760,7 +795,7 @@ PARSER_RC pluginsd_label(char **words, size_t num_words, void *user, PLUGINSD_AC
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __maybe_unused, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __maybe_unused, void *user)
 {
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     debug(D_PLUGINSD, "requested to OVERWRITE host labels");
@@ -777,7 +812,7 @@ PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __may
 }
 
 
-PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user)
 {
     const char *name = get_word(words, num_words, 1);
     const char *value = get_word(words, num_words, 2);
@@ -799,7 +834,7 @@ PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user, PLUGINSD_A
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user, PLUGINSD_ACTION  *plugins_action __maybe_unused)
+PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user)
 {
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
@@ -823,100 +858,7 @@ PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words _
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_guid(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
-{
-    char *uuid_str = get_word(words, num_words, 1);
-    uuid_t uuid;
-
-    if (unlikely(!uuid_str)) {
-        error("requested a GUID, without a uuid.");
-        return PARSER_RC_ERROR;
-    }
-    if (unlikely(strlen(uuid_str) != GUID_LEN || uuid_parse(uuid_str, uuid) == -1)) {
-        error("requested a GUID, without a valid uuid string.");
-        return PARSER_RC_ERROR;
-    }
-
-    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
-    if (plugins_action->guid_action) {
-        return plugins_action->guid_action(user, &uuid);
-    }
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_context(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
-{
-    char *uuid_str = get_word(words, num_words, 1);
-    uuid_t uuid;
-
-    if (unlikely(!uuid_str)) {
-        error("requested a CONTEXT, without a uuid.");
-        return PARSER_RC_ERROR;
-    }
-    if (unlikely(strlen(uuid_str) != GUID_LEN || uuid_parse(uuid_str, uuid) == -1)) {
-        error("requested a CONTEXT, without a valid uuid string.");
-        return PARSER_RC_ERROR;
-    }
-
-    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
-    if (plugins_action->context_action) {
-        return plugins_action->context_action(user, &uuid);
-    }
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_tombstone(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action)
-{
-    char *uuid_str = get_word(words, num_words, 1);
-    uuid_t uuid;
-
-    if (unlikely(!uuid_str)) {
-        error("requested a TOMBSTONE, without a uuid.");
-        return PARSER_RC_ERROR;
-    }
-    if (unlikely(strlen(uuid_str) != GUID_LEN || uuid_parse(uuid_str, uuid) == -1)) {
-        error("requested a TOMBSTONE, without a valid uuid string.");
-        return PARSER_RC_ERROR;
-    }
-
-    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
-    if (plugins_action->tombstone_action) {
-        return plugins_action->tombstone_action(user, &uuid);
-    }
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC metalog_pluginsd_host(char **words, size_t num_words, void *user, PLUGINSD_ACTION  *plugins_action)
-{
-    char *machine_guid = get_word(words, num_words, 1);
-    char *hostname = get_word(words, num_words, 2);
-    char *registry_hostname = get_word(words, num_words, 3);
-    char *update_every_s = get_word(words, num_words, 4);
-    char *os = get_word(words, num_words, 5);
-    char *timezone = get_word(words, num_words, 6);
-    char *tags = get_word(words, num_words, 7);
-
-    int update_every = 1;
-    if (likely(update_every_s && *update_every_s))
-        update_every = str2i(update_every_s);
-    if (unlikely(!update_every))
-        update_every = 1;
-
-    debug(D_PLUGINSD, "HOST PARSED: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s",
-         machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
-
-    if (plugins_action->host_action) {
-        return plugins_action->host_action(
-            user, machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
-    }
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
+PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user)
 {
     char *id = get_word(words, num_words, 1);
     char *start_time_str = get_word(words, num_words, 2);
@@ -948,6 +890,11 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
     if(start_time_str && end_time_str) {
         time_t start_time = strtol(start_time_str, NULL, 0);
         time_t end_time = strtol(end_time_str, NULL, 0);
+
+        internal_error(
+                (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
+                "REPLAY: received a " PLUGINSD_KEYWORD_REPLAY_BEGIN " on chart '%s' ('%s') on host '%s', from %ld to %ld, which does not match our request (%ld to %ld).",
+                rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost), start_time, end_time, st->replay.after, st->replay.before);
 
         if(start_time && end_time) {
             if (start_time > end_time) {
@@ -987,7 +934,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
+PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
 {
     char *dimension = get_word(words, num_words, 1);
     char *value_str = get_word(words, num_words, 2);
@@ -1024,19 +971,28 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user, PLUGIN
         debug(D_PLUGINSD, "REPLAY: is replaying dimension '%s'/'%s' to '%s'", rrdset_id(st), dimension, value_str);
 
     if (likely(value_str)) {
-        RRDDIM *rd = rrddim_find(st, dimension);
+        RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
         if(unlikely(!rd)) {
             error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_SET " to dimension with id '%s' on chart '%s' ('%s') on host '%s', which does not exist. Disabling it.",
                   dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
             goto disable;
         }
-        else {
+
+        RRDDIM_FLAGS rd_flags = rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED);
+
+        if(unlikely(rd_flags & RRDDIM_FLAG_OBSOLETE)) {
+            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+            rrddim_isnot_obsolete(st, rd);
+        }
+
+        if(!(rd_flags & RRDDIM_FLAG_ARCHIVED)) {
             NETDATA_DOUBLE value = strtondd(value_str, NULL);
             SN_FLAGS flags = SN_FLAG_NONE;
 
             char c;
-            while((c = *flags_str++)) {
-                switch(c) {
+            while ((c = *flags_str++)) {
+                switch (c) {
                     case 'R':
                         flags |= SN_FLAG_RESET;
                         break;
@@ -1052,7 +1008,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user, PLUGIN
                 }
             }
 
-            if(!netdata_double_isnumber(value)) {
+            if (!netdata_double_isnumber(value)) {
                 value = NAN;
                 flags = SN_EMPTY_SLOT;
             }
@@ -1062,6 +1018,10 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user, PLUGIN
             rd->last_collected_time.tv_usec = 0;
             rd->collections_counter++;
         }
+        else
+            error("Dimension %s in chart '%s' has the ARCHIVED flag set, but it is collected. Ignoring data.", rrddim_name(rd), rrdset_id(st));
+
+        rrddim_acquired_release(rda);
     }
     return PARSER_RC_OK;
 
@@ -1070,7 +1030,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
+PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user)
 {
     char *dimension = get_word(words, num_words, 1);
     char *last_collected_ut_str = get_word(words, num_words, 2);
@@ -1093,7 +1053,8 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
         goto disable;
     }
 
-    RRDDIM *rd = rrddim_find(st, dimension);
+    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+    RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     if(unlikely(!rd)) {
         error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " to dimension with id '%s' on chart '%s' ('%s') on host '%s', which does not exist. Disabling it.",
               dimension, rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost));
@@ -1110,6 +1071,7 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     rd->last_collected_value = last_collected_value_str ? str2ll(last_collected_value_str, NULL) : 0;
     rd->last_calculated_value = last_calculated_value_str ? str2ndd(last_calculated_value_str, NULL) : 0;
     rd->last_stored_value = last_stored_value_str ? str2ndd(last_stored_value_str, NULL) : 0.0;
+    rrddim_acquired_release(rda);
     return PARSER_RC_OK;
 
 disable:
@@ -1117,12 +1079,10 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
+PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user)
 {
     char *last_collected_ut_str = get_word(words, num_words, 1);
     char *last_updated_ut_str = get_word(words, num_words, 2);
-    char *last_collected_total_str = get_word(words, num_words, 3);
-    char *collected_total_str = get_word(words, num_words, 4);
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -1147,9 +1107,6 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
         st->last_updated.tv_usec = last_updated_ut % USEC_PER_SEC;
     }
 
-    st->last_collected_total = last_collected_total_str ? strtoll(last_collected_total_str, NULL, 0) : 0;
-    st->collected_total = collected_total_str ? strtoll(collected_total_str, NULL, 0) : 0;
-
     st->counter++;
     st->counter_done++;
 
@@ -1160,7 +1117,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGINSD_ACTION *plugins_action __maybe_unused)
+PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 {
     if (num_words < 7) {
         error("REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
@@ -1168,12 +1125,12 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGIN
     }
 
     time_t update_every_child = str2l(get_word(words, num_words, 1));
-    time_t first_entry_child = str2l(get_word(words, num_words, 2));
-    time_t last_entry_child = str2l(get_word(words, num_words, 3));
+    time_t first_entry_child = (time_t)str2ull(get_word(words, num_words, 2));
+    time_t last_entry_child = (time_t)str2ull(get_word(words, num_words, 3));
 
     bool start_streaming = (strcmp(get_word(words, num_words, 4), "true") == 0);
-    time_t first_entry_requested = str2l(get_word(words, num_words, 5));
-    time_t last_entry_requested = str2l(get_word(words, num_words, 6));
+    time_t first_entry_requested = (time_t)str2ull(get_word(words, num_words, 5));
+    time_t last_entry_requested = (time_t)str2ull(get_word(words, num_words, 6));
 
     PARSER_USER_OBJECT *user_object = user;
 
@@ -1186,20 +1143,36 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user, PLUGIN
         return PARSER_RC_ERROR;
     }
 
+//    internal_error(true,
+//                   "REPLAY: host '%s', chart '%s': received " PLUGINSD_KEYWORD_REPLAY_END " child first_t = %llu, last_t = %llu, start_streaming = %s, requested first_t = %llu, last_t = %llu",
+//                   rrdhost_hostname(host), rrdset_id(st),
+//                   (unsigned long long)first_entry_child, (unsigned long long)last_entry_child,
+//                   start_streaming?"true":"false",
+//                   (unsigned long long)first_entry_requested, (unsigned long long)last_entry_requested);
+
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
 
     st->counter++;
     st->counter_done++;
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    st->replay.start_streaming = false;
+    st->replay.after = 0;
+    st->replay.before = 0;
+#endif
+
     if (start_streaming) {
         if (st->update_every != update_every_child)
             rrdset_set_update_every(st, update_every_child);
 
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
         rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
         return PARSER_RC_OK;
     }
+
+    rrdcontext_updated_retention_rrdset(st);
 
     bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child,
                                       first_entry_requested, last_entry_requested);

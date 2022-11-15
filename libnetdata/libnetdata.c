@@ -34,7 +34,7 @@ const char *program_version = VERSION;
 #warning NETDATA_TRACE_ALLOCATIONS ENABLED
 #include "Judy.h"
 
-#ifdef HAVE_DLSYM
+#if defined(HAVE_DLSYM) && defined(ENABLE_DLSYM)
 #include <dlfcn.h>
 
 typedef void (*libc_function_t)(void);
@@ -136,7 +136,6 @@ static void *(*libc_malloc)(size_t) = malloc;
 static void *(*libc_calloc)(size_t, size_t) = calloc;
 static void *(*libc_realloc)(void *, size_t) = realloc;
 static void (*libc_free)(void *) = free;
-static char *(*libc_strdup)(const char *) = strdup;
 
 #ifdef HAVE_MALLOC_USABLE_SIZE
 static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size;
@@ -312,7 +311,7 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
         t->padding[i] = 0xFF;
 #endif
 
-    strcpy((char *)&t->data, s);
+    memcpy(&t->data, s, size);
     return (char *)&t->data;
 }
 
@@ -1233,7 +1232,8 @@ static inline int madvise_mergeable(void *mem, size_t len) {
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only)
+{
     // info("netdata_mmap('%s', %zu", filename, size);
 
     // MAP_SHARED is used in memory mode map
@@ -1272,7 +1272,7 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
         fd_for_mmap = -1;
     }
 
-    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
+    mem = mmap(NULL, size, read_only ? PROT_READ : PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
     if (mem != MAP_FAILED) {
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

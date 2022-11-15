@@ -168,7 +168,8 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
 
     if(posix_spawn_file_actions_init(&fa)) {
         error("POPEN: posix_spawn_file_actions_init() failed.");
-        return -1;
+        ret = -1;
+        goto set_return_values_and_return;
     }
 
     if(fpp_child_stdin) {
@@ -292,9 +293,8 @@ cleanup_and_return:
             fclose(fp_child_stdin);
         else if (pipefd_stdin[PIPE_WRITE] != -1)
             close(pipefd_stdin[PIPE_WRITE]);
-    }
-    else {
-        *fpp_child_stdin  = fp_child_stdin;
+
+        fp_child_stdin = NULL;
     }
 
     // the child end - close it
@@ -307,10 +307,16 @@ cleanup_and_return:
             fclose(fp_child_stdout);
         else if (pipefd_stdout[PIPE_READ] != -1)
             close(pipefd_stdout[PIPE_READ]);
+
+        fp_child_stdout = NULL;
     }
-    else {
+
+set_return_values_and_return:
+    if(fpp_child_stdin)
+        *fpp_child_stdin = fp_child_stdin;
+
+    if(fpp_child_stdout)
         *fpp_child_stdout = fp_child_stdout;
-    }
 
     return ret;
 }

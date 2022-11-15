@@ -292,7 +292,11 @@ int is_legacy = 1;
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
     }
 
-    host->rrdpush_enable_replication = rrdpush_enable_replication;
+    if(rrdpush_enable_replication)
+        rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
+    else
+        rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
+
     host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
     host->rrdpush_replication_step = rrdpush_replication_step;
 
@@ -618,10 +622,13 @@ void rrdhost_update(RRDHOST *host
         rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
-        host->rrdpush_enable_replication = rrdpush_enable_replication;
+        if(rrdpush_enable_replication)
+            rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
+        else
+            rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
+
         host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
         host->rrdpush_replication_step = rrdpush_replication_step;
-
 
         rrd_hosts_available++;
         ml_new_host(host);
@@ -1051,6 +1058,7 @@ void stop_streaming_sender(RRDHOST *host)
     dictionary_destroy(host->sender->replication_requests);
     freez(host->sender);
     host->sender = NULL;
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 }
 
 void stop_streaming_receiver(RRDHOST *host)
@@ -1118,7 +1126,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     freez(host->exporting_flags);
 
-    health_thread_stop(host);
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE

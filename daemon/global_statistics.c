@@ -865,6 +865,7 @@ static void dbengine_statistics_charts(void) {
 
             {
                 static RRDSET *st_long_term_pages = NULL;
+                static RRDDIM *rd_memory = NULL;
                 static RRDDIM *rd_total = NULL;
                 static RRDDIM *rd_insertions = NULL;
                 static RRDDIM *rd_deletions = NULL;
@@ -885,6 +886,7 @@ static void dbengine_statistics_charts(void) {
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
+                    rd_memory = rrddim_add(st_long_term_pages, "journal v2 descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_total = rrddim_add(st_long_term_pages, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_insertions = rrddim_add(st_long_term_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -893,6 +895,7 @@ static void dbengine_statistics_charts(void) {
                 } else
                     rrdset_next(st_long_term_pages);
 
+                rrddim_set_by_pointer(st_long_term_pages, rd_memory, (collected_number)stats_array[37]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_deletions, (collected_number)stats_array[6]);

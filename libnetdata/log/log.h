@@ -94,6 +94,16 @@ static inline void debug_dummy(void) {}
 void error_log_limit_reset(void);
 void error_log_limit_unlimited(void);
 
+typedef struct error_with_limit {
+    time_t log_every;
+    size_t count;
+    time_t last_logged;
+    usec_t sleep_ut;
+} ERROR_LIMIT;
+
+#define error_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+#define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+
 #ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) error_int("IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
@@ -107,6 +117,7 @@ void error_log_limit_unlimited(void);
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define infoerr(args...) error_int("INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error(args...)   error_int("ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
+#define error_limit(erl, args...)   error_limit_int(erl, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal_assert(expr) ((expr) ? (void)(0) : fatal_int(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
 
@@ -114,6 +125,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
 void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
+void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, unsigned long line __maybe_unused, const char *fmt, ... ) PRINTFLIKE(6, 7);;
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 void log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);

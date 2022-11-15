@@ -26,15 +26,13 @@ static inline std::string getMLDimensionID(RRDDIM *RD) {
 
 class Dimension {
 public:
-    Dimension(RRDDIM *RD, RRDSET *AnomalyRateRS) :
+    Dimension(RRDDIM *RD) :
         RD(RD),
-        AnomalyRateRD(rrddim_add(AnomalyRateRS, ml::getMLDimensionID(RD).c_str(), NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE)),
         LastTrainedAt(Seconds(0)),
         Trained(false),
         ConstantModel(false),
         AnomalyScore(0.0),
-        AnomalyBit(0),
-        AnomalyBitCounter(0)
+        AnomalyBit(0)
     { }
 
     RRDDIM *getRD() const {
@@ -53,14 +51,6 @@ public:
         return Query(RD).oldestTime();
     }
 
-    void setAnomalyRateRDName(const char *Name) const {
-        rrddim_reset_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
-    }
-
-    RRDDIM *getAnomalyRateRD() const {
-        return AnomalyRateRD;
-    }
-
     bool isTrained() const {
         return Trained;
     }
@@ -77,8 +67,6 @@ public:
 
     bool predict(CalculatedNumber Value, bool Exists);
 
-    void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous);
-
     std::pair<bool, double> detect(size_t WindowLength, bool Reset);
 
     std::array<KMeans, 1> getModels();
@@ -88,7 +76,6 @@ private:
 
 public:
     RRDDIM *RD;
-    RRDDIM *AnomalyRateRD;
 
     TimePoint LastTrainedAt;
     std::atomic<bool> Trained;
@@ -96,7 +83,6 @@ public:
 
     CalculatedNumber AnomalyScore;
     std::atomic<bool> AnomalyBit;
-    unsigned AnomalyBitCounter;
 
     std::vector<CalculatedNumber> CNs;
     std::array<KMeans, 1> Models;

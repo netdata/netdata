@@ -55,10 +55,6 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
     RRDHOST *host = st->rrdhost;
 #endif
 
-    // Do not export anomaly rates charts.
-    if (rrdset_is_ar_chart(st))
-        return 0;
-
     if (st->exporting_flags == NULL)
         st->exporting_flags = callocz(instance->engine->instance_num, sizeof(size_t));
 

@@ -33,6 +33,8 @@ int default_rrdeng_page_fetch_retries = 3;
 int default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB * 4; // not used for default - use storage_tiers_cache_quota_mb[0]
 int default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB * 4; // not used for default - use storage_tiers_disk_quota_mb[0]
 int default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB * 4; // not used for default - use storage_tiers_disk_quota_mb[0]
+int db_engine_journal_indexing = 1;
+int db_engine_journal_check = 0;
 
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
@@ -135,13 +137,12 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
         __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
 
         if(pa) {
-            if(page_index->alignment && page_index->alignment != pa)
-                fatal("DBENGINE: page_index has a different alignment.");
+            if(page_index->alignment && page_index->alignment != pa && page_index->writers > 0)
+                fatal("DBENGINE: page_index has a different alignment (page_index refcount is %u, writers is %u).",
+                        page_index->refcount, page_index->writers);
 
-            if(!page_index->alignment) {
-                page_index->alignment = pa;
-                __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
-            }
+            page_index->alignment = pa;
+            __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
         }
     }
 
@@ -287,7 +288,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
         if (page_is_empty) {
             print_page_cache_descr(descr, "Page has empty metrics only, deleting", true);
             pg_cache_put(ctx, descr);
-            pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
+            pg_cache_punch_hole(ctx, descr, 1, 0, NULL, true);
         } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
     } else {
@@ -422,7 +423,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
             }
         }
 
-        pg_cache_insert(ctx, page_index, descr);
+        (void )pg_cache_insert(ctx, page_index, descr, true);
     } else {
         pg_cache_add_new_metric_time(page_index, descr);
     }
@@ -463,18 +464,9 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
         if(unlikely(points_gap != 1)) {
             if (unlikely(points_gap <= 0)) {
-                time_t now = now_realtime_sec();
-                static __thread size_t counter = 0;
-                static __thread time_t last_time_logged = 0;
-                counter++;
-
-                if(now - last_time_logged > 600) {
-                    error("DBENGINE: collected point is in the past (repeated %zu times in the last %zu secs). Ignoring these data collection points.",
-                          counter, (size_t)(last_time_logged?(now - last_time_logged):0));
-
-                    last_time_logged = now;
-                    counter = 0;
-                }
+                error_limit_static_global_var(erl, 1, 0);
+                error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, which is in the past of the current page end time %llu",
+                            point_in_time_ut, last_point_in_time_ut);
                 return;
             }
 
@@ -502,7 +494,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 //                print_page_cache_descr(descr, buffer, false);
 
                 // loop to fill the gap
-                usec_t step_ut = page_index->latest_update_every_s * USEC_PER_SEC;
+                usec_t step_ut = update_every_ut;
                 usec_t last_point_filled_ut = last_point_in_time_ut + step_ut;
 
                 while (last_point_filled_ut < point_in_time_ut) {
@@ -514,6 +506,12 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                 }
             }
         }
+    }
+    else if(unlikely(point_in_time_ut <= page_index->latest_time_ut && page_index->latest_time_ut != INVALID_TIME)) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, while is in the past of latest value in the database %llu",
+                    point_in_time_ut, page_index->latest_time_ut);
+        return;
     }
 
     rrdeng_store_metric_next_internal(collection_handle, point_in_time_ut, n, min_value, max_value, count, anomaly_count, flags);
@@ -553,16 +551,6 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
 // ----------------------------------------------------------------------------
 // query ops
 
-//static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
-//{
-//    return (uint32_t *)&page_info->scratch[0];
-//}
-//
-//static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
-//{
-//    return (uint32_t *)&page_info->scratch[sizeof(uint32_t)];
-//}
-//
 /*
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
@@ -626,6 +614,7 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
     usec_t wanted_start_time_ut = handle->wanted_start_time_s * USEC_PER_SEC;
     descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
         wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
+
     if (NULL == descr)
         return 1;
 
@@ -932,44 +921,6 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     pg_cache_put(ctx, descr);
 }
 
-/* Gets a reference for the page */
-void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle)
-{
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-
-    debug(D_RRDENGINE, "Reading existing page:");
-    descr = pg_cache_lookup(ctx, NULL, id, INVALID_TIME);
-    if (NULL == descr) {
-        *handle = NULL;
-
-        return NULL;
-    }
-    *handle = descr;
-    pg_cache_descr = descr->pg_cache_descr;
-
-    return pg_cache_descr->page;
-}
-
-/* Gets a reference for the page */
-void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time_ut, void **handle)
-{
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-
-    debug(D_RRDENGINE, "Reading existing page:");
-    descr = pg_cache_lookup(ctx, NULL, id, point_in_time_ut);
-    if (NULL == descr) {
-        *handle = NULL;
-
-        return NULL;
-    }
-    *handle = descr;
-    pg_cache_descr = descr->pg_cache_descr;
-
-    return pg_cache_descr->page;
-}
-
 /*
  * Gathers Database Engine statistics.
  * Careful when modifying this function.
@@ -1020,7 +971,8 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
     array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
     array[36] = (uint64_t)global_flushing_pressure_page_deletions;
-    fatal_assert(RRDENG_NR_STATS == 37);
+    array[37] = (uint64_t)pg_cache->active_descriptors;
+    fatal_assert(RRDENG_NR_STATS == 38);
 }
 
 /* Releases reference to page */
@@ -1069,6 +1021,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->max_cache_pages = page_cache_mb * (1048576LU / RRDENG_BLOCK_SIZE);
     /* try to keep 5% of the page cache free */
     ctx->cache_pages_low_watermark = (ctx->max_cache_pages * 95LLU) / 100;
+    ctx->cache_pages_warn_watermark = (ctx->max_cache_pages * 90LLU) / 100;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->max_disk_space = disk_space_mb * 1048576LLU;
@@ -1102,11 +1055,6 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-//    error = metalog_init(ctx);
-//    if (error) {
-//        error("Failed to initialize metadata log file event loop.");
-//        goto error_after_rrdeng_worker;
-//    }
 
     return 0;
 

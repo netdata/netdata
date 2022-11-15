@@ -42,7 +42,7 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         rrddim_foreach_done(rd);
     }
 
-    time_t now = after, actual_after = 0, actual_before = 0;
+    time_t now = after + 1, actual_after = 0, actual_before = 0;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
@@ -143,11 +143,9 @@ static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu " TOTAL_NUMBER_FORMAT " " TOTAL_NUMBER_FORMAT "\n",
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu\n",
                    (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
-                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec,
-                   st->last_collected_total,
-                   st->collected_total
+                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
     );
 }
 
@@ -155,10 +153,13 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
     time_t query_after = after;
     time_t query_before = before;
     time_t now = now_realtime_sec();
+    time_t tolerance = 2;   // sometimes from the time we get this value, to the time we check,
+                            // a data collection has been made
+                            // so, we give this tolerance to detect invalid timestamps
 
     // find the first entry we have
     time_t first_entry_local = rrdset_first_entry_t(st);
-    if(first_entry_local > now) {
+    if(first_entry_local > now + tolerance) {
         internal_error(true,
                        "RRDSET: '%s' first time %llu is in the future (now is %llu)",
                        rrdset_id(st), (unsigned long long)first_entry_local, (unsigned long long)now);
@@ -170,7 +171,14 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
 
     // find the latest entry we have
     time_t last_entry_local = st->last_updated.tv_sec;
-    if(last_entry_local > now) {
+    if(!last_entry_local) {
+        internal_error(true,
+                       "RRDSET: '%s' last updated time zero. Querying db for last updated time.",
+                       rrdset_id(st));
+        last_entry_local = rrdset_last_entry_t(st);
+    }
+
+    if(last_entry_local > now + tolerance) {
         internal_error(true,
                        "RRDSET: '%s' last updated time %llu is in the future (now is %llu)",
                        rrdset_id(st), (unsigned long long)last_entry_local, (unsigned long long)now);
@@ -244,6 +252,18 @@ static bool send_replay_chart_cmd(send_command callback, void *callback_data, RR
     }
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(
+            st->replay.after != 0 || st->replay.before != 0,
+            "REPLAY: host '%s', chart '%s': sending replication request, while there is another inflight",
+            rrdhost_hostname(st->rrdhost), rrdset_id(st)
+            );
+
+    st->replay.start_streaming = start_streaming;
+    st->replay.after = after;
+    st->replay.before = before;
+#endif
+
     debug(D_REPLICATION, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
           rrdset_id(st), start_streaming ? "true" : "false", (unsigned long long)after, (unsigned long long)before);
 
@@ -269,7 +289,7 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     // if replication is disabled, send an empty replication request
     // asking no data
-    if (!host->rrdpush_enable_replication) {
+    if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION))) {
         internal_error(true,
                        "REPLAY: host '%s', chart '%s': sending empty replication request because replication is disabled",
                        rrdhost_hostname(host), rrdset_id(st));

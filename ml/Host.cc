@@ -141,7 +141,12 @@ void TrainableHost::train() {
 
         worker_is_idle();
         SleepFor = std::min(AllottedDuration - RealDuration, MaxSleepFor);
-        std::this_thread::sleep_for(SleepFor);
+        TimePoint Now = SteadyClock::now();
+        auto Until = Now + SleepFor;
+        while (Now < Until && !netdata_exit) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            Now = SteadyClock::now();
+        }
         worker_is_busy(0);
     }
 }
@@ -161,10 +166,6 @@ void DetectableHost::detectOnce() {
     size_t NumTrainedDimensions = 0;
     size_t NumActiveDimensions = 0;
 
-    bool CollectAnomalyRates = (++AnomalyRateTimer == Cfg.DBEngineAnomalyRateEvery);
-    if (CollectAnomalyRates)
-        rrdset_next(AnomalyRateRS);
-
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
@@ -173,10 +174,8 @@ void DetectableHost::detectOnce() {
 
             Dimension *D = DP.second;
 
-            if (!D->isActive()) {
-                D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, false);
+            if (!D->isActive())
                 continue;
-            }
 
             NumActiveDimensions++;
             NumTrainedDimensions += D->isTrained();
@@ -184,7 +183,6 @@ void DetectableHost::detectOnce() {
             bool IsAnomalous = D->isAnomalous();
             if (IsAnomalous)
                 NumAnomalousDimensions += 1;
-            D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, IsAnomalous);
         }
 
         if (NumAnomalousDimensions)
@@ -193,12 +191,6 @@ void DetectableHost::detectOnce() {
             HostAnomalyRate = 0.0;
 
         NumNormalDimensions = NumActiveDimensions - NumAnomalousDimensions;
-    }
-
-    if (CollectAnomalyRates) {
-        worker_is_busy(WORKER_JOB_UPDATE_ANOMALY_RATES);
-        AnomalyRateTimer = 0;
-        rrdset_done(AnomalyRateRS);
     }
 
     this->NumAnomalousDimensions = NumAnomalousDimensions;

@@ -973,20 +973,15 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
  * Send collected data to Netdata.
  *
  *  @param em   the structure with thread information
- *
- * @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
- *         otherwise function returns 1 to avoid chart recreation
  */
-static int ebpf_send_systemd_process_charts(ebpf_module_t *em)
+static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
 {
-    int ret = 1;
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_ps.create_process);
-        } else if (unlikely(ect->systemd))
-            ret = 0;
+        }
     }
     write_end_chart();
 
@@ -1023,8 +1018,6 @@ static int ebpf_send_systemd_process_charts(ebpf_module_t *em)
         }
         write_end_chart();
     }
-
-    return ret;
 }
 
 /**
@@ -1046,13 +1039,11 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
 
     if (has_systemd) {
-        static int systemd_chart = 0;
-        if (!systemd_chart) {
+        if (send_cgroup_chart) {
             ebpf_create_systemd_process_charts(em);
-            systemd_chart = 1;
         }
 
-        systemd_chart = ebpf_send_systemd_process_charts(em);
+        ebpf_send_systemd_process_charts(em);
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
@@ -1150,8 +1141,6 @@ static void process_collector(ebpf_module_t *em)
             update_apps_list = 0;
             cleanup_exited_pids();
             collect_data_for_all_processes(pid_fd);
-
-            ebpf_create_apps_charts(apps_groups_root_target);
         }
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1162,6 +1151,8 @@ static void process_collector(ebpf_module_t *em)
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);
+
+            ebpf_create_apps_charts(apps_groups_root_target);
             if (all_pids_count > 0) {
                 if (apps_enabled) {
                     ebpf_process_update_apps_data();

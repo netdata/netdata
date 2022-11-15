@@ -35,10 +35,6 @@ void ml_delete_dimension(RRDDIM *RD);
 
 bool ml_is_anomalous(RRDDIM *RD, double value, bool exists);
 
-void ml_process_rrdr(RRDR *R, int MaxAnomalyRates);
-
-void ml_dimension_update_name(RRDSET *RS, RRDDIM *RD, const char *name);
-
 bool ml_streaming_enabled();
 
 #define ML_ANOMALY_RATES_CHART_ID  "anomaly_detection.anomaly_rates"

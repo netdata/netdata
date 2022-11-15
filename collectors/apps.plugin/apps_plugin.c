@@ -4594,14 +4594,14 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(wb, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
 
 #ifdef NETDATA_DEV_MODE
-        add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
 #endif
-        add_table_field(wb, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, true, false, "Pid", "count_unique");
+        add_table_field(wb, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, false, false, "Pid", "count_unique");
         add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
-        add_table_field(wb, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
-        add_table_field(wb, "Uid", "User ID", false, "integer", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
-        add_table_field(wb, "Group", "Group Owner", false, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
-        add_table_field(wb, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(wb, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
+        add_table_field(wb, "Uid", "User ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
+        add_table_field(wb, "Group", "Group Owner", false, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
+        add_table_field(wb, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
         add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "processes", Processes_max, "descending", true, false, false, NULL, "sum");
         add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "threads", Threads_max, "descending", true, false, false, NULL, "sum");
         add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "seconds", Uptime_max, "descending", true, false, false, NULL, "max");
@@ -4664,7 +4664,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                 wb,
                 ""
                 "\n   },"
-                "\n   \"default sort column\": \"CPU\","
+                "\n   \"default_sort_column\": \"CPU\","
                 "\n   \"charts\": {"
                 "\n      \"CPU\": {"
                 "\n         \"name\":\"CPU Utilization\","
@@ -4745,17 +4745,21 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                        "\n      }"
                                        "\n   },"
                                        "\n   \"group_by\": {"
-                                       "\n     \"Process Tree by PID\": {"
-                                       "\n         \"columns\": [ \"PPid\" ]"
+                                       "\n     \"pid\": {"
+                                       "\n         \"name\":\"Process Tree by PID\","
+                                       "\n         \"columns\":[ \"PPid\" ]"
                                        "\n     },"
-                                       "\n     \"Process Tree by Category\": {"
-                                       "\n         \"columns\": [ \"Category\", \"PPid\" ]"
+                                       "\n     \"category\": {"
+                                       "\n         \"name\":\"Process Tree by Category\","
+                                       "\n         \"columns\":[ \"Category\", \"PPid\" ]"
                                        "\n     },"
-                                       "\n     \"Process Tree by User\": {"
-                                       "\n         \"columns\": [ \"User\", \"PPid\" ]"
+                                       "\n     \"user\": {"
+                                       "\n         \"name\":\"Process Tree by User\","
+                                       "\n         \"columns\":[ \"User\", \"PPid\" ]"
                                        "\n     },"
-                                       "\n     \"Process Tree by Group\": {"
-                                       "\n         \"columns\": [ \"Group\", \"PPid\" ]"
+                                       "\n     \"group\": {"
+                                       "\n         \"name\":\"Process Tree by Group\","
+                                       "\n         \"columns\":[ \"Group\", \"PPid\" ]"
                                        "\n     }"
                                        "\n   }"
         );

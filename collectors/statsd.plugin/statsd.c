@@ -20,15 +20,10 @@
 
 // --------------------------------------------------------------------------------------
 
+// DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
 // #define STATSD_MULTITHREADED 1
 
-#ifdef STATSD_MULTITHREADED
-// DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
 #define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT)
-#else
-#define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT | DICT_OPTION_SINGLE_THREADED)
-#endif
-
 #define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
 
 // --------------------------------------------------------------------------------------------------------------------

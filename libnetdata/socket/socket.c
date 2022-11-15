@@ -1547,8 +1547,9 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
         debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", pi->slot, pf->fd);
 
         if(unlikely(errno == EMFILE)) {
-            error("POLLFD: LISTENER: too many open files - sleeping for 1ms - used by this thread %zu, max for this thread %zu", p->used, p->limit);
-            usleep(1000); // 1ms
+            error_limit_static_global_var(erl, 10, 1000);
+            error_limit(&erl, "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
+                      p->used, p->limit);
         }
         else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
             error("POLLFD: LISTENER: accept() failed.");

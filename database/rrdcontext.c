@@ -63,9 +63,7 @@ typedef enum {
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 28), // this context changed because of a db rotation
     RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 29), // this context is not used anymore
     RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS           = (1 << 30), // this context is not used anymore
-
-    // DO NOT ADD (1 << 31) or bigger!
-    // runtime error: left shift of 1 by 31 places cannot be represented in type 'int'
+    RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION       = (1 << 31), // this object has updated retention
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
@@ -229,6 +227,7 @@ static struct rrdcontext_reason {
     { RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD,      "child disconnected",   65 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_DB_ROTATION,             "db rotation",          65 * USEC_PER_SEC },
     { RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS,           "changed flags",        65 * USEC_PER_SEC },
+    { RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION,       "updated retention",    65 * USEC_PER_SEC },
 
     // terminator
     { 0, NULL, 0 },
@@ -768,7 +767,7 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
     }
 
     if(ri->rrdset) {
-        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || rrdset_is_ar_chart(ri->rrdset)))
+        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
             ri->flags |= RRD_FLAG_HIDDEN; // no need of atomics at the constructor
         else
             ri->flags &= ~RRD_FLAG_HIDDEN; // no need of atomics at the constructor
@@ -876,7 +875,7 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     }
 
     if(ri->rrdset) {
-        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || rrdset_is_ar_chart(ri->rrdset)))
+        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
             rrd_flag_set(ri, RRD_FLAG_HIDDEN);
         else
             rrd_flag_clear(ri, RRD_FLAG_HIDDEN);
@@ -1095,6 +1094,14 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     rrdcontext_release(st->rrdcontext);
     st->rrdcontext = NULL;
+}
+
+static inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
+    RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+    if(unlikely(!ri)) return;
+
+    rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION);
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
 }
 
 static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
@@ -1465,6 +1472,10 @@ void rrdcontext_updated_rrdset(RRDSET *st) {
 
 void rrdcontext_removed_rrdset(RRDSET *st) {
     rrdinstance_rrdset_is_freed(st);
+}
+
+void rrdcontext_updated_retention_rrdset(RRDSET *st) {
+    rrdinstance_rrdset_has_updated_retention(st);
 }
 
 void rrdcontext_updated_rrdset_name(RRDSET *st) {
@@ -2209,9 +2220,6 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
             if(rrd_flag_is_deleted(ri))
                 continue;
 
-            if(ri->rrdset && rrdset_is_ar_chart(ri->rrdset))
-                continue;
-
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
                 if(rrd_flag_is_deleted(rm))
@@ -2268,6 +2276,7 @@ typedef struct query_target_locals {
 static __thread QUERY_TARGET thread_query_target = {};
 void query_target_release(QUERY_TARGET *qt) {
     if(unlikely(!qt)) return;
+    if(unlikely(!qt->used)) return;
 
     simple_pattern_free(qt->hosts.pattern);
     qt->hosts.pattern = NULL;
@@ -2406,7 +2415,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         tier_retention[tier].eng = eng;
         tier_retention[tier].db_update_every = (time_t) (qtl->host->db[tier].tier_grouping * ri->update_every);
 
-        if(rm->rrddim && rm->rrddim->tiers[tier]->db_metric_handle)
+        if(rm->rrddim && rm->rrddim->tiers[tier] && rm->rrddim->tiers[tier]->db_metric_handle)
             tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
         else
             tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid, NULL);
@@ -2439,6 +2448,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         }
     }
 
+    bool release_retention = true;
     bool timeframe_matches =
             (tiers_added
             && (common_first_time_t - common_update_every * 2) <= qt->window.before
@@ -2521,11 +2531,13 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 qm->tiers[tier].db_last_time_t = tier_retention[tier].db_last_time_t;
                 qm->tiers[tier].db_update_every = tier_retention[tier].db_update_every;
             }
+            release_retention = false;
         }
     }
-    else {
+    else
         qtl->metrics_skipped_due_to_not_matching_timeframe++;
 
+    if(release_retention) {
         // cleanup anything we allocated to the retention we will not use
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if (tier_retention[tier].db_metric_handle)
@@ -2743,9 +2755,10 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     QUERY_TARGET *qt = &thread_query_target;
 
     if(qt->used)
-        fatal("QUERY TARGET: this query target is already used.");
+        fatal("QUERY TARGET: this query target is already used (%zu queries made with this QUERY_TARGET so far).", qt->queries);
 
     qt->used = true;
+    qt->queries++;
 
     // copy the request into query_thread_target
     qt->request = *qtr;
@@ -3248,7 +3261,7 @@ static void rrdmetric_process_updates(RRDMETRIC *rm, bool force, RRD_FLAGS reaso
     if(reason != RRD_FLAG_NONE)
         rrd_flag_set_updated(rm, reason);
 
-    if(!force && !rrd_flag_is_updated(rm) && rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION))
+    if(!force && !rrd_flag_is_updated(rm) && rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION) && !rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION))
         return;
 
     if(worker_jobs)
@@ -3282,7 +3295,11 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
             if(unlikely(netdata_exit)) break;
 
-            rrdmetric_process_updates(rm, force, reason, worker_jobs);
+            RRD_FLAGS reason_to_pass = reason;
+            if(rrd_flag_check(ri, RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION))
+                reason_to_pass |= RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION;
+
+            rrdmetric_process_updates(rm, force, reason_to_pass, worker_jobs);
 
             if(unlikely(!rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)))
                 live_retention = false;
@@ -3385,7 +3402,11 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         dfe_start_reentrant(rc->rrdinstances, ri) {
             if(unlikely(netdata_exit)) break;
 
-            rrdinstance_post_process_updates(ri, force, reason, worker_jobs);
+            RRD_FLAGS reason_to_pass = reason;
+            if(rrd_flag_check(rc, RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION))
+                reason_to_pass |= RRD_FLAG_UPDATE_REASON_UPDATED_RETENTION;
+
+            rrdinstance_post_process_updates(ri, force, reason_to_pass, worker_jobs);
 
             if(unlikely(hidden && !rrd_flag_check(ri, RRD_FLAG_HIDDEN)))
                 hidden = false;

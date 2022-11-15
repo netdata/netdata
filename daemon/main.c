@@ -310,7 +310,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
@@ -321,7 +321,8 @@ int help(int exitcode) {
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
             " Twitter    : https://twitter.com/linuxnetdata\n"
-            " Facebook   : https://www.facebook.com/linuxnetdata/\n"
+            " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
+            " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
             "\n"
     );
@@ -679,6 +680,9 @@ static void get_netdata_configured_variables() {
 
     db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_NO);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", storage_tiers_cache_quota_mb[0]);
+    db_engine_journal_indexing = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal indexing", CONFIG_BOOLEAN_YES);
+    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
