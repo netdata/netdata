@@ -289,7 +289,7 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     // if replication is disabled, send an empty replication request
     // asking no data
-    if (!host->rrdpush_enable_replication) {
+    if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION))) {
         internal_error(true,
                        "REPLAY: host '%s', chart '%s': sending empty replication request because replication is disabled",
                        rrdhost_hostname(host), rrdset_id(st));

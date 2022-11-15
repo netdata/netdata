@@ -766,6 +766,8 @@ typedef enum {
     // Configuration options
     RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS   = (1 << 3), // delete files of obsolete charts
     RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
+
+    RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -946,7 +948,6 @@ struct rrdhost {
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
-    bool rrdpush_enable_replication;                // enable replication
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
 
