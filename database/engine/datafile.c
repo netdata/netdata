@@ -17,7 +17,7 @@ void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
         extent = next_extent;
     }
     datafile->extents.first = NULL;
-    internal_error(true, "Deleted %lu extents of file %s", count, path);
+    internal_error(true, "Deleted %u extents of file %s", count, path);
 }
 
 void df_extent_insert(struct extent_info *extent)

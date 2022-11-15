@@ -733,7 +733,7 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
         crc = crc32(crc, (void *) &local_metric_list_header, sizeof(local_metric_list_header));
         rc = crc32cmp(metric_list_header->checksum, crc);
 
-        internal_error(rc, "Index %lu : %s entries %d at offset %u (%llu -- %llu) verified, HEADER CRC computed %u, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
+        internal_error(true, "Index %u : %s entries %u at offset %u (%llu -- %llu) verified, HEADER CRC computed %lu, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
                 j2_header->start_time_ut + (usec_t) metric->delta_start * USEC_PER_SEC, j2_header->start_time_ut + (usec_t) metric->delta_end * USEC_PER_SEC,
                          crc, metric_list_header->crc);
         if (!rc) {
@@ -743,8 +743,7 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
             crc = crc32(0L, Z_NULL, 0);
             crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));
             rc = crc32cmp(journal_trailer->checksum, crc);
-            internal_error(rc, "Index %lu : %s entries %d at offset %u (%llu -- %llu) verified, HEADER CRC computed %u, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
-                           j2_header->start_time_ut + (usec_t) metric->delta_start * USEC_PER_SEC, j2_header->start_time_ut + (usec_t) metric->delta_end * USEC_PER_SEC,
+            internal_error(rc, "Index %u : %s entries %u at offset %u verified, DATA CRC computed %lu, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
                            crc, metric_list_header->crc);
             if (!rc) {
                 total_pages += metric_list_header->entries;
@@ -1137,8 +1136,6 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                     pg_cache_wait_event_unsafe(descr);
                 }
 
-                //bool can_punch_hole = !(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED);
-                //if (likely(false == can_punch_hole)) {
                 descr->extent_entry = &extent_list[page_entry->extent_index];
                 descr->extent = NULL;
                 descr->file = journalfile->datafile->file;
@@ -1147,12 +1144,6 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
                 rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
                 rrdeng_page_descr_mutex_unlock(ctx, descr);
                 mark_journalfile_for_expiration_check = true;
-                //} else {
-                //    rrdeng_page_descr_mutex_unlock(ctx, descr);
-                //    uv_rwlock_rdunlock(&page_index->lock);
-                //    pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
-                //    uv_rwlock_rdlock(&page_index->lock);
-                //}
             }
         }
 
