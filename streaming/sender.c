@@ -21,9 +21,14 @@
 #define WORKER_SENDER_JOB_BUFFER_RATIO              15
 #define WORKER_SENDER_JOB_BYTES_RECEIVED            16
 #define WORKER_SENDER_JOB_BYTES_SENT                17
+#define WORKER_SENDER_JOB_REPLAY_REQUEST            18
+#define WORKER_SENDER_JOB_REPLAY_RESPONSE           19
+#define WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE         20
+#define WORKER_SENDER_JOB_REPLAY_COMPLETION         21
+#define WORKER_SENDER_JOB_FUNCTION                  22
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 18
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 18
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 23
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 23
 #endif
 
 extern struct config stream_config;
@@ -875,6 +880,8 @@ void execute_commands(struct sender_state *s) {
         const char *keyword = get_word(words, num_words, 0);
 
         if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_FUNCTION);
+
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
             char *function = get_word(words, num_words, 3);
@@ -903,7 +910,10 @@ void execute_commands(struct sender_state *s) {
                     stream_execute_function_callback(wb, code, tmp);
                 }
             }
-        } else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
+        }
+        else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_REPLAY_REQUEST);
+
             const char *chart_id = get_word(words, num_words, 1);
             const char *start_streaming = get_word(words, num_words, 2);
             const char *after = get_word(words, num_words, 3);
@@ -926,7 +936,8 @@ void execute_commands(struct sender_state *s) {
                 };
                 dictionary_set(s->replication_requests, chart_id, &tmp, sizeof(struct replication_request));
             }
-        } else {
+        }
+        else {
             error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, words[0]?words[0]:"(unset)");
         }
 
@@ -1129,6 +1140,8 @@ int process_one_replication_request(const DICTIONARY_ITEM *item, void *value, vo
     size_t used_percent = sender_buffer_used_percent(s);
     if(used_percent >= 50) return -1; // signal the traversal to stop
 
+    worker_is_busy(WORKER_SENDER_JOB_REPLAY_RESPONSE);
+
     struct replication_request *rr = value;
     const char *name = dictionary_acquired_item_name(item);
 
@@ -1144,6 +1157,12 @@ int process_one_replication_request(const DICTIONARY_ITEM *item, void *value, vo
                        , rrdhost_hostname(s->host), s->connected_to, name);
         return 0;
     }
+
+    if(rr->after < s->replication_first_time || !s->replication_first_time)
+        s->replication_first_time = rr->after;
+
+    if(rr->before < s->replication_min_time || !s->replication_min_time)
+        s->replication_min_time = rr->before;
 
     netdata_thread_disable_cancelability();
 
@@ -1165,12 +1184,31 @@ int process_one_replication_request(const DICTIONARY_ITEM *item, void *value, vo
 }
 
 static void process_replication_requests(struct sender_state *s) {
-    if(dictionary_entries(s->replication_requests) == 0)
+    size_t entries = dictionary_entries(s->replication_requests);
+
+    worker_set_metric(WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE, (NETDATA_DOUBLE)entries);
+
+    if(!entries)
         return;
 
-    dictionary_sorted_walkthrough_rw(s->replication_requests, DICTIONARY_LOCK_WRITE,
+    s->replication_min_time = 0;
+
+    int count = dictionary_sorted_walkthrough_rw(s->replication_requests, DICTIONARY_LOCK_WRITE,
                                      process_one_replication_request, s,
                                      replication_request_compar);
+
+    if(count != 0 && s->replication_min_time && s->replication_first_time) {
+        time_t now = now_realtime_sec();
+        if(now > s->replication_first_time && now >= s->replication_min_time) {
+            time_t completed = s->replication_min_time - s->replication_first_time;
+            time_t all_duration = now - s->replication_first_time;
+
+            NETDATA_DOUBLE percent = (NETDATA_DOUBLE) completed * 100.0 / (NETDATA_DOUBLE) all_duration;
+            worker_set_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, percent);
+        }
+    }
+
+    worker_is_idle();
 }
 
 void *rrdpush_sender_thread(void *ptr) {
@@ -1193,9 +1231,17 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
+    worker_register_job_name(WORKER_SENDER_JOB_REPLAY_REQUEST, "replay request");
+    worker_register_job_name(WORKER_SENDER_JOB_REPLAY_RESPONSE, "replay response");
+    worker_register_job_name(WORKER_SENDER_JOB_FUNCTION, "function");
+
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENTAL);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE, "replications pending", "commands", WORKER_METRIC_ABSOLUTE);
+
+    worker_set_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, 100.0);
 
     struct sender_state *s = ptr;
     s->tid = gettid();
