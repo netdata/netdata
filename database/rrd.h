@@ -58,8 +58,6 @@ struct pg_cache_page_index;
 extern bool dbengine_enabled;
 extern size_t storage_tiers;
 extern size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-extern size_t storage_tiers_disk_quota_mb[RRD_STORAGE_TIERS];
-extern size_t storage_tiers_cache_quota_mb[RRD_STORAGE_TIERS];
 
 typedef enum {
     RRD_BACKFILL_NONE,

@@ -30,12 +30,11 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
 int db_engine_use_malloc = 0;
 int default_rrdeng_page_fetch_timeout = 3;
 int default_rrdeng_page_fetch_retries = 3;
-int default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB * 4; // not used for default - use storage_tiers_cache_quota_mb[0]
-int default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB * 4; // not used for default - use storage_tiers_disk_quota_mb[0]
-int default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB * 4; // not used for default - use storage_tiers_disk_quota_mb[0]
+int default_rrdeng_page_cache_mb = 32;
 int db_engine_journal_indexing = 1;
 int db_engine_journal_check = 0;
-
+int default_rrdeng_disk_quota_mb = 256;
+int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 

@@ -4,10 +4,8 @@
 #include "rrd.h"
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-size_t storage_tiers = 1; // this default is not used - 3 when dbengine is used, 1 otherwise
+size_t storage_tiers = 1;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
-size_t storage_tiers_disk_quota_mb[RRD_STORAGE_TIERS] = { RRDENG_MIN_DISK_SPACE_MB * 4, RRDENG_MIN_DISK_SPACE_MB * 2, RRDENG_MIN_DISK_SPACE_MB, RRDENG_MIN_DISK_SPACE_MB, RRDENG_MIN_DISK_SPACE_MB };
-size_t storage_tiers_cache_quota_mb[RRD_STORAGE_TIERS] = { RRDENG_MIN_PAGE_CACHE_SIZE_MB * 4, RRDENG_MIN_PAGE_CACHE_SIZE_MB * 2, RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_PAGE_CACHE_SIZE_MB };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
 #if RRD_STORAGE_TIERS != 5
@@ -758,7 +756,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
-    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) ? 3 : 1);
+    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
         error("At least 1 storage tier is required. Assuming 1.");
         storage_tiers = 1;
@@ -767,11 +765,6 @@ void dbengine_init(char *hostname) {
     if(storage_tiers > RRD_STORAGE_TIERS) {
         error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
         storage_tiers = RRD_STORAGE_TIERS;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    }
-    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && storage_tiers != 1) {
-        error("Host '%s': only 1 database tier can be supported without dbengine.", hostname);
-        storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
@@ -809,8 +802,8 @@ void dbengine_init(char *hostname) {
             break;
         }
 
-        int page_cache_mb = (int)storage_tiers_cache_quota_mb[tier];
-        int disk_space_mb = (int)storage_tiers_disk_quota_mb[tier];
+        int page_cache_mb = default_rrdeng_page_cache_mb;
+        int disk_space_mb = default_multidb_disk_quota_mb;
         size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
