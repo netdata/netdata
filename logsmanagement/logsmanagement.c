@@ -580,7 +580,7 @@ void *logsmanagement_main(void *ptr) {
 
     // putenv("UV_THREADPOOL_SIZE=16");
 
-    if(logs_manag_config_load()) return NULL;
+    if(logs_manag_config_load()) goto cleanup;
 
     main_loop = mallocz(sizeof(uv_loop_t));
     fatal_assert(uv_loop_init(main_loop) == 0);
@@ -598,7 +598,7 @@ void *logsmanagement_main(void *ptr) {
 
     tail_plugin_init(p_file_infos_arr);
 
-    if(flb_init()) return NULL;
+    if(flb_init()) goto cleanup;
 
     logs_manag_config_init();
 
@@ -623,8 +623,11 @@ void *logsmanagement_main(void *ptr) {
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
 
-    /* Run Fluent Bit engine */
-    flb_run();
+    /* Run Fluent Bit engine 
+     * TODO: If flb_run() fails, some memory will be leaked due to above 
+     * *_init() functions and threads by db_init() will need to be terminated.
+     * All this should be handled in logsmanagement_main_cleanup() ideally. */
+    if(flb_run()) goto cleanup;
 
     p_file_infos_arr_ready = 1;
 
@@ -633,6 +636,7 @@ void *logsmanagement_main(void *ptr) {
     /* Run uvlib loop. */
     uv_run(main_loop, UV_RUN_DEFAULT);
 
+cleanup:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

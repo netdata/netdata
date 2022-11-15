@@ -12,6 +12,7 @@
 
 /**
  * @brief Performs parsing and metric extraction for a raw log message
+ * @todo Doesn't really belong in this source file, should be moved.
  */
 void generic_parser(void *arg){
 

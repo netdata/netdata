@@ -69,8 +69,10 @@ void *logsmanagement_plugin_main(void *ptr){
 	netdata_thread_cleanup_push(logsmanagement_plugin_main_cleanup, ptr);
 
     /* wait for p_file_infos_arr initialisation */
-    while(!p_file_infos_arr_ready) sleep_usec(100000); 
-
+    for(int retries = 100; !p_file_infos_arr_ready; retries--){
+        sleep_usec(100 * USEC_PER_MS);
+        if(retries == 0) goto cleanup;
+    }
 
     stats_chart_data = callocz(1, sizeof(struct Stats_chart_data));
     stats_chart_data->rrd_type = "netdata";
@@ -416,6 +418,7 @@ void *logsmanagement_plugin_main(void *ptr){
         rrdset_done(stats_chart_data->st_disk_usage);
     }
 
+cleanup:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -481,10 +481,8 @@ int tail_plugin_add_input(struct File_info *const p_file_info){
     return 0;
 }
 
-int tail_plugin_init(struct File_infos_arr *const p_file_infos_arr){
+void tail_plugin_init(struct File_infos_arr *const p_file_infos_arr){
     if(unlikely(0 != uv_mutex_init(&p_file_infos_arr->fs_events_reenable_lock))) fatal("uv_mutex_init() failed");
     if(unlikely(0 != uv_cond_init(&p_file_infos_arr->fs_events_reenable_cond))) fatal("uv_cond_init() failed");
     uv_thread_create(&fs_events_reenable_thread_id, fs_events_reenable_thread, NULL);
-
-    return 0;
 }

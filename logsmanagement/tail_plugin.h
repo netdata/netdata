@@ -10,6 +10,6 @@
 #include "file_info.h"
 
 int tail_plugin_add_input(struct File_info *const p_file_info);
-int tail_plugin_init(struct File_infos_arr *const p_file_infos_arr);
+void tail_plugin_init(struct File_infos_arr *const p_file_infos_arr);
 
 #endif  // TAIL_PLUGIN_H_
