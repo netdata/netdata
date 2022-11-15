@@ -771,6 +771,7 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
         host->health_log.max = (unsigned int)n;
 
     conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    host->health_use_title_for_notifications = config_get_boolean(CONFIG_SECTION_HEALTH, "use title for notifications", CONFIG_BOOLEAN_NO);
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 

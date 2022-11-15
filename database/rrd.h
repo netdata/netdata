@@ -1014,6 +1014,7 @@ struct rrdhost {
     FILE *health_log_fp;                           // the FILE pointer to the open alarms event log file
     uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
+    int health_use_title_for_notifications;        // use the title alert config for notifications
 
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
