@@ -1699,7 +1699,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                     mw_free(pub->data);
                     return MQTT_NG_CLIENT_NOT_IMPL_YET;
                 }
-                if ( (rc = mqtt_ng_puback(client, pub->packet_id, 0)) ) {
+                if ( pub->qos == 1 && (rc = mqtt_ng_puback(client, pub->packet_id, 0)) ) {
                     client->client_state = ERROR;
                     ERROR("Error generating PUBACK reply for PUBLISH");
                     return rc;
