@@ -773,7 +773,7 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
                 rw_lock_acquired = true;
             }
 
-            struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false, false);
+            struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
             if (unlikely(added_descr != new_descr))
                 rrdeng_page_descr_freez(new_descr);
 
@@ -959,8 +959,7 @@ struct rrdeng_page_descr *pg_cache_insert(
     struct rrdengine_instance *ctx,
     struct pg_cache_page_index *index,
     struct rrdeng_page_descr *descr,
-    bool lock_and_count,
-    bool remove_old)
+    bool lock_and_count)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
@@ -992,39 +991,15 @@ struct rrdeng_page_descr *pg_cache_insert(
     if (lock_and_count)
         uv_rwlock_wrlock(&page_index->lock);
 
-    struct rrdeng_page_descr *old_descr = NULL;
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
-    bool page_inserted = (NULL == *PValue);
-    if (unlikely(!page_inserted)) {
-        if (false == remove_old) {
-            descr = *PValue;
-            if (lock_and_count)
-                uv_rwlock_wrunlock(&page_index->lock);
-            return descr;
-        }
-        old_descr = *PValue;
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(page_index->id, uuid_str);
-        internal_error(true, "ATTEMPT TO INSERT %s @ %llu BUT IT EXISTS: old entry (%llu, %llu, %llu)  new entry (%llu, %llu, %llu)",
-                       uuid_str, (descr->start_time_ut / USEC_PER_SEC),
-                       old_descr->start_time_ut, old_descr->end_time_ut, old_descr->page_length,
-                       descr->start_time_ut, descr->end_time_ut, descr->page_length);
-        fatal_assert(old_descr == descr);
+    fatal_assert(NULL != PValue);
 
-        uv_rwlock_wrlock(&page_index->ctx->datafiles.rwlock);
-        if (false == unlink_descriptor_extent_unsafe(old_descr)) {
-            rrdeng_page_descr_mutex_lock(ctx, old_descr);
-            old_descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
-            rrdeng_page_descr_mutex_unlock(ctx, old_descr);
-        }
-        page_inserted = false;
-        uv_rwlock_wrunlock(&page_index->ctx->datafiles.rwlock);
-    }
+    if (unlikely(*PValue) && !lock_and_count)
+        return *PValue;
+
     *PValue = descr;
-
-    if (page_inserted && lock_and_count) {
+    if (lock_and_count)
         ++page_index->page_count;
-    }
 
     pg_cache_add_new_metric_time(page_index, descr);
 
@@ -1032,7 +1007,7 @@ struct rrdeng_page_descr *pg_cache_insert(
         uv_rwlock_wrunlock(&page_index->lock);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (page_inserted && lock_and_count) {
+    if (lock_and_count) {
         ++ctx->stats.pg_cache_insertions;
         ++pg_cache->page_descriptors;
     }
