@@ -13,13 +13,7 @@ struct rrdengine_instance;
 #define DATAFILE_PREFIX "datafile-"
 #define DATAFILE_EXTENSION ".ndf"
 
-#ifndef MAX_DATAFILE_SIZE
 #define MAX_DATAFILE_SIZE   (1073741824LU)
-#endif
-#if  MIN_DATAFILE_SIZE > MAX_DATAFILE_SIZE
-#error MIN_DATAFILE_SIZE > MAX_DATAFILE_SIZE
-#endif
-
 #define MIN_DATAFILE_SIZE   (4194304LU)
 #define MAX_DATAFILES (65536) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (20)
@@ -32,7 +26,6 @@ struct extent_info {
     uint8_t number_of_pages;
     struct rrdengine_datafile *datafile;
     struct extent_info *next;
-    uint32_t index;                    // This is the entent index for version 2
     struct rrdeng_page_descr *pages[];
 };
 
@@ -48,7 +41,6 @@ struct rrdengine_datafile {
     unsigned fileno;
     uv_file file;
     uint64_t pos;
-    uv_rwlock_t extent_rwlock;
     struct rrdengine_instance *ctx;
     struct rrdengine_df_extents extents;
     struct rrdengine_journalfile *journalfile;
@@ -56,22 +48,20 @@ struct rrdengine_datafile {
 };
 
 struct rrdengine_datafile_list {
-    uv_rwlock_t rwlock;
     struct rrdengine_datafile *first; /* oldest */
     struct rrdengine_datafile *last; /* newest */
 };
 
 void df_extent_insert(struct extent_info *extent);
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
-void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
+void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
-int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);
+int destroy_data_file(struct rrdengine_datafile *datafile);
 int create_data_file(struct rrdengine_datafile *datafile);
 int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
-void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile);
 
 #endif /* NETDATA_DATAFILE_H */

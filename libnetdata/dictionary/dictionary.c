@@ -2171,13 +2171,11 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const D
 // ----------------------------------------------------------------------------
 // sorted walkthrough
 
-typedef int (*qsort_compar)(const void *item1, const void *item2);
-
 static int dictionary_sort_compar(const void *item1, const void *item2) {
     return strcmp(item_get_name((*(DICTIONARY_ITEM **)item1)), item_get_name((*(DICTIONARY_ITEM **)item2)));
 }
 
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data, dictionary_sorted_compar compar) {
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
     if(unlikely(!dict || !callback)) return 0;
 
     if(unlikely(is_dictionary_destroyed(dict))) {
@@ -2202,10 +2200,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     if(unlikely(i != entries))
         entries = i;
 
-    if(compar)
-        qsort(array, entries, sizeof(DICTIONARY_ITEM *), (qsort_compar)compar);
-    else
-        qsort(array, entries, sizeof(DICTIONARY_ITEM *), dictionary_sort_compar);
+    qsort(array, entries, sizeof(DICTIONARY_ITEM *), dictionary_sort_compar);
 
     bool callit = true;
     int ret = 0, r;

@@ -5,7 +5,6 @@
 
 #define STREAM_COMPRESSION_MSG "STREAM_COMPRESSION"
 
-// signature MUST end with a newline
 #define SIGNATURE ((uint32_t)('z' | 0x80) | (0x80 << 8) | (0x80 << 16) | ('\n' << 24))
 #define SIGNATURE_MASK ((uint32_t)0xff | (0x80 << 8) | (0x80 << 16) | (0xff << 24))
 #define SIGNATURE_SIZE 4

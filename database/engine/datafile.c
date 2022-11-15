@@ -1,29 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
-{
-    struct extent_info *extent = datafile->extents.first, *next_extent;
-
-    char path[RRDENG_PATH_MAX];
-
-    generate_journalfilepath_v2(datafile, path, sizeof(path));
-    internal_error(true, "Deleting extents of file %s", path);
-    unsigned count = 0;
-    while (extent) {
-        next_extent = extent->next;
-        freez(extent);
-        count++;
-        extent = next_extent;
-    }
-    datafile->extents.first = NULL;
-    internal_error(true, "Deleted %u extents of file %s", count, path);
-}
-
 void df_extent_insert(struct extent_info *extent)
 {
     struct rrdengine_datafile *datafile = extent->datafile;
-    uv_rwlock_wrlock(&datafile->extent_rwlock);
 
     if (likely(NULL != datafile->extents.last)) {
         datafile->extents.last->next = extent;
@@ -32,14 +12,10 @@ void df_extent_insert(struct extent_info *extent)
         datafile->extents.first = extent;
     }
     datafile->extents.last = extent;
-
-    uv_rwlock_wrunlock(&datafile->extent_rwlock);
 }
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
     if (likely(NULL != ctx->datafiles.last)) {
         ctx->datafiles.last->next = datafile;
     }
@@ -47,13 +23,12 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
         ctx->datafiles.first = datafile;
     }
     ctx->datafiles.last = datafile;
-
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
-void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_datafile *next;
+
     next = datafile->next;
     fatal_assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
     ctx->datafiles.first = next;
@@ -69,7 +44,6 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->file = (uv_file)0;
     datafile->pos = 0;
     datafile->extents.first = datafile->extents.last = NULL; /* will be populated by journalfile */
-    fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->journalfile = NULL;
     datafile->next = NULL;
     datafile->ctx = ctx;
@@ -123,7 +97,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
     return ret;
 }
 
-int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
+int destroy_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
@@ -202,7 +176,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     uv_fs_req_cleanup(&req);
     posix_memfree(superblock);
     if (ret < 0) {
-        destroy_data_file_unsafe(datafile);
+        destroy_data_file(datafile);
         return ret;
     }
 
@@ -330,8 +304,10 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
+        info("Scanning file \"%s/%s\"", ctx->dbfiles_path, dent.name);
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &no);
         if (2 == ret) {
+            info("Matched file \"%s/%s\"", ctx->dbfiles_path, dent.name);
             datafile = mallocz(sizeof(*datafile));
             datafile_init(datafile, ctx, tier, no);
             datafiles[matched_files++] = datafile;
@@ -361,7 +337,6 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         journalfile = mallocz(sizeof(*journalfile));
         datafile->journalfile = journalfile;
         journalfile_init(journalfile, datafile);
-        journalfile->file_index = i;
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */
@@ -371,7 +346,6 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
-            // TODO: Also delete the version 2
             error("Deleting invalid data and journal file pair.");
             ret = unlink_journal_file(journalfile);
             if (!ret) {
@@ -433,7 +407,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsi
     return 0;
 
 error_after_journalfile:
-    destroy_data_file_unsafe(datafile);
+    destroy_data_file(datafile);
     freez(journalfile);
 error_after_datafile:
     freez(datafile);
@@ -447,7 +421,6 @@ int init_data_files(struct rrdengine_instance *ctx)
 {
     int ret;
 
-    fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
     ret = scan_data_files(ctx);
     if (ret < 0) {
         error("Failed to scan path \"%s\".", ctx->dbfiles_path);

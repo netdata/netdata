@@ -206,7 +206,7 @@ static void arrayalloc_add_page(ARAL *ar) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->cache_dir, ar->filename, ar->internal.file_number);
         page->filename = strdupz(filename);
-        page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0, false);
+        page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0);
         if (unlikely(!page->data))
             fatal("Cannot allocate arrayalloc buffer of size %zu on filename '%s'", page->size, page->filename);
     }
@@ -344,7 +344,7 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 #endif
     }
 
-#ifdef NETDATA_ARRAYALLOC_INTERNAL_CHECKS
+#ifdef NETDATA_INTERNAL_CHECKS
     {
         // find the page ptr belongs
         ARAL_PAGE *page2 = find_page_with_allocation_internal_check(ar, ptr);

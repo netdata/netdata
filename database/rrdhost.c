@@ -290,11 +290,7 @@ int is_legacy = 1;
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
     }
 
-    if(rrdpush_enable_replication)
-        rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
-    else
-        rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
-
+    host->rrdpush_enable_replication = rrdpush_enable_replication;
     host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
     host->rrdpush_replication_step = rrdpush_replication_step;
 
@@ -620,13 +616,10 @@ void rrdhost_update(RRDHOST *host
         rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
-        if(rrdpush_enable_replication)
-            rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
-        else
-            rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
-
+        host->rrdpush_enable_replication = rrdpush_enable_replication;
         host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
         host->rrdpush_replication_step = rrdpush_replication_step;
+
 
         rrd_hosts_available++;
         ml_new_host(host);
