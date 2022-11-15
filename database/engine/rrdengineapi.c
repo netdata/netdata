@@ -491,7 +491,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 //                print_page_cache_descr(descr, buffer, false);
 
                 // loop to fill the gap
-                usec_t step_ut = page_index->latest_update_every_s * USEC_PER_SEC;
+                usec_t step_ut = update_every_ut;
                 usec_t last_point_filled_ut = last_point_in_time_ut + step_ut;
 
                 while (last_point_filled_ut < point_in_time_ut) {
@@ -504,7 +504,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
             }
         }
     }
-    else if(unlikely(page_index->latest_time_ut != INVALID_TIME && point_in_time_ut <= page_index->latest_time_ut)) {
+    else if(unlikely(point_in_time_ut <= page_index->latest_time_ut && page_index->latest_time_ut != INVALID_TIME)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, while is in the past of latest value in the database %llu",
                     point_in_time_ut, page_index->latest_time_ut);
