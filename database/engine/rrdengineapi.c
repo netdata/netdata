@@ -223,8 +223,6 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle->unaligned_page = 0;
     page_index->latest_update_every_s = update_every;
 
-    handle->last_collected_point_in_time_ut = page_index->latest_time_ut;
-
     uv_rwlock_wrlock(&page_index->lock);
     ++page_index->writers;
     uv_rwlock_wrunlock(&page_index->lock);
@@ -454,15 +452,6 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     struct pg_cache_page_index *page_index = handle->page_index;
     struct rrdeng_page_descr *descr = handle->descr;
 
-    if(point_in_time_ut <= handle->last_collected_point_in_time_ut) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, latest was %llu",
-                    point_in_time_ut, handle->last_collected_point_in_time_ut);
-        return;
-    }
-
-    handle->last_collected_point_in_time_ut = point_in_time_ut;
-
     if(likely(descr)) {
         usec_t last_point_in_time_ut = descr->end_time_ut;
         usec_t update_every_ut = page_index->latest_update_every_s * USEC_PER_SEC;
@@ -472,18 +461,9 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
         if(unlikely(points_gap != 1)) {
             if (unlikely(points_gap <= 0)) {
-                time_t now = now_realtime_sec();
-                static __thread size_t counter = 0;
-                static __thread time_t last_time_logged = 0;
-                counter++;
-
-                if(now - last_time_logged > 600) {
-                    error("DBENGINE: collected point is in the past (repeated %zu times in the last %zu secs). Ignoring these data collection points.",
-                          counter, (size_t)(last_time_logged?(now - last_time_logged):0));
-
-                    last_time_logged = now;
-                    counter = 0;
-                }
+                error_limit_static_global_var(erl, 1, 0);
+                error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, which is in the past of the current page end time %llu",
+                            point_in_time_ut, last_point_in_time_ut);
                 return;
             }
 
@@ -523,6 +503,12 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                 }
             }
         }
+    }
+    else if(unlikely(page_index->latest_time_ut != INVALID_TIME && point_in_time_ut <= page_index->latest_time_ut)) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: ignoring past collected point at %llu, while is in the past of latest value in the database %llu",
+                    point_in_time_ut, page_index->latest_time_ut);
+        return;
     }
 
     rrdeng_store_metric_next_internal(collection_handle, point_in_time_ut, n, min_value, max_value, count, anomaly_count, flags);
