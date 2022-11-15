@@ -42,7 +42,7 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         rrddim_foreach_done(rd);
     }
 
-    time_t now = after, actual_after = 0, actual_before = 0;
+    time_t now = after + 1, actual_after = 0, actual_before = 0;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
@@ -252,6 +252,18 @@ static bool send_replay_chart_cmd(send_command callback, void *callback_data, RR
     }
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(
+            st->replay.after != 0 || st->replay.before != 0,
+            "REPLAY: host '%s', chart '%s': sending replication request, while there is another inflight",
+            rrdhost_hostname(st->rrdhost), rrdset_id(st)
+            );
+
+    st->replay.start_streaming = start_streaming;
+    st->replay.after = after;
+    st->replay.before = before;
+#endif
+
     debug(D_REPLICATION, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
           rrdset_id(st), start_streaming ? "true" : "false", (unsigned long long)after, (unsigned long long)before);
 
@@ -277,7 +289,7 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     // if replication is disabled, send an empty replication request
     // asking no data
-    if (!host->rrdpush_enable_replication) {
+    if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION))) {
         internal_error(true,
                        "REPLAY: host '%s', chart '%s': sending empty replication request because replication is disabled",
                        rrdhost_hostname(host), rrdset_id(st));

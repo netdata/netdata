@@ -64,7 +64,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->entries;
         if(!entries) entries = 5;
 
-        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1);
+        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false);
         if(!rd->db) {
             info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
@@ -666,8 +666,8 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     rrdset_strncpyz_name(filename, rrddim_id(rd), FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    rd_on_file = (struct rrddim_map_save_v019 *)netdata_mmap(fullfilename, size,
-        ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+    rd_on_file = (struct rrddim_map_save_v019 *)netdata_mmap(
+        fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1, false);
 
     if(unlikely(!rd_on_file)) return false;
 

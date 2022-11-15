@@ -533,8 +533,9 @@ typedef enum rrdset_flags {
 
     RRDSET_FLAG_SENDER_REPLICATION_FINISHED   = (1 << 22), // the sending side has completed replication
     RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 23), // the receiving side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 24), // the receiving side has replication in progress
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES = (1 << 24), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES = (1 << 25), // a custom variable has been updated and needs to be exposed to parent
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -658,6 +659,14 @@ struct rrdset {
         netdata_rwlock_t rwlock;                    // protection for RRDCALC *base
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    struct {
+        bool start_streaming;
+        time_t after;
+        time_t before;
+    } replay;
+#endif
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
@@ -757,6 +766,8 @@ typedef enum {
     // Configuration options
     RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS   = (1 << 3), // delete files of obsolete charts
     RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
+
+    RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -937,7 +948,6 @@ struct rrdhost {
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
-    bool rrdpush_enable_replication;                // enable replication
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
 

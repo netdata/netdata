@@ -1232,7 +1232,8 @@ static inline int madvise_mergeable(void *mem, size_t len) {
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only)
+{
     // info("netdata_mmap('%s', %zu", filename, size);
 
     // MAP_SHARED is used in memory mode map
@@ -1271,7 +1272,7 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
         fd_for_mmap = -1;
     }
 
-    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
+    mem = mmap(NULL, size, read_only ? PROT_READ : PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
     if (mem != MAP_FAILED) {
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

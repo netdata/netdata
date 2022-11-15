@@ -20,7 +20,7 @@ void *dbengine_page_alloc() {
     if (unlikely(db_engine_use_malloc))
         page = mallocz(RRDENG_BLOCK_SIZE);
     else {
-        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm);
+        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm, false);
         if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
     }
     return page;
@@ -60,181 +60,6 @@ static void sanity_check(void)
     BUILD_BUG_ON(sizeof(((struct rrdeng_page_info *)0)->scratch) < 2 * sizeof(uint32_t));
 }
 
-/* always inserts into tail */
-static inline void xt_cache_replaceQ_insert(struct rrdengine_worker_config* wc,
-                                            struct extent_cache_element *xt_cache_elem)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-
-    xt_cache_elem->prev = NULL;
-    xt_cache_elem->next = NULL;
-
-    if (likely(NULL != xt_cache->replaceQ_tail)) {
-        xt_cache_elem->prev = xt_cache->replaceQ_tail;
-        xt_cache->replaceQ_tail->next = xt_cache_elem;
-    }
-    if (unlikely(NULL == xt_cache->replaceQ_head)) {
-        xt_cache->replaceQ_head = xt_cache_elem;
-    }
-    xt_cache->replaceQ_tail = xt_cache_elem;
-}
-
-static inline void xt_cache_replaceQ_delete(struct rrdengine_worker_config* wc,
-                                            struct extent_cache_element *xt_cache_elem)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *prev, *next;
-
-    prev = xt_cache_elem->prev;
-    next = xt_cache_elem->next;
-
-    if (likely(NULL != prev)) {
-        prev->next = next;
-    }
-    if (likely(NULL != next)) {
-        next->prev = prev;
-    }
-    if (unlikely(xt_cache_elem == xt_cache->replaceQ_head)) {
-        xt_cache->replaceQ_head = next;
-    }
-    if (unlikely(xt_cache_elem == xt_cache->replaceQ_tail)) {
-        xt_cache->replaceQ_tail = prev;
-    }
-    xt_cache_elem->prev = xt_cache_elem->next = NULL;
-}
-
-static inline void xt_cache_replaceQ_set_hot(struct rrdengine_worker_config* wc,
-                                             struct extent_cache_element *xt_cache_elem)
-{
-    xt_cache_replaceQ_delete(wc, xt_cache_elem);
-    xt_cache_replaceQ_insert(wc, xt_cache_elem);
-}
-
-/* Returns the index of the cached extent if it was successfully inserted in the extent cache, otherwise -1 */
-static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-    unsigned idx;
-    int ret;
-
-    ret = find_first_zero(xt_cache->allocation_bitmap);
-    if (-1 == ret || ret >= MAX_CACHED_EXTENTS) {
-        for (xt_cache_elem = xt_cache->replaceQ_head ; NULL != xt_cache_elem ; xt_cache_elem = xt_cache_elem->next) {
-            idx = xt_cache_elem - xt_cache->extent_array;
-            if (!check_bit(xt_cache->inflight_bitmap, idx)) {
-                xt_cache_replaceQ_delete(wc, xt_cache_elem);
-                break;
-            }
-        }
-        if (NULL == xt_cache_elem)
-            return -1;
-    } else {
-        idx = (unsigned)ret;
-        xt_cache_elem = &xt_cache->extent_array[idx];
-    }
-    xt_cache_elem->extent = extent;
-    xt_cache_elem->fileno = extent->datafile->fileno;
-    xt_cache_elem->inflight_io_descr = NULL;
-    xt_cache_replaceQ_insert(wc, xt_cache_elem);
-    modify_bit(&xt_cache->allocation_bitmap, idx, 1);
-
-    return (int)idx;
-}
-
-/**
- * Returns 0 if the cached extent was found in the extent cache, 1 otherwise.
- * Sets *idx to point to the position of the extent inside the cache.
- **/
-static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct extent_info *extent, unsigned *idx)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-    unsigned i;
-
-    for (i = 0 ; i < MAX_CACHED_EXTENTS ; ++i) {
-        xt_cache_elem = &xt_cache->extent_array[i];
-        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent &&
-            xt_cache_elem->fileno == extent->datafile->fileno) {
-            *idx = i;
-            return 0;
-        }
-    }
-    return 1;
-}
-
-#if 0 /* disabled code */
-static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned idx)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-
-    xt_cache_elem = &xt_cache->extent_array[idx];
-    xt_cache_replaceQ_delete(wc, xt_cache_elem);
-    xt_cache_elem->extent = NULL;
-    modify_bit(&wc->xt_cache.allocation_bitmap, idx, 0); /* invalidate it */
-    modify_bit(&wc->xt_cache.inflight_bitmap, idx, 0); /* not in-flight anymore */
-}
-#endif
-
-void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsigned idx,
-                                       struct extent_io_descriptor *xt_io_descr)
-{
-    struct extent_cache *xt_cache = &wc->xt_cache;
-    struct extent_cache_element *xt_cache_elem;
-    struct extent_io_descriptor *old_next;
-
-    xt_cache_elem = &xt_cache->extent_array[idx];
-    old_next = xt_cache_elem->inflight_io_descr->next;
-    xt_cache_elem->inflight_io_descr->next = xt_io_descr;
-    xt_io_descr->next = old_next;
-}
-
-void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, struct extent_io_descriptor *xt_io_descr)
-{
-    unsigned i, j, page_offset;
-    struct rrdengine_instance *ctx = wc->ctx;
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-    void *page;
-    struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
-
-    for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        page = dbengine_page_alloc();
-        descr = xt_io_descr->descr_array[i];
-        for (j = 0, page_offset = 0 ; j < extent->number_of_pages ; ++j) {
-            /* care, we don't hold the descriptor mutex */
-            if (!uuid_compare(*extent->pages[j]->id, *descr->id) &&
-                extent->pages[j]->page_length == descr->page_length &&
-                extent->pages[j]->start_time_ut == descr->start_time_ut &&
-                extent->pages[j]->end_time_ut == descr->end_time_ut) {
-                break;
-            }
-            page_offset += extent->pages[j]->page_length;
-
-        }
-        /* care, we don't hold the descriptor mutex */
-       (void) memcpy(page, wc->xt_cache.extent_array[idx].pages + page_offset, descr->page_length);
-
-        rrdeng_page_descr_mutex_lock(ctx, descr);
-        pg_cache_descr = descr->pg_cache_descr;
-        pg_cache_descr->page = page;
-        pg_cache_descr->flags |= RRD_PAGE_POPULATED;
-        pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
-        pg_cache_replaceQ_insert(ctx, descr);
-        if (xt_io_descr->release_descr) {
-            pg_cache_put(ctx, descr);
-        } else {
-            debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
-            pg_cache_wake_up_waiters(ctx, descr);
-        }
-    }
-    if (xt_io_descr->completion)
-        completion_mark_complete(xt_io_descr->completion);
-    freez(xt_io_descr);
-}
-
 static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
     switch(type) {
         case PAGE_METRICS: {
@@ -272,11 +97,30 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
+unsigned int getdatafile_fileno(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    if (descr->extent)
+        return descr->extent->datafile->fileno;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+        if (journalfile->journal_data && datafile->file == descr->file)
+                break;
+        datafile = datafile->next;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    return datafile ? datafile->fileno : 0;
+}
+
 static void do_extent_processing (struct rrdengine_worker_config *wc, struct extent_io_descriptor *xt_io_descr, bool read_failed)
 {
     struct rrdengine_instance *ctx = wc->ctx;
-    struct rrdeng_page_descr *descr;
+    struct rrdeng_page_descr *descr = NULL;
     struct page_cache_descr *pg_cache_descr;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     int ret;
     unsigned i, j, count;
     void *page, *uncompressed_buf = NULL;
@@ -294,33 +138,29 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     trailer = xt_io_descr->buf + xt_io_descr->bytes - sizeof(*trailer);
 
     if (unlikely(read_failed)) {
-        struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
-
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u-%u.", __func__, xt_io_descr->pos,
-              xt_io_descr->bytes, datafile->tier, datafile->fileno);
+        error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u.", __func__, xt_io_descr->pos,
+                  xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
         goto after_crc_check;
     }
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, xt_io_descr->buf, xt_io_descr->bytes - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
 #ifdef NETDATA_INTERNAL_CHECKS
-    {
+    if(xt_io_descr->descr_array[0]->extent) {
         struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
         debug(D_RRDENGINE, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u-%u. CRC32 check: %s", __func__,
               xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno, ret ? "FAILED" : "SUCCEEDED");
     }
 #endif
     if (unlikely(ret)) {
-        struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
-
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        error("%s: Extent at offset %"PRIu64"(%u) was read from datafile %u-%u. CRC32 check: FAILED", __func__,
-              xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno);
+        error("%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. CRC32 check: FAILED", __func__,
+               xt_io_descr->pos, xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
     }
 
 after_crc_check:
@@ -337,33 +177,13 @@ after_crc_check:
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
-    {
-        uint8_t xt_is_cached = 0;
-        unsigned xt_idx;
-        struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
 
-        xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-        if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
-            struct extent_cache *xt_cache = &wc->xt_cache;
-            struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
-            struct extent_io_descriptor *curr, *next;
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0]->id, sizeof(uuid_t));
+    struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
-            if (have_read_error) {
-                memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
-            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
-            } else {
-                (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
-            }
-            /* complete all connected in-flight read requests */
-            for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = next) {
-                next = curr->next;
-                read_cached_extent_cb(wc, xt_idx, curr);
-            }
-            xt_cache_elem->inflight_io_descr = NULL;
-            modify_bit(&xt_cache->inflight_bitmap, xt_idx, 0); /* not in-flight anymore */
-        }
-    }
+    struct pg_alignment *alignment = likely(NULL != page_index) ? page_index->alignment : NULL;
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
         uint8_t is_prefetched_page;
@@ -378,13 +198,13 @@ after_crc_check:
                 header->descr[i].start_time_ut == descrj->start_time_ut &&
                 header->descr[i].end_time_ut == descrj->end_time_ut) {
                 descr = descrj;
+                bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, j, 0);
                 break;
             }
         }
         is_prefetched_page = 0;
         if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
-            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid,
-                                                         header->descr[i].start_time_ut);
+            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid, header->descr[i].start_time_ut, alignment);
             if (!descr)
                 continue; /* Failed to reserve a suitable page */
             is_prefetched_page = 1;
@@ -410,6 +230,18 @@ after_crc_check:
             pg_cache_put(ctx, descr);
         } else {
             debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
+            pg_cache_wake_up_waiters(ctx, descr);
+        }
+    }
+    for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
+        descr =  xt_io_descr->descr_array[j];
+        if (unlikely(bitmap256_get_bit(&xt_io_descr->descr_array_wakeup, j))) {
+            rrdeng_page_descr_mutex_lock(ctx, descr);
+            if (!(descr->pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
+                descr->pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
+                descr->pg_cache_descr->flags |= RRD_PAGE_INVALID;
+            }
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
             pg_cache_wake_up_waiters(ctx, descr);
         }
     }
@@ -492,12 +324,21 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     struct extent_io_descriptor *xt_io_descr;
     struct rrdengine_datafile *datafile;
     struct extent_info *extent = descr[0]->extent;
-    uint8_t xt_is_cached = 0, xt_is_inflight = 0;
-    unsigned xt_idx;
+    uv_file file_to_use;
 
-    datafile = extent->datafile;
-    pos = extent->offset;
-    size_bytes = extent->size;
+    struct journal_extent_list *extent_entry = (struct journal_extent_list *) descr[0]->extent_entry;
+
+    if (likely(extent_entry)) {
+        file_to_use = descr[0]->file;
+        pos = extent_entry->datafile_offset;
+        size_bytes = extent_entry->datafile_size;
+    }
+    else {
+        datafile = extent->datafile;
+        file_to_use = datafile->file;
+        pos = extent->offset;
+        size_bytes = extent->size;
+    }
 
     xt_io_descr = callocz(1, sizeof(*xt_io_descr));
     for (i = 0 ; i < count; ++i) {
@@ -506,33 +347,16 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         pg_cache_descr->flags |= RRD_PAGE_READ_PENDING;
         rrdeng_page_descr_mutex_unlock(ctx, descr[i]);
         xt_io_descr->descr_array[i] = descr[i];
+        bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, i, 1);
     }
     xt_io_descr->descr_count = count;
-    xt_io_descr->file = datafile->file;
+    xt_io_descr->file = file_to_use;
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->pos = pos;
     xt_io_descr->req_worker.data = xt_io_descr;
     xt_io_descr->completion = NULL;
     xt_io_descr->release_descr = release_descr;
     xt_io_descr->buf = NULL;
-
-    xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-    if (xt_is_cached) {
-        xt_cache_replaceQ_set_hot(wc, &wc->xt_cache.extent_array[xt_idx]);
-        xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
-        if (xt_is_inflight) {
-            enqueue_inflight_read_to_xt_cache(wc, xt_idx, xt_io_descr);
-            return;
-        }
-        return read_cached_extent_cb(wc, xt_idx, xt_io_descr);
-    } else {
-        ret = try_insert_into_xt_cache(wc, extent);
-        if (-1 != ret) {
-            xt_idx = (unsigned)ret;
-            modify_bit(&wc->xt_cache.inflight_bitmap, xt_idx, 1);
-            wc->xt_cache.extent_array[xt_idx].inflight_io_descr = xt_io_descr;
-        }
-    }
 
     ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_read_extent, read_mmap_extent_cb);
     fatal_assert(-1 != ret);
@@ -647,7 +471,7 @@ static void invalidate_oldest_committed(void *arg)
 
             goto out;
         }
-        pg_cache_punch_hole(ctx, descr, 1, 1, NULL);
+        pg_cache_punch_hole(ctx, descr, 1, 1, NULL, true);
 
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
@@ -696,6 +520,152 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
             wc->now_invalidating_dirty_pages = NULL;
         }
     }
+}
+
+struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid)
+{
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
+    struct pg_cache_page_index *page_index = (NULL == PValue) ? NULL : *PValue;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    return page_index;
+}
+
+struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
+{
+    uv_rwlock_rdlock(&page_index->lock);
+    Pvoid_t *PValue = JudyLGet(page_index->JudyL_array, start_time_s, PJE0);
+    struct rrdeng_page_descr *descr = unlikely(NULL == PValue) ? NULL : *PValue;
+    uv_rwlock_rdunlock(&page_index->lock);
+    return descr;
+};
+
+static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, time_t start_time_s, bool expired)
+{
+    struct rrdeng_page_descr *descr = get_descriptor(page_index, start_time_s);
+    if (unlikely(!descr))
+        return true;
+
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    unsigned flags = descr->pg_cache_descr->flags & RRD_PAGE_POPULATED;
+    if ((!flags || expired) && pg_cache_try_get_unsafe(descr, 1)) {
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
+        pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+        return true;
+    }
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+    return false;
+}
+
+#ifndef DESCRIPTOR_EXPIRATION_TIME
+#define DESCRIPTOR_EXPIRATION_TIME (365 * 86400)
+#endif
+
+static void check_journal_file(struct rrdengine_journalfile *journalfile, size_t count)
+{
+    struct rrdengine_instance *ctx = journalfile->datafile->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    Pvoid_t *PValue;
+    Word_t page_address;
+    uint32_t Index;
+
+    struct journal_v2_header *journal_header = (struct journal_v2_header *) journalfile->journal_data;
+    time_t journal_start_time_s = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+
+    uv_rwlock_rdlock(&pg_cache->v2_lock);
+
+    bool expired = ((now_realtime_sec() - journalfile->last_access) > DESCRIPTOR_EXPIRATION_TIME);
+
+    unsigned count_evicted = 0;
+    for (page_address = 0,
+        PValue = JudyLFirst(journalfile->JudyL_array, &page_address, PJE0),
+        Index = unlikely(NULL == PValue) ? 0 : *(uint32_t *) PValue;
+        Index ;
+        PValue = JudyLNext(journalfile->JudyL_array, &page_address, PJE0),
+        Index = unlikely(NULL == PValue) ? 0 : *(uint32_t *) PValue) {
+
+        uv_rwlock_rdunlock(&pg_cache->v2_lock);
+
+        // Assume we will evict everything
+        bool all_evicted = true;
+        // Get the page index will be working on
+        struct journal_page_header *page_list_header = journalfile->journal_data + page_address;
+        struct pg_cache_page_index *page_index = get_page_index(pg_cache, &page_list_header->uuid);
+
+        if (likely(page_index)) {
+            struct journal_page_list *page_list = (struct journal_page_list *) ((void *) page_list_header + sizeof(*page_list_header));
+            uint32_t entries = page_list_header->entries;
+
+            // First try to target the marked entry; Note marked entry is recorded +1
+            struct journal_page_list *page_entry = &page_list[Index - 1];
+            time_t index_time_s = journal_start_time_s + page_entry->delta_start_s;
+            all_evicted = try_to_remove_v2_descriptor(ctx, page_index, index_time_s, expired);
+
+            // Try to scan range ; all need to return evicted
+            for (uint32_t x = 0; all_evicted && x < entries; x++) {
+                index_time_s = journal_start_time_s + (&page_list[x])->delta_start_s;
+                all_evicted = all_evicted && try_to_remove_v2_descriptor(ctx, page_index, index_time_s, expired);
+            }
+        }
+
+        if (all_evicted) {
+            uv_rwlock_wrlock(&pg_cache->v2_lock);
+            (void) JudyLDel(&journalfile->JudyL_array, page_address, PJE0);
+            uv_rwlock_wrunlock(&pg_cache->v2_lock);
+            ++count_evicted;
+        }
+
+        uv_rwlock_rdlock(&pg_cache->v2_lock);
+        if (count_evicted > count / 10)
+            break;
+    }
+
+    uv_rwlock_rdunlock(&pg_cache->v2_lock);
+}
+
+void after_delete_descriptors(struct rrdengine_worker_config* wc)
+{
+    int error = uv_thread_join(wc->now_deleting_descriptors);
+    if (error)
+        error("uv_thread_join(): %s", uv_strerror(error));
+    freez(wc->now_deleting_descriptors);
+    wc->now_deleting_descriptors = NULL;
+    wc->cleanup_deleting_descriptors = 0;
+    /* interrupt event loop */
+    uv_stop(wc->loop);
+}
+
+void delete_descriptors(void *arg)
+{
+    struct rrdengine_instance *ctx = arg;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct rrdengine_worker_config *wc = &ctx->worker_config;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    struct rrdengine_journalfile *journalfile;
+    while (datafile) {
+        journalfile = datafile->journalfile;
+        if (!journalfile->journal_data) {
+            datafile = datafile->next;
+            continue;
+        }
+
+        uv_rwlock_rdlock(&pg_cache->v2_lock);
+        Word_t count = JudyLCount(journalfile->JudyL_array, 0, -1, PJE0);
+        uv_rwlock_rdunlock(&pg_cache->v2_lock);
+
+        if (unlikely(count))
+            check_journal_file(journalfile, count);
+
+        datafile = datafile->next;
+    }
+
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    wc->cleanup_deleting_descriptors = 1;
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 void flush_pages_cb(uv_fs_t* req)
@@ -794,15 +764,43 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
-        if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
+        bool invalid_page = ((pg_cache_descr->flags & RRD_PAGE_INVALID) == RRD_PAGE_INVALID);
+        if (likely(false == invalid_page)) {
+            if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
+                page_write_pending = 1;
+                /* care, no reference being held */
+                pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
+                uncompressed_payload_length += descr->page_length;
+                descr_commit_idx_array[count] = Index;
+                eligible_pages[count++] = descr;
+            }
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
+        } else {
+#ifdef NETDATA_INTERNAL_CHECKS
+            {
+                char uuid_str[UUID_STR_LEN];
+                uuid_unparse_lower(*descr->id, uuid_str);
+                internal_error(true, "SKIPPING page %p marked as invalid for %s with %llu, %llu length=%u",
+                               descr, uuid_str, descr->start_time_ut, descr->end_time_ut, descr->page_length);
+
+                struct pg_cache_page_index *page_index = get_page_index(pg_cache, descr->id);
+                struct rrdeng_page_descr *in_cache_descr = get_descriptor(page_index,(time_t) (descr->start_time_ut / USEC_PER_SEC ));
+
+                if (likely(in_cache_descr))
+                    internal_error(true, "MEMORY page %p found %s with %llu, %llu length=%u",
+                                   in_cache_descr, uuid_str, in_cache_descr->start_time_ut / USEC_PER_SEC, in_cache_descr->end_time_ut / USEC_PER_SEC, in_cache_descr->page_length);
+                else
+                    internal_error(true, "MEMORY page not found for %s", uuid_str);
+            }
+#endif
+            if (pg_cache_try_get_unsafe(descr, 1)) {
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
+            }
+            else
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
             page_write_pending = 1;
-            /* care, no reference being held */
-            pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
-            uncompressed_payload_length += descr->page_length;
-            descr_commit_idx_array[count] = Index;
-            eligible_pages[count++] = descr;
         }
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
 
         if (page_write_pending) {
             ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
@@ -929,21 +927,25 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     int ret, error;
     char path[RRDENG_PATH_MAX];
 
+    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+
     datafile = ctx->datafiles.first;
     journalfile = datafile->journalfile;
     datafile_bytes = datafile->pos;
     journalfile_bytes = journalfile->pos;
-    deleted_bytes = 0;
+    deleted_bytes = journalfile->journal_data_size;
 
-    info("Deleting data and journal file pair.");
-    datafile_list_delete(ctx, datafile);
-    ret = destroy_journal_file(journalfile, datafile);
+    info("Deleting data and journal files");
+    datafile_list_delete_unsafe(ctx, datafile);
+    ret = destroy_journal_file_unsafe(journalfile, datafile);
     if (!ret) {
         generate_journalfilepath(datafile, path, sizeof(path));
         info("Deleted journal file \"%s\".", path);
+        generate_journalfilepath_v2(datafile, path, sizeof(path));
+        info("Deleted journal file \"%s\".", path);
         deleted_bytes += journalfile_bytes;
     }
-    ret = destroy_data_file(datafile);
+    ret = destroy_data_file_unsafe(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));
         info("Deleted data file \"%s\".", path);
@@ -964,6 +966,9 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     wc->now_deleting_files = NULL;
 
     wc->cleanup_thread_deleting_files = 0;
+
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
     rrdcontext_db_rotation();
 
     /* interrupt event loop */
@@ -982,13 +987,18 @@ static void delete_old_data(void *arg)
     uuid_t metric_id;
 
     /* Safe to use since it will be deleted after we are done */
+
     datafile = ctx->datafiles.first;
 
+    uv_rwlock_wrlock(&datafile->extent_rwlock);
     for (extent = datafile->extents.first ; extent != NULL ; extent = next) {
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
+            if (unlikely(!descr))
+                continue;
+
+            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id, true);
             if (unlikely(can_delete_metric)) {
                 /*
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
@@ -1000,18 +1010,30 @@ static void delete_old_data(void *arg)
         next = extent->next;
         freez(extent);
     }
+    uv_rwlock_wrunlock(&datafile->extent_rwlock);
+
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&wc->async));
 }
 
+#define DESCRIPTOR_INITIAL_CLEANUP    (60)
+#ifndef DESCRIPTOR_INTERVAL_CLEANUP
+#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
+#endif
+
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
+    static time_t next_descriptor_cleanup = 0;
     struct rrdengine_instance *ctx = wc->ctx;
     struct rrdengine_datafile *datafile;
     unsigned current_size, target_size;
     uint8_t out_of_space, only_one_datafile;
     int ret, error;
+
+    if (0 == next_descriptor_cleanup) {
+        next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INITIAL_CLEANUP;
+    }
 
     out_of_space = 0;
     /* Do not allow the pinned pages to exceed the disk space quota to avoid deadlocks */
@@ -1024,14 +1046,33 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     only_one_datafile = (datafile == ctx->datafiles.first) ? 1 : 0;
-    if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
+
+    if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile)) && !wc->now_deleting_descriptors) {
         /* Finalize data and journal file and create a new pair */
+        struct rrdengine_journalfile *journalfile = unlikely(NULL == ctx->datafiles.last) ? NULL : ctx->datafiles.last->journalfile;
         wal_flush_transaction_buffer(wc);
         ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
         if (likely(!ret)) {
             ++ctx->last_fileno;
+            if (likely(journalfile && db_engine_journal_indexing))
+                wc->run_indexing = true;
         }
     }
+
+    if (db_engine_journal_indexing && !wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration && !out_of_space &&
+        NO_QUIESCE == ctx->quiesce && next_descriptor_cleanup < now_realtime_sec()) {
+        next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INTERVAL_CLEANUP;
+
+        wc->now_deleting_descriptors = mallocz(sizeof(*wc->now_deleting_descriptors));
+        wc->cleanup_deleting_descriptors = 0;
+        error = uv_thread_create(wc->now_deleting_descriptors, delete_descriptors, ctx);
+        if (error) {
+            error("uv_thread_create(): %s", uv_strerror(error));
+            freez(wc->now_deleting_descriptors);
+            wc->now_deleting_descriptors = NULL;
+        }
+    }
+
     if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {
         /* delete old data */
         if (wc->now_deleting_files) {
@@ -1060,7 +1101,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 {
-    if (wc->now_invalidating_dirty_pages || wc->now_deleting_files) {
+    if (wc->now_invalidating_dirty_pages || wc->now_deleting_files || wc->now_deleting_descriptors) {
         return 1;
     }
     return 0;
@@ -1076,6 +1117,10 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
     if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
     }
+
+    if (unlikely(wc->cleanup_deleting_descriptors))
+        after_delete_descriptors(wc);
+
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
         ctx->quiesce = QUIESCED;
         completion_mark_complete(&ctx->rrdengine_completion);
@@ -1244,8 +1289,9 @@ void timer_cb(uv_timer_t* handle)
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
     rrdeng_test_quota(wc);
+
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
-    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
+    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages && !wc->now_deleting_descriptors && !wc->running_journal_migration)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
         struct page_cache *pg_cache = &ctx->pg_cache;
         unsigned long total_bytes, bytes_written, nr_committed_pages, bytes_to_write = 0, producers, low_watermark,
@@ -1277,6 +1323,12 @@ void timer_cb(uv_timer_t* handle)
             }
         }
     }
+
+    if (true == wc->run_indexing) {
+        wc->run_indexing = false;
+        queue_journalfile_v2_migration(wc);
+    }
+
     load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS
     {
@@ -1284,7 +1336,6 @@ void timer_cb(uv_timer_t* handle)
         debug(D_RRDENGINE, "%s", get_rrdeng_statistics(wc->ctx, buf, sizeof(buf)));
     }
 #endif
-
     worker_is_idle();
 }
 
@@ -1333,9 +1384,14 @@ void rrdeng_worker(void* arg)
     wc->now_deleting_files = NULL;
     wc->cleanup_thread_deleting_files = 0;
 
+    wc->now_deleting_descriptors = NULL;
+    wc->cleanup_deleting_descriptors = 0;
+    wc->running_journal_migration = 0;
+
     wc->now_invalidating_dirty_pages = NULL;
     wc->cleanup_thread_invalidating_dirty_pages = 0;
     wc->inflight_dirty_pages = 0;
+    wc->run_indexing = false;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);
