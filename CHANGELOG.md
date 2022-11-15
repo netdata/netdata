@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- remove python.d/nginx\_plus [\#13995](https://github.com/netdata/netdata/pull/13995) ([ilyam8](https://github.com/ilyam8))
+- bump go.d.plugin to v0.43.1 [\#13993](https://github.com/netdata/netdata/pull/13993) ([ilyam8](https://github.com/ilyam8))
 - added debug info on left-over query targets [\#13990](https://github.com/netdata/netdata/pull/13990) ([ktsaou](https://github.com/ktsaou))
 - replication improvements [\#13989](https://github.com/netdata/netdata/pull/13989) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin function processes: keys should not have spaces [\#13980](https://github.com/netdata/netdata/pull/13980) ([ktsaou](https://github.com/ktsaou))
@@ -346,8 +348,6 @@
 - Detect stored metric size by page type  [\#13334](https://github.com/netdata/netdata/pull/13334) ([stelfrag](https://github.com/stelfrag))
 - Silence compile warnings on external source [\#13332](https://github.com/netdata/netdata/pull/13332) ([MrZammler](https://github.com/MrZammler))
 - UpdateNodeCollectors message [\#13330](https://github.com/netdata/netdata/pull/13330) ([MrZammler](https://github.com/MrZammler))
-- Cid 379238 379238 [\#13328](https://github.com/netdata/netdata/pull/13328) ([stelfrag](https://github.com/stelfrag))
-- Docs fix metric storage [\#13327](https://github.com/netdata/netdata/pull/13327) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
