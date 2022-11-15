@@ -110,7 +110,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
     }
 
 #ifdef ENABLE_COMPRESSION
-    if (s->flags & SENDER_FLAG_COMPRESSION && s->compressor) {
+    if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor) {
         while(src_len) {
             size_t size_to_compress = src_len;
 
@@ -470,7 +470,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
 #ifdef  ENABLE_COMPRESSION
     // If we don't want compression, remove it from our capabilities
-    if(!(s->flags & SENDER_FLAG_COMPRESSION) && stream_has_capability(s, STREAM_CAP_COMPRESSION))
+    if(!(s->flags & SENDER_FLAG_COMPRESSION))
         s->capabilities &= ~STREAM_CAP_COMPRESSION;
 #endif  // ENABLE_COMPRESSION
 
@@ -666,20 +666,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
 
 #ifdef ENABLE_COMPRESSION
-    // if the stream does not have compression capability,
-    // shut it down for us too.
-    // FIXME - this means that if there are multiple parents and one of them does not support compression
-    //         we are going to shut it down for all of them eventually...
-    if(!stream_has_capability(s, STREAM_CAP_COMPRESSION))
-        s->flags &= ~SENDER_FLAG_COMPRESSION;
-
-    if(s->flags & SENDER_FLAG_COMPRESSION) {
-        if(s->compressor)
+    if(stream_has_capability(s, STREAM_CAP_COMPRESSION)) {
+        if(!s->compressor)
+            s->compressor = create_compressor();
+        else
             s->compressor->reset(s->compressor);
     }
-    else
-        info("STREAM %s [send to %s]: compression is disabled on this connection.", rrdhost_hostname(host), s->connected_to);
-
 #endif  //ENABLE_COMPRESSION
 
     log_sender_capabilities(s);
@@ -1096,6 +1088,8 @@ void sender_init(RRDHOST *host)
         host->sender->flags |= SENDER_FLAG_COMPRESSION;
         host->sender->compressor = create_compressor();
     }
+    else
+        host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
 #endif
 
     netdata_mutex_init(&host->sender->mutex);
