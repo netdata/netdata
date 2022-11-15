@@ -263,8 +263,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         rc->next_event_id++,
         rc->config_hash_id,
         now,
-        rc->title,
         rc->name,
+        rc->title,
         rc->rrdset->id,
         rc->rrdset->context,
         rc->rrdset->family,
@@ -439,6 +439,8 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
 
         rc->next_event_id = 1;
         rc->name = (ctr->overwrite_alert_name) ? string_strdupz(ctr->overwrite_alert_name) : string_dup(rt->name);
+        rc->title = string_dup(rt->title);
+        rc->original_title = string_dup(rt->title);
         rc->chart = string_dup(st->id);
         uuid_copy(rc->config_hash_id, rt->config_hash_id);
 

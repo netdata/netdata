@@ -102,4 +102,9 @@ void sql_refresh_hashes(void);
 
 void health_add_host_labels(void);
 
+#define ALARM_ENTRY_VAR_MAX 100
+#define ALARM_ENTRY_VAR_STATUS "$status"
+#define ALARM_ENTRY_VAR_VALUE "$value"
+#define ALARM_ENTRY_VAR_HOSTNAME "$hostname"
+
 #endif //NETDATA_HEALTH_H
