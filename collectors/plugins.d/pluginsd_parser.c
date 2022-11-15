@@ -892,7 +892,7 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
         time_t end_time = strtol(end_time_str, NULL, 0);
 
         internal_error(
-                end_time < st->replay.after || start_time > st->replay.before,
+                (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
                 "REPLAY: received a " PLUGINSD_KEYWORD_REPLAY_BEGIN " on chart '%s' ('%s') on host '%s', from %ld to %ld, which does not match our request (%ld to %ld).",
                 rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost), start_time, end_time, st->replay.after, st->replay.before);
 
