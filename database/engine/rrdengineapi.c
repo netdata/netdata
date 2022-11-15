@@ -550,16 +550,6 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
 // ----------------------------------------------------------------------------
 // query ops
 
-//static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
-//{
-//    return (uint32_t *)&page_info->scratch[0];
-//}
-//
-//static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
-//{
-//    return (uint32_t *)&page_info->scratch[sizeof(uint32_t)];
-//}
-//
 /*
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
@@ -1064,11 +1054,6 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-//    error = metalog_init(ctx);
-//    if (error) {
-//        error("Failed to initialize metadata log file event loop.");
-//        goto error_after_rrdeng_worker;
-//    }
 
     return 0;
 
