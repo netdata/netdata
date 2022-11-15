@@ -252,6 +252,18 @@ static bool send_replay_chart_cmd(send_command callback, void *callback_data, RR
     }
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(
+            st->replay.after != 0 || st->replay.before != 0,
+            "REPLAY: host '%s', chart '%s': sending replication request, while there is another inflight",
+            rrdhost_hostname(st->rrdhost), rrdset_id(st)
+            );
+
+    st->replay.start_streaming = start_streaming;
+    st->replay.after = after;
+    st->replay.before = before;
+#endif
+
     debug(D_REPLICATION, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
           rrdset_id(st), start_streaming ? "true" : "false", (unsigned long long)after, (unsigned long long)before);
 

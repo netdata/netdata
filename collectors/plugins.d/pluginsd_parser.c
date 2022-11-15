@@ -296,6 +296,12 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
     bool ok = true;
     if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        st->replay.start_streaming = false;
+        st->replay.after = 0;
+        st->replay.before = 0;
+#endif
+
         rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
 
@@ -885,6 +891,11 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
         time_t start_time = strtol(start_time_str, NULL, 0);
         time_t end_time = strtol(end_time_str, NULL, 0);
 
+        internal_error(
+                end_time < st->replay.after || start_time > st->replay.before,
+                "REPLAY: received a " PLUGINSD_KEYWORD_REPLAY_BEGIN " on chart '%s' ('%s') on host '%s', from %ld to %ld, which does not match our request (%ld to %ld).",
+                rrdset_name(st), rrdset_id(st), rrdhost_hostname(st->rrdhost), start_time, end_time, st->replay.after, st->replay.before);
+
         if(start_time && end_time) {
             if (start_time > end_time) {
                 error("REPLAY: requested a " PLUGINSD_KEYWORD_REPLAY_BEGIN " on chart '%s' ('%s') on host '%s', but timings are invalid (%ld to %ld). Disabling it.",
@@ -1144,6 +1155,12 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
     st->counter++;
     st->counter_done++;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    st->replay.start_streaming = false;
+    st->replay.after = 0;
+    st->replay.before = 0;
+#endif
 
     if (start_streaming) {
         if (st->update_every != update_every_child)

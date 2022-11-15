@@ -659,6 +659,14 @@ struct rrdset {
         netdata_rwlock_t rwlock;                    // protection for RRDCALC *base
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    struct {
+        bool start_streaming;
+        time_t after;
+        time_t before;
+    } replay;
+#endif
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
