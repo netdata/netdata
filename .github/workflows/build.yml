@@ -706,6 +706,75 @@ jobs:
             && github.event_name != 'pull_request'
           }}
 
+  create-nightly: # Create a nightly build release in netdata/netdata-nightlies
+    name: Create Nightly Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
+    needs:
+      - updater-check
+      - source-build
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Checkout Main Repo
+        id: checkout-main
+        uses: actions/checkout@v3
+        with:
+          path: main
+      - name: Checkout Nightly Repo
+        id: checkout-nightly
+        uses: actions/checkout@v3
+        with:
+          repository: netdata/netdata-nightlies
+          path: nightlies
+      - name: Retrieve Artifacts
+        id: fetch
+        uses: actions/download-artifact@v3
+        with:
+          name: final-artifacts
+          path: final-artifacts
+      - name: Prepare version info
+        id: version
+        run: |
+          # shellcheck disable=SC2129
+          echo "version=$(cat main/packaging/version)" >> "${GITHUB_OUTPUT}"
+          echo "commit=$(cd nightlies && git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+          echo "date=$(date +%F)" >> "${GITHUB_OUTPUT}"
+      - name: Create Release
+        id: create-release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: false
+          artifactErrorsFailBuild: true
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
+          owner: netdata
+          repo: netdata-nightlies
+          body: Netdata nightly build for ${{ steps.version.outputs.date }}.
+          commit: ${{ steps.version.outputs.commit }}
+          tag: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to draft release:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to create nightly release or attach artifacts.
+              Checkout netdata/netdata: ${{ steps.checkout-main.outcome }}
+              Checkout netdata/netdata-nightlies: ${{ steps.checkout-nightly.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
+              Prepare version info: ${{ steps.version.outcome }}
+              Create release: ${{ steps.create-release.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'workflow_dispatch'
+          }}
+
   normalize-tag: # Fix the release tag if needed
     name: Normalize Release Tag
     runs-on: ubuntu-latest
