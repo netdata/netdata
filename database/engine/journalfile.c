@@ -1004,7 +1004,7 @@ void *journal_v2_write_data_page(struct journal_v2_header *j2_header, void *data
     data_page->delta_start_s = (descr->start_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
     data_page->delta_end_s = (descr->end_time_ut - j2_header->start_time_ut) / USEC_PER_SEC;
     data_page->extent_index = extent_index;
-    data_page->update_every_s = descr->update_every_s;
+    data_page->update_every_s = (uint16_t) descr->update_every_s;
     data_page->page_length = descr->page_length;
     data_page->type = descr->type;
 
