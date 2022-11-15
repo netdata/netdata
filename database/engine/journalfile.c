@@ -814,14 +814,14 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
             pg_cache->metrics_index.last_page_index = page_index;
         }
 
-        usec_t metric_delta_start = header_start_time + (usec_t ) metric->delta_start;
-        usec_t metric_delta_end = header_start_time + (usec_t ) metric->delta_end;
+        usec_t metric_start_ut = header_start_time + (usec_t ) metric->delta_start * USEC_PER_SEC;
+        usec_t metric_end_ut = header_start_time + (usec_t ) metric->delta_end * USEC_PER_SEC;
 
-        if (page_index->oldest_time_ut > metric_delta_start)
-            page_index->oldest_time_ut = metric_delta_start;
+        if (page_index->oldest_time_ut > metric_start_ut)
+            page_index->oldest_time_ut = metric_start_ut;
 
-        if (page_index->latest_time_ut < metric_delta_end)
-            page_index->latest_time_ut = metric_delta_end;
+        if (page_index->latest_time_ut < metric_end_ut)
+            page_index->latest_time_ut = metric_end_ut;
 
         ++page_index->page_count;
         ++pg_cache->page_descriptors;
