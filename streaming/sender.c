@@ -1188,8 +1188,10 @@ static void process_replication_requests(struct sender_state *s) {
 
     worker_set_metric(WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE, (NETDATA_DOUBLE)entries);
 
-    if(!entries)
+    if(!entries) {
+        worker_set_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, 100.0);
         return;
+    }
 
     s->replication_min_time = 0;
 
