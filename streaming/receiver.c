@@ -240,8 +240,11 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
         return 0;
     }
 
+    // for compressed streams, the compression signature header ends with a new line
+    // so, here we read a single line from the stream.
+
     int ret = 0;
-    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret)) {
+    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len, &ret)) {
         internal_error(true, "read_stream() failed (1).");
         return 1;
     }
@@ -284,7 +287,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     }
 
     // Fill read buffer with decompressed data
-    r->read_len = r->decompressor->get(r->decompressor, r->read_buffer, sizeof(r->read_buffer));
+    r->read_len += (int)r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len);
     return 0;
 }
 
