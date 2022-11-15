@@ -214,13 +214,13 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
         case MQTT_WSS_LOG_ERROR:
         case MQTT_WSS_LOG_FATAL:
         case MQTT_WSS_LOG_WARN:
-            error_report("MQTTWSS: %s", str);
+            error_report("%s", str);
             return;
         case MQTT_WSS_LOG_INFO:
-            error_report("MQTTWSS: %s", str);
+            error_report("%s", str);
             return;
         case MQTT_WSS_LOG_DEBUG:
-            error_report("MQTTWSS: %s", str);
+            error_report("%s", str);
             return;
         default:
             error("Unknown log type from mqtt_wss");
