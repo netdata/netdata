@@ -4,6 +4,7 @@
 #include "sqlite_aclk_node.h"
 
 #include "../../aclk/aclk_contexts_api.h"
+#include "../../aclk/aclk_capas.h"
 
 #ifdef ENABLE_ACLK
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
@@ -71,14 +72,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.ml_info.ml_capable = ml_capable(localhost);
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
 
-    struct capability instance_caps[] = {
-        { .name = "proto", .version = 1,                     .enabled = 1 },
-        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(wc->host) },
-        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = 1 },
-        { .name = NULL,    .version = 0,                     .enabled = 0 }
-    };
-    node_info.node_instance_capabilities = instance_caps;
+    node_info.node_instance_capabilities = aclk_get_node_instance_capas(wc->host);
 
     now_realtime_timeval(&node_info.updated_at);
 
@@ -126,6 +120,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 
     rrd_unlock();
     freez(node_info.claim_id);
+    freez(node_info.node_instance_capabilities);
     freez(host_version);
 
     wc->node_collectors_send = now_realtime_sec();

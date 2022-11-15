@@ -5,6 +5,7 @@
 #include "aclk_util.h"
 #include "aclk_stats.h"
 #include "aclk.h"
+#include "aclk_capas.h"
 
 #include "schema-wrappers/proto_2_json.h"
 
@@ -211,22 +212,11 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     size_t len;
     uint16_t pid;
 
-    struct capability agent_capabilities[] = {
-        { .name = "json",  .version = 2, .enabled = 0 },
-        { .name = "proto", .version = 1, .enabled = 1 },
-#ifdef ENABLE_ML
-        { .name = "ml",    .version = 1, .enabled = ml_enabled(localhost) },
-#endif
-        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1, .enabled = 1 },
-        { .name = NULL,    .version = 0, .enabled = 0 }
-    };
-
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
         .session_id = aclk_session_newarch,
-        .capabilities = agent_capabilities
+        .capabilities = aclk_get_agent_capas()
     };
 
     rrdhost_aclk_state_lock(localhost);

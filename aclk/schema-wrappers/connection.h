@@ -17,7 +17,7 @@ typedef struct {
 
     unsigned int lwt:1;
 
-    struct capability *capabilities;
+    const struct capability *capabilities;
 
 // TODO in future optional fields
 // > 15 optional fields:

@@ -13,6 +13,7 @@
 #include "aclk_rx_msgs.h"
 #include "https_client.h"
 #include "schema-wrappers/schema_wrappers.h"
+#include "aclk_capas.h"
 
 #include "aclk_proxy.h"
 
@@ -779,14 +780,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     node_state_update.node_id = mallocz(UUID_STR_LEN);
     uuid_unparse_lower(node_id, (char*)node_state_update.node_id);
 
-    struct capability caps[] = {
-        { .name = "proto", .version = 1,                     .enabled = 1 },
-        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(host) },
-        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = 1 },
-        { .name = NULL,    .version = 0,                     .enabled = 0 }
-    };
-    node_state_update.capabilities = caps;
+    node_state_update.capabilities = aclk_get_agent_capas();
 
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
@@ -825,14 +819,7 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, host_id);
 
             RRDHOST *host = rrdhost_find_by_guid(host_id);
-            struct capability caps[] = {
-                { .name = "proto", .version = 1,                     .enabled = 1 },
-                { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
-                { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-                { .name = "ctx",   .version = 1,                     .enabled = 1 },
-                { .name = NULL,    .version = 0,                     .enabled = 0 }
-            };
-            node_state_update.capabilities = caps;
+            node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
             rrdhost_aclk_state_lock(localhost);
             node_state_update.claim_id = localhost->aclk_state.claimed_id;
@@ -841,6 +828,8 @@ void aclk_send_node_instances()
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)node_state_update.node_id,
                  list->live,
                  list->hops);
+
+            freez((void*)node_state_update.capabilities);
             freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
