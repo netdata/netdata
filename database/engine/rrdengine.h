@@ -79,6 +79,14 @@ enum rrdeng_opcode {
     RRDENG_MAX_OPCODE
 };
 
+enum rrdeng_callback_opcode {
+    RRDENG_READ_PAGE_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_READ_PAGE,
+    RRDENG_READ_EXTENT_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_READ_EXTENT,
+    RRDENG_COMMIT_PAGE_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_COMMIT_PAGE,
+    RRDENG_FLUSH_PAGES_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_FLUSH_PAGES,
+};
+
+
 struct rrdeng_read_page {
     struct rrdeng_page_descr *page_cache_descr;
 };

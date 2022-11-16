@@ -257,6 +257,7 @@ static void read_extent_cb(uv_fs_t *req)
     struct rrdengine_worker_config *wc = req->loop->data;
     struct extent_io_descriptor *xt_io_descr;
 
+    worker_is_busy(RRDENG_READ_EXTENT_CB);
     xt_io_descr = req->data;
     do_extent_processing(wc, xt_io_descr, req->result < 0);
     uv_fs_req_cleanup(req);
@@ -271,6 +272,10 @@ static void read_mmap_extent_cb(uv_work_t *req, int status __maybe_unused)
     struct extent_io_descriptor *xt_io_descr;
     xt_io_descr = req->data;
 
+    if (xt_io_descr->release_descr)
+        worker_is_busy(RRDENG_READ_EXTENT_CB);
+    else
+        worker_is_busy(RRDENG_READ_PAGE_CB);
     if (likely(xt_io_descr->map_base)) {
         do_extent_processing(wc, xt_io_descr, false);
         munmap(xt_io_descr->map_base, xt_io_descr->map_length);
@@ -678,6 +683,7 @@ void flush_pages_cb(uv_fs_t* req)
     struct page_cache_descr *pg_cache_descr;
     unsigned i, count;
 
+    worker_is_busy(RRDENG_FLUSH_PAGES_CB);
     xt_io_descr = req->data;
     if (req->result < 0) {
         ++ctx->stats.io_errors;
@@ -1403,6 +1409,10 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
     worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
     worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
+    worker_register_job_name(RRDENG_READ_PAGE_CB,                   "read page cb");
+    worker_register_job_name(RRDENG_READ_EXTENT_CB,                 "read extent cb");
+    worker_register_job_name(RRDENG_COMMIT_PAGE_CB,                 "commit cb");
+    worker_register_job_name(RRDENG_FLUSH_PAGES_CB ,                "flush cb");
 
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
