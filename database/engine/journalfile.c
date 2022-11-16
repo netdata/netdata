@@ -1498,6 +1498,7 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
     if (activate) {
         journalfile->journal_data = data_start;
         journalfile->journal_data_size = total_file_size;
+        journalfile->is_valid = true;
 
         // HERE we need to remove old descriptors and activate the new ones
         {
