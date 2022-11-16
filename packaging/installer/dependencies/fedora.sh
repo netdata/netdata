@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << Fedora: [24->35] >>
+# << Fedora: [24->37] >>
 
 set -e
 
@@ -49,6 +49,8 @@ declare -a package_tree=(
   curl
   gzip
   python3
+  bison
+  flex
   "${ulogd_pkg}"
 )
 

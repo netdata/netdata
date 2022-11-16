@@ -25,6 +25,8 @@ package_tree="
   liblz4
   openssl
   python3
+  bison
+  flex
   "
 
 prompt() {

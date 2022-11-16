@@ -34,6 +34,8 @@ declare -a package_tree=(
   curl
   gzip
   python3
+  bison
+  flex
 )
 
 usage() {

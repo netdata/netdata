@@ -32,6 +32,8 @@ declare -a package_tree=(
   git
   curl
   gzip
+  bison
+  flex
 )
 
 prompt() {

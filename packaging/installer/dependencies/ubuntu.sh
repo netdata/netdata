@@ -32,6 +32,8 @@ package_tree="
   libssl-dev
   libelf-dev
   python3
+  bison
+  flex
   "
 usage() {
   cat << EOF

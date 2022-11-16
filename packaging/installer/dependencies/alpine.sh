@@ -31,6 +31,9 @@ package_tree="
   util-linux-dev
   libmnl-dev
   json-c-dev
+  fts-dev
+  bison
+  flex
   "
 
 usage() {

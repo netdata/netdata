@@ -663,6 +663,23 @@ declare -A pkg_cmake=(
   ['default']="cmake"
 )
 
+declare -A pkg_bison=(
+  ['default']="bison"
+
+  ['centos-7']="bison bison-devel"
+)
+
+declare -A pkg_flex=(
+  ['default']="flex"
+
+  ['centos-7']="flex flex-devel"
+)
+
+declare -A pkg_fts_dev=(
+  ['default']="NOTREQUIRED"
+  ['alpine']="fts-dev"
+)
+
 declare -A pkg_json_c_dev=(
   ['alpine']="json-c-dev"
   ['arch']="json-c"
@@ -1196,6 +1213,8 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
+    require_cmd bison || suitable_package bison
+    require_cmd flex || suitable_package flex
   fi
 
   # -------------------------------------------------------------------------
@@ -1227,6 +1246,7 @@ packages() {
     suitable_package libuuid-dev
     suitable_package libmnl-dev
     suitable_package json-c-dev
+    suitable_package fts-dev
   fi
 
   # -------------------------------------------------------------------------

@@ -33,6 +33,8 @@ package_tree="
   libelf-dev
   python
   python3
+  bison
+  flex
   "
 
 usage() {

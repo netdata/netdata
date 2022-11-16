@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << CentOS: [7] [8] >>
+# << CentOS: [7] [8] [9] >>
 
 set -e
 
@@ -28,6 +28,8 @@ declare -a package_tree=(
   tar
   curl
   gzip
+  bison
+  flex
 )
 
 os_version() {
