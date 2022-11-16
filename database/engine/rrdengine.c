@@ -164,6 +164,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     }
 
 after_crc_check:
+    worker_is_busy(RRDENG_EXT_DECOMPRESSION);
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
         for (i = 0 ; i < count ; ++i) {
@@ -183,6 +184,7 @@ after_crc_check:
     struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
+    worker_is_busy(RRDENG_PAGE_POPULATION);
     struct pg_alignment *alignment = likely(NULL != page_index) ? page_index->alignment : NULL;
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
@@ -256,8 +258,12 @@ static void read_extent_cb(uv_fs_t *req)
 {
     struct rrdengine_worker_config *wc = req->loop->data;
     struct extent_io_descriptor *xt_io_descr;
+    xt_io_descr = req->data;
 
-    worker_is_busy(RRDENG_READ_EXTENT_CB);
+    if (xt_io_descr->release_descr)
+        worker_is_busy(RRDENG_READ_EXTENT_CB);
+    else
+        worker_is_busy(RRDENG_READ_PAGE_CB);
     xt_io_descr = req->data;
     do_extent_processing(wc, xt_io_descr, req->result < 0);
     uv_fs_req_cleanup(req);
@@ -1410,6 +1416,8 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_READ_EXTENT_CB,                 "read extent cb");
     worker_register_job_name(RRDENG_COMMIT_PAGE_CB,                 "commit cb");
     worker_register_job_name(RRDENG_FLUSH_PAGES_CB ,                "flush cb");
+    worker_register_job_name(RRDENG_PAGE_POPULATION ,                "populate cache");
+    worker_register_job_name(RRDENG_EXT_DECOMPRESSION ,              "extent decompression");
 
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
