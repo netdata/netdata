@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- Revert "New journal disk based indexing for agent memory reduction" [\#14000](https://github.com/netdata/netdata/pull/14000) ([ktsaou](https://github.com/ktsaou))
+- Revert "enable dbengine tiering by default" [\#13999](https://github.com/netdata/netdata/pull/13999) ([ktsaou](https://github.com/ktsaou))
+- fixes MQTT-NG QoS0 [\#13997](https://github.com/netdata/netdata/pull/13997) ([underhood](https://github.com/underhood))
 - remove python.d/nginx\_plus [\#13995](https://github.com/netdata/netdata/pull/13995) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.43.1 [\#13993](https://github.com/netdata/netdata/pull/13993) ([ilyam8](https://github.com/ilyam8))
+- Add 'funcs' capability [\#13992](https://github.com/netdata/netdata/pull/13992) ([underhood](https://github.com/underhood))
 - added debug info on left-over query targets [\#13990](https://github.com/netdata/netdata/pull/13990) ([ktsaou](https://github.com/ktsaou))
 - replication improvements [\#13989](https://github.com/netdata/netdata/pull/13989) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin function processes: keys should not have spaces [\#13980](https://github.com/netdata/netdata/pull/13980) ([ktsaou](https://github.com/ktsaou))
@@ -42,6 +46,7 @@
 - fix crash on query plan switch [\#13920](https://github.com/netdata/netdata/pull/13920) ([ktsaou](https://github.com/ktsaou))
 - Enable aclk conversation log even without NETDATA\_INTERNAL CHECKS [\#13917](https://github.com/netdata/netdata/pull/13917) ([MrZammler](https://github.com/MrZammler))
 - add ping dashboard info and alarms [\#13916](https://github.com/netdata/netdata/pull/13916) ([ilyam8](https://github.com/ilyam8))
+- enable dbengine tiering by default [\#13914](https://github.com/netdata/netdata/pull/13914) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
 - do not free hosts if a change on db mode is not needed [\#13912](https://github.com/netdata/netdata/pull/13912) ([ktsaou](https://github.com/ktsaou))
 - timeframe matching should take into account the update frequency of the chart [\#13911](https://github.com/netdata/netdata/pull/13911) ([ktsaou](https://github.com/ktsaou))
@@ -59,6 +64,7 @@
 - Prompt users about updates/claiming on unknown install types. [\#13890](https://github.com/netdata/netdata/pull/13890) ([Ferroin](https://github.com/Ferroin))
 - tune rrdcontext timings [\#13889](https://github.com/netdata/netdata/pull/13889) ([ktsaou](https://github.com/ktsaou))
 - filtering out charts in context queries, includes them in full\_xxx variables [\#13886](https://github.com/netdata/netdata/pull/13886) ([ktsaou](https://github.com/ktsaou))
+- New journal disk based indexing for agent memory reduction [\#13885](https://github.com/netdata/netdata/pull/13885) ([stelfrag](https://github.com/stelfrag))
 - Fix systemd chart update \(eBPF\) [\#13884](https://github.com/netdata/netdata/pull/13884) ([thiagoftsm](https://github.com/thiagoftsm))
 - apps.plugin function processes cosmetic changes [\#13880](https://github.com/netdata/netdata/pull/13880) ([ktsaou](https://github.com/ktsaou))
 - allow single chart to be filtered in context queries [\#13879](https://github.com/netdata/netdata/pull/13879) ([ktsaou](https://github.com/ktsaou))
@@ -343,11 +349,6 @@
 - fix crash on start on slow disks because ml is initialized before dbengine starts [\#13342](https://github.com/netdata/netdata/pull/13342) ([ktsaou](https://github.com/ktsaou))
 - fix\(packaging\): respect CFLAGS arg when building Docker image [\#13340](https://github.com/netdata/netdata/pull/13340) ([ilyam8](https://github.com/ilyam8))
 - add github stars badge to readme [\#13338](https://github.com/netdata/netdata/pull/13338) ([andrewm4894](https://github.com/andrewm4894))
-- Fix coverity 379241 [\#13336](https://github.com/netdata/netdata/pull/13336) ([MrZammler](https://github.com/MrZammler))
-- Rrdcontext [\#13335](https://github.com/netdata/netdata/pull/13335) ([ktsaou](https://github.com/ktsaou))
-- Detect stored metric size by page type  [\#13334](https://github.com/netdata/netdata/pull/13334) ([stelfrag](https://github.com/stelfrag))
-- Silence compile warnings on external source [\#13332](https://github.com/netdata/netdata/pull/13332) ([MrZammler](https://github.com/MrZammler))
-- UpdateNodeCollectors message [\#13330](https://github.com/netdata/netdata/pull/13330) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
