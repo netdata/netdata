@@ -994,8 +994,6 @@ static void delete_old_data(void *arg)
 
     /* Safe to use since it will be deleted after we are done */
 
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
     datafile = ctx->datafiles.first;
     // If this is migrated then do special cleanup
     if (datafile->journalfile->journal_data && datafile->journalfile->is_valid) {
@@ -1014,6 +1012,7 @@ static void delete_old_data(void *arg)
         unsigned deleted = 0;
         unsigned delete_check = 0;
         datafile->journalfile->is_valid = false;
+
         for (entries = 0; entries < j2_header->metric_count; entries++) {
             struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
             struct journal_page_list *descr_page = (struct journal_page_list *) ((uint8_t *) metric_list_header + sizeof(struct journal_page_header));
@@ -1037,13 +1036,11 @@ static void delete_old_data(void *arg)
             metric++;
         }
         info("Removed %u pages from %u metrics (evicted %u), %u queued for final deletion check", deleted,  entries, evicted, delete_check);
-        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
         wc->cleanup_thread_deleting_files = 1;
         /* wake up event loop */
         fatal_assert(0 == uv_async_send(&wc->async));
         return;
     }
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     uv_rwlock_wrlock(&datafile->extent_rwlock);
     for (extent = datafile->extents.first ; extent != NULL ; extent = next) {
