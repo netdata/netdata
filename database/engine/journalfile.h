@@ -61,7 +61,7 @@ struct journal_page_list {
     uint32_t delta_start_s;    // relative to the start time of journal
     uint32_t delta_end_s;      // relative to delta_start
     uint32_t extent_index;     // Index to the extent (extent list) (bytes from BASE)
-    uint16_t update_every_s;
+    uint32_t update_every_s;
     uint16_t page_length;
     uint8_t type;
 };
