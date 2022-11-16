@@ -1378,7 +1378,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             publish->topic = mw_calloc(1, publish->topic_len + 1 /* add 0x00 */);
             if (publish->topic == NULL)
                 return MQTT_NG_CLIENT_OOM;
-            parser->varhdr_state = MQTT_PARSE_VARHDR_PACKET_ID;
+            parser->varhdr_state = MQTT_PARSE_VARHDR_TOPICNAME;
             parser->mqtt_parsed_len = 2;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_TOPICNAME:
