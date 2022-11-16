@@ -4299,7 +4299,7 @@ netdataDashboard.context = {
         info: 'The number of connections per second to the web service that have been attempted since the service started.'
     },
     'wmi.iis_website_isapi_extension_requests_count': {
-        info: 'The number of ISAPI extension requests that are being processed simultaneously by the web service.'
+        info: 'The number of <a href="https://learn.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525282(v=vs.90)" target="_blank">ISAPI extension</a> requests that are being processed simultaneously by the web service.'
     },
     'wmi.iis_website_ftp_file_transfer_rate': {
         info: 'The total number of files that have been sent and received by the FTP service since the service started.'
