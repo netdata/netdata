@@ -79,6 +79,10 @@ const char *database_migrate_v5_v6[] = {
     NULL
 };
 
+const char *database_migrate_v7_v8_extra[] = {
+    "ALTER TABLE alert_hash ADD title text;",
+    NULL
+};
 
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
@@ -210,6 +214,8 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when altering health_log tables, rc = %d", rc);
+
+    init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v7_v8_extra[0]);
 
     return 0;
 }

@@ -833,8 +833,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
-    "p_db_lookup_before, p_update_every) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34);"
+    "p_db_lookup_before, p_update_every, title) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
@@ -1046,6 +1046,11 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 
     param++;
     rc = sqlite3_bind_int(res, 34, cfg->p_update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_string_or_null(res, cfg->title, param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
