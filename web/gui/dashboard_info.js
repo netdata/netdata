@@ -4311,7 +4311,7 @@ netdataDashboard.context = {
         info: 'Rate of errors:</p><p><b>Document_locked</b> - The number of requests that have been made since the service started that could not be satisfied by the server because the requested document was locked. Usually reported as HTTP error 423. <b>document_not_found</b> - The number of requests that have been made since the service started that were not satisfied by the server because the requested document was not found. Usually reported as HTTP error 404</p>'
     },
     'wmi.iis_website_uptime': {
-        info: 'The uptime for the web service or a Web site.'
+        info: 'The total time elapsed since the web service started.'
     },
 
     // ------------------------------------------------------------------------
