@@ -27,6 +27,7 @@ struct rrdengine_journalfile {
     uint32_t journal_data_size;                 // Total file size mapped
     Pvoid_t JudyL_array;                        // Used to track active v2 descriptors
     time_t last_access;                         // Last access for v2 descriptors to decide cleanup
+    bool is_valid;
     struct rrdengine_datafile *datafile;
 };
 

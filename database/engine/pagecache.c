@@ -689,7 +689,7 @@ void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_
 
 static void update_journal_access_time(struct rrdengine_journalfile *journalfile, struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
 {
-    if (journalfile) {
+    if (journalfile && journalfile->is_valid) {
         journalfile->last_access = now_realtime_sec();
         return;
     }
@@ -706,7 +706,7 @@ static void update_journal_access_time(struct rrdengine_journalfile *journalfile
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     while (datafile) {
         journalfile = datafile->journalfile;
-        if (!journalfile->journal_data) {
+        if (!journalfile->journal_data || !journalfile->is_valid) {
             datafile = datafile->next;
             continue;
         }
@@ -832,7 +832,7 @@ static struct rrdeng_page_descr *populate_page_index(
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     while (datafile) {
         struct journal_v2_header *journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
-        if (!journal_header) {
+        if (!journal_header || !datafile->journalfile->is_valid) {
             datafile = datafile->next;
             continue;
         }
@@ -896,9 +896,11 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
         }
     }
 
-    descr = populate_page_index(page_index, start_time_ut, end_time_ut, cache_pages);
-    if (descr)
-        return descr;
+    if (likely(db_engine_journal_indexing)) {
+        descr = populate_page_index(page_index, start_time_ut, end_time_ut, cache_pages);
+        if (descr)
+            return descr;
+    }
 
     Index = (Word_t) (start_time_ut / USEC_PER_SEC);
     PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);

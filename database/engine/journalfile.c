@@ -136,6 +136,7 @@ void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengin
     journalfile->data = NULL;
     journalfile->file_index = 0;
     journalfile->last_access = 0;
+    journalfile->is_valid = true;
 }
 
 static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
@@ -209,15 +210,16 @@ int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struc
     generate_journalfilepath(datafile, path, sizeof(path));
     generate_journalfilepath_v2(datafile, path_v2, sizeof(path));
 
-    ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
-    if (ret < 0) {
-        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+    if (journalfile->file) {
+        ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
+        if (ret < 0) {
+            error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+            ++ctx->stats.fs_errors;
+            rrd_stat_atomic_add(&global_fs_errors, 1);
+        }
+        uv_fs_req_cleanup(&req);
+        (void) close_uv_file(datafile, journalfile->file);
     }
-    uv_fs_req_cleanup(&req);
-
-    (void) close_uv_file(datafile, journalfile->file);
 
     // This is the new journal v2 index file
     ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
@@ -1216,7 +1218,7 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
     struct metric_info_s *metric_info;
 
     // Do nothing if we already have a mmaped file
-    if (unlikely(journalfile->journal_data))
+    if (unlikely(journalfile->journal_data && journalfile->is_valid))
         return;
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
@@ -1529,7 +1531,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     generate_journalfilepath(datafile, path, sizeof(path));
 
     // If it is not the last file, open read only
-    fd = open_file_direct_io(path, datafile->fileno == ctx->last_fileno ? O_RDWR : O_RDONLY, &file);
+    fd = open_file_direct_io(path, O_RDWR, &file);
     if (fd < 0) {
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
