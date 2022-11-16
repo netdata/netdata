@@ -490,6 +490,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 #endif
             // Remove entry from previous extent
             int ret = unlink_descriptor_extent_unsafe(journalfile, descr);
+            (void)ret;
             internal_error(true, "REMOVING UUID %s with %lu %s (extent %d)", uuid_str, start_time_ut, ret ? "OK" : "FAIL", ret);
         }
         else {
