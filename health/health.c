@@ -543,7 +543,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               buffer_tostring(crit_alarms),
                               ae->classification?ae_classification(ae):"Unknown",
                               edit_command,
-                              host != localhost ? host->machine_guid:"");
+                              host != localhost ? host->machine_guid:"",
+                              ae->title ? ae_title(ae):"");
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {

@@ -245,6 +245,7 @@ else
   classification="${27}"     # The class field from .conf files
   edit_command_line="${28}"  # The command to edit the alarm, with the line number
   child_machine_guid="${29}" # If populated, the notification is sent for a child
+  custom_title="${30}"       # If populated, a custom title to use for subjects
 fi
 
 # -----------------------------------------------------------------------------
@@ -2491,6 +2492,10 @@ else
   raised_for=
 fi
 
+if [ -n "${custom_title}" ]; then
+    html_email_subject="${custom_title}"
+fi
+
 # prepare HTML versions of elements
 info_html=
 [ -n "${info}" ] && info_html=" <small><br/>${info}</small>"
@@ -3487,7 +3492,7 @@ Content-Transfer-Encoding: 8bit
                     <tbody>
                     <tr>
                       <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;padding-bottom:0;word-break:break-word;">
-                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata 2021 - The real-time performance and health monitoring</div>
+                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata 2022 - The real-time performance and health monitoring</div>
                       </td>
                     </tr>
                     </tbody>

@@ -649,6 +649,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     string_freez(ae->source);
     string_freez(ae->units);
     string_freez(ae->info);
+    string_freez(ae->title);
     string_freez(ae->old_value_string);
     string_freez(ae->new_value_string);
     freez(ae);
