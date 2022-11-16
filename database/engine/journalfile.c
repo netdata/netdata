@@ -335,6 +335,37 @@ static int check_journal_file_superblock(uv_file file)
     return ret;
 }
 
+static bool unlink_descriptor_single_extent( struct extent_info *extent, struct rrdeng_page_descr *descr)
+{
+    if (!extent)
+        return false;
+
+    for (uint8_t index = 0; index < extent->number_of_pages; index++) {
+        if (extent->pages[index] == descr) {
+            extent->pages[index] = NULL;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool unlink_descriptor_extent_unsafe(struct rrdengine_journalfile *journalfile, struct rrdeng_page_descr *descr)
+{
+    if (unlikely(!descr))
+        return false;
+
+    if (true == unlink_descriptor_single_extent(descr->extent, descr))
+        return true;
+
+    struct extent_info *extent = journalfile->datafile->extents.first;
+    while (extent) {
+        if (unlink_descriptor_single_extent(extent, descr))
+            return true;
+        extent = extent->next;
+    }
+    return false;
+}
+
 static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                                     void *buf, unsigned max_size)
 {
@@ -458,8 +489,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                            extent->offset, extent->size);
 #endif
             // Remove entry from previous extent
-            unlink_descriptor_extent_unsafe(descr);
-            internal_error(true, "REMOVING UUID %s with %lu OK", uuid_str, start_time_ut);
+            int ret = unlink_descriptor_extent_unsafe(journalfile, descr);
+            internal_error(true, "REMOVING UUID %s with %lu %s (extent %d)", uuid_str, start_time_ut, ret ? "OK" : "FAIL", ret);
         }
         else {
             descr = pg_cache_create_descr();
@@ -474,8 +505,11 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->extent = extent;
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
+        extent->number_of_pages = valid_pages;
         if (likely(!descr_found))
             (void)pg_cache_insert(ctx, page_index, descr, true);
+        else
+            pg_cache_add_new_metric_time(page_index, descr);
 
         if (page_index->latest_time_ut == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
@@ -616,21 +650,6 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     if (unlikely(!journal_is_mmapped))
         posix_memfree(buf);
     return max_id;
-}
-
-bool unlink_descriptor_extent_unsafe(struct rrdeng_page_descr *descr)
-{
-    if (unlikely(!descr || !descr->extent))
-        return true;
-
-    struct extent_info *extent = descr->extent;
-    for (uint8_t index = 0; index < extent->number_of_pages; index++) {
-        if (extent->pages[index] == descr) {
-            extent->pages[index] = NULL;
-            return true;
-        }
-    }
-    return false;
 }
 
 // Checks that the extent list checksum is valid
