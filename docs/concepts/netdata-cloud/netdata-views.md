@@ -10,8 +10,6 @@ learn_docs_purpose: "Present the Netdata cloud's views/tabs, not focusing on das
 -->
 
 
-**********************************************************************
-
 ## Home
 
 The Home tab provides a predefined dashboard of relevant information about entities in the War Room.
@@ -35,7 +33,7 @@ Only nodes with v1.25.0-127 or later of the the [open-source Netdata](https://gi
 agent can contribute to composite charts. If your node(s) use an earlier version of Netdata, you will see them marked as
 **needs upgrade** in various dropdowns.
 
-See our [update docs](/docs/agent/packaging/installer/update) for the preferred update method based on how you installed
+See our [update docs](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/update-the-agent.md) for the preferred update method based on how you installed
 Netdata.
 
 ## Composite charts
@@ -121,7 +119,7 @@ is applied. By default the aggregation applied is _average_ but the user can cho
 * Double exponential smoothing
 * Coefficient variation
 
-For more details on each, you can refer to our Agent's HTTP API details on [Data Queries - Data Grouping](/docs/agent/web/api/queries#data-grouping).
+For more details on each, you can refer to our Agent's HTTP API details on [Data Queries - Data Grouping](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md).
 
 ### Reset to defaults
 
@@ -141,7 +139,7 @@ src="https://user-images.githubusercontent.com/1153921/95762109-1d219300-0c62-11
 node you're interested in.
 
 The single-node dashboard opens in a new tab. From there, you can continue to troubleshoot or run [Metric
-Correlations](/docs/cloud/insights/metric-correlations) for faster root cause analysis.
+Correlations](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/find-the-root-cause-of-an-issue-with-metric-correlations.md) for faster root cause analysis.
 
 ## Add composite charts to a dashboard
 
@@ -152,8 +150,7 @@ entering the name and clicking **New Dashboard**.
 ## Interacting with composite charts: pan, zoom, and resize
 
 You can interact with composite charts as you would with other Netdata charts. You can use the controls beneath each
-chart to pan, zoom, or resize the chart, or use various combinations of the keyboard and mouse. See the [chart
-interaction doc](/docs/dashboard/interact-charts) for details.
+chart to pan, zoom, or resize the chart, or use various combinations of the keyboard and mouse. See the [interact with the charts Task](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md) for details.
 
 ## Menu
 
@@ -168,7 +165,7 @@ One difference between the Overview's menu and those found in single-node dashbo
 the Overview condenses multiple services, families, or instances into single sections, sub-menus, and associated charts.
 
 For services, let's say you have two concurrent jobs with the [web_log
-collector](/docs/agent/collectors/go.d.plugin/modules/weblog), one for Apache and another for Nginx. A single-node or
+collector](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md), one for Apache and another for Nginx. A single-node or
 local dashboard shows two section, **web_log apache** and **web_log nginx**, whereas the Overview condenses these into a
 single **web_log** section containing composite charts from both jobs.
 
@@ -177,8 +174,7 @@ charts. For example, if Node A has 5 disks, and Node B has 3, each disk contribu
 chart. The utility bar should show that there are 8 charts from 2 nodes contributing to that chart.
 
 This action applies to disks, network devices, and other metric types that involve multiple instances of a piece of
-hardware or software. The Overview currently does not display metrics from filesystems. Read more about [families and
-instances](/docs/dashboard/dimensions-contexts-families)
+hardware or software. The Overview currently does not display metrics from filesystems.
 
 ## Persistence of composite chart settings
 
@@ -198,12 +194,12 @@ single row, first featuring that node's alarm status (yellow for warnings, red f
 system, some essential information about the node, followed by columns of user-defined key metrics represented in
 real-time charts.
 
-Use the [Overview](/docs/cloud/visualize/overview) for monitoring an infrastructure in real time using
+Use the Overview for monitoring an infrastructure in real time using
 composite charts and Netdata's familiar dashboard UI.
 
-Check the [War Room docs](/docs/cloud/war-rooms) for details on the utility bar, which contains the [node
-filter](/docs/cloud/war-rooms#node-filter) and the [timeframe
-selector](/docs/cloud/war-rooms#play-pause-force-play-and-timeframe-selector).
+Check the [War Room docs](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md) for details on the utility bar, which contains the node
+filter and the timeframe
+selector.
 
 ## Add and customize metrics columns
 
@@ -231,11 +227,10 @@ metrics.
 ## See more metrics in Netdata Cloud
 
 If you want to add more metrics to your War Rooms and they don't show up when you add new metrics to Nodes, you likely
-need to configure those nodes to collect from additional data sources. See our [collectors doc](/docs/collect/enable-configure) 
+need to configure those nodes to collect from additional data sources. See our [Agent configuration Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/agent-configuration.md#-configure-a-collector-module) 
 to learn how to use dozens of pre-installed collectors that can instantly collect from your favorite services and applications.
 
-If you want to see up to 30 days of historical metrics in Cloud (and more on individual node dashboards), read our guide
-on [long-term storage of historical metrics](/guides/longer-metrics-storage). Also, see our
+If you want to see up to 30 days of historical metrics in Cloud (and more on individual node dashboards), read our [Agent configuration Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/agent-configuration.md#change-the-agents-metric-retention). Also, see our
 [calculator](/docs/store/change-metrics-storage#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
 for finding the disk and RAM you need to store metrics for a certain period of time.
 
@@ -243,13 +238,12 @@ for finding the disk and RAM you need to store metrics for a certain period of t
 ## Related topics
 
 ### **Related Concepts**
-- [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
-- [Charts](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
-- [Rooms](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/rooms.md)
-- [Dashboards](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md)
-- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
+- [Spaces](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/spaces.md)
+- [Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md)
+- [Dashboards](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md)
+- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
 ### Related Tasks
-- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/rework-learn/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-- [Interact with charts](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/interact-with-the-charts.md)
+- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
+- [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)
 
