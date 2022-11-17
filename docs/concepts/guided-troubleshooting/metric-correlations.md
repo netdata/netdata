@@ -157,10 +157,10 @@ set `enable metric correlations = no` in the `[global]` section of `netdata.conf
 
 ### Related Concepts
 
-- [Anomaly Advisor](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
+- [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
 
 ### Related Tasks
 
-- [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/find-the-root-cause-of-an-issue-with-metric-correlations.md)
+- [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/find-the-root-cause-of-an-issue-with-metric-correlations.md)
 
 
