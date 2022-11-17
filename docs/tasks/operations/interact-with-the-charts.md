@@ -79,7 +79,7 @@ To bring the chart back to normal size, you can click the same button, now with 
 You can add a chart to one of your custom dashboards by clicking the **add to dashboard** button.
 
 To read more about custom dashboards, check our Task
-on [how to create custom Dashboards](https://github.com/netdata/learn/blob/master/docs/tasks/setup/space-administration/room-management.md#createdelete-custom-dashboards).
+on [how to create custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md#createdelete-custom-dashboards).
 
 ## Metrics management bar
 
@@ -199,4 +199,4 @@ In this bar you can:
 
 ### Related Concepts
 
-- [From raw metrics to visualization](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
+- [From raw metrics to visualization](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
