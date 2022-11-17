@@ -34,4 +34,4 @@ To use the Anomaly Advisor:
 - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
 
 ### Related References
-- [Netdata Configuration](https://github.com/netdata/netdata/blob/master/daemon/config/README.md).
+- [Netdata Configuration](https://github.com/netdata/netdata/blob/master/daemon/config/README.md)
