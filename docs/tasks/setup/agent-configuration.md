@@ -99,7 +99,7 @@ organization power over your infrastructure.
 #### Create unique host labels
 
 Host labels are defined in `netdata.conf`. To create host labels, open that file
-using [`edit-config`](#edit-configuration-files-using-the-edit-config-script).
+using `edit-config`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -229,7 +229,7 @@ but the Agent is highly configurable if you want your nodes to store days, weeks
 2. Edit `netdata.conf` with recommended database engine settings
 
    Now that you have a recommended setting for your Agent's `dbengine`, edit
-   the [Netdata configuration file](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/configure-the-agent.md)
+   the Netdata configuration file
    and look for the `[db]` subsection. Change it to the recommended values you calculated from the calculator. For
    example:
 
@@ -249,7 +249,7 @@ but the Agent is highly configurable if you want your nodes to store days, weeks
    ```
 
 3. Save the file
-   and [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/general-configuration/start-stop-and-restart-agent.md)
+   and [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/start-stop-and-restart-agent.md)
    , to change the database engine's size.
 
 #### Related topics
