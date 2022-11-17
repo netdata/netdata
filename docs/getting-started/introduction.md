@@ -54,7 +54,9 @@ Netdata is:
 
 ### Secure by design
 
-
+-   **Distributed data architecture**  so fast and efficient, there’s no limit to the number of metrics you can follow. 
+-   Because your data is **stored at the edge**, security is ensured.
+-   
 ### Comparison with other monitoring solutions
 
 Netdata offers many benefits over the existing monitoring landscape, whether they're expensive SaaS products or other
@@ -88,7 +90,23 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 ## How it works 
 
+Netdata is a highly efficient, highly modular, metrics management engine. Its lockless design makes it ideal for concurrent operations on the metrics.
 
+You can see a high level representation in the following diagram.
+
+![Diagram of Netdata's core functionality](https://user-images.githubusercontent.com/2662304/199225735-01a41cc5-c074-4fe2-b780-5f08e92c6769.png)
+
+And a higher level diagram in this one.
+
+![Diagram 2 of Netdata's core
+functionality](https://user-images.githubusercontent.com/1153921/95367248-5f755980-0889-11eb-827f-9b7aa02a556e.png)
+
+You can even visit this slightly dated [interactive infographic](https://my-netdata.io/infographic.html) and get lost in a rabbit hole. 
+
+But the best way to get under the hood or in the steering wheel of our highly efficient, low-latency system (supporting multiple readers and one writer on each metric) is to read the rest of our docs, or just to jump in and [get started](app.netdata.com).
+
+
+https://my-netdata.io/infographic.html
 ## Community
 
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
