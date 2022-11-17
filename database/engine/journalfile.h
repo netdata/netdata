@@ -36,6 +36,7 @@ struct rrdengine_journalfile {
 
 #define JOURVAL_V2_MAGIC           (0x01221019)
 #define JOURVAL_V2_REBUILD_MAGIC   (0x00221019)
+#define JOURVAL_V2_SKIP_MAGIC      (0x02221019)
 
 struct journal_v2_block_trailer {
     union {
