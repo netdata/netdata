@@ -119,7 +119,7 @@ the Agent, for more details, check the next section.
 
 For more details on what are the extra parameters `claim-token`, `claim-rooms` and `claim-url` please refer
 to
-the [kickstart script reference](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md/packaging/installer/methods/kickstart.md)
+the [kickstart script reference](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
 .
 
 #### Claim an Agent without root privileges
@@ -197,7 +197,7 @@ connected on startup or restart.
 
 For the connection process to work, the contents of `/var/lib/netdata` _must_ be preserved across container restarts
 using a persistent volume. You can read more at
-our [recommended `docker run` and Docker Compose deployment Task](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-host-with-docker-runtime.md#steps)
+our [recommended `docker run` and Docker Compose deployment Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-agent-and-claim.md)
 .
 
 <details>
@@ -492,7 +492,7 @@ installed Netdata using an unsupported package.
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using
-our [recommended express installation method](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md#steps)
+our [recommended express installation method](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-agent-and-claim.md)
 .
 
 ### kickstart: Failed to write new machine GUID
@@ -516,7 +516,7 @@ Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the cl
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using
-our [recommended express installation method](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md#steps)
+our [recommended express installation method](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-agent-and-claim.md)
 .
 
 ### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
@@ -546,7 +546,7 @@ Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud
 ```
 
 To fix this issue, reinstall Netdata using
-your [preferred method](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/express-installation-deploy-netdata-into-a-linux-unix-node-(via-kickstart).md)
+your [preferred method](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-agent-and-claim.md)
 and do not add the `--disable-cloud` option.
 
 ### cloud-available is false / ACLK Available: No
