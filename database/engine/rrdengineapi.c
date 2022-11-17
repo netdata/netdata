@@ -1123,8 +1123,70 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
     /* wait for dbengine to quiesce */
     completion_wait_for(&ctx->rrdengine_completion);
     completion_destroy(&ctx->rrdengine_completion);
+}
 
-    //metalog_prepare_exit(ctx->metalog_ctx);
+static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
+{
+    void *data_start = datafile->journalfile->journal_data;
+    if (unlikely(!data_start))
+        return;
+
+    struct journal_v2_header *j2_header = (void *) data_start;
+
+    stats->extents += j2_header->extent_count;
+
+    unsigned entries;
+    struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
+    for (entries = 0; entries < j2_header->extent_count; entries++) {
+        stats->extents_compressed_bytes += extent_list->datafile_size;
+        stats->extents_pages += extent_list->pages;
+        extent_list++;
+    }
+
+    struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
+    usec_t journal_start_time_ut = j2_header->start_time_ut;
+
+    for (entries = 0; entries < j2_header->metric_count; entries++) {
+
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
+        for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
+
+            usec_t update_every_usec;
+
+            size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+
+            usec_t start_time_ut = journal_start_time_ut + ((usec_t) descr->delta_start_s * USEC_PER_SEC);
+            usec_t end_time_ut = journal_start_time_ut + ((usec_t) descr->delta_end_s * USEC_PER_SEC);
+
+            if(likely(points > 1))
+                update_every_usec = (end_time_ut - start_time_ut) / (points - 1);
+            else {
+                update_every_usec = default_rrd_update_every * get_tier_grouping(datafile->ctx->tier) * USEC_PER_SEC;
+                stats->single_point_pages++;
+            }
+
+            time_t duration_secs = (time_t)((end_time_ut - start_time_ut + update_every_usec)/USEC_PER_SEC);
+
+            stats->pages_uncompressed_bytes += descr->page_length;
+            stats->pages_duration_secs += duration_secs;
+            stats->points += points;
+
+            stats->page_types[descr->type].pages++;
+            stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
+            stats->page_types[descr->type].pages_duration_secs += duration_secs;
+            stats->page_types[descr->type].points += points;
+
+            if(!stats->first_t || (start_time_ut - update_every_usec) < stats->first_t)
+                stats->first_t = (start_time_ut - update_every_usec) / USEC_PER_SEC;
+
+            if(!stats->last_t || end_time_ut > stats->last_t)
+                stats->last_t = end_time_ut / USEC_PER_SEC;
+
+            descr++;
+        }
+        metric++;
+    }
 }
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
@@ -1136,9 +1198,14 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         stats.metrics_pages += page_index->page_count;
     }
 
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
         stats.datafiles++;
 
+        if (df->journalfile->journal_data) {
+            populate_v2_statistics(df, &stats);
+        }
+        else
         for(struct extent_info *ei = df->extents.first; ei ; ei = ei->next) {
             stats.extents++;
             stats.extents_compressed_bytes += ei->size;
@@ -1177,7 +1244,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
             }
         }
     }
-
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     stats.currently_collected_metrics = ctx->stats.metric_API_producers;
     stats.max_concurrently_collected_metrics = ctx->metric_API_max_producers;
