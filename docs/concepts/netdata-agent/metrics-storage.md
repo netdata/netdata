@@ -164,9 +164,9 @@ _Users should_ **back up** _their `./dbengine` folders if they consider this dat
 
 ### Related Concepts
 
-- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
-- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md)
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md)
 - [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 
@@ -174,5 +174,3 @@ _Users should_ **back up** _their `./dbengine` folders if they consider this dat
 ## Related Tasks
 
 - [Claim existing Agent deployments](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-- [Change database mode](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/manage-retained-metrics/change-database-mode.md)
-
