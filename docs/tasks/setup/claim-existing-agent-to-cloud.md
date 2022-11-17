@@ -9,7 +9,7 @@ learn_rel_path: "Setup"
 learn_docs_purpose: "Instructions on how to claim a node on a Space in the Cloud."
 -->
 
-You can securely connect a Netdata Agent, running on a distributed node, to Netdata Cloud.  
+Running on a distributed node, you can securely connect a Netdata Agent to Netdata Cloud.  
 A Space's administrator creates a **claiming token**, which is used to add an Agent to their Space via
 the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
@@ -25,7 +25,7 @@ it in any way.
 Only the administrators of a Space in Netdata Cloud can view the claiming token and accompanying script that is
 generated.
 
-The connection process ensures no third party can add your node, and then view your node's metrics, in a Netdata Cloud
+The connection process ensures that no third party can add your node to view your node's metrics, in a Netdata Cloud
 account, Space, or War Room that you did not authorize.
 
 By connecting a node, you opt in to sending data from your Agent to the Cloud via
@@ -42,6 +42,8 @@ the identity of the Agent when it connects to the Cloud.
 :::
 
 ## Prerequisites
+
+In order to claim an existing agent to the Cloud, you will need the following:
 
 - A node with a Netdata Agent installed
 - A Netdata Cloud account with a Space created
