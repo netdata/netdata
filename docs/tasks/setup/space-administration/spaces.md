@@ -1,7 +1,7 @@
 <!--
-title: "Nodes"
-sidebar_label: "Nodes"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/nodes.md"
+title: "Spaces"
+sidebar_label: "Spaces"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/spaces.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 sidebar_position: "10"
