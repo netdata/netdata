@@ -3,7 +3,7 @@ title: "Agent-cloud link (ACLK)"
 sidebar_label: "Agent-cloud link (ACLK)"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md"
 sidebar_position: "1400"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "Concepts"
 learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain that the ACLK is // a mechanism for secure connection between the Agent and the Hub/Cloud."
@@ -157,15 +157,13 @@ Restart your Agent and [connect your node](/claim/README.md#how-to-connect-a-nod
 
 ### Related Concepts
 
-- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
-- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md)
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md)
 - [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 - [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
 
 ### Related References
 
-- [ACLK](/aclk/README.md)
-
-*******************************************************************************
+- [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
