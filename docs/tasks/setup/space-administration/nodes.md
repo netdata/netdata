@@ -126,4 +126,4 @@ Space** in the bottom of the **Info** tab.
 
 ### Related Concepts
 
-- [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
+- [Spaces](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/spaces.md)
