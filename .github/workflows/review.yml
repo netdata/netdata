@@ -17,6 +17,8 @@ jobs:
       actionlint: ${{ steps.actionlint.outputs.run }}
       eslint: ${{ steps.eslint.outputs.run }}
       hadolint: ${{ steps.hadolint.outputs.run }}
+      languagetool: ${{ steps.languagetool.outputs.run }}
+      markdownlint: ${{ steps.markdownlint.outputs.run }}
       shellcheck: ${{ steps.shellcheck.outputs.run }}
       yamllint: ${{ steps.yamllint.outputs.run }}
     steps:
@@ -57,6 +59,28 @@ jobs:
             echo 'Dockerfiles have changed, need to run Hadolint.'
           else
             echo '::set-output name=run::false'
+          fi
+      - name: Check files for languagetool
+        id: languagetool
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/languagetool') }}" = "true" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.md' ; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+            echo 'Markdown files have changed, need to run languagetool.'
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check files for markdownlint
+        id: markdownlint
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/markdownlint') }}" = "true" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.md' ; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+            echo 'Markdown files have changed, need to run markdownlint.'
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
           fi
       - name: Check files for shellcheck
         id: shellcheck
@@ -133,6 +157,35 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
+
+  languagetool:
+    name: languagetool
+    needs: prep-review
+    if: needs.prep-review.outputs.languagetool == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Run languagetool
+        uses: reviewdog/action-languagetool@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+
+  markdownlint:
+    name: markdownlint
+    needs: prep-review
+    if: needs.prep-review.outputs.markdownlint == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Run markdownlint
+        uses: reviewdog/action-markdownlint@v0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+          markdownlint_flags: -s ./.mdl-style.rb .
 
   shellcheck:
     name: shellcheck
