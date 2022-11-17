@@ -141,7 +141,9 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        error("%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u.", __func__, xt_io_descr->pos,
+
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u.", __func__, xt_io_descr->pos,
                   xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
         goto after_crc_check;
     }
@@ -159,7 +161,9 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         have_read_error = 1;
-        error("%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. CRC32 check: FAILED", __func__,
+
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. CRC32 check: FAILED", __func__,
                xt_io_descr->pos, xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
     }
 
