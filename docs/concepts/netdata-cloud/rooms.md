@@ -28,29 +28,29 @@ Every War Room has its own dashboards, navigation, indicators, and management to
 Every War Rooms provides multiple views. Each view focus on a particular area/subject of the nodes which you monitor in
 this War Rooms. Let's explore what view you have available:
 
-- The default view for any War Room is the [**Home** tab](/docs/concepts/visualize/overview#home), which give you an overview
+- The default view for any War Room is the **Home** tab, which gives you an overview
   of this space. Here you can see the number of Nodes claimed, data retention statics, user particate, alerts and more
 
-- The second and most important view is the [**Overview** tab](/docs/concepts/visualize/overview#overview) which uses composite
+- The second and most important view is the **Overview** tab which uses composite
   charts to display real-time metrics from every available node in a given War Room.
 
-- The [**Nodes** tab](/docs/concepts/visualize/nodes) gives you the ability to see the status (offline or online), host details
+- The **Nodes** tab gives you the ability to see the status (offline or online), host details
   , alarm status and also a short overview of some key metrics from all your nodes at a glance.
 
-- [**Kubernetes** tab](/docs/concepts/visualize/kubernetes) is a logical grouping of charts regards to your Kubernetes clusters.
+- **Kubernetes** tab is a logical grouping of charts regards to your Kubernetes clusters.
   It contains a subset of the charts available in the _Overview tab_
 
-- The [**Dashboards** tab](/docs/concepts/visualize/dashboards) gives you the ability to have tailored made views of
+- The **Dashboards** tab gives you the ability to have tailored made views of
   specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
 
 - The **Alerts** tab provides you with an overview for all the active alerts you receive for the nodes in this War Room,
   you can also see alla the alerts that are configured to be triggered in any given moment.
 
-- The **Anomalies** tab is dedicated to the [Anomaly Advisor](/docs/cloud/insights/anomaly-advisor) tool
+- The **Anomalies** tab is dedicated to the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md#anomaly-advisor) tool
 
 ### Non static tabs
 
-If you open a [new dashboard](/docs/concepts/visualize/dashboards), jump to a single-node dashboard, or navigate to a dedicated
+If you open a new dashboard, jump to a single-node dashboard, or navigate to a dedicated
 alert page, each of these will open in a new War Room tab.
 
 Tabs can be rearranged with drag-and-drop or closed with the **X** button. Open tabs persist between sessions, so you
@@ -59,7 +59,7 @@ can always come right back to your preferred setup.
 ### Play, pause, force play, and timeframe selector
 
 A War Room has three different states: playing, paused, and force playing. The default playing state refreshes charts
-every second as long as the browser tab is in focus. [Interacting with a chart](/docs/dashboard/interact-charts) pauses
+every second as long as the browser tab is in focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md) pauses
 the War Room. Once the tab loses focus, charts pause automatically.
 
 The top navigation bar features a play/pause button to quickly change the state, and a dropdown to select **Force Play**
@@ -101,7 +101,7 @@ health and performance of your organization's essential services.
 
 **Incident response**: You can also create new War Rooms as one of the first steps in your incident response process.
 For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes
-using the [Pulsar collector](/docs/agent/collectors/go.d.plugin/modules/pulsar) begins reporting a suspiciously low
+using the Pulsar collector begins reporting a suspiciously low
 messages rate. You can create a War Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition
 to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for getting to resolution as fast
 as possible.
@@ -127,11 +127,11 @@ icon of the War Room's name in the top of the page to do that. A sidebar will op
 connected node you want to add to this War Room by clicking on the checkbox next to its hostname, then click **+ Add**
 at the top of the panel.
 
-3. To _add existing users to a War Room_, click on **Add Users**. See our [invite doc](/docs/cloud/manage/invite-your-team)
+3. To _add existing users to a War Room_, click on **Add Users**. See our relative [Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md#add-users-to-a-war-room)
 for details on inviting new users to your Space in Netdata Cloud.
 
 :::note
- \* This action requires admin rights for this space
+ This action requires admin rights for this space
 :::
 
 ### Bookmarks for  essential resources
@@ -159,15 +159,12 @@ the **🗑** icon.
 ## Related Topics
 
 ### **Related Concepts**
-- [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
-- [Netdata Views](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
-- [Dashboards](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md)
-- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
+- [Spaces](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/spaces.md)
+- [Netdata Views](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
+- [Dashboards](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md)
+- [From raw metrics to visualizations](https://github.com/netdata/master/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
 ### Related Tasks
-- [Room Management](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/setup/space-administration/room-management.md)
-- [Setting up spaces and rooms](https://github.com/netdata/learn/blob/master/docs/tasks/setup/setup-spaces-and-rooms.md#how-to-organize-your-netdata-cloud)
-- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/rework-learn/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-- [Interact with charts](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/interact-with-the-charts.md)
-
-*******************************************************************************
+- [Room Management](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md)
+- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
+- [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)
