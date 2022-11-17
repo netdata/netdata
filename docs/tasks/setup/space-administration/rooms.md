@@ -24,7 +24,7 @@ management tools.
 :::note
 Some of these actions can be configured to be accessible to normal users too instead of being admin-only, you can read
 more in
-the [Space administration](https://github.com/netdata/learn/blob/master/docs/tasks/setup/space-administration/space-administration.md#manage-permissions)
+the [Space administration](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/spaces.md)
 Task.
 :::
 
@@ -104,7 +104,7 @@ From the **War Room settings** interface:
 3. Select from the list of the Space's users, that are eligible to be added to this War Room.
 
 If you want to add a new User to the War Room that isn't on the Space, check
-the [Space administration](https://github.com/netdata/learn/blob/master/docs/tasks/setup/space-administration/space-administration.md#manage-permissions)
+the [Space administration](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/spaces.md)
 Task.
 
 ### Remove users from a War Room
@@ -123,7 +123,7 @@ Then you can add charts by following the prompt.
 :::tip
 You can quickly add a chart to a Custom Dashboard, by clicking the **Add to dashboard** button of the top bar on any
 chart. To read more, check
-the [interact with the Charts](https://github.com/netdata/learn/blob/master/docs/tasks/interact-with-the-charts.md)
+the [interact with the Charts](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)
 Task.
 :::
 
@@ -133,5 +133,5 @@ To delete a Custom Dashboard, select it from the tick box column, and then click
 
 ### Related Concepts
 
-1. [War Rooms](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md)
-2. [Views Concept](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
+1. [War Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md)
+2. [Views Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
