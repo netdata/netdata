@@ -31,7 +31,7 @@ it's possible. This approach has a number of benefits:
 
 Netdata Cloud bridges the gap between many distributed databases by centralizing only the interface. You query and
 visualize your nodes' metrics real time and whenever your need to. When
-you [look at charts in Netdata Cloud](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md), the metrics values are queried
+you [look at charts in Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md), the metrics values are queried
 directly from that node's database and securely streamed to Netdata Cloud, which proxies them to your browser.
 
 ## Integrity of metrics in a distributed data architecture approach
