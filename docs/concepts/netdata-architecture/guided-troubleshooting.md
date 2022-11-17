@@ -23,7 +23,7 @@ The ML driving our Anomaly Adviser and Metric Correlations feature works at the 
 
 Netdata's Anomaly Advisor feature lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of interest. If you are running a Netdata version higher than v1.35.0-29-nightly, you will be able to use the Anomaly Advisor out of the box with zero configuration. If you are on an earlier Netdata version, you will need to first enable ML on your nodes by following the steps below.
 
-Read more [here](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md).
+Read more [here](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md).
 
 ## Metric correlation
 
@@ -34,7 +34,7 @@ are relevant to the window of interest, you can get to the root cause sooner.
 Because Metric Correlations uses every available metric from that node, with as high as 1-second granularity, you get
 extraordinary insights for the status of your system.
 
-Read more about Metric Correlations [here](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/metric-correlations.md).
+Read more about Metric Correlations [here](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md).
 
 ### Metric Correlation under the hood
 
@@ -88,7 +88,5 @@ cause of an issue
 - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md)
 
 ### Related Tasks
-- [Detect anomalies with Anomaly Advisor](https://github.com/netdata/learn/blob/master/docs/tasks/detect-anomalies-with-anomaly-advisor.md)
-- [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/learn/blob/master/docs/tasks/find-the-root-cause-of-an-issue-with-metric-correlations.md)
-
-
+- [Detect anomalies with Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/detect-anomalies-with-anomaly-advisor.md)
+- [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/find-the-root-cause-of-an-issue-with-metric-correlations.md)
