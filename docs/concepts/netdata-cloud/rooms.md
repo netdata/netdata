@@ -160,7 +160,6 @@ the **🗑** icon.
 
 ### **Related Concepts**
 - [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
-- [Charts](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
 - [Netdata Views](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
 - [Dashboards](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md)
 - [From raw metrics to visualizations](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
