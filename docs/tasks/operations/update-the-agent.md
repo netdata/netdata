@@ -1,7 +1,7 @@
 <!--
-title: "Update Agent"
-sidebar_label: "Update Agent"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/operations/update-agent.md"
+title: "Update the Agent"
+sidebar_label: "Update the Agent"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/operations/update-the-agent.md"
 learn_status: "Published"
 sidebar_position: "4"
 learn_topic_type: "Tasks"
