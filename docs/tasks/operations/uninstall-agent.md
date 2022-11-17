@@ -2,7 +2,7 @@
 title: "Uninstall Netdata"
 sidebar_label: "Uninstall agent"
 custom_edit_url: "https://github.com/netdata/netdata/blog/master/tasks/operations/UNINSTALL.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "Tasks"
 sidebar_position: "7"
 learn_rel_path: "Operations"
