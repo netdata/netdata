@@ -23,7 +23,7 @@ Every collector has two primary jobs:
 If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
 Netdata Agent gathers these metrics, sends them to the [database engine for
 storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md), and immediately [visualizes them
-meaningfully](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md) on dashboards.
+meaningfully](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md) on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
 can be a URL and port, a socket, a file, a web page, and more.
@@ -38,15 +38,15 @@ The endpoint is user-configurable, as are many other specifics of what a given c
 
 ## What can Netdata collect?
 
-To quickly find your answer, see our [list of supported collectors](/collectors/COLLECTORS.md).
+<!--To quickly find your answer, see our [list of supported collectors](/collectors/COLLECTORS.md).-->
 
 Generally, Netdata's collectors can be grouped into three types:
 
--   [Systems](/docs/collect/system-metrics.md): Monitor CPU, memory, disk, networking, systemd, eBPF, and much more.
+-   Systems: Monitor CPU, memory, disk, networking, systemd, eBPF, and much more.
     Every metric exposed by `/proc`, `/sys`, and other Linux kernel sources.
--   [Containers](/docs/collect/container-metrics.md): Gather metrics from container agents, like `dockerd` or `kubectl`,
+-   Containers: Gather metrics from container agents, like `dockerd` or `kubectl`,
     along with the resource usage of containers and the applications they run.
--   [Applications](/docs/collect/application-metrics.md): Collect per-second metrics from web servers, databases, logs,
+-   Applications: Collect per-second metrics from web servers, databases, logs,
     message brokers, APM tools, email servers, and much more.
 
 ## Collector architecture and terminology
@@ -61,9 +61,9 @@ terms related to collecting metrics.
     The Go orchestrator is in active development.
     -   [go.d.plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/): An orchestrator for data
         collection modules written in `go`.
-    -   [python.d.plugin](/collectors/python.d.plugin/README.md): An orchestrator for data collection modules written in
+    -   python.d.plugin: An orchestrator for data collection modules written in
         `python` v2/v3.
-    -   [charts.d.plugin](/collectors/charts.d.plugin/README.md): An orchestrator for data collection modules written in
+    -   charts.d.plugin: An orchestrator for data collection modules written in
         `bash` v4+.
 -   **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
     processes that communicate with the Netdata daemon via pipes.
@@ -74,14 +74,13 @@ terms related to collecting metrics.
 
 ### Related Concepts
 
-- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
-- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md)
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md)
 - [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 - [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
 
-## Related Tasks
+### Related Tasks
 
 - [Claim existing Agent deployments](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-- [Change database mode](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/manage-retained-metrics/change-database-mode.md)
