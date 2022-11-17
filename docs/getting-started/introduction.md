@@ -6,14 +6,7 @@ learn_status: "Published"
 learn_topic_type: "Getting started"
 learn_rel_path: "Getting started"
 learn_docs_purpose: "Present netdata in a nutshell"
--->
 
-
-:::info
-
-I want this doc to be also the README.md in netdata/netdata.
-
-:::
 
 ## What is Netdata ?
 
