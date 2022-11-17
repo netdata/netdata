@@ -1148,25 +1148,22 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
             struct journal_page_list *page_entry = &page_list[index++];
 
-            if (likely(page_entry->extent_index != UINT32_MAX)) {
+            fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
+            fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
 
-                fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
-                fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
-
-                rrdeng_page_descr_mutex_lock(ctx, descr);
-                while (!pg_cache_try_get_unsafe(descr, 1)) {
-                    pg_cache_wait_event_unsafe(descr);
-                }
-
-                descr->extent_entry = &extent_list[page_entry->extent_index];
-                descr->extent = NULL;
-                descr->file = journalfile->datafile->file;
-                ++pg_cache->active_descriptors;
-                pg_cache_put_unsafe(descr);
-                rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
-                rrdeng_page_descr_mutex_unlock(ctx, descr);
-                mark_journalfile_for_expiration_check = true;
+            rrdeng_page_descr_mutex_lock(ctx, descr);
+            while (!pg_cache_try_get_unsafe(descr, 1)) {
+                pg_cache_wait_event_unsafe(descr);
             }
+
+            descr->extent_entry = &extent_list[page_entry->extent_index];
+            descr->extent = NULL;
+            descr->file = journalfile->datafile->file;
+            ++pg_cache->active_descriptors;
+            pg_cache_put_unsafe(descr);
+            rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
+            mark_journalfile_for_expiration_check = true;
         }
 
         if (mark_journalfile_for_expiration_check) {
