@@ -4287,7 +4287,7 @@ netdataDashboard.context = {
         info: 'The total bytes of data that have been sent and received by the web service.'
     },
     'wmi.iis_website_requests_rate': {
-        info: 'The number of requests per second that have been made since the web service.'
+        info: 'The number of requests per second that have been made to the web service.'
     },
     'wmi.iis_website_active_connections_count': {
         info: 'The number of active connections to the web service.'
@@ -4302,7 +4302,7 @@ netdataDashboard.context = {
         info: 'The number of <a href="https://learn.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525282(v=vs.90)" target="_blank">ISAPI extension</a> requests that are being processed simultaneously by the web service.'
     },
     'wmi.iis_website_ftp_file_transfer_rate': {
-        info: 'The total number of files that have been sent and received by the FTP service.'
+        info: 'The total number of files that have been sent and received per second by the FTP service.'
     },
     'wmi.iis_website_logon_attempts_rate': {
         info: 'The number of attempts per second to log on to the web service that have occurred.'
