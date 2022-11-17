@@ -1017,13 +1017,19 @@ static void delete_old_data(void *arg)
         unsigned evicted = 0;
         unsigned deleted = 0;
         unsigned delete_check = 0;
+
+        uv_rwlock_wrlock(&ctx->datafiles.rwlock);
         datafile->journalfile->is_valid = false;
+        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
         for (entries = 0; entries < j2_header->metric_count; entries++) {
             struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
             struct journal_page_list *descr_page = (struct journal_page_list *) ((uint8_t *) metric_list_header + sizeof(struct journal_page_header));
             for (uint32_t index = 0; index < metric->entries; index++) {
                 struct pg_cache_page_index *page_index = get_page_index(&ctx->pg_cache, &metric->uuid);
+
+                if (unlikely(!page_index))
+                    continue;
 
                 time_t start_time_s = journal_start_time_s + descr_page->delta_start_s;
 
