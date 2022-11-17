@@ -14,13 +14,12 @@ replicate metrics data across multiple nodes, or centralize all your metrics dat
 (TSDB).
 
 When one node streams metrics to another, the node receiving metrics can visualize them on the
-[dashboard](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md), run health checks to [trigger
-alarms](/docs/monitor/view-active-alarms.md) and [send notifications](/docs/monitor/enable-notifications.md), and
-[export](/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
+dashboard, run health checks to trigger alarms, send notifications, and
+export all metrics to an external TSDB. When Netdata streams metrics to another
 Netdata, the receiving one is able to perform everything a Netdata instance is capable of.
 
 Streaming lets you decide exactly how you want to store and maintain metrics data. While we believe Netdata's
-[distributed architecture]([https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-architecture/distributed-data-architecture.md) is ideal for speed and scale, streaming
+[distributed architecture](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/distributed-data-architecture.md) is ideal for speed and scale, streaming
 provides centralization options for those who want to maintain only a single TSDB instance.
 
 ## Streaming basics
@@ -83,13 +82,13 @@ Each child dashboard is also available directly at the following URL pattern:
 
 ### Related Concepts
 
-- [ACLK](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/aclk.md)
+- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
-- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md)
+- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md)
 - [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 - [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
 
 ### Related References
 
-  - [Streaming reference](/docs/metrics-storage-management/reference-streaming.mdx)*******************************************************************************
+  - [Streaming reference](https://github.com/netdata/netdata/blob/master/streaming/README.md)
