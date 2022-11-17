@@ -71,8 +71,8 @@ Netdata community to build the feature. If you would like to get involved and he
 ## Related Topics
 
 ### Related Concepts
-- [Metric Correlations](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/guided-troubleshooting/metric-correlations.md)
+- [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md)
 
 ### Related Tasks
 
-- [Detect anomalies with Anomaly Advisor ](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/detect-anomalies-with-anomaly-advisor.md)
+- [Detect anomalies with Anomaly Advisor ](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/detect-anomalies-with-anomaly-advisor.md)
