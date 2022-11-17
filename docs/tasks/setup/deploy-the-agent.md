@@ -456,7 +456,7 @@ your machine from within the container. Please read the following carefully.
 ###### _Docker socket proxy (safest option)_
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](/docs/agent/running-behind-haproxy) so that it restricts connections to read-only access to the CONTAINERS
+HAProxy so that it restricts connections to read-only access to the CONTAINERS
 endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
@@ -573,7 +573,7 @@ services:
 ##### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
-[Netdata daemon command line options](/docs/agent/daemon#command-line-options) such as the IP address Netdata will be
+[Netdata daemon command line options](https://github.com/netdata/netdata/blob/master/daemon/README.md#command-line-options) such as the IP address Netdata will be
 running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd).
 
 #### Publish a test image to your own repository
