@@ -1543,7 +1543,7 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
         return;
 
     // shrink file size
-    int ret = truncate(path, (__off_t) resize_file_to);
+    int ret = truncate(path, (long) resize_file_to);
     if (ret < 0) {
         ctx->disk_space += total_file_size;
         ++ctx->stats.fs_errors;
