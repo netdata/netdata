@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix connection resets on big parents [\#14004](https://github.com/netdata/netdata/pull/14004) ([underhood](https://github.com/underhood))
+- minor typo in the uninstall command [\#14002](https://github.com/netdata/netdata/pull/14002) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "New journal disk based indexing for agent memory reduction" [\#14000](https://github.com/netdata/netdata/pull/14000) ([ktsaou](https://github.com/ktsaou))
 - Revert "enable dbengine tiering by default" [\#13999](https://github.com/netdata/netdata/pull/13999) ([ktsaou](https://github.com/ktsaou))
 - fixes MQTT-NG QoS0 [\#13997](https://github.com/netdata/netdata/pull/13997) ([underhood](https://github.com/underhood))
@@ -347,8 +349,6 @@
 - query engine: omit first point if not needed [\#13345](https://github.com/netdata/netdata/pull/13345) ([ktsaou](https://github.com/ktsaou))
 - fix 32bit calculation on array allocator [\#13343](https://github.com/netdata/netdata/pull/13343) ([ktsaou](https://github.com/ktsaou))
 - fix crash on start on slow disks because ml is initialized before dbengine starts [\#13342](https://github.com/netdata/netdata/pull/13342) ([ktsaou](https://github.com/ktsaou))
-- fix\(packaging\): respect CFLAGS arg when building Docker image [\#13340](https://github.com/netdata/netdata/pull/13340) ([ilyam8](https://github.com/ilyam8))
-- add github stars badge to readme [\#13338](https://github.com/netdata/netdata/pull/13338) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
