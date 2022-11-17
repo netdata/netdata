@@ -87,8 +87,7 @@ On such installs, you can update Netdata using your distribution package manager
 ### Manual installation from Git
 
 If you
-installed [Netdata manually from Git](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/manual-installation-deploy-netdata-into-a-linux-unix-based-node.md)
-, you can run that installer again
+installed Netdata manually from Git, you can run that installer again
 to update your agent.
 
 1. First, run our automatic requirements' installer, which works on many Linux distributions, to
@@ -165,7 +164,7 @@ and re-create it using the latest image.
 
 You can now re-create your Netdata container using the `docker run` command or a `docker-compose.yml` file. See
 our [Docker
-installation instructions](https://github.com/netdata/netdata/blob/master/docs/tasks/installation/deploy-netdata-in-a-host-with-docker-runtime.md)
+installation instructions](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-the-agent.md)
 for details.
 
 ## Kubernetes
