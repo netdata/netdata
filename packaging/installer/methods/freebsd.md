@@ -25,7 +25,7 @@ Please respond in the affirmative for any relevant prompts during the installati
 
 ## Install Netdata
 
-The recommended method is to use the single line [kickstart script](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart)
+The simplest method is to use the single line [kickstart script](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart)
 
 If you have a Netdata cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
 
@@ -38,6 +38,7 @@ Once the installation is completed you should be able to start monitoring the Fr
 
 ![image](https://user-images.githubusercontent.com/24860547/202489210-3c5a3346-8f53-4b7b-9832-f9383b34d864.png)
 
+Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
 
 ## Manual installation
 
