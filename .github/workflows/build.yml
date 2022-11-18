@@ -670,13 +670,15 @@ jobs:
         with:
           name: final-artifacts
           path: final-artifacts
-      - name: Setup Gcloud
-        id: gcloud
-        uses: google-github-actions/setup-gcloud@v1.0.1
+      - name: Authenticate to GCS
+        id: gcs-auth
+        uses: googe-github-actions/auth@v1
         with:
           project_id: ${{ secrets.GCP_NIGHTLY_STORAGE_PROJECT }}
-          service_account_key: ${{ secrets.GCP_STORAGE_SERVICE_ACCOUNT_KEY }}
-          export_default_credentials: true
+          credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
+      - name: Setup GCS
+        id: gcs-setup
+        uses: google-github-actions/setup-gcloud@v1.0.1
       - name: Upload Artifacts
         id: upload
         uses: google-github-actions/upload-cloud-storage@v0.10.4
@@ -696,7 +698,8 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to upload nightly release artifacts.
               Fetch artifacts: ${{ steps.fetch.outcome }}
-              Setup GCloud: ${{ steps.gcloud.outcome }}
+              Authenticatie GCS: ${{ steps.gcs-auth.outcome }}
+              Setup GCS: ${{ steps.gcs-setup.outcome }}
               Upload artifacts: ${{ steps.upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
@@ -727,6 +730,7 @@ jobs:
         with:
           repository: netdata/netdata-nightlies
           path: nightlies
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
         uses: actions/download-artifact@v3
