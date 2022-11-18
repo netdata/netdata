@@ -469,10 +469,12 @@ char *btf_path = NULL;
 static void ebpf_exit(int sig)
 {
 #ifdef LIBBPF_MAJOR_VERSION
+    pthread_mutex_lock(&lock);
     if (default_btf) {
         btf__free(default_btf);
         default_btf = NULL;
     }
+    pthread_mutex_unlock(&lock);
 #endif
 
     char filename[FILENAME_MAX + 1];
