@@ -51,8 +51,7 @@ the accuracy of the values you enter below, changes in the compression ratio, an
 
 :::
 
-Visit the [Netdata Storage Calculator](https://netdata-storage-calculator.herokuapp.com/) app to customize 
-data retention according to your preferences.
+You can use the [Netdata Storage Calculator](https://netdata-storage-calculator.herokuapp.com/) found here to get a general idea of storage space until we deliver our updated calculator in the coming weeks.
 
 ## Edit `netdata.conf` with recommended database engine settings
 
