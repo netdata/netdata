@@ -317,6 +317,16 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         string_freez(old_units);
     }
 
+    if(ctr->family && *ctr->family) {
+        STRING *old_family = st->family;
+        st->family = rrd_string_strdupz(ctr->family);
+        if(old_family != st->family)
+            ctr->react_action |= RRDSET_REACT_UPDATED;
+        string_freez(old_family);
+
+        // TODO - we should rename RRDFAMILY variables
+    }
+
     if(ctr->context && *ctr->context) {
         STRING *old_context = st->context;
         st->context = rrd_string_strdupz(ctr->context);
