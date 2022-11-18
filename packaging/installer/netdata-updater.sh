@@ -369,8 +369,8 @@ download() {
 }
 
 get_netdata_latest_tag() {
-  dest="${1}"
-  url="https://github.com/netdata/netdata/releases/latest"
+  url="https://github.com/netdata/${1}/releases/latest"
+  dest="${2}"
 
   if command -v curl >/dev/null 2>&1; then
     tag=$(curl "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
@@ -463,9 +463,9 @@ parse_version() {
 
 get_latest_version() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    get_netdata_latest_tag /dev/stdout
+    get_netdata_latest_tag netdata /dev/stdout
   else
-    download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout
+    get_netdata_latest_tag netdata-nightlies /dev/stdout
   fi
 }
 
@@ -529,12 +529,13 @@ set_tarball_urls() {
   fi
 
   if [ "$1" = "stable" ]; then
-    latest="$(get_netdata_latest_tag /dev/stdout)"
+    latest="$(get_netdata_latest_tag netdata /dev/stdout)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_NIGHTLIES_BASEURL/sha256sums.txt"
+    tag="$(get_netdata_latest_tag netdata-nightlies /dev/stdout)"
+    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/download/${tag}/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_NIGHTLIES_BASEURL/download/${tag}/sha256sums.txt"
   fi
 }
 
@@ -908,7 +909,7 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 [ -z "${NETDATA_TARBALL_CHECKSUM}" ] && [ -f "${NETDATA_LIB_DIR}/netdata.tarball.checksum" ] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
 
 # Grab the nightlies baseurl (defaulting to our Google Storage bucket)
-export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
+export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://github.com/netdata/netdata-nightlies/releases}"
 
 if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)" U0011
