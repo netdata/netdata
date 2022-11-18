@@ -258,7 +258,7 @@ static inline void
     usec_t end_time_ut, old_end_time_ut;
     uint32_t page_length;
 
-    if (NULL == descr->extent) {
+    if (NULL == descr->extent && NULL == descr->extent_entry) {
         /* this page is currently being modified, get consistent info locklessly */
         do {
             end_time_ut = descr->end_time_ut;
