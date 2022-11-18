@@ -1172,12 +1172,15 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         return 0;
     }
 
+    netdata_thread_disable_cancelability();
     uv_rwlock_rdlock(&page_index->lock);
     descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, PAGE_CACHE_MAX_PRELOAD_PAGES);
     if (NULL == descr) {
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
         *ret_page_indexp = NULL;
+
+        netdata_thread_enable_cancelability();
         return 0;
     } else {
         Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
@@ -1289,6 +1292,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         freez(*page_info_arrayp);
         *page_info_arrayp = NULL;
     }
+    netdata_thread_enable_cancelability();
     return count;
 }
 
@@ -1327,6 +1331,9 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     page_not_in_cache = 0;
     uv_rwlock_rdlock(&page_index->lock);
     int retry_count = 0;
+
+    netdata_thread_disable_cancelability();
+
     while (1) {
         descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, PAGE_CACHE_MAX_PRELOAD_PAGES);
         if (NULL == descr || 0 == descr->page_length || retry_count == default_rrdeng_page_fetch_retries) {
@@ -1336,6 +1343,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             uv_rwlock_rdunlock(&page_index->lock);
 
             pg_cache_release_pages(ctx, 1);
+            netdata_thread_enable_cancelability();
             return NULL;
         }
         rrdeng_page_descr_mutex_lock(ctx, descr);
@@ -1354,6 +1362,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
                       descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
                 pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
             }
+            netdata_thread_enable_cancelability();
             return NULL;
         }
 
@@ -1384,6 +1393,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             pg_cache_wake_up_waiters_unsafe(descr);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
             rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
+            netdata_thread_enable_cancelability();
             return descr;
         }
         uv_rwlock_rdunlock(&page_index->lock);
@@ -1410,6 +1420,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
     else
         rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
+    netdata_thread_enable_cancelability();
     return descr;
 }
 
