@@ -6,7 +6,7 @@ learn_status: "Published"
 learn_topic_type: "Getting started"
 learn_rel_path: "Getting started"
 learn_docs_purpose: "Present netdata in a nutshell"
-
+-->
 
 ## What is Netdata ?
 
@@ -96,10 +96,22 @@ functionality](https://user-images.githubusercontent.com/1153921/95367248-5f7559
 
 You can even visit this slightly dated [interactive infographic](https://my-netdata.io/infographic.html) and get lost in a rabbit hole. 
 
-But the best way to get under the hood or in the steering wheel of our highly efficient, low-latency system (supporting multiple readers and one writer on each metric) is to read the rest of our docs, or just to jump in and [get started](app.netdata.com).
+But the best way to get under the hood or in the steering wheel of our highly efficient, low-latency system (supporting multiple readers and one writer on each metric) is to read the rest of our docs, or just to jump in and [get started](app.netdata.com). But here's a good breakdown:
+
+### Netdata Agent
+
+Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
+
+You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no sudo required.
+
+### Netdata Cloud
+Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface. When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
+
+Netdata Cloud is free! You can add an entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and alarms entirely for free.
+
+While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when you're viewing the Netdata Cloud interface.
 
 
-https://my-netdata.io/infographic.html
 ## Community
 
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
