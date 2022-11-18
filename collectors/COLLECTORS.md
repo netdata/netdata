@@ -503,6 +503,7 @@ default. To use a third-party collector, visit their GitHub/documentation page a
 
 <details>
 <summary>Typical third party Python collector installation instructions</summary>
+<br>
 In general the below steps should be sufficient to use a third party collector.
 
 1. Download collector code file into folder expected by Netdata.
