@@ -129,7 +129,7 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
-            dims[i] = rrddim_add(st, aclk_query_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+            dims[i] = rrddim_add(st, aclk_query_get_name(i, 1), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
 
     } else
         rrdset_next(st);
