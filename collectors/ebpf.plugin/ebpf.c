@@ -463,10 +463,8 @@ char *btf_path = NULL;
 
 /**
  * Close the collector gracefully
- *
- * @param sig is the signal number used to close the collector
  */
-static void ebpf_exit(int sig)
+static void ebpf_exit()
 {
 #ifdef LIBBPF_MAJOR_VERSION
     pthread_mutex_lock(&lock);
@@ -482,7 +480,7 @@ static void ebpf_exit(int sig)
     if (unlink(filename))
         error("Cannot remove PID file %s", filename);
 
-    exit(sig);
+    ebpf_exit_plugin = 2;
 }
 
 /**
@@ -515,6 +513,7 @@ int ebpf_exit_plugin = 0;
  */
 static void ebpf_stop_threads(int sig)
 {
+    UNUSED(sig);
     ebpf_exit_plugin = 1;
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++);
@@ -552,7 +551,7 @@ static void ebpf_stop_threads(int sig)
         }
     }
 
-    ebpf_exit(sig);
+    ebpf_exit();
 }
 
 /*****************************************************************
@@ -1956,7 +1955,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
             error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
                   ebpf_stock_config_dir);
-            ebpf_exit(1);
+            ebpf_exit();
         }
     } else
         info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
@@ -2175,7 +2174,7 @@ int main(int argc, char **argv)
 
     if (ebpf_start_pthread_variables()) {
         error("Cannot start mutex to control overall charts.");
-        ebpf_exit(5);
+        ebpf_exit();
     }
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
@@ -2205,11 +2204,11 @@ int main(int argc, char **argv)
         netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
     }
 
-    usec_t step = 60 * USEC_PER_SEC;
+    usec_t step = USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    for (;;) {
+    while (ebpf_exit_plugin != 2) {
         (void)heartbeat_next(&hb, step);
     }
 
