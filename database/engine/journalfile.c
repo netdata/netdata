@@ -1148,8 +1148,8 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         uint32_t entries = page_list_header->entries;
 
         uv_rwlock_rdlock(&page_index->lock);
+        uv_file file = journalfile->datafile->file;
 
-        bool mark_journalfile_for_expiration_check = false;
         for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
              descr != NULL;
@@ -1168,30 +1168,19 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
 
             rrdeng_page_descr_mutex_lock(ctx, descr);
-            while (!pg_cache_try_get_unsafe(descr, 1)) {
-                pg_cache_wait_event_unsafe(descr);
-            }
-
             descr->extent_entry = &extent_list[page_entry->extent_index];
             descr->extent = NULL;
-            descr->file = journalfile->datafile->file;
-            ++pg_cache->active_descriptors;
-            pg_cache_put_unsafe(descr);
-            rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+            descr->file = file;
+            rrd_atomic_fetch_add(&pg_cache->active_descriptors, 1);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
-            mark_journalfile_for_expiration_check = true;
         }
-
-        if (mark_journalfile_for_expiration_check) {
-            uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
-            mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
-        }
-
+        uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
+        mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
         uv_rwlock_rdunlock(&page_index->lock);
     }
 }
 
-bool descriptor_is_corrupted(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+static bool descriptor_is_corrupted(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct pg_cache_page_index *page_index = get_page_index(pg_cache, descr->id);
