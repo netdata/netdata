@@ -548,6 +548,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 #if __FreeBSD__ >= 11
                         ifm->rd_drops_out = rrddim_add(ifm->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
+                    }
 
                     rrddim_set_by_pointer(ifm->st_drops, ifm->rd_drops_in,  IFA_DATA(iqdrops));
 #if __FreeBSD__ >= 11
