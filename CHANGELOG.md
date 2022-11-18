@@ -16,6 +16,7 @@
 - Add 'funcs' capability [\#13992](https://github.com/netdata/netdata/pull/13992) ([underhood](https://github.com/underhood))
 - added debug info on left-over query targets [\#13990](https://github.com/netdata/netdata/pull/13990) ([ktsaou](https://github.com/ktsaou))
 - replication improvements [\#13989](https://github.com/netdata/netdata/pull/13989) ([ktsaou](https://github.com/ktsaou))
+- use calculator app instead of spreadsheet [\#13981](https://github.com/netdata/netdata/pull/13981) ([andrewm4894](https://github.com/andrewm4894))
 - apps.plugin function processes: keys should not have spaces [\#13980](https://github.com/netdata/netdata/pull/13980) ([ktsaou](https://github.com/ktsaou))
 - dont crash when netdata cannot execute its external plugins [\#13978](https://github.com/netdata/netdata/pull/13978) ([ktsaou](https://github.com/ktsaou))
 - Add \_total suffix to raw increment metrics for remote write [\#13977](https://github.com/netdata/netdata/pull/13977) ([vlvkobal](https://github.com/vlvkobal))
@@ -347,8 +348,6 @@
 - added another way to get ansible plays [\#13349](https://github.com/netdata/netdata/pull/13349) ([mhkarimi1383](https://github.com/mhkarimi1383))
 - Send node info message sooner [\#13348](https://github.com/netdata/netdata/pull/13348) ([MrZammler](https://github.com/MrZammler))
 - query engine: omit first point if not needed [\#13345](https://github.com/netdata/netdata/pull/13345) ([ktsaou](https://github.com/ktsaou))
-- fix 32bit calculation on array allocator [\#13343](https://github.com/netdata/netdata/pull/13343) ([ktsaou](https://github.com/ktsaou))
-- fix crash on start on slow disks because ml is initialized before dbengine starts [\#13342](https://github.com/netdata/netdata/pull/13342) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
