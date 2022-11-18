@@ -1213,6 +1213,9 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
             for(int p = 0; p < ei->number_of_pages ;p++) {
                 struct rrdeng_page_descr *descr = ei->pages[p];
 
+                if (unlikely(!descr))
+                    continue;
+
                 usec_t update_every_usec;
 
                 size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
