@@ -887,6 +887,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     journalfile->journal_data_size = file_size;
 
     usec_t header_start_time = j2_header->start_time_ut;
+    usec_t now_usec_t = now_realtime_usec();
     for (size_t i=0; i < entries; i++) {
         Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t));
         if (likely(NULL != PValue)) {
@@ -910,6 +911,12 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
         if (page_index->latest_time_ut < metric_end_ut)
             page_index->latest_time_ut = metric_end_ut;
+
+        if (page_index->latest_time_ut > now_usec_t) {
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "DBENGINE: Ignoring page index latest time as it is in the future(now=%llu, page=%llu)", now_usec_t, page_index->latest_time_ut);
+            page_index->latest_time_ut = now_usec_t;
+        }
 
         ++page_index->page_count;
         ++pg_cache->page_descriptors;
