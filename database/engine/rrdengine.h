@@ -271,6 +271,7 @@ struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
+    bool journal_initialization;
     uint8_t drop_metrics_under_page_cache_pressure; /* boolean */
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;

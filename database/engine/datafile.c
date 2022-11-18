@@ -448,6 +448,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     int ret;
 
     fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
+    ctx->journal_initialization = true;
     ret = scan_data_files(ctx);
     if (ret < 0) {
         error("Failed to scan path \"%s\".", ctx->dbfiles_path);
@@ -461,7 +462,7 @@ int init_data_files(struct rrdengine_instance *ctx)
         }
         ctx->last_fileno = 1;
     }
-
+    ctx->journal_initialization = false;
     return 0;
 }
 

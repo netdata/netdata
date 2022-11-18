@@ -1141,7 +1141,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {
+    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce && false == ctx->journal_initialization)) {
         /* delete old data */
         if (wc->now_deleting_files) {
             /* already deleting data */
