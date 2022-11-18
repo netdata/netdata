@@ -748,60 +748,52 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
     struct rrdeng_page_descr *descr = NULL;
 
     bool journal_updated = false;
-    bool rw_lock_acquired = false;
+
+    // Get write lock since we will probably add pages
+    uv_rwlock_rdunlock(&page_index->lock);
+    uv_rwlock_wrlock(&page_index->lock);
 
     // We will cache pages_to_cache pages or until our end time is out of range
     for (uint32_t x = pos; x < pages_to_cache; x++) {
 
         struct journal_page_list *page_entry = &page_list[x];
 
-        if (page_entry->extent_index == UINT32_MAX)
-            continue;
-
         if (delta_end_time_s < page_entry->delta_start_s)
             break;
 
         time_t index_time_s = (time_t) (journal_start_time_s + page_entry->delta_start_s);
 
-        if (!descr_exists_unsafe(page_index, index_time_s)) {
-            struct rrdeng_page_descr *new_descr = pg_cache_create_descr();
-            new_descr->page_length = page_entry->page_length;
-            new_descr->start_time_ut = index_time_s * USEC_PER_SEC;
-            new_descr->end_time_ut = (journal_start_time_s + page_entry->delta_end_s) * USEC_PER_SEC;
-            new_descr->id = &page_index->id;
-            new_descr->extent = NULL;
-            new_descr->extent_entry = &extent_list[page_entry->extent_index];
-            new_descr->type = page_entry->type;
-            new_descr->update_every_s = page_entry->update_every_s;
-            new_descr->file = datafile->file;
+        if (descr_exists_unsafe(page_index, index_time_s))
+            continue;
 
-            if (false == rw_lock_acquired) {
-                uv_rwlock_rdunlock(&page_index->lock);
-                uv_rwlock_wrlock(&page_index->lock);
-                rw_lock_acquired = true;
-            }
+        struct rrdeng_page_descr *new_descr = pg_cache_create_descr();
+        new_descr->page_length = page_entry->page_length;
+        new_descr->start_time_ut = index_time_s * USEC_PER_SEC;
+        new_descr->end_time_ut = (journal_start_time_s + page_entry->delta_end_s) * USEC_PER_SEC;
+        new_descr->id = &page_index->id;
+        new_descr->extent = NULL;
+        new_descr->extent_entry = &extent_list[page_entry->extent_index];
+        new_descr->type = page_entry->type;
+        new_descr->update_every_s = page_entry->update_every_s;
+        new_descr->file = datafile->file;
 
-            struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
-            if (unlikely(added_descr != new_descr))
-                rrdeng_page_descr_freez(new_descr);
+        struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
+        if (unlikely(added_descr != new_descr))
+            rrdeng_page_descr_freez(new_descr);
 
-            if (!descr) {
-                descr = added_descr;
-                // Mark the area to check
-                mark_journalfile_descriptor(pg_cache, datafile->journalfile, page_offset, x);
-                journal_updated = true;
-            }
+        if (!descr) {
+            descr = added_descr;
+            // Mark the area to check
+            mark_journalfile_descriptor(pg_cache, datafile->journalfile, page_offset, x);
+            journal_updated = true;
         }
     }
 
     if (!journal_updated)
         update_journal_access_time(datafile->journalfile, NULL, NULL);
 
-    // Check if we have switched to rw lock for the page index and switch back
-    if (rw_lock_acquired) {
-        uv_rwlock_wrunlock(&page_index->lock);
-        uv_rwlock_rdlock(&page_index->lock);
-    }
+    uv_rwlock_wrunlock(&page_index->lock);
+    uv_rwlock_rdlock(&page_index->lock);
     return descr;
 };
 
