@@ -9,7 +9,7 @@ learn_rel_path: "Getting started/Installation"
 learn_docs_purpose: "Instructions on running the kickstart script on Linux/Unix systems."
 -->
 
-import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Admonition from '@theme/Admonition';
