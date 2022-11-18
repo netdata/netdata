@@ -1213,6 +1213,15 @@ int init_rrd_files(struct rrdengine_instance *ctx)
         all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter;
     }
 
+    if(ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].counter) {
+        buffer_sprintf(wb, "%s%zu pages had start time or end time in the future (latest: %llu secs ago)"
+                       , (all_errors)?", ":""
+                       , ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].counter
+                       , (now - ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].latest_end_time_ut) / USEC_PER_SEC
+        );
+        all_errors += ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].counter;
+    }
+
     if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter) {
         buffer_sprintf(wb, "%s%zu pages had start time = end time with more than 1 entries (latest: %llu secs ago)"
                        , (all_errors)?", ":""

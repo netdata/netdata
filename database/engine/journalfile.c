@@ -392,6 +392,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     extent->datafile = journalfile->datafile;
     extent->next = NULL;
 
+    usec_t now_usec_t = now_realtime_usec();
     for (i = 0, valid_pages = 0 ; i < count ; ++i) {
         uuid_t *temp_id;
         Pvoid_t *PValue;
@@ -414,6 +415,14 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter++;
             if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut < end_time_ut)
                 ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut = end_time_ut;
+            continue;
+        }
+
+        if (unlikely(start_time_ut > now_usec_t || end_time_ut > now_usec_t)) {
+            ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].counter++;
+            usec_t max_start_end_ut = MAX(start_time_ut, end_time_ut);
+            if(ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].latest_end_time_ut < max_start_end_ut)
+                ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].latest_end_time_ut = max_start_end_ut;
             continue;
         }
 
