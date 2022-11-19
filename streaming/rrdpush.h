@@ -7,7 +7,6 @@
 #include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
-#include "replication.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -266,5 +265,7 @@ void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+
+#include "replication.h"
 
 #endif //NETDATA_RRDPUSH_H

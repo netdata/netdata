@@ -2,16 +2,17 @@
 
 #include "common.h"
 
-extern void *aclk_main(void *ptr);
-extern void *analytics_main(void *ptr);
-extern void *checks_main(void *ptr);
-extern void *cpuidlejitter_main(void *ptr);
-extern void *global_statistics_main(void *ptr);
-extern void *health_main(void *ptr);
-extern void *pluginsd_main(void *ptr);
-extern void *service_main(void *ptr);
-extern void *statsd_main(void *ptr);
-extern void *timex_main(void *ptr);
+void *aclk_main(void *ptr);
+void *analytics_main(void *ptr);
+void *checks_main(void *ptr);
+void *cpuidlejitter_main(void *ptr);
+void *global_statistics_main(void *ptr);
+void *health_main(void *ptr);
+void *pluginsd_main(void *ptr);
+void *service_main(void *ptr);
+void *statsd_main(void *ptr);
+void *timex_main(void *ptr);
+void *replication_thread_main(void *ptr __maybe_unused);
 
 extern bool global_statistics_enabled;
 
@@ -138,6 +139,16 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = rrdcontext_main
+    },
+
+    {
+            .name = "replication",
+            .config_section = NULL,
+            .config_name = NULL,
+            .enabled = 1,
+            .thread = NULL,
+            .init_routine = NULL,
+            .start_routine = replication_thread_main
     },
 
     // terminator

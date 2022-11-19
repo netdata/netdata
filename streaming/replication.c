@@ -390,3 +390,198 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     return send_replay_chart_cmd(callback, callback_data, st, start_streaming, first_entry_wanted, last_entry_wanted);
 }
+
+// ----------------------------------------------------------------------------
+// replication thread
+
+struct replication_request {
+    struct sender_state *sender;
+    STRING *chart_id;
+    bool start_streaming;
+    time_t after;
+    time_t before;
+
+    size_t refcount;
+    bool deleted;
+
+    RRDSET *st;
+
+    struct replication_request *next;
+    struct replication_request *prev;
+};
+
+struct replication_thread {
+    bool thread_is_running;
+    netdata_mutex_t mutex;
+
+    size_t requests_count;
+    struct replication_request *requests;
+};
+
+static struct replication_thread rep = {
+        .thread_is_running = false,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .requests_count = 0,
+        .requests = NULL,
+};
+
+void replication_lock() {
+    netdata_mutex_lock(&rep.mutex);
+}
+
+void replication_unlock() {
+    netdata_mutex_unlock(&rep.mutex);
+}
+
+static void replication_del_request_unsafe(struct replication_request *r) {
+    if(!r->refcount) {
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rep.requests, r, prev, next);
+        rep.requests_count--;
+        string_freez(r->chart_id);
+        freez(r);
+    }
+    else
+        // currently being executed
+        r->deleted = true;
+}
+
+void replication_add_request(struct sender_state *sender, const char *chart_id, time_t after, time_t before, bool start_streaming) {
+    replication_lock();
+
+    struct replication_request *r = mallocz(sizeof(struct replication_request));
+    r->sender = sender;
+    r->chart_id = string_strdupz(chart_id);
+    r->after = after;
+    r->before = before;
+    r->start_streaming = start_streaming;
+    r->refcount = 0;
+    r->deleted = false;
+    r->st = NULL;
+    r->next = NULL;
+    r->prev = NULL;
+
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rep.requests, r, prev, next);
+    rep.requests_count++;
+
+    replication_unlock();
+}
+
+void replication_flush_sender(struct sender_state *sender) {
+    replication_lock();
+
+    struct replication_request *r = rep.requests;
+    while(r) {
+        if(r->sender == sender) {
+            struct replication_request *to_delete = r;
+            r = r->next;
+
+            replication_del_request_unsafe(to_delete);
+        }
+        else
+            r = r->next;
+    }
+
+    replication_unlock();
+}
+
+static int replication_request_compar(const void *a, const void *b) {
+    struct replication_request *r1 = *(struct replication_request **)a;
+    struct replication_request *r2 = *(struct replication_request **)b;
+
+    if(r1->after < r2->after)
+        return -1;
+    if(r1->after > r2->after)
+        return 1;
+    return 0;
+}
+
+static struct replication_request *replication_get_oldest_request_unsafe(void) {
+
+    size_t entries = rep.requests_count;
+    struct replication_request **array = mallocz(sizeof(struct replication_request *) * entries);
+
+    struct replication_request *r = rep.requests;
+    size_t i;
+    for(i = 0; i < entries && r ;i++, r = r->next)
+        array[i] = r;
+
+    if(i != entries)
+        entries = i;
+
+    qsort(array, entries, sizeof(struct replication_request *), replication_request_compar);
+
+    for(i = 0; i < entries ;i++) {
+        r = array[i];
+
+        if(r->refcount)
+            // currently being executed
+            continue;
+
+        r->st = rrdset_find(r->sender->host, string2str(r->chart_id));
+        if(!r->st) {
+            internal_error(true,
+                           "STREAM %s [send to %s]: cannot find chart '%s' to satisfy pending replication command."
+                           , rrdhost_hostname(r->sender->host), r->sender->connected_to, string2str(r->chart_id));
+
+            replication_del_request_unsafe(r);
+        }
+        else
+            return r;
+    }
+
+    return NULL;
+}
+
+void *replication_thread_main(void *ptr __maybe_unused) {
+
+    while(!netdata_exit) {
+        replication_lock();
+
+        if(!rep.requests || !rep.requests_count) {
+            replication_unlock();
+            sleep_usec(1000 * USEC_PER_MS);
+            continue;
+        }
+
+        struct replication_request *r = replication_get_oldest_request_unsafe();
+        if(!r) {
+            replication_unlock();
+            sleep_usec(1000 * USEC_PER_MS);
+            continue;
+        }
+
+        if(r->after < r->sender->replication_first_time || !r->sender->replication_first_time)
+            r->sender->replication_first_time = r->after;
+
+        if(r->before < r->sender->replication_min_time || !r->sender->replication_min_time)
+            r->sender->replication_min_time = r->before;
+
+        r->refcount++;
+        replication_unlock();
+        netdata_thread_disable_cancelability();
+
+        // send the replication data
+        bool start_streaming = replicate_chart_response(r->st->rrdhost, r->st,
+                                                        r->start_streaming, r->after, r->before);
+
+        netdata_thread_enable_cancelability();
+        replication_lock();
+
+        if (likely(!r->deleted)) {
+            // enable normal streaming if we have to
+            if (start_streaming) {
+                debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
+                      rrdhost_hostname(r->sender->host), rrdset_id(r->st));
+
+                rrdset_flag_set(r->st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            }
+        }
+
+        r->refcount--;
+        replication_del_request_unsafe(r);
+
+        replication_unlock();
+    }
+
+    return NULL;
+}

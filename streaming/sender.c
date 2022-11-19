@@ -276,6 +276,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_sender_thread_reset_all_charts(host);
     rrdpush_sender_thread_send_custom_host_variables(host);
     dictionary_flush(host->sender->replication_requests);
+    replication_flush_sender(host->sender);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
@@ -938,12 +939,18 @@ void execute_commands(struct sender_state *s) {
                       after ? after : "(unset)",
                       before ? before : "(unset)");
             } else {
-                struct replication_request tmp = {
-                        .start_streaming = !strcmp(start_streaming, "true"),
-                        .after = strtoll(after, NULL, 0),
-                        .before = strtoll(before, NULL, 0),
-                };
-                dictionary_set(s->replication_requests, chart_id, &tmp, sizeof(struct replication_request));
+//                struct replication_request tmp = {
+//                        .start_streaming = !strcmp(start_streaming, "true"),
+//                        .after = strtoll(after, NULL, 0),
+//                        .before = strtoll(before, NULL, 0),
+//                };
+//                dictionary_set(s->replication_requests, chart_id, &tmp, sizeof(struct replication_request));
+
+                replication_add_request(s, chart_id,
+                                        strtoll(after, NULL, 0),
+                                        strtoll(before, NULL, 0),
+                                        !strcmp(start_streaming, "true")
+                                        );
             }
         }
         else {
@@ -1449,7 +1456,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if(unlikely(s->read_len))
             execute_commands(s);
 
-        process_replication_requests(s);
+        // process_replication_requests(s);
 
         if(unlikely(fds[Collector].revents & (POLLERR|POLLHUP|POLLNVAL))) {
             char *error = NULL;
