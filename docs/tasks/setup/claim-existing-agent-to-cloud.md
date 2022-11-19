@@ -1,6 +1,6 @@
 <!--
-title: "Claim existing Agent to the Cloud"
-sidebar_label: "Claim existing Agent to the Cloud"
+title: "Claim existing Agent to Cloud"
+sidebar_label: "Claim existing Agent to Cloud"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md"
 learn_status: "Published"
 sidebar_position: "30"
