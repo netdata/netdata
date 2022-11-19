@@ -11,7 +11,7 @@ learn_docs_purpose: "Step by step instructions to deploy an Agent."
 
 ## Linux
 
-import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '../../src/components/OneLineInstall/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Admonition from '@theme/Admonition';
