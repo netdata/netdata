@@ -156,31 +156,70 @@ void circ_buff_search(  Circ_buff_t *const buff, logs_query_params_t *const p_qu
     }
 }
 
-size_t circ_buffer_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space){
-    size_t const requested_text_compressed_space = LZ4_compressBound(requested_text_space);
-    m_assert(requested_text_compressed_space != 0, "requested_text_compressed_space is zero");
-    size_t const required_space = requested_text_space + requested_text_compressed_space;
+/**
+ * @brief Query circular buffer if there is space for item insertion.
+ * @param buff Circular buffer to query for available space.
+ * @param requested_text_space Size of raw (uncompressed) space needed.
+ * @return \p requested_text_space if there is enough space, else 0.
+ */
+size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space){
+    size_t available_text_space = requested_text_space;
+
+    /* Calculate how much is the maximum compressed space that will 
+     * be required on top of the requested space for the raw data. */
+    buff->in->text_compressed_size = (size_t) LZ4_compressBound(requested_text_space);
+    m_assert(buff->in->text_compressed_size != 0, "requested text compressed space is zero");
+    size_t const required_space = requested_text_space + buff->in->text_compressed_size;
     
-    size_t total_cached_mem = 0;
+    size_t total_cached_mem_ex_in = 0;
     for (int i = 0; i < buff->num_of_items; i++){
-        total_cached_mem += buff->items[i].data_max_size;
+        total_cached_mem_ex_in += buff->items[i].data_max_size;
     }
-    total_cached_mem += buff->in->data_max_size;
 
-    buff->total_cached_mem = total_cached_mem;
-
-    if(unlikely(total_cached_mem + required_space > buff->total_cached_mem_max)){
-        return 0;
-    }
-    
+    /* If the required space is more than the allocated space of the input
+     * buffer, then we need to check if the input buffer can be reallocated:
+     * 
+     * a) If the total memory consumption of the circular buffer plus the 
+     * required space is less than the limit set by "circular buffer max size" 
+     * for this log source, then the input buffer can be reallocated.
+     * 
+     * b) If the total memory consumption of the circular buffer plus the 
+     * required space is more than the limit set by "circular buffer max size" 
+     * for this log source, we will attempt to reclaim some of the circular 
+     * buffer allocated memory from any empty items. If after reclaiming the 
+     * total memory consumption is still beyond the configuration limit, 0
+     * will be returned as the available space for raw logs in the input buffer.
+     * */
     if(required_space > buff->in->data_max_size) {
-        buff->in->data_max_size = required_space;
-        buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
+        if(likely(total_cached_mem_ex_in + required_space <= buff->total_cached_mem_max)){
+            buff->in->data_max_size = required_space;
+            buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
+        }
+        else{
+            int head = buff->head % buff->num_of_items;
+            int tail = buff->tail % buff->num_of_items;
+
+            for (int i = head; i != tail; i = (i + 1) % buff->num_of_items) {
+                buff->items[i].data_max_size = 1;
+                buff->items[i].data = reallocz(buff->items[i].data, buff->items[i].data_max_size);
+            }
+
+            total_cached_mem_ex_in = 0;
+            for (int i = 0; i < buff->num_of_items; i++){
+                total_cached_mem_ex_in += buff->items[i].data_max_size;
+            }
+
+            if(total_cached_mem_ex_in + required_space <= buff->total_cached_mem_max){
+                buff->in->data_max_size = required_space;
+                buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
+            }
+            else available_text_space = 0;
+        }
     }
 
-    buff->in->text_compressed_size = requested_text_compressed_space;
+    buff->total_cached_mem = total_cached_mem_ex_in + buff->in->data_max_size;
 
-    return requested_text_space;
+    return available_text_space;
 }
 
 int circ_buff_insert(Circ_buff_t *const buff){

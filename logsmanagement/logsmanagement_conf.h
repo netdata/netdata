@@ -38,9 +38,9 @@
 
 #define CIRCULAR_BUFF_SPARE_ITEMS 2                 /**< Additional circular buffers items to give time to the db engine to save buffers to disk **/
 
-#define CIRCULAR_BUFF_DEFAULT_MAX_SIZE (200 MiB)    /**< Default circular_buffer_max_size **/
-#define CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN (10 MiB)   /**< circular_buffer_max_size read from configuration cannot be smaller than this **/
-#define CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX (1000 MiB) /**< circular_buffer_max_size read from configuration cannot be larger than this **/
+#define CIRCULAR_BUFF_DEFAULT_MAX_SIZE (64 MiB)    /**< Default circular_buffer_max_size **/
+#define CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN (1 MiB)   /**< circular_buffer_max_size read from configuration cannot be smaller than this **/
+#define CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX (1024 MiB) /**< circular_buffer_max_size read from configuration cannot be larger than this **/
 
 /* -------------------------------------------------------------------------- */
 

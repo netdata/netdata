@@ -55,7 +55,7 @@ typedef struct Circ_buff {
 
 void generic_parser(void *arg);
 void circ_buff_search(Circ_buff_t *buff, logs_query_params_t *p_query_params);
-size_t circ_buffer_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space);
+size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space);
 int circ_buff_insert(Circ_buff_t *const buff);
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff);
 Circ_buff_t *circ_buff_init(const int num_of_items, const size_t max_size);

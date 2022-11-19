@@ -362,7 +362,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         m_assert(text, "text is NULL");
 
                         new_tmp_text_size = buff->in->text_size + text_size + 1; // +1 for '\n'
-                        size_t available_text_space = circ_buffer_prepare_write(buff, new_tmp_text_size);
+                        size_t available_text_space = circ_buff_prepare_write(buff, new_tmp_text_size);
                         m_assert(available_text_space != 0, "available_text_space is 0");
                         // TODO: What do if available_text_space == 0 ??
 
@@ -618,7 +618,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         new_tmp_text_size += 5; // +5 for '[', ']', ':' and ' ' characters around and after pid and '\n' at the end
 
         /* Metrics extracted, now prepare circular buffer for write */
-        const size_t available_text_space = circ_buffer_prepare_write(buff, new_tmp_text_size);
+        const size_t available_text_space = circ_buff_prepare_write(buff, new_tmp_text_size);
         m_assert(available_text_space != 0, "available_text_space is 0");
         // TODO: What do if available_text_space == 0 ??
 
@@ -763,7 +763,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         new_tmp_text_size += 1; // +1 fpr '\n' character at the end
         
         /* Metrics extracted, now prepare circular buffer for write */
-        const size_t available_text_space = circ_buffer_prepare_write(buff, new_tmp_text_size);
+        const size_t available_text_space = circ_buff_prepare_write(buff, new_tmp_text_size);
         m_assert(available_text_space != 0, "available_text_space is 0");
         // TODO: What do if available_text_space == 0 ??
 

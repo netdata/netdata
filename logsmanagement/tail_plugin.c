@@ -377,7 +377,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
     if (likely((int64_t)new_filesize - (int64_t)old_filesize > 0)) {
         Circ_buff_t *buff = p_file_info->circ_buff;
         size_t filesize_diff = (size_t)(new_filesize - old_filesize);
-        size_t available_text_space = circ_buffer_prepare_write(buff, filesize_diff);
+        size_t available_text_space = circ_buff_prepare_write(buff, filesize_diff);
 
         if(unlikely(available_text_space == 0)){
             m_assert(available_text_space != 0, "available_text_space is 0");
