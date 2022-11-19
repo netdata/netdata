@@ -365,11 +365,15 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
             if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid))) {
-                bool found_in_sql = true;
-                if(unlikely(sql_find_chart_uuid(host, st, &st->chart_uuid))) {
-                    uuid_generate(st->chart_uuid);
-                    found_in_sql = false;
-                }
+                  uuid_generate(st->chart_uuid);
+                  bool found_in_sql = false;
+
+//                bool found_in_sql = true;
+//                if(unlikely(sql_find_chart_uuid(host, st, &st->chart_uuid))) {
+//                    uuid_generate(st->chart_uuid);
+//                    found_in_sql = false;
+//                }
+
 #ifdef NETDATA_INTERNAL_CHECKS
                 char uuid_str[UUID_STR_LEN];
                 uuid_unparse_lower(st->chart_uuid, uuid_str);

@@ -83,11 +83,15 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rd->rrd_memory_mode = ctr->memory_mode;
 
     if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid)))) {
-        bool found_in_sql = true;
-        if(unlikely(sql_find_dimension_uuid(st, rd, &rd->metric_uuid))) {
-            uuid_generate(rd->metric_uuid);
-            found_in_sql = false;
-        }
+        uuid_generate(rd->metric_uuid);
+        bool found_in_sql = false;
+
+//        bool found_in_sql = true;
+//        if(unlikely(sql_find_dimension_uuid(st, rd, &rd->metric_uuid))) {
+//            found_in_sql = false;
+//            uuid_generate(rd->metric_uuid);
+//        }
+
 #ifdef NETDATA_INTERNAL_CHECKS
         char uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(rd->metric_uuid, uuid_str);
