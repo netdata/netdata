@@ -1,7 +1,7 @@
 <!--
-title: "Secure Agent Netdata deployments"
-sidebar_label: "Secure Netdata deployments"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/secure-netdata-deployments.md"
+title: "Secure Agent deployments"
+sidebar_label: "Secure Agent deployments"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/security/secure-agent-deployments.md"
 sidebar_position : "50"
 learn_status: "Unpublished"
 learn_topic_type: "Tasks"
