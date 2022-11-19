@@ -103,12 +103,11 @@ struct rrdeng_cmd {
     union {
         struct rrdeng_read_page read_page;
         struct rrdeng_read_extent read_extent;
-        struct rrdengine_journalfile *journalfile;
         struct completion *completion;
     };
 };
 
-#define RRDENG_CMD_Q_MAX_SIZE (2048)
+#define RRDENG_CMD_Q_MAX_SIZE (8192)
 
 struct rrdeng_work {
     uv_work_t req;
