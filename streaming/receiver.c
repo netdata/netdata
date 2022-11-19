@@ -4,6 +4,7 @@
 #include "parser/parser.h"
 
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
+#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED (WORKER_PARSER_FIRST_JOB - 2)
 
 #if WORKER_PARSER_FIRST_JOB < 1
 #error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
@@ -110,185 +111,173 @@ PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
     return PARSER_RC_OK;
 }
 
+static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t size) {
+    if(unlikely(!size)) {
+        internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
+        return 0;
+    }
 
-#ifndef ENABLE_COMPRESSION
-/* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
- */
-static int receiver_read(struct receiver_state *r, FILE *fp) {
+    int bytes_read;
+
 #ifdef ENABLE_HTTPS
-    if (r->ssl.conn && !r->ssl.flags) {
+    if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         ERR_clear_error();
-        int desired = sizeof(r->read_buffer) - r->read_len - 1;
-        int ret = SSL_read(r->ssl.conn, r->read_buffer + r->read_len, desired);
-        if (ret > 0 ) {
-            r->read_len += ret;
-            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
-            return 0;
+
+        bytes_read = SSL_read(r->ssl.conn, buffer, (int)size);
+
+        if(unlikely(bytes_read <= 0)) {
+            u_long err;
+            char buf[256];
+            while ((err = ERR_get_error()) != 0) {
+                ERR_error_string_n(err, buf, sizeof(buf));
+                error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
+            }
+            bytes_read = -1;
         }
-        // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
-        u_long err;
-        char buf[256];
-        while ((err = ERR_get_error()) != 0) {
-            ERR_error_string_n(err, buf, sizeof(buf));
-            error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
-        }
-        return 1;
+        else
+            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
+
+        return bytes_read;
     }
 #endif
-    if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
-        return 1;
-    r->read_len = strlen(r->read_buffer);
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, r->read_len);
-    return 0;
-}
-#else
-/*
- * The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
- * if SSL encryption is on, then use SSL API for reading stream data.
- * Use line oriented fgets() in buffer from receiver_state is provided.
- * In other cases use fread to read binary data from socket.
- * Return zero on success and the number of bytes were read using pointer in the last argument.
- */
-static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t size, int* ret) {
-    if (!ret)
-        return 1;
-    *ret = 0;
-#ifdef ENABLE_HTTPS
-    if (r->ssl.conn && !r->ssl.flags) {
-        ERR_clear_error();
-        if (buffer != r->read_buffer + r->read_len) {
-            *ret = SSL_read(r->ssl.conn, buffer, size);
-            if (*ret > 0 ) 
-                return 0;
-        } else {
-            // we need to receive data with LF to parse compression header
-            size_t ofs = 0;
-            int res = 0;
-            errno = 0;
-            while (ofs < size) {
-                do {
-                    res = SSL_read(r->ssl.conn, buffer + ofs, 1);
-                    // When either SSL_ERROR_SYSCALL (OpenSSL < 3.0) or SSL_ERROR_SSL(OpenSSL > 3.0) happens,
-                    // the connection was lost https://www.openssl.org/docs/man3.0/man3/SSL_get_error.html,
-                    // without the test we will have an infinite loop https://github.com/netdata/netdata/issues/13092
-                    int local_ssl_err = SSL_get_error(r->ssl.conn, res);
-                    if (local_ssl_err == SSL_ERROR_SYSCALL || local_ssl_err == SSL_ERROR_SSL) {
-                        error("The SSL connection has error SSL_ERROR_SYSCALL(%d) and system is registering errno = %d",
-                              local_ssl_err, errno);
-                        return 1;
-                    }
-                } while (res == 0);
 
-                if (res < 0)
-                    break;
-                if (buffer[ofs] == '\n')
-                    break;
-                ofs += res;
-            }
-            if (res > 0) {
-                ofs += res;
-                *ret = ofs;
-                buffer[ofs] = 0;
-                return 0;
-            }
-        }
-        // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
-        u_long err;
-        char buf[256];
-        while ((err = ERR_get_error()) != 0) {
-            ERR_error_string_n(err, buf, sizeof(buf));
-            error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
-        }
-        return 1;
+    bytes_read = (int)fread(buffer, 1, size, fp);
+    if(unlikely(bytes_read <= 0)) {
+        internal_error(true, "%s(): fread() failed with return value %d", __FUNCTION__, bytes_read);
+        bytes_read = -2;
     }
+    else
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
+
+    return bytes_read;
+}
+
+static bool receiver_read_uncompressed(struct receiver_state *r, FILE *fp) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(r->read_buffer[r->read_len] != '\0')
+        fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
 #endif
-    if (buffer != r->read_buffer + r->read_len) {
-        // read to external buffer
-        *ret = fread(buffer, 1, size, fp);
-        if (!*ret)
-            return 1;
-    } else {
-        if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
-            return 1;
-        *ret = strlen(r->read_buffer);
-    }
-    return 0;
+
+    int bytes_read = read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
+    if(unlikely(bytes_read <= 0))
+        return false;
+
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
+
+    r->read_len += bytes_read;
+    r->read_buffer[r->read_len] = '\0';
+
+    return true;
 }
 
-/*
- * Get the next line of data for parsing.
- * Return data from the decompressor buffer if available.
- * Otherwise read next line from the socket and check for compression header.
- * Return the line was read If no compression header was found.
- * Otherwise read the entire block of compressed data, decompress it
- * and return it in receiver_state buffer.
- * Return zero on success.
- */
-static int receiver_read(struct receiver_state *r, FILE *fp) {
-    // check any decompressed data  present
+#ifdef ENABLE_COMPRESSION
+static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(r->read_buffer[r->read_len] != '\0')
+        fatal("%s: read_buffer does not start with zero #2", __FUNCTION__ );
+#endif
+
+    // first use any available uncompressed data
     if (r->decompressor && r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
-        size_t available = sizeof(r->read_buffer) - r->read_len;
+        size_t available = sizeof(r->read_buffer) - r->read_len - 1;
         if (available) {
             size_t len = r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, available);
             if (!len) {
-                internal_error(true, "decompressor returned zero length");
-                return 1;
+                internal_error(true, "decompressor returned zero length #1");
+                return false;
             }
 
-            r->read_len += len;
+            r->read_len += (int)len;
+            r->read_buffer[r->read_len] = '\0';
         }
-        return 0;
+        else
+            internal_error(true, "The line to read is too big! Already have %d bytes in read_buffer.", r->read_len);
+
+        return true;
     }
 
-    int ret = 0;
-    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret)) {
-        internal_error(true, "read_stream() failed (1).");
-        return 1;
+    // no decompressed data available
+    // read the compression signature of the next block
+
+    if(unlikely(r->read_len + r->decompressor->signature_size > sizeof(r->read_buffer) - 1)) {
+        internal_error(true, "The last incomplete line does not leave enough room for the next compression header! Already have %d bytes in read_buffer.", r->read_len);
+        return false;
     }
 
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
-
-    if (!is_compressed_data(r->read_buffer, ret)) {
-        r->read_len += ret;
-        return 0;
-    }
-
-    if (unlikely(!r->decompressor)) 
-        r->decompressor = create_decompressor();
-    
-    size_t bytes_to_read = r->decompressor->start(r->decompressor, r->read_buffer, ret);
-
-    // Read the entire block of compressed data because
-    // we're unable to decompress incomplete block
-    char compressed[bytes_to_read];
+    // read the compression signature from the stream
+    // we have to do a loop here, because read_stream() may return less than the data we need
+    int bytes_read = 0;
     do {
-        if (read_stream(r, fp, compressed, bytes_to_read, &ret)) {
-            internal_error(true, "read_stream() failed (2).");
-            return 1;
+        int ret = read_stream(r, fp, r->read_buffer + r->read_len + bytes_read, r->decompressor->signature_size - bytes_read);
+        if (unlikely(ret <= 0))
+            return false;
+
+        bytes_read += ret;
+    } while(unlikely(bytes_read < (int)r->decompressor->signature_size));
+
+    if(unlikely(bytes_read != (int)r->decompressor->signature_size))
+        fatal("read %d bytes, but expected compression signature of size %zu", bytes_read, r->decompressor->signature_size);
+
+    size_t compressed_message_size = r->decompressor->start(r->decompressor, r->read_buffer + r->read_len, bytes_read);
+    if (unlikely(!compressed_message_size)) {
+        internal_error(true, "multiplexed uncompressed data in compressed stream!");
+        r->read_len += bytes_read;
+        r->read_buffer[r->read_len] = '\0';
+        return true;
+    }
+
+    if(unlikely(compressed_message_size > COMPRESSION_MAX_MSG_SIZE)) {
+        error("received a compressed message of %zu bytes, which is bigger than the max compressed message size supported of %zu. Ignoring message.",
+              compressed_message_size, (size_t)COMPRESSION_MAX_MSG_SIZE);
+        return false;
+    }
+
+    // delete compression header from our read buffer
+    r->read_buffer[r->read_len] = '\0';
+
+    // Read the entire compressed block of compressed data
+    char compressed[compressed_message_size];
+    size_t compressed_bytes_read = 0;
+    do {
+        size_t start = compressed_bytes_read;
+        size_t remaining = compressed_message_size - start;
+
+        int last_read_bytes = read_stream(r, fp, &compressed[start], remaining);
+        if (unlikely(last_read_bytes <= 0)) {
+            internal_error(true, "read_stream() failed #2, with code %d", last_read_bytes);
+            return false;
         }
 
-        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, ret);
+        compressed_bytes_read += last_read_bytes;
 
-        // Send input data to decompressor
-        if (ret)
-            r->decompressor->put(r->decompressor, compressed, ret);
+    } while(unlikely(compressed_message_size > compressed_bytes_read));
 
-        bytes_to_read -= ret;
-    } while (bytes_to_read > 0);
-
-    // Decompress
-    size_t bytes_to_parse = r->decompressor->decompress(r->decompressor);
+    // decompress the compressed block
+    size_t bytes_to_parse = r->decompressor->decompress(r->decompressor, compressed, compressed_bytes_read);
     if (!bytes_to_parse) {
         internal_error(true, "no bytes to parse.");
-        return 1;
+        return false;
     }
 
-    // Fill read buffer with decompressed data
-    r->read_len = r->decompressor->get(r->decompressor, r->read_buffer, sizeof(r->read_buffer));
-    return 0;
-}
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
 
-#endif
+    // fill read buffer with decompressed data
+    size_t len = (int)r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
+    if (!len) {
+        internal_error(true, "decompressor returned zero length #2");
+        return false;
+    }
+    r->read_len += (int)len;
+    r->read_buffer[r->read_len] = '\0';
+
+    return true;
+}
+#else // !ENABLE_COMPRESSION
+static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
+    return receiver_read_uncompressed(r, fp);
+}
+#endif // ENABLE_COMPRESSION
 
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
@@ -302,7 +291,10 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
     char *de = &buffer[buffer_length - 2];
 
     if(ss >= se) {
+        *ds = '\0';
+        *pos = 0;
         r->read_len = 0;
+        r->read_buffer[r->read_len] = '\0';
         return NULL;
     }
 
@@ -333,6 +325,9 @@ static char *receiver_next_line(struct receiver_state *r, char *buffer, size_t b
     // move everything to the beginning
     memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
     r->read_len -= (int)start;
+    r->read_buffer[r->read_len] = '\0';
+    *ds = '\0';
+    *pos = 0;
     return NULL;
 }
 
@@ -365,36 +360,56 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, F
 
     user.parser = parser;
 
+    bool compressed_connection = false;
 #ifdef ENABLE_COMPRESSION
-    if (rpt->decompressor)
-        rpt->decompressor->reset(rpt->decompressor);
+    if(stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
+        compressed_connection = true;
+
+        if (!rpt->decompressor)
+            rpt->decompressor = create_decompressor();
+        else
+            rpt->decompressor->reset(rpt->decompressor);
+    }
 #endif
 
-    char buffer[PLUGINSD_LINE_MAX + 2];
-    do {
-        if(receiver_read(rpt, fp_in)) break;
+    rpt->read_buffer[0] = '\0';
+    rpt->read_len = 0;
 
-        size_t pos = 0;
-        while(receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &pos)) {
-            if(unlikely(netdata_exit)) {
-                internal_error(true, "exiting...");
-                goto done;
-            }
-            if(unlikely(rpt->shutdown)) {
-                internal_error(true, "parser shutdown...");
-                goto done;
-            }
-            if (unlikely(parser_action(parser,  buffer))) {
-                internal_error(true, "parser_action() failed...");
-                goto done;
-            }
+    size_t read_buffer_start = 0;
+    char buffer[PLUGINSD_LINE_MAX + 2] = "";
+    while(!netdata_exit) {
+        if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
+            bool have_new_data;
+            if(compressed_connection)
+                have_new_data = receiver_read_compressed(rpt, fp_in);
+            else
+                have_new_data = receiver_read_uncompressed(rpt, fp_in);
+
+            if(!have_new_data)
+                break;
+
+            rpt->last_msg_t = now_realtime_sec();
+            continue;
         }
 
-        rpt->last_msg_t = now_realtime_sec();
+        if(unlikely(netdata_exit)) {
+            internal_error(true, "exiting...");
+            goto done;
+        }
+        if(unlikely(rpt->shutdown)) {
+            internal_error(true, "parser shutdown...");
+            goto done;
+        }
+
+        if (unlikely(parser_action(parser,  buffer))) {
+            internal_error(true, "parser_action() failed on keyword '%s'.", buffer);
+            break;
+        }
     }
-    while(!netdata_exit);
 
 done:
+    internal_error(true, "Streaming receiver thread stopping...");
+
     result = user.count;
 
     // free parser with the pop function
@@ -724,8 +739,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_set_is_parent_label(++localhost->senders_count);
 
-    rrdcontext_host_child_connected(rpt->host);
+    if(stream_has_capability(rpt->host->receiver, STREAM_CAP_REPLICATION)) {
+        RRDSET *st;
+        rrdset_foreach_read(st, rpt->host) {
+            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        }
+        rrdset_foreach_done(st);
+    }
 
+    rrdcontext_host_child_connected(rpt->host);
 
     rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
@@ -745,6 +767,15 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).",
           rpt->hostname, rpt->client_ip, rpt->client_port, count);
+
+    if(stream_has_capability(rpt->host->receiver, STREAM_CAP_REPLICATION)) {
+        RRDSET *st;
+        rrdset_foreach_read(st, rpt->host) {
+            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        }
+        rrdset_foreach_done(st);
+    }
 
     rrdcontext_host_child_disconnected(rpt->host);
 
@@ -792,6 +823,7 @@ void *rrdpush_receiver_thread(void *ptr) {
 
     worker_register("STREAMRCV");
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ, "received bytes", "bytes/s", WORKER_METRIC_INCREMENTAL);
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, "uncompressed bytes", "bytes/s", WORKER_METRIC_INCREMENTAL);
     rrdpush_receive(rpt);
     worker_unregister();
 

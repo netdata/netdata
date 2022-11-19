@@ -344,7 +344,7 @@ void arrayalloc_freez(ARAL *ar, void *ptr) {
 #endif
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_ARRAYALLOC_INTERNAL_CHECKS
     {
         // find the page ptr belongs
         ARAL_PAGE *page2 = find_page_with_allocation_internal_check(ar, ptr);

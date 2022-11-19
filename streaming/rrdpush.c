@@ -940,7 +940,8 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_CLABELS) buffer_strcat(wb, "CLABELS ");
     if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
-    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION");
+    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
+    if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

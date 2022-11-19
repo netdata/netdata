@@ -13,6 +13,7 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         RRDDIM *rd;
         struct storage_engine_query_handle handle;
         STORAGE_POINT sp;
+        bool enabled;
     } data[dimensions];
 
     memset(data, 0, sizeof(data));
@@ -33,27 +34,35 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
             if (rd_dfe.counter >= dimensions)
                 break;
 
-            data[rd_dfe.counter].dict = rd_dfe.dict;
-            data[rd_dfe.counter].rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
-            data[rd_dfe.counter].rd = rd;
+            if(rd->exposed) {
+                data[rd_dfe.counter].dict = rd_dfe.dict;
+                data[rd_dfe.counter].rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
+                data[rd_dfe.counter].rd = rd;
 
-            ops->init(rd->tiers[0]->db_metric_handle, &data[rd_dfe.counter].handle, after, before);
+                ops->init(rd->tiers[0]->db_metric_handle, &data[rd_dfe.counter].handle, after, before);
+
+                data[rd_dfe.counter].enabled = true;
+            }
+            else
+                data[rd_dfe.counter].enabled = false;
         }
         rrddim_foreach_done(rd);
     }
 
-    time_t now = after, actual_after = 0, actual_before = 0;
+    time_t now = after + 1, actual_after = 0, actual_before = 0; (void)actual_before;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
+            if(!data[i].enabled) continue;
+
             // fetch the first valid point for the dimension
             int max_skip = 100;
             while(data[i].sp.end_time < now && !ops->is_finished(&data[i].handle) && max_skip-- > 0)
                 data[i].sp = ops->next_metric(&data[i].handle);
 
-            if(max_skip <= 0)
-                error("REPLAY: host '%s', chart '%s', dimension '%s': db does not advance the query beyond time %llu",
-                      rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(data[i].rd), (unsigned long long)now);
+            internal_error(max_skip <= 0,
+                           "REPLAY: host '%s', chart '%s', dimension '%s': db does not advance the query beyond time %llu",
+                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(data[i].rd), (unsigned long long) now);
 
             if(data[i].sp.end_time < now)
                 continue;
@@ -66,6 +75,17 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
                 min_start_time = MIN(min_start_time, data[i].sp.start_time);
                 min_end_time = MIN(min_end_time, data[i].sp.end_time);
             }
+        }
+
+        time_t wall_clock_time = now_realtime_sec();
+        if(min_start_time > wall_clock_time + 1 || min_end_time > wall_clock_time + 1) {
+            internal_error(true,
+                           "REPLAY: host '%s', chart '%s': db provided future start time %llu or end time %llu (now is %llu)",
+                            rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           (unsigned long long)min_start_time,
+                           (unsigned long long)min_end_time,
+                           (unsigned long long)wall_clock_time);
+            break;
         }
 
         if(min_end_time < now) {
@@ -85,14 +105,18 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         else
             actual_before = min_end_time;
 
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu\n"
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n"
                        , (unsigned long long)min_start_time
-                       , (unsigned long long)min_end_time);
+                       , (unsigned long long)min_end_time
+                       , (unsigned long long)wall_clock_time
+                       );
 
         // output the replay values for this time
         for (size_t i = 0; i < dimensions && data[i].rd; i++) {
+            if(!data[i].enabled) continue;
+
             if(data[i].sp.start_time <= min_end_time && data[i].sp.end_time >= min_end_time)
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT_AUTO " \"%s\"\n",
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                rrddim_id(data[i].rd), data[i].sp.sum, data[i].sp.flags & SN_FLAG_RESET ? "R" : "");
             else
                 buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" NAN \"E\"\n",
@@ -123,6 +147,8 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
     // release all the dictionary items acquired
     // finalize the queries
     for(size_t i = 0; i < dimensions && data[i].rda ;i++) {
+        if(!data[i].enabled) continue;
+
         ops->finalize(&data[i].handle);
         dictionary_acquired_item_release(data[i].dict, data[i].rda);
     }
@@ -133,7 +159,9 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
 static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT_AUTO " " NETDATA_DOUBLE_FORMAT_AUTO "\n",
+        if(!rd->exposed) continue;
+
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
                        rrddim_id(rd),
                        (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
                        rd->last_collected_value,
@@ -252,6 +280,18 @@ static bool send_replay_chart_cmd(send_command callback, void *callback_data, RR
     }
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(
+            st->replay.after != 0 || st->replay.before != 0,
+            "REPLAY: host '%s', chart '%s': sending replication request, while there is another inflight",
+            rrdhost_hostname(st->rrdhost), rrdset_id(st)
+            );
+
+    st->replay.start_streaming = start_streaming;
+    st->replay.after = after;
+    st->replay.before = before;
+#endif
+
     debug(D_REPLICATION, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
           rrdset_id(st), start_streaming ? "true" : "false", (unsigned long long)after, (unsigned long long)before);
 
@@ -277,7 +317,7 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     // if replication is disabled, send an empty replication request
     // asking no data
-    if (!host->rrdpush_enable_replication) {
+    if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION))) {
         internal_error(true,
                        "REPLAY: host '%s', chart '%s': sending empty replication request because replication is disabled",
                        rrdhost_hostname(host), rrdset_id(st));

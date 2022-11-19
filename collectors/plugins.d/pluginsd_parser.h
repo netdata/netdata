@@ -26,6 +26,10 @@ typedef struct parser_user_object {
 
         usec_t start_time_ut;
         usec_t end_time_ut;
+
+        time_t wall_clock_time;
+
+        bool rset_enabled;
     } replay;
 } PARSER_USER_OBJECT;
 

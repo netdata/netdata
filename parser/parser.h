@@ -7,7 +7,7 @@
 
 #define PARSER_MAX_CALLBACKS 20
 #define PARSER_MAX_RECOVER_KEYWORDS 128
-#define WORKER_PARSER_FIRST_JOB 1
+#define WORKER_PARSER_FIRST_JOB 2
 
 // PARSER return codes
 typedef enum parser_rc {
@@ -56,6 +56,7 @@ typedef struct parser {
     PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
     void    *user;                  // User defined structure to hold extra state between calls
     uint32_t flags;
+    size_t line;
 
     char *(*read_function)(char *buffer, long unsigned int, void *input);
     int (*eof_function)(void *input);

@@ -156,17 +156,20 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
 static void svc_rrdset_check_obsoletion(RRDHOST *host) {
     worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
 
+    time_t now = now_realtime_sec();
     time_t last_entry_t;
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
+            continue;
+
         last_entry_t = rrdset_last_entry_t(st);
 
-        if(last_entry_t && last_entry_t < host->senders_connect_time && host->senders_connect_time
-         + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
-             < now_realtime_sec())
+        if(last_entry_t && last_entry_t < host->senders_connect_time &&
+             host->senders_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
+             < now)
 
             rrdset_is_obsolete(st);
-
     }
     rrdset_foreach_done(st);
 }
