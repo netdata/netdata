@@ -1056,7 +1056,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
-            bytes = netdata_ssl_write(w->ssl.conn,buf, len) ;
+            bytes = netdata_ssl_write(w->ssl.conn, buf, len) ;
         } else {
             bytes = send(w->ofd,buf, len , flags);
         }

@@ -1203,6 +1203,15 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
 
+    if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled && st->rrdhost->receiver) {
+        time_t now = now_realtime_sec();
+        time_t started = st->rrdhost->receiver->replication_first_time_t;
+        time_t current = ((PARSER_USER_OBJECT *) user)->replay.end_time;
+
+        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+                          (NETDATA_DOUBLE)(current - started) * 100.0 / (NETDATA_DOUBLE)(now - started));
+    }
+
     ((PARSER_USER_OBJECT *) user)->replay.start_time = 0;
     ((PARSER_USER_OBJECT *) user)->replay.end_time = 0;
     ((PARSER_USER_OBJECT *) user)->replay.start_time_ut = 0;
@@ -1226,6 +1235,9 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
         rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+
+        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, 100.0);
+
         return PARSER_RC_OK;
     }
 

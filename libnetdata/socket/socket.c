@@ -940,7 +940,7 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
     return bytes;
 }
 
-ssize_t netdata_ssl_write(SSL *ssl, void *buf, size_t num) {
+ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num) {
     error_limit_static_thread_var(erl, 1, 0);
 
     int bytes, err, retries = 0;

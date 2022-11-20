@@ -262,6 +262,9 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
 
 static bool send_replay_chart_cmd(send_command callback, void *callback_data, RRDSET *st, bool start_streaming, time_t after, time_t before) {
 
+    if(st->rrdhost->receiver && (!st->rrdhost->receiver->replication_first_time_t || after < st->rrdhost->receiver->replication_first_time_t))
+        st->rrdhost->receiver->replication_first_time_t = after;
+
 #ifdef NETDATA_INTERNAL_CHECKS
     if(after && before) {
         char after_buf[LOG_DATE_LENGTH + 1], before_buf[LOG_DATE_LENGTH + 1];

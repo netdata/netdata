@@ -3,8 +3,12 @@
 #include "rrdpush.h"
 #include "parser/parser.h"
 
+// IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
 #define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED (WORKER_PARSER_FIRST_JOB - 2)
+
+// this has to be the same at parser.h
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
 #if WORKER_PARSER_FIRST_JOB < 1
 #error The define WORKER_PARSER_FIRST_JOB needs to be at least 1
@@ -801,6 +805,7 @@ void *rrdpush_receiver_thread(void *ptr) {
     worker_register("STREAMRCV");
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ, "received bytes", "bytes/s", WORKER_METRIC_INCREMENT);
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, "uncompressed bytes", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
     rrdpush_receive(rpt);
     worker_unregister();
 

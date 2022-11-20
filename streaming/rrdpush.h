@@ -203,6 +203,8 @@ struct receiver_state {
     unsigned int rrdpush_compression;
     struct decompressor_state *decompressor;
 #endif
+
+    time_t replication_first_time_t;
 };
 
 struct rrdpush_destinations {
