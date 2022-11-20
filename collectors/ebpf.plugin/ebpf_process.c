@@ -1162,34 +1162,6 @@ static void set_local_pointers()
  *****************************************************************/
 
 /**
- *
- */
-static void wait_for_all_threads_die()
-{
-    ebpf_modules[EBPF_MODULE_PROCESS_IDX].enabled = 0;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    int max = 10;
-    int i;
-    for (i = 0; i < max; i++) {
-        heartbeat_next(&hb, 200000);
-
-        size_t j, counter = 0, compare = 0;
-        for (j = 0; ebpf_modules[j].thread_name; j++) {
-            if (!ebpf_modules[j].enabled)
-                counter++;
-
-            compare++;
-        }
-
-        if (counter == compare)
-            break;
-    }
-}
-
-/**
  * Enable tracepoints
  *
  * Enable necessary tracepoints for thread.
@@ -1285,7 +1257,6 @@ endprocess:
     if (!em->enabled)
         ebpf_update_disabled_plugin_stats(em);
 
-    wait_for_all_threads_die();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
