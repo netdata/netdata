@@ -268,6 +268,8 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_sender_thread_reset_all_charts(host);
     rrdpush_sender_thread_send_custom_host_variables(host);
     replication_flush_sender(host->sender);
+
+    __atomic_store_n(&host->sender->receiving_metrics, 0, __ATOMIC_SEQ_CST);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
@@ -1189,7 +1191,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // If the TCP window never opened then something is wrong, restart connection
         if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout &&
-            __atomic_load_n(&s->replication_pending_requests, __ATOMIC_SEQ_CST) == 0)) {
+            __atomic_load_n(&s->replication_pending_requests, __ATOMIC_SEQ_CST) == 0) &&
+            __atomic_load_n(&s->receiving_metrics, __ATOMIC_SEQ_CST) != 0) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
             error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", rrdhost_hostname(s->host), s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
             rrdpush_sender_thread_close_socket(s->host);

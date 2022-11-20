@@ -766,6 +766,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         netdata_thread_enable_cancelability();
 
         if(start_streaming && last_sender_flush == __atomic_load_n(&r->sender->last_flush_time_ut, __ATOMIC_SEQ_CST)) {
+            __atomic_fetch_add(&r->sender->receiving_metrics, 1, __ATOMIC_SEQ_CST);
+
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
 

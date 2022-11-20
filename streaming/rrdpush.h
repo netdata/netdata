@@ -168,6 +168,7 @@ struct sender_state {
     time_t replication_min_time;
 
     usec_t last_flush_time_ut;
+    size_t receiving_metrics;
 };
 
 struct receiver_state {
