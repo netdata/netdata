@@ -54,9 +54,6 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-
-static enum ebpf_threads_status ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
-
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
 
@@ -679,14 +676,13 @@ static void ebpf_process_disable_tracepoints()
 static void ebpf_process_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_process_exited = NETDATA_THREAD_EBPF_STOPPING;
 
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
 
     ebpf_process_disable_tracepoints();
 
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
 }
 
 /*****************************************************************
