@@ -628,7 +628,7 @@ static void replication_request_react_callback(const DICTIONARY_ITEM *item, void
 
 static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *sender_state) {
     struct sender_state *s = sender_state; (void)s;
-    struct replication_request *r = old_value;
+    struct replication_request *r = old_value; (void)r;
     struct replication_request *r_new = new_value;
 
     internal_error(

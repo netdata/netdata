@@ -84,7 +84,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid)))) {
         uuid_generate(rd->metric_uuid);
-        bool found_in_sql = false;
+        bool found_in_sql = false; (void)found_in_sql;
 
 //        bool found_in_sql = true;
 //        if(unlikely(sql_find_dimension_uuid(st, rd, &rd->metric_uuid))) {
