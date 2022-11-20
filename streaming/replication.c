@@ -618,31 +618,33 @@ static void replication_request_react_callback(const DICTIONARY_ITEM *item, void
     // related to it.
 
     replication_sort_entry_add(r->sender, r->chart_id, r->after, item);
+    __atomic_fetch_add(&r->sender->replication_pending_requests, 1, __ATOMIC_SEQ_CST);
 }
 
 static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *sender_state) {
     struct sender_state *s = sender_state; (void)s;
-    struct replication_request *rr = old_value;
-    struct replication_request *rr_new = new_value;
+    struct replication_request *r = old_value;
+    struct replication_request *r_new = new_value;
 
     internal_error(
             true,
             "STREAM %s [send to %s]: ignoring duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
             rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
-            (unsigned long long)rr->after, (unsigned long long)rr->before, rr->start_streaming?"true":"false",
-            (unsigned long long)rr_new->after, (unsigned long long)rr_new->before, rr_new->start_streaming?"true":"false");
+            (unsigned long long)r->after, (unsigned long long)r->before, r->start_streaming ? "true" : "false",
+            (unsigned long long)r_new->after, (unsigned long long)r_new->before, r_new->start_streaming ? "true" : "false");
 
-    string_freez(rr_new->chart_id);
+    string_freez(r_new->chart_id);
 
     return false;
 }
 
 static void replication_request_delete_callback(const DICTIONARY_ITEM *item, void *value, void *sender_state __maybe_unused) {
-    struct replication_request *rr = value;
+    struct replication_request *r = value;
 
-    replication_sort_entry_del(rr->sender, rr->chart_id, rr->after, item);
+    replication_sort_entry_del(r->sender, r->chart_id, r->after, item);
 
-    string_freez(rr->chart_id);
+    string_freez(r->chart_id);
+    __atomic_fetch_sub(&r->sender->replication_pending_requests, 1, __ATOMIC_SEQ_CST);
 }
 
 

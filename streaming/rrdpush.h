@@ -163,6 +163,7 @@ struct sender_state {
 #endif
 
     DICTIONARY *replication_requests;
+    size_t replication_pending_requests;
     time_t replication_first_time;
     time_t replication_min_time;
 

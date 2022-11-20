@@ -1188,7 +1188,8 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // If the TCP window never opened then something is wrong, restart connection
-        if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout)) {
+        if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout &&
+            __atomic_load_n(&s->replication_pending_requests, __ATOMIC_SEQ_CST) == 0)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
             error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", rrdhost_hostname(s->host), s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
             rrdpush_sender_thread_close_socket(s->host);
