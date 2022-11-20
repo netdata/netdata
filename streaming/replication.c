@@ -451,47 +451,27 @@ static struct replication_thread {
         .JudyL_array = NULL,
 };
 
-void replication_judy_recursive_lock(char mode) {
-    static __thread bool i_am_the_locker = false;
-    static __thread int recursions = 0;
+static __thread int replication_recursive_mutex_recursions = 0;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if((i_am_the_locker && recursions < 1) || (!i_am_the_locker && recursions != 0))
-        fatal("REPLICATION: invalid lock status");
-#endif
-
-    if(mode == 'L') {
-        if(i_am_the_locker) {
-            recursions++;
-            return;
-        }
-
+static void replication_recursive_lock() {
+    if(++replication_recursive_mutex_recursions == 1)
         netdata_mutex_lock(&rep.mutex);
-        i_am_the_locker = true;
-        recursions++;
-    }
-    else {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(!i_am_the_locker)
-            fatal("REPLICATION: this thread is not the locker");
-#endif
-
-        recursions--;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if(recursions < 0)
-            fatal("REPLICATION: recursions is %d", recursions);
+    if(replication_recursive_mutex_recursions < 0 || replication_recursive_mutex_recursions > 2)
+        fatal("REPLICATION: recursions is %d", replication_recursive_mutex_recursions);
 #endif
-
-        if(!recursions) {
-            netdata_mutex_unlock(&rep.mutex);
-            i_am_the_locker = false;
-        }
-    }
 }
 
-#define replication_recursive_lock() replication_judy_recursive_lock('L')
-#define replication_recursive_unlock() replication_judy_recursive_lock('U')
+static void replication_recursive_unlock() {
+    if(--replication_recursive_mutex_recursions == 0)
+        netdata_mutex_unlock(&rep.mutex);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(replication_recursive_mutex_recursions < 0 || replication_recursive_mutex_recursions > 2)
+        fatal("REPLICATION: recursions is %d", replication_recursive_mutex_recursions);
+#endif
+}
 
 // ----------------------------------------------------------------------------
 // replication sort entry management
