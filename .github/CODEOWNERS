@@ -21,9 +21,9 @@ exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
 docs/ @DShreve2
-health/ @thiagoftsm @vkalintiris
-health/health.d/ @thiagoftsm
-health/notifications/ @Ferroin @thiagoftsm
+health/ @thiagoftsm @vkalintiris @MrZammler
+health/health.d/ @thiagoftsm @MrZammler
+health/notifications/ @Ferroin @thiagoftsm @MrZammler
 ml/ @andrewm4894 @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin
