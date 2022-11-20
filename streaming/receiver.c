@@ -141,22 +141,19 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
     }
 #endif
 
-    ssize_t bytes_read;
-    do {
-        bytes_read = read(r->fd, buffer, size);
-        if(bytes_read == 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
-            info("STREAM: %s(): timeout on socket, retrying...", __FUNCTION__);
-            sleep_usec(100 * USEC_PER_MS);
-        }
-        else if (bytes_read == 0) {
-            error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
-            bytes_read = -1;
-        }
-        else if (bytes_read < 0) {
-            error("STREAM: %s() failed to read from socket!", __FUNCTION__);
-            bytes_read = -2;
-        }
-    } while(bytes_read == 0);
+    ssize_t bytes_read = read(r->fd, buffer, size);
+    if(bytes_read == 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
+        error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
+        bytes_read = -3;
+    }
+    else if (bytes_read == 0) {
+        error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
+        bytes_read = -1;
+    }
+    else if (bytes_read < 0) {
+        error("STREAM: %s() failed to read from socket!", __FUNCTION__);
+        bytes_read = -2;
+    }
 
 //    do {
 //        bytes_read = (int) fread(buffer, 1, size, fp);

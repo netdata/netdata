@@ -302,7 +302,7 @@ static bool send_replay_chart_cmd(send_command callback, void *callback_data, RR
 
     int ret = callback(buffer, callback_data);
     if (ret < 0) {
-        error("failed to send replay request to child (ret=%d)", ret);
+        error("REPLICATION: failed to send replication request to child (error %d)", ret);
         return false;
     }
 

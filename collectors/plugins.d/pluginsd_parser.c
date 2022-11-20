@@ -5,8 +5,6 @@
 #define LOG_FUNCTIONS false
 
 static int send_to_plugin(const char *txt, void *data) {
-    error_limit_static_global_var(erl, 1, 0);
-
     PARSER *parser = data;
 
     if(!txt || !*txt)
@@ -20,7 +18,7 @@ static int send_to_plugin(const char *txt, void *data) {
             return SSL_write(ssl->conn, txt, (int)size);
         }
 
-        error_limit(&erl, "PLUGINSD: cannot write to SSL connection - connection is not ready.");
+        error("PLUGINSD: cannot send command (SSL)");
         return -1;
     }
 #endif
@@ -28,7 +26,7 @@ static int send_to_plugin(const char *txt, void *data) {
     if(parser->fp_output) {
         int bytes = fprintf(parser->fp_output, "%s", txt);
         if(bytes <= 0) {
-            error_limit(&erl, "PLUGINSD: cannot write to FILE ptr.");
+            error("PLUGINSD: cannot send command (FILE)");
             return -2;
         }
         fflush(parser->fp_output);
@@ -43,7 +41,7 @@ static int send_to_plugin(const char *txt, void *data) {
         do {
             sent = write(parser->fd, txt, strlen(txt));
             if(sent <= 0) {
-                error_limit(&erl, "PLUGINSD: cannot write to file descriptor %d", parser->fd);
+                error("PLUGINSD: cannot send command (fd)");
                 return -3;
             }
             bytes += sent;
@@ -53,8 +51,8 @@ static int send_to_plugin(const char *txt, void *data) {
         return (int)bytes;
     }
 
-    error_limit(&erl, "PLUGINSD: no output socket/pipe/file given.");
-    return -3;
+    error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
+    return -4;
 }
 
 PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
@@ -469,7 +467,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     pf->sent_ut = now_realtime_usec();
 
     if(ret < 0) {
-        error("FUNCTION: failed to send function to plugin, fprintf() returned error %d", ret);
+        error("FUNCTION: failed to send function to plugin, error %d", ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
     }
     else {
