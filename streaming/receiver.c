@@ -202,7 +202,7 @@ static bool receiver_read_compressed(struct receiver_state *r) {
 #endif
 
     // first use any available uncompressed data
-    if (r->decompressor && r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
+    if (r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
         size_t available = sizeof(r->read_buffer) - r->read_len - 1;
         if (available) {
             size_t len = r->decompressor->get(r->decompressor, r->read_buffer + r->read_len, available);
