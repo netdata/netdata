@@ -141,13 +141,34 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
     }
 #endif
 
-    bytes_read = (int)fread(buffer, 1, size, fp);
-    if(unlikely(bytes_read <= 0)) {
-        internal_error(true, "%s(): fread() failed with return value %d", __FUNCTION__, bytes_read);
+    int fd = fileno(fp);
+
+    bytes_read = (int)read(fd, buffer, size);
+    if(bytes_read == 0) {
+        internal_error(true, "%s(): EOF while reading data from socket", __FUNCTION__);
+        bytes_read = -1;
+    }
+    if(bytes_read < 0) {
+        internal_error(true, "%s(): failed to read data from socket", __FUNCTION__);
         bytes_read = -2;
     }
-    else
-        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
+
+//    do {
+//        bytes_read = (int) fread(buffer, 1, size, fp);
+//        if (unlikely(bytes_read <= 0)) {
+//            if(feof(fp)) {
+//                internal_error(true, "%s(): fread() failed with EOF", __FUNCTION__);
+//                bytes_read = -2;
+//            }
+//            else if(ferror(fp)) {
+//                internal_error(true, "%s(): fread() failed with ERROR", __FUNCTION__);
+//                bytes_read = -3;
+//            }
+//            else bytes_read = 0;
+//        }
+//        else
+//            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
+//    } while(bytes_read == 0);
 
     return bytes_read;
 }
