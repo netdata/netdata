@@ -745,13 +745,12 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_is_busy(WORKER_JOB_ITERATION);
 
         // this call also updates our statistics
-        replication_recursive_lock();
         struct replication_request r = replication_request_get_first_available();
+
         if(r.found) {
             // delete the request from the dictionary
             dictionary_del(r.sender->replication_requests, string2str(r.chart_id));
         }
-        replication_recursive_unlock();
 
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)rep.requests_count);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
